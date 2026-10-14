@@ -1,468 +1,168 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/otp"
-	"github.com/leodip/goiabada/authserver/internal/otpcredential"
-	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// authOTPDatabase is what the OTP hop needs: the client, the user, and the OTP credential
-// lifecycle this hop verifies against and may establish.
-//
-// It embeds the OTP credential port because verifying a passcode and installing an authenticator
-// both run through otpcredential, which owns the step claim as well as the write (#387).
-// ClientHasLogo is authflow.GetClientDisplayInfo's read, for the screen's client block.
-type authOTPDatabase interface {
-	otpcredential.Database
-
-	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-}
-
+// HandleAuthOtpGet is GET /auth/otp, which accepts level2_otp and renders the form
+// authflow.OTPPrompt prepared: the code form for a user with an authenticator, the enrolment form,
+// with its QR code and secret, for one without.
 func HandleAuthOtpGet(
 	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	database authOTPDatabase,
-	otpSecretGenerator OtpSecretGenerator,
+	prompt *authflow.OTPPrompt,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		authContext, ok := boundary.loadAuthContext(w, r)
+		settings, authContext, ok := boundary.beginStep(w, r, ceremony.AuthStateLevel2OTP)
 		if !ok {
 			return
 		}
 
-		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateLevel2OTP) {
-			return
-		}
-
-		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
+		result, err := prompt.Run(r.Context(), newBrowserSession(w, r, ceremonyStore), authContext, settings.AppName)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		if user == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
+		if result.SaveErr != nil {
+			boundary.answerStepSaveFailure(w, r, result.SaveErr)
 			return
 		}
 
-		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
-		if err != nil {
+		bind := otpFormBind(authContext, result.Display, nil)
+		template := "/auth_otp.html"
+		if result.Form == authflow.OTPEnrolmentForm {
+			template = "/auth_otp_enrollment.html"
+			bind["base64Image"] = result.QRCodeImage
+			bind["secretKey"] = result.EnrolmentSecret
+		}
+
+		if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", template, bind); err != nil {
 			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
-			return
-		}
-
-		displayInfo := authflow.GetClientDisplayInfo(r.Context(), database, client)
-
-		if user.OTPEnabled {
-
-			// An enrolment key this ceremony generated before the user enrolled somewhere
-			// else is dead now, and HandleAuthOtpPost picks the template for its error
-			// rerender by whether one is present, so leaving it here would redraw the
-			// enrolment page for a user who is already enrolled. Same clearing this arm did
-			// when the seed and its image lived in two slots on the browser session (#242).
-			authContext.OTPKeyURL = ""
-
-			err = ceremonyStore.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				boundary.answerStepSaveFailure(w, r, err)
-				return
-			}
-
-			bind := map[string]interface{}{
-				"error": nil,
-				// The rendered form says which ceremony rendered it, and HandleAuthOtpPost refuses
-				// a submission naming any other one. A code entered here after a second
-				// /auth/authorize replaced the auth context would otherwise complete that other
-				// request's level 2 (#79).
-				"ceremonyId":              authContext.CeremonyId,
-				"layoutShowClientSection": displayInfo.ShowSection,
-				"layoutClientName":        displayInfo.ClientName,
-				"layoutHasClientLogo":     displayInfo.HasLogo,
-				"layoutClientLogoUrl":     displayInfo.LogoURL,
-				"layoutClientDescription": displayInfo.Description,
-				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-			}
-
-			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp.html", bind)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-		} else {
-			// must enroll first
-
-			// Generate only when this ceremony has no usable key yet, so a reload of
-			// /auth/otp renders the secret and QR code the user has already scanned.
-			// Generating on every GET is the defect: it replaced the seed behind a scanned
-			// QR code, so every code from it was then checked against a secret the user was
-			// never shown (#242 part 3).
-			//
-			// A stored URL that will not parse counts as none, which is the failure the one
-			// field brings with it. This handler is the only writer of it, so an unusable
-			// value can only be a defect or a context shape this binary does not understand;
-			// generating shows the user a fresh QR code to scan, where refusing would wedge
-			// the ceremony on a 500 that every reload repeats (#247).
-			secretKey, err := otp.SecretFromKeyURL(authContext.OTPKeyURL)
-			if err != nil {
-				settings, ok := reqctx.SettingsFrom(r.Context())
-				if !ok {
-					pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-					return
-				}
-				keyURL, genErr := otpSecretGenerator.GenerateKeyURL(user.Email, settings.AppName)
-				if genErr != nil {
-					pageRenderer.InternalServerError(w, r, genErr)
-					return
-				}
-				authContext.OTPKeyURL = keyURL
-
-				secretKey, err = otp.SecretFromKeyURL(keyURL)
-				if err != nil {
-					pageRenderer.InternalServerError(w, r, err)
-					return
-				}
-			}
-
-			// Drawn from the URL on every render rather than carried beside it, so the
-			// ceremony holds one value and the image cannot come to disagree with the secret
-			// the code is checked against (#247).
-			base64Image, err := otp.RenderQRCodeImage(authContext.OTPKeyURL)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-
-			err = ceremonyStore.SaveAuthContext(w, r, authContext)
-			if err != nil {
-				boundary.answerStepSaveFailure(w, r, err)
-				return
-			}
-
-			bind := map[string]interface{}{
-				"error":                   nil,
-				"ceremonyId":              authContext.CeremonyId,
-				"base64Image":             base64Image,
-				"secretKey":               secretKey,
-				"layoutShowClientSection": displayInfo.ShowSection,
-				"layoutClientName":        displayInfo.ClientName,
-				"layoutHasClientLogo":     displayInfo.HasLogo,
-				"layoutClientLogoUrl":     displayInfo.LogoURL,
-				"layoutClientDescription": displayInfo.Description,
-				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-			}
-
-			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_otp_enrollment.html", bind)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
 		}
 	}
 }
 
+// HandleAuthOtpPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
+// submitted body and runs authflow.OTPSubmission on it, then answers what it did: the form again
+// beside a refusal, the lost-enrolment page, or the redirect to /auth/completed.
+//
+// The boundary refuses a submission naming another ceremony before the state gate and before the
+// code is looked at, so an OTP form left open in another tab gets the "no longer active" page and
+// spends no step of a code the current ceremony still needs (#79, #111 decision 3).
 func HandleAuthOtpPost(
 	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	database authOTPDatabase,
-	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
-	dataCipher *encryption.DataCipher,
+	submission *authflow.OTPSubmission,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		// The boundary refuses a submission naming another ceremony before the state gate, so an OTP
-		// prompt left open in another tab gets the "no longer active" page, and before the code is
-		// looked at: neither MatchStep nor TryConsumeUserOTPStep is reached, so a stale submission
-		// cannot burn a step of a passcode the ceremony the user is actually on still needs (#79,
-		// #111 decision 3).
-		authContext, ok := boundary.loadAuthContext(w, r)
+		_, authContext, ok := boundary.beginStep(w, r, ceremony.AuthStateLevel2OTP)
 		if !ok {
 			return
 		}
 
-		if !boundary.requireAuthState(w, r, authContext, ceremony.AuthStateLevel2OTP) {
-			return
-		}
+		// The body alone: a code in the request target reaches the browser's history, the Referer
+		// and every proxy's access log (#202).
+		code := r.PostFormValue("otp")
 
-		// The enrolment key comes off the ceremony rather than out of a slot shared by the
-		// whole browser, so a submission can only ever be checked against the secret the
-		// same ceremony rendered. Empty for a user who is already enrolled, which is what
-		// sends the error rerender below to the verification template (#242 decision 4).
-		//
-		// The secret is derived here because every enrolling path needs it; the QR code is
-		// not, because only the error rerender does, and encoding a PNG on every submission
-		// to discard it is work the ceremony no longer has to do (#247).
-		keyURL := authContext.OTPKeyURL
-		var secretKey string
-		if keyURL != "" {
-			var err error
-			secretKey, err = otp.SecretFromKeyURL(keyURL)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-				return
-			}
-		}
-
-		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		if user == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("user not found"))
-			return
-		}
-
-		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
-			return
-		}
-
-		displayInfo := authflow.GetClientDisplayInfo(r.Context(), database, client)
-
-		renderError := func(message string) {
-			bind := map[string]interface{}{
-				"error": message,
-				// In the shared part of the map rather than in the enrollment-only half below,
-				// because both templates carry the hidden input. Without it a single mistyped
-				// code would end the ceremony: the retry would name no ceremony and be refused.
-				"ceremonyId":              authContext.CeremonyId,
-				"layoutShowClientSection": displayInfo.ShowSection,
-				"layoutClientName":        displayInfo.ClientName,
-				"layoutHasClientLogo":     displayInfo.HasLogo,
-				"layoutClientLogoUrl":     displayInfo.LogoURL,
-				"layoutClientDescription": displayInfo.Description,
-				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-			}
-
-			template := "/auth_otp.html"
-			if keyURL != "" {
-				base64Image, imgErr := otp.RenderQRCodeImage(keyURL)
-				if imgErr != nil {
-					pageRenderer.InternalServerError(w, r, imgErr)
-					return
-				}
-				template = "/auth_otp_enrollment.html"
-				bind["base64Image"] = base64Image
-				bind["secretKey"] = secretKey
-			}
-
-			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", template, bind)
-			if err != nil {
-				pageRenderer.InternalServerError(w, r, err)
-			}
-		}
-
-		// i18n surface: A — browser-flow form rerender.
-		if !user.Enabled {
-			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"user_id": user.Id,
-			})
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeOtpAccountDisabled, nil).Localize(r.Context()))
-			return
-		}
-
-		// This ceremony rendered an enrolment, and the account has an authenticator now: the user
-		// finished setting one up elsewhere, in another tab or on their account page, since the
-		// form was shown. The seed on this form can never be stored, so the sign-in ends here, as
-		// it does when the change commits between this request's read and its write below. Checked
-		// before the code, which until now was verified against the other authenticator, refused
-		// as incorrect, and answered with this form's QR code again, a loop no code could leave.
-		// Found reviewing the ACR and AMR page against the code before 1.7.0.
-		if keyURL != "" && user.OTPEnabled {
-			endLostEnrolment(boundary, pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
-			return
-		}
-
-		// r.PostFormValue rather than r.FormValue, matching the ceremony id read above so both
-		// reads in this function agree about what a submission is: r.Form merges the URL query
-		// behind the body, so /auth/otp?otp=... would let a passcode arrive in the request
-		// target, where it reaches the browser's history, the Referer of anything the page
-		// loads, and the access log of every proxy in front of the deployment (#202).
-		otpCode := r.PostFormValue("otp")
-		if len(otpCode) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()))
-			return
-		}
-
-		incorrectOtpError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(r.Context())
-
-		// One verification call on both arms, and which one is the difference the two arms have
-		// always had: an enrolled user's passcode is checked against the authenticator stored on
-		// their row, an enrolling one's against the seed this ceremony rendered. The step claim
-		// that makes a passcode single-use rides inside either, bound to the authenticator the
-		// passcode was checked against by the entry point rather than from here (#111 decision 10,
-		// #387, #471 decision 3).
-		var verified otpcredential.VerifyResult
-		if user.OTPEnabled {
-			verified, err = otpcredential.VerifyStored(r.Context(), database, dataCipher, user, otpCode, time.Now().UTC())
-		} else {
-			verified, err = otpcredential.VerifySupplied(r.Context(), database, user, secretKey, otpCode,
-				time.Now().UTC())
-		}
+		result, err := submission.Run(r.Context(),
+			newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures), authContext, code)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
-		// The audit set stays here rather than moving with the verification, because it is what
-		// genuinely differs between this ceremony and the account API: that endpoint raises
-		// nothing on a wrong code and no failure event at all, where a browser authentication
-		// refusal is an event an operator filters by (#387 decision 4).
-		switch verified.Outcome {
-		case otpcredential.OutcomeReplayed:
-			// A replayed step is refused exactly as a wrong code is, so it counts as
-			// one: a code already spent proves nothing about who is submitting it.
-			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
-				"user_id": user.Id,
-				"step":    verified.Step,
-			})
-			auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-				"user_id": user.Id,
-			})
-			renderError(incorrectOtpError)
-			return
-		case otpcredential.OutcomeWrong:
-			// Every wrong code is a guess at three of a million, so this is the
-			// counter the whole OTP budget exists to move (#219).
-			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-				"user_id": user.Id,
-			})
-			renderError(incorrectOtpError)
-			return
+		renderRefusal := func(errorCode string) {
+			renderOTPFormAgain(w, r, pageRenderer, authContext, result,
+				i18n.NewLocalizedError(errorCode, nil).Localize(r.Context()))
 		}
 
-		// The generation of the authenticator the code was checked against, handed to
-		// RecordOTPVerified: the stored one's, which VerifyStored bound its step claim to, or the
-		// one an enrolment below establishes. The code's otp claim stands only while the user
-		// still has that authenticator (#542).
-		verifiedGeneration := user.OtpConfigGeneration
-		enrolled := false
-		if !user.OTPEnabled {
-			// is enrolling to TOTP now. The seed is encrypted at rest, the authenticator written and
-			// the OTP configuration generation's advance committed together, so there is no state in
-			// which the authenticator is on and no session knows (#242 decision 2). The write lands
-			// only while OTP is still off at the generation read above; when it does not, the sign-in
-			// ends rather than claiming a second factor that was never stored (#471 decision 2).
-			generation, established, establishErr := otpcredential.Establish(r.Context(), database, dataCipher, user, secretKey)
-			if establishErr != nil {
-				pageRenderer.InternalServerError(w, r, establishErr)
-				return
-			}
-			if !established {
-				endLostEnrolment(boundary, pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
-				return
-			}
-			verifiedGeneration = generation
-			enrolled = true
-
-			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
-				"user_id": user.Id,
-			})
+		switch result.Answer {
+		case authflow.OTPAccountDisabled:
+			renderRefusal(i18n.ErrCodeOtpAccountDisabled)
+		case authflow.OTPEnrolmentLost:
+			answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
+		case authflow.OTPCodeMissing:
+			renderRefusal(i18n.ErrCodeOtpCodeRequired)
+		case authflow.OTPRefused:
+			renderRefusal(i18n.ErrCodeOtpIncorrectCode)
+		case authflow.OTPAccepted:
+			boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 		}
-
-		// from this point the user is considered authenticated with otp
-
-		auditLogger.Log(r.Context(), audit.EventAuthSuccessOtp, map[string]interface{}{
-			"user_id": user.Id,
-		})
-
-		authContext.RecordOTPVerified(time.Now(), verifiedGeneration, enrolled)
-
-		// Rotate the browser session's identifier here too, for the same reason the
-		// password handler does: a credential has just been verified, and that is a
-		// privilege change wherever it happens.
-		//
-		// The window this closes is smaller than the password one, since a ceremony
-		// reaching level 2 has usually already rotated at level 1, but it is not empty: a
-		// session that arrived at level 1 by single sign-on and is stepping up has not
-		// rotated in this ceremony at all, so until /auth/completed runs the identifier it
-		// carried at level 1 still names the row that is about to become level 2. Rotating
-		// on acceptance means an identifier stolen at level 1 is dead the moment the
-		// authenticator code is accepted rather than one redirect later.
-		//
-		// Before the save, for the ordering argument on authflow.PasswordSubmission.Run:
-		// rotation persists the contents as they are now, so a failure between the two
-		// leaves a fresh identifier on a session that has not been marked
-		// authentication_completed (#266). It is conditional on this ceremony, as the password
-		// handler's is (#579).
-		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); regenerateSessionErr != nil {
-			boundary.answerStepSaveFailure(w, r, regenerateSessionErr)
-			return
-		}
-
-		err = ceremonyStore.SaveAuthContext(w, r, authContext)
-		if err != nil {
-			boundary.answerStepSaveFailure(w, r, err)
-			return
-		}
-		boundary.stepRedirect(w, r, "/auth/completed", authContext)
 	}
 }
 
-// endLostEnrolment ends a sign-in whose enrolment lost its compare-and-set (#471 decision 2, #144).
-// The passcode matched the seed this ceremony rendered, but the account's authenticator was no
-// longer as the request read it: another enrolment, or an enable and a disable, landed in between.
-// Nothing was stored, so the ceremony has no second factor to claim and cannot continue.
-//
-// It ends on a page of its own, at 409 because the request conflicted with the account's current
-// state (RFC 9110 section 15.5.10), in the visitor's language. Not the enrolment form again, whose
-// QR code is for an authenticator that was never stored, and not the "no longer active" page, whose
-// text says another sign-in was started in this browser. The ceremony is cleared first, the order
-// handler_auth_issue's refusals use, because the render commits the response and the clear's
-// Set-Cookie must reach the browser before it (#141); its failure does not change the page, since a
-// replay of the context left behind meets this same refusal or a state gate. Nothing is audited as
-// an enable or a successful second factor, and the passcode's step stays spent, as #111 already
-// accepts for a failed enable.
-func endLostEnrolment(boundary *CeremonyBoundary, pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
-	r *http.Request, userId int64, ceremonyId string) {
+// otpFormBind is the data both OTP forms render with. The form names its ceremony, so the boundary
+// can refuse a submission of a form another /auth/authorize has replaced since (#79).
+func otpFormBind(authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,
+	message interface{}) map[string]interface{} {
 
-	slog.WarnContext(r.Context(), "the account's authenticator changed during the enrolment, so nothing was stored and the sign-in ends",
-		"user_id", userId)
+	return map[string]interface{}{
+		"error":                   message,
+		"ceremonyId":              authContext.CeremonyId,
+		"layoutShowClientSection": displayInfo.ShowSection,
+		"layoutClientName":        displayInfo.ClientName,
+		"layoutHasClientLogo":     displayInfo.HasLogo,
+		"layoutClientLogoUrl":     displayInfo.LogoURL,
+		"layoutClientDescription": displayInfo.Description,
+		"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
+	}
+}
 
-	err := ceremonyStore.ClearAuthContext(w, r, ceremonyId)
-	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
-		// The browser has moved on to another sign-in, which is not the one whose authenticator
-		// changed, so it is answered as every replaced step is (#579 decision 2).
+// renderOTPFormAgain renders the OTP form again beside a refusal: the enrolment form, its QR code
+// drawn from the ceremony's enrolment key, when the ceremony holds one, and the code form otherwise.
+// A refusal leaves the key on the ceremony as it was.
+func renderOTPFormAgain(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
+	authContext *ceremony.AuthContext, result authflow.OTPSubmissionResult, message string) {
+
+	bind := otpFormBind(authContext, result.Display, message)
+	template := "/auth_otp.html"
+	if authContext.OTPKeyURL != "" {
+		image, err := otp.RenderQRCodeImage(authContext.OTPKeyURL)
+		if err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+			return
+		}
+		template = "/auth_otp_enrollment.html"
+		bind["base64Image"] = image
+		bind["secretKey"] = result.EnrolmentSecret
+	}
+
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", template, bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
+	}
+}
+
+// answerLostEnrolment answers authflow.OTPEnrolmentLost, whose ceremony the operation has cleared
+// (#471 decision 2). A clear that found the ceremony replaced is answerCeremonyReplaced's: the
+// browser has moved on to another sign-in, not the one whose authenticator changed (#579). Otherwise
+// the page says the account's two-factor settings changed, at 409, since the request conflicted with
+// the account's current state (RFC 9110 section 15.5.10), in the visitor's language. Not the
+// enrolment form again, whose QR code is for an authenticator that was never stored, and not the "no
+// longer active" page, which says another sign-in started in this browser. A clear that failed
+// otherwise does not change the page: a replay of the context left behind meets the same refusal or
+// a state gate.
+func answerLostEnrolment(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,
+	pageRenderer PageRenderer, clearErr error) {
+
+	if errors.Is(clearErr, ceremony.ErrCeremonyReplaced) {
 		boundary.answerCeremonyReplaced(w, r)
 		return
 	}
-	if err != nil {
+	if clearErr != nil {
 		slog.ErrorContext(r.Context(), "unable to clear the auth context while ending a lost enrolment, rendering the page anyway",
-			"error", err)
+			"error", clearErr)
 	}
 
 	bind := map[string]interface{}{

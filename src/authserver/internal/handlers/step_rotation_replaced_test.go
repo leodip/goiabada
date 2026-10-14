@@ -120,6 +120,7 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{

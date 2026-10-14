@@ -318,7 +318,8 @@ func TestHandleAuthOtpGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 				auditLogger:        handlersmocks.NewAuditLogger(t),
 			})
 
-			req := httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId, nil)
+			req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId, nil),
+				&record.Settings{AppName: "TestApp"})
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 				CeremonyId: testCeremonyId,

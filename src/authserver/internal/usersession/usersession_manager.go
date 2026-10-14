@@ -164,7 +164,7 @@ type Removal struct {
 // fail-closed direction and the only one a nil can safely take (#242).
 //
 // authentication.AuthTime is the instant this ceremony's last credential was accepted, captured by
-// the password handler and overwritten by the OTP handler. It becomes the session's AuthTime
+// authflow.PasswordSubmission and overwritten by authflow.OTPSubmission. It becomes the session's AuthTime
 // and so the auth_time claim, which OIDC Core 3.1.2.1 makes max_age's reference point: "the
 // last time the End-User was actively authenticated by the OP". Reading the clock here
 // instead would name the moment this function ran, and the browser owns the hop between the
@@ -808,7 +808,7 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 // holds what the engine kept of the same instant, so a ceremony's own instant and the row it wrote
 // differ below a microsecond, in either direction when an engine rounds rather than truncates.
 //
-// The instants the password and OTP handlers stamp come from the auth server instance's clock, so
+// The instants authflow.PasswordSubmission and authflow.OTPSubmission stamp come from the auth server instance's clock, so
 // the first comparison assumes the instances of one deployment share a synchronized clock, as NTP
 // keeps them. A host minutes adrift can refuse a genuinely later sign-in, and the user's next
 // sign-in that enters a credential is stamped by the same slow clock, so it can be refused again

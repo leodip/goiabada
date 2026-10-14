@@ -86,6 +86,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -117,6 +118,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -149,6 +151,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		// The stale pair is what this case is about as much as the render is: a ceremony that
@@ -432,6 +435,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		expectedError := errors.New("auth context error")
@@ -469,6 +473,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, ceremony.ErrNoAuthContext)
@@ -505,6 +510,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -601,6 +607,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 				rr := httptest.NewRecorder()
 
 				authContext := &ceremony.AuthContext{
@@ -646,6 +653,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -687,6 +695,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -741,6 +750,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -806,6 +816,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		target := "/auth/otp?" + url.Values{"otp": {otpCode}}.Encode()
 		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -867,6 +878,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -929,6 +941,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -990,6 +1003,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1057,6 +1071,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1152,6 +1167,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -1211,6 +1227,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1347,6 +1364,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1430,6 +1448,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1507,6 +1526,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1606,6 +1626,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		// The seed is on the ceremony rather than on the user row, which is what makes this
@@ -1704,6 +1725,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1772,6 +1794,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1860,6 +1883,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			form.Add("otp", otpCode)
 			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale))
 			rr := httptest.NewRecorder()
 
@@ -1939,6 +1963,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -2052,6 +2077,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		form.Add("otp", code)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		req.RemoteAddr = "203.0.113.7:5000"
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)

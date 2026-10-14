@@ -91,8 +91,8 @@ type AuthContext struct {
 	// CeremonyId and DeferredErrorCode each document for their own fields.
 	OtpConfigGeneration *int64
 	// OTPKeyURL holds the otpauth:// URL of the TOTP key this ceremony's user is enrolling:
-	// written by the /auth/otp render that generated it, read by HandleAuthOtpPost to verify
-	// the code the user types.
+	// written by authflow.OTPPrompt when it generates it, read by authflow.OTPSubmission to
+	// verify the code the user types.
 	//
 	// One field rather than the seed and its rendered QR code, because the URL is the
 	// library's own record of the whole key and both are derived from it, otp.SecretFromKeyURL
@@ -113,7 +113,7 @@ type AuthContext struct {
 	// half of it: a second /auth/authorize mints a new auth context and takes the old key
 	// with it, so there is no shared slot for one ceremony's seed to be read out of by
 	// another and no ceremony id to check it against. ClearAuthContext at /auth/issue removes
-	// it, and HandleAuthOtpPost blanks it once the enrolment has succeeded, so a spent
+	// it, and RecordOTPVerified blanks it once the enrolment has succeeded, so a spent
 	// credential neither travels through the rest of the ceremony nor sits in the cookie of
 	// one abandoned after enrolling (#247).
 	//

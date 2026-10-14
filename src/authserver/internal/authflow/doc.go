@@ -13,6 +13,11 @@
 //     /auth/authorize, or decides whether level 2 is owed (ceremony.StepUpOwed).
 //   - Level2Selection, GET /auth/level2: chooses the level 2 method (DecideLevel2Arm) and captures
 //     the user's OTP configuration generation.
+//   - OTPPrompt, GET /auth/otp: chooses the code form or the enrolment form, and keeps, or mints,
+//     the ceremony's enrolment key; the handler renders the form.
+//   - OTPSubmission, POST /auth/otp: checks the code the handler read from the form, stores the
+//     enrolment key as the user's authenticator when the user is enrolling, and records level 2 on
+//     the ceremony, or ends a sign-in whose enrolment can no longer be stored.
 //   - Completion, GET /auth/completed: decides on the user (decideBeforeBinding), binds the ceremony
 //     to a user session by reusing the browser's or creating one, or restarts it at level 1
 //     (decideCompletion), then sends it to consent or to issuance (DecideAfterBinding).
@@ -57,6 +62,12 @@
 //     password-completed ceremony, and saves nothing when the rotation fails (#266). It charges a
 //     refused guess to the rate limiter, through the adapter, before the audit record, and never a
 //     right password (#219).
+//   - OTPPrompt draws an enrolment key's QR code before it saves the ceremony, so a key that cannot
+//     be drawn is not saved.
+//   - OTPSubmission ends a lost enrolment before it looks at the code, and clears the ceremony
+//     before the handler answers (#471, #141). Like PasswordSubmission it charges a refused or
+//     replayed code before the audit records, and rotates before it saves the ceremony in
+//     authentication_completed, saving nothing when the rotation fails (#219, #266).
 //   - Completion decides on the user before either arm binds, so a refusal or a restart writes no
 //     session (#522).
 //   - Completion's reuse arm asks whether its bind is stale before it rotates the browser session's

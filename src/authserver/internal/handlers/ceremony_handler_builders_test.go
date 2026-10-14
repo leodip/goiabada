@@ -131,7 +131,7 @@ type authOtpGetDeps struct {
 
 func buildAuthOtpGet(d authOtpGetDeps) http.HandlerFunc {
 	return HandleAuthOtpGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		d.pageRenderer, d.ceremonyStore, d.database, d.otpSecretGenerator)
+		d.pageRenderer, d.ceremonyStore, authflow.NewOTPPrompt(d.database, d.otpSecretGenerator))
 }
 
 // authOtpPostDeps.credentialFailures left out records nothing (noCredentialFailures).
@@ -145,8 +145,8 @@ type authOtpPostDeps struct {
 
 func buildAuthOtpPost(d authOtpPostDeps) http.HandlerFunc {
 	return HandleAuthOtpPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
-		d.pageRenderer, d.ceremonyStore, d.database, d.auditLogger, credentialFailuresOrNone(d.credentialFailures),
-		testDataCipher)
+		d.pageRenderer, d.ceremonyStore, credentialFailuresOrNone(d.credentialFailures),
+		authflow.NewOTPSubmission(d.database, d.auditLogger, testDataCipher))
 }
 
 type authCompletedGetDeps struct {
