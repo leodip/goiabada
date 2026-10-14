@@ -62,8 +62,6 @@ test("the access token comes back in the fragment, with its type, lifetime and t
 });
 
 test("an authorization response carrying a token or a code is never cached (section 5.1)", async ({ page, browser, clients, users }) => {
-  // #573 item 2: the redirects carry no Cache-Control or Pragma today. Remove this line once they do.
-  test.fail();
   const user = await users.create();
   const { client, context } = await implicitClientAndSession(page, browser, clients, user);
   const code = (overrides: Record<string, string> = {}) => codeRequest(client.identifier, overrides).params;

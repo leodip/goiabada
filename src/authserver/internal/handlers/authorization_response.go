@@ -210,10 +210,12 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, template
 }
 
 // noStoreAuthorizationResponse writes the Cache-Control/Pragma pair RFC 6749 section 5.1 requires of
-// any response carrying tokens, credentials or other sensitive information. Every authorization
-// response this package writes carries at least an authorization code or an access token, so all
-// three encodings set it. The two redirect writers below set neither before #573, leaving the
-// credential in the Location of a response a cache was free to store and replay.
+// any response carrying tokens, credentials or other sensitive information. A successful
+// authorization response carries an authorization code or an access token; an error carries
+// neither, and is marked all the same, so every authorization response follows one rule whatever
+// its mode and outcome. All three encodings call it: the two redirect writers below, which set
+// neither header before #573 and so left the credential in the Location of a response a cache was
+// free to store and replay, and writeFormPost.
 func noStoreAuthorizationResponse(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
@@ -318,13 +320,12 @@ func writeFormPost(w http.ResponseWriter, templateFS fs.FS, redirectURI string, 
 	// intermediaries) not to store or reuse the content of the response." The page holds the
 	// client's state, and on the success path an authorization code, so a cached or reused copy is a
 	// replayable response sitting in an intermediary. This pair is what the rest of this codebase
-	// writes for a no-store response (#146).
+	// writes for a no-store response (#146), and what the two redirect writers write (#573).
 	//
 	// Set here rather than before Execute deliberately: a render that fails must leave the response
 	// completely untouched, so that the caller's last-resort InternalServerError owns every header
 	// as well as the status (#141).
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Pragma", "no-cache")
+	noStoreAuthorizationResponse(w)
 
 	_, err = w.Write(rendered.Bytes())
 	if err != nil {

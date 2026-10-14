@@ -164,8 +164,6 @@ test("an unknown or wrongly cased grant_type is unsupported_grant_type", async (
 });
 
 test("a missing grant_type is invalid_request", async ({ page, clients, request }) => {
-  // #573 item 1: answered unsupported_grant_type today. Remove this line once it is fixed.
-  test.fail();
   const client = await clientCredentialsClient(page, clients);
 
   // Section 5.2: a request missing a required parameter is invalid_request.

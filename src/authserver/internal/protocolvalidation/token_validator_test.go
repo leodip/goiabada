@@ -192,6 +192,33 @@ func TestValidateTokenRequest(t *testing.T) {
 		assert.Equal(t, "Missing required grant_type parameter.", customErr.Description())
 		assert.Equal(t, 400, customErr.HTTPStatus())
 	})
+
+	// The missing grant_type is read after the client checks, as the unsupported one is: a request
+	// missing both is answered for its client_id, and one naming an unknown client as invalid_client.
+	t.Run("an empty grant_type with a missing client_id answers the client_id first", func(t *testing.T) {
+		input := &ValidateTokenRequestInput{GrantType: ""}
+
+		result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
+
+		assert.Nil(t, result)
+		var customErr *oauth.ErrorDetail
+		require.ErrorAs(t, err, &customErr)
+		assert.Equal(t, "invalid_request", customErr.Code())
+		assert.Equal(t, "Missing required client_id parameter.", customErr.Description())
+	})
+
+	t.Run("an empty grant_type from an unknown client answers invalid_client first", func(t *testing.T) {
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "unknown_client_no_grant").Return(nil, nil).Once()
+		input := &ValidateTokenRequestInput{GrantType: "", ClientId: "unknown_client_no_grant"}
+
+		result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
+
+		assert.Nil(t, result)
+		var customErr *oauth.ErrorDetail
+		require.ErrorAs(t, err, &customErr)
+		assert.Equal(t, "invalid_client", customErr.Code())
+		assert.Equal(t, "Client does not exist.", customErr.Description())
+	})
 }
 
 // TestValidateTokenRequest_AuthStateGeneration covers the three places the generation

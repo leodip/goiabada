@@ -115,7 +115,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *r
 	// server does not support, and section 4 makes grant_type a required parameter of every token
 	// request (4.1.3, 4.3.2, 4.4.2, 6). An absent one is therefore a missing required parameter,
 	// invalid_request, and not a value the server failed to recognise. Read after the client checks
-	// above so an unknown client is still answered first, as the row below holds (#573).
+	// above so a missing client_id and an unknown client are still answered first, as they are for an
+	// unrecognised grant_type below; TestValidateTokenRequest holds both orders (#573).
 	if len(input.GrantType) == 0 {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Missing required grant_type parameter.", http.StatusBadRequest)
