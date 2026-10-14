@@ -1,12 +1,12 @@
-package usersession
+package handlers
 
 import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
 
-	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/authserver/internal/useragent"
+	"github.com/leodip/goiabada/authserver/internal/usersession"
 )
 
 // The device cookie names a browser rather than a session, so that a sign-in can tell the user's
@@ -27,25 +27,42 @@ const (
 	deviceIdBytes = 32
 )
 
-func (u *Manager) deviceCookieName() string {
-	if u.secureCookies {
+// DeviceCookie reads and writes the device cookie /auth/completed's create arm records a new user
+// session with. The route table builds one; secure is whether the auth server's base URL is https,
+// which gives the cookie its __Host- prefix and Secure, as it gives them to the session cookie.
+type DeviceCookie struct {
+	secure bool
+}
+
+// NewDeviceCookie builds the device cookie for a deployment whose base URL is https when secure.
+func NewDeviceCookie(secure bool) *DeviceCookie {
+	return &DeviceCookie{secure: secure}
+}
+
+func (d *DeviceCookie) name() string {
+	if d.secure {
 		return hostCookiePrefix + deviceCookieName
 	}
 	return deviceCookieName
 }
 
-// browserDevice is the device identifier the browser presents, or a new one when it presents none
-// or one that does not parse. Only the name this deployment writes is read, so on https a bare-named
-// cookie, which a sibling host could have set, is not.
-func (u *Manager) browserDevice(r *http.Request) (string, error) {
-	if cookie, err := r.Cookie(u.deviceCookieName()); err == nil && isDeviceIdentifier(cookie.Value) {
-		return cookie.Value, nil
+// read is the browser r comes from: the identifier its device cookie holds, or a new one when it
+// presents none or one that does not parse, with the display labels and the raw User-Agent. Only the
+// name this deployment writes is read, so on https a bare-named cookie, which a sibling host could
+// have set, is not.
+func (d *DeviceCookie) read(r *http.Request) usersession.Device {
+	name, deviceType, deviceOS := useragent.Labels(r)
+	device := usersession.Device{Name: name, Type: deviceType, OS: deviceOS, UserAgent: r.UserAgent()}
+
+	if cookie, err := r.Cookie(d.name()); err == nil && isDeviceIdentifier(cookie.Value) {
+		device.Identifier = cookie.Value
+		return device
 	}
 	buf := make([]byte, deviceIdBytes)
-	if _, err := rand.Read(buf); err != nil {
-		return "", errs.Wrap(err, "unable to read from the random number generator")
-	}
-	return hex.EncodeToString(buf), nil
+	_, _ = rand.Read(buf) // cannot fail: crypto/rand ends the process rather than return an error
+	device.Identifier = hex.EncodeToString(buf)
+	device.New = true
+	return device
 }
 
 // isDeviceIdentifier is whether value is one this server mints: deviceIdBytes as lower-case hex. A
@@ -55,23 +72,16 @@ func isDeviceIdentifier(value string) bool {
 	return err == nil && len(decoded) == deviceIdBytes && hex.EncodeToString(decoded) == value
 }
 
-// deviceDigest is what a session stores of the identifier: its SHA-256, so a database read does not
-// hand out a value a browser could present.
-func deviceDigest(identifier string) string {
-	return hashutil.HashString(identifier)
-}
-
-// writeDeviceCookie gives the browser its identifier for another 400 days, with the session
-// cookie's attributes.
-func (u *Manager) writeDeviceCookie(w http.ResponseWriter, identifier string) {
+// write gives the browser identifier for another 400 days, with the session cookie's attributes.
+func (d *DeviceCookie) write(w http.ResponseWriter, identifier string) {
 	//nolint:gosec // G124: HttpOnly and SameSite are set; Secure follows the base URL's scheme, as on the session cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     u.deviceCookieName(),
+		Name:     d.name(),
 		Value:    identifier,
 		Path:     "/",
 		MaxAge:   deviceCookieMaxAge,
 		HttpOnly: true,
-		Secure:   u.secureCookies,
+		Secure:   d.secure,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

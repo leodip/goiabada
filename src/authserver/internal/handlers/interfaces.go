@@ -61,6 +61,10 @@ type CeremonyStore interface {
 	// rotates only while the browser session still holds the ceremony named, and otherwise
 	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
 	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm, which also
+	// writes the new user session's identifier into the browser session as it rotates it (#266),
+	// on the same condition (#579 decision 4).
+	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error
 	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
 	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
 	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error
@@ -105,10 +109,15 @@ type CodeIssuer interface {
 
 type UserSessionManager interface {
 	HasValidUserSession(userSession *record.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool
-	StartNewUserSession(w http.ResponseWriter, r *http.Request,
-		clientId int64, authentication usersession.Authentication,
-		authStateGeneration int64, otpConfigGeneration *int64,
-		ipAddress string, replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
+	// StartNewUserSession creates the create arm's session in one transaction and answers it with
+	// the rows it removed. It writes nothing to the browser: the caller binds the session to the
+	// browser session after it returns, and abandons it when that fails.
+	StartNewUserSession(ctx context.Context, clientId int64, authentication usersession.Authentication,
+		authStateGeneration int64, otpConfigGeneration *int64, device usersession.Device, ipAddress string,
+		replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
+	// AbandonUserSession deletes a session StartNewUserSession committed when binding it to the
+	// browser session failed, and returns cause, joined with the delete's failure if it failed.
+	AbandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error
 
 	// BumpUserSession updates an existing session's last accessed time and client list.
 	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication

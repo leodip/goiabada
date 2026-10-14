@@ -47,8 +47,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
-	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database,
-		s.cfg.AuthServer.IsCookieSecure())
+	userSessionManager := usersession.NewManager(s.database)
 	otpSecretGenerator := otp.NewKeyGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.cfg.AdminConsole.BaseURL, s.dataCipher, userSessionManager)
 	// The tokens the token endpoint and /auth/issue answer with, and the token requests refused,
@@ -142,7 +141,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, userSessionManager, authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker)))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker)))
 		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
 		passwordPrompt := authflow.NewPasswordPrompt(s.database)
 		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))

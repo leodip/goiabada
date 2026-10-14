@@ -372,16 +372,19 @@ func TestHandleAuthCompletedGet_ABoundSessionWithNoAuthTimeIsRefused(t *testing.
 		f.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 		expectCeremonyConfirmed(f.ceremonyStore, f.rr, f.req)
-		started := &record.UserSession{Id: 12, UserId: 1, AcrLevel: record.AcrLevel1,
+		started := &record.UserSession{Id: 12, SessionIdentifier: "new-session-of-user-1", UserId: 1, AcrLevel: record.AcrLevel1,
 			Started: time.Date(2026, 10, 14, 8, 31, 0, 0, time.UTC)}
-		f.userSessionManager.On("StartNewUserSession", f.rr, f.req, int64(1),
-			signedInAs(int64(1), "pwd", record.AcrLevel1, &passwordAt), int64(0), (*int64)(nil), "",
+		var minted string
+		f.userSessionManager.On("StartNewUserSession", theContextOf(f.req), int64(1),
+			signedInAs(int64(1), "pwd", record.AcrLevel1, &passwordAt), int64(0), (*int64)(nil), aNewDeviceOf(f.req, &minted), "",
 			(*record.UserSession)(nil), testSessionLimits).Return(started, nil, nil).Once()
+		expectNewSessionBound(f.ceremonyStore, f.rr, f.req, "new-session-of-user-1")
 		f.auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()
 		f.expect500(mock.MatchedBy(hasNoAuthTime))
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
+		assert.Equal(t, minted, deviceCookieOf(t, f.rr).Value, "the session was bound before its auth time was read")
 		f.pageRenderer.AssertExpectations(t)
 		f.userSessionManager.AssertExpectations(t)
 		f.permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything,

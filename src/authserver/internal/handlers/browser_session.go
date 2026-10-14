@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 )
 
@@ -19,9 +18,9 @@ type browserSession struct {
 	w             http.ResponseWriter
 	r             *http.Request
 	ceremonyStore CeremonyStore
-	// userSessionManager is set only for /auth/completed, whose session start rotates the browser
-	// session's identifier and writes the device cookie (newSessionStartingBrowserSession).
-	userSessionManager UserSessionManager
+	// deviceCookie is set only for /auth/completed, whose create arm records the browser's device on
+	// the session it starts and writes the device cookie (newSessionStartingBrowserSession).
+	deviceCookie *DeviceCookie
 	// credentialFailures is set only for a step that checks a credential
 	// (newCredentialCheckingBrowserSession).
 	credentialFailures CredentialFailureRecorder
@@ -33,9 +32,9 @@ func newBrowserSession(w http.ResponseWriter, r *http.Request, ceremonyStore Cer
 
 // newSessionStartingBrowserSession is newBrowserSession for a step that also starts a user session.
 func newSessionStartingBrowserSession(w http.ResponseWriter, r *http.Request, ceremonyStore CeremonyStore,
-	userSessionManager UserSessionManager) *browserSession {
+	deviceCookie *DeviceCookie) *browserSession {
 
-	return &browserSession{w: w, r: r, ceremonyStore: ceremonyStore, userSessionManager: userSessionManager}
+	return &browserSession{w: w, r: r, ceremonyStore: ceremonyStore, deviceCookie: deviceCookie}
 }
 
 // newCredentialCheckingBrowserSession is newBrowserSession for a step that checks a credential, whose
@@ -79,14 +78,20 @@ func (b *browserSession) ConfirmCeremony(ceremonyId string) error {
 	return b.ceremonyStore.ConfirmCeremony(b.w, b.r, ceremonyId)
 }
 
-// StartNewUserSession is UserSessionManager.StartNewUserSession, the create arm's session start,
-// which rotates the browser session's identifier onto the new session and writes the device cookie.
-func (b *browserSession) StartNewUserSession(clientId int64, authentication usersession.Authentication,
-	authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession,
-	limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error) {
+// RegenerateSessionAndBind is CeremonyStore.RegenerateSessionAndBind, the create arm's conditional
+// rotation, which binds the user session it started to the browser session.
+func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userSessionIdentifier string) error {
+	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userSessionIdentifier)
+}
 
-	return b.userSessionManager.StartNewUserSession(b.w, b.r, clientId, authentication, authStateGeneration,
-		otpConfigGeneration, ipAddress, replacing, limits)
+// Device is the browser this request comes from, as its device cookie and headers say.
+func (b *browserSession) Device() usersession.Device {
+	return b.deviceCookie.read(b.r)
+}
+
+// WriteDeviceCookie gives the browser its device identifier, on this request's response.
+func (b *browserSession) WriteDeviceCookie(identifier string) {
+	b.deviceCookie.write(b.w, identifier)
 }
 
 // RecordCredentialFailure is CredentialFailureRecorder.RecordCredentialFailure on this request, whose

@@ -125,7 +125,7 @@ func restartAtLevel1() restartPlan {
 //
 //   - the identifier rotates when the bind will raise a privilege, OWASP's "regenerate on any
 //     privilege level change", since this server's ACR levels are privilege levels (#266 decision 6).
-//     It is no fixation defence: fixation is closed on the create arm, inside StartNewUserSession;
+//     It is no fixation defence: fixation is closed on the create arm, in bindNewSession's rotation;
 //   - AuthTime is refreshed when a credential was entered in this ceremony (prompt=login, a step-up),
 //     since the bind otherwise keeps the session's, which is right for SSO reuse only;
 //   - the level and methods are replaced with this ceremony's when it completed level 1 itself

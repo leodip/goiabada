@@ -301,15 +301,18 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newAuthTime := time.Now().UTC()
 		newSession := &record.UserSession{
-			Id:       8,
-			UserId:   2,
-			AcrLevel: record.AcrLevel1,
-			AuthTime: newAuthTime,
+			Id:                8,
+			SessionIdentifier: "new-session-of-user-2",
+			UserId:            2,
+			AcrLevel:          record.AcrLevel1,
+			AuthTime:          newAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
+			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
 			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
 			Return(newSession, nil, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-2")
 
 		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
@@ -327,6 +330,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
@@ -471,13 +476,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newAuthTime := time.Now().UTC()
 		newSession := &record.UserSession{
-			Id:       8,
-			UserId:   2,
-			AcrLevel: record.AcrLevel1,
-			AuthTime: newAuthTime,
+			Id:                8,
+			SessionIdentifier: "new-session-of-user-2",
+			UserId:            2,
+			AcrLevel:          record.AcrLevel1,
+			AuthTime:          newAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
+			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-2")
 
 		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
@@ -493,6 +501,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
@@ -594,14 +604,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newAuthTime := time.Now().UTC()
 		newSession := &record.UserSession{
-			Id:       8,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
-			AuthTime: newAuthTime,
+			Id:                8,
+			SessionIdentifier: "new-session-of-user-1",
+			UserId:            1,
+			AcrLevel:          record.AcrLevel1,
+			AuthTime:          newAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession, testSessionLimits).
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
+			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 			Return(newSession, []usersession.Removal{{Session: *ownSession, Reason: "replaced_by_sign_in"}}, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
 
 		user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -620,6 +633,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
+
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
@@ -636,11 +651,11 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.AssertExpectations(t)
 	})
 
-	// StartNewUserSession fails after its transaction committed -- the browser session write is the
-	// one step after it -- so the rows it removed are gone and come back beside the error. Each is
-	// audited before the 500, because an event is owed for every deletion that happened, and no
-	// started_new_user_session is written, because the new row was abandoned. When the failure
-	// reports no removals, nothing is audited at all. (#243)
+	// The rotation binding the new session fails after the start's transaction committed, so the rows
+	// the start removed are gone, and the new row is abandoned. Each removal is audited before the
+	// 500, because an event is owed for every deletion that happened, and no started_new_user_session
+	// is written, because the new row was abandoned; nor is the device cookie. When the start reports
+	// no removals, nothing is audited at all. (#243, #198)
 	for _, tc := range []struct {
 		name    string
 		removed []usersession.Removal
@@ -723,9 +738,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			}).Return().Maybe()
 
 			startError := errors.New("unable to rotate the browser session identifier")
-			userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "203.0.113.7", ownSession, testSessionLimits).
-				Return(nil, tc.removed, startError)
+			started := &record.UserSession{Id: 10, SessionIdentifier: "new-session-of-user-1", UserId: 1}
+			var minted string
+			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
+				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
+				Return(started, tc.removed, nil)
+			rotateError := errors.New("the backend refused the write")
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, "new-session-of-user-1").
+				Return(rotateError).Once()
+			// The rotation's failure, wrapped, is the cause the abandonment is handed; what it answers is
+			// what the 500 carries.
+			userSessionManager.On("AbandonUserSession", theContextOf(req), started, mock.MatchedBy(func(cause error) bool {
+				return errors.Is(cause, rotateError) &&
+					strings.Contains(cause.Error(), "unable to rotate the browser session identifier")
+			})).Return(startError).Once()
 
 			pageRenderer.On("InternalServerError", rr, req, startError).Run(func(mock.Arguments) { answered = true }).Return().Once()
 			expectCeremonyConfirmed(ceremonyStore, rr, req)
@@ -744,6 +770,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			assert.Equal(t, wantReasons, auditedReasons, "each event carries the reason its removal was reported with")
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			noDeviceCookieIn(t, rr)
+			userSessionManager.AssertExpectations(t)
 		})
 	}
 
@@ -962,8 +990,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.EventTerminatedUserSession, mock.Anything).Run(recordEvent).Return().Once()
 
 		startError := errors.New("the replacement session could not be created")
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(nil, nil, startError)
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
+			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(nil, nil, startError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
@@ -972,6 +1001,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		noDeviceCookieIn(t, rr)
 
 		// No redirect, so nothing is issued on a ceremony left with no session.
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -1388,12 +1419,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// Expect StartNewUserSession to be called instead of BumpUserSession
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
-			AuthTime: sessionAuthTime,
+			Id:                1,
+			SessionIdentifier: "new-session-of-user-1",
+			UserId:            1,
+			AcrLevel:          record.AcrLevel1,
+			AuthTime:          sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -1414,6 +1448,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
@@ -1823,17 +1859,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newUserSession := &record.UserSession{
 			Id:                  1,
+			SessionIdentifier:   "new-session-of-user-1",
 			UserId:              1,
 			AcrLevel:            record.AcrLevel2Optional,
 			AuthTime:            time.Now().UTC(),
 			OtpConfigGeneration: 4,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1),
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 			signedInWith(usersession.Authentication{
 				UserId: 1, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional,
 				AuthTime: &pwdAuthTime, PasswordAuthTime: &pwdAuthTime,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &captured},
-			}), int64(7), &captured, "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+			}), int64(7), &captured, aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -1849,6 +1888,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		// The create arm never calls the promote: StartNewUserSession writes the column on
@@ -2836,12 +2877,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
-			AuthTime: sessionAuthTime,
+			Id:                1,
+			SessionIdentifier: "new-session-of-user-1",
+			UserId:            1,
+			AcrLevel:          record.AcrLevel1,
+			AuthTime:          sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -2862,6 +2906,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyId, rr.Header().Get("Location"))
@@ -2939,12 +2985,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
-			AuthTime: sessionAuthTime,
+			Id:                1,
+			SessionIdentifier: "new-session-of-user-1",
+			UserId:            1,
+			AcrLevel:          record.AcrLevel1,
+			AuthTime:          sessionAuthTime,
 		}
-		userSessionManager.On("StartNewUserSession", rr, req, int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		var minted string
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -2965,6 +3014,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyId, rr.Header().Get("Location"))
@@ -3435,17 +3486,9 @@ func signedInAs(userId int64, methods string, acr record.AcrLevel, at *time.Time
 		PasswordAuthTime: at})
 }
 
-// signedInWith matches the authentication /auth/completed hands the session manager when it is want
-// with this ceremony's browser-session condition.
+// signedInWith matches the authentication /auth/completed hands the session manager when it is want.
 func signedInWith(want usersession.Authentication) interface{} {
 	return mock.MatchedBy(func(a usersession.Authentication) bool {
-		// The rotation binding the new session is made on this ceremony's condition (#579
-		// decision 4). A func compares equal to nothing, so it is checked by what it answers and the
-		// rest of the authentication by value.
-		if !heldOnlyBy(a.BrowserSessionCondition, testCeremonyId) {
-			return false
-		}
-		a.BrowserSessionCondition = nil
 		return assert.ObjectsAreEqual(want, a)
 	})
 }
@@ -3528,7 +3571,8 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 			})
 			if create {
 				expectCeremonyConfirmed(ceremonyStore, rr, req)
-				userSessionManager.On("StartNewUserSession", rr, req, int64(1), claimed, int64(0), &generation, "",
+				var minted string
+				userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), claimed, int64(0), &generation, aNewDeviceOf(req, &minted), "",
 					(*record.UserSession)(nil), testSessionLimits).Return(nil, nil, removed).Once()
 			} else {
 				userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), claimed, false, "").
@@ -3539,6 +3583,8 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 			})).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
+
+			noDeviceCookieIn(t, rr)
 
 			require.Equal(t, http.StatusFound, rr.Code)
 			assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
@@ -3822,8 +3868,10 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 				AuthorizationCodeEnabled: true,
 			}, nil)
 			userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
-			userSessionManager.On("StartNewUserSession", rr, req, int64(1), mock.Anything, int64(7), (*int64)(nil), "", (*record.UserSession)(nil), testSessionLimits).
-				Return(&record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: time.Now().UTC()}, nil, nil)
+			var minted string
+			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), mock.Anything, int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
+				Return(&record.UserSession{Id: 1, SessionIdentifier: "new-session-of-user-1", UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: time.Now().UTC()}, nil, nil)
+			expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
 			auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()
 			user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 7}
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -3833,6 +3881,8 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			expectCeremonyConfirmed(ceremonyStore, rr, req)
 
 			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 			assertAnsweredNoLongerActive(t, rr)
 			pageRenderer.AssertExpectations(t)

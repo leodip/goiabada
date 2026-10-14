@@ -205,7 +205,7 @@ func TestBumpUserSession_ASecondBumpForTheSameClientUpdatesItsAssociation(t *tes
 	held := createTestClient(t)
 	added := createTestClient(t)
 	session := createTestUserSessionWithClient(t, user.Id, held.Id)
-	manager := usersession.NewManager(nil, "", database, false)
+	manager := usersession.NewManager(database)
 
 	_, err := manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
 	require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestBumpUserSession_TwoBumpsThatOverlapQueueOnTheSessionAndLeaveOnePair(t *
 	for i := range callers {
 		bumps[i] = goBlocked(t, fmt.Sprintf("bump %d", i), holder, func(reached func()) error {
 			reached()
-			_, bumpErr := usersession.NewManager(nil, "", callers[i], false).
+			_, bumpErr := usersession.NewManager(callers[i]).
 				BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
 			return bumpErr
 		})

@@ -15,14 +15,14 @@ import (
 // client; or the "no longer active" page for a bind a newer sign-in made stale (#538) or a ceremony
 // the browser session no longer holds (#579).
 //
-// userSessionManager is the session start the per-request adapter wraps, because it rotates the
-// browser session's identifier and writes the device cookie.
+// deviceCookie is the device cookie the per-request adapter reads the browser's device from and
+// writes once the create arm has bound a new session to the browser session.
 func HandleAuthCompletedGet(
 	boundary *CeremonyBoundary,
 	responder *ClientErrorResponder,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	userSessionManager UserSessionManager,
+	deviceCookie *DeviceCookie,
 	completion *authflow.Completion,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +33,7 @@ func HandleAuthCompletedGet(
 
 		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 		result, err := completion.Run(r.Context(),
-			newSessionStartingBrowserSession(w, r, ceremonyStore, userSessionManager),
+			newSessionStartingBrowserSession(w, r, ceremonyStore, deviceCookie),
 			settings, authContext, sessionIdentifier, middleware.ClientIP(r))
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)

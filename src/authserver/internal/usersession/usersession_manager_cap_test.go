@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -56,8 +55,8 @@ func startCapped(t *testing.T, existing []record.UserSession, limits SessionLimi
 		m.db.On("DeleteUserSession", mock.Anything, txSentinel, id).Return(nil).Once()
 	}
 
-	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, limits)
+	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, limits)
 
 	require.NoError(t, err)
 	return removed
@@ -168,8 +167,8 @@ func TestStartNewUserSession_TheCapCountsWhatTheSweepsLeft(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(41)).Return(nil).Once()
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
-	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", &replaced, capLimits(3))
+	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", &replaced, capLimits(3))
 
 	require.NoError(t, err)
 	assert.Equal(t, map[int64]string{41: "replaced_by_sign_in", 42: "same_device"}, removedReasons(removed))
@@ -190,8 +189,8 @@ func TestStartNewUserSession_TheCapEndsWhatIsStillOverItAfterTheSweeps(t *testin
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(41)).Return(nil).Once()
 
-	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, capLimits(3))
+	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(3))
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42, 41}, removedIds(removed), "the sweep's row, then the cap's")
@@ -220,8 +219,8 @@ func TestStartNewUserSession_TheCapNeverEndsTheNewSession(t *testing.T) {
 		}).Once()
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(41)).Return(nil).Once()
 
-	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, capLimits(1))
+	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(1))
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{41}, removedIds(removed))
@@ -254,8 +253,8 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsCapRemovalsOnce(t 
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Twice()
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(43)).Return(nil).Once()
 
-	_, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, "192.168.1.50", nil, capLimits(3))
+	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
+		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(3))
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42, 43}, removedIds(removed))

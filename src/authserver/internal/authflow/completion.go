@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // UserDisabledDescription is the error_description of the access_denied a ceremony is answered with
@@ -38,14 +37,19 @@ type completionDatabase interface {
 }
 
 // completionSessions is what Completion asks of the user sessions: whether the browser's is valid,
-// whether a bind would be refused as stale, and the reuse arm's bind.
-// *usersession.UserSessionManager satisfies it.
+// whether a bind would be refused as stale, the reuse arm's bind, and the create arm's start and the
+// deletion of a started session it could not bind to the browser session. *usersession.Manager
+// satisfies it.
 type completionSessions interface {
 	sessionValidity
 	AuthenticationIsStale(ctx context.Context, sessionIdentifier string,
 		authentication usersession.Authentication) (bool, error)
 	BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
 		authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error)
+	StartNewUserSession(ctx context.Context, clientId int64, authentication usersession.Authentication,
+		authStateGeneration int64, otpConfigGeneration *int64, device usersession.Device, ipAddress string,
+		replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
+	AbandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error
 }
 
 // scopeFilter narrows a scope to what the user holds. *permissions.PermissionChecker satisfies it.
@@ -70,12 +74,14 @@ type completionBrowser interface {
 	// ConfirmCeremony writes nothing: it answers nil while the browser session, read afresh, still
 	// holds the ceremony, the create arm's check before it ends or creates anything.
 	ConfirmCeremony(ceremonyId string) error
-	// StartNewUserSession is the create arm's session start: its transaction, then the rotation that
-	// binds the new session to the browser session on condition it still holds this ceremony, and
-	// the device cookie. A rotation finding the session gone answers sessionstore.ErrNotFound.
-	StartNewUserSession(clientId int64, authentication usersession.Authentication,
-		authStateGeneration int64, otpConfigGeneration *int64, ipAddress string, replacing *record.UserSession,
-		limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
+	// RegenerateSessionAndBind rotates the browser session's identifier and writes the user session
+	// named into it, the create arm's rotation.
+	RegenerateSessionAndBind(ceremonyId string, userSessionIdentifier string) error
+	// Device is the browser the request comes from: its device cookie's identifier, or a new one,
+	// and its display labels.
+	Device() usersession.Device
+	// WriteDeviceCookie gives the browser its device identifier. It cannot fail.
+	WriteDeviceCookie(identifier string)
 }
 
 // Completion is GET /auth/completed, reached once a ceremony's authentication is complete
@@ -118,9 +124,9 @@ type CompletionResult struct {
 	// (usersession.ErrStaleAuthentication, #538). Nothing was bound, rotated or saved, and the handler
 	// answers the "no longer active" page.
 	Stale bool
-	// Replaced is a rotation, a confirmation or the session start finding the browser session no
-	// longer holding this ceremony, or gone. Nothing was bound to the browser session, and the
-	// handler answers it as any step of a replaced ceremony (#579).
+	// Replaced is a rotation or a confirmation finding the browser session no longer holding this
+	// ceremony, or gone. Nothing was bound to the browser session, and the handler answers it as any
+	// step of a replaced ceremony (#579).
 	Replaced bool
 }
 
@@ -244,7 +250,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		slog.WarnContext(ctx, "a newer authentication has already reached this session, answering this ceremony as one the browser has replaced",
 			"ceremony_user_id", authContext.UserId)
 		return CompletionResult{Stale: true}, nil
-	case errors.Is(err, ceremony.ErrCeremonyReplaced) || errors.Is(err, sessionstore.ErrNotFound):
+	case errors.Is(err, ceremony.ErrCeremonyReplaced):
 		return CompletionResult{Replaced: true}, nil
 	case err != nil:
 		return CompletionResult{}, err
@@ -395,8 +401,8 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 	return boundSession, nil
 }
 
-// bindNewSession is the create arm: it starts a new session for the ceremony and answers it. In
-// order:
+// bindNewSession is the create arm: it starts a new session for the ceremony, binds it to the
+// browser session and answers it. In order:
 //
 //  1. Confirms the browser session still holds this ceremony (ConfirmCeremony). Everything after
 //     this ends or deletes something, and a ceremony the browser abandoned for a newer sign-in must
@@ -405,9 +411,20 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 //  2. When the plan says the arrived-with session is another user's: terminates it with its codes
 //     and refresh tokens (revocation.TerminateUserSessionTx), then audits the handover, the deletion
 //     and the termination, in that order and after the commit.
-//  3. Starts the new session (StartNewUserSession), replacing the arrived-with one when it is this
-//     user's, and audits every session the start removed, whether or not it then failed.
-//  4. Audits the new session.
+//  3. Reads the browser's device and starts the new session (StartNewUserSession), replacing the
+//     arrived-with one when it is this user's. The start commits before it returns.
+//  4. Rotates the browser session's identifier, writing the new session into it, on condition it
+//     still holds this ceremony (RegenerateSessionAndBind). A failure abandons the new session
+//     (AbandonUserSession): a ceremony the browser replaced meanwhile is Replaced, any other failure
+//     an error.
+//  5. Once bound, writes the device cookie.
+//  6. Audits every session the start removed, whether or not the binding then failed, since their
+//     deletion committed, then the new session.
+//
+// The rotation comes after the start's commit, and this is the fixation defence of the create arm:
+// no identifier that existed before the sign-in names the session it produced (#266). It cannot join
+// the start's transaction, whose deadlock rerun would write Set-Cookie twice, hence the compensating
+// delete (#198). The reuse arm, in bindReusedSession, rotates before its bind instead.
 //
 // A failed termination is returned before anything is created, with the browser still holding the
 // old session: the fail-closed direction.
@@ -457,23 +474,29 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	if plan.replacesOwnSession() {
 		replacing = userSession
 	}
+
+	device := browser.Device()
+
 	// AuthenticatedAt is always set here: decideCompletion takes this arm only with
 	// Level1AuthCompleted, and the password step sets both. StartNewUserSession refuses a nil or
 	// zero instant rather than invent one (#252 decision 8).
-	newSession, removedSessions, err := browser.StartNewUserSession(client.Id, usersession.Authentication{
+	newSession, removedSessions, err := o.sessions.StartNewUserSession(ctx, client.Id, usersession.Authentication{
 		UserId:           authContext.UserId,
 		AuthMethods:      authContext.AuthMethods,
 		AcrLevel:         targetAcrLevel,
 		AuthTime:         authContext.AuthenticatedAt,
 		PasswordAuthTime: authContext.PasswordVerifiedAt,
 		OTPClaim:         OTPClaimOf(authContext),
-		// The rotation binding the new session lands only while the browser session still holds this
-		// ceremony (#579 decision 4).
-		BrowserSessionCondition: ceremony.Held(authContext.CeremonyId),
-	}, authContext.AuthStateGeneration, authContext.OtpConfigGeneration, ipAddress, replacing, limits)
+	}, authContext.AuthStateGeneration, authContext.OtpConfigGeneration, device, ipAddress, replacing, limits)
+	if err == nil {
+		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyId, newSession.SessionIdentifier); rotateErr != nil {
+			err = o.sessions.AbandonUserSession(ctx, newSession,
+				errs.Wrap(rotateErr, "unable to rotate the browser session identifier"))
+		} else {
+			browser.WriteDeviceCookie(device.Identifier)
+		}
+	}
 
-	// A removed row is gone once the start's transaction committed, which a failure after the commit
-	// does not undo, so each is audited before either answer.
 	for _, removal := range removedSessions {
 		o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": removal.Session.Id,

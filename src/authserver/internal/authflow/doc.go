@@ -89,7 +89,9 @@
 //   - Completion's reuse arm asks whether its bind is stale before it rotates the browser session's
 //     identifier, and rotates before the bind commits the raised level (#538, #266).
 //   - Completion's create arm confirms the browser session still holds the ceremony before it ends a
-//     foreign session or creates one, and the session start commits before its rotation (#579).
+//     foreign session or creates one (#579), and the session start commits before the rotation that
+//     binds the new session to the browser session (#266). A failed rotation deletes the new session
+//     (#198), and the device cookie is written only once the rotation succeeded.
 //   - Audit records of a session write, and of a recorded consent, follow its commit.
 //   - ConsentSubmission narrows the ticked scopes to what the user holds before it reads or writes a
 //     consent, so a selection the narrowing empties writes nothing (#241). Its refusals read the
