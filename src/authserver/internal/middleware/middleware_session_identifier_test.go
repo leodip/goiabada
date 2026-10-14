@@ -160,13 +160,18 @@ func TestSessionIdentifier(t *testing.T) {
 
 		var present bool
 		var cached any
+		var getErr error
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, present = reqctx.SessionIdentifierFrom(r.Context())
 			sess, err := store.Get(r, sessionkeys.AuthServerSessionName)
-			require.NoError(t, err)
+			if err != nil {
+				getErr = err
+				return
+			}
 			cached = sess.Values[sessionkeys.SessionIdentifier]
 		})).ServeHTTP(rr, browserRequest(cookies))
 
+		require.NoError(t, getErr)
 		assert.False(t, present)
 		assert.Nil(t, cached, "the request's own session must not hold the dangling pointer either")
 		assert.NotContains(t, storedBrowserSession(t, store, cookies), sessionkeys.SessionIdentifier)

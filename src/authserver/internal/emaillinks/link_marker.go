@@ -174,7 +174,7 @@ func SaveLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *ht
 	// since, and the copy would not show it. Only the marker's key is written, onto those values, on
 	// condition nothing wrote the session in between, so whatever else another request wrote is kept
 	// (#579).
-	err = httpSession.ChangeAndSave(r, w, sess, func(values map[string]any) error {
+	saveErr := httpSession.ChangeAndSave(r, w, sess, func(values map[string]any) error {
 		held, err := decodeLinkMarker(values)
 		if err != nil {
 			return err
@@ -210,10 +210,10 @@ func SaveLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *ht
 		values[sessionkeys.LinkMarker] = string(jsonData)
 		return nil
 	})
-	if errors.Is(err, errContinuationInFlight) {
+	if errors.Is(saveErr, errContinuationInFlight) {
 		return LinkMarkerContinuationInFlight, nil
 	}
-	return "", err
+	return "", saveErr
 }
 
 // GetLinkMarker returns the session's marker if it belongs to the wanted flow and is
