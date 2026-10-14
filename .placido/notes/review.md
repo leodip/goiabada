@@ -25,9 +25,11 @@
   `site/STYLE.md` and its linked glossary. The docs describe the latest version;
   breaking changes and migration steps belong in release notes. For docs or
   OpenAPI changes, build the site on the host as `site/README.md` describes.
-- **Browser tests:** the Playwright suite under `e2e/` runs only by hand, against a
-  shared VPS. Never run its scripts, and do not count a spec that was not run as
-  missing evidence. Check instead that a change to a page, a message, or a flow
-  updates the specs under `e2e/playwright/tests/` that assert it, and that new or
-  changed specs follow the rules under "Browser tests" in `e2e/README.md`. Check
-  their types on the host with `cd e2e/playwright && npm ci && npm run typecheck`.
+- **Browser tests:** the Playwright suite under `e2e/` runs against one shared
+  environment on a VPS, and placido runs it whole as the last gate, after the
+  review. Do not run `e2e` or the scripts under `e2e/` yourself, and do not count a
+  spec that has not run yet as missing evidence. Check instead that a change to a
+  page, a message, or a flow updates the specs under `e2e/playwright/tests/` that
+  assert it, that new or changed specs follow the rules under "Browser tests" in
+  `e2e/README.md`, and that their types check on the host (`cd e2e/playwright &&
+  npm ci && npm run typecheck`).

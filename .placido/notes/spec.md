@@ -20,8 +20,8 @@
   for wording; breaking changes and migration steps belong in release notes.
 - **Browser tests:** `e2e/` holds a Playwright suite that runs against a real
   deployment on a VPS (see `e2e/README.md`): the admin console's pages, the test
-  app's sign-in flows, and the protocol where no page reaches it (`oauth/`). Only
-  the owner runs it, by hand, so it is never a gate. When a change alters what the
-  suite covers, name in the agreement the specs under `e2e/playwright/tests/` to add
-  or update, put them in a slice, and say that the owner runs them before merging,
-  as `e2e/run.sh --source tests/<folder>`.
+  app's sign-in flows, and the protocol where no page reaches it (`oauth/`).
+  Placido runs it whole as the last gate, once the review is done, against an
+  environment rebuilt from the branch. When a change alters what the suite covers,
+  name in the agreement the specs under `e2e/playwright/tests/` to add or update,
+  and put them in a slice.

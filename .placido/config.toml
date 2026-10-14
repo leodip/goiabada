@@ -54,6 +54,11 @@ about = "Regenerate the four schema.golden files, after adding or changing a mig
 run   = ".placido/stack.sh exec 'cd ../core && go run ./cmd/ownershipdump'"
 about = "Regenerate the core symbol ownership table, after adding or moving a core symbol; commit it."
 
+[commands.e2e]
+run   = ".placido/e2e.sh"
+about = "Rebuilds the one shared e2e environment on the VPS from this worktree's src/ and runs the Playwright suite against it (e2e/run.sh --source), several minutes. Placido runs it whole as the last gate, after the review; run it yourself only to fix a failing e2e gate, narrowed to the failing area by appending a Playwright argument, such as tests/oauth."
+
 [gates]
 slice = ["vet", "unit"]
 final = ["lint", "setup-wizard", "data-sqlite", "integration-sqlite"]
+last  = ["e2e"]   # after the review, before the push: the browser suite against an environment built from the branch
