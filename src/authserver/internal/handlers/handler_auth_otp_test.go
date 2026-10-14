@@ -1751,7 +1751,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, int64(1), int64(3), mock.Anything).
 				Return(false, nil).Run(func(mock.Arguments) { calls = append(calls, "establish") }).Once()
 
-			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).
 				Run(func(mock.Arguments) { calls = append(calls, "clear-ceremony") }).Once()
 			pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 				mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -1816,7 +1816,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 
-	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).Once()
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["_httpStatus"] == http.StatusConflict &&

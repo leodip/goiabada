@@ -69,25 +69,37 @@ func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 // themselves, as a double-submitted consent form needs. An empty stored id is never owned, as
 // ceremonyMatches refuses it.
 func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
-	sess, err := s.sessionStore.Get(r, s.sessionName)
-	if err != nil {
-		return err
-	}
-
 	jsonData, err := json.Marshal(authContext)
 	if err != nil {
 		return err
 	}
 
+	return s.changeOwnCeremony(w, r, authContext.CeremonyId, func(values map[string]any) {
+		values[sessionkeys.AuthContext] = string(jsonData)
+	})
+}
+
+// changeOwnCeremony applies change to the browser session as it is stored now, only while it holds
+// the ceremony named, through ChangeAndSave: the one write SaveAuthContext and ClearAuthContext are
+// made with. It answers ErrCeremonyReplaced, having written nothing, when the session holds another
+// ceremony, none, or is gone.
+func (s *Store) changeOwnCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string,
+	change func(values map[string]any)) error {
+
+	sess, err := s.sessionStore.Get(r, s.sessionName)
+	if err != nil {
+		return err
+	}
+
 	err = s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		owned, ownedErr := holdsCeremony(values, authContext.CeremonyId)
+		owned, ownedErr := holdsCeremony(values, ceremonyId)
 		if ownedErr != nil {
 			return ownedErr
 		}
 		if !owned {
 			return errs.WithStack(ErrCeremonyReplaced)
 		}
-		values[sessionkeys.AuthContext] = string(jsonData)
+		change(values)
 		return nil
 	})
 	if errors.Is(err, sessionstore.ErrNotFound) {
@@ -128,19 +140,31 @@ func (s *Store) ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authC
 	return s.sessionStore.Save(r, w, sess)
 }
 
-func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
+// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session still
+// holds it, for SaveAuthContext's reason (#579). It answers ErrCeremonyReplaced, writing nothing, when
+// the session holds another ceremony, none, or is gone, and a session never stored is one holding
+// none, so the clear of a ceremony the browser does not hold creates no row and no cookie. Anything
+// else the session holds is kept as the fresh read found it.
+func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
+	return s.changeOwnCeremony(w, r, ceremonyId, func(values map[string]any) {
+		delete(values, sessionkeys.AuthContext)
+	})
+}
 
+// DiscardAuthContext is /auth/authorize's clear, before it answers a request it refused at once. It
+// ends whatever ceremony the browser session held, without a condition, as /auth/authorize's saves
+// replace it. A browser with no stored session holds nothing to end, so nothing is written for it:
+// no row holding nothing for the session's lifetime, and no cookie naming one (#579 decision 6).
+func (s *Store) DiscardAuthContext(w http.ResponseWriter, r *http.Request) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
-	delete(sess.Values, sessionkeys.AuthContext)
-	err = s.sessionStore.Save(r, w, sess)
-	if err != nil {
-		return err
+	if sess.ID == "" {
+		return nil
 	}
-
-	return nil
+	delete(sess.Values, sessionkeys.AuthContext)
+	return s.sessionStore.Save(r, w, sess)
 }
 
 // RegenerateSession replaces the browser session's identifier, keeping its contents.

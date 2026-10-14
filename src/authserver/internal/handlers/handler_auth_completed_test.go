@@ -1896,7 +1896,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the sentinel under either ordering; rr.Result() reads the snapshot taken when the
 		// status line was written, which is the only unit-tier view that tells them apart.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -1990,7 +1990,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -2079,7 +2079,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"user_id": int64(1),
 		}).Return()
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -2170,7 +2170,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the site's second and pre-existing 500,
 		// pinned separately so a future edit cannot delete either copy unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -2260,7 +2260,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Same sentinel as the disabled-user case, for the second refusal in this handler.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -2353,7 +2353,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -2440,7 +2440,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -2529,7 +2529,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// this change the handler carried on into the clear after answering the 500, which is
 		// the missing return decision 5 adds; the 500 is asserted Once() so a second one would
 		// fail the mock.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -3118,7 +3118,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 						"user_id": int64(1),
 					}).Return().Once()
-					ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).Once()
+					ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 				default:
 					ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 						// Restart route 1: the request kept, the attempt discarded.

@@ -83,7 +83,7 @@ func parkedBy(t *testing.T, e *authorizeEndpoint, query string) *ceremony.AuthCo
 func answeredAtOnceTo(t *testing.T, e *authorizeEndpoint, query string) *url.URL {
 	t.Helper()
 	stubAuthenticatedBrowser(e.database, e.userSessionManager)
-	e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
+	e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 	rr := e.get(t, query)
 
@@ -281,7 +281,7 @@ func TestHandleAuthorizeGet_SilenceIsReadThroughTheSharedSplitter(t *testing.T) 
 	answeredAtOnce := func(t *testing.T, prompt string) url.Values {
 		t.Helper()
 		e := newSyntaxAuthorizeEndpoint(t)
-		e.ceremonyStore.On("ClearAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
+		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, syntaxQuery(map[string]string{"prompt": prompt}))
 

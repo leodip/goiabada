@@ -128,7 +128,7 @@ func HandleAuthCompletedGet(
 				auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
 					"user_id": user.Id,
 				})
-				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 					redirectErrorFromAuthContext(authContext, client, "access_denied", userDisabledDescription))
 				return
 			case beforeBindingGenerationMoved:
@@ -270,7 +270,7 @@ func HandleAuthCompletedGet(
 
 		switch answer {
 		case afterBindingNoScope:
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, client,
 					"access_denied", "The user is not authorized to access any of the requested scopes"))
 		case afterBindingConsent:

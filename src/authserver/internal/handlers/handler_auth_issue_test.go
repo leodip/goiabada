@@ -193,7 +193,7 @@ func TestHandleIssueGet(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -422,7 +422,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// is dropped. The stub writes a sentinel where the CookieStore would write that
 		// cookie, so the committed response is what carries the assertion below.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -493,7 +493,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// branch: a failed clear writes no cookie, so the browser keeps the auth context whether
 		// this answers 500 or redirects, and the client is owed its error response either way
 		// (#141 decision 7). It used to get nothing at all.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -557,7 +557,7 @@ func TestHandleIssueGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort.
@@ -618,7 +618,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// The other half of the same family: the clear succeeds and it is the ordinary
 		// login_required refusal that cannot be committed. This 500 predates #141 and is pinned
 		// separately so a future edit cannot delete either copy unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -736,7 +736,7 @@ func TestHandleIssueGet(t *testing.T) {
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 
@@ -822,7 +822,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).
 			Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 		f.serve()
 
@@ -849,8 +849,8 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			Return(&record.Code{Id: 2, Code: "second-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Twice()
-		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(clearErr).Once()
-		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req, testCeremonyId).Return(clearErr).Once()
+		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req, testCeremonyId).Return(nil).Once()
 		f.pageRenderer.On("InternalServerError", mock.Anything, f.req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, clearErr)
 		})).Run(func(args mock.Arguments) {
@@ -939,7 +939,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 
 			f.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			f.ceremonyStore.AssertExpectations(t)
 		})
 
@@ -948,7 +948,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 
 			f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
 				Return(nil, errs.WithStack(refusal.sentinel)).Once()
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
 
 			f.serve()
 
@@ -987,7 +987,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 		assert.NotContains(t, f.rr.Header().Get("Location"), "/auth/level1")
 		assert.NotContains(t, f.rr.Header().Get("Location"), "code=")
 		f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		f.pageRenderer.AssertExpectations(t)
 	})
@@ -1098,7 +1098,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			// The ceremony is restarted rather than ended, so the context survives to be
 			// rebuilt at /auth/level1.
-			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 			pageRenderer.AssertExpectations(t)
 			ceremonyStore.AssertExpectations(t)
@@ -1158,7 +1158,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			stubLiveSession(database, foreignSessionUserId)
 			stubClientProvenanceLookup(database)
-			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 			armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1241,7 +1241,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1372,7 +1372,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		stubClientProvenanceLookup(database)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1641,7 +1641,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1733,7 +1733,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return details["issue_access_token"] == false && details["issue_id_token"] == true
 		})).Return()
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1827,7 +1827,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			return details["issue_access_token"] == true && details["issue_id_token"] == true
 		})).Return()
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1900,7 +1900,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}), true, false).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1958,7 +1958,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			"user_id":           int64(123),
 			"client_identifier": "unknown-client",
 		}).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		// No clientName in the bind: renderRedirectBlocked leaves it out when the client could
 		// not be resolved, because saying anything about the application would be a claim this
@@ -2471,7 +2471,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
 
 		clearError := errs.New("failed to clear auth context")
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(clearError)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(clearError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, clearError)
@@ -3323,7 +3323,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -3397,7 +3397,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// shows it under either ordering, while rr.Result() reads the snapshot taken when the
 		// status line was written.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -3475,7 +3475,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -3550,7 +3550,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Enabled: true,
 		}, nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -3624,7 +3624,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// login_required refusal that cannot be committed. This is the site's second and
 		// pre-existing 500, pinned separately so a future edit cannot delete either copy
 		// unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -3698,7 +3698,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -3780,7 +3780,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 				client.RedirectURIs = []record.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -3917,7 +3917,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 				Return(&record.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 				Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
-			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
@@ -4007,7 +4007,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.Anything).Return()
-	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 		mock.Anything).Return(nil)
 
@@ -4106,7 +4106,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			}).Return()
 
 			if tc.silent {
-				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+				ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 			} else {
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -4255,7 +4255,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, wantFiltered, user).
 				Return(tc.filtered, nil)
 
-			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
@@ -4476,7 +4476,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// is as unacceptable here as a code would be. The page is rendered anyway and the browser
 		// keeps a replayable auth context, which is the lesser of the two: a replay arrives back at
 		// this same gate and is refused again for as long as the registration is gone.
-		ceremonyStore.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).
 			Return(errs.New("the session store is unreachable"))
 
 		// This expectation IS the assertion. A handler that returned after the failed clear never
@@ -4541,7 +4541,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			}).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		// The clear worked and it is the page that cannot be produced. There is nowhere left to
 		// report the refusal, so the 500 is the last resort, and it stays a 500: falling back to a
@@ -4644,7 +4644,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is the
 		// code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		ceremonyStore.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).
 			Return(errs.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
@@ -4691,7 +4691,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		rr := httptest.NewRecorder()
 		armEmptiedScope(t, "form_post", database, ceremonyStore, auditLogger, userSessionManager, permissionChecker, req)
 
-		ceremonyStore.On("ClearAuthContext", rr, req).
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).
 			Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
@@ -4736,7 +4736,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// access_denied refusal that cannot be committed. This is the site's second and separate
 		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "unable to parse template")

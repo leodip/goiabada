@@ -67,31 +67,33 @@ func TestGetAuthContext(t *testing.T) {
 	})
 }
 
+// ceremonyA and ceremonyB are the two sign-ins of one browser the conditional writes are decided
+// between: A the one a step loaded, B the one another tab's /auth/authorize replaced it with.
+const ceremonyA, ceremonyB = "ceremony-a", "ceremony-b"
+
+// loadedStep seeds ceremony A as /auth/authorize stores it and loads it on a step's request,
+// which is what every step does before it saves or clears.
+func loadedStep(t *testing.T, ceremonyStore *Store) ([]*http.Cookie, *http.Request, *AuthContext) {
+	t.Helper()
+	seedReq := browserRequest(nil)
+	seedRR := httptest.NewRecorder()
+	require.NoError(t, ceremonyStore.ReplaceAuthContext(seedRR, seedReq,
+		&AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", AuthState: AuthStateRequiresLevel1}))
+	cookies := seedRR.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	stepReq := browserRequest(cookies)
+	loaded, err := ceremonyStore.GetAuthContext(stepReq)
+	require.NoError(t, err)
+	require.Equal(t, ceremonyA, loaded.CeremonyId)
+	return cookies, stepReq, loaded
+}
+
 // SaveAuthContext is every step's save after /auth/authorize, and it lands only while the browser
 // session still holds the ceremony the step loaded (#579). Each case loads ceremony A as a step's
 // request would, lets another request of the same browser write in between, and then has the step
 // save: what the save answers, and what the session then holds, is the whole of the rule.
 func TestSaveAuthContext(t *testing.T) {
-	const ceremonyA, ceremonyB = "ceremony-a", "ceremony-b"
-
-	// loadedStep seeds ceremony A as /auth/authorize stores it and loads it on a step's request,
-	// which is what every step does before it saves.
-	loadedStep := func(t *testing.T, ceremonyStore *Store) ([]*http.Cookie, *http.Request, *AuthContext) {
-		t.Helper()
-		seedReq := browserRequest(nil)
-		seedRR := httptest.NewRecorder()
-		require.NoError(t, ceremonyStore.ReplaceAuthContext(seedRR, seedReq,
-			&AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", AuthState: AuthStateRequiresLevel1}))
-		cookies := seedRR.Result().Cookies()
-		require.Len(t, cookies, 1)
-
-		stepReq := browserRequest(cookies)
-		loaded, err := ceremonyStore.GetAuthContext(stepReq)
-		require.NoError(t, err)
-		require.Equal(t, ceremonyA, loaded.CeremonyId)
-		return cookies, stepReq, loaded
-	}
-
 	t.Run("LandsWhileTheSessionHoldsItsCeremony", func(t *testing.T) {
 		ceremonyStore, _, _ := newRealStore(t)
 		cookies, stepReq, loaded := loadedStep(t, ceremonyStore)
@@ -338,6 +340,7 @@ const (
 var (
 	errLoadRefused   = errors.New("the backend refused the read")
 	errCreateRefused = errors.New("the backend refused the write")
+	errUpdateRefused = errors.New("the backend refused the update")
 )
 
 // armableBackend is the in-memory backend with the two operations Store reaches through the
@@ -348,6 +351,11 @@ type armableBackend struct {
 	*sessiontest.MemoryBackend
 	failLoad   bool
 	failCreate bool
+	failUpdate bool
+
+	// created counts the rows written, so a case can say no row was created for a browser that
+	// held none.
+	created int
 }
 
 func (b *armableBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
@@ -361,7 +369,22 @@ func (b *armableBackend) Create(ctx context.Context, id string, data []byte, aut
 	if b.failCreate {
 		return time.Time{}, errCreateRefused
 	}
+	b.created++
 	return b.MemoryBackend.Create(ctx, id, data, authenticated)
+}
+
+func (b *armableBackend) Update(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	if b.failUpdate {
+		return time.Time{}, errUpdateRefused
+	}
+	return b.MemoryBackend.Update(ctx, id, data, authenticated)
+}
+
+func (b *armableBackend) UpdateIfUnchanged(ctx context.Context, id string, expected, data []byte, authenticated bool) (time.Time, error) {
+	if b.failUpdate {
+		return time.Time{}, errUpdateRefused
+	}
+	return b.MemoryBackend.UpdateIfUnchanged(ctx, id, expected, data, authenticated)
 }
 
 // newRealStore returns the Store, the session store behind it and the backend behind that. The
@@ -486,6 +509,7 @@ func largeAuthContext() *AuthContext {
 		long += "scope" + string(rune('a'+i%26)) + ":permission "
 	}
 	return &AuthContext{
+		CeremonyId:  "large-ceremony",
 		AuthState:   AuthStateReadyToIssueCode,
 		ClientId:    "test-client",
 		UserId:      123,
@@ -495,14 +519,15 @@ func largeAuthContext() *AuthContext {
 	}
 }
 
+// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session still
+// holds it (#579). The cases mirror TestSaveAuthContext's: the step loads ceremony A, another
+// request of the same browser writes in between, and the step clears.
 func TestClearAuthContext(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
+	t.Run("ClearsTheCeremonyTheSessionHolds", func(t *testing.T) {
 		ceremonyStore, store, _ := newRealStore(t)
-		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
-		})
+		cookies, stepReq, _ := loadedStep(t, ceremonyStore)
 
-		err := ceremonyStore.ClearAuthContext(httptest.NewRecorder(), browserRequest(cookies))
+		err := ceremonyStore.ClearAuthContext(httptest.NewRecorder(), stepReq, ceremonyA)
 		require.NoError(t, err)
 
 		// The row the browser's cookie names is the one the clear emptied.
@@ -511,28 +536,123 @@ func TestClearAuthContext(t *testing.T) {
 		requireSessionDecoded(t, store, browserRequest(cookies))
 	})
 
+	t.Run("AnotherCeremonyWrittenInBetweenIsNotCleared", func(t *testing.T) {
+		// The issue's interleaving at an error answer or at issuance: tab A's step has loaded
+		// ceremony A, tab B's /auth/authorize replaces it with ceremony B, and tab A's step ends.
+		ceremonyStore, _, _ := newRealStore(t)
+		cookies, stepReq, _ := loadedStep(t, ceremonyStore)
+
+		require.NoError(t, ceremonyStore.ReplaceAuthContext(httptest.NewRecorder(), browserRequest(cookies),
+			&AuthContext{CeremonyId: ceremonyB, ClientId: "client-b", AuthState: AuthStateRequiresLevel1}))
+
+		rr := httptest.NewRecorder()
+		err := ceremonyStore.ClearAuthContext(rr, stepReq, ceremonyA)
+
+		require.ErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies(), "a clear that wrote nothing tells the browser nothing")
+		stored, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
+		require.NoError(t, err)
+		assert.Equal(t, ceremonyB, stored.CeremonyId, "the newer ceremony is what the browser session keeps")
+		assert.Equal(t, "client-b", stored.ClientId)
+	})
+
+	t.Run("NoCeremonyLeftInBetweenWritesNothing", func(t *testing.T) {
+		ceremonyStore, store, _ := newRealStore(t)
+		cookies, stepReq, _ := loadedStep(t, ceremonyStore)
+
+		other := browserRequest(cookies)
+		sess, err := store.Get(other, realStoreSessionName)
+		require.NoError(t, err)
+		delete(sess.Values, sessionkeys.AuthContext)
+		sess.Values["unrelated"] = "written meanwhile"
+		require.NoError(t, store.Save(other, httptest.NewRecorder(), sess))
+
+		rr := httptest.NewRecorder()
+		err = ceremonyStore.ClearAuthContext(rr, stepReq, ceremonyA)
+
+		require.ErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies())
+		stored, err := store.Get(browserRequest(cookies), realStoreSessionName)
+		require.NoError(t, err)
+		assert.Equal(t, "written meanwhile", stored.Values["unrelated"])
+	})
+
+	t.Run("ASessionGoneInBetweenIsNotRecreated", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies, stepReq, _ := loadedStep(t, ceremonyStore)
+		createdBefore := backend.created
+
+		require.NoError(t, backend.Delete(context.Background(), sessionIdentifier(t, store, cookies[0])))
+
+		rr := httptest.NewRecorder()
+		err := ceremonyStore.ClearAuthContext(rr, stepReq, ceremonyA)
+
+		require.ErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies())
+		assert.Equal(t, createdBefore, backend.created, "no row is written in place of the one that is gone")
+		_, err = backend.Load(context.Background(), sessionIdentifier(t, store, cookies[0]))
+		require.ErrorIs(t, err, sessionstore.ErrNotFound)
+	})
+
+	t.Run("ASessionNeverStoredWritesNothing", func(t *testing.T) {
+		// A browser that holds no session holds no ceremony, so there is nothing of this step's to
+		// clear and nothing is created to clear it in.
+		ceremonyStore, _, backend := newRealStore(t)
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.ClearAuthContext(rr, browserRequest(nil), ceremonyA)
+
+		require.ErrorIs(t, err, ErrCeremonyReplaced)
+		assert.Empty(t, rr.Result().Cookies(), "no cookie names a session")
+		assert.Zero(t, backend.created, "no row is created")
+	})
+
+	t.Run("AnUnrelatedWriteInBetweenIsKept", func(t *testing.T) {
+		ceremonyStore, store, _ := newRealStore(t)
+		cookies, stepReq, _ := loadedStep(t, ceremonyStore)
+
+		other := browserRequest(cookies)
+		sess, err := store.Get(other, realStoreSessionName)
+		require.NoError(t, err)
+		sess.Values["unrelated"] = "written meanwhile"
+		require.NoError(t, store.Save(other, httptest.NewRecorder(), sess))
+
+		require.NoError(t, ceremonyStore.ClearAuthContext(httptest.NewRecorder(), stepReq, ceremonyA))
+
+		stored, err := store.Get(browserRequest(cookies), realStoreSessionName)
+		require.NoError(t, err)
+		assert.Equal(t, "written meanwhile", stored.Values["unrelated"])
+		_, err = ceremonyStore.GetAuthContext(browserRequest(cookies))
+		require.ErrorIs(t, err, ErrNoAuthContext)
+	})
+
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyA, ClientId: "test-client"}),
 		})
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.ClearAuthContext(rr, browserRequest(cookies))
+		err := ceremonyStore.ClearAuthContext(rr, browserRequest(cookies), ceremonyA)
 
 		require.ErrorIs(t, err, errLoadRefused)
+		require.NotErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies())
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
+		// A write the backend refuses is a fault, the 500 a failed clear answers, and not a
+		// ceremony the browser replaced.
 		ceremonyStore, _, backend := newRealStore(t)
-		backend.failCreate = true
+		_, stepReq, _ := loadedStep(t, ceremonyStore)
+		backend.failUpdate = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.ClearAuthContext(rr, browserRequest(nil))
+		err := ceremonyStore.ClearAuthContext(rr, stepReq, ceremonyA)
 
-		require.ErrorIs(t, err, errCreateRefused)
+		require.ErrorIs(t, err, errUpdateRefused)
+		require.NotErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies())
 	})
 
@@ -553,7 +673,7 @@ func TestClearAuthContext(t *testing.T) {
 		browserReq := replayThroughJar(t, seedRes, nil)
 
 		rr := httptest.NewRecorder()
-		err = ceremonyStore.ClearAuthContext(rr, browserReq)
+		err = ceremonyStore.ClearAuthContext(rr, browserReq, largeAuthContext().CeremonyId)
 		require.NoError(t, err)
 		http.Redirect(rr, browserReq, clientRefusalURL, http.StatusFound)
 
@@ -593,7 +713,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		http.Redirect(rr, browserReq, clientRefusalURL, http.StatusFound)
-		err = ceremonyStore.ClearAuthContext(rr, browserReq)
+		err = ceremonyStore.ClearAuthContext(rr, browserReq, largeAuthContext().CeremonyId)
 		require.NoError(t, err)
 
 		res := rr.Result()
@@ -610,6 +730,82 @@ func TestClearAuthContext(t *testing.T) {
 		// browser is holding something unreadable".
 		requireSessionDecoded(t, store, replayed)
 	})
+}
+
+// DiscardAuthContext is /auth/authorize's clear, before its immediate error answer. It starts no
+// step of a ceremony, so it holds no ceremony to check: it ends whatever the browser session held,
+// as /auth/authorize's own saves replace it. But a browser that holds no stored session gets no
+// row and no cookie for the clear of nothing (#579 decision 6).
+func TestDiscardAuthContext(t *testing.T) {
+	t.Run("ClearsWhateverCeremonyTheSessionHolds", func(t *testing.T) {
+		ceremonyStore, store, _ := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyB, ClientId: "client-b"}),
+		})
+
+		rr := httptest.NewRecorder()
+		require.NoError(t, ceremonyStore.DiscardAuthContext(rr, browserRequest(cookies)))
+
+		assert.NotEmpty(t, rr.Result().Cookies())
+		_, err := ceremonyStore.GetAuthContext(browserRequest(cookies))
+		require.ErrorIs(t, err, ErrNoAuthContext)
+		requireSessionDecoded(t, store, browserRequest(cookies))
+	})
+
+	t.Run("ABrowserWithNoSessionGetsNoRowAndNoCookie", func(t *testing.T) {
+		ceremonyStore, _, backend := newRealStore(t)
+		rr := httptest.NewRecorder()
+
+		require.NoError(t, ceremonyStore.DiscardAuthContext(rr, browserRequest(nil)))
+
+		assert.Empty(t, rr.Result().Cookies(), "no cookie names a session holding nothing")
+		assert.Zero(t, backend.created, "no row is created to hold nothing")
+	})
+
+	t.Run("ABrowserWhoseSessionIsGoneGetsNoRowAndNoCookie", func(t *testing.T) {
+		// A cookie naming a row that has expired or was removed is a browser with no stored
+		// session, as the store reads it.
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyB}),
+		})
+		require.NoError(t, backend.Delete(context.Background(), sessionIdentifier(t, store, cookies[0])))
+		createdBefore := backend.created
+		rr := httptest.NewRecorder()
+
+		require.NoError(t, ceremonyStore.DiscardAuthContext(rr, browserRequest(cookies)))
+
+		assert.Empty(t, rr.Result().Cookies())
+		assert.Equal(t, createdBefore, backend.created)
+	})
+
+	t.Run("SessionError", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyB}),
+		})
+		backend.failLoad = true
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.DiscardAuthContext(rr, browserRequest(cookies))
+
+		require.ErrorIs(t, err, errLoadRefused)
+		assert.Empty(t, rr.Result().Cookies())
+	})
+
+	t.Run("SaveError", func(t *testing.T) {
+		ceremonyStore, store, backend := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyB}),
+		})
+		backend.failUpdate = true
+		rr := httptest.NewRecorder()
+
+		err := ceremonyStore.DiscardAuthContext(rr, browserRequest(cookies))
+
+		require.ErrorIs(t, err, errUpdateRefused)
+		assert.Empty(t, rr.Result().Cookies())
+	})
 
 	t.Run("RealStoreSaveThenClearLastWins", func(t *testing.T) {
 		// The /auth/authorize shape at sites 1 and 2: ReplaceAuthContext has already written the
@@ -623,7 +819,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		err := ceremonyStore.ReplaceAuthContext(rr, req, largeAuthContext())
 		require.NoError(t, err)
-		err = ceremonyStore.ClearAuthContext(rr, req)
+		err = ceremonyStore.DiscardAuthContext(rr, req)
 		require.NoError(t, err)
 		http.Redirect(rr, req, clientRefusalURL, http.StatusFound)
 
@@ -647,21 +843,30 @@ func TestClearAuthContext(t *testing.T) {
 	t.Run("RealStoreClearThenSaveLastWins", func(t *testing.T) {
 		// Control for the case above. Without it, that case passes just as well if the jar simply
 		// discards everything when a cookie name repeats, which would make it evidence of nothing.
-		// Here the later write is the save, so the jar must keep the context.
+		// Here the later write is the save, so the jar must keep the context. The browser holds a
+		// session already, so the clear writes too and both reach the wire.
 		//
 		// No requireSessionDecoded here either: keeping the context requires a successful decode.
-		ceremonyStore, _, _ := newRealStore(t)
+		ceremonyStore, store, _ := newRealStore(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			sessionkeys.AuthContext: authContextJSON(t, &AuthContext{CeremonyId: ceremonyB}),
+		})
 
 		req := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/authorize?client_id=test-client", nil)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.ClearAuthContext(rr, req)
+		err := ceremonyStore.DiscardAuthContext(rr, req)
 		require.NoError(t, err)
 		err = ceremonyStore.ReplaceAuthContext(rr, req, largeAuthContext())
 		require.NoError(t, err)
 		http.Redirect(rr, req, clientRefusalURL, http.StatusFound)
 
-		authContext, err := ceremonyStore.GetAuthContext(replayThroughJar(t, rr.Result(), nil))
+		res := rr.Result()
+		require.Len(t, res.Cookies(), 2, "both writes reach the wire, or this controls nothing")
+		authContext, err := ceremonyStore.GetAuthContext(replayThroughJar(t, res, nil))
 		require.NoError(t, err)
 		assert.Equal(t, AuthStateReadyToIssueCode, authContext.AuthState)
 	})

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -302,7 +303,7 @@ func HandleAuthOtpPost(
 		// as incorrect, and answered with this form's QR code again, a loop no code could leave.
 		// Found reviewing the ACR and AMR page against the code before 1.7.0.
 		if keyURL != "" && user.OTPEnabled {
-			endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id)
+			endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
 			return
 		}
 
@@ -384,7 +385,7 @@ func HandleAuthOtpPost(
 				return
 			}
 			if !established {
-				endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id)
+				endLostEnrolment(pageRenderer, ceremonyStore, w, r, user.Id, authContext.CeremonyId)
 				return
 			}
 			verifiedGeneration = generation
@@ -448,12 +449,19 @@ func HandleAuthOtpPost(
 // an enable or a successful second factor, and the passcode's step stays spent, as #111 already
 // accepts for a failed enable.
 func endLostEnrolment(pageRenderer PageRenderer, ceremonyStore CeremonyStore, w http.ResponseWriter,
-	r *http.Request, userId int64) {
+	r *http.Request, userId int64, ceremonyId string) {
 
 	slog.WarnContext(r.Context(), "the account's authenticator changed during the enrolment, so nothing was stored and the sign-in ends",
 		"user_id", userId)
 
-	if err := ceremonyStore.ClearAuthContext(w, r); err != nil {
+	err := ceremonyStore.ClearAuthContext(w, r, ceremonyId)
+	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
+		// The browser has moved on to another sign-in, which is not the one whose authenticator
+		// changed, so it is answered as every replaced step is (#579 decision 2).
+		answerCeremonyReplaced(pageRenderer, w, r)
+		return
+	}
+	if err != nil {
 		slog.ErrorContext(r.Context(), "unable to clear the auth context while ending a lost enrolment, rendering the page anyway",
 			"error", err)
 	}

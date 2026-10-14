@@ -142,7 +142,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 		Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
-	ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 	HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,

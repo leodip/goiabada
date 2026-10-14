@@ -105,9 +105,9 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 						ac.DeferredErrorDescription == administrativeScopeRefusedDescription
 				})).Return(nil).Once()
 			case answerClient:
-				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).Once()
+				ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil).Once()
 			case blockedPage:
-				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil).Once()
+				ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil).Once()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 					"/auth_redirect_blocked.html", mock.Anything).Return(nil).Once()
 			}

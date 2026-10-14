@@ -49,7 +49,12 @@ type CeremonyStore interface {
 	// ReplaceAuthContext is /auth/authorize's save, which starts a ceremony and so replaces
 	// whatever the browser session held.
 	ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
-	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
+	// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session
+	// still holds it and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
+	ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// DiscardAuthContext is /auth/authorize's clear, which ends whatever ceremony the browser
+	// session held, and writes nothing for a browser with no stored session.
+	DiscardAuthContext(w http.ResponseWriter, r *http.Request) error
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
 	// change to match a cookie store's structural immunity to session fixation (#266).

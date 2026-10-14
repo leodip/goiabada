@@ -115,7 +115,7 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 			userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
-			ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+			ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil)
 
 			handler.ServeHTTP(rr, req)
 
@@ -248,7 +248,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Empty(t, rr.Header().Get("Location"), "a fault answers the client nothing")
-			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -328,7 +328,7 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			} else {
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
 				stubRegisteredRedirectURI(database, "https://example.com")
-				ceremonyStore.On("ClearAuthContext", rr, req).Return(nil)
+				ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil)
 			}
 
 			handler.ServeHTTP(rr, req)

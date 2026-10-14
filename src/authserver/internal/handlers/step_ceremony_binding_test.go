@@ -134,7 +134,7 @@ func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
 
 				assert.Equal(t, step.accepted, stored.AuthState, "a refused request leaves the ceremony as it was")
 				ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-				ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			})
 		}
 

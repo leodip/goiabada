@@ -285,7 +285,7 @@ func HandleConsentPost(
 			// error redirect has committed never reaches the wire, so the browser would keep an
 			// auth context in requires_consent, which GET /auth/consent accepts, and replaying it
 			// could turn access_denied into a code for the same authorization request (#141).
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, refusedClient,
 					"access_denied", "The user did not provide consent"))
 		case consentSubmissionNothingHeld:
@@ -298,7 +298,7 @@ func HandleConsentPost(
 			// selection an administrator emptied, which is not. The wording and the error code
 			// are /auth/completed's for the same condition arriving later, so the same removal
 			// gets one answer wherever it lands (#241 decision 3).
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext, client,
 					"access_denied", "The user is not authorized to access any of the requested scopes"))
 		default:

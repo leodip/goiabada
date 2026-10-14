@@ -96,7 +96,7 @@ func HandleAuthLevel1CompletedGet(
 		// shortcut is reached only with a valid session and that request was answered at once, but
 		// the delivery does not depend on which one it is.
 		if authContext.DeferredErrorCode != "" {
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS, authContext.CeremonyId,
 				redirectErrorFromAuthContext(authContext,
 					clientProvenance(r.Context(), database, authContext.ClientId),
 					authContext.DeferredErrorCode, authContext.DeferredErrorDescription))
