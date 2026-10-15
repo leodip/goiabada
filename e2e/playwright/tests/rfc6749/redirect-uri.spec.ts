@@ -176,24 +176,3 @@ test("a loopback redirect URI takes any port, and the token request must name th
   expectTokenError(otherPort, "invalid_grant");
   await signIn.context.close();
 });
-
-test("before sending a code over a registered redirect URI without TLS, the user is warned (section 3.1.2.1 SHOULD)", async ({
-  page,
-  browser,
-  clients,
-  users,
-}) => {
-  // No warning today. #575 refuses such a URI when it is saved, after which this test can no
-  // longer register one: delete it then.
-  test.fail();
-  const user = await users.create();
-  const { client } = await browserSignInClient(page, clients);
-  const plainHttp = `http://${new URL(testRedirectUri).host}/callback`;
-  await addRedirectUri(page, client.id, plainHttp);
-  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
-
-  const { redirect, page: warning } = await followAuthorize(signIn.context.request, codeRequest(client.identifier, { redirect_uri: plainHttp }).params);
-  expect(redirect?.href, "the code was sent without a warning").toBeUndefined();
-  expect(warning?.status).toBe(200);
-  await signIn.context.close();
-});

@@ -5751,8 +5751,9 @@ components:
           maxItems: 60
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
-            longer than 2048 bytes, or one listed twice is refused with VALIDATION_ERROR before
-            anything is written.
+            longer than 2048 bytes, one listed twice, or a plain http one on a host other than
+            loopback (127.0.0.1, [::1] or localhost) that expectedRedirectURIs does not list is
+            refused with VALIDATION_ERROR before anything is written.
           items:
             type: string
         expectedRedirectURIs:

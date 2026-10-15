@@ -1,7 +1,7 @@
 // RFC 9700 sections 2.1, 4.1 and 2.6 on redirect URIs. A requested redirect URI is compared with the
 // registered ones by simple string comparison (RFC 3986 section 6.2.1), with no patterns, and the only
 // exception is the port of a loopback redirect URI (RFC 8252 section 7.3). And no authorization
-// response travels without TLS: the auth server allows no http redirect URI but on loopback. The near
+// response travels without TLS: the auth server saves no http redirect URI but on loopback. The near
 // misses ../rfc6749/redirect-uri.spec.ts tries are not repeated here; dynamic registration is in
 // client-registration.system.ts.
 import type { Page } from "@playwright/test";
@@ -100,34 +100,10 @@ test("only a loopback redirect URI takes any port: [::1] and localhost as 127.0.
 });
 
 test("an http redirect URI on a host other than loopback is refused at registration (section 2.6 MUST NOT)", async ({ page, clients }) => {
-  // #575: the admin console saves it today. Remove this line once it is refused.
-  test.fail();
   const client = await clients.create();
   const plainHttp = `http://${host}/callback`;
 
   expect(await tryAddRedirectUri(page, client.id, plainHttp), "refused with the error dialog").toBe(false);
   await page.reload();
   await expect(page.locator("#redirectURIsTable")).not.toContainText(plainHttp);
-});
-
-test("no authorization response is sent to an http redirect URI on a host other than loopback (section 2.6 MUST NOT)", async ({
-  page,
-  browser,
-  clients,
-  users,
-}) => {
-  // #575: the code is sent today. That issue refuses such a URI when it is saved and keeps a stored
-  // one working, so once it lands this test can no longer register its URI: delete it then, and the
-  // test above holds the rule.
-  test.fail();
-  const user = await users.create();
-  const { client } = await browserSignInClient(page, clients);
-  const plainHttp = `http://${host}/callback`;
-  await addRedirectUri(page, client.id, plainHttp);
-  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
-
-  const { redirect, page: refusal } = await followAuthorize(signIn.context.request, codeRequest(client.identifier, { redirect_uri: plainHttp }).params);
-  expect(redirect?.href, "a code was sent without TLS").toBeUndefined();
-  expectRefusedOnPage(refusal!, /http/);
-  await signIn.context.close();
 });

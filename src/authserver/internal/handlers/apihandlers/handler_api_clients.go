@@ -1046,6 +1046,13 @@ func HandleClientRedirectURIsPut(
 			writeJSONError(w, "expectedRedirectURIs is required: send the redirect URIs as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
+		expected := make([]string, 0, len(req.ExpectedRedirectURIs))
+		loaded := make(map[string]struct{}, len(req.ExpectedRedirectURIs))
+		for _, raw := range req.ExpectedRedirectURIs {
+			uri := strings.TrimSpace(raw)
+			expected = append(expected, uri)
+			loaded[uri] = struct{}{}
+		}
 
 		// The bounds are the model's, the same at dynamic client registration: at most
 		// RedirectURIsMaxPerClient per client, each at most RedirectURIMaxBytes, which the columns
@@ -1111,10 +1118,14 @@ func HandleClientRedirectURIsPut(
 			// an installation serving the console over http on a non-loopback host would
 			// lock its administrators out.
 			//
-			// Same accepted cost as the absolute-URI rule: the PUT replaces the whole set,
-			// so a client holding a legacy http row cannot save its list until that URI
-			// moves to https or loopback. The message names the offending URI.
-			if urlmatch.IsInsecureHTTPRedirectURI(uri) {
+			// For the same reason, a URI the caller loaded passes when the save carries it
+			// back. A legacy non-absolute row above does not, but that row is already refused
+			// at /auth/authorize; this one still works, and refusing it would block every
+			// other change to the list, removing a compromised callback included. Adding an
+			// http URI is what is refused, and the caller's word for what it loaded is
+			// checked: the transaction below answers 409 when the stored rows differ from it,
+			// so naming a new http URI there writes nothing (#575).
+			if _, wasLoaded := loaded[uri]; !wasLoaded && urlmatch.IsInsecureHTTPRedirectURI(uri) {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInsecureHTTP, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
@@ -1131,10 +1142,6 @@ func HandleClientRedirectURIsPut(
 			return
 		}
 
-		expected := make([]string, 0, len(req.ExpectedRedirectURIs))
-		for _, raw := range req.ExpectedRedirectURIs {
-			expected = append(expected, strings.TrimSpace(raw))
-		}
 		redirectURIKey := func(ru record.RedirectURI) string { return strings.TrimSpace(ru.URI) }
 		redirectURIId := func(ru record.RedirectURI) int64 { return ru.Id }
 

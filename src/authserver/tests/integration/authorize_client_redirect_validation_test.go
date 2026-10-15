@@ -9,8 +9,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientIdIsMissing(t *testing.T) {
@@ -289,50 +292,74 @@ func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *t
 		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
 }
 
-// TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillProceeds pins the other
-// half of the RFC 9700 section 2.6 fix: the http rule is a save gate, not an authorize
-// gate. A redirect URI stored before the rule keeps working at /auth/authorize, which is
-// what keeps an upgrade from locking out an integration that already runs over plain
-// http - including, in the worst case, the admin console's own client, whose redirect URIs
-// bootstrap seeds from GOIABADA_ADMINCONSOLE_BASEURL. The request below must proceed past
-// redirect validation and into the ceremony, not land on the refusal page.
-func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillProceeds(t *testing.T) {
+// TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode pins the
+// other half of the RFC 9700 section 2.6 fix: the http rule is a save gate, not an authorize
+// gate. A redirect URI stored before the rule keeps working, which is what keeps an upgrade
+// from locking out an integration that already runs over plain http - including, in the worst
+// case, the admin console's own client, whose redirect URIs bootstrap seeds from
+// GOIABADA_ADMINCONSOLE_BASEURL. So the whole ceremony runs and the code arrives at the stored
+// URI: a refusal page, an error page or a deferred error would each stop it short of /auth/issue
+// (#575).
+func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel1,
 	}
-	err := database.CreateClient(context.Background(), nil, client)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
-
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	stored := "http://app.example.com/callback"
-	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored}))
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier + "&redirect_uri=" + url.QueryEscape(stored)
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
+
+	requestState := fake.LetterN(8)
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(stored) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
+		"&scope=openid" +
+		"&state=" + requestState +
+		"&nonce=" + fake.LetterN(8)
 
 	httpClient := createHttpClient(t)
-
 	resp, err := httpClient.Get(destUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
 
-	title := strings.TrimSpace(doc.Find("h1").First().Text())
-	assert.NotEqual(t, "Unable to authorize", title,
-		"a stored http redirect URI must not be refused at /auth/authorize; the rule is a save gate only")
-	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Empty(t, errorMsg,
-		"validation must proceed past a stored http redirect URI into the ceremony")
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	location, err := url.Parse(resp.Header.Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, stored, location.Scheme+"://"+location.Host+location.Path,
+		"the code goes to the stored http redirect URI; the rule is a save gate only")
+	_, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, requestState, stateVal)
 }

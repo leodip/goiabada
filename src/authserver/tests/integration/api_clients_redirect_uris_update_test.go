@@ -596,3 +596,55 @@ func TestAPIClientRedirectURIsPut_PlainHTTPOnNonLoopbackRefused(t *testing.T) {
 	defer func() { _ = respOK.Body.Close() }()
 	assert.Equal(t, http.StatusOK, respOK.StatusCode, "https, loopback http and custom schemes must still be accepted")
 }
+
+// TestAPIClientRedirectURIsPut_AStoredPlainHTTPURIDoesNotBlockTheSave is the other side of the
+// save gate above: a plain-http URI stored before it still works, so a save carrying it back is
+// not refused, and the rest of the list stays editable around it. Adding a second one is still
+// refused, and so is naming one as loaded that is not stored, which the stored-rows check answers
+// with 409 before anything is written (#575).
+func TestAPIClientRedirectURIsPut_AStoredPlainHTTPURIDoesNotBlockTheSave(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := newRedirectURIsClient(t, "redir-legacy-http-")
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
+
+	legacy := "http://intranet.example.com/callback"
+	for _, uri := range []string{legacy, "https://compromised.example.com/callback"} {
+		require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: uri}))
+	}
+	loaded := readRedirectURIs(t, accessToken, client.Id)
+
+	// The compromised callback is removed and its replacement added, with the http row kept.
+	save := api.UpdateClientRedirectURIsRequest{
+		RedirectURIs:         []string{legacy, "https://replacement.example.com/callback"},
+		ExpectedRedirectURIs: loaded,
+	}
+	resp := makeAPIRequest(t, "PUT", baseURL, accessToken, save)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode, "a stored http URI must not block the save that carries it back")
+	assert.ElementsMatch(t, save.RedirectURIs, readRedirectURIs(t, accessToken, client.Id))
+	loaded = save.RedirectURIs
+
+	// A second http URI beside the stored one is an addition, and is refused by name.
+	added := "http://other.example.com/callback"
+	resp = makeAPIRequest(t, "PUT", baseURL, accessToken, api.UpdateClientRedirectURIsRequest{
+		RedirectURIs:         append([]string{added}, loaded...),
+		ExpectedRedirectURIs: loaded,
+	})
+	var body map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, "Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+added, body["error_description"])
+
+	// Naming it as loaded, to pass the gate, is checked against the stored rows: 409, nothing written.
+	resp = makeAPIRequest(t, "PUT", baseURL, accessToken, api.UpdateClientRedirectURIsRequest{
+		RedirectURIs:         append([]string{added}, loaded...),
+		ExpectedRedirectURIs: append([]string{added}, loaded...),
+	})
+	body = nil
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusConflict, resp.StatusCode)
+	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+	assert.ElementsMatch(t, loaded, readRedirectURIs(t, accessToken, client.Id), "a refused save writes nothing")
+}
