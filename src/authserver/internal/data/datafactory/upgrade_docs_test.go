@@ -66,6 +66,19 @@ func TestUpgradeRecordsTable_ARecordTwoRowsNameIsRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), `two rows for "database migrated"`)
 }
 
+// A row missing a cell is refused rather than skipped, so a complete copy in a later table cannot
+// stand in for it.
+func TestUpgradeRecordsTable_ARowMissingACellIsRefused(t *testing.T) {
+	const header = "| Record | When | Attributes |\n|---|---|---|\n"
+	page := "## How migrations run\n\n" + header + "| `database migrated` | A start migrated. |\n\n" +
+		header + "| `database migrated` | A start migrated. | `from`, `to` |\n"
+
+	_, err := upgradeRecordsTable(page)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "a row of 2 cells under a header of 3")
+}
+
 // schemaRecordsAStartWrites is each record the starts wrote about the schema, with the sorted
 // names of its attributes.
 func schemaRecordsAStartWrites(t *testing.T) map[string][]string {
@@ -101,9 +114,10 @@ func schemaRecordsAStartWrites(t *testing.T) map[string][]string {
 }
 
 // upgradeRecordsTable reads every table headed | Record | When | Attributes | under ## How
-// migrations run: each row's record, and the attributes its last cell names, sorted, none being
-// an empty list. A record two rows name is an error, whichever tables they are in, because the
-// check would hold only one of them to what a start writes.
+// migrations run: each row's record, and the attributes its Attributes column names, sorted, none
+// being an empty list. A record two rows name is an error, whichever tables they are in, because
+// the check would hold only one of them to what a start writes, and so is a row whose cells are
+// not its header's, which could not be read.
 func upgradeRecordsTable(page string) (map[string][]string, error) {
 	section, found := docsreader.SectionText(page, "## How migrations run")
 	if !found {
@@ -117,8 +131,9 @@ func upgradeRecordsTable(page string) (map[string][]string, error) {
 		}
 		holdsTable = true
 		for _, cells := range table.Rows {
-			if len(cells) != 3 {
-				continue
+			if len(cells) != len(table.Header) {
+				return nil, fmt.Errorf("%s: ## How migrations run has a row of %d cells under a header of %d: %q",
+					upgradePage, len(cells), len(table.Header), cells)
 			}
 			attrs := []string{}
 			if cell := cells[2]; cell != "none" {

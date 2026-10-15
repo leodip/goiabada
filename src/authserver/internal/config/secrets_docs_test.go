@@ -367,6 +367,20 @@ func TestKubernetesDocs_AKeyTwoRowsNameIsRefused(t *testing.T) {
 	}
 }
 
+// A row missing a cell is refused rather than skipped, so a complete row in a later table cannot
+// stand in for it.
+func TestKubernetesDocs_ARowMissingACellIsRefused(t *testing.T) {
+	const header = "| Secret | Key | Variable | Read by | Value |\n|---|---|---|---|---|\n"
+	section := header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | admin console |\n\n" +
+		header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | the password |\n"
+
+	_, err := contractTable(section)
+
+	if err == nil || !strings.Contains(err.Error(), "a row of 4 cells under a header of 5") {
+		t.Errorf("a row missing a cell was not refused: %v", err)
+	}
+}
+
 func TestKubernetesDocs_AContractWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
@@ -601,16 +615,17 @@ func secretContractFindings(root string) ([]string, error) {
 // contractTable reads every table whose header begins contractHeader: each row's Secret, Key and
 // Variable, its Read by, and whether its Value opens with "Optional". A key two rows name is an
 // error, whichever tables they are in, because the check would hold only one of them to the
-// manifests.
+// manifests, and so is a row whose cells are not its header's, which could not be read.
 func contractTable(section string) (map[secretRef]secretReader, error) {
 	rows := map[secretRef]secretReader{}
 	for _, table := range docsreader.Tables(section) {
-		if !strings.HasPrefix("| "+strings.Join(table.Header, " | ")+" |", contractHeader) {
+		if len(table.Header) < 5 || !strings.HasPrefix("| "+strings.Join(table.Header, " | ")+" |", contractHeader) {
 			continue
 		}
 		for _, cells := range table.Rows {
-			if len(cells) < 5 {
-				continue
+			if len(cells) != len(table.Header) {
+				return nil, fmt.Errorf("%s: %s has a row of %d cells under a header of %d: %q",
+					kubernetesSecretsPage, contractSection, len(cells), len(table.Header), cells)
 			}
 			cell := func(i int) string { return strings.Trim(strings.TrimSpace(cells[i]), "`") }
 			ref := secretRef{cell(0), cell(1), cell(2)}

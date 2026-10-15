@@ -155,6 +155,24 @@ func TestConceptDocs_AMissingDefaultsSectionStops(t *testing.T) {
 	}
 }
 
+// A row missing its default stops the check rather than dropping out of it, so a complete row in a
+// later table cannot stand in for it.
+func TestConceptDocs_ADefaultsRowMissingACellStops(t *testing.T) {
+	root := t.TempDir()
+	writeDefaultsFixture(t, root, "site/tokens.mdx", "## How long tokens last\n\n"+
+		"| Setting | Default |\n|---|---|\n| **Token expiration in seconds** |\n\n"+
+		"| Setting | Default |\n|---|---|\n| **Token expiration in seconds** | 300 |\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "## How long tokens last",
+			[]string{"Token expiration in seconds"}}, map[string]string{"Token expiration in seconds": "300"})
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "a row of 1 cells under a header of 2") {
+		t.Errorf("a row missing its default did not stop the check: %+v", report)
+	}
+}
+
 func TestConceptDocs_ADefaultsSectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeDefaultsFixture(t, root, "site/tokens.mdx", "## How long tokens last\n\nFive minutes.\n")
@@ -171,8 +189,8 @@ func TestConceptDocs_ADefaultsSectionWithNoTableStops(t *testing.T) {
 
 // assertDefaultsTable is the reporting half of the defaults check: one failure per row whose
 // default is not the seed's, per row naming a setting the section does not owe, and per owed
-// setting with no row; a stop for a section or table not found. A default is read as its first
-// word, so "300 (5 minutes)" is 300.
+// setting with no row; a stop for a section or table not found, or a row that cannot be read. A
+// default is read as its first word, so "300 (5 minutes)" is 300.
 func assertDefaultsTable(r guard.Reporter, root string, section defaultsSection, seeded map[string]string) {
 	r.Helper()
 	rows, err := defaultsTableRows(root, section)
@@ -201,9 +219,11 @@ func assertDefaultsTable(r guard.Reporter, root string, section defaultsSection,
 	}
 }
 
-// defaultsTableRows is the Setting and Default table of the section heading opens, one row per
+// defaultsTableRows is the Setting and Default tables of the section heading opens, one row per
 // setting: its name and the default the page shows. The section is read through the shared reader,
-// and the table the section's tables hold whose header names the two columns.
+// and every table in it whose header names the two columns. A row whose cells are not its
+// header's is an error, so a row missing its default stops the check rather than dropping out of
+// it.
 func defaultsTableRows(root string, section defaultsSection) ([][2]string, error) {
 	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
@@ -217,10 +237,12 @@ func defaultsTableRows(root string, section defaultsSection) ([][2]string, error
 		}
 		found = true
 		for _, cells := range table.Rows {
-			if len(cells) >= 2 {
-				value, _, _ := strings.Cut(cells[1], " ")
-				rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
+			if len(cells) != len(table.Header) {
+				return nil, fmt.Errorf("%s: %s has a row of %d cells under a header of %d: %q",
+					section.page, section.heading, len(cells), len(table.Header), cells)
 			}
+			value, _, _ := strings.Cut(cells[1], " ")
+			rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
 		}
 	}
 	if !found {

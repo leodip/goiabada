@@ -57,9 +57,10 @@ type flagRow struct {
 	text  string
 }
 
-// readFlagRows reads the table in the section that heading opens. A page without the section, or a
-// section with no row naming a flag, is an error: a check that read nothing would pass whatever the
-// page said.
+// readFlagRows reads the table in the section that heading opens. A page without the section, a
+// section with no row naming a flag, or a row whose first cell names none, is an error: a check
+// that read nothing would pass whatever the page said, and a row dropped for a flag written
+// without its code span would pass whatever the row said.
 func readFlagRows(page []byte, heading string) ([]flagRow, error) {
 	text, found := docsreader.SectionText(string(page), heading)
 	if !found {
@@ -67,16 +68,14 @@ func readFlagRows(page []byte, heading string) ([]flagRow, error) {
 	}
 	var rows []flagRow
 	for _, row := range docsreader.Rows(text) {
-		if len(row) == 0 {
-			continue
-		}
 		var names []string
 		for _, match := range flagCode.FindAllStringSubmatch(row[0], -1) {
 			names = append(names, match[1])
 		}
-		if len(names) > 0 {
-			rows = append(rows, flagRow{flags: names, text: strings.Join(row, " | ")})
+		if len(names) == 0 {
+			return nil, fmt.Errorf("the %q section has a row whose first cell names no flag in a code span: %q", heading, row)
 		}
+		rows = append(rows, flagRow{flags: names, text: strings.Join(row, " | ")})
 	}
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("the %q section has no table row naming a flag", heading)
@@ -190,6 +189,17 @@ func TestFlagTable_AMissingSectionOrTableStops(t *testing.T) {
 				t.Errorf("read %d rows from a page with no flags table, want an error", len(rows))
 			}
 		})
+	}
+}
+
+// A row whose flag is not in a code span stops the check rather than dropping out of it.
+func TestFlagTable_ARowNamingNoFlagStops(t *testing.T) {
+	page := "## Flags\n\n| Flag | What it does |\n|---|---|\n| `--type` | x |\n| --does-not-exist | An unknown flag. |\n"
+
+	_, err := readFlagRows([]byte(page), flagsHeading)
+
+	if err == nil || !strings.Contains(err.Error(), "--does-not-exist") {
+		t.Errorf("a row naming no flag in a code span did not stop the check naming it: %v", err)
 	}
 }
 
