@@ -152,6 +152,15 @@ func TestWriteResponseParams(t *testing.T) {
 			expected:    "https://app.example.com/cb?error_uri=https%3A%2F%2Fstale&lang=en&error=access_denied&error_description=denied",
 		},
 		{
+			// Every authorization response writes iss (RFC 9207 section 2), so it is the
+			// response's whether or not the params at hand name it (#576).
+			name:        "A registered iss is dropped even when unsent",
+			redirectURI: "https://app.example.com/cb?iss=https%3A%2F%2Fevil.example&lang=en",
+			params:      []responseParam{{"code", "fresh-code"}},
+			reserved:    authorizationResponseParamNames,
+			expected:    "https://app.example.com/cb?lang=en&code=fresh-code",
+		},
+		{
 			name:        "A percent-encoded reserved name is dropped even when unsent",
 			redirectURI: "https://app.example.com/cb?%73tate=fixed&lang=en",
 			params:      []responseParam{{"code", "fresh-code"}},

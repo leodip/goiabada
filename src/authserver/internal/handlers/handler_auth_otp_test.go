@@ -486,7 +486,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// anywhere else fails here (#434).
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, "https://admin.test/account/profile", rr.Header().Get("Location"))
 		ceremonyStore.AssertExpectations(t)
 	})
@@ -1125,7 +1125,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the code was accepted")
 		// An accepted code shows no form, so it reads neither the client nor its logo.
@@ -1307,7 +1307,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit", "rotate", "save"}, calls,
@@ -2136,7 +2136,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 			require.NoError(t, err)
 			authContext.AuthState = ceremony.AuthStateLevel2OTP
-			assert.Equal(t, http.StatusFound, post(handler, otpCode), "verification %d should succeed", i+1)
+			assert.Equal(t, http.StatusSeeOther, post(handler, otpCode), "verification %d should succeed", i+1)
 		}
 	})
 }

@@ -491,7 +491,8 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 	// Answered before the missing-context redirect only when a context exists: with none stored the
 	// load fails first, so a request naming any ceremony, or none, ends at the account page.
 	t.Run("a missing context is still the account page, whatever the request names", func(t *testing.T) {
-		for _, method := range []string{http.MethodGet, http.MethodPost} {
+		// A POST is answered with a 303 and a GET with a 302 (#576, decision 6).
+		for method, status := range map[string]int{http.MethodGet: http.StatusFound, http.MethodPost: http.StatusSeeOther} {
 			t.Run(method, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)
 				ceremonyStore := handlersmocks.NewCeremonyStore(t)
@@ -504,7 +505,7 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 				_, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 				assert.False(t, ok)
-				assert.Equal(t, http.StatusFound, rr.Code)
+				assert.Equal(t, status, rr.Code)
 				assert.Equal(t, testAdminConsoleBaseURL+"/account/profile", rr.Header().Get("Location"))
 			})
 		}

@@ -195,7 +195,7 @@ func TestHandleAuthPwdPost_AnAcceptedPasswordReadsNoClient(t *testing.T) {
 
 	m.post().ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusFound, rr.Code)
+	assert.Equal(t, http.StatusSeeOther, rr.Code)
 	assert.Equal(t, "https://auth.test/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 	m.database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	m.database.AssertNotCalled(t, "ClientHasLogo", mock.Anything, mock.Anything, mock.Anything)

@@ -20,18 +20,18 @@ Your app doesn't call this endpoint itself: it sends the user's browser there. T
    Host: auth.example.com
    ```
 
-2. The user signs in. When the browser comes back, check that `state` is the one you sent:
+2. The user signs in. When the browser comes back, check that `state` is the one you sent, and that `iss` is the auth server's issuer:
 
    ```http
    HTTP/1.1 302 Found
-   Location: https://app.example.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=af0ifjsldkj
+   Location: https://app.example.com/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=af0ifjsldkj&iss=https%3A%2F%2Fauth.example.com
    ```
 
 3. Redeem the code at the [token endpoint](/reference/endpoints/token/) within 60 seconds, with the same `redirect_uri` and your code verifier.
 
 </Steps>
 
-If the request is refused, the browser comes back with `error` and `error_description` in place of `code`, for example `?error=invalid_scope&error_description=...&state=af0ifjsldkj`. Some refusals never come back: see [When an error reaches your app](#when-an-error-reaches-your-app).
+If the request is refused, the browser comes back with `error` and `error_description` in place of `code`, for example `?error=invalid_scope&error_description=...&state=af0ifjsldkj&iss=https%3A%2F%2Fauth.example.com`. Some refusals never come back: see [When an error reaches your app](#when-an-error-reaches-your-app).
 
 ## GET or POST
 
@@ -110,7 +110,7 @@ The auth server never sends a browser to a client's redirect URI with an error b
 | The browser has a valid session, and the request doesn't have `prompt=login` | The error is sent at once |
 | Anything else, `prompt=login` included | The user is asked for their password, and the error is sent once they've entered it, before any one-time code. That sign-in creates no session. |
 
-The error, its description, the response mode and `state` are the same whichever way it's sent. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) for what each case looks like.
+The error, its description, the response mode, `state` and `iss` are the same whichever way it's sent. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) for what each case looks like.
 
 ## Administrative scopes
 
@@ -127,7 +127,9 @@ The allowance is read again just before the code or the implicit flow's tokens a
 
 ## The response
 
-A successful response carries `code`, and `state` when your app sent one. An error response carries `error`, `error_description`, and `state` when your app sent one. `error_description` is English, holds no character outside those RFC 6749 allows in it, and is at most 512 bytes.
+A successful response carries `code`, `state` when your app sent one, and `iss`. An error response carries `error`, `error_description`, `state` when your app sent one, and `iss`. `error_description` is English, holds no character outside those RFC 6749 allows in it, and is at most 512 bytes.
+
+`iss` is the auth server's issuer: the same value as `issuer` in the [discovery document](/reference/endpoints/discovery-and-jwks/) and the `iss` claim in every token. Every response carries it, success or error, in every response mode, and the discovery document says so with `authorization_response_iss_parameter_supported: true`. Compare it with the issuer you expect before you read anything else in the response. An app that signs in with more than one authorization server learns from it which one answered, so a response from one can't pass for another's ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html)). Many client libraries check it for you once discovery advertises it.
 
 `response_mode` says how they travel:
 
@@ -136,6 +138,8 @@ A successful response carries `code`, and `state` when your app sent one. An err
 | `query`, the default for `response_type=code` | A `302 Found` to the redirect URI with the parameters in its query string. The redirect URI's own query is kept. |
 | `fragment`, the default for the implicit flow | A `302 Found` to the redirect URI with the parameters after `#`. The browser keeps them away from your server, so your page's JavaScript reads them. |
 | `form_post` | A page that posts the parameters to the redirect URI as a form, on its own, as [OAuth 2.0 Form Post Response Mode](https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html) defines |
+
+A redirect that answers the consent form, such as the `access_denied` a user who declines gets, is a `303 See Other` in place of the `302 Found`. The browser follows both with a GET, so your redirect URI sees the same request either way.
 
 Whichever way it travels, a response, success or error, comes with `Cache-Control: no-store` and `Pragma: no-cache`, so neither the browser nor a proxy keeps a copy of it.
 

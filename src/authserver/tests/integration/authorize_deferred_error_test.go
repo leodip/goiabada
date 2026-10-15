@@ -104,7 +104,7 @@ func TestAuthorize_Deferred_QueryMode_DeliversAfterLogin(t *testing.T) {
 	assert.Equal(t,
 		deferralRedirectURI+"?error=invalid_scope"+
 			"&error_description="+url.QueryEscape(invalidScopeDescription)+
-			"&state="+deferralStateEscaped,
+			"&state="+deferralStateEscaped+issParam(t),
 		location)
 }
 
@@ -128,7 +128,7 @@ func TestAuthorize_Deferred_FragmentMode_DeliversAfterLogin(t *testing.T) {
 	assert.Equal(t,
 		deferralRedirectURI+"#error=invalid_scope"+
 			"&error_description="+url.QueryEscape(invalidScopeDescription)+
-			"&state="+deferralStateEscaped,
+			"&state="+deferralStateEscaped+issParam(t),
 		location)
 }
 
@@ -157,7 +157,7 @@ func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 	assert.Equal(t,
 		deferralRedirectURI+"?error=invalid_request"+
 			"&error_description="+url.QueryEscape("The max_age parameter must be a non-negative integer.")+
-			"&state="+deferralStateEscaped,
+			"&state="+deferralStateEscaped+issParam(t),
 		resp.Header.Get("Location"))
 }
 

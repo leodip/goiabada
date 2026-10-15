@@ -98,7 +98,7 @@ func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) 
 
 	assert.Len(t, issued.Query()["state"], 1, "exactly one state must reach the client, got %q", location)
 	assert.Equal(t,
-		fmt.Sprintf("https://app.example.com/callback?lang=en&code=%s&state=%s", code, registeredQueryStateEscaped),
+		fmt.Sprintf("https://app.example.com/callback?lang=en&code=%s&state=%s", code, registeredQueryStateEscaped)+issParam(t),
 		location)
 }
 
@@ -140,7 +140,7 @@ func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 	assert.Equal(t,
 		"https://app.example.com/callback?lang=en&error=login_required"+
 			"&error_description=User+authentication+is+required"+
-			"&state="+registeredQueryStateEscaped,
+			"&state="+registeredQueryStateEscaped+issParam(t),
 		location)
 }
 

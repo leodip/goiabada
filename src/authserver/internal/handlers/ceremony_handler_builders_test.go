@@ -23,9 +23,12 @@ func testCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore
 }
 
 // testClientErrorResponder is the client-error responder the route table would build from these
-// doubles.
-func testClientErrorResponder(database *datamocks.Database, pageRenderer PageRenderer, templateFS fs.FS) *ClientErrorResponder {
-	return NewClientErrorResponder(database, pageRenderer, templateFS)
+// doubles, with formPostFS in place of the built-in templates, so a test can render a form_post page
+// that fails to parse or to execute.
+func testClientErrorResponder(database *datamocks.Database, pageRenderer PageRenderer, formPostFS fs.FS) *ClientErrorResponder {
+	responder := NewClientErrorResponder(database, pageRenderer)
+	responder.formPostFS = formPostFS
+	return responder
 }
 
 type authorizeGetDeps struct {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,7 +94,7 @@ func TestAPISettingsGeneralPut_DisablingSelfRegKeepsTheVerificationChoice(t *tes
 	// First enable both
 	preReq := api.UpdateSettingsGeneralRequest{
 		AppName:                 "App X",
-		Issuer:                  "issuer-" + fake.LetterN(6),
+		Issuer:                  "https://issuer-" + strings.ToLower(fake.LetterN(6)) + ".example.org",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
 		PasswordPolicy: "low",
@@ -134,7 +135,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	// App name too long (>30)
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
 		AppName:        strings.Repeat("a", 31),
-		Issuer:         "issuer-valid",
+		Issuer:         "https://example.org",
 		PasswordPolicy: "low",
 	})
 	defer func() { _ = resp1.Body.Close() }()
@@ -143,58 +144,28 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
 	assert.Equal(t, "App name is too long. The maximum length is 30 characters.", err1.ErrorDescription)
 
-	// Issuer contains ':' but invalid URI
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         "http://",
-		PasswordPolicy: "low",
-	})
-	defer func() { _ = resp2.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
-	var err2 api.ErrorResponse
-	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Invalid issuer. Please enter a valid URI.", err2.ErrorDescription)
-
-	// Issuer invalid identifier format
-	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         "invalid issuer",
-		PasswordPolicy: "low",
-	})
-	defer func() { _ = resp3.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
-	var err3 api.ErrorResponse
-	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", err3.ErrorDescription)
-
-	// Issuer with consecutive dashes
-	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         "aa--bb",
-		PasswordPolicy: "low",
-	})
-	defer func() { _ = resp4.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
-	var err4 api.ErrorResponse
-	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.", err4.ErrorDescription)
-
-	// Issuer too short (<3)
-	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
-		AppName:        "App",
-		Issuer:         "aa",
-		PasswordPolicy: "low",
-	})
-	defer func() { _ = resp5.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
-	var err5 api.ErrorResponse
-	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "Issuer is too short. The minimum length is 3 characters.", err5.ErrorDescription)
+	// The issuer is an https URL with no query, fragment or user info, or the base URL (#576
+	// decision 3): a URL with no host, a plain name, an identifier with a space and an http URL
+	// other than the base URL are each refused with the sentence stating the rule.
+	const issuerRule = "Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL."
+	for _, issuer := range []string{"http://", "https://", "goiabada", "invalid issuer", "http://auth.example.org", "https://example.org?tenant=a"} {
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+			AppName:        "App",
+			Issuer:         issuer,
+			PasswordPolicy: "low",
+		})
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, issuer)
+		var errResp api.ErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = resp.Body.Close()
+		assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode, issuer)
+		assert.Equal(t, issuerRule, errResp.ErrorDescription, issuer)
+	}
 
 	// Issuer too long (>60)
 	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
 		AppName:        "App",
-		Issuer:         strings.Repeat("a", 61),
+		Issuer:         "https://example.org/" + strings.Repeat("a", 41),
 		PasswordPolicy: "low",
 	})
 	defer func() { _ = resp6.Body.Close() }()
@@ -206,7 +177,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	// Invalid password policy
 	resp7 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
 		AppName:        "App",
-		Issuer:         "issuer-valid",
+		Issuer:         "https://example.org",
 		PasswordPolicy: "invalid-policy",
 	})
 	defer func() { _ = resp7.Body.Close() }()
@@ -214,6 +185,63 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 	var err7 api.ErrorResponse
 	_ = json.NewDecoder(resp7.Body).Decode(&err7)
 	assert.Equal(t, "Invalid password policy", err7.ErrorDescription)
+}
+
+// PUT: the base URL is the one issuer the rule accepts whatever its scheme, since discovery is
+// fetched under it and a new install seeds it, http on a deployment with no TLS (#576 decision 3).
+func TestAPISettingsGeneralPut_TheBaseURLIsAnAcceptedIssuer(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) { settings.Issuer = "https://before.example.org" })
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+		AppName:        "App",
+		Issuer:         appConfig.AuthServer.BaseURL,
+		PasswordPolicy: "low",
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, appConfig.AuthServer.BaseURL, stored.Issuer)
+}
+
+// PUT: a stored issuer the rule refuses stands until the operator changes it, and the other
+// general settings save around it, because the rule applies only to an issuer that differs from
+// the stored one (#576 decision 4). Changing it to another value the rule refuses is refused.
+func TestAPISettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(t *testing.T) {
+	const legacyIssuer = "goiabada"
+	before := changeSettings(t, func(settings *record.Settings) { settings.Issuer = legacyIssuer })
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+		AppName:                 "Saved around the issuer",
+		Issuer:                  legacyIssuer,
+		SelfRegistrationEnabled: !before.SelfRegistrationEnabled,
+		PasswordPolicy:          "low",
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, legacyIssuer, stored.Issuer)
+	assert.Equal(t, "Saved around the issuer", stored.AppName)
+	assert.Equal(t, !before.SelfRegistrationEnabled, stored.SelfRegistrationEnabled)
+
+	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+		AppName:        "Saved around the issuer",
+		Issuer:         legacyIssuer + "-changed",
+		PasswordPolicy: "low",
+	})
+	defer func() { _ = resp2.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
+
+	stored, err = database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, legacyIssuer, stored.Issuer)
 }
 
 // Test implicit flow enabled setting
@@ -394,9 +422,8 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 }
 
 // TestAPISettingsGeneralPut_AngleBracketsRejected covers the two checks this endpoint carries. The
-// issuer one matters only on the URL branch: the identifier branch's regex has always refused "<"
-// with its own message, while url.ParseRequestURI accepts it in a path or a host, so an issuer
-// holding markup used to reach the iss claim of every token (#275).
+// issuer rule accepts "<" in an https URL's path or host, so an issuer holding markup would reach
+// the iss claim of every token without the issuer's own check (#275).
 func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 	before := restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
@@ -409,10 +436,10 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 	}{
 		{"app name", api.UpdateSettingsGeneralRequest{
 			AppName:        "Acme <the third>",
-			Issuer:         "issuer-valid",
+			Issuer:         "https://example.org",
 			PasswordPolicy: "low",
 		}, "validator.settings.app_name_angle_brackets"},
-		{"issuer, URL branch", api.UpdateSettingsGeneralRequest{
+		{"issuer", api.UpdateSettingsGeneralRequest{
 			AppName:        "Acme",
 			Issuer:         "https://example.org/<b>",
 			PasswordPolicy: "low",

@@ -58,6 +58,10 @@ func HandleWellKnownOIDCConfigGet(
 			CodeChallengeMethodsSupported:     []string{"S256"},
 			RequestParameterSupported:         false,
 			RequestURIParameterSupported:      false,
+			// Every authorization response carries iss, whatever form the issuer setting has: the
+			// value is the issuer above, so the three that RFC 9207 section 2.4 has a client compare
+			// are one (#576, decision 2).
+			AuthorizationResponseIssParameterSupported: true,
 		}
 
 		// Include registration endpoint if DCR is enabled (RFC 7591 §4)

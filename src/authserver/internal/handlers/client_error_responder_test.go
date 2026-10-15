@@ -24,28 +24,28 @@ func TestClientErrorResponder_AnswerClientAfterClear(t *testing.T) {
 
 	t.Run("a clear that worked answers the client with the input", func(t *testing.T) {
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+		req := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/consent", nil))
 
 		testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).
 			answerClientAfterClear(rr, req, input, nil)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t,
-			"https://example.com/callback?error=access_denied&error_description=The+user+did+not+provide+consent&state=abc123",
+			"https://example.com/callback?error=access_denied&error_description=The+user+did+not+provide+consent&state=abc123&iss=https%3A%2F%2Fissuer.example",
 			rr.Header().Get("Location"))
 	})
 
 	t.Run("a clear that failed answers server_error and logs the failure at error", func(t *testing.T) {
 		logged := logtest.CaptureSlog(t)
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+		req := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/consent", nil))
 
 		testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).
 			answerClientAfterClear(rr, req, input, assert.AnError)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t,
-			"https://example.com/callback?error=server_error&error_description=Internal+server+error&state=abc123",
+			"https://example.com/callback?error=server_error&error_description=Internal+server+error&state=abc123&iss=https%3A%2F%2Fissuer.example",
 			rr.Header().Get("Location"))
 		records := logged.Records()
 		require.Len(t, records, 1)
@@ -65,7 +65,7 @@ func TestClientErrorResponder_AnswerClientAfterClear(t *testing.T) {
 		t.Run("a response that cannot be written is the 500, "+name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			rr := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+			req := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/consent", nil))
 			pageRenderer.On("InternalServerError", rr, req, mock.Anything).Return().Once()
 
 			testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), pageRenderer,

@@ -21,8 +21,9 @@ func CORS(database corsDatabase) func(next http.Handler) http.Handler {
 			// StripSlashes runs below this middleware, so the slashed form of a covered path
 			// routes but would not receive the same CORS decision without normalizing here (#335).
 			switch strings.TrimSuffix(r.URL.Path, "/") {
-			case "/.well-known/openid-configuration", "/certs":
-				// always allow the discovery URL
+			case "/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/certs":
+				// Always allow both discovery addresses and the JWKS: they are public, and a client
+				// running in a browser, an MCP client among them, reads them cross-origin (#576).
 				return true
 			case "/auth/token", "/auth/logout", "/userinfo":
 				// Allow when any client has registered this origin. An index lookup, on the

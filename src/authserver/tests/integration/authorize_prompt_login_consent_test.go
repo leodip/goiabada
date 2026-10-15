@@ -506,7 +506,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Should redirect to client with access_denied error
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	errorCode, _, state := getErrorFromUrl(t, resp)
 

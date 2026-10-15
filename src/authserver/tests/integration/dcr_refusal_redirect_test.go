@@ -97,7 +97,7 @@ func TestDCR_Refusal_AdministratorClientStillRedirects(t *testing.T) {
 	_ = consentPage.Body.Close()
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode,
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode,
 		"an administrator-created client's error response is still delivered by redirect")
 
 	errorCode, _, _ := getErrorFromUrl(t, resp)

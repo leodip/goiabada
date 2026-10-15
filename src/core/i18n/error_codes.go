@@ -231,12 +231,10 @@ const (
 	// SMTP being off handler.smtp.not_enabled, and the test send's missing destination
 	// handler.settings_email.destination_required. The SMTP connection and send failures are one
 	// whole sentence per cause, never an opening and a cause joined at run time.
-	ErrCodeSettingsGeneralAppNameTooLong          = "handler.settings_general.app_name_too_long" // Args: {"max": int}
-	ErrCodeSettingsGeneralIssuerURIInvalid        = "handler.settings_general.issuer_uri_invalid"
-	ErrCodeSettingsGeneralIssuerIdentifierInvalid = "handler.settings_general.issuer_identifier_invalid"
-	ErrCodeSettingsGeneralIssuerTooShort          = "handler.settings_general.issuer_too_short" // Args: {"min": int}
-	ErrCodeSettingsGeneralIssuerTooLong           = "handler.settings_general.issuer_too_long"  // Args: {"max": int}
-	ErrCodeSettingsGeneralPasswordPolicyInvalid   = "handler.settings_general.password_policy_invalid"
+	ErrCodeSettingsGeneralAppNameTooLong        = "handler.settings_general.app_name_too_long" // Args: {"max": int}
+	ErrCodeSettingsGeneralIssuerURIInvalid      = "handler.settings_general.issuer_uri_invalid"
+	ErrCodeSettingsGeneralIssuerTooLong         = "handler.settings_general.issuer_too_long" // Args: {"max": int}
+	ErrCodeSettingsGeneralPasswordPolicyInvalid = "handler.settings_general.password_policy_invalid"
 
 	ErrCodeSettingsSessionsIdleTimeoutNotPositive       = "handler.settings_sessions.idle_timeout_not_positive"
 	ErrCodeSettingsSessionsMaxLifetimeNotPositive       = "handler.settings_sessions.max_lifetime_not_positive"

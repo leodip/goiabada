@@ -4,7 +4,9 @@
 <head>
     <!-- Internal auto-submitting page. Briefly visible (≤ 50ms) before
          JavaScript auto-submits the form. Not localized — title text is
-         effectively never seen by the user. -->
+         effectively never seen by the user. Always read from the built-in
+         templates, never from GOIABADA_AUTHSERVER_TEMPLATEDIR: it encodes
+         an authorization response on the wire. -->
     <title>Submit this form</title>
 </head>
 
@@ -37,6 +39,9 @@
         {{end}}
         {{if .state}}
             <input type="hidden" name="state" value="{{.state}}" />
+        {{end}}
+        {{if .iss}}
+            <input type="hidden" name="iss" value="{{.iss}}" />
         {{end}}
     </form>
 

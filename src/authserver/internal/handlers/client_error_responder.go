@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -32,18 +33,20 @@ type clientErrorDatabase interface {
 type ClientErrorResponder struct {
 	database     clientErrorDatabase
 	pageRenderer PageRenderer
-	templateFS   fs.FS
+	// formPostFS is where form_post.html is read from, for an error and for a success response alike.
+	formPostFS fs.FS
 }
 
-// NewClientErrorResponder builds the responder. templateFS is where form_post.html is read from, for
-// an error and for a success response alike.
-func NewClientErrorResponder(database clientErrorDatabase, pageRenderer PageRenderer,
-	templateFS fs.FS) *ClientErrorResponder {
-
+// NewClientErrorResponder builds the responder. Its form_post page is the built-in one whatever
+// GOIABADA_AUTHSERVER_TEMPLATEDIR says, so no constructor parameter can hand it the directory: the
+// page encodes an authorization response, and an operator's copy taken from an older release would
+// drop iss while discovery advertises it, which RFC 9207 section 2.4 has a client reject (#576,
+// decision 5).
+func NewClientErrorResponder(database clientErrorDatabase, pageRenderer PageRenderer) *ClientErrorResponder {
 	return &ClientErrorResponder{
 		database:     database,
 		pageRenderer: pageRenderer,
-		templateFS:   templateFS,
+		formPostFS:   web.TemplateFS(),
 	}
 }
 
@@ -223,6 +226,7 @@ func (rsp *ClientErrorResponder) RedirectWillBeEmitted(ctx context.Context, clie
 //     and 4.1.2.1 requires "the exact value received from the client", so a whitespace-only state is
 //     a real one (#146). The end_session_endpoint differs because its specification does: see
 //     buildPostLogoutRedirect.
+//   - iss, which writeAuthorizationResponse appends to every authorization response (RFC 9207).
 //
 // An implicit response type's error goes in the fragment, or in the form_post the request asked for,
 // never in the query, per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5 (implicitResponseMode, #231).
@@ -251,5 +255,5 @@ func (rsp *ClientErrorResponder) redirToClientWithError(w http.ResponseWriter, r
 		params = append(params, responseParam{"state", input.state})
 	}
 
-	return writeAuthorizationResponse(w, r, rsp.templateFS, effectiveResponseMode, input.redirectURI, params)
+	return writeAuthorizationResponse(w, r, rsp.formPostFS, effectiveResponseMode, input.redirectURI, params)
 }

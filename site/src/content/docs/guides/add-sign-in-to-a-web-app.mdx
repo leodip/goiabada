@@ -29,11 +29,11 @@ Most OpenID Connect libraries do every step below once you give them the discove
 4. The user signs in, and the browser comes back to your redirect URI:
 
    ```http
-   GET /callback?code=SplxlOBeZQQYbYS6WxSbIA&state=af0ifjsldkj HTTP/1.1
+   GET /callback?code=SplxlOBeZQQYbYS6WxSbIA&state=af0ifjsldkj&iss=https%3A%2F%2Fauth.example.com HTTP/1.1
    Host: app.example.com
    ```
 
-   Check that `state` is the one you kept. If it isn't, stop: the request didn't come from your app. If the browser brings `error` and `error_description` instead of `code`, the sign-in was refused, and the description says why.
+   Check that `state` is the one you kept. If it isn't, stop: the request didn't come from your app. Check too that `iss` is the auth server's issuer, the `issuer` in its [discovery document](/reference/endpoints/discovery-and-jwks/). If the browser brings `error` and `error_description` instead of `code`, the sign-in was refused, and the description says why.
 
 5. From your server, redeem the code at the token endpoint within 60 seconds, with your client secret and the code verifier:
 

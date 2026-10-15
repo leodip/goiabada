@@ -39,9 +39,23 @@ func createHttpClient(t *testing.T) *http.Client {
 	return client
 }
 
+// ceremonyRedirectStatus is the code a redirect of the sign-in ceremony carries, read from the request
+// that produced response: every redirect answering a POST is a 303, which RFC 9700 section 4.12
+// recommends after a request that may carry the user's credentials, and every one answering a GET is
+// a 302 (#576, decision 6).
+func ceremonyRedirectStatus(response *http.Response) int {
+	if response.Request != nil && response.Request.Method == http.MethodPost {
+		return http.StatusSeeOther
+	}
+	return http.StatusFound
+}
+
+// assertRedirect asserts response is a redirect to location's path, with ceremonyRedirectStatus's
+// code, so every flow that follows a Location checks it, and returns its Location.
 func assertRedirect(t *testing.T, response *http.Response, location string) string {
-	if response.StatusCode != http.StatusFound {
-		t.Fatalf("Expected status code %d, got %d", http.StatusFound, response.StatusCode)
+	expectedStatus := ceremonyRedirectStatus(response)
+	if response.StatusCode != expectedStatus {
+		t.Fatalf("Expected status code %d, got %d", expectedStatus, response.StatusCode)
 	}
 
 	redirectLocation, err := url.Parse(response.Header.Get("Location"))

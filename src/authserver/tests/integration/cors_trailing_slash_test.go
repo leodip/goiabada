@@ -21,6 +21,10 @@ func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 		assertCorsPathPair(t, origin, "/certs", http.StatusOK)
 	})
 
+	t.Run("always allowed RFC 8414 discovery needs no database fixture", func(t *testing.T) {
+		assertCorsPathPair(t, origin, "/.well-known/oauth-authorization-server", http.StatusOK)
+	})
+
 	t.Run("database gated userinfo uses a registered origin", func(t *testing.T) {
 		client := &record.Client{
 			ClientIdentifier: "cors-slash-" + strings.ToLower(fake.LetterN(8)),

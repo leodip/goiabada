@@ -232,9 +232,7 @@ failures are one key per cause, each a whole sentence.
 | `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
 | `handler.account_logout.post_logout_redirect_uri_not_registered` | (none) | postLogoutRedirectUri is not registered for the client |
 | `handler.settings_general.app_name_too_long` | `max` (int) | App name is too long. The maximum length is {{.max}} characters. |
-| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Please enter a valid URI. |
-| `handler.settings_general.issuer_identifier_invalid` | (none) | Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores. |
-| `handler.settings_general.issuer_too_short` | `min` (int) | Issuer is too short. The minimum length is {{.min}} characters. |
+| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
 | `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
 | `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
 | `handler.settings_sessions.idle_timeout_not_positive` | (none) | User session - idle timeout in seconds must be greater than zero. |

@@ -43,10 +43,11 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 			"email", "email_verified", "address", "phone_number", "phone_number_verified",
 			"groups", "attributes",
 		},
-		TokenEndpointAuthMethodsSupported: []string{"client_secret_post", "client_secret_basic", "none"},
-		CodeChallengeMethodsSupported:     []string{"S256"},
-		RequestParameterSupported:         false,
-		RequestURIParameterSupported:      false,
+		TokenEndpointAuthMethodsSupported:          []string{"client_secret_post", "client_secret_basic", "none"},
+		CodeChallengeMethodsSupported:              []string{"S256"},
+		RequestParameterSupported:                  false,
+		RequestURIParameterSupported:               false,
+		AuthorizationResponseIssParameterSupported: true,
 	}
 }
 
@@ -124,4 +125,22 @@ func TestWellKnownConfig_WritesFalseRequestParameters(t *testing.T) {
 	}
 	_, present := fields["registration_endpoint"]
 	assert.False(t, present, "registration_endpoint stays omitted while DCR is off")
+}
+
+// TestWellKnownConfig_AdvertisesIssInAuthorizationResponses pins RFC 9207 section 3's flag on the
+// wire. Every authorization response carries iss, whatever form the issuer setting has, so the flag
+// is true for every issuer, a plain http one included (#576, decision 2). RFC 9207 section 3 reads
+// an absent flag as false, and a client then ignores the iss it receives.
+func TestWellKnownConfig_AdvertisesIssInAuthorizationResponses(t *testing.T) {
+	for _, issuer := range []string{"https://example.com", "http://localhost:9090"} {
+		t.Run(issuer, func(t *testing.T) {
+			encoded, err := json.Marshal(serveDiscovery(t, &record.Settings{Issuer: issuer}))
+			require.NoError(t, err)
+
+			var fields map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(encoded, &fields))
+
+			assert.Equal(t, "true", string(fields["authorization_response_iss_parameter_supported"]))
+		})
+	}
 }
