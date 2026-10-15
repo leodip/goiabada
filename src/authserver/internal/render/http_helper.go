@@ -253,10 +253,10 @@ func localizedEmailTemplate(templateFS fs.FS, templateName, locale string) strin
 			continue
 		}
 		suffix := strings.TrimSuffix(strings.TrimPrefix(name, stem+"."), ext)
-		tag, err := language.Parse(suffix)
+		tag, parseErr := language.Parse(suffix)
 		// A suffix that is not a well-formed language tag, or a second copy of
 		// a language already listed, is not a choice this email offers.
-		if err != nil || seen[tag] {
+		if parseErr != nil || seen[tag] {
 			continue
 		}
 		seen[tag] = true
