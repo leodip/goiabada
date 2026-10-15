@@ -1,3 +1,12 @@
+// Package docsreader reads the docs site's Markdown the way the docs tests read it: the section a
+// heading opens and the tables inside it. Every docs test reads sections and tables through this
+// package, so a fix to how a heading inside a fence, an escaped pipe or a code span in a cell is
+// read is made once (#536).
+//
+// It is a leaf of its own rather than a file in core/guard because the setup wizard's docs tests
+// read through it too, and a test the wizard reaches may not import core/guard, whose dependencies
+// would land in the wizard's go.sum (#500). It imports nothing but `core/errs` and the standard
+// library, and its own tests do the same, so the wizard's go.sum stays as it is.
 package docsreader
 
 import (
@@ -7,16 +16,6 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 )
-
-// The docs site's Markdown, read the way the docs tests read it: the section a heading opens and
-// the tables inside it. Every docs test reads sections and tables through this package, so a fix to
-// how a heading inside a fence, an escaped pipe or a code span in a cell is read is made once
-// (#536).
-//
-// It is a leaf of its own rather than a file in core/guard because the setup wizard's docs tests
-// read through it too, and a test the wizard reaches may not import core/guard, whose dependencies
-// would land in the wizard's go.sum (#500). It imports nothing but `core/errs` and the standard
-// library, and its own tests do the same, so the wizard's go.sum stays as it is.
 
 // SectionText is the text of the section heading opens in an already-read page: the lines after
 // the heading up to the next heading of the same or higher level outside a code fence, the fenced
@@ -58,6 +57,7 @@ func SectionText(page, heading string) (text string, found bool) {
 // SectionText reads it. An empty heading reads the whole page. A page that cannot be read, or one
 // with no such section, is an error, so a check that read nothing cannot pass as one that did.
 func Section(root, page, heading string) (string, error) {
+	//nolint:gosec // G304: root is the repo's own docs tree and page a test-given path, never request input
 	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(page)))
 	if err != nil {
 		return "", errs.Errorf("reading %s: %w", page, err)
