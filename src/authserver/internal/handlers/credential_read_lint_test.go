@@ -19,9 +19,10 @@ import (
 // and accounthandlers/handler_account_register_test.go cover the replacement; the lint covers the
 // spelling coming back.
 //
-// The list below is this module's, not a shared one. It must not carry "state": handler_authorize.go
-// reads .FormValue("state") at two sites, and OIDC Core 3.1.2.1 requires the authorization endpoint
-// to accept both GET and POST, so that name has a lawful query source here. The admin console has no
+// The list below is this module's, not a shared one. It must not carry "state": the authorization
+// endpoint reads it from the query and a form body merged (authorizeParameters), and OIDC Core
+// 3.1.2.1 requires that endpoint to accept both GET and POST, so that name has a lawful query
+// source here. The admin console has no
 // such endpoint, which is why its list is the longer one.
 //
 // handlers and middleware are named again beneath the internal/ tree as coverage floors. They are
@@ -66,7 +67,7 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		//
 		// The closing delimiter is what makes "code" safe to list: the walk matches
 		// .FormValue("code") and never .FormValue("code_challenge") or
-		// .FormValue("code_challenge_method"), both of which handler_authorize.go reads
+		// .FormValue("code_challenge_method"), both of which the authorization endpoint reads
 		// legitimately from the authorization request.
 		`"code"`,
 		`"code_verifier"`,

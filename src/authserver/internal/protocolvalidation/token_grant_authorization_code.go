@@ -280,7 +280,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// branch, which mints none, so holding a code IS the proof of the code flow. The error
 	// emitter's gate reaches the same rule from the other side, deriving the flag from the
 	// ceremony's response type, because it runs where no code exists yet to prove it
-	// (redirectWillBeEmitted). RFC 8252 flexibility is therefore required rather
+	// (RedirectWillBeEmitted). RFC 8252 flexibility is therefore required rather
 	// than optional here, because a native app's code stores the requested URI with its
 	// ephemeral loopback port and would never exact-match the registered portless form. It
 	// can only be more permissive than the gate this same stored value already passed at

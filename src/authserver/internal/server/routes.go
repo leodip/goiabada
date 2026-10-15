@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
@@ -46,8 +47,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
-	userSessionManager := usersession.NewManager(s.sessionStore, sessionkeys.AuthServerSessionName, s.database,
-		s.cfg.AuthServer.IsCookieSecure())
+	userSessionManager := usersession.NewManager(s.database)
 	otpSecretGenerator := otp.NewKeyGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.cfg.AuthServer.BaseURL, s.cfg.AdminConsole.BaseURL, s.dataCipher, userSessionManager)
 	// The tokens the token endpoint and /auth/issue answer with, and the token requests refused,
@@ -126,23 +126,30 @@ func (s *Server) initRoutes(branches appBranches) {
 	publicSettingsHandler := handlers.NewPublicSettings(s.database)
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)
 
+	// One route boundary and one client-error responder, shared by every ceremony route: the
+	// ceremony load, its id check, the state gate, the step redirects and the error responses to a
+	// client are each written once.
+	ceremonyBoundary := handlers.NewCeremonyBoundary(httpHelper, ceremonyStore, auditLogger, baseURL, adminConsoleBaseURL)
+	clientErrorResponder := handlers.NewClientErrorResponder(s.database, httpHelper, s.templateFS)
+
 	pages.Route("/auth", func(r chi.Router) {
 		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the
 		// POST arrives cross-site without the Lax session cookie and must not touch the browser's
 		// own session (#246).
-		r.Get("/authorize", handlers.HandleAuthorizeGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, baseURL))
-		r.Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authorizeValidator, s.database, baseURL))
-		r.Get("/level1", handlers.HandleAuthLevel1Get(httpHelper, ceremonyStore, auditLogger, baseURL, adminConsoleBaseURL))
-		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, auditLogger, baseURL, adminConsoleBaseURL))
-		r.Get("/level2", handlers.HandleAuthLevel2Get(httpHelper, ceremonyStore, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-		r.Get("/completed", handlers.HandleAuthCompletedGet(httpHelper, ceremonyStore, userSessionManager, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
-		r.Get("/issue", handlers.HandleIssueGet(httpHelper, ceremonyStore, s.templateFS, codeIssuer, tokenIssuer, s.database, auditLogger, userSessionManager, permissionChecker, tokenMetrics, baseURL, adminConsoleBaseURL))
-		r.Get("/pwd", handlers.HandleAuthPwdGet(httpHelper, ceremonyStore, s.database, auditLogger, adminConsoleBaseURL))
-		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(httpHelper, ceremonyStore, s.database, auditLogger, rateLimiter, baseURL, adminConsoleBaseURL))
-		r.Get("/otp", handlers.HandleAuthOtpGet(httpHelper, ceremonyStore, s.database, otpSecretGenerator, auditLogger, adminConsoleBaseURL))
-		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(httpHelper, ceremonyStore, s.database, auditLogger, rateLimiter, s.dataCipher, baseURL, adminConsoleBaseURL))
-		r.Get("/consent", handlers.HandleConsentGet(httpHelper, ceremonyStore, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-		r.Post("/consent", handlers.HandleConsentPost(httpHelper, ceremonyStore, s.database, s.templateFS, auditLogger, permissionChecker, baseURL, adminConsoleBaseURL))
+		r.Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger))))
+		r.Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authflow.NewAuthorizationParking(authorizeValidator, s.database), baseURL))
+		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
+		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
+		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))
+		r.Get("/completed", handlers.HandleAuthCompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, handlers.NewDeviceCookie(s.cfg.AuthServer.IsCookieSecure()), authflow.NewCompletion(s.database, userSessionManager, auditLogger, permissionChecker)))
+		r.Get("/issue", handlers.HandleIssueGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewIssuance(s.database, codeIssuer, tokenIssuer, userSessionManager, permissionChecker, auditLogger, tokenMetrics)))
+		passwordPrompt := authflow.NewPasswordPrompt(s.database)
+		r.Get("/pwd", handlers.HandleAuthPwdGet(ceremonyBoundary, httpHelper, passwordPrompt))
+		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
+		r.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
+		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher)))
+		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
+		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
 		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
 		r.Post("/logout", handlers.HandleLogoutPost(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))
 	})

@@ -1,9 +1,11 @@
 package protocolvalidation
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,4 +87,38 @@ func TestAdministrativeScopeRefusal(t *testing.T) {
 	assert.Equal(t, "The client is not allowed to request the administrative scope 'authserver:manage'.",
 		refusal.Description())
 	assert.Equal(t, http.StatusBadRequest, refusal.HTTPStatus())
+}
+
+// administrativeScopeAuditRecorder records the one event LogAdministrativeScopeRefused writes.
+type administrativeScopeAuditRecorder struct {
+	event   string
+	details map[string]interface{}
+	calls   int
+}
+
+func (r *administrativeScopeAuditRecorder) Log(_ context.Context, auditEvent string, details map[string]interface{}) {
+	r.event = auditEvent
+	r.details = details
+	r.calls++
+}
+
+// TestLogAdministrativeScopeRefused_Payload pins the administrative_scope_refused payload field by
+// field, the one shape /auth/authorize, /auth/issue and the token endpoint all record (#499
+// decision 9).
+func TestLogAdministrativeScopeRefused_Payload(t *testing.T) {
+	client := &record.Client{Id: 7, ClientIdentifier: "my-reporting-tool"}
+	recorder := &administrativeScopeAuditRecorder{}
+
+	LogAdministrativeScopeRefused(context.Background(), recorder, client,
+		[]string{"authserver:manage", "authserver:admin-read"}, "refresh_token", 13)
+
+	require.Equal(t, 1, recorder.calls)
+	assert.Equal(t, audit.EventAdministrativeScopeRefused, recorder.event)
+	assert.Equal(t, map[string]interface{}{
+		"client_id":         int64(7),
+		"client_identifier": "my-reporting-tool",
+		"scopes":            []string{"authserver:manage", "authserver:admin-read"},
+		"checkpoint":        "refresh_token",
+		"user_id":           int64(13),
+	}, recorder.details)
 }

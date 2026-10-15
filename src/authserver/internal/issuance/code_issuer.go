@@ -73,8 +73,10 @@ type CreateCodeInput struct {
 	UserId              int64
 	AcrLevel            record.AcrLevel
 	AuthMethods         string
-	// AuthenticatedAt overrides the code's auth_time when set (prompt=none reuses the session's);
-	// nil or zero means the moment of issuance.
+	// AuthenticatedAt is the code's auth_time: the ceremony's, which /auth/completed set from the
+	// session it bound, or prompt=none from the session it reused. Required: IssueAuthCode refuses a
+	// nil or zero one rather than stamp the moment of issuance, which would tell a client checking
+	// max_age that the user had just authenticated.
 	AuthenticatedAt     *time.Time
 	AuthStateGeneration int64
 	SessionIdentifier   string
@@ -149,6 +151,15 @@ func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *Crea
 		return nil, errs.New("issuing an authorization code requires a transaction: the session row it takes first is released by an autocommitted statement")
 	}
 
+	// Refused before any statement, as the implicit arm refuses the same ceremony in
+	// authflow.Issuance: every ceremony that reaches issuance carries its auth time, so a missing
+	// one is a defect, and the clock in its place would be a claim that the user had just
+	// authenticated.
+	if input.AuthenticatedAt == nil || input.AuthenticatedAt.IsZero() {
+		return nil, errs.Errorf("the ceremony for user %v has no auth time to issue an authorization code with",
+			input.UserId)
+	}
+
 	// A code naming a one-time code is issued only while the user still has the authenticator it
 	// came from, asked on the user under the user's row lock, first in this transaction. /auth/issue
 	// asked a moment ago, but a removal committing since would otherwise see this code inserted after
@@ -179,6 +190,7 @@ func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *Crea
 // and the client lookup has to join it because sqlitedb sets SetMaxOpenConns(1), so a
 // nil-transaction read issued while tx holds the single connection waits for a connection tx itself
 // owns. That is a hang rather than an error, so neither statement may be reverted to nil (#139).
+// input.AuthenticatedAt is set: IssueAuthCode refused a nil or zero one.
 func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*record.Code, error) {
 
 	responseMode := input.ResponseMode
@@ -220,17 +232,11 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		codeChallengeMethod = sql.NullString{String: input.CodeChallengeMethod, Valid: true}
 	}
 
-	// Use provided AuthenticatedAt if set (for prompt=none), otherwise use current time
-	authenticatedAt := time.Now().UTC()
-	if input.AuthenticatedAt != nil && !input.AuthenticatedAt.IsZero() {
-		authenticatedAt = *input.AuthenticatedAt
-	}
-
 	code := &record.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
 		ClientId:            client.Id,
-		AuthenticatedAt:     authenticatedAt,
+		AuthenticatedAt:     *input.AuthenticatedAt,
 		UserId:              input.UserId,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,

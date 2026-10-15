@@ -112,7 +112,12 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		}, nil).Once()
 		prepare(pageRenderer, auditLogger, database, rr, req)
 
-		HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+		buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		}).ServeHTTP(rr, req)
 
 		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -122,9 +127,10 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	t.Run("at exactly the limit the ceremony matches and the sign-in proceeds", func(t *testing.T) {
 		serve(t, len(body), func(pageRenderer *handlersmocks.PageRenderer, _ *handlersmocks.AuditLogger,
 			database *datamocks.Database, rr *httptest.ResponseRecorder, req *http.Request) {
-			// The first read past the ceremony gate. Failing it ends the case there, which is all
-			// this side needs to show: the body was read and the gate passed.
-			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+			// The first read past the ceremony gate, the account the address names. Failing it ends
+			// the case there, which is all this side needs to show: the body was read and the gate
+			// passed.
+			database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").
 				Return(nil, assert.AnError).Once()
 			pageRenderer.On("InternalServerError", rr, req, mock.Anything).Return().Once()
 		})

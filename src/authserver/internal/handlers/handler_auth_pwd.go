@@ -1,312 +1,149 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"net/http"
 	"strings"
-	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// authPwdDatabase is what the password hop needs: the client and the user being authenticated.
-//
-// It embeds the client display port because the screen renders through getClientDisplayInfo.
-//
-// No session lookup: the GET used to read the browser's session to prefill the email field, but
-// GetUserSessionBySessionIdentifier never loads the session's User, so the address was always
-// empty. It was removed rather than repaired, because prefilling an ended session's address is
-// what a shared machine should not do (#248, #436).
-type authPwdDatabase interface {
-	clientDisplayDatabase
-
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-}
-
+// HandleAuthPwdGet is GET /auth/pwd, which accepts level1_password and renders the password form
+// with the client block authflow.PasswordPrompt returns.
 func HandleAuthPwdGet(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
-	ceremonyStore CeremonyStore,
-	database authPwdDatabase,
-	auditLogger AuditLogger,
-	adminConsoleBaseURL string,
+	prompt *authflow.PasswordPrompt,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		settings, authContext, ok := boundary.beginStep(w, r, ceremony.AuthStateLevel1Password)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel1Password) {
-			return
-		}
-
-		settings, ok := reqctx.SettingsFrom(r.Context())
-		if !ok {
-			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-
-		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
+		displayInfo, err := prompt.Run(r.Context(), authContext)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
-		if client == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
-			return
-		}
 
-		displayInfo := getClientDisplayInfo(r.Context(), database, client)
-
-		bind := map[string]interface{}{
-			"error": nil,
-			// The rendered form says which ceremony rendered it, and HandleAuthPwdPost refuses a
-			// submission naming any other one. Without it, a password typed into this form after a
-			// second /auth/authorize replaced the auth context would finish that other request's
-			// authorization instead, and where that client requires no consent the code is issued
-			// without the user seeing any screen at all (#79).
-			"ceremonyId":  authContext.CeremonyId,
-			"smtpEnabled": settings.SMTPEnabled,
-			// The Register link goes to a page that answers not-found unless registration is
-			// available, so the form offers it only then (#526 decision 2).
-			"registrationAvailable":   settings.IsSelfRegistrationAvailable(),
-			"layoutShowClientSection": displayInfo.ShowSection,
-			"layoutClientName":        displayInfo.ClientName,
-			"layoutHasClientLogo":     displayInfo.HasLogo,
-			"layoutClientLogoUrl":     displayInfo.LogoURL,
-			"layoutClientDescription": displayInfo.Description,
-			"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-		}
-
-		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
+		renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo, nil, "")
 	}
 }
 
+// HandleAuthPwdPost is POST /auth/pwd, which accepts level1_password. It reads the form, refuses a
+// missing address or password itself, and runs authflow.PasswordSubmission on the rest, then answers
+// what it did: the form again beside a refusal, with the client block authflow.PasswordPrompt loads
+// for it, or the redirect to /auth/level1completed.
+//
+// The boundary refuses a submission naming another ceremony before the state gate and before the
+// credentials are read, so a login form left open in another tab gets the "no longer active" page
+// and cannot authenticate anybody for anything (#79).
 func HandleAuthPwdPost(
+	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
-	database authPwdDatabase,
-	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
-	baseURL string,
-	adminConsoleBaseURL string,
+	prompt *authflow.PasswordPrompt,
+	submission *authflow.PasswordSubmission,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		// loadAuthContext refuses a submission naming another ceremony before the AuthState check, so
-		// a login form left open in another tab gets the 400 mismatch page rather than the 500 that
-		// a replaced context's state would produce, and before anything reads the credentials: a
-		// submission naming a ceremony that is no longer current is answered without ever looking up
-		// a user or verifying a password, so a stale form cannot authenticate anybody for anything
-		// (#79).
-		authContext, ok := loadAuthContext(pageRenderer, ceremonyStore, auditLogger, w, r, adminConsoleBaseURL)
+		settings, authContext, ok := boundary.beginStep(w, r, ceremony.AuthStateLevel1Password)
 		if !ok {
 			return
 		}
 
-		if !requireAuthState(pageRenderer, w, r, authContext, ceremony.AuthStateLevel1Password) {
-			return
-		}
-
-		// Normalized to exactly what the rate limiter's account key does, and to what every
-		// write path stores. Two things depend on the spelling matching: the limiter and the
-		// account it protects must agree about which account a request is, or a case variant
-		// buys a fresh bucket; and mysql and mssql compare email case-insensitively while
-		// postgres and sqlite do not, so without this a stored bob@x.com typed as Bob@x.com
-		// signs in on two engines and is refused on the other two (#219).
+		// Lowercased and trimmed exactly as the rate limiter's account key is, and as every write
+		// stores an address: the limiter and the account it protects must agree on which account a
+		// request is, and mysql and mssql compare email case-insensitively while postgres and sqlite
+		// do not (#219).
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 
-		// r.PostFormValue rather than r.FormValue, matching the ceremony id read above so both
-		// reads in this function agree about what a submission is: r.Form merges the URL query
-		// behind the body, so /auth/pwd?password=... would authenticate, and a credential in a
-		// request target reaches the browser's history, the Referer of anything the page loads,
-		// and the access log of every proxy in front of the deployment (#202).
+		// The body alone: a credential in the request target reaches the browser's history, the
+		// Referer and every proxy's access log (#202).
 		password := r.PostFormValue("password")
 
-		settings, ok := reqctx.SettingsFrom(r.Context())
-		if !ok {
-			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
-			return
-		}
-
-		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-		if client == nil {
-			pageRenderer.InternalServerError(w, r, errs.New("client not found"))
-			return
-		}
-
-		displayInfo := getClientDisplayInfo(r.Context(), database, client)
-
-		// renderError closes over r so a subsequent locale refinement
-		// is picked up by the closure on its next invocation.
-		renderError := func(le *i18n.LocalizedError) {
-			bind := map[string]interface{}{
-				"error": le.Localize(r.Context()),
-				// The re-rendered form has to carry the id too, or a single mistyped password
-				// would end the ceremony: the retry would name no ceremony and be refused.
-				"ceremonyId":              authContext.CeremonyId,
-				"smtpEnabled":             settings.SMTPEnabled,
-				"registrationAvailable":   settings.IsSelfRegistrationAvailable(),
-				"email":                   email,
-				"layoutShowClientSection": displayInfo.ShowSection,
-				"layoutClientName":        displayInfo.ClientName,
-				"layoutHasClientLogo":     displayInfo.HasLogo,
-				"layoutClientLogoUrl":     displayInfo.LogoURL,
-				"layoutClientDescription": displayInfo.Description,
-				"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
-			}
-
-			err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind)
+		// renderRefusal reads r when it is called, so a refusal after the password was verified is
+		// worded in the locale the user switched r to. It loads the client block then and only then:
+		// an accepted submission redirects, and has no form to show it in. A failed read, or a client
+		// not found, answers 500, as it does on the GET.
+		renderRefusal := func(code string) {
+			displayInfo, err := prompt.Run(r.Context(), authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
+				return
 			}
+			renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo,
+				i18n.NewLocalizedError(code, nil), email)
 		}
 
-		// Already trimmed above. password is not: a space can be part of one.
+		// Refused before any lookup, and never charged to the rate limiter: a form that verifies
+		// nothing must not spend an account's failure budget (#219). A space can be part of a
+		// password, so only one made of nothing else counts as missing.
 		if len(email) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginEmailRequired, nil))
+			renderRefusal(i18n.ErrCodeLoginEmailRequired)
 			return
 		}
-
 		if len(strings.TrimSpace(password)) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginPasswordRequired, nil))
+			renderRefusal(i18n.ErrCodeLoginPasswordRequired)
 			return
 		}
 
-		user, err := database.GetUserByEmail(r.Context(), nil, email)
+		result, err := submission.Run(r.Context(),
+			newCredentialCheckingBrowserSession(w, r, ceremonyStore, credentialFailures),
+			authContext, email, password)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
 		}
 
-		// The address typed into the form is recorded only as its digest, of the address as the
-		// lookup above normalized it: the form collects whatever anyone types, an attacker's
-		// address list or a password pasted into the wrong field, and the audit table would
-		// otherwise keep every one of them in plain text (#522 decision 10).
-		emailDigest := hashutil.HashString(email)
-
-		// "Authentication failed." stays on the request's existing locale
-		// (we don't yet know whether this email belongs to a real user —
-		// switching to user.Locale here would side-channel disclose whether
-		// the account exists).
-		authFailed := i18n.NewLocalizedError(i18n.ErrCodeLoginAuthFailed, nil)
-
-		if user == nil {
-			// Timing-safe user enumeration protection: perform a dummy bcrypt comparison
-			// even when the user doesn't exist. This ensures the response time is similar
-			// to when a user exists but the password is wrong, preventing attackers from
-			// determining whether an email exists based on response timing differences.
-			passwordhash.Verify(passwordhash.DummyHash, password)
-
-			// A guess against an address that names no account is still a guess, and
-			// charging it is also what keeps this branch from being a cheaper way to
-			// enumerate addresses than the branch below.
-			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), audit.EventAuthFailedPwd, map[string]interface{}{
-				"email_digest": emailDigest,
-			})
-			renderError(authFailed)
+		if result.Answer == authflow.PasswordRefused {
+			renderRefusal(i18n.ErrCodeLoginAuthFailed)
 			return
 		}
 
-		if !passwordhash.Verify(user.PasswordHash, password) {
-			credentialFailures.RecordCredentialFailure(r)
-			// The account the guess was against, which the audit log's readers can already
-			// see; nothing here reaches the visitor, who is answered as for an unknown address.
-			auditLogger.Log(r.Context(), audit.EventAuthFailedPwd, map[string]interface{}{
-				"email_digest": emailDigest,
-				"user_id":      user.Id,
-			})
-			renderError(authFailed)
+		// The password is verified, so the user's own locale discloses nothing any more.
+		r = r.WithContext(i18n.WithLocale(r.Context(), false, result.UserLocale))
+
+		if result.Answer == authflow.PasswordAccountDisabled {
+			renderRefusal(i18n.ErrCodeLoginAccountDisabled)
 			return
 		}
+		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
+	}
+}
 
-		// Password verified — surfacing user-specific errors (account disabled,
-		// downstream flow messages) in user.Locale is now safe and correct.
-		// Skipped when explicit request or in-flight UI locales are in play.
-		r = r.WithContext(i18n.WithLocale(r.Context(), false, user.Locale))
+// renderPasswordForm renders the password form for the ceremony, with a refusal and the address the
+// user typed when it is shown again. The form names its ceremony, so the boundary can refuse a
+// submission of a form another /auth/authorize has replaced since (#79).
+func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
+	settings *record.Settings, authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,
+	refusal *i18n.LocalizedError, email string) {
 
-		// Deliberately not a credential failure: the password was right, so there is
-		// nothing here for the rate limiter to bound. The same holds for the missing-email
-		// and missing-password renders above, which verify nothing at all. Charging those
-		// would let anyone spend an account's failure budget without ever guessing (#219).
-		if !user.Enabled {
-			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"user_id": user.Id,
-			})
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginAccountDisabled, nil))
-			return
-		}
+	bind := map[string]interface{}{
+		"error":       nil,
+		"ceremonyId":  authContext.CeremonyId,
+		"smtpEnabled": settings.SMTPEnabled,
+		// The Register link goes to a page that answers not-found unless registration is available,
+		// so the form offers it only then (#526 decision 2).
+		"registrationAvailable":   settings.IsSelfRegistrationAvailable(),
+		"layoutShowClientSection": displayInfo.ShowSection,
+		"layoutClientName":        displayInfo.ClientName,
+		"layoutHasClientLogo":     displayInfo.HasLogo,
+		"layoutClientLogoUrl":     displayInfo.LogoURL,
+		"layoutClientDescription": displayInfo.Description,
+		"layoutClientWebsiteUrl":  displayInfo.WebsiteURL,
+	}
+	if refusal != nil {
+		bind["error"] = refusal.Localize(r.Context())
+		bind["email"] = email
+	}
 
-		// from this point the user is considered authenticated with pwd
-
-		auditLogger.Log(r.Context(), audit.EventAuthSuccessPwd, map[string]interface{}{
-			"user_id": user.Id,
-		})
-
-		authContext.RecordPasswordVerified(user, time.Now())
-
-		// Rotate the browser session's identifier here, the instant a credential is
-		// accepted, and not only at /auth/completed where the user session is minted.
-		//
-		// Everything between those two points writes into the row the arriving identifier
-		// names, and the pages in between are plain GETs gated on nothing but the recorded
-		// AuthState: /auth/level1completed admits level1_password_completed and
-		// /auth/completed admits authentication_completed, neither comparing anything about
-		// the browser making the request, because the session is deliberately not bound to
-		// IP or User-Agent. So an attacker who planted an identifier and polls those two
-		// paths while this password is being checked can reach /auth/completed before the
-		// victim's own redirect does, and be handed the session minted for the victim.
-		// Replacing the identifier the moment the password is accepted leaves that race
-		// nothing to race for. Undo this and the race is back, silently, with every
-		// existing test still green (#266).
-		//
-		// Before the save, never after. Rotation writes the session's CURRENT contents
-		// under the new identifier, so rotating first means the row carries the state this
-		// ceremony had before the password was accepted. A failure between the two then
-		// leaves a fresh identifier on a session that is not yet password-completed, which
-		// is the harmless direction; saving first and failing to rotate would leave the
-		// planted identifier naming a row that IS password-completed, which is exactly the
-		// state the attacker needs. Same ordering, and the same reason, as the step-up arm
-		// in handler_auth_completed.
-		//
-		// The rotation lands only while the browser session still holds this ceremony, and builds
-		// the new row from the session as it is stored now rather than from this request's copy,
-		// which would put a ceremony another tab's /auth/authorize has replaced back over the
-		// newer one. One that finds it replaced, or the session gone, writes nothing and answers
-		// the "no longer active" page (#579).
-		if regenerateSessionErr := ceremonyStore.RegenerateSession(w, r, authContext.CeremonyId); regenerateSessionErr != nil {
-			answerStepSaveFailure(pageRenderer, w, r, regenerateSessionErr)
-			return
-		}
-
-		err = ceremonyStore.SaveAuthContext(w, r, authContext)
-		if err != nil {
-			answerStepSaveFailure(pageRenderer, w, r, err)
-			return
-		}
-		http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/level1completed", authContext), http.StatusFound)
+	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", bind); err != nil {
+		pageRenderer.InternalServerError(w, r, err)
 	}
 }

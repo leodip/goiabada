@@ -139,7 +139,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		// enforcing this in the schema would mean a different mechanism per engine.
 		//
 		// Tolerable because username is not an authentication key: sign-in resolves
-		// the account by email (HandleAuthPwdPost), this is the only caller of
+		// the account by email (authflow.PasswordSubmission), this is the only caller of
 		// GetUserByUsername, and the one place the value escapes is the OIDC
 		// preferred_username claim, which the spec tells relying parties not to
 		// assume is unique.

@@ -84,9 +84,15 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleConsentGet(pageRenderer, ceremonyStore, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildConsentGet(consentGetDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   auditLogger,
+			})
 
 			req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+			req = withSettings(req, &record.Settings{})
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -187,14 +193,20 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker,
-				testBaseURL, testAdminConsoleBaseURL)
+			handler := buildConsentPost(consentPostDeps{
+				pageRenderer:      pageRenderer,
+				ceremonyStore:     ceremonyStore,
+				database:          database,
+				auditLogger:       auditLogger,
+				permissionChecker: permissionChecker,
+			})
 
 			form := url.Values{}
 			form.Add("btnSubmit", "submit")
 			form.Add(ceremonyIdField, testCeremonyId)
 			form.Add("consent0", "on")
 			req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+			req = withSettings(req, &record.Settings{})
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
@@ -229,14 +241,20 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleConsentPost(pageRenderer, ceremonyStore, database, nil, auditLogger, permissionChecker,
-			testBaseURL, testAdminConsoleBaseURL)
+		handler := buildConsentPost(consentPostDeps{
+			pageRenderer:      pageRenderer,
+			ceremonyStore:     ceremonyStore,
+			database:          database,
+			auditLogger:       auditLogger,
+			permissionChecker: permissionChecker,
+		})
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("consent0", "on")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
+		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 

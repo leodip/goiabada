@@ -1,9 +1,14 @@
-package handlers
+package authflow
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -189,7 +194,101 @@ func TestConsentScreenOwed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, consentScreenOwed(tc.scopes, tc.scope, tc.promptConsent))
+			assert.Equal(t, tc.want, ConsentScreenOwed(tc.scopes, tc.scope, tc.promptConsent))
 		})
 	}
+}
+
+func TestBuildScopeInfoArray(t *testing.T) {
+	t.Run("Empty scope", func(t *testing.T) {
+		result := buildScopeInfoArray(context.Background(), "", nil)
+		assert.Empty(t, result)
+	})
+
+	t.Run("Single ID token scope", func(t *testing.T) {
+		result := buildScopeInfoArray(context.Background(), "openid", nil)
+		assert.Len(t, result, 1)
+		assert.Equal(t, ScopeInfo{
+			Scope:            "openid",
+			Description:      "Authenticate your user and identify you via a unique ID",
+			AlreadyConsented: false,
+		}, result[0])
+	})
+
+	t.Run("Multiple ID token scopes", func(t *testing.T) {
+		result := buildScopeInfoArray(context.Background(), "openid profile email", nil)
+		assert.Len(t, result, 3)
+		assert.Equal(t, ScopeInfo{
+			Scope:            "openid",
+			Description:      "Authenticate your user and identify you via a unique ID",
+			AlreadyConsented: false,
+		}, result[0])
+		assert.Equal(t, ScopeInfo{
+			Scope:            "profile",
+			Description:      "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at",
+			AlreadyConsented: false,
+		}, result[1])
+		assert.Equal(t, ScopeInfo{
+			Scope:            "email",
+			Description:      "Access to claims: email, email_verified",
+			AlreadyConsented: false,
+		}, result[2])
+	})
+
+	t.Run("Offline access scope", func(t *testing.T) {
+		result := buildScopeInfoArray(context.Background(), "openid offline_access", nil)
+		assert.Len(t, result, 2)
+		assert.Equal(t, ScopeInfo{
+			Scope:            "offline_access",
+			Description:      "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction",
+			AlreadyConsented: false,
+		}, result[1])
+	})
+
+	t.Run("Custom scope", func(t *testing.T) {
+		result := buildScopeInfoArray(context.Background(), "openid custom:read", nil)
+		assert.Len(t, result, 2)
+		assert.Equal(t, ScopeInfo{
+			Scope:            "custom:read",
+			Description:      "Permission read on resource custom",
+			AlreadyConsented: false,
+		}, result[1])
+	})
+
+	t.Run("With existing consent", func(t *testing.T) {
+		consent := &record.UserConsent{
+			Scope: "openid profile",
+		}
+		result := buildScopeInfoArray(context.Background(), "openid profile email", consent)
+		assert.Len(t, result, 3)
+		assert.True(t, result[0].AlreadyConsented)
+		assert.True(t, result[1].AlreadyConsented)
+		assert.False(t, result[2].AlreadyConsented)
+	})
+
+	t.Run("Mixed scopes with consent", func(t *testing.T) {
+		consent := &record.UserConsent{
+			Scope: "openid custom:read",
+		}
+		result := buildScopeInfoArray(context.Background(), "openid profile custom:read custom:write", consent)
+		assert.Len(t, result, 4)
+		assert.True(t, result[0].AlreadyConsented)
+		assert.False(t, result[1].AlreadyConsented)
+		assert.True(t, result[2].AlreadyConsented)
+		assert.False(t, result[3].AlreadyConsented)
+	})
+
+	// Guards §6.9: consent scope descriptions (OIDC scopes and the
+	// resource-permission template) must localize to the active locale, not
+	// render hardcoded English.
+	t.Run("Localizes descriptions in pt-BR", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
+		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
+
+		result := buildScopeInfoArray(req.Context(), "openid offline_access custom:read", nil)
+		assert.Len(t, result, 3)
+		assert.Equal(t, "Autenticar seu usuário e identificá-lo por um ID único", result[0].Description)
+		assert.Contains(t, result[1].Description, "token de atualização offline")
+		assert.Equal(t, "Permissão read no recurso custom", result[2].Description)
+	})
 }

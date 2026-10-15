@@ -20,6 +20,7 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -59,7 +60,7 @@ func assertReplacedAnsweredAtWarn(t *testing.T, logged *logtest.SlogCapture) {
 // are not sent into a browser where a newer sign-in is in progress. The database mock has no
 // expectation, so the redirect gate's registration read, which only an emitted error makes, fails
 // the case on its own.
-func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
+func TestAnswerClientAfterStepClear_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
@@ -67,14 +68,56 @@ func TestAnswerClientWithError_AReplacedCeremonyAnswersNoLongerActive(t *testing
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
-	answerClientWithError(rr, req, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, testCeremonyId,
+	answerClientAfterStepClear(rr, req, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil),
 		testRedirectError("access_denied", "The user did not provide consent", "query",
-			"https://legit.example/cb", "abc123", "code"))
+			"https://legit.example/cb", "abc123", "code"),
+		ceremonyStore.ClearAuthContext(rr, req, testCeremonyId))
 
 	assertAnsweredNoLongerActive(t, rr)
 	assertReplacedAnsweredAtWarn(t, logged)
 	pageRenderer.AssertExpectations(t)
 	ceremonyStore.AssertExpectations(t)
+}
+
+// The same answer at /auth/level1completed's delivery of a parked error: the clear found another
+// ceremony, so the parked error is sent nowhere. The client's provenance is read before the clear,
+// as the delivery always reads it; the registration read the redirect gate makes is never reached.
+func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	database := datamocks.NewDatabase(t)
+	handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: handlersmocks.NewUserSessionManager(t),
+		database:           database,
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+	})
+
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyId, nil))
+	rr := httptest.NewRecorder()
+	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+		CeremonyId:               testCeremonyId,
+		AuthState:                ceremony.AuthStateLevel1PasswordCompleted,
+		ClientId:                 "test-client",
+		RedirectURI:              "https://legit.example/cb",
+		ResponseType:             "code",
+		State:                    "abc123",
+		DeferredErrorCode:        "invalid_scope",
+		DeferredErrorDescription: "Invalid scope format: 'bogus'.",
+	}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+		&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
+	logged := logtest.CaptureSlog(t)
+
+	handler.ServeHTTP(rr, req)
+
+	assertAnsweredNoLongerActive(t, rr)
+	assertReplacedAnsweredAtWarn(t, logged)
+	pageRenderer.AssertExpectations(t)
+	ceremonyStore.AssertExpectations(t)
+	database.AssertNotCalled(t, "GetRedirectURIsByClientId", mock.Anything, mock.Anything, int64(1))
 }
 
 // lastComparisonBackend is the in-memory backend with a turn for the test before every conditional
@@ -95,7 +138,7 @@ func (b *lastComparisonBackend) UpdateIfUnchanged(ctx context.Context, id string
 // is the same replaced ceremony as on a first attempt, and answered the same: the page, with
 // neither the error nor its state sent to the client, and ceremony B kept. Read as a clear that ran
 // out of attempts, it answered server_error by redirect (#579 decision 2).
-func TestAnswerClientWithError_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
+func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
 	backend := &lastComparisonBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.SessionIdentifier, false,
 		sessionstore.PersistentCookie, sessionstore.KeyPair{
@@ -135,9 +178,10 @@ func TestAnswerClientWithError_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerA
 	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
-	answerClientWithError(rr, req, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, testCeremonyId,
+	answerClientAfterStepClear(rr, req, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil),
 		testRedirectError("access_denied", "The user did not provide consent", "query",
-			"https://legit.example/cb", "state-a", "code"))
+			"https://legit.example/cb", "state-a", "code"),
+		ceremonyStore.ClearAuthContext(rr, req, testCeremonyId))
 
 	assert.Equal(t, 3, comparisons)
 	assertAnsweredNoLongerActive(t, rr)
@@ -248,8 +292,12 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
-		testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthOtpPost(authOtpPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	require.NoError(t, err)
@@ -261,6 +309,7 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -273,8 +322,6 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)

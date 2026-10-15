@@ -145,8 +145,17 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
-		userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          templateFS,
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+	}).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
 	database.AssertExpectations(t)
@@ -182,14 +191,23 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-	// The row is gone, which is the shape refuseIssuanceUnusableSession answers.
+	// The row is gone, which is the shape authflow.Issuance answers as unusable.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(nil, nil)
 	ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger,
-		userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          templateFS,
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+	}).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
 	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),

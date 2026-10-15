@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +27,11 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1Get(authLevel1GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -53,7 +58,11 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1Get(authLevel1GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -81,7 +90,11 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1Get(authLevel1GetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -118,7 +131,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -146,7 +165,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -179,7 +204,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -241,7 +272,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -279,7 +316,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -339,7 +382,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -400,7 +449,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -567,7 +622,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 
 				auditLogger := handlersmocks.NewAuditLogger(t)
-				handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+					pageRenderer:       pageRenderer,
+					ceremonyStore:      ceremonyStore,
+					userSessionManager: userSessionManager,
+					database:           database,
+					auditLogger:        auditLogger,
+				})
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 				req = withSessionSettings(req)
@@ -664,7 +725,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					userSessionManager := handlersmocks.NewUserSessionManager(t)
 					database := datamocks.NewDatabase(t)
 					auditLogger := handlersmocks.NewAuditLogger(t)
-					handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+					handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+						pageRenderer:       pageRenderer,
+						ceremonyStore:      ceremonyStore,
+						userSessionManager: userSessionManager,
+						database:           database,
+						auditLogger:        auditLogger,
+					})
 
 					req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 					req = withSessionSettings(req)
@@ -768,7 +835,13 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 
 				auditLogger := handlersmocks.NewAuditLogger(t)
-				handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+					pageRenderer:       pageRenderer,
+					ceremonyStore:      ceremonyStore,
+					userSessionManager: userSessionManager,
+					database:           database,
+					auditLogger:        auditLogger,
+				})
 
 				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
 				req = withSessionSettings(req)
@@ -874,7 +947,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				auditLogger:        auditLogger,
+			})
 
 			req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 			req = withSessionSettings(req)
@@ -920,7 +999,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req := withSessionSettings(httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil))
 		rr := httptest.NewRecorder()
@@ -954,7 +1039,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -972,7 +1063,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		// The client's redirect URI was validated upstream, so it is owed an error response even
 		// when this server cannot tidy up after itself, and RFC 6749 4.1.2.1 mints server_error for
 		// exactly this condition (#141). This delivery point gets that behaviour by going through
-		// answerClientWithError rather than by re-implementing it from memory, which is the whole
+		// answerClientAfterStepClear rather than by re-implementing it from memory, which is the whole
 		// reason that helper was extracted.
 		location := rr.Header().Get("Location")
 		assert.Contains(t, location, "error=server_error")
@@ -997,7 +1088,14 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			auditLogger:        auditLogger,
+		})
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1027,7 +1125,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1059,7 +1163,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			auditLogger:        auditLogger,
+		})
 
 		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 		req = withSessionSettings(req)
@@ -1092,4 +1202,97 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
 	})
+}
+
+// Each read /auth/level1completed makes before its decision answers 500 when it fails, carrying the
+// read's own error, and stops there: no later read, no save, no redirect. The reads come in order,
+// the session, its user, then the client.
+func TestHandleAuthLevel1CompletedGet_AFailedReadAnswers500AndSavesNothing(t *testing.T) {
+	readFailure := errors.New("read failed")
+	session := &record.UserSession{Id: 7, SessionIdentifier: "sess-1", UserId: 1}
+
+	for _, tc := range []struct {
+		name    string
+		arm     func(database *datamocks.Database)
+		wantErr func(err error) bool
+		notRead func(t *testing.T, database *datamocks.Database)
+	}{
+		{
+			name: "the session",
+			arm: func(database *datamocks.Database) {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sess-1").Return(nil, readFailure).Once()
+			},
+			wantErr: func(err error) bool { return errors.Is(err, readFailure) },
+			notRead: func(t *testing.T, database *datamocks.Database) {
+				database.AssertNotCalled(t, "UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "the session's user",
+			arm: func(database *datamocks.Database) {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sess-1").Return(session, nil).Once()
+				database.On("UserSessionLoadUser", mock.Anything, (*sql.Tx)(nil), session).Return(readFailure).Once()
+			},
+			wantErr: func(err error) bool { return errors.Is(err, readFailure) },
+			notRead: func(t *testing.T, database *datamocks.Database) {
+				database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+			},
+		},
+		{
+			name: "the client",
+			arm: func(database *datamocks.Database) {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sess-1").Return(session, nil).Once()
+				database.On("UserSessionLoadUser", mock.Anything, (*sql.Tx)(nil), session).Return(nil).Once()
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(nil, readFailure).Once()
+			},
+			wantErr: func(err error) bool { return errors.Is(err, readFailure) },
+			notRead: func(t *testing.T, database *datamocks.Database) {},
+		},
+		{
+			name: "a client not found",
+			arm: func(database *datamocks.Database) {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sess-1").Return(session, nil).Once()
+				database.On("UserSessionLoadUser", mock.Anything, (*sql.Tx)(nil), session).Return(nil).Once()
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(nil, nil).Once()
+			},
+			wantErr: func(err error) bool { return err.Error() == "client test-client not found" },
+			notRead: func(t *testing.T, database *datamocks.Database) {},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				auditLogger:        handlersmocks.NewAuditLogger(t),
+			})
+
+			req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyId, nil))
+			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "sess-1"))
+			rr := httptest.NewRecorder()
+			ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
+				CeremonyId: testCeremonyId,
+				AuthState:  ceremony.AuthStateLevel1ExistingSession,
+				ClientId:   "test-client",
+				UserId:     1,
+			}, nil)
+			tc.arm(database)
+			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(tc.wantErr)).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			pageRenderer.AssertExpectations(t)
+			database.AssertExpectations(t)
+			tc.notRead(t, database)
+			userSessionManager.AssertNotCalled(t, "HasValidUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			assert.Empty(t, rr.Header().Get("Location"))
+		})
+	}
 }

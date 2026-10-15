@@ -191,7 +191,7 @@ func spellingsOf(local, domain string) []string {
 //
 // failed is what the handler found when it checked the credential, and it is the whole
 // point of the helper: a failures-only tier is spent by calling RecordCredentialFailure
-// from inside the handler, exactly as HandleAuthPwdPost does on a wrong password. A case
+// from inside the handler, exactly as the password step does on a wrong password. A case
 // that drives requests without it spends no tier at all, pwd_ip included, whatever it says it
 // is measuring (#219, #564).
 func runPwd(m *RateLimiter, email, ip string, failed bool) (int, bool, *httptest.ResponseRecorder) {

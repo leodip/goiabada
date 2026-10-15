@@ -27,6 +27,8 @@ packages:
         config:
           dir: "./internal/data/mocks"
           pkgname: "datamocks"
+  # internal/handlers' ports, and the six services in doubled_services.go that no handler takes:
+  # the handler tests build the authflow operations from their doubles (#580).
   github.com/leodip/goiabada/authserver/internal/handlers:
     interfaces:
       AuthorizeValidator:

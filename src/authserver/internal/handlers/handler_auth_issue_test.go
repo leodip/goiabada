@@ -81,7 +81,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -114,7 +124,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -150,7 +170,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// The positive control for the liveness check (#129 stage 6): the ordinary ceremony,
 		// with a session identifier in the context and a session row behind it. It fails
@@ -236,7 +266,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// An empty identifier is the shape the terminated ceremony actually arrives in:
 		// middleware.SessionIdentifier finds the row gone, deletes the identifier from the
@@ -295,7 +335,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, fstest.MapFS{}, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          fstest.MapFS{},
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -336,7 +386,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// The narrower half of the same predicate: the middleware saw the session alive on
 		// this very request and the termination committed immediately afterwards, so the
@@ -389,9 +449,19 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
-		// The same empty identifier as the row above, arriving from handlePromptNone rather
+		// The same empty identifier as the row above, arriving from prompt=none rather
 		// than from the consent screen: it validated and bumped the session, redirected here,
 		// and the session was ended in that hop. Restarting level 1 would render a password
 		// form, which this request forbids (#129 decision 16).
@@ -465,7 +535,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -533,7 +613,17 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -591,7 +681,17 @@ func TestHandleIssueGet(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -646,7 +746,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -694,7 +804,17 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 
@@ -798,9 +918,17 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			stubRegisteredRedirectURI(f.database, f.authContext.RedirectURI)
 			stubClientProvenanceLookup(f.database)
 		}
-		handler := HandleIssueGet(f.pageRenderer, f.ceremonyStore, fstest.MapFS{}, f.codeIssuer,
-			handlersmocks.NewImplicitTokenIssuer(t), f.database, f.auditLogger, userSessionManager,
-			permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        f.pageRenderer,
+			ceremonyStore:       f.ceremonyStore,
+			templateFS:          fstest.MapFS{},
+			codeIssuer:          f.codeIssuer,
+			implicitTokenIssuer: handlersmocks.NewImplicitTokenIssuer(t),
+			database:            f.database,
+			auditLogger:         f.auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 		f.ceremonyStore.On("GetAuthContext", f.req).Return(f.authContext, nil)
 		stubLiveSession(f.database, 123)
 		armIssueGate(f.database, userSessionManager, permissionChecker, f.authContext.RedirectURI)
@@ -916,7 +1044,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			f.serve()
 
 			// The same answer the liveness read gives for the same condition, which is what makes
-			// refuseIssuanceUnusableSession one implementation rather than two that agree today.
+			// authflow.Issuance's refuseUnusableSession one implementation rather than two that agree today.
 			assert.Equal(t, http.StatusFound, f.rr.Code)
 			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"),
 				"the restart names the ceremony it kept")
@@ -1043,7 +1171,17 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1136,7 +1274,17 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -1205,22 +1353,33 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseMode: "fragment",
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
-			Scope:        "openid",
-			State:        "test-state",
-			AuthMethods:  "pwd",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseMode:    "fragment",
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid",
+			State:           "test-state",
+			AuthMethods:     "pwd",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1288,21 +1447,32 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
-			State:        "test-state",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			Scope:           "openid profile",
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			State:           "test-state",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1351,22 +1521,33 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "id_token token",
-			RedirectURI:  "https://example.com/callback",
-			State:        "test-state",
-			Prompt:       "none",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			Scope:           "openid profile",
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "id_token token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			State:           "test-state",
+			Prompt:          "none",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
@@ -1413,6 +1594,36 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 	require.NoError(t, err)
 	req = withSessionSettings(req)
 	return withSessionSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)))
+}
+
+// testIssueAuthTime is the auth time an implicit ceremony reaches /auth/issue with, which
+// /auth/completed always sets from the session it binds to.
+var testIssueAuthTime = time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC)
+
+// newCreateCodeInput is the code input a ceremony is issued with, as the handler tests expect it:
+// every field authflow copies off the ceremony, with the session the code binds to. It is written out
+// here rather than taken from authflow, so the expectation does not come from the code under test.
+func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier string) *issuance.CreateCodeInput {
+	return &issuance.CreateCodeInput{
+		ClientId:            authContext.ClientId,
+		RedirectURI:         authContext.RedirectURI,
+		ResponseMode:        authContext.ResponseMode,
+		Scope:               authContext.Scope,
+		ConsentedScope:      authContext.ConsentedScope,
+		CodeChallenge:       authContext.CodeChallenge,
+		CodeChallengeMethod: authContext.CodeChallengeMethod,
+		State:               authContext.State,
+		Nonce:               authContext.Nonce,
+		UserAgent:           authContext.UserAgent,
+		IpAddress:           authContext.IpAddress,
+		UserId:              authContext.UserId,
+		AcrLevel:            authContext.AcrLevel,
+		AuthMethods:         authContext.AuthMethods,
+		AuthenticatedAt:     authContext.AuthenticatedAt,
+		AuthStateGeneration: authContext.AuthStateGeneration,
+		SessionIdentifier:   sessionIdentifier,
+		OTPClaim:            otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OtpClaimGeneration},
+	}
 }
 
 // stubLiveSession makes the ownership check pass, which is the precondition for reaching
@@ -1570,7 +1781,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1584,17 +1805,18 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseMode: "fragment",
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
-			Scope:        "openid",
-			State:        "test-state",
-			Nonce:        "test-nonce",
-			AcrLevel:     "urn:goiabada:pwd",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseMode:    "fragment",
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid",
+			State:           "test-state",
+			Nonce:           "test-nonce",
+			AcrLevel:        "urn:goiabada:pwd",
 			// Nonzero so the matcher below pins that the handler carries this into
 			// ImplicitGrantInput rather than leaving it at the zero value (#106
 			// decision 13: implicit's only possible source is the AuthContext).
@@ -1674,7 +1896,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1684,17 +1916,18 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseMode: "fragment",
-			ResponseType: "id_token",
-			RedirectURI:  "https://example.com/callback",
-			Scope:        "openid",
-			State:        "test-state",
-			Nonce:        "test-nonce",
-			AcrLevel:     "urn:goiabada:pwd",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseMode:    "fragment",
+			ResponseType:    "id_token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid",
+			State:           "test-state",
+			Nonce:           "test-nonce",
+			AcrLevel:        "urn:goiabada:pwd",
 			// Nonzero so the matcher below pins that the handler carries this into
 			// ImplicitGrantInput rather than leaving it at the zero value (#106
 			// decision 13: implicit's only possible source is the AuthContext).
@@ -1765,7 +1998,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1775,17 +2018,18 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseMode: "fragment",
-			ResponseType: "id_token token",
-			RedirectURI:  "https://example.com/callback",
-			Scope:        "openid",
-			State:        "test-state",
-			Nonce:        "test-nonce",
-			AcrLevel:     "urn:goiabada:pwd",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseMode:    "fragment",
+			ResponseType:    "id_token token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid",
+			State:           "test-state",
+			Nonce:           "test-nonce",
+			AcrLevel:        "urn:goiabada:pwd",
 			// Nonzero so the matcher below pins that the handler carries this into
 			// ImplicitGrantInput rather than leaving it at the zero value (#106
 			// decision 13: implicit's only possible source is the AuthContext).
@@ -1861,7 +2105,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1871,15 +2125,16 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
-			AuthState:      ceremony.AuthStateReadyToIssueCode,
-			ClientId:       "test-client",
-			UserId:         123,
-			ResponseType:   "token",
-			RedirectURI:    "https://example.com/callback",
-			Scope:          "openid profile email",
-			ConsentedScope: "openid profile", // User consented to less
-			State:          "test-state",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid profile email",
+			ConsentedScope:  "openid profile", // User consented to less
+			State:           "test-state",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1915,7 +2170,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	// The client vanished between /auth/completed and /auth/issue. Before #241 this reached
-	// issueImplicitGrant, which loaded the client itself and answered a 500; now the registration
+	// the implicit arm, which loaded the client itself and answered a 500; now the registration
 	// gate above the dispatch meets it first, and a client with no registrations at all cannot
 	// have the stored redirect URI among them. It is a refusal rather than a fault, so it renders
 	// the withheld page and never names a client on it.
@@ -1930,7 +2185,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -1940,13 +2205,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			Scope:        "openid profile",
-			ClientId:     "unknown-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			Scope:           "openid profile",
+			ClientId:        "unknown-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -1991,7 +2257,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2002,13 +2278,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       999,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			Scope:           "openid profile",
+			ClientId:        "test-client",
+			UserId:          999,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -2041,7 +2318,17 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2051,13 +2338,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
-			Scope:        "openid",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -2338,7 +2626,17 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2348,13 +2646,14 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			Scope:           "openid profile",
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -2384,7 +2683,17 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2395,13 +2704,14 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			Scope:           "openid profile",
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -2435,7 +2745,17 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -2445,13 +2765,14 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
-			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
-			ResponseType: "token",
-			RedirectURI:  "https://example.com/callback",
-			Scope:        "openid",
+			CeremonyId:      testCeremonyId,
+			AuthState:       ceremony.AuthStateReadyToIssueCode,
+			ClientId:        "test-client",
+			UserId:          123,
+			ResponseType:    "token",
+			AuthenticatedAt: &testIssueAuthTime,
+			RedirectURI:     "https://example.com/callback",
+			Scope:           "openid",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -3165,8 +3486,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 					"form_post.html": {Data: []byte(keysTemplate)},
 				}
 
-				err := redirToClientWithError(w, r,
-					testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS,
+				err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r,
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
@@ -3238,8 +3558,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				r := httptest.NewRequest("GET", "/auth/authorize", nil)
 				r = withSessionSettings(r)
 
-				err := redirToClientWithError(w, r,
-					testRegisteredDatabase(t, "https://example.com/callback"), nil, web.TemplateFS(),
+				err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, web.TemplateFS()).redirToClientWithError(w, r,
 					testRedirectError("access_denied", "Access denied", "form_post",
 						"https://example.com/callback", tc.state, "code"))
 
@@ -3271,7 +3590,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3354,7 +3683,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3439,7 +3778,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3517,7 +3866,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3587,7 +3946,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3652,7 +4021,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		// A live session, since this subtest reaches code creation (#129 stage 6).
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -3728,7 +4107,17 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -3879,7 +4268,17 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -3981,7 +4380,17 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-	handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          templateFS,
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+	})
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
@@ -4061,7 +4470,17 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
@@ -4154,7 +4573,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 // while a REFRESH of an older grant does (#241).
 //
 // The two write-back rows are decision 2's answer and they are not interchangeable. The code issuer
-// and issueImplicitGrant both prefer ConsentedScope and fall back to Scope when it is empty, so the
+// and the implicit issuer both prefer ConsentedScope and fall back to Scope when it is empty, so the
 // filtered value has to land on whichever of the two the issuer will read and never on the other.
 func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 	for _, tc := range []struct {
@@ -4214,7 +4633,17 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer, database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4366,8 +4795,17 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-			handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-				database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildIssueGet(issueGetDeps{
+				pageRenderer:        pageRenderer,
+				ceremonyStore:       ceremonyStore,
+				templateFS:          templateFS,
+				codeIssuer:          codeIssuer,
+				implicitTokenIssuer: implicitTokenIssuer,
+				database:            database,
+				auditLogger:         auditLogger,
+				userSessionManager:  userSessionManager,
+				permissionChecker:   permissionChecker,
+			})
 
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
@@ -4442,8 +4880,17 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4513,8 +4960,17 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4600,7 +5056,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
-		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
+		// answer to the client, so it passes through RedirectWillBeEmitted too (#241 decision 11).
 		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
@@ -4634,8 +5090,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4684,8 +5149,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4726,8 +5200,17 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
-		handler := HandleIssueGet(pageRenderer, ceremonyStore, templateFS, codeIssuer, implicitTokenIssuer,
-			database, auditLogger, userSessionManager, permissionChecker, testTokenMetrics(), testBaseURL, testAdminConsoleBaseURL)
+		handler := buildIssueGet(issueGetDeps{
+			pageRenderer:        pageRenderer,
+			ceremonyStore:       ceremonyStore,
+			templateFS:          templateFS,
+			codeIssuer:          codeIssuer,
+			implicitTokenIssuer: implicitTokenIssuer,
+			database:            database,
+			auditLogger:         auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		})
 
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
@@ -4754,65 +5237,56 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 }
 
-// TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom holds the one place /auth/issue hands
-// the ceremony to issuance. Issuance used to embed the whole AuthContext, so nothing could be left
-// behind; now it names seventeen fields and the handler copies them, and a field copied from the
-// wrong source or not at all would write a code that silently lacks it (#437). Every source field
-// carries a distinct value, so a swap between two string fields fails as well as an omission.
-func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
-	authenticatedAt := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
-	otpClaimGeneration := int64(5)
+// The code arm writes its form_post through the template FS the route table gave the client-error
+// responder, the one the error responses of the same ceremony are written through, so a code and an
+// error to the same client render the same operator-supplied form_post.html.
+func TestHandleIssueGet_ACodeInFormPostRendersFromTheRespondersTemplates(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	ceremonyStore := handlersmocks.NewCeremonyStore(t)
+	codeIssuer := handlersmocks.NewCodeIssuer(t)
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	userSessionManager := handlersmocks.NewUserSessionManager(t)
+	permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		templateFS:         fstest.MapFS{"form_post.html": {Data: []byte(`<form action="{{.redirectURI}}"><input name="code" value="{{.code}}"></form>`)}},
+		codeIssuer:         codeIssuer,
+		database:           database,
+		auditLogger:        auditLogger,
+		userSessionManager: userSessionManager,
+		permissionChecker:  permissionChecker,
+	})
+
+	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
+	rr := httptest.NewRecorder()
+
 	authContext := &ceremony.AuthContext{
-		ClientId:            "client-identifier",
-		RedirectURI:         "https://app.example/callback",
-		ResponseMode:        "form_post",
-		Scope:               "openid profile email",
-		ConsentedScope:      "openid profile",
-		CodeChallenge:       "challenge-value",
-		CodeChallengeMethod: "S256",
-		State:               "state-value",
-		Nonce:               "nonce-value",
-		UserAgent:           "user-agent-value",
-		IpAddress:           "203.0.113.7",
-		UserId:              42,
-		AcrLevel:            record.AcrLevel2Optional,
-		AuthMethods:         "pwd otp",
-		AuthenticatedAt:     &authenticatedAt,
-		AuthStateGeneration: 9,
-		OtpClaimGeneration:  &otpClaimGeneration,
-		// Ceremony state issuance does not read, set so that copying it anywhere would show.
-		CeremonyId: "ceremony-id",
-		AuthState:  ceremony.AuthStateReadyToIssueCode,
+		CeremonyId:   testCeremonyId,
+		AuthState:    ceremony.AuthStateReadyToIssueCode,
+		Scope:        "openid profile",
+		ClientId:     "test-client",
+		UserId:       123,
+		ResponseMode: "form_post",
+		ResponseType: "code",
+		RedirectURI:  "https://example.com/callback",
 	}
+	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
+	stubLiveSession(database, 123)
+	codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).Return(&record.Code{
+		Id: 1, Code: "form-post-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+	}, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
+	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
-	got := newCreateCodeInput(authContext, "session-identifier")
+	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, &issuance.CreateCodeInput{
-		ClientId:            "client-identifier",
-		RedirectURI:         "https://app.example/callback",
-		ResponseMode:        "form_post",
-		Scope:               "openid profile email",
-		ConsentedScope:      "openid profile",
-		CodeChallenge:       "challenge-value",
-		CodeChallengeMethod: "S256",
-		State:               "state-value",
-		Nonce:               "nonce-value",
-		UserAgent:           "user-agent-value",
-		IpAddress:           "203.0.113.7",
-		UserId:              42,
-		AcrLevel:            record.AcrLevel2Optional,
-		AuthMethods:         "pwd otp",
-		AuthenticatedAt:     &authenticatedAt,
-		AuthStateGeneration: 9,
-		SessionIdentifier:   "session-identifier",
-		OTPClaim:            otpcredential.OTPClaim{Claimed: true, Generation: &otpClaimGeneration},
-	}, got)
-
-	// A field added to CreateCodeInput and not copied here is left zero, which the literal above
-	// would not notice until someone remembered to extend it.
-	value := reflect.ValueOf(*got)
-	for i := 0; i < value.NumField(); i++ {
-		assert.Falsef(t, value.Field(i).IsZero(), "CreateCodeInput.%s is never copied from the ceremony",
-			value.Type().Field(i).Name)
-	}
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, `<form action="https://example.com/callback"><input name="code" value="form-post-code"></form>`,
+		rr.Body.String())
+	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
+	pageRenderer.AssertNotCalled(t, "InternalServerError", rr, req, mock.Anything)
 }

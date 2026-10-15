@@ -1,4 +1,4 @@
-package handlers
+package authflow
 
 import (
 	"testing"
@@ -11,46 +11,47 @@ import (
 
 // Every arm /auth/completed can bind a ceremony through, and what each arm does beyond its core
 // write. The handler cases show each arm reaching its act; which arm a ceremony takes is decided
-// here (#437 seam 1).
+// here (#437 seam 1). Each plan is read in the frozen reference's shape (frozenShapeOf), which
+// TestDecideCompletion_MatchesTheFrozenReferenceForEveryCombination holds the decision to whole.
 func TestDecideCompletion(t *testing.T) {
 	testCases := []struct {
 		name  string
 		facts completionFacts
-		want  completionPlan
+		want  frozenCompletionPlan
 	}{
 		// Reuse: the arrived-with session is valid and the ceremony's (#133).
 		{
 			name:  "a valid owned session is reused, with nothing else to do for an SSO pass",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel1},
-			want:  completionPlan{arm: completionArmReuse},
+			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			// Reuse asks nothing of level 1: an SSO pass never saw the password form.
 			name:  "reuse does not need level 1 completed in this ceremony",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, level1Completed: false},
-			want:  completionPlan{arm: completionArmReuse},
+			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			name:  "a bump that raises a privilege rotates the identifier first",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true},
-			want:  completionPlan{arm: completionArmReuse, rotateIdentifier: true},
+			want:  frozenCompletionPlan{arm: frozenArmReuse, rotateIdentifier: true},
 		},
 		{
 			name:  "a credential entered in this ceremony refreshes AuthTime",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, credentialEntered: true},
-			want:  completionPlan{arm: completionArmReuse, refreshAuthTime: true},
+			want:  frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_optional",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
-			want: completionPlan{arm: completionArmReuse, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_mandatory",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
-			want: completionPlan{arm: completionArmReuse, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
 			// The password handler captures too, and a level 1 target never addressed level 2 (#242
@@ -58,12 +59,12 @@ func TestDecideCompletion(t *testing.T) {
 			name: "a captured OTP generation is not promoted for a level 1 target",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel1},
-			want: completionPlan{arm: completionArmReuse},
+			want: frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			name:  "nothing is promoted without a capture, whatever the target",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel2Mandatory},
-			want:  completionPlan{arm: completionArmReuse},
+			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			// prompt=login over the user's own valid session: a new authentication, so the session
@@ -72,7 +73,7 @@ func TestDecideCompletion(t *testing.T) {
 			name: "level 1 completed in this ceremony replaces the reused session's authentication",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, level1Completed: true,
 				credentialEntered: true, target: record.AcrLevel1},
-			want: completionPlan{arm: completionArmReuse, refreshAuthTime: true, replaceAuthentication: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, replaceAuthentication: true},
 		},
 		{
 			// A step-up over an SSO pass entered a credential, the code, but verified no password,
@@ -80,13 +81,13 @@ func TestDecideCompletion(t *testing.T) {
 			name: "a code entered over a reused session refreshes AuthTime and replaces nothing",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
-			want: completionPlan{arm: completionArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "every reuse flag at once",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true,
 				level1Completed: true, credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
-			want: completionPlan{arm: completionArmReuse, rotateIdentifier: true, refreshAuthTime: true,
+			want: frozenCompletionPlan{arm: frozenArmReuse, rotateIdentifier: true, refreshAuthTime: true,
 				replaceAuthentication: true, promoteOtpConfigGeneration: true},
 		},
 
@@ -94,59 +95,59 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			name:  "no session and no level 1 restarts",
 			facts: completionFacts{},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
 			// AuthenticatedAt has two writers, and OTP alone is not level 1 (#129 decision 15).
 			name:  "a credential entered without level 1 still restarts",
 			facts: completionFacts{credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
 			name:  "an expired owned session without level 1 restarts, and is not replaced",
 			facts: completionFacts{sessionPresent: true, sessionValid: false, sessionOwned: true},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
 			// Destroying somebody's session must follow a real authentication in this ceremony.
 			name:  "a foreign session without level 1 restarts, and is not terminated",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: false},
-			want:  completionPlan{arm: completionArmRestart},
+			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 
 		// Create: no reusable session, level 1 done in this ceremony.
 		{
 			name:  "no session with level 1 creates one, terminating and replacing nothing",
 			facts: completionFacts{level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate},
+			want:  frozenCompletionPlan{arm: frozenArmCreate},
 		},
 		{
 			name:  "a valid foreign session is terminated before the new one is created",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: false, level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate, terminateForeignSession: true},
+			want:  frozenCompletionPlan{arm: frozenArmCreate, terminateForeignSession: true},
 		},
 		{
 			// A row that can never be resumed is still a cookie in this browser with grants behind it.
 			name:  "an expired foreign session is terminated as well",
 			facts: completionFacts{sessionPresent: true, sessionValid: false, sessionOwned: false, level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate, terminateForeignSession: true},
+			want:  frozenCompletionPlan{arm: frozenArmCreate, terminateForeignSession: true},
 		},
 		{
 			name:  "an expired owned session is replaced by the new one, not terminated",
 			facts: completionFacts{sessionPresent: true, sessionValid: false, sessionOwned: true, level1Completed: true},
-			want:  completionPlan{arm: completionArmCreate, replaceOwnSession: true},
+			want:  frozenCompletionPlan{arm: frozenArmCreate, replaceOwnSession: true},
 		},
 		{
 			name: "the reuse flags stay off on the create arm",
 			facts: completionFacts{level1Completed: true, raisesPrivilege: true, credentialEntered: true,
 				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
-			want: completionPlan{arm: completionArmCreate},
+			want: frozenCompletionPlan{arm: frozenArmCreate},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, decideCompletion(tc.facts))
+			assert.Equal(t, tc.want, frozenShapeOf(t, decideCompletion(tc.facts)))
 		})
 	}
 }
@@ -214,7 +215,7 @@ func TestDecideBeforeBinding(t *testing.T) {
 	}
 }
 
-// afterBindingWorld is what HandleAuthCompletedGet would load after binding, answered from the row.
+// afterBindingWorld is what Completion.Run would load after binding, answered from the row.
 type afterBindingWorld struct {
 	promptConsent    bool
 	consentRequired  bool
@@ -223,34 +224,34 @@ type afterBindingWorld struct {
 	consentScope     *string // nil for no consent row
 }
 
-// driveAfterBinding runs decideAfterBinding as HandleAuthCompletedGet does, loading each fact it
+// driveAfterBinding runs DecideAfterBinding as Completion.Run does, loading each fact it
 // asks for from the world, and answers the answer and the facts in the order they were asked for.
-func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswer, []afterBindingFact) {
+func driveAfterBinding(t *testing.T, world afterBindingWorld) (AfterBindingAnswer, []AfterBindingFact) {
 	t.Helper()
 
-	facts := afterBindingFacts{
-		promptConsent:    world.promptConsent,
-		consentRequired:  world.consentRequired,
-		clientIdentifier: world.clientIdentifier,
+	facts := AfterBindingFacts{
+		PromptConsent:    world.promptConsent,
+		ConsentRequired:  world.consentRequired,
+		ClientIdentifier: world.clientIdentifier,
 	}
-	var asked []afterBindingFact
+	var asked []AfterBindingFact
 	for {
-		answer, need := decideAfterBinding(facts)
-		if need == afterBindingFactNone {
-			require.NotEqual(t, afterBindingUndecided, answer, "a decided ceremony has an answer")
+		answer, need := DecideAfterBinding(facts)
+		if need == AfterBindingFactNone {
+			require.NotEqual(t, AfterBindingUndecided, answer, "a decided ceremony has an answer")
 			return answer, asked
 		}
 		require.NotContains(t, asked, need, "each fact is loaded once")
 		asked = append(asked, need)
 
 		switch need {
-		case afterBindingFactEffectiveScope:
+		case AfterBindingFactEffectiveScope:
 			scope := world.effectiveScope
-			facts.effectiveScope = &scope
-		case afterBindingFactConsent:
-			facts.consentLoaded = true
+			facts.EffectiveScope = &scope
+		case AfterBindingFactConsent:
+			facts.ConsentLoaded = true
 			if world.consentScope != nil {
-				facts.consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
+				facts.Consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
 			}
 		default:
 			require.FailNow(t, "an unknown fact", "%v", need)
@@ -261,52 +262,52 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 // Where a ceremony bound to a session goes, and whether the scope is filtered on the way.
 func TestDecideAfterBinding(t *testing.T) {
 	const (
-		scope   = afterBindingFactEffectiveScope
-		consent = afterBindingFactConsent
+		scope   = AfterBindingFactEffectiveScope
+		consent = AfterBindingFactConsent
 	)
 	scopes := func(s string) *string { return &s }
 
 	testCases := []struct {
 		name       string
 		world      afterBindingWorld
-		wantAnswer afterBindingAnswer
-		wantReads  []afterBindingFact
+		wantAnswer AfterBindingAnswer
+		wantReads  []AfterBindingFact
 	}{
 		{
 			name:       "a user holding none of the scopes is refused",
 			world:      afterBindingWorld{effectiveScope: ""},
-			wantAnswer: afterBindingNoScope,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingNoScope,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			name:       "no scope is refused before prompt=consent is honoured",
 			world:      afterBindingWorld{promptConsent: true, effectiveScope: ""},
-			wantAnswer: afterBindingNoScope,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingNoScope,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			name:       "prompt=consent goes to the consent screen",
 			world:      afterBindingWorld{promptConsent: true, effectiveScope: "openid"},
-			wantAnswer: afterBindingConsent,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingConsent,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			name:       "a client requiring consent goes to the consent screen",
 			world:      afterBindingWorld{consentRequired: true, effectiveScope: "openid"},
-			wantAnswer: afterBindingConsent,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingConsent,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			name:       "offline_access in the effective scope goes to the consent screen",
 			world:      afterBindingWorld{effectiveScope: "openid offline_access"},
-			wantAnswer: afterBindingConsent,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingConsent,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			name:       "no consent needed goes to issuance",
 			world:      afterBindingWorld{effectiveScope: "openid profile"},
-			wantAnswer: afterBindingIssue,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingIssue,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		// authserver:manage-account is owed the consent screen whatever the client's Consent
 		// required says, unless the user's stored consent to the client covers it, and the admin
@@ -315,15 +316,15 @@ func TestDecideAfterBinding(t *testing.T) {
 			name: "manage-account from a consent-off client with no stored consent goes to the consent screen",
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
 				effectiveScope: "openid authserver:manage-account"},
-			wantAnswer: afterBindingConsent,
-			wantReads:  []afterBindingFact{scope, consent},
+			wantAnswer: AfterBindingConsent,
+			wantReads:  []AfterBindingFact{scope, consent},
 		},
 		{
 			name: "manage-account with a stored consent leaving it out goes to the consent screen",
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
 				effectiveScope: "openid authserver:manage-account", consentScope: scopes("openid profile")},
-			wantAnswer: afterBindingConsent,
-			wantReads:  []afterBindingFact{scope, consent},
+			wantAnswer: AfterBindingConsent,
+			wantReads:  []AfterBindingFact{scope, consent},
 		},
 		{
 			// A consent-off client is asked about manage-account and nothing else, so a stored
@@ -332,23 +333,23 @@ func TestDecideAfterBinding(t *testing.T) {
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
 				effectiveScope: "openid profile authserver:manage-account",
 				consentScope:   scopes("openid authserver:manage-account")},
-			wantAnswer: afterBindingIssue,
-			wantReads:  []afterBindingFact{scope, consent},
+			wantAnswer: AfterBindingIssue,
+			wantReads:  []AfterBindingFact{scope, consent},
 		},
 		{
 			name: "the admin console's client goes to issuance with manage-account and reads no consent",
 			world: afterBindingWorld{clientIdentifier: "admin-console-client",
 				effectiveScope: "authserver:manage authserver:manage-account email openid profile"},
-			wantAnswer: afterBindingIssue,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingIssue,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			// The user's permissions narrowed the scope, and what is about to be granted is what
 			// the rule reads.
 			name:       "manage-account filtered out of the effective scope is owed nothing",
 			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: "openid"},
-			wantAnswer: afterBindingIssue,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingIssue,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			// A client requiring consent goes to the consent step as before, which reads the
@@ -356,14 +357,14 @@ func TestDecideAfterBinding(t *testing.T) {
 			name: "manage-account from a client requiring consent goes to the consent screen without a read here",
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client", consentRequired: true,
 				effectiveScope: "openid authserver:manage-account"},
-			wantAnswer: afterBindingConsent,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingConsent,
+			wantReads:  []AfterBindingFact{scope},
 		},
 		{
 			name:       "no scope is refused before manage-account is asked about",
 			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: ""},
-			wantAnswer: afterBindingNoScope,
-			wantReads:  []afterBindingFact{scope},
+			wantAnswer: AfterBindingNoScope,
+			wantReads:  []AfterBindingFact{scope},
 		},
 	}
 

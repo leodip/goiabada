@@ -2,7 +2,6 @@ package usersession
 
 import (
 	"context"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -203,10 +202,9 @@ func TestStartNewUserSession_RecordsThePasswordInstant(t *testing.T) {
 	passwordAt := time.Now().UTC().Add(-3 * time.Minute)
 	codeAt := passwordAt.Add(time.Minute)
 
-	result, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt,
-			BrowserSessionCondition: anyBrowserSession},
-		0, nil, "192.168.1.50", nil, SessionLimits{})
+	result, _, err := m.manager.StartNewUserSession(context.Background(), 7,
+		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
+		0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
 	assert.Same(t, *captured, result)
@@ -220,10 +218,9 @@ func TestStartNewUserSession_RefusesAMissingPasswordInstant(t *testing.T) {
 	m := newStartSessionMocks(t)
 	at := time.Now().UTC()
 
-	_, _, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &at,
-			BrowserSessionCondition: anyBrowserSession},
-		0, nil, "192.168.1.50", nil, SessionLimits{})
+	_, _, err := m.manager.StartNewUserSession(context.Background(), 7,
+		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &at},
+		0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorContains(t, err, "no password instant captured")
 	m.db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
@@ -240,13 +237,12 @@ func TestStartNewUserSession_AClaimThatNoLongerStandsCreatesNothing(t *testing.T
 	m.db.On("AcquireUserRow", mock.Anything, txSentinel, int64(123)).Return(nil).Once()
 	m.db.On("GetUserById", mock.Anything, txSentinel, int64(123)).Return(&record.User{Id: 123, OtpConfigGeneration: 5}, nil).Once()
 
-	result, removed, err := m.manager.StartNewUserSession(httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent), 7,
+	result, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
 		Authentication{
 			UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
-			OTPClaim:                otpcredential.OTPClaim{Claimed: true, Generation: &generation},
-			BrowserSessionCondition: anyBrowserSession,
+			OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 		},
-		0, &generation, "192.168.1.50", nil, SessionLimits{})
+		0, &generation, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorIs(t, err, otpcredential.ErrAuthenticatorRemoved)
 	require.ErrorIs(t, stub.BodyErr, otpcredential.ErrAuthenticatorRemoved)

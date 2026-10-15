@@ -105,9 +105,10 @@ func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) 
 // TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState is the same assertion on the error
 // redirect, which is the one #146 was reported against.
 //
-// prompt=none with no session is the cheapest of the sixteen error redirects: handlePromptNone
-// answers login_required on its first check, so there is no ceremony to walk and nothing about the
-// error's cause is under test here, only the shape of the URI it is delivered in.
+// prompt=none with no session is the cheapest of the sixteen error redirects:
+// authflow.SilentAuthentication answers login_required on its first check, so there is no ceremony to
+// walk and nothing about the error's cause is under test here, only the shape of the URI it is
+// delivered in.
 func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 	client, _, _ := newRegisteredQueryClient(t)
 

@@ -120,7 +120,7 @@ type VerifyResult struct {
 // enable write precisely so a failed enable cannot leave OTP switched on, so a rolled back or lost
 // establish behaves exactly as a failed write always has and the user types the next code.
 //
-// Shared by the two enable sites decision 2 names, HandleAuthOtpPost's enrollment branch and
+// Shared by the two enable sites decision 2 names, authflow.OTPSubmission's enrollment branch and
 // HandleAccountOTPPut's enable branch. There is no third. The encryption and the two field
 // writes were the caller's before #387 and are folded in here, so a site that establishes an
 // authenticator cannot store the seed without moving the counter.
@@ -291,7 +291,7 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 // the browser handler as record.User.GetOTPSecret, which is what #387's rule about a plaintext seed
 // not leaving the minimum is about.
 //
-// One caller today, HandleAuthOtpPost's already-enrolled arm.
+// One caller today, authflow.OTPSubmission's already-enrolled arm.
 func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, code string, now time.Time) (VerifyResult, error) {
 	secret, err := storedSecret(dataCipher, user)
 	if err != nil {

@@ -27,10 +27,11 @@ import (
 // guarded by the move itself, which is the silent-unguarding shape #333 exists to refuse. bootstrap
 // is named for the same reason: it declares the seed's ports, and #424 created it. userconsent too:
 // its port left handler_consent.go with the consent writer (#437). And authorizerequest, whose two
-// ports the authorization handlers embed (#437).
+// ports the authorization handlers embed (#437). And authflow, which declares the ports of the
+// ceremony steps' operations, their browser-session writes among them (#580).
 func TestHandlers_NoDeadInterfaces(t *testing.T) {
 	guard.AssertNoDeadInterfaces(t, "authserver/internal/handlers", "authserver/internal/revocation",
 		"authserver/internal/emaillinks", "authserver/internal/otpcredential",
 		"authserver/internal/userclaims", "authserver/internal/userconsent", "authserver/internal/authorizerequest",
-		"authserver/internal/bootstrap")
+		"authserver/internal/bootstrap", "authserver/internal/authflow")
 }

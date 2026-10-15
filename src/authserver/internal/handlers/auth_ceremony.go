@@ -10,6 +10,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -22,13 +24,10 @@ const ceremonyIdField = "ceremonyId"
 // ceremonyMatches reports whether a submitted form, or a step's page load, belongs to the ceremony
 // the session currently holds.
 //
-// An empty stored id is refused rather than matched against an empty submission. Only an auth
-// context written by a binary from before #79 can carry one, and treating "" as equal to ""
-// would make such a context accept a form naming no ceremony at all, which is every forged
-// form. The cost is that a user mid-flow across a deploy is refused once and starts the
-// authorization again.
+// An empty stored id is refused rather than matched against an empty submission: "" equal to ""
+// would accept a form naming no ceremony at all, which is every forged form (#79).
 //
-// Constant time, like emailedCodeMatches and the client secret comparison in
+// Constant time, like accounthandlers' emailedCodeMatches and the client secret comparison in
 // protocolvalidation.ValidateTokenRequest. Not because this value is guessed at, but because a
 // plain comparison stopping at the first differing byte is the kind of thing that is cheap to avoid
 // and expensive to notice later.
@@ -39,26 +38,93 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 	return subtle.ConstantTimeCompare([]byte(contextCeremonyId), []byte(submitted)) == 1
 }
 
+// CeremonyBoundary is what every step of an authorization ceremony does at its route boundary,
+// before and after the step's own work: load the auth context and check that the request names it,
+// gate on the state the step accepts, redirect to the next step, and answer a save, clear or rotation
+// that failed. The route table builds one and hands it to every step handler, so these answers are
+// written once and no step can drift from them.
+//
+// It never decides a step and never writes the browser session: a step's saves, clears and rotations
+// go through the per-request adapter (browserSession) its authflow operation writes through. The
+// boundary only reads the auth context.
+type CeremonyBoundary struct {
+	pageRenderer        PageRenderer
+	ceremonyStore       CeremonyStore
+	auditLogger         AuditLogger
+	baseURL             string
+	adminConsoleBaseURL string
+}
+
+// NewCeremonyBoundary builds the route boundary every step handler shares. baseURL is the auth
+// server's, which the step redirects are built under; adminConsoleBaseURL is the console's, where a
+// visitor with no ceremony left is sent.
+func NewCeremonyBoundary(pageRenderer PageRenderer, ceremonyStore CeremonyStore, auditLogger AuditLogger,
+	baseURL string, adminConsoleBaseURL string) *CeremonyBoundary {
+
+	return &CeremonyBoundary{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		auditLogger:         auditLogger,
+		baseURL:             baseURL,
+		adminConsoleBaseURL: adminConsoleBaseURL,
+	}
+}
+
+// beginStep is what a step does before its own work, in order: read the request's settings, load
+// the auth context and check the ceremony id (loadAuthContext), and gate on the states the step
+// accepts (requireAuthState). It reports false when it answered, and the caller then returns without
+// writing anything.
+//
+// The settings come first, before anything is read or written. middleware.Settings runs on every
+// application route and answers its own failure, so a step without settings is a wiring defect; it
+// answers the 500 page carrying reqctx.ErrNoSettings and reads no ceremony. A step hands the
+// settings to its operation as a plain value (#580 decision 5).
+func (b *CeremonyBoundary) beginStep(w http.ResponseWriter, r *http.Request,
+	accepted ...ceremony.AuthState) (*record.Settings, *ceremony.AuthContext, bool) {
+
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		b.pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
+		return nil, nil, false
+	}
+
+	authContext, ok := b.loadAuthContext(w, r)
+	if !ok {
+		return nil, nil, false
+	}
+
+	if !b.requireAuthState(w, r, authContext, accepted...) {
+		return nil, nil, false
+	}
+	return settings, authContext, true
+}
+
+// redirectAfterSave answers a step that saved its ceremony towards nextStep: the redirect to it when
+// the save landed, and answerStepSaveFailure's answer when it did not.
+func (b *CeremonyBoundary) redirectAfterSave(w http.ResponseWriter, r *http.Request,
+	authContext *ceremony.AuthContext, nextStep string, saveErr error) {
+
+	if saveErr != nil {
+		b.answerStepSaveFailure(w, r, saveErr)
+		return
+	}
+	b.stepRedirect(w, r, nextStep, authContext)
+}
+
 // rejectCeremonyMismatch answers a request that names a ceremony the session no longer holds, or
-// none: audit it, then render the error page at 400.
+// none: audit it, then render the "no longer active" page at 400.
 //
-// The auth context is deliberately NOT touched. The ceremony that is current is the one the
-// user is actually working on, in another tab, and clearing or advancing it here would let a
-// forgotten tab cancel a live authorization with nothing left to recover from. The stale form
-// or page is simply dead. The client is not told either, for the same reason: the client that
-// would receive an error is the current one, whose authorization the user still wants (#79
-// decision 5).
-//
-// Mirrors accounthandlers' rejectResetPassword: audit, then render, at http.StatusBadRequest because a
-// submission was genuinely refused.
-func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, w http.ResponseWriter,
-	r *http.Request, authContext *ceremony.AuthContext) {
+// The auth context is not touched. The ceremony that is current is the one the user is working on,
+// in another tab, and clearing or advancing it here would let a forgotten tab cancel a live
+// authorization. The client is not told either: the client that would receive an error is the
+// current one, whose authorization the user still wants (#79 decision 5).
+func (b *CeremonyBoundary) rejectCeremonyMismatch(w http.ResponseWriter, r *http.Request,
+	authContext *ceremony.AuthContext) {
 
 	const maxAuditedValueLength = 100
 
-	// Truncated for the same reason accounthandlers' auditedClientIP truncates it for the two
-	// emailed-link flows: httpmw.RealIP resolves the IP from a forwarded header in a proxied
-	// deployment, so this is a sink for a value that originates outside the process.
+	// httpmw.RealIP resolves the IP from a forwarded header in a proxied deployment, so the value
+	// originates outside the process and is bounded before it reaches the audit log.
 	clientIP := middleware.ClientIP(r)
 	if len(clientIP) > maxAuditedValueLength {
 		clientIP = clientIP[:maxAuditedValueLength]
@@ -70,92 +136,88 @@ func rejectCeremonyMismatch(pageRenderer PageRenderer, auditLogger AuditLogger, 
 		"ip":                clientIP,
 	}
 	// Absent rather than zero when the ceremony has not identified anyone yet, which is every
-	// submission of the password form. A payload naming user 0 asserts a row that does not exist.
+	// submission of the password form: a payload naming user 0 asserts a row that does not exist.
 	if authContext.UserId != 0 {
 		details["user_id"] = authContext.UserId
 	}
-	auditLogger.Log(r.Context(), audit.EventAuthCeremonyMismatch, details)
+	b.auditLogger.Log(r.Context(), audit.EventAuthCeremonyMismatch, details)
 
-	renderCeremonyNoLongerActive(pageRenderer, w, r)
+	b.renderCeremonyNoLongerActive(w, r)
 }
 
 // renderCeremonyNoLongerActive renders the page a ceremony this browser has replaced is answered
-// with, at 400, touching no auth context. rejectCeremonyMismatch answers a request naming another
-// ceremony with it, and /auth/completed answers a bind that found a newer sign-in already on the
-// session with it, because that sign-in's own /auth/authorize replaced the ceremony first (#538).
-func renderCeremonyNoLongerActive(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
+// with, at 400, touching no auth context. It answers a request naming another ceremony
+// (rejectCeremonyMismatch), a step whose save found another ceremony in the session
+// (answerCeremonyReplaced), and /auth/completed's bind that found a newer sign-in already on the
+// session (#538).
+func (b *CeremonyBoundary) renderCeremonyNoLongerActive(w http.ResponseWriter, r *http.Request) {
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.title"),
 		"error":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.message"),
 		"_httpStatus": http.StatusBadRequest,
 	}
 
-	if err := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
-		pageRenderer.InternalServerError(w, r, err)
+	if err := b.pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
+		b.pageRenderer.InternalServerError(w, r, err)
 	}
 }
 
 // answerStepSaveFailure answers a step whose save or clear of its auth context, or rotation of the
-// browser session's identifier, failed. One that found the browser session no longer holding this
-// ceremony (ceremony.ErrCeremonyReplaced: another /auth/authorize replaced it, it ended, or the
-// session is gone) wrote nothing, and is answered by answerCeremonyReplaced. Any other failure is
-// the 500 it always was.
-func answerStepSaveFailure(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, err error) {
+// browser session's identifier, failed. A failure that found the browser session no longer holding
+// this ceremony (ceremony.ErrCeremonyReplaced) wrote nothing and is answerCeremonyReplaced's; any
+// other failure is a 500.
+func (b *CeremonyBoundary) answerStepSaveFailure(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, ceremony.ErrCeremonyReplaced) {
-		answerCeremonyReplaced(pageRenderer, w, r)
+		b.answerCeremonyReplaced(w, r)
 		return
 	}
-	pageRenderer.InternalServerError(w, r, err)
+	b.pageRenderer.InternalServerError(w, r, err)
 }
 
 // answerCeremonyReplaced answers a step whose save or clear found the browser session no longer
-// holding its ceremony, which wrote nothing: the "no longer active" page at 400, as a request naming
-// another ceremony is, so the newer sign-in carries on (#579). Whatever the step would otherwise have
-// answered, an error redirect, a refusal page or a code, is not answered: nothing goes to the client,
-// for rejectCeremonyMismatch's reason. Logged at warn and audited nowhere, as /auth/completed's stale
-// bind is: the request named its ceremony correctly, so it is no ceremony mismatch (#578).
-func answerCeremonyReplaced(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
+// holding its ceremony: another /auth/authorize replaced it, it ended, or the session is gone. That
+// write changed nothing, and the answer is the "no longer active" page at 400, so the newer sign-in
+// carries on (#579). Whatever the step would otherwise have answered, an error redirect, a refusal
+// page or a code, is not sent: nothing goes to the client, for rejectCeremonyMismatch's reason. Logged
+// at warn and audited nowhere, because the request named its ceremony correctly and so is no ceremony
+// mismatch (#578).
+func (b *CeremonyBoundary) answerCeremonyReplaced(w http.ResponseWriter, r *http.Request) {
 	slog.WarnContext(r.Context(), "the browser session no longer holds this ceremony, answering it as no longer active")
-	renderCeremonyNoLongerActive(pageRenderer, w, r)
+	b.renderCeremonyNoLongerActive(w, r)
 }
 
-// loadAuthContext reads the ceremony's auth context for a gated route, and answers the request
-// itself when there is none to read or it is not the one the request names. It reports false when it
-// answered, and the caller then returns without writing anything.
+// loadAuthContext reads the ceremony's auth context for a step, and answers the request itself when
+// there is none or it is not the one the request names. It reports false when it answered, and the
+// caller then returns without writing anything.
 //
-//   - A missing context redirects to the account page with a warn line, since a visitor who reaches a
-//     step after the ceremony ended has nothing to resume and somewhere better to be. The load comes
-//     first for that reason: a request naming any ceremony, or none, still ends there when nothing is
-//     stored.
-//   - A request that does not name the stored ceremony is rejectCeremonyMismatch's 400, before
-//     requireAuthState and before anything else is read: a submission never reaches a credential check
-//     and a page load never reaches a step's loads (#79 for the forms, #246 and #437 for the pages).
+//   - A missing context redirects to the account page with a warn line: a visitor who reaches a step
+//     after the ceremony ended has nothing to resume. The load comes first, so a request naming any
+//     ceremony, or none, ends there when nothing is stored.
+//   - A request that does not name the stored ceremony is rejectCeremonyMismatch's 400, before the
+//     state gate and before anything else is read: a submission never reaches a credential check and
+//     a page load never reaches a step's loads (#79 for the forms, #246 and #437 for the pages).
 //   - Any other failure is a 500.
 //
-// Every step names its ceremony because a browser holds ONE auth context, so a second
-// /auth/authorize replaces it while every tab of the first is still open. A form carries the id in its
-// body and a page load in the URL every redirect between the steps builds (ceremonyStepURL). Without
-// the second half, a tab of the replaced sign-in that reached its next step acted on the newer
-// sign-in and could finish another application's authorization (#246 decision 22). Take the
-// comparison out and every step accepts any request while a context is stored, silently, since the
-// flows that follow their own redirects still pass.
-func loadAuthContext(pageRenderer PageRenderer, ceremonyStore CeremonyStore, auditLogger AuditLogger,
-	w http.ResponseWriter, r *http.Request, adminConsoleBaseURL string) (*ceremony.AuthContext, bool) {
-
-	authContext, err := ceremonyStore.GetAuthContext(r)
+// A browser holds one auth context, so a second /auth/authorize replaces it while every tab of the
+// first is still open. A form names its ceremony in its body and a page load in the URL every step
+// redirect builds (stepRedirect). Without the comparison, a tab of the replaced sign-in that reached
+// its next step would act on the newer sign-in and could finish another application's authorization
+// (#246 decision 22).
+func (b *CeremonyBoundary) loadAuthContext(w http.ResponseWriter, r *http.Request) (*ceremony.AuthContext, bool) {
+	authContext, err := b.ceremonyStore.GetAuthContext(r)
 	if err != nil {
 		if errors.Is(err, ceremony.ErrNoAuthContext) {
-			var profileUrl = profileURL(adminConsoleBaseURL)
+			var profileUrl = profileURL(b.adminConsoleBaseURL)
 			slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 			http.Redirect(w, r, profileUrl, http.StatusFound)
 		} else {
-			pageRenderer.InternalServerError(w, r, err)
+			b.pageRenderer.InternalServerError(w, r, err)
 		}
 		return nil, false
 	}
 
 	if !ceremonyMatches(authContext.CeremonyId, submittedCeremonyId(r)) {
-		rejectCeremonyMismatch(pageRenderer, auditLogger, w, r, authContext)
+		b.rejectCeremonyMismatch(w, r, authContext)
 		return nil, false
 	}
 	return authContext, true
@@ -185,27 +247,33 @@ func ceremonyStepURL(baseURL string, path string, authContext *ceremony.AuthCont
 	return baseURL + path + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyId}}.Encode()
 }
 
-// requireAuthState is every gated route's check that the ceremony is on a step the route accepts.
-// When it is not, it renders the error page at 400, logs the accepted states and the actual one at
-// warn, and reports false; the caller then returns without writing anything.
+// stepRedirect answers with a 302 to the ceremony's next step, at path under the auth server's base
+// URL and naming the ceremony (ceremonyStepURL). path is always one of the ceremony's own routes, a
+// constant in the step's handler or its authflow operation, never anything the request carries.
+func (b *CeremonyBoundary) stepRedirect(w http.ResponseWriter, r *http.Request, path string,
+	authContext *ceremony.AuthContext) {
+
+	http.Redirect(w, r, ceremonyStepURL(b.baseURL, path, authContext), http.StatusFound)
+}
+
+// requireAuthState is every step's check that the ceremony is on a step the route accepts. When it is
+// not, it renders the state mismatch page at 400, logs the accepted states and the actual one at warn,
+// and reports false; the caller then returns without writing anything.
 //
 // A mismatch is a client's mistake and not a server fault. The ordinary way to reach one is the Back
-// button: the browser returns to /auth/pwd after the password was accepted, the context has moved on
-// to level1_password_completed, and a 500 page with a stack would tell the visitor the server had
-// broken. RFC 9110 section 15.5.1 is the fit, "the server cannot or will not process the request due
-// to something that is perceived to be a client error"; 15.6.1's 500 is for "an unexpected
-// condition", and a stale tab is not unexpected (#279 decision 21, #248 part 1). Every route answers
-// through here, /auth/level1completed with its two accepted states included, so no gate can drift
-// back to a 500 on its own (#436).
+// button: the browser returns to /auth/pwd after the password was accepted and the context has moved
+// on to level1_password_completed. RFC 9110 section 15.5.1 fits, "the server cannot or will not process
+// the request due to something that is perceived to be a client error"; 15.6.1's 500 is for "an
+// unexpected condition", and a stale tab is not unexpected (#279 decision 21, #248 part 1, #436).
 //
-// warn rather than error, and with both sides named: the pair is the whole diagnosis, and an
-// operator watching error-level lines should not be paged by a Back button. There is no stack
-// because there is no failure to trace to a line of code.
+// Warn rather than error, with both sides named: the pair is the whole diagnosis, and an operator
+// watching error-level lines should not be paged by a Back button. There is no stack because there is
+// no failure to trace.
 //
-// The auth context is deliberately NOT touched, for rejectCeremonyMismatch's reason: the state it
-// holds belongs to the step the user is actually on, and advancing or clearing it here would let a
-// stale page cancel a live authorization. The client is not told either, for the same reason.
-func requireAuthState(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request,
+// The auth context is not touched, for rejectCeremonyMismatch's reason: the state belongs to the step
+// the user is actually on, and advancing or clearing it here would let a stale page cancel a live
+// authorization. The client is not told either.
+func (b *CeremonyBoundary) requireAuthState(w http.ResponseWriter, r *http.Request,
 	authContext *ceremony.AuthContext, accepted ...ceremony.AuthState) bool {
 
 	if authContext.InState(accepted...) {
@@ -225,8 +293,8 @@ func requireAuthState(pageRenderer PageRenderer, w http.ResponseWriter, r *http.
 		"_httpStatus": http.StatusBadRequest,
 	}
 
-	if err := pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
-		pageRenderer.InternalServerError(w, r, err)
+	if err := b.pageRenderer.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind); err != nil {
+		b.pageRenderer.InternalServerError(w, r, err)
 	}
 	return false
 }

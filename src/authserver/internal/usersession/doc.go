@@ -4,5 +4,7 @@
 // about users. core/sessionstore is the browser session store whose cookie names the user session,
 // and internal/sessionbackend is where the auth server keeps that store's rows. The two session
 // lifetimes and the client's max_age are parameters of HasValidUserSession rather than read from
-// the request context (#433).
+// the request context (#433). It touches no HTTP: the binding of a new session to the browser
+// session, and the device cookie, are written by authflow.Completion through the handler's
+// per-request adapter, after StartNewUserSession commits.
 package usersession

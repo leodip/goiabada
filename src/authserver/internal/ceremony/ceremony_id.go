@@ -24,8 +24,8 @@ const idAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX
 // constant.
 const QueryParameter = "ceremony"
 
-// NewId draws a ceremony's id. Only HandleAuthorizeGet calls it, because that is the one place an
-// auth context is created.
+// NewId draws a ceremony's id. Only authflow.Authorization.Run calls it, because that is the one
+// place an auth context is created.
 func NewId() string {
 	return securerandom.StringFromAlphabet(IdLength, idAlphabet)
 }

@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -24,19 +24,18 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
+	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // Every rotation of the browser session's identifier a ceremony step makes lands only while the
 // browser session still holds the ceremony the step loaded, and a step whose rotation found its
 // ceremony replaced, or its session gone, answers the "no longer active" page at 400 and goes no
 // further (#579 decisions 2 and 3). The rotations are the password's, the code's and
-// /auth/completed's reuse arm's; the create arm's is inside StartNewUserSession, and the create arm
-// first confirms the browser session still holds its ceremony before it ends or creates anything
+// /auth/completed's reuse arm's and its create arm's, which binds the session it started; the create
+// arm first confirms the browser session still holds its ceremony before it ends or creates anything
 // (decision 4). The cases arm the CeremonyStore mock; the last is the issue's interleaving at the
 // password step, with the real ceremony store.
 
@@ -57,8 +56,12 @@ func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL,
-		testAdminConsoleBaseURL)
+	handler := buildAuthPwdPost(authPwdPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
@@ -76,8 +79,6 @@ func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 		CeremonyId: testCeremonyId,
 		ClientId:   "test-client",
 	}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{ClientIdentifier: "test-client"}, nil)
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
 		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
 	}, nil)
@@ -100,8 +101,12 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher,
-		testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthOtpPost(authOtpPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	require.NoError(t, err)
@@ -112,6 +117,7 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -123,8 +129,6 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 		Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()), OtpConfigGeneration: 3,
 	}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{ClientIdentifier: "test-client"}, nil)
 	database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 		Return(true, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
@@ -149,8 +153,15 @@ func TestHandleAuthCompletedGet_AReuseArmRotationFindingItsCeremonyReplacedAnswe
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
-	handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-		auditLogger, permissionChecker, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthCompletedGet(authCompletedGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: userSessionManager,
+		database:           database,
+		templateFS:         fstest.MapFS{},
+		auditLogger:        auditLogger,
+		permissionChecker:  permissionChecker,
+	})
 
 	sessionIdentifier := "test-session"
 	req, _ := http.NewRequest(http.MethodGet, "/auth/completed?ceremony="+testCeremonyId, nil)
@@ -257,8 +268,15 @@ func TestHandleAuthCompletedGet_TheCreateArmEndsAndCreatesNothingForAReplacedCer
 			// Strict: a termination, which opens a transaction, fails the case.
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, handlersmocks.NewPermissionChecker(t), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  handlersmocks.NewPermissionChecker(t),
+			})
 			req, _ := armCreateArm(t, tc, ceremonyStore, userSessionManager, database)
 			rr := httptest.NewRecorder()
 
@@ -279,18 +297,19 @@ func TestHandleAuthCompletedGet_TheCreateArmEndsAndCreatesNothingForAReplacedCer
 	}
 }
 
-// A newer sign-in can land between the create arm's check and its rotation, after the commit. The
-// rotation inside StartNewUserSession then refuses, or finds the session gone, and the new session
-// is abandoned as a failed rotation abandons it. /auth/completed answers the page rather than a
-// 500, audits the rows the committed sweep removed as it does for any failed rotation, and records
-// no new session (#579 decisions 3 and 4).
+// A newer sign-in can land between the create arm's check and its rotation, after the start's
+// commit. The rotation then refuses, or finds the session gone, and the new session is abandoned as a
+// failed rotation abandons it. /auth/completed answers the page rather than a 500, audits the rows the
+// committed sweep removed as it does for any failed rotation, records no new session and writes no
+// device cookie (#579 decisions 3 and 4).
 func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnswersNoLongerActive(t *testing.T) {
 	for _, failure := range []struct {
 		name string
 		err  error
 	}{
-		{name: "another ceremony", err: errs.Wrap(ceremony.ErrCeremonyReplaced, "unable to rotate the browser session identifier")},
-		{name: "the session gone", err: errs.Wrap(sessionstore.ErrNotFound, "unable to rotate the browser session identifier")},
+		{name: "another ceremony", err: errs.WithStack(ceremony.ErrCeremonyReplaced)},
+		// What ceremony.Store answers for a session gone since the request read it.
+		{name: "the session gone", err: errs.Wrap(ceremony.ErrCeremonyReplaced, "the browser session is gone")},
 	} {
 		t.Run(failure.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -298,16 +317,30 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			handler := HandleAuthCompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, fstest.MapFS{},
-				auditLogger, handlersmocks.NewPermissionChecker(t), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  handlersmocks.NewPermissionChecker(t),
+			})
 			req, pwdAuthTime := armCreateArm(t, createArmCases[2], ceremonyStore, userSessionManager, database)
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(nil).Once()
 			removed := []usersession.Removal{{Session: record.UserSession{Id: 42}, Reason: audit.DeletedUserSessionSameDevice}}
-			userSessionManager.On("StartNewUserSession", rr, req, int64(1),
-				signedInAs(int64(1), "pwd", record.AcrLevel1, pwdAuthTime), int64(7), (*int64)(nil), "",
-				(*record.UserSession)(nil), testSessionLimits).Return(nil, removed, failure.err).Once()
+			started := &record.UserSession{Id: 43, SessionIdentifier: "the-new-user-session", UserId: 1}
+			var minted string
+			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
+				signedInAs(int64(1), "pwd", record.AcrLevel1, pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "",
+				(*record.UserSession)(nil), testSessionLimits).Return(started, removed, nil).Once()
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, "the-new-user-session").
+				Return(failure.err).Once()
+			userSessionManager.On("AbandonUserSession", theContextOf(req), started, mock.MatchedBy(func(cause error) bool {
+				return errors.Is(cause, failure.err)
+			})).Return(func(_ context.Context, _ *record.UserSession, cause error) error { return cause }).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 				return details["user_session_id"] == int64(42) && details["reason"] == audit.DeletedUserSessionSameDevice
 			})).Return().Once()
@@ -316,10 +349,12 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 			handler.ServeHTTP(rr, req)
 
 			assertAnsweredNoLongerActive(t, rr)
+			noDeviceCookieIn(t, rr)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
+			userSessionManager.AssertExpectations(t)
 		})
 	}
 }
@@ -357,8 +392,6 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 			close(release)
 		}
 	}()
-	databaseA.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{ClientIdentifier: "test-client"}, nil)
 	databaseA.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Run(func(mock.Arguments) {
 		close(reached)
 		<-release
@@ -378,8 +411,12 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	tabADone := make(chan struct{})
 	go func() {
 		defer close(tabADone)
-		HandleAuthPwdPost(pageRendererA, ceremonyStore, databaseA, auditLoggerA, noCredentialFailures{}, testBaseURL,
-			testAdminConsoleBaseURL).ServeHTTP(rrA, reqA)
+		buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRendererA,
+			ceremonyStore: ceremonyStore,
+			database:      databaseA,
+			auditLogger:   auditLoggerA,
+		}).ServeHTTP(rrA, reqA)
 	}()
 	select {
 	case <-reached:
@@ -392,9 +429,16 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	// Tab B's /auth/authorize, carrying the same cookie, through to its save.
 	e := newSyntaxAuthorizeEndpoint(t)
 	e.stubLoggedOutBrowser()
-	tabB := HandleAuthorizeGet(e.pageRenderer, ceremonyStore, e.userSessionManager, e.database, nil,
-		protocolvalidation.NewAuthorizeValidator(e.database), handlersmocks.NewAuditLogger(t),
-		handlersmocks.NewPermissionChecker(t), handlersmocks.NewTokenParser(t), testBaseURL)
+	tabB := buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       e.pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: e.userSessionManager,
+		database:           e.database,
+		authorizeValidator: protocolvalidation.NewAuthorizeValidator(e.database),
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+		permissionChecker:  handlersmocks.NewPermissionChecker(t),
+		tokenParser:        handlersmocks.NewTokenParser(t),
+	})
 	reqB := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
 		"/auth/authorize?"+syntaxQuery(nil), nil)), cookies)
 	rrB := httptest.NewRecorder()
@@ -424,21 +468,31 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState)
 }
 
-// heldOnlyBy reports whether condition is the one the ceremony named makes on the browser session:
-// it lets a session holding that ceremony through and refuses one holding another as replaced.
-func heldOnlyBy(condition func(map[string]any) error, ceremonyId string) bool {
-	if condition == nil {
-		return false
-	}
-	holding := func(id string) map[string]any {
-		jsonData, err := json.Marshal(&ceremony.AuthContext{CeremonyId: id})
-		if err != nil {
-			panic(err)
+// theContextOf matches req's own context, which /auth/completed's operation runs under.
+func theContextOf(req *http.Request) interface{} {
+	return mock.MatchedBy(func(ctx context.Context) bool { return ctx == req.Context() })
+}
+
+// aNewDeviceOf matches the device /auth/completed's create arm reads from req, which carries no
+// device cookie: a new identifier as this server mints one, with req's display labels and header. It
+// records the identifier in minted, which the device cookie the response sets must then hold.
+func aNewDeviceOf(req *http.Request, minted *string) interface{} {
+	return mock.MatchedBy(func(device usersession.Device) bool {
+		name, deviceType, deviceOS := useragent.Labels(req)
+		if !device.New || !lowerHex64.MatchString(device.Identifier) || device.Name != name ||
+			device.Type != deviceType || device.OS != deviceOS || device.UserAgent != req.UserAgent() {
+			return false
 		}
-		return map[string]any{sessionkeys.AuthContext: string(jsonData)}
-	}
-	return condition(holding(ceremonyId)) == nil &&
-		errors.Is(condition(holding(ceremonyId+"-newer")), ceremony.ErrCeremonyReplaced)
+		*minted = device.Identifier
+		return true
+	})
+}
+
+// expectNewSessionBound arms /auth/completed's create arm's rotation, which binds the user session it
+// started to the browser session on condition it still holds this ceremony (#266, #579 decision 4).
+func expectNewSessionBound(ceremonyStore *handlersmocks.CeremonyStore, rr *httptest.ResponseRecorder, req *http.Request,
+	userSessionIdentifier string) {
+	ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, userSessionIdentifier).Return(nil).Once()
 }
 
 // expectCeremonyNoLongerActiveOnAnyRequest is expectCeremonyNoLongerActive for a handler that renders

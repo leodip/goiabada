@@ -444,16 +444,16 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 // ceremonies, and the case that decided #129 decision 16.
 //
 // It is the same window as TestSessionEndedOnConsentScreen_NoCodeIsIssued, entered by the
-// other door. handlePromptNone runs its silent checks, bumps the session and redirects to
-// /auth/issue; the session is ended in that one hop; and the liveness check at /auth/issue
-// finds the identifier gone exactly as it does for the consent-screen ceremony.
+// other door. authflow.SilentAuthentication runs its silent checks, bumps the session and
+// redirects to /auth/issue; the session is ended in that one hop; and the liveness check at
+// /auth/issue finds the identifier gone exactly as it does for the consent-screen ceremony.
 //
 // What differs is the outcome, and that is the point of the pairing. The consent-screen
 // ceremony is restarted at level 1 and arrives at a password form. This one must never see a
 // page at all: prompt=none forbids UI, and nothing between /auth/issue and /auth/pwd reads
 // the prompt, so a restart would hand a silent-renewal iframe a login screen and no error,
 // which it cannot tell from a hang. It gets login_required instead, which is what
-// handlePromptNone itself returns when its own session lookup finds no row.
+// authflow.SilentAuthentication itself returns when its own session lookup finds no row.
 func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
@@ -479,7 +479,7 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
-	// handlePromptNone accepted the session and handed off. Asserting that rather than an
+	// authflow.SilentAuthentication accepted the session and handed off. Asserting that rather than an
 	// error here is deliberate: it is what puts the whole window in the next hop.
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
 

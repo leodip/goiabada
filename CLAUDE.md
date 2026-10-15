@@ -52,10 +52,11 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `timezones/` - The IANA zone table a user's zone is picked from, one row per country and zone, generated from the tzdata release and SHA-256 its generator pins. Nothing loads it at startup; a test checks every zone loads (#49, #432)
 
 ### Auth Server (`src/authserver/`)
-- `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
+- `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR). A ceremony handler keeps only the HTTP side of its step: the route boundary (`CeremonyBoundary`, `auth_ceremony.go`), its `internal/authflow` operation called with a per-request browser adapter (`browserSession`, `browser_session.go`), and the response its result names, written through the client-error responder (`ClientErrorResponder`) or a step redirect. The device cookie is read and written here (`device_cookie.go`). `doubled_services.go` declares, whole, the six services the route table hands straight to the operations, which no handler takes, so mockery generates the doubles the handler tests build every operation from (#580)
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
+- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Every ceremony route has one: `/auth/authorize` (`Authorization` on the GET, which creates the ceremony and routes it with `decideAuthorizeRoute`, after `ResolveParked` swaps in a parked request; `AuthorizationParking` on the POST), `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal, `PasswordSubmission` on the POST), `/auth/otp` (`OTPPrompt` on the GET, `OTPSubmission` on the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST), `/auth/issue` (`Issuance`) and a `prompt=none` request at `/auth/authorize` (`SilentAuthentication`, with `DecideSilentAuthentication`, which `Authorization` hands it to). The handlers keep what reads the request and writes the response: `/auth/authorize`'s parameter parse, its settings read and its `ui_locales` swap of the request's localizer among them (#580)
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
@@ -103,7 +104,7 @@ Primary flow for web/mobile apps. User authenticates via browser, receives code,
 - Endpoint: `GET /auth/authorize` → `POST /auth/token` (grant_type=authorization_code)
 - PKCE: always required for a public client; otherwise configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
-- Implementation: `handler_authorize.go`, `issuance/code_issuer.go`; redeemed by `handler_token_authorization_code.go`, `protocolvalidation/token_grant_authorization_code.go`, `issuance/grant_authorization_code.go`
+- Implementation: `handler_authorize.go`, `authflow/authorization.go`, `issuance/code_issuer.go`; redeemed by `handler_token_authorization_code.go`, `protocolvalidation/token_grant_authorization_code.go`, `issuance/grant_authorization_code.go`
 
 ### Client Credentials
 Server-to-server auth. No user context, client authenticates directly for access token.
@@ -124,7 +125,7 @@ Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in 
 - Endpoint: `GET /auth/authorize` with `response_type=token|id_token|id_token token`
 - Disabled by default. Enable via `Settings.ImplicitFlowEnabled` or `Client.ImplicitGrantEnabled`
 - Security risk: Tokens exposed in browser history/Referer headers
-- Implementation: `handler_auth_issue.go`, `issuance/grant_implicit.go`, `protocolvalidation/authorize_validator.go`
+- Implementation: `handler_auth_issue.go`, `authflow/issuance.go`, `issuance/grant_implicit.go`, `protocolvalidation/authorize_validator.go`
 
 ### ROPC - Resource Owner Password Credentials (Deprecated)
 Direct username/password exchange for tokens. **Deprecated in OAuth 2.1** due to credential exposure.
@@ -161,28 +162,36 @@ There is no single order: a ceremony's path depends on the target ACR, the sessi
 
 | State | Assigned by | When |
 |---|---|---|
-| `requires_level_1` | `HandleAuthorizeGet` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
-| | `HandleAuthCompletedGet` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
-| | `refuseIssuanceUnusableSession` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
-| `level1_password` | `HandleAuthLevel1Get` | unconditional |
-| `level1_password_completed` | `HandleAuthPwdPost` | password verified, user enabled |
-| `level1_existing_session` | `HandleAuthorizeGet` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
-| `requires_level_2` | `HandleAuthLevel1CompletedGet` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
-| `level2_otp` | `HandleAuthLevel2Get` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
-| `authentication_completed` | `HandleAuthLevel1CompletedGet` | no step-up needed |
-| | `HandleAuthLevel2Get` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
-| | `HandleAuthOtpPost` | OTP verified or enrolled |
-| `requires_consent` | `HandleAuthCompletedGet` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
-| `ready_to_issue_code` | `handlePromptNone` | every silent check passed, skipping every hop between |
-| | `HandleAuthCompletedGet` | no consent needed |
-| | `HandleConsentGet` | scope already fully consented, no `offline_access`, no `prompt=consent` |
-| | `HandleConsentPost` | approved with at least one scope |
+| `requires_level_1` | `authflow.Authorization` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
+| | `authflow.Completion` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
+| | `authflow.Issuance` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
+| `level1_password` | `authflow.SelectLevel1Method` | unconditional |
+| `level1_password_completed` | `authflow.PasswordSubmission` | password verified, user enabled |
+| `level1_existing_session` | `authflow.Authorization` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
+| `requires_level_2` | `authflow.Level1Completion` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
+| `level2_otp` | `authflow.Level2Selection` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
+| `authentication_completed` | `authflow.Level1Completion` | no step-up needed |
+| | `authflow.Level2Selection` | `level2_optional` and no OTP enrolled, which is the skip that bypasses `/auth/otp` entirely |
+| | `authflow.OTPSubmission` | OTP verified or enrolled |
+| `requires_consent` | `authflow.Completion` | `prompt=consent`, or `client.ConsentRequired`, or `offline_access` in scope, or `authserver:manage-account` still in scope, the client not the admin console's, and no stored consent covering it (`userconsent.AlwaysOwed`, #509) |
+| `ready_to_issue_code` | `authflow.SilentAuthentication` | every silent check passed, skipping every hop between |
+| | `authflow.Completion` | no consent needed |
+| | `authflow.ConsentPrompt` | scope already fully consented, no `offline_access`, no `prompt=consent` |
+| | `authflow.ConsentSubmission` | approved with at least one scope the user still holds |
 
-Every step but `/auth/authorize` first checks, in `loadAuthContext`, that the request names the
-sign-in the browser holds: the `ceremony` query parameter on a GET, built into every redirect between
-steps by `ceremonyStepURL`, and the `ceremonyId` form field on a POST. A missing or differing id gets
-the "no longer active" page, 400. Each route then gates on the state it finds through
-`requireAuthState`, which answers 400 when it is not one it accepts (#246, #437):
+Every step handler takes the route boundary, `handlers.CeremonyBoundary` (`auth_ceremony.go`), and
+every handler that answers a client with an error the client-error responder,
+`handlers.ClientErrorResponder` (`client_error_responder.go`), which holds the emission gates, the
+query, fragment and `form_post` encodings, the refusal interstitial and the `server_error` fallback
+and clears nothing; the route table builds one of each. Every step but `/auth/authorize` begins
+with the boundary's `beginStep`, which reads the request's settings before anything else (a request
+without them is the 500 page carrying `reqctx.ErrNoSettings`, as it is at `/auth/authorize`, which
+reads them first too), then loads the ceremony and gates its state as below. It first checks,
+in the boundary's `loadAuthContext`, that the request names the sign-in the browser holds: the
+`ceremony` query parameter on a GET, built into every redirect between steps by `stepRedirect`, and
+the `ceremonyId` form field on a POST. A missing or differing id gets the "no longer active" page, 400.
+Each route then gates on the state it finds through `requireAuthState`, which answers 400 when it is
+not one it accepts (#246, #437):
 
 | Route | Method | Accepts | On mismatch |
 |---|---|---|---|
@@ -203,15 +212,15 @@ the "no longer active" page, 400. Each route then gates on the state it finds th
 ### Flow Handlers (in order)
 | Handler | File | Purpose |
 |---------|------|---------|
-| `/auth/authorize` | `handler_authorize.go` | Entry point. Validates request, checks existing session, routes to level1. A POST (`handler_authorize_post.go`) only parks the request and redirects to the GET |
-| `/auth/level1` | `handler_auth_level1.go` | Selects level1 auth method (currently only password) |
-| `/auth/pwd` | `handler_auth_pwd.go` | Password login form. Validates credentials, creates session |
-| `/auth/level1completed` | `handler_auth_level1.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
-| `/auth/level2` | `handler_auth_level2.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
-| `/auth/otp` | `handler_auth_otp.go` | OTP verification (or enrollment if user doesn't have OTP yet) |
-| `/auth/completed` | `handler_auth_completed.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check |
-| `/auth/consent` | `handler_consent.go` | User consent screen (if required) |
-| `/auth/issue` | `handler_auth_issue.go` | Issues authorization code, redirects to client |
+| `/auth/authorize` | `handler_authorize.go`, `authflow/authorization.go`, `authflow/silent_authentication.go` | Entry point. `authflow.Authorization` creates the ceremony, validates the request, checks the existing session and routes it to level1 or SSO; a `prompt=none` request is answered by `authflow.SilentAuthentication`, without a page. A POST (`handler_authorize_post.go`, `authflow/authorization_parking.go`) only parks the request and redirects to the GET |
+| `/auth/level1` | `handler_auth_level1.go`, `authflow/level1_selection.go` | Selects level1 auth method (currently only password) |
+| `/auth/pwd` | `handler_auth_pwd.go`, `authflow/password.go` | Password login form. Verifies the password, rotates the browser session's identifier, records level 1 on the ceremony |
+| `/auth/level1completed` | `handler_auth_level1.go`, `authflow/level1_completion.go` | Delivers a deferred authorization error if one is parked (see below), else decides if level2 needed based on ACR and session state |
+| `/auth/level2` | `handler_auth_level2.go`, `authflow/level2_selection.go` | Selects level2 auth method. If `level2_optional` + no OTP → skip to completed |
+| `/auth/otp` | `handler_auth_otp.go`, `authflow/otp.go` | OTP verification (or enrollment if user doesn't have OTP yet). Rotates the browser session's identifier, records level 2 on the ceremony |
+| `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a disabled user refused, a moved-on generation restarted, both before any session is bound), session bump/create, scope filtering, consent check. The plan is one of three modes (`authflow/completion_decide.go`): reuse, which rotates the browser session's identifier before the bind when it raises the session; create, which confirms the ceremony, starts the session (`StartNewUserSession`, which writes nothing to the browser), then rotates and binds it to the browser session (`RegenerateSessionAndBind`), deletes it when that fails, and writes the device cookie only after; and restart |
+| `/auth/consent` | `handler_consent.go`, `authflow/consent.go` | User consent screen (if required), and the submission weighed against the permissions the user holds now, recorded through `userconsent` |
+| `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, scope), then issues the authorization code or the implicit tokens, redirects to client |
 
 ### AuthContext field rule
 Every field on `AuthContext` is either request or attempt. The request is what `/auth/authorize`
@@ -219,13 +228,13 @@ accepted, including `RequestedScope`, the scope as asked for before any hop narr
 user holds; the attempt is everything an authentication writes. A restart keeps the request and
 discards the attempt: `AuthContext.Restart()` zeroes every attempt field, puts `Scope` back from
 `RequestedScope` and sets `requires_level_1`, so the second pass earns its own `amr`, scope and
-consent (#140, #436). There are two restart routes: `HandleAuthCompletedGet` when no session is
+consent (#140, #436). There are two restart routes: `authflow.Completion` when no session is
 reusable and level 1 was never completed, or when the user's generation has moved on, or when the
 ceremony names `otp` from an authenticator the user no longer has (#542), decided before
-it binds a session (#522), and `refuseIssuanceUnusableSession` at `/auth/issue` when the
+it binds a session (#522), and `authflow.Issuance` at `/auth/issue` when the
 bound session is gone, expired or foreign, or the user's generation has moved on, or the ceremony names `otp` from an authenticator the user no longer has, and the request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
-list. Request fields are written only in `HandleAuthorizeGet`, which
+list. Request fields are written only in `authflow.Authorization.Run`, which
 `TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`. A bind that finds a
 newer authentication already on the session is not a restart: it writes nothing
 (`ErrStaleAuthentication`, #538) and `/auth/completed` answers it with the "no longer active"
@@ -253,7 +262,8 @@ after its marker expired leaves a newer link's in place.
 `/auth/authorize` never redirects an unauthenticated browser to a client's `redirect_uri` on a failed
 request, per RFC 9700 4.11.2. A validation failure is answered at once when the request is silent
 (`prompt=none`, read from the raw parameter), when the browser holds a valid session and did not ask
-for `prompt=login`, or when no redirect would be emitted anyway (`redirectWillBeEmitted` false).
+for `prompt=login`, or when no redirect would be emitted anyway (the responder's `RedirectWillBeEmitted` false).
+`authflow.Authorization` decides which (`decideAuthorizeRoute`).
 Otherwise the error code and description are parked on `AuthContext.DeferredErrorCode` /
 `DeferredErrorDescription`, the visitor goes to `/auth/level1`, and the redirect is emitted from
 `/auth/level1completed` once the password is verified. That ceremony ends there and creates no
@@ -262,11 +272,11 @@ session.
 One failure is answered before any of that and never redirects at all: a `response_mode` outside
 `query`, `fragment`, `form_post` renders the refusal page at 400 with no error parameters, per OIDC
 Core 3.1.2.6, since the server cannot encode a response in a mode it does not implement. The set has
-one definition, `protocolvalidation.IsSupportedResponseMode`, shared by the handler and
+one definition, `protocolvalidation.IsSupportedResponseMode`, shared by `authflow.Authorization` and
 `ValidateRequest`.
 
 ### Key Logic in Level1Completed
-`handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
+`authflow/level1_completion.go:Level1Completion.Run`, answered by `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
 - If a deferred error is parked → answer the client and stop (see above)
 - If the ceremony verified the password itself (`Level1AuthCompleted`: `prompt=login`, an `id_token_hint` naming someone else, a restart) → the session counts for nothing, and the step-up is decided as with no session: target above level 1 → redirect to level2. See **Re-authentication over a session** below (#537)
 - Otherwise the session is reused (the `level1_existing_session` SSO shortcut), and:
@@ -277,10 +287,10 @@ one definition, `protocolvalidation.IsSupportedResponseMode`, shared by the hand
 - Otherwise → auth completed
 
 ### Key Logic in Level2
-`handler_auth_level2.go:HandleAuthLevel2Get`:
-- If `level2_optional` + `user.OTPEnabled` → show OTP form
+`authflow/level2_selection.go:Level2Selection.Run`, its arm decided by `DecideLevel2Arm`:
+- If `level2_optional` + `user.OTPEnabled` → `/auth/otp`, the OTP form
 - If `level2_optional` + no OTP → skip to auth completed
-- If `level2_mandatory` → show OTP form (user enrolls if needed)
+- If `level2_mandatory` → `/auth/otp`, the OTP form (user enrolls if needed)
 
 ### Session Reuse (SSO)
 When user has valid session (`UserSession` in DB + session cookie):
@@ -318,7 +328,7 @@ Valid if ALL true:
 3. If `max_age` param: `now <= AuthTime + max_age` (`Started` when `AuthTime` is zero)
 
 ### ACR Step-Up Logic (`ceremony/step_up.go`)
-One rule, `StepUpOwed`, read by `HandleAuthLevel1CompletedGet` and `handlePromptNone`. Uses `record.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
+One rule, `StepUpOwed`, read by `authflow.Level1Completion` and `authflow.SilentAuthentication`. Uses `record.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)
@@ -342,12 +352,12 @@ restart. OIDC Core 1.0 section 3.1.2.3 says that with `prompt=login` the server 
 the End-User even if the End-User is already authenticated", and section 2 defines `acr`, `amr` and
 `auth_time` as describing the same "authentication". So such a ceremony:
 
-1. **Owes every factor its target needs.** `HandleAuthLevel1CompletedGet` passes no session to
+1. **Owes every factor its target needs.** `authflow.Level1Completion` passes no session to
    `StepUpOwed`, so a level 3 target asks for the code (or enrolment), and a level 2 target asks for
    it when the user has one, whatever the session already gave. Keycloak does the same ("the LoA from
    previous authentications are not considered").
 2. **Replaces the session's authentication** on `/auth/completed`'s reuse arm
-   (`completionPlan.replaceAuthentication`): the session takes the target level, this ceremony's
+   (`reuseSessionPlan.replaceAuthentication`): the session takes the target level, this ceremony's
    methods, its credential's instant and its password's, as the create arm would stamp a new session. That can lower
    the session (`prompt=login` at a level 1 client over a level 3 session leaves it at level 1, `pwd`),
    and the next level 3 request then steps up. The session row is kept, not replaced, so other clients'
@@ -390,9 +400,9 @@ takes first, so a removal landing after the handler's check either waits for the
 lowers it, or is seen. Tokens already issued, and the refresh tokens that renew them, keep their
 claims: ending the user's sessions revokes those (#542 decision 1).
 
-Both readers, `HandleAuthLevel1CompletedGet` and `handlePromptNone`, only compare and write nothing,
+Both readers, `authflow.Level1Completion` and `authflow.SilentAuthentication`, only compare and write nothing,
 so an abandoned ceremony spends no re-prompt. The snapshot is captured onto `AuthContext` at
-`handler_auth_pwd` and on every arm of `HandleAuthLevel2Get`, and promoted once, at
+`authflow.PasswordSubmission` and on every arm of `authflow.Level2Selection`, and promoted once, at
 `/auth/completed`: `StartNewUserSession` writes it on the create arm, and
 `PromoteUserSessionOtpConfigGeneration` on the reuse arm when the target ACR is above level 1. Both
 columns are `dont-update` (#242).
@@ -435,6 +445,7 @@ Three test types:
 1. **Unit Tests** - Throughout codebase alongside source files (`*_test.go`)
    - Handler tests: `src/authserver/internal/handlers/*_test.go`
    - Provider tests: `src/authserver/internal/{ceremony,issuance,signingkeys}/*_test.go`
+   - Ceremony step operations: `src/authserver/internal/authflow/*_test.go`, its decisions' tables, the completion plan's constructor lint and its import lint; the steps' behaviour is pinned by the handler tests, which build each operation through one builder per handler (`ceremony_handler_builders_test.go`) from the same doubles, those of `handlers/doubled_services.go` among them
    - Core logic tests: `src/core/oauth/*_test.go`, `src/core/inputvalidation/*_test.go`
    - Validator tests: `src/authserver/internal/{protocol,account}validation/*_test.go`
 
@@ -522,7 +533,7 @@ its admin-route classification lint beside it, which holds every admin write rou
 whose handler applies a ceiling of the administrative policy, to a row naming the ceilings its handler applies
 or why it needs none, in both directions (#402),
 and its write-once lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field
-outside `HandleAuthorizeGet`, resolved with `go/types` (#436). `AssertImportsOnly` and
+outside `authflow.Authorization.Run`, resolved with `go/types` (#436). `AssertImportsOnly` and
 `AssertNoParentImport` both parse imports with `go/parser` rather than matching text, because an
 alias binds a different name to the same path and one of the 39 production files did exactly that.
 `git grep -n 'func assert.*\(r Reporter\|r guard\.Reporter\)' -- '*.go'` lists them; no count is
@@ -579,8 +590,8 @@ it declares to having at least one reference somewhere in that module, productio
 `core/guard.AssertNoDeadInterfaces`; the core and setup tiers never execute it, because those two
 handler packages are the only call sites. The walk is recursive, so the auth server's has always
 covered `apihandlers` and `accounthandlers` and the ports #387 gave them, and its call names
-`internal/{revocation,emaillinks,otpcredential,userclaims,userconsent,authorizerequest}` beside it, because a package that
-declares a port nobody reaches is the same defect wherever it sits (#387, #437). Liveness is `go/types` object identity and not a matching
+`internal/{revocation,emaillinks,otpcredential,userclaims,userconsent,authorizerequest,bootstrap,authflow}` beside it, because a package that
+declares a port nobody reaches is the same defect wherever it sits (#387, #437, #580). Liveness is `go/types` object identity and not a matching
 spelling — a shadowed name and a same-named type in another package each count as nothing, which is
 how the census behind #333 first read `TCPConnectionTester` as live — and structural satisfaction
 does not count at all, since an interface no code names is what dead means here (#333).
@@ -663,7 +674,7 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 2. **Audit logging**: All security events logged via `auditLogger` (see `authserver/internal/audit/events.go` for event names)
 3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password, OTP and email changes, email verification and its resend, forgot/reset password, self-registration, activation, DCR). Credential checks count failures only, so a successful attempt spends nothing. The limits counted by a user or by an email apply whatever `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` says: those counted by a user something has already authenticated, the signing-in user or a token's subject (OTP, account password, email verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant, and reset mails and registration notices per address), since only Goiabada can count them (#503). The switch governs only the tiers that read the client's address, those counted by an IP address and `pwd_account_net`, the 10 wrong passwords per 15 minutes for one email from one client block; with it off the password check reserves the account-wide tier alone. The price is #89's lockout: 100 wrong passwords block an account's password sign-in for up to an hour, its remedy blocking the attacker at the proxy or CDN (#503)
 4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
-5. **Credential form fields**: A handler reads a credential-bearing field (`password`, `passwordConfirmation`, `currentPassword`, `newPassword`, `newPasswordConfirmation`, `otp`, `secretKey`, `base64Image`, `verificationCode`, `clientSecret`) and a form-binding marker (`ceremonyId`, `continuationId`) with `r.PostFormValue`, never `r.FormValue`. `r.FormValue` merges the URL query behind the request body, so the value would be accepted from the request target, where it reaches the browser's history, the `Referer` of anything the page loads, and the access log of every proxy, gateway and CDN in front of the deployment. Every such form is POST-only with a separate GET handler that renders it, so the query is never a submission. Enforced by `core/guard.AssertNoCredentialQueryFallback`, which carries the walk and the four merged-form accessors it refuses, called from a `credential_read_lint_test.go` in each `internal/handlers` package and from `core/httpmw`; each caller owns its own name list, because the lists must differ. The auth server's adds the four token-endpoint credentials (`code`, `code_verifier`, `refresh_token`, `client_secret`) and `access_token`, which `JwtAuthorizationHeaderToContext` in `authserver/internal/middleware` reads lawfully from a form body per OIDC Core 1.0 5.3.1; the kernel's is `access_token` alone, and since #385 moved that read out of core it refuses the read coming back rather than holding a site. Only `state` is exempt, at `handler_authorize.go`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as well as POST; `code` is not, being an authorization *response* value the client returns in the request entity-body (RFC 6749 4.1.2, 4.1.3) (#202, #333)
+5. **Credential form fields**: A handler reads a credential-bearing field (`password`, `passwordConfirmation`, `currentPassword`, `newPassword`, `newPasswordConfirmation`, `otp`, `secretKey`, `base64Image`, `verificationCode`, `clientSecret`) and a form-binding marker (`ceremonyId`, `continuationId`) with `r.PostFormValue`, never `r.FormValue`. `r.FormValue` merges the URL query behind the request body, so the value would be accepted from the request target, where it reaches the browser's history, the `Referer` of anything the page loads, and the access log of every proxy, gateway and CDN in front of the deployment. Every such form is POST-only with a separate GET handler that renders it, so the query is never a submission. Enforced by `core/guard.AssertNoCredentialQueryFallback`, which carries the walk and the four merged-form accessors it refuses, called from a `credential_read_lint_test.go` in each `internal/handlers` package and from `core/httpmw`; each caller owns its own name list, because the lists must differ. The auth server's adds the four token-endpoint credentials (`code`, `code_verifier`, `refresh_token`, `client_secret`) and `access_token`, which `JwtAuthorizationHeaderToContext` in `authserver/internal/middleware` reads lawfully from a form body per OIDC Core 1.0 5.3.1; the kernel's is `access_token` alone, and since #385 moved that read out of core it refuses the read coming back rather than holding a site. Only `state` is exempt, at `/auth/authorize`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as well as POST; `code` is not, being an authorization *response* value the client returns in the request entity-body (RFC 6749 4.1.2, 4.1.3) (#202, #333)
 6. **Transactions**: exist for atomicity, and every one is opened through `RunInTransaction`, which reruns the body when the engine aborts it as a deadlock victim (bounded, then the error surfaces); `begin_transaction_lint_test.go` in `src/authserver/internal/data` refuses a bare `BeginTransaction` in production code. No lock order is imposed. One property is kept on purpose (#139): a termination deletes the session row first, and issuance takes that row before inserting its code, or before signing the implicit grant's tokens, in one transaction, so a code or a token can never slip between a termination's sweep and its commit. A second is kept the same way (#131): a refresh rotation takes the user's row first (`AcquireUserRow`), as a credential change does through its write and its generation increment, so a rotation's child is never stamped from a token a revocation has already moved past, and a revocation's sweep never misses a child. A third is kept the same way (#542): a sign-in's claim to a one-time code is checked on the user under the user's row (`otpcredential.OTPClaim.Recheck`), first in the transaction that binds it to a session or issues it, and a removal takes the user's row first and lowers the sessions in the same transaction, so a code is never bound or issued after the removal of the authenticator it came from. Concurrent transactions on the same account can still deadlock on MySQL, PostgreSQL or SQL Server; the loser is rolled back with nothing half applied and rerun. SQLite has one connection and cannot deadlock. Do not add ordering to prevent a deadlock; add a test that forces it and shows the retry resolves it (#301)
 7. **Error handling**: every error this tree constructs goes through `core/errs` (`New`, `Errorf`, `Wrap`, `Wrapf`, `WithStack`, `Join`), which captures one stack per error tree, the origin's, and prints it under `%+v`; a package-level sentinel is the one exception and stays on stdlib `errors.New`, because a stack captured at init would masquerade as the origin of everything wrapping it. Match with `errors.Is` / `errors.As`, never a bare type assertion and never the error's text. `errorlint` in `.golangci.yml` holds the first half; the few places that mean the error value itself carry a `//nolint:errorlint` saying why: `core/errs`'s own tree walk, the migrator's `IsNoChange` and `IsNilVersion`, whose identity is the whole test (#268), and the migrate command's `reportStop`. `TestNoLegacyErrors` in `core/guard/errors_lint.go`, called from all three module tiers and walking the whole of `src/`, refuses `github.com/pkg/errors`, stdlib `errors.New`/`errors.Join`/`fmt.Errorf` in production code, and `errs.WithStack(errs.New(...))` and any `errs` constructor in a package-level var, which is the sentinel rule enforced rather than merely stated (#279). In the admin console a handler answers either a page or JSON, never both: `NotFound`/`InternalServerError`/`HandleAPIError` render HTML, and `JSONNotFound`/`JSONBadRequestBody`/`JSONError`/`HandleAPIErrorJSON` answer the same statuses as JSON. Mixing them makes the browser's `response.json()` throw on that branch alone; `TestHandlers_AjaxHandlersDoNotUsePageWriters` in `adminconsole/internal/handlers/ajax_writer_lint_test.go` refuses it. Which of the two a handler picks is the only decision it makes about an `apiClient` failure: `HandleAPIError`, `HandleAPIErrorWithCallback` and `HandleAPIErrorJSON` turn the auth server's status into the console's, and `TestHandlers_ApiClientErrorsReachTheClassifier` refuses a guard that answers one itself or catches every status as a rejected value (#279). In the auth server the type makes the choice: `internal/handlers` declares the page and JSON writers as two ports, `PageRenderer` and `JSONWriter`, and hands the token, userinfo, JWKS and discovery endpoints only the second, so a page writer there does not compile; `routes.go` registers them, registration and the APIs on the branches of `initMiddleware` whose settings and session middleware answer their own faults, and a panic, as JSON too (#435)
 8. **Logging**: `core/logging` owns the one `slog` handler, installed by both servers at startup. Every message is a lowercase string literal with no `component:` prefix and no `failed to` or `error ` opener, the one verb being "unable to"; values ride as snake_case attributes, one fixed name per concept, `error` for an error, `client_identifier` for the wire string against `client_id` for the row id. `request_id` is the handler's, injected from the context, so a site with a `context.Context` or `*http.Request` in scope at any depth uses the `*Context` variant. Error means someone must act, Warn a refused or handled request, Info lifecycle and configuration, Debug per-request tracing. Two guards hold it. `sloglint`, enabled in `.golangci.yml` and run by `./run-tests.sh --type lint` and CI's Lint job over type-checked code, holds the lowercase message, the snake_case keys, the refused `err` and `request_id`, and the `*Context` rule; a function that hands its caller's key/value run to a record is registered there under `custom-funcs` so the keys are read at its call sites. `TestSlogConvention` in `core/guard/slog_lint.go`, called from all three module tiers, holds what sloglint cannot express: that the message is a literal at the call rather than a constant, the refused message openers, `slog.SetDefault`/`New`/`Default`/`With` outside the handler's own files, a `...` spread into a record or a forwarder outside the functions `slogSpreadSites` lists, that list against `custom-funcs`, and a plain `slog.Debug`/`Info`/`Warn`/`Error` in any production package outside the directories `slogNoRequestDirs` lists, the ones with no request above them: the mains and composition (both `config` and `server` packages, `datafactory`, `migrator`, the four engine adapters, `bootstrap`), `cleanup`, the developer tools and generators, test support, and the setup wizard. Each entry is one directory and not its subtree, so a package created anywhere else, beneath a listed one included, is checked from its first commit (#442). The plain-record rule admits the functions `slogPlainSites` names, each with the reason no context reaches it: the admin console's template function `addUrlParam` and the `convertToString` it calls, `core/i18n`'s startup records in `loadOverrideCatalogs` and `orEmpty`, and `StaticFS` and `TemplateFS` in each application's `web` package. That rule is what refuses a new helper written without a context after sloglint has admitted it. `AssertRequestPathContext` and `AssertAuditLogContext` share the same scope, and `requestContextOwners` admits `core/i18n`'s `WithLocale`, whose background context is the fallback for a nil one. A package holding both startup and request work, like `core/i18n` with its locale middleware, stays in scope with its startup functions admitted by name. A request-path helper therefore takes a `context.Context`; a helper with neither a context nor a request is a startup or template site. No request-path writer is left carrying no `request_id`: the audit path was the last but one until #328 gave `AuditLogger.Log` a context, and `commondb`'s transaction and statement records were the last until #386 gave every `Database` method one. Level is not decidable and is pinned per site through `logtest.CaptureSlog(t)`, the one way a test reads records (#320)

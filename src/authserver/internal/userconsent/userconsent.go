@@ -1,11 +1,10 @@
 // Package userconsent owns the stored record of what a user consented to a client receiving: one
-// operation, Record, which the consent screen's submission calls once the ticked scopes have been
-// weighed against the permissions the user holds.
+// operation, Record, which the consent screen's submission (authflow.ConsentSubmission) calls once
+// the ticked scopes have been weighed against the permissions the user holds.
 //
-// It left HandleConsentPost because persisting the consent is not the handler's job: the handler
-// parses the submission, decides between refusing and granting, and answers; how the row is read,
-// created or rewritten is this package's. It is an application service in the shape #387 gave the
-// others: it takes no http.ResponseWriter, *http.Request, template data or status code, and it
+// The submission reads the user's answer and decides between refusing and granting; how the row is
+// read, created or rewritten is this package's. It is an application service in the shape #387 gave
+// the others: it takes no http.ResponseWriter, *http.Request, template data or status code, and it
 // imports no handler package (#437).
 //
 // **The audit call stays at the caller**, as revocation and otpcredential require of theirs: the

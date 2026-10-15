@@ -96,7 +96,7 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 
 	stalled := &staleBindStaller{Database: database, reached: make(chan struct{}), release: make(chan struct{})}
 	defer stalled.proceed()
-	tabA := usersession.NewManager(nil, "", stalled, false)
+	tabA := usersession.NewManager(stalled)
 
 	signaled := make(chan error, 1)
 	go func() {
@@ -109,7 +109,7 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 	parkTabA(t, stalled, signaled)
 
 	// Tab B's whole prompt=login, completing while tab A's request is stalled.
-	tabB := usersession.NewManager(nil, "", database, false)
+	tabB := usersession.NewManager(database)
 	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id,
 		signInOf(user.Id, "pwd", record.AcrLevel1, newer, &newer), true, "")
 	require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing
 
 	stalled := &staleBindStaller{Database: database, reached: make(chan struct{}), release: make(chan struct{})}
 	defer stalled.proceed()
-	tabA := usersession.NewManager(nil, "", stalled, false)
+	tabA := usersession.NewManager(stalled)
 
 	signaled := make(chan error, 1)
 	go func() {
@@ -157,7 +157,7 @@ func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing
 	parkTabA(t, stalled, signaled)
 
 	// Tab B's whole step-up, completing while tab A's request is stalled.
-	tabB := usersession.NewManager(nil, "", database, false)
+	tabB := usersession.NewManager(database)
 	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id,
 		signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, newer, nil), false, "")
 	require.NoError(t, err)
@@ -223,11 +223,11 @@ func TestBindUserSession_TheNewerSignInWinsWhicheverBindRunsSecond(t *testing.T)
 				newerReplace = true
 			}
 
-			_, err := usersession.NewManager(nil, "", database, false).
+			_, err := usersession.NewManager(database).
 				BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id, olderAuth, olderReplace, "")
 			require.NoError(t, err, "the older bind commits first, before the newer sign-in exists")
 
-			_, err = usersession.NewManager(nil, "", database, false).
+			_, err = usersession.NewManager(database).
 				BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id, newerAuth, newerReplace, "")
 			require.NoError(t, err, "the newer sign-in takes the session")
 
@@ -255,7 +255,7 @@ func TestBindUserSession_CurrentAndNewerBindsAreNotRefused(t *testing.T) {
 	session.PasswordAuthTime = held
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
 
-	manager := usersession.NewManager(nil, "", database, false)
+	manager := usersession.NewManager(database)
 
 	at := held
 	_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
@@ -298,7 +298,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 
 	// The session as the ceremony adopted it: level 2, pwd otp, with the auth_time tab A's
 	// ceremony copied at /auth/authorize.
-	seed := usersession.NewManager(nil, "", database, false)
+	seed := usersession.NewManager(database)
 	// Newer than the row createTestUserSession stamped, so the seed bind that writes the
 	// adopted state is current rather than stale against it.
 	adopted := time.Now().UTC().Truncate(time.Microsecond)
@@ -312,7 +312,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 
 	stalled := &staleBindStaller{Database: database, reached: make(chan struct{}), release: make(chan struct{})}
 	defer stalled.proceed()
-	tabA := usersession.NewManager(nil, "", stalled, false)
+	tabA := usersession.NewManager(stalled)
 
 	signaled := make(chan error, 1)
 	go func() {
@@ -328,7 +328,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	parkTabA(t, stalled, signaled)
 
 	// Tab B's whole prompt=login, completing while tab A's request is stalled.
-	tabB := usersession.NewManager(nil, "", database, false)
+	tabB := usersession.NewManager(database)
 	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id,
 		signInOf(user.Id, "pwd", record.AcrLevel1, newer, &newer), true, "")
 	require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
 		stepUp := usersession.Authentication{UserId: user.Id, AuthMethods: "pwd otp",
 			AcrLevel: record.AcrLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
 
-		manager := usersession.NewManager(nil, "", database, false)
+		manager := usersession.NewManager(database)
 		for attempt := 1; attempt <= 2; attempt++ {
 			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
 				stepUp, false, "")
@@ -389,7 +389,7 @@ func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
 		password := time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond).Add(1600 * time.Nanosecond)
 		signIn := signInOf(user.Id, "pwd", record.AcrLevel1, password, &password)
 
-		manager := usersession.NewManager(nil, "", database, false)
+		manager := usersession.NewManager(database)
 		for attempt := 1; attempt <= 2; attempt++ {
 			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
 				signIn, true, "")

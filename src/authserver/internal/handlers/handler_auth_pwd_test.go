@@ -33,10 +33,16 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthPwdGet(authPwdGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -59,10 +65,16 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthPwdGet(authPwdGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -90,7 +102,12 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthPwdGet(authPwdGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -149,7 +166,12 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthPwdGet(authPwdGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -205,7 +227,12 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthPwdGet(authPwdGetDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 		require.NoError(t, err)
@@ -276,7 +303,12 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
-			handler := HandleAuthPwdGet(pageRenderer, ceremonyStore, database, handlersmocks.NewAuditLogger(t), testAdminConsoleBaseURL)
+			handler := buildAuthPwdGet(authPwdGetDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   handlersmocks.NewAuditLogger(t),
+			})
 
 			req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
 			require.NoError(t, err)
@@ -304,8 +336,12 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
-			handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, handlersmocks.NewAuditLogger(t),
-				noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthPwdPost(authPwdPostDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   handlersmocks.NewAuditLogger(t),
+			})
 
 			form := url.Values{}
 			form.Add(ceremonyIdField, testCeremonyId)
@@ -344,9 +380,15 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		req, _ := http.NewRequest("POST", "/auth/pwd", nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -368,7 +410,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -376,6 +423,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -457,7 +505,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildAuthPwdPost(authPwdPostDeps{
+					pageRenderer:  pageRenderer,
+					ceremonyStore: ceremonyStore,
+					database:      database,
+					auditLogger:   auditLogger,
+				})
 
 				form := url.Values{}
 				form.Add("email", "test@example.com")
@@ -472,6 +525,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 				rr := httptest.NewRecorder()
 
 				authContext := &ceremony.AuthContext{
@@ -503,7 +557,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -553,7 +612,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -609,7 +673,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -656,7 +725,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -722,7 +796,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		passwordHash, err := passwordhash.Hash("the-right-password")
 		require.NoError(t, err)
@@ -759,8 +838,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			"user_id":      int64(31),
 		}).Return().Once()
 
+		// The client block is loaded once the guess is refused, and the form shows it as before.
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Authentication failed."
+			return data["error"] == "Authentication failed." &&
+				data["layoutShowClientSection"] == true && data["layoutClientName"] == "test-client"
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -788,7 +869,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -843,7 +929,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
@@ -885,7 +976,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -905,11 +1001,6 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			ClientId:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &record.Settings{
 			SMTPEnabled: true,
@@ -993,7 +1084,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -1012,9 +1108,6 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&record.Client{ClientIdentifier: "test-client"}, nil)
-
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
@@ -1051,7 +1144,12 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		password := "testpassword"
 		passwordHash, err := passwordhash.Hash(password)
@@ -1155,15 +1253,22 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only the accepted-password case reaches it, and this table covers both outcomes.
 		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		// Only a refusal reads it, for the form it shows again; this table covers both outcomes.
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(account, nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(ceremonyStore)
-		handler := HandleAuthPwdPost(pageRenderer, ceremonyStore, database, auditLogger, rateLimiter, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthPwdPost(authPwdPostDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			auditLogger:        auditLogger,
+			credentialFailures: rateLimiter,
+		})
 		return rateLimiter.LimitPwd(handler), database, authContext
 	}
 

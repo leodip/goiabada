@@ -93,9 +93,9 @@ func (s *Store) changeOwnCeremony(w http.ResponseWriter, r *http.Request, ceremo
 		return err
 	}
 
-	held := Held(ceremonyId)
+	isHeld := held(ceremonyId)
 	return goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		if err := held(values); err != nil {
+		if err := isHeld(values); err != nil {
 			return err
 		}
 		change(values)
@@ -114,14 +114,12 @@ func goneIsReplaced(err error) error {
 	return err
 }
 
-// Held is the condition every write of the ceremony named makes on the browser session, applied to
+// held is the condition every write of the ceremony named makes on the browser session, applied to
 // the session's values as a fresh read found them: nil while they hold that ceremony, and
 // ErrCeremonyReplaced when they hold another, none, or a context naming none, since an empty id is
 // never held, as ceremonyMatches refuses it (#579). A context that does not decode is a fault and
-// is returned as one. The store's own writes are made on it, and /auth/completed's create arm hands
-// it to the rotation that binds a new user session to the browser session, which is the one write of
-// a ceremony made outside this type.
-func Held(ceremonyId string) func(values map[string]any) error {
+// is returned as one.
+func held(ceremonyId string) func(values map[string]any) error {
 	return func(values map[string]any) error {
 		jsonData, ok := values[sessionkeys.AuthContext].(string)
 		if !ok || ceremonyId == "" {
@@ -203,7 +201,35 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 		return err
 	}
 
-	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, Held(ceremonyId)))
+	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, held(ceremonyId)))
+}
+
+// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm: the rotation also
+// writes userSessionIdentifier, the user session the arm has just committed, into the browser
+// session, so no identifier that existed before the sign-in names the session it produced, and the
+// sign-in reaches the browser as one Set-Cookie. A planted identifier would otherwise name the row
+// the victim's sign-in fills in (session fixation, #266).
+//
+// It writes, as RegenerateSession does, only while the browser session still holds the ceremony
+// named, and answers ErrCeremonyReplaced, having written nothing and set no cookie, when it holds
+// another, none, or is gone (#579 decision 4). The caller then abandons the user session it bound
+// nothing to.
+func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string,
+	userSessionIdentifier string) error {
+
+	sess, err := s.sessionStore.Get(r, s.sessionName)
+	if err != nil {
+		return err
+	}
+
+	isHeld := held(ceremonyId)
+	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, func(values map[string]any) error {
+		if err := isHeld(values); err != nil {
+			return err
+		}
+		values[sessionkeys.SessionIdentifier] = userSessionIdentifier
+		return nil
+	}))
 }
 
 // errCeremonyConfirmed is the refusal ConfirmCeremony's change answers when the session holds its
@@ -224,9 +250,9 @@ func (s *Store) ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremony
 		return err
 	}
 
-	held := Held(ceremonyId)
+	isHeld := held(ceremonyId)
 	err = goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		if heldErr := held(values); heldErr != nil {
+		if heldErr := isHeld(values); heldErr != nil {
 			return heldErr
 		}
 		return errCeremonyConfirmed
