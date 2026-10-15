@@ -29,10 +29,11 @@ func TestValidateRequest_ResponseTypeSpellings(t *testing.T) {
 
 	request := func(responseType string) *ValidateRequestInput {
 		return &ValidateRequestInput{
-			ResponseType:         responseType,
-			ImplicitGrantEnabled: true,
-			Scope:                "openid",
-			Nonce:                "a-nonce",
+			AuthorizationCodeEnabled: true,
+			ResponseType:             responseType,
+			ImplicitGrantEnabled:     true,
+			Scope:                    "openid",
+			Nonce:                    "a-nonce",
 		}
 	}
 

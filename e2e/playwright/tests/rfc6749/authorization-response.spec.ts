@@ -105,8 +105,6 @@ test("a client not allowed the authorization code flow is answered unauthorized_
   clients,
   users,
 }) => {
-  // #573 item 3: answered on the auth server's page today. Remove this line once it is redirected.
-  test.fail();
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients);
   await page.goto(clientUrl(client.id, "oauth2-flows"));
