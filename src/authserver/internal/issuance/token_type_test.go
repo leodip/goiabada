@@ -31,3 +31,26 @@ func TestTokenType_String(t *testing.T) {
 		})
 	}
 }
+
+// The three typ values of tokens that are not ID Tokens are refused as a hint, and nothing else is:
+// an ID Token carries no typ, and an unknown value is not one this server stamps (#401).
+func TestIsNotIDTokenTyp(t *testing.T) {
+	testCases := []struct {
+		typ  string
+		want bool
+	}{
+		{"Bearer", true},
+		{"Refresh", true},
+		{"Offline", true},
+		{"", false},
+		{"ID", false},
+		{"bearer", false},
+		{"JWT", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.typ, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsNotIDTokenTyp(tc.typ))
+		})
+	}
+}

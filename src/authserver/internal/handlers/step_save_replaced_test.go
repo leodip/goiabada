@@ -119,8 +119,12 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorizeLeavesItsCeremonyA
 	tabADone := make(chan struct{})
 	go func() {
 		defer close(tabADone)
-		HandleAuthLevel2Get(pageRendererA, ceremonyStore, databaseA, auditLoggerA, testBaseURL,
-			testAdminConsoleBaseURL).ServeHTTP(rrA, reqA)
+		buildAuthLevel2Get(authLevel2GetDeps{
+			pageRenderer:  pageRendererA,
+			ceremonyStore: ceremonyStore,
+			database:      databaseA,
+			auditLogger:   auditLoggerA,
+		}).ServeHTTP(rrA, reqA)
 	}()
 	select {
 	case <-reached:
@@ -133,9 +137,16 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorizeLeavesItsCeremonyA
 	// Tab B's /auth/authorize, carrying the same cookie, through to its save.
 	e := newSyntaxAuthorizeEndpoint(t)
 	e.stubLoggedOutBrowser()
-	tabB := HandleAuthorizeGet(e.pageRenderer, ceremonyStore, e.userSessionManager, e.database, nil,
-		protocolvalidation.NewAuthorizeValidator(e.database), handlersmocks.NewAuditLogger(t),
-		handlersmocks.NewPermissionChecker(t), handlersmocks.NewTokenParser(t), testBaseURL)
+	tabB := buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       e.pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: e.userSessionManager,
+		database:           e.database,
+		authorizeValidator: protocolvalidation.NewAuthorizeValidator(e.database),
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+		permissionChecker:  handlersmocks.NewPermissionChecker(t),
+		tokenParser:        handlersmocks.NewTokenParser(t),
+	})
 	reqB := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
 		"/auth/authorize?"+syntaxQuery(nil), nil)), cookies)
 	rrB := httptest.NewRecorder()
@@ -183,8 +194,11 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorizeLeavesItsCeremonyA
 func TestHandleAuthLevel1Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
-	handler := HandleAuthLevel1Get(pageRenderer, ceremonyStore, handlersmocks.NewAuditLogger(t), testBaseURL,
-		testAdminConsoleBaseURL)
+	handler := buildAuthLevel1Get(authLevel1GetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		auditLogger:   handlersmocks.NewAuditLogger(t),
+	})
 
 	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1?ceremony="+testCeremonyId, nil))
 	rr := httptest.NewRecorder()
@@ -217,8 +231,13 @@ func TestHandleAuthLevel1CompletedGet_AReplacedCeremonyAnswersNoLongerActive(t *
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
 			database := datamocks.NewDatabase(t)
-			handler := HandleAuthLevel1CompletedGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				handlersmocks.NewAuditLogger(t), testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				auditLogger:        handlersmocks.NewAuditLogger(t),
+			})
 
 			req := withSessionSettings(httptest.NewRequest(http.MethodGet,
 				"/auth/level1completed?ceremony="+testCeremonyId, nil))
@@ -249,10 +268,14 @@ func TestHandleAuthLevel2Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
-	handler := HandleAuthLevel2Get(pageRenderer, ceremonyStore, database, handlersmocks.NewAuditLogger(t), testBaseURL,
-		testAdminConsoleBaseURL)
+	handler := buildAuthLevel2Get(authLevel2GetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   handlersmocks.NewAuditLogger(t),
+	})
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil)
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 		CeremonyId: testCeremonyId,
@@ -287,10 +310,16 @@ func TestHandleAuthOtpGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
-			handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, handlersmocks.NewOtpSecretGenerator(t),
-				handlersmocks.NewAuditLogger(t), testAdminConsoleBaseURL)
+			handler := buildAuthOtpGet(authOtpGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				database:           database,
+				otpSecretGenerator: handlersmocks.NewOtpSecretGenerator(t),
+				auditLogger:        handlersmocks.NewAuditLogger(t),
+			})
 
-			req := httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId, nil)
+			req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId, nil),
+				&record.Settings{AppName: "TestApp"})
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 				CeremonyId: testCeremonyId,

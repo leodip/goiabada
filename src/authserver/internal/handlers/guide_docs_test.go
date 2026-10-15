@@ -135,15 +135,19 @@ func TestGuideDocs_ALostAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 // Require two-factor authentication promises a code at a sign-in that starts a session, and at a
 // request with prompt=login, whatever the session already gave, not at every sign-in with a password:
 // SSO reuses a session at the level. prompt=login is a new authentication (OIDC Core 1.0 section
-// 3.1.2.3), so HandleAuthLevel1CompletedGet decides its step-up as for a sign-in with no session and
+// 3.1.2.3), so authflow.Level1Completion decides its step-up as for a sign-in with no session and
 // sends a level 3 target to /auth/level2 over the user's own level 3 session (#537). Until #537 the
 // session's code counted and the guide said prompt=login "doesn't ask for a code" (#522 decision 13).
 func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
-	handler := HandleAuthLevel1CompletedGet(handlersmocks.NewPageRenderer(t), ceremonyStore,
-		handlersmocks.NewUserSessionManager(t), database, nil, handlersmocks.NewAuditLogger(t),
-		testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
+		pageRenderer:       handlersmocks.NewPageRenderer(t),
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: handlersmocks.NewUserSessionManager(t),
+		database:           database,
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+	})
 
 	req, _ := http.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
 	req = withSessionSettings(req)

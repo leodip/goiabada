@@ -87,10 +87,19 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			req := httptest.NewRequest("GET", "/authorize?"+tc.query, nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			rr := httptest.NewRecorder()
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
@@ -174,8 +183,16 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code" +
 				"&scope=openid&state=the-state&nonce=the-nonce"

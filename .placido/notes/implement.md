@@ -33,8 +33,7 @@
   on the host as `site/README.md` describes; the devcontainer has no Node.js.
 - **Browser tests:** the Playwright suite under `e2e/` runs against one shared
   environment on a VPS, and placido runs it whole as the last gate, after the
-  review. Do not run `e2e` or the scripts under `e2e/` yourself. Add or update specs
-  where the change needs them: the ones the agreement names, and any under
-  `e2e/playwright/tests/` that assert a page, a message, or a flow you changed.
-  Follow the rules under "Browser tests" in `e2e/README.md`, and check their types
-  on the host with `cd e2e/playwright && npm ci && npm run typecheck`.
+  review. Do not run `e2e` or the scripts under `e2e/` yourself. Look at
+  `e2e/playwright/tests/` and add or update specs as the change needs, starting with
+  the ones the agreement names. Follow `e2e/README.md`, and check the types on the
+  host with `cd e2e/playwright && npm ci && npm run typecheck`.

@@ -1,4 +1,4 @@
-package handlers
+package authflow
 
 import (
 	"context"
@@ -462,7 +462,7 @@ func TestConsentClientName(t *testing.T) {
 			},
 			wantName:       "Payroll Portal",
 			wantUnverified: true,
-			why: "the consent name does not read ShowDescription. HandleConsentGet suppresses the " +
+			why: "the consent name does not read ShowDescription. ConsentPrompt suppresses the " +
 				"separate description line instead, so the same string is not printed twice",
 		},
 		{
@@ -483,7 +483,7 @@ func TestConsentClientName(t *testing.T) {
 			client := base()
 			tt.mutate(client)
 
-			name, unverified := consentClientName(client)
+			name, unverified := ConsentClientName(client)
 
 			assert.Equal(t, tt.wantName, name, tt.why)
 			assert.Equal(t, tt.wantUnverified, unverified, tt.why)

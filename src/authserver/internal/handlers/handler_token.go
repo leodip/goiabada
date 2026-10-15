@@ -225,9 +225,8 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// checkpoint.
 	var administrativeScopeRefused *protocolvalidation.AdministrativeScopeRefusedError
 	if errors.As(err, &administrativeScopeRefused) {
-		auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
-			administrativeScopeRefusedDetails(administrativeScopeRefused.Client, administrativeScopeRefused.Scopes,
-				input.GrantType.String(), administrativeScopeRefused.UserId))
+		protocolvalidation.LogAdministrativeScopeRefused(r.Context(), auditLogger, administrativeScopeRefused.Client,
+			administrativeScopeRefused.Scopes, input.GrantType.String(), administrativeScopeRefused.UserId)
 	}
 
 	// The redemption half of #241's registration boundary. The validator refuses an

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
@@ -20,8 +21,10 @@ type issuanceOutcome struct {
 	err  error
 }
 
-// ceremonyCodeInput is the code a ceremony for this client, user and session asks the issuer for.
+// ceremonyCodeInput is the code a ceremony for this client, user and session asks the issuer for,
+// authenticated a minute ago: the issuer refuses a code with no auth time.
 func ceremonyCodeInput(client *record.Client, user *record.User, sessionIdentifier string) *issuance.CreateCodeInput {
+	authenticatedAt := time.Now().UTC().Add(-time.Minute)
 	return &issuance.CreateCodeInput{
 		ClientId:          client.ClientIdentifier,
 		UserId:            user.Id,
@@ -29,6 +32,7 @@ func ceremonyCodeInput(client *record.Client, user *record.User, sessionIdentifi
 		Scope:             "openid profile",
 		AcrLevel:          "urn:goiabada:level1",
 		AuthMethods:       "pwd",
+		AuthenticatedAt:   &authenticatedAt,
 		SessionIdentifier: sessionIdentifier,
 	}
 }

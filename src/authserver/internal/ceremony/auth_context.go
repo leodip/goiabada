@@ -49,12 +49,12 @@ type AuthContext struct {
 	UserId                        int64
 	AuthState                     AuthState
 	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
-	AuthenticatedAt               *time.Time // Optional: override for auth_time in code issuance (used by prompt=none)
+	AuthenticatedAt               *time.Time // auth_time of what is issued: set by /auth/completed or prompt=none; issuance refuses nil
 	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
 	// Level1AuthCompleted records that level 1 authentication happened in THIS ceremony,
 	// as opposed to being inherited from a session the ceremony reused. It is written only
-	// where level 1 is performed, today only handler_auth_pwd, and read by
-	// handler_auth_completed to decide whether a ceremony with no valid session may create
+	// where level 1 is performed, today only authflow.PasswordSubmission, and read by
+	// authflow.Completion to decide whether a ceremony with no valid session may create
 	// one (#129 decision 15).
 	//
 	// AuthenticatedAt cannot answer that question, which is why this field exists: the OTP
@@ -91,8 +91,8 @@ type AuthContext struct {
 	// CeremonyId and DeferredErrorCode each document for their own fields.
 	OtpConfigGeneration *int64
 	// OTPKeyURL holds the otpauth:// URL of the TOTP key this ceremony's user is enrolling:
-	// written by the /auth/otp render that generated it, read by HandleAuthOtpPost to verify
-	// the code the user types.
+	// written by authflow.OTPPrompt when it generates it, read by authflow.OTPSubmission to
+	// verify the code the user types.
 	//
 	// One field rather than the seed and its rendered QR code, because the URL is the
 	// library's own record of the whole key and both are derived from it, otp.SecretFromKeyURL
@@ -113,7 +113,7 @@ type AuthContext struct {
 	// half of it: a second /auth/authorize mints a new auth context and takes the old key
 	// with it, so there is no shared slot for one ceremony's seed to be read out of by
 	// another and no ceremony id to check it against. ClearAuthContext at /auth/issue removes
-	// it, and HandleAuthOtpPost blanks it once the enrolment has succeeded, so a spent
+	// it, and RecordOTPVerified blanks it once the enrolment has succeeded, so a spent
 	// credential neither travels through the rest of the ceremony nor sits in the cookie of
 	// one abandoned after enrolling (#247).
 	//
@@ -138,7 +138,7 @@ type AuthContext struct {
 	// replaced sign-in that reaches its next step gets the "no longer active" page instead of
 	// acting on the newer one (#246, #437).
 	//
-	// Generated only in HandleAuthorizeGet, through NewId, the sole creation site, so no other
+	// Generated only in authflow.Authorization.Run, through NewId, the sole creation site, so no other
 	// path can mint one. Absent from a context written by an older binary it unmarshals as "", which
 	// ceremonyMatches refuses rather than matching against an empty submission: a user mid-flow
 	// across a deploy is refused once and restarts the authorization, bounded by the session
@@ -246,7 +246,7 @@ func (ac *AuthContext) SetScope(scope string) {
 // by every request of the ceremony that parked it (#213 decision 10, #266).
 //
 // Both fields are request fields, so this is a setter the request-field guard holds to
-// HandleAuthorizeGet like a direct write (#437).
+// authflow.Authorization.Run like a direct write (#437).
 func (ac *AuthContext) ParkDeferredError(code, description string) {
 	ac.DeferredErrorCode = code
 	ac.DeferredErrorDescription = oauth.ConformErrorDescription(description)

@@ -297,25 +297,36 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
 	registry := metrics.NewRegistry()
-	handler := HandleIssueGet(pageRenderer, ceremonyStore, web.TemplateFS(), codeIssuer, implicitTokenIssuer, database,
-		auditLogger, userSessionManager, permissionChecker, tokenmetrics.Register(registry), testBaseURL, testAdminConsoleBaseURL)
+	handler := buildIssueGet(issueGetDeps{
+		pageRenderer:        pageRenderer,
+		ceremonyStore:       ceremonyStore,
+		templateFS:          web.TemplateFS(),
+		codeIssuer:          codeIssuer,
+		implicitTokenIssuer: implicitTokenIssuer,
+		database:            database,
+		auditLogger:         auditLogger,
+		userSessionManager:  userSessionManager,
+		permissionChecker:   permissionChecker,
+		tokenMetrics:        tokenmetrics.Register(registry),
+	})
 
 	req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
-		CeremonyId:   testCeremonyId,
-		AuthState:    ceremony.AuthStateReadyToIssueCode,
-		ClientId:     "test-client",
-		UserId:       123,
-		ResponseMode: "form_post",
-		ResponseType: "id_token token",
-		RedirectURI:  "https://example.com/callback",
-		Scope:        "openid",
-		State:        "test-state",
-		Nonce:        "test-nonce",
-		AcrLevel:     "urn:goiabada:pwd",
-		AuthMethods:  "pwd",
+		CeremonyId:      testCeremonyId,
+		AuthState:       ceremony.AuthStateReadyToIssueCode,
+		ClientId:        "test-client",
+		UserId:          123,
+		ResponseMode:    "form_post",
+		ResponseType:    "id_token token",
+		RedirectURI:     "https://example.com/callback",
+		Scope:           "openid",
+		State:           "test-state",
+		Nonce:           "test-nonce",
+		AcrLevel:        "urn:goiabada:pwd",
+		AuthMethods:     "pwd",
+		AuthenticatedAt: &testIssueAuthTime,
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
@@ -365,7 +376,7 @@ func TestRedirToClientWithError_ImplicitFlow_QueryIsAnsweredInTheFragment(t *tes
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
-			err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil,
+			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r,
 				testRedirectError("invalid_request", "Implicit flow does not support response_mode=query.", "query",
 					"https://example.com/callback", "state123", responseType))
 
@@ -384,7 +395,7 @@ func TestRedirToClientWithError_ImplicitFlow_QueryIsAnsweredInTheFragment(t *tes
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil,
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r,
 			testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "state123", "code"))
 
 		require.NoError(t, err)

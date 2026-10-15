@@ -69,8 +69,16 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 			tokenParser := handlersmocks.NewTokenParser(t)
 			logs := logtest.CaptureSlog(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 				"&response_type=code&state=s1&scope=" + url.QueryEscape("openid authserver:manage")
@@ -180,8 +188,16 @@ func TestHandleAuthorizeGet_AnAllowedClientIsNotRefusedAnAdministrativeScope(t *
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=" + client.ClientIdentifier + "&redirect_uri=" +
 				url.QueryEscape("https://legit.example/cb") +

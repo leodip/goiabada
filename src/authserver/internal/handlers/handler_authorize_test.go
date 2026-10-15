@@ -9,9 +9,11 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -23,8 +25,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // stubAuthenticatedBrowser gives HandleAuthorizeGet a browser that has already authenticated.
@@ -40,7 +42,7 @@ import (
 // stubRegisteredRedirectURI gives a ceremony's client the registrations the error emitter now reads
 // before it will emit anything.
 //
-// Since #241 decision 11, redirectWillBeEmitted weighs the destination against what the client has
+// Since #241 decision 11, RedirectWillBeEmitted weighs the destination against what the client has
 // registered right now, not only against where the URI came from and whether it names a host. Every
 // test below that asserts the SHAPE of an error redirect is asserting what a client receives, which
 // is orthogonal to whether an administrator has since deleted the callback, so each is handed its
@@ -77,7 +79,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -158,7 +169,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -219,10 +239,20 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=invalid-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -266,12 +296,22 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		// jwt is JARM, which this server does not implement, and it is what a client asking for an
 		// unsupported mode most plausibly asks for.
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&response_mode=jwt", nil)
 		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
@@ -320,7 +360,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&response_mode=query", nil)
@@ -378,7 +427,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		stubRegisteredRedirectURI(database, "https://example.com")
 		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
@@ -433,7 +491,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=invalid&scope=openid", nil)
@@ -484,7 +551,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
@@ -545,7 +621,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=invalid", nil)
@@ -609,7 +694,17 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
@@ -670,7 +765,17 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&response_mode=form_post&scope=invalid", nil)
@@ -725,7 +830,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -795,7 +909,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -840,7 +963,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid", nil)
 		require.NoError(t, err)
@@ -916,7 +1048,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -981,7 +1122,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		form := url.Values{}
@@ -1047,7 +1197,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET",
 			"/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&ui_locales=pt-BR%20es",
@@ -1111,7 +1270,16 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		form := url.Values{}
 		form.Set("client_id", "test-client")
@@ -1259,7 +1427,7 @@ func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
+	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1270,7 +1438,7 @@ func TestRedirToClientWithError_FragmentResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
+	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1289,7 +1457,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 			</form>`)},
 	}
 
-	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
+	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -1318,7 +1486,7 @@ func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitte
 		"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 	}
 
-	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
+	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("server_error", "Internal server error",
 		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
@@ -1344,7 +1512,7 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
 	}
 
-	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
+	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("server_error", "Internal server error",
 		"form_post", "https://example.com/callback", "def456", "code"))
 
 	require.Error(t, err)
@@ -1355,7 +1523,7 @@ func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
+	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -1381,7 +1549,7 @@ func TestRedirToClientWithError_ImplicitFlow_DefaultsToFragment(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to fragment for implicit flow
-			err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
+			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1400,7 +1568,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -1419,7 +1587,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 				</form>`)},
 		}
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -1445,7 +1613,7 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 			r := httptest.NewRequest("GET", "/authorize", nil)
 
 			// No response_mode specified, should default to query for hybrid flow (contains code)
-			err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
+			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
 
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
@@ -1470,7 +1638,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
 
 		require.NoError(t, err)
 		location := w.Header().Get("Location")
@@ -1481,7 +1649,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
 
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=+++",
@@ -1505,7 +1673,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "code"))
 
 		require.NoError(t, err)
@@ -1522,7 +1690,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		// The retention half of the fix, which has nothing to do with state. url.Query discards
 		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
 		// a URI it had not registered.
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?lang=en;mode=dark"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?lang=en;mode=dark"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?lang=en;mode=dark", "abc123", "code"))
 
 		require.NoError(t, err)
@@ -1537,7 +1705,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		// The two branches construct differently and that difference is observable here: a
 		// registered "state=fixed" in the query is NOT replaced, because the response parameters
 		// are going into the fragment and the query is not the field list being written.
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"fragment", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "token"))
 
 		require.NoError(t, err)
@@ -1552,7 +1720,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?state=fixed&lang=en", "", "code"))
 
 		require.NoError(t, err)
@@ -1566,7 +1734,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback?code=stale&lang=en"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?code=stale&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?code=stale&lang=en", "client-csrf-token", "code"))
 
 		require.NoError(t, err)
@@ -1589,7 +1757,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback", state, "code"))
 
 		require.NoError(t, err)
@@ -1601,7 +1769,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, nil, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"fragment", "https://example.com/callback", state, "token"))
 
 		require.NoError(t, err)
@@ -1619,7 +1787,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 			"form_post.html": {Data: []byte(`<input name="state" value="{{.state}}">`)},
 		}
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"form_post", "https://example.com/callback", state, "code"))
 
 		require.NoError(t, err)
@@ -1644,7 +1812,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
 		}
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"form_post", "https://example.com/callback", "abc123", "code"))
 
 		require.NoError(t, err)
@@ -1664,7 +1832,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 			"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 		}
 
-		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
+		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("server_error", "Internal server error",
 			"form_post", "https://example.com/callback", "abc123", "code"))
 
 		require.Error(t, err)
@@ -1736,7 +1904,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 					return data["destination"] == tc.destination
 				})).Return(nil)
 
-			err := redirToClientWithError(w, r, datamocks.NewDatabase(t), pageRenderer, nil, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
+			err := testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "query", tc.redirectURI, "abc123", "code"))
 
 			require.NoError(t, err)
 			assert.Empty(t, w.Header().Get("Location"), "a withheld redirect must never become a Location: %s", tc.why)
@@ -1745,7 +1913,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 	}
 }
 
-// redirectWillBeEmitted is the one definition of "would an error response to this client actually
+// RedirectWillBeEmitted is the one definition of "would an error response to this client actually
 // leave the server", and it now has two readers: the emitter, which withholds the redirect and
 // renders the interstitial, and the handler, which asks the same question earlier to decide whether
 // anything has to be authenticated first. Two call sites that must agree is exactly the shape a
@@ -1936,7 +2104,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := redirectWillBeEmitted(context.Background(), tc.database(t), tc.client, tc.redirectURI, tc.responseType,
+			got := testClientErrorResponder(tc.database(t), nil, nil).RedirectWillBeEmitted(context.Background(), tc.client, tc.redirectURI, tc.responseType,
 				"TestRedirectWillBeEmitted")
 
 			assert.Equal(t, tc.want, got, tc.why)
@@ -1971,7 +2139,7 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	// No expectation on the database at all: the floor must short-circuit above the live gates, so
 	// a registration read reaching this mock fails the case. That is the ordering claim, and it is
 	// what stops a "helpful" edit from re-asking and taking the newer answer.
-	err := redirToClientWithError(w, r, datamocks.NewDatabase(t), pageRenderer, nil, input)
+	err := testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil).redirToClientWithError(w, r, input)
 
 	require.NoError(t, err)
 	assert.Empty(t, w.Header().Get("Location"),
@@ -1979,7 +2147,7 @@ func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	pageRenderer.AssertExpectations(t)
 }
 
-// The three gates live in redirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
+// The three gates live in RedirectWillBeEmitted and TestRedirectWillBeEmitted's table owns their
 // answers. What the table cannot see is whether the emitter actually HANDS it the ceremony's
 // response type, because it calls the predicate directly. This is that seam: the same loopback
 // rows, driven through redirToClientWithError, so an edit that stopped propagating input's
@@ -2038,7 +2206,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 			input := testRedirectError("invalid_scope", "Invalid scope", "query",
 				"http://127.0.0.1:49152/cb", "", tc.responseType)
 
-			err := redirToClientWithError(w, r, database, pageRenderer, nil, input)
+			err := testClientErrorResponder(database, pageRenderer, nil).redirToClientWithError(w, r, input)
 
 			require.NoError(t, err)
 			if tc.wantLocation == "" {
@@ -2051,7 +2219,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 	}
 }
 
-// answerClientWithError builds its fallback as a copy of the caller's own input with the code and
+// answerClientAfterClear builds its fallback as a copy of the caller's own input with the code and
 // description swapped, so every OTHER field has to survive the swap. Nothing above reaches that
 // copy: the clear succeeds in the cases that assert redirect shape, and the cases where it fails
 // carry an ordinary registered callback, no earlier refusal and a code response type, so erasing
@@ -2060,7 +2228,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 // These are the three fields whose erasure survived a mutation of the copy. The other three,
 // client, response mode and redirect URI, are already caught by the prompt=none clear-failure
 // cases in TestHandleAuthorizeGet_PromptNone (#241).
-func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
+func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *testing.T) {
 	// newRequest is per-subtest because the mocks key their expectations on the exact w and r.
 	setup := func(t *testing.T) (*handlersmocks.PageRenderer, *handlersmocks.CeremonyStore,
 		*httptest.ResponseRecorder, *http.Request) {
@@ -2091,7 +2259,8 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		// No expectation on the database at all, exactly as TestRedirToClientWithError_HonoursAnEarlierRefusal
 		// does: a registration read reaching this mock fails the case. That is stronger than stubbing a
 		// recovered read and asserting it was ignored, because it proves the second read never happens.
-		answerClientWithError(w, r, datamocks.NewDatabase(t), pageRenderer, ceremonyStore, nil, testCeremonyId, input)
+		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), input,
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
 
 		assert.Empty(t, w.Header().Get("Location"),
 			"swapping the code for server_error must not launder away a refusal the request already earned: "+
@@ -2110,7 +2279,8 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		input := testRedirectError("invalid_scope", "Invalid scope", "query",
 			"http://127.0.0.1:49152/cb", "", "code")
 
-		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, nil, testCeremonyId, input)
+		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), input,
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
 
 		assert.Contains(t, w.Header().Get("Location"), "http://127.0.0.1:49152/cb?error=server_error",
 			"the fallback runs the registration gate again with its own copy, so a dropped response type "+
@@ -2129,7 +2299,8 @@ func TestAnswerClientWithError_TheFallbackPreservesWhatItDoesNotSwap(t *testing.
 		input := testRedirectError("invalid_scope", "Invalid scope", "query", "https://legit.example/cb",
 			"abc123", "code")
 
-		answerClientWithError(w, r, database, pageRenderer, ceremonyStore, nil, testCeremonyId, input)
+		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), input,
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
 
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "error=server_error")
@@ -2154,7 +2325,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		require.NoError(t, err)
@@ -2221,7 +2401,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=id_token%20token&scope=openid&nonce=test-nonce", nil)
 		require.NoError(t, err)
@@ -2285,7 +2474,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid", nil)
@@ -2345,7 +2543,16 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=token&scope=openid&nonce=test-nonce", nil)
 		require.NoError(t, err)
@@ -2401,51 +2608,6 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	})
 }
 
-// TestValidateIdTokenHint_TypeOfToken: a validly signed token of this server that is not an ID
-// Token is refused as a hint, with the answer a hint that does not parse gets, so the reply does
-// not say which kind of token was sent (#401). ID Tokens carry no typ at all, so the absent row is
-// the one a real hint takes.
-func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
-	settings := &record.Settings{Issuer: "https://test-issuer.com"}
-
-	tests := []struct {
-		name     string
-		typ      interface{} // nil leaves the claim out
-		accepted bool
-	}{
-		{name: "ID Token, no typ", typ: nil, accepted: true},
-		{name: "access token", typ: "Bearer"},
-		{name: "session refresh token", typ: "Refresh"},
-		{name: "offline refresh token", typ: "Offline"},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			claims := jwt.MapClaims{"iss": "https://test-issuer.com", "sub": "user-123"}
-			if tc.typ != nil {
-				claims["typ"] = tc.typ
-			}
-			tokenParser := handlersmocks.NewTokenParser(t)
-			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
-				Return(&oauth.JwtToken{TokenBase64: "the-hint", Claims: claims}, nil)
-
-			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
-
-			if tc.accepted {
-				require.NoError(t, err)
-				assert.Equal(t, "user-123", sub)
-				return
-			}
-			assert.Empty(t, sub)
-			var detail *oauth.ErrorDetail
-			require.ErrorAs(t, err, &detail)
-			assert.Equal(t, "invalid_request", detail.Code())
-			assert.Equal(t, "The id_token_hint is invalid.", detail.Description())
-			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
-		})
-	}
-}
-
 func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	t.Run("Invalid id_token_hint bad signature - invalid_request", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -2458,7 +2620,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=bad-jwt-token", nil)
@@ -2517,7 +2688,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-wrong-issuer", nil)
@@ -2585,7 +2765,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=an-access-token", nil)
@@ -2654,7 +2843,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-no-sub", nil)
@@ -2719,7 +2917,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=expired-jwt-token", nil)
@@ -2803,7 +3010,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=valid-jwt-token", nil)
@@ -2887,7 +3103,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -2972,7 +3197,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
@@ -3022,6 +3256,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			UserId:      789,
 			AcrLevel:    record.AcrLevel1,
 			AuthMethods: "pwd",
+			AuthTime:    time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
 			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
 			// site from the interactive one, and it must inherit from the session too, or a
 			// silent re-issue would launder an old ceremony forward (#106 decision 11(d)).
@@ -3093,7 +3328,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		const requestedScope = "openid res:offline_access_read"
 		userSubject := fake.UUID()
@@ -3140,6 +3384,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			UserId:              789,
 			AcrLevel:            record.AcrLevel1,
 			AuthMethods:         "pwd",
+			AuthTime:            time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
 			AuthStateGeneration: 7,
 			User: record.User{
 				Id:                  789,
@@ -3199,7 +3444,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3257,9 +3511,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
-		// Same sentinel as the "Invalid scopes" case, for handlePromptNone's own refusal
-		// closure: rr.Result() reads the header snapshot taken at commit time, so the sentinel
-		// only appears there if the clear ran before the client response was committed.
+		// Same sentinel as the "Invalid scopes" case, for the silent path's own refusal
+		// (authflow.SilentAuthentication): rr.Result() reads the header snapshot taken at commit
+		// time, so the sentinel only appears there if the clear ran before the client response was
+		// committed.
 		const clearedContextCookie = "cleared-auth-context"
 		ceremonyStore.On("DiscardAuthContext", rr, req).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
@@ -3293,7 +3548,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3386,12 +3650,22 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
 
-		// handlePromptNone's closure carries its own copy of the last-resort 500, so removing
-		// site 1's copy leaves this one and vice versa. Each is pinned at its own site.
+		// The silent path answers its refusal from its own call to the responder, so the
+		// last-resort 500 is pinned here as well as at site 1.
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3481,7 +3755,17 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			templateFS:         templateFS,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 
 		hintSubject := fake.UUID()
 		sessionSubject := fake.UUID()
@@ -3570,7 +3854,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=abc123&request=foo", nil)
@@ -3619,7 +3912,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&state=xyz&request_uri=https://example.com/x", nil)
@@ -3667,7 +3969,16 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		permissionChecker := handlersmocks.NewPermissionChecker(t)
 		tokenParser := handlersmocks.NewTokenParser(t)
-		handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
 		stubAuthenticatedBrowser(database, userSessionManager)
 
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&request=", nil)
@@ -3854,8 +4165,16 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(tc.redirectURI) +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
@@ -3880,7 +4199,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 
 			// Maybe, for the reason the session lookup below is Maybe: the registration read is
-			// the third gate inside redirectWillBeEmitted, so the DCR rows and the unemittable-URI
+			// the third gate inside RedirectWillBeEmitted, so the DCR rows and the unemittable-URI
 			// row are refused above it and never query. The rows that do reach it hold their own
 			// destination registered, which is what keeps them about the routing they are named
 			// for rather than about a deleted callback (#241 decision 11).
@@ -3936,9 +4255,9 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 //
 // §4 wrote hasValidUserSession as a plain local assigned above the predicate. That would query the
 // session on every request reaching it, including a prompt=none request that queries again inside
-// handlePromptNone and a prompt=login request that never looked at one before this change, and it
-// would let a database fault answer 500 where the server used to answer correctly without a session
-// at all. The three rows below are the difference, and each fails if the assignment is made eager.
+// authflow.SilentAuthentication and a prompt=login request that never looked at one before this
+// change, and it would let a database fault answer 500 where the server used to answer correctly
+// without a session at all. The three rows below are the difference, and each fails if the assignment is made eager.
 func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -3974,8 +4293,16 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb" +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
@@ -4060,8 +4387,16 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 	tokenParser := handlersmocks.NewTokenParser(t)
 
-	handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-		authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+	handler := buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       pageRenderer,
+		ceremonyStore:      ceremonyStore,
+		userSessionManager: userSessionManager,
+		database:           database,
+		authorizeValidator: authorizeValidator,
+		auditLogger:        auditLogger,
+		permissionChecker:  permissionChecker,
+		tokenParser:        tokenParser,
+	})
 
 	req := httptest.NewRequest("GET",
 		"/authorize?client_id=test-client&redirect_uri=https%3A%2F%2Flegit.example%2Fcb"+
@@ -4100,7 +4435,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	ceremonyStore.AssertExpectations(t)
 }
 
-// One authorization request asks redirectWillBeEmitted twice: HandleAuthorizeGet asks it before
+// One authorization request asks RedirectWillBeEmitted twice: HandleAuthorizeGet asks it before
 // routing, to decide whether a validation failure may be answered at once or has to be parked behind
 // a login, and the emitter asks it again at the last moment. Since the predicate started reading the
 // registration table (#241 decision 11) those two answers need not agree, and the disagreement has a
@@ -4169,8 +4504,16 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			permissionChecker := handlersmocks.NewPermissionChecker(t)
 			tokenParser := handlersmocks.NewTokenParser(t)
 
-			handler := HandleAuthorizeGet(pageRenderer, ceremonyStore, userSessionManager, database, nil,
-				authorizeValidator, auditLogger, permissionChecker, tokenParser, testBaseURL)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				authorizeValidator: authorizeValidator,
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+				tokenParser:        tokenParser,
+			})
 
 			target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 				"&response_type=code&scope=" + url.QueryEscape("openid bogus")
@@ -4226,4 +4569,36 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			ceremonyStore.AssertExpectations(t)
 		})
 	}
+}
+
+// A refusal whose reason the handler does not know names no message or status to answer with, so it
+// is the 500 page rather than a refusal page with a guessed text.
+func TestAnswerAuthorizePageRefusal_AnUnknownReasonIsA500(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	req := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+	rr := httptest.NewRecorder()
+	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "unknown reason")
+	})).Return().Once()
+
+	answerAuthorizePageRefusal(pageRenderer, rr, req, &authflow.AuthorizePageRefusal{})
+
+	pageRenderer.AssertExpectations(t)
+	pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything)
+}
+
+// A refusal page that cannot be rendered is the 500 page carrying the render's failure.
+func TestRenderAuthorizeRefusal_ARenderFailureIsA500(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	req := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
+	rr := httptest.NewRecorder()
+	renderErr := errors.New("template exploded")
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
+		Return(renderErr).Once()
+	pageRenderer.On("InternalServerError", rr, req, renderErr).Return().Once()
+
+	renderAuthorizeRefusal(pageRenderer, rr, req, "refused", http.StatusBadRequest)
+
+	pageRenderer.AssertExpectations(t)
 }

@@ -6,9 +6,9 @@ package handlers
 // The screen is decided in two places: /auth/completed sends a ceremony to /auth/consent when the
 // request has prompt=consent, the client requires consent or the scope has offline_access, or when
 // the scope holds authserver:manage-account, the client is not the admin console's and the user's
-// stored consent does not cover it (decideAfterBinding, #509), and /auth/consent then skips the
-// screen when every scope is already consented, unless offline_access or prompt=consent is there
-// (consentScreenOwed). The table states the two together, so it is held to both, for every
+// stored consent does not cover it (authflow.DecideAfterBinding, #509), and /auth/consent then skips
+// the screen when every scope is already consented, unless offline_access or prompt=consent is there
+// (authflow.ConsentScreenOwed). The table states the two together, so it is held to both, for every
 // combination of its five conditions and of the client being the admin console's or not, which the
 // manage-account column folds in.
 //
@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
@@ -79,9 +80,9 @@ func consentWorlds() []consentWorld {
 	return worlds
 }
 
-// consentScreenShown is whether a sign-in in world sees the consent screen: decideAfterBinding's
-// answer for a user holding every scope asked for, given stored consent covering the scopes this
-// world requires or none, and, when that is the consent step, consentScreenOwed's for the same
+// consentScreenShown is whether a sign-in in world sees the consent screen:
+// authflow.DecideAfterBinding's answer for a user holding every scope asked for, given stored consent covering the scopes this
+// world requires or none, and, when that is the consent step, authflow.ConsentScreenOwed's for the same
 // consent. With Consent required off, manage-account alone is enough even when another requested
 // scope was never approved; this partial-consent case keeps the table's approval column honest.
 func consentScreenShown(t *testing.T, world consentWorld) bool {
@@ -105,33 +106,33 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 		}
 		storedConsent = &record.UserConsent{Scope: consentedScope}
 	}
-	facts := afterBindingFacts{
-		promptConsent:    world.promptConsent,
-		consentRequired:  world.consentRequired,
-		clientIdentifier: clientIdentifier,
-		effectiveScope:   &scope,
+	facts := authflow.AfterBindingFacts{
+		PromptConsent:    world.promptConsent,
+		ConsentRequired:  world.consentRequired,
+		ClientIdentifier: clientIdentifier,
+		EffectiveScope:   &scope,
 	}
-	answer, need := decideAfterBinding(facts)
-	if need == afterBindingFactConsent {
-		facts.consentLoaded = true
-		facts.consent = storedConsent
-		answer, need = decideAfterBinding(facts)
+	answer, need := authflow.DecideAfterBinding(facts)
+	if need == authflow.AfterBindingFactConsent {
+		facts.ConsentLoaded = true
+		facts.Consent = storedConsent
+		answer, need = authflow.DecideAfterBinding(facts)
 	}
-	if need != afterBindingFactNone {
-		t.Fatalf("%s: decideAfterBinding still needs fact %d with the effective scope and the consent given", world, need)
+	if need != authflow.AfterBindingFactNone {
+		t.Fatalf("%s: DecideAfterBinding still needs fact %d with the effective scope and the consent given", world, need)
 	}
 	switch answer {
-	case afterBindingIssue:
+	case authflow.AfterBindingIssue:
 		return false
-	case afterBindingConsent:
+	case authflow.AfterBindingConsent:
 	default:
-		t.Fatalf("%s: decideAfterBinding answered %d, neither issuance nor the consent step", world, answer)
+		t.Fatalf("%s: DecideAfterBinding answered %d, neither issuance nor the consent step", world, answer)
 	}
-	var scopes []ScopeInfo
+	var scopes []authflow.ScopeInfo
 	for _, s := range strings.Split(scope, " ") {
-		scopes = append(scopes, ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
+		scopes = append(scopes, authflow.ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
 	}
-	return consentScreenOwed(scopes, scope, world.promptConsent)
+	return authflow.ConsentScreenOwed(scopes, scope, world.promptConsent)
 }
 
 // consentScreens is consentScreenShown for every world.

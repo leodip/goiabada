@@ -19,9 +19,7 @@
   `src/authserver/web/openapi.yaml`. Use `site/STYLE.md` and its linked glossary
   for wording; breaking changes and migration steps belong in release notes.
 - **Browser tests:** `e2e/` holds a Playwright suite that runs against a real
-  deployment on a VPS (see `e2e/README.md`): the admin console's pages, the test
-  app's sign-in flows, and the protocol where no page reaches it (`oauth/`).
-  Placido runs it whole as the last gate, once the review is done, against an
-  environment rebuilt from the branch. When a change alters what the suite covers,
-  name in the agreement the specs under `e2e/playwright/tests/` to add or update,
-  and put them in a slice.
+  deployment on a VPS (see `e2e/README.md`). Placido runs it whole as the last gate,
+  after the review; no agent runs it. In every interview, look at
+  `e2e/playwright/tests/`, decide which specs to add or update for this change, and
+  name them in the agreement, in the slices that change that behavior.

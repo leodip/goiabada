@@ -310,6 +310,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		input.RedirectURI = "https://example.com/cb"
 		input.Scope = "openid"
 		input.ResponseMode = "query"
+		input.AuthenticatedAt = codeAuthTime()
 		input.AuthStateGeneration = 7 // the user is at 9; reading the user would emit 9
 
 		_, err := issuer.createAuthCode(context.Background(), nil, input)

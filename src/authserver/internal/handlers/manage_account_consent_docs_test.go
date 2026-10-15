@@ -30,7 +30,7 @@ func TestConceptDocs_TheConsentSectionSaysWhoIsAskedForManageAccount(t *testing.
 		[]string{"`" + consentManageAccountScope + "`", "admin console's own client"})
 }
 
-// manageAccountSilentRefusals is what decideSilentAuthentication answers a prompt=none request from a
+// manageAccountSilentRefusals is what authflow.DecideSilentAuthentication answers a prompt=none request from a
 // client with Consent required off, other than the admin console's, whose scope holds
 // authserver:manage-account: with no stored consent, and with one leaving manage-account out. It
 // fails when the code answers either with no refusal, or refuses the admin console's client, since
@@ -51,17 +51,17 @@ func manageAccountSilentRefusals(t *testing.T) []silentRefusal {
 	for _, consentScope := range []*string{nil, scope("openid")} {
 		world.consentScope = consentScope
 		answer, _ := driveSilentAuthentication(t, world)
-		if answer.errorCode == "" {
-			t.Fatalf("decideSilentAuthentication refuses nothing for %+v", world)
+		if answer.ErrorCode == "" {
+			t.Fatalf("authflow.DecideSilentAuthentication refuses nothing for %+v", world)
 		}
-		refusals = append(refusals, silentRefusal{answer.errorCode, answer.errorDescription})
+		refusals = append(refusals, silentRefusal{answer.ErrorCode, answer.ErrorDescription})
 	}
 
 	world.consentScope = nil
 	world.clientIdentifier = builtin.AdminConsoleClientIdentifier
-	if answer, _ := driveSilentAuthentication(t, world); answer.errorCode != "" {
-		t.Fatalf("decideSilentAuthentication refuses the admin console's client with %s %q",
-			answer.errorCode, answer.errorDescription)
+	if answer, _ := driveSilentAuthentication(t, world); answer.ErrorCode != "" {
+		t.Fatalf("authflow.DecideSilentAuthentication refuses the admin console's client with %s %q",
+			answer.ErrorCode, answer.ErrorDescription)
 	}
 	return refusals
 }

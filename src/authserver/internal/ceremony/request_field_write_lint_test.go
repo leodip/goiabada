@@ -9,8 +9,8 @@ package ceremony
 // later hops, so a restart carried the first user's narrowing to whoever signed in next, and it had
 // to become an attempt field with RequestedScope beside it as the request (#436). The classification
 // test in auth_context_fields_test.go says which fields are request fields; this guard holds every
-// write to one to HandleAuthorizeGet, the handler that accepts the request, closures inside it
-// included, and holds the setters that write one to being called from there too.
+// write to one to authflow.Authorization.Run, the operation that accepts the request, closures
+// inside it included, and holds the setters that write one to being called from there too.
 //
 // Fields and methods are resolved as go/types objects, so a write is caught whatever the variable
 // holding the context is called, through a pointer, a promoted field or a method expression. What it
@@ -52,7 +52,7 @@ const requestFieldModuleParent = "github.com/leodip/goiabada/"
 
 const (
 	requestFieldCeremonyPath = requestFieldModuleParent + "authserver/internal/ceremony"
-	requestFieldHandlersPath = requestFieldModuleParent + "authserver/internal/handlers"
+	requestFieldAuthflowPath = requestFieldModuleParent + "authserver/internal/authflow"
 )
 
 // requestFieldSetters are the AuthContext methods that write a request field. A call to one is a
@@ -61,14 +61,23 @@ const (
 // therefore refused for the write in its body.
 var requestFieldSetters = []string{"SetTargetAcrLevel", "ParkDeferredError"}
 
-// requestFieldWriter names the one function whose body may write a request field: the handler that
-// accepts the authorization request. Function literals inside it are inside it.
-var requestFieldWriter = requestFieldFunc{pkg: requestFieldHandlersPath, name: "HandleAuthorizeGet"}
+// requestFieldWriter names the one function whose body may write a request field: the operation
+// that accepts the authorization request and creates its ceremony. Function literals inside it are
+// inside it.
+var requestFieldWriter = requestFieldFunc{pkg: requestFieldAuthflowPath, recv: "Authorization", name: "Run"}
 
 // requestFieldFunc is a function or method named by its package's import path, its receiver's type
 // name (empty for a function) and its own.
 type requestFieldFunc struct {
 	pkg, recv, name string
+}
+
+// String is the function as a reader names it: Recv.Name for a method, Name for a function.
+func (f requestFieldFunc) String() string {
+	if f.recv == "" {
+		return f.name
+	}
+	return f.recv + "." + f.name
 }
 
 // requestFieldWrite is one write the rule refuses, or one it could not judge.
@@ -546,7 +555,7 @@ func assertRequestFieldsWrittenOnce(r guard.Reporter, root, scope string, fields
 			"while nothing after /auth/authorize writes one. Write it in %s, or, if the value is something an "+
 			"authentication decides, move the field to attemptFields in auth_context_fields_test.go so Restart "+
 			"discards it (#436).",
-			len(walk.found), scope, writer.name, requestFieldLines(walk.found), writer.name)
+			len(walk.found), scope, writer, requestFieldLines(walk.found), writer)
 	}
 	if len(walk.unresolved) > 0 {
 		r.Errorf("%d write(s) under %s to a field or setter named like an AuthContext request field, on a "+
@@ -623,11 +632,13 @@ func (s *Store) UILocales() []string {
 
 // requestFieldAuthorizeFixture is the writer in a fixture tree, writing every request field by every
 // form the rule refuses elsewhere, in its body and in the closure it returns.
-const requestFieldAuthorizeFixture = `package handlers
+const requestFieldAuthorizeFixture = `package authflow
 
 import "github.com/leodip/goiabada/authserver/internal/ceremony"
 
-func HandleAuthorizeGet(state string) func() *ceremony.AuthContext {
+type Authorization struct{}
+
+func (o *Authorization) Run(state string) func() *ceremony.AuthContext {
 	ac := &ceremony.AuthContext{State: state}
 	ac.State += "-suffix"
 	ac.UILocales = append(ac.UILocales, "en")
@@ -651,7 +662,7 @@ func HandleAuthorizeGet(state string) func() *ceremony.AuthContext {
 func TestRequestFieldWrites_Finder_RefusesEveryWriteFormAndNoRead(t *testing.T) {
 	root := t.TempDir()
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
-	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_authorize.go", requestFieldAuthorizeFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/authflow/authorization.go", requestFieldAuthorizeFixture)
 
 	// Refused: each form once, through differently named variables, a promoted field and a method
 	// expression.
@@ -699,6 +710,22 @@ func narrow(ac *ceremony.AuthContext) {
 }
 
 var fixed = ceremony.AuthContext{UILocales: []string{"en"}}
+`)
+	// Refused too: a method of the writer's name on another receiver, and a function of that name,
+	// in the writer's own package. The writer is the one method, not its name.
+	writeRequestFieldFixture(t, root, "authserver/internal/authflow/silent_authentication.go", `package authflow
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+type SilentAuthentication struct{}
+
+func (o *SilentAuthentication) Run(ac *ceremony.AuthContext) {
+	ac.State = "a method named Run on another type"
+}
+
+func Run(ac *ceremony.AuthContext) {
+	ac.State = "a function named Run"
+}
 `)
 
 	// Passed: every read production makes, including the slice returned by Store.UILocales and a
@@ -757,7 +784,7 @@ func fixture(ac *ceremony.AuthContext) {
 
 	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	require.NoError(t, err)
-	assert.Equal(t, 5, walk.files, "the test file is not read, the other five are")
+	assert.Equal(t, 6, walk.files, "the test file is not read, the other six are")
 	assert.True(t, walk.authContextFound)
 	assert.Empty(t, walk.undeclared)
 
@@ -781,6 +808,8 @@ func fixture(ac *ceremony.AuthContext) {
 		"authserver/internal/handlers/handler_auth_issue.go:27: calls SetTargetAcrLevel",
 		"authserver/internal/handlers/handler_auth_issue.go:28: calls SetTargetAcrLevel",
 		"authserver/internal/handlers/handler_auth_issue.go:29: calls ParkDeferredError",
+		"authserver/internal/authflow/silent_authentication.go:8: assigns State",
+		"authserver/internal/authflow/silent_authentication.go:12: assigns State",
 		"authserver/internal/issuance/code_issuer.go:8: assigns UILocales",
 		"authserver/internal/issuance/code_issuer.go:12: sets UILocales in an AuthContext literal",
 	}, requestFieldStrings(walk.found), "the finder matched the wrong set")
@@ -833,10 +862,10 @@ func completed(ac *ceremony.AuthContext, effective string) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
 	})
 
-	require.True(t, report.Failed(), "a request field written outside HandleAuthorizeGet passed the guard")
+	require.True(t, report.Failed(), "a request field written outside Authorization.Run passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
 	assert.Contains(t, report.Text(), "authserver/internal/handlers/handler_auth_completed.go:6: assigns State")
-	assert.Contains(t, report.Text(), "outside HandleAuthorizeGet")
+	assert.Contains(t, report.Text(), "outside Authorization.Run")
 	assert.Contains(t, report.Text(), "#436")
 }
 
@@ -869,7 +898,7 @@ func issue(f *flow.Context) {
 func TestRequestFieldWrites_Guard_PassesTheWriterAndTheReads(t *testing.T) {
 	root := t.TempDir()
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
-	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_authorize.go", requestFieldAuthorizeFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/authflow/authorization.go", requestFieldAuthorizeFixture)
 	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_completed.go", `package handlers
 
 import "github.com/leodip/goiabada/authserver/internal/ceremony"

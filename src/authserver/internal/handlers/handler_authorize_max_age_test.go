@@ -53,9 +53,16 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 			database:           datamocks.NewDatabase(t),
 			authorizeValidator: handlersmocks.NewAuthorizeValidator(t),
 		}
-		f.handler = HandleAuthorizeGet(f.pageRenderer, f.ceremonyStore, f.userSessionManager, f.database, nil,
-			f.authorizeValidator, handlersmocks.NewAuditLogger(t), handlersmocks.NewPermissionChecker(t),
-			handlersmocks.NewTokenParser(t), testBaseURL)
+		f.handler = buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       f.pageRenderer,
+			ceremonyStore:      f.ceremonyStore,
+			userSessionManager: f.userSessionManager,
+			database:           f.database,
+			authorizeValidator: f.authorizeValidator,
+			auditLogger:        handlersmocks.NewAuditLogger(t),
+			permissionChecker:  handlersmocks.NewPermissionChecker(t),
+			tokenParser:        handlersmocks.NewTokenParser(t),
+		})
 
 		target := "/authorize?client_id=test-client&redirect_uri=" + url.QueryEscape(redirectURI) +
 			"&response_type=code&scope=openid&state=s1&" + query

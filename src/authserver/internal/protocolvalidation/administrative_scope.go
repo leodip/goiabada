@@ -1,9 +1,11 @@
 package protocolvalidation
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -64,4 +66,28 @@ func (e *AdministrativeScopeRefusedError) Error() string {
 // Unwrap puts Detail on the chain, as UserDisabledError's does.
 func (e *AdministrativeScopeRefusedError) Unwrap() error {
 	return e.Detail
+}
+
+// AuditLogger records one security event under the request's context, the shape
+// LogAdministrativeScopeRefused needs. *audit.Logger satisfies it, as it does handlers.AuditLogger
+// and authflow's port of the same shape.
+type AuditLogger interface {
+	Log(ctx context.Context, auditEvent string, details map[string]interface{})
+}
+
+// LogAdministrativeScopeRefused emits EventAdministrativeScopeRefused: the client refused, the
+// administrative scopes it asked for, the checkpoint that refused them, and the user they were
+// asked for (#499 decision 9). Every checkpoint records it here, /auth/authorize ("authorize"),
+// /auth/issue ("issue") and the token endpoint under the grant's name, so the record has one shape
+// wherever the condition is met, as the answer does in AdministrativeScopeRefusal.
+func LogAdministrativeScopeRefused(ctx context.Context, auditLogger AuditLogger, client *record.Client,
+	scopes []string, checkpoint string, userId int64) {
+
+	auditLogger.Log(ctx, audit.EventAdministrativeScopeRefused, map[string]interface{}{
+		"client_id":         client.Id,
+		"client_identifier": client.ClientIdentifier,
+		"scopes":            scopes,
+		"checkpoint":        checkpoint,
+		"user_id":           userId,
+	})
 }

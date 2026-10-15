@@ -4,14 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,12 +15,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -53,13 +50,18 @@ func newAuthorizePostEndpoint(t *testing.T) *authorizePostEndpoint {
 		validator:    handlersmocks.NewAuthorizeValidator(t),
 		database:     datamocks.NewDatabase(t),
 	}
-	e.handler = HandleAuthorizePost(e.pageRenderer, e.validator, e.database, testBaseURL)
+	e.handler = buildAuthorizePost(authorizePostDeps{
+		pageRenderer:       e.pageRenderer,
+		authorizeValidator: e.validator,
+		database:           e.database,
+	})
 	return e
 }
 
 func (e *authorizePostEndpoint) post(query, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, "/auth/authorize?"+query, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 	e.handler.ServeHTTP(rr, req)
 	return rr
@@ -242,72 +244,6 @@ func TestHandleAuthorizePost_TheRefusalPageHonoursUILocalesFromTheBody(t *testin
 	e.post("", validAuthorizeQuery+"&response_mode=web_message&ui_locales=pt-BR")
 }
 
-func TestParkedAuthorizeForm(t *testing.T) {
-	t.Run("keeps every copy of each listed parameter, in order", func(t *testing.T) {
-		params := url.Values{"state": {"a", "b"}, "scope": {"openid"}, "prompt": {"login", "consent"}}
-		assert.Equal(t, params, parkedAuthorizeForm(params))
-	})
-
-	t.Run("drops what nothing reads, and request_handle", func(t *testing.T) {
-		form := parkedAuthorizeForm(url.Values{
-			"client_id": {"c"}, "login_hint": {"x"}, "junk": {"y"}, authorizerequest.HandleParameter: {"z"},
-		})
-		assert.Equal(t, url.Values{"client_id": {"c"}}, form)
-	})
-
-	t.Run("keeps a listed parameter that was sent empty", func(t *testing.T) {
-		assert.Equal(t, url.Values{"state": {""}}, parkedAuthorizeForm(url.Values{"state": {""}}),
-			"an empty state is a value the ceremony reads, and a difference the GET must see")
-	})
-
-	t.Run("owns its slices", func(t *testing.T) {
-		params := url.Values{"state": {"a"}}
-		form := parkedAuthorizeForm(params)
-		params["state"][0] = "changed"
-		assert.Equal(t, "a", form.Get("state"))
-	})
-}
-
-// The list of what is parked is held to the handler's reads, so a parameter read later cannot be
-// left out and silently vanish between a POST and its GET. It is the parameters the endpoint reads
-// (TestAuthorizeRequestParameters_EveryReadIsListed owns that list) and the two it reads only to
-// refuse, and not the handle.
-func TestAuthorizeParkedParameters_CoverEveryRead(t *testing.T) {
-	isParams := func(e ast.Expr) bool {
-		ident, ok := e.(*ast.Ident)
-		return ok && ident.Name == "params"
-	}
-	reads := formReads(t, "handler_authorize.go", isParams)
-
-	parsed, err := parser.ParseFile(token.NewFileSet(), "handler_authorize.go", nil, 0)
-	require.NoError(t, err)
-	var presence []string
-	ast.Inspect(parsed, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok || sel.Sel.Name != "Has" || !isParams(sel.X) || len(call.Args) != 1 {
-			return true
-		}
-		if lit, ok := call.Args[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
-			name, err := strconv.Unquote(lit.Value)
-			require.NoError(t, err)
-			presence = append(presence, name)
-		}
-		return true
-	})
-	require.ElementsMatch(t, []string{"request", "request_uri"}, presence,
-		"the two parameters the handler reads only for their presence")
-
-	for _, name := range append(slices.Clone(reads), presence...) {
-		assert.Contains(t, authorizeParkedParameters, name, "handler_authorize.go reads %q", name)
-	}
-	assert.ElementsMatch(t, append(slices.Clone(authorizeRequestParameters), "request", "request_uri"), authorizeParkedParameters)
-	assert.NotContains(t, authorizeParkedParameters, authorizerequest.HandleParameter)
-}
-
 // consumes registers the transaction, the read and the claim of the handle every case below holds.
 func (e *authorizeEndpoint) consumes(handle string, form url.Values, claimed bool) {
 	tx := &sql.Tx{}
@@ -384,7 +320,7 @@ func TestHandleAuthorizeGet_ARequestHandleRunsTheCeremonyFromTheParkedRequest(t 
 // request that runs (the handle alone), and the strict database registered no read, so a refusal
 // that consumed the handle first fails.
 func TestHandleAuthorizeGet_ARequestHandleBesideAnotherParameterIsRefused(t *testing.T) {
-	for _, name := range authorizeParkedParameters {
+	for _, name := range authflow.AuthorizeParkedParameters() {
 		t.Run(name, func(t *testing.T) {
 			e := newAuthorizeEndpoint(t)
 			e.expectsPage(unusableHandlePage())

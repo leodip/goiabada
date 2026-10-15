@@ -27,9 +27,16 @@ import (
 func newSyntaxAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 	t.Helper()
 	e := newAuthorizeEndpoint(t)
-	e.handler = HandleAuthorizeGet(e.pageRenderer, e.ceremonyStore, e.userSessionManager, e.database, nil,
-		protocolvalidation.NewAuthorizeValidator(e.database), handlersmocks.NewAuditLogger(t),
-		handlersmocks.NewPermissionChecker(t), handlersmocks.NewTokenParser(t), testBaseURL)
+	e.handler = buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       e.pageRenderer,
+		ceremonyStore:      e.ceremonyStore,
+		userSessionManager: e.userSessionManager,
+		database:           e.database,
+		authorizeValidator: protocolvalidation.NewAuthorizeValidator(e.database),
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+		permissionChecker:  handlersmocks.NewPermissionChecker(t),
+		tokenParser:        handlersmocks.NewTokenParser(t),
+	})
 
 	implicit := true
 	client := &record.Client{

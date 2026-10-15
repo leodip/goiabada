@@ -77,9 +77,16 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		expectedError := &oauth.ErrorDetail{}
@@ -102,9 +109,16 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -128,9 +142,16 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		// The stale pair is what this case is about as much as the render is: a ceremony that
@@ -214,7 +235,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -324,7 +351,13 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		otpSecretGenerator := handlersmocks.NewOtpSecretGenerator(t)
 
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		handler := HandleAuthOtpGet(pageRenderer, ceremonyStore, database, otpSecretGenerator, auditLogger, testAdminConsoleBaseURL)
+		handler := buildAuthOtpGet(authOtpGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			otpSecretGenerator: otpSecretGenerator,
+			auditLogger:        auditLogger,
+		})
 
 		req, _ := http.NewRequest("GET", "/auth/otp?ceremony="+testCeremonyId, nil)
 		rr := httptest.NewRecorder()
@@ -389,7 +422,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -397,6 +435,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		expectedError := errors.New("auth context error")
@@ -421,7 +460,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -429,6 +473,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, ceremony.ErrNoAuthContext)
@@ -452,7 +497,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -460,6 +510,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -537,7 +588,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+				handler := buildAuthOtpPost(authOtpPostDeps{
+					pageRenderer:  pageRenderer,
+					ceremonyStore: ceremonyStore,
+					database:      database,
+					auditLogger:   auditLogger,
+				})
 
 				form := url.Values{}
 				form.Add("otp", "123456")
@@ -551,6 +607,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 				rr := httptest.NewRecorder()
 
 				authContext := &ceremony.AuthContext{
@@ -583,7 +640,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -591,6 +653,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -619,7 +682,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -627,6 +695,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -668,7 +737,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
@@ -676,6 +750,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add(ceremonyIdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -718,7 +793,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -736,6 +816,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		target := "/auth/otp?" + url.Values{"otp": {otpCode}}.Encode()
 		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -785,13 +866,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -842,13 +929,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -898,13 +991,19 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		form := url.Values{}
 		form.Add(ceremonyIdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -951,7 +1050,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -967,6 +1071,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -986,11 +1091,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// The verification claim, at the generation the user was read with, matched exactly
 		// rather than with mock.Anything: it is what binds the claim to the authenticator the
@@ -1028,6 +1128,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the code was accepted")
+		// An accepted code shows no form, so it reads neither the client nor its logo.
+		database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "ClientHasLogo", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1041,7 +1144,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1057,6 +1165,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -1072,8 +1181,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
 			OtpConfigGeneration: 3,
 		}, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&record.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(true, nil)
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
@@ -1095,7 +1202,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1111,6 +1223,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1130,11 +1243,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// false, because enrollment claims before the enable write and otp_enabled is
 		// still off at that point (#111 decision 10). Matched exactly for the reason the
@@ -1226,7 +1334,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1242,6 +1355,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1261,11 +1375,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// The claim succeeds and the enable write then fails, which is the ordering §4
 		// asks for: a burned code and a retry beats OTP left enabled on a refused request.
@@ -1304,7 +1413,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1320,6 +1434,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1334,9 +1449,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		user := &record.User{Id: 1, Enabled: true, OTPEnabled: false}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil)
@@ -1376,7 +1488,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1392,6 +1509,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1470,7 +1588,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1486,6 +1609,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		// The seed is on the ceremony rather than on the user row, which is what makes this
@@ -1563,7 +1687,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1579,6 +1708,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1597,11 +1727,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// A database fault must surface as a 500 rather than being collapsed into either
 		// answer: "not consumed" would refuse valid codes for the duration of the fault,
@@ -1626,7 +1751,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:  pageRenderer,
+			ceremonyStore: ceremonyStore,
+			database:      database,
+			auditLogger:   auditLogger,
+		})
 
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "TestApp",
@@ -1642,6 +1772,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1713,8 +1844,12 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
-				testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+			handler := buildAuthOtpPost(authOtpPostDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   auditLogger,
+			})
 
 			key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 			require.NoError(t, err)
@@ -1726,6 +1861,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			form.Add("otp", otpCode)
 			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, tc.locale))
 			rr := httptest.NewRecorder()
 
@@ -1740,8 +1876,6 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 
 			user := &record.User{Id: 1, Enabled: true, OTPEnabled: false, OtpConfigGeneration: 3}
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-				Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 				Return(true, nil)
 
@@ -1788,8 +1922,12 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, noCredentialFailures{},
-		testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+	handler := buildAuthOtpPost(authOtpPostDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	})
 
 	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
 	require.NoError(t, err)
@@ -1801,6 +1939,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 	rr := httptest.NewRecorder()
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
@@ -1813,8 +1952,6 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 
 	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
@@ -1881,8 +2018,9 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		}
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		// Only a refusal reads it, for the form it shows again; this table covers both outcomes.
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
 		// The claim follows enrolled: the enrolled half asserts an authenticator, at the
 		// generation read with it, and the enrollment half establishes one (#111 decision 10,
 		// #471 decision 3).
@@ -1898,7 +2036,13 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			template, mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(ceremonyStore)
-		handler := HandleAuthOtpPost(pageRenderer, ceremonyStore, database, auditLogger, rateLimiter, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+		handler := buildAuthOtpPost(authOtpPostDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			database:           database,
+			auditLogger:        auditLogger,
+			credentialFailures: rateLimiter,
+		})
 		return rateLimiter.LimitOtp(handler), authContext
 	}
 
@@ -1908,6 +2052,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		form.Add("otp", code)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 		req.RemoteAddr = "203.0.113.7:5000"
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)

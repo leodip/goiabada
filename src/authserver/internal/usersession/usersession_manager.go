@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -14,11 +13,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/hashutil"
 )
 
 // userSessionManagerDatabase is what the session manager needs: the session row and the clients
@@ -38,45 +36,26 @@ type userSessionManagerDatabase interface {
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
-// sessionCleanupTimeout bounds the compensating delete once abandonUserSession has detached it
-// from the caller's cancellation. Ten seconds, matching every other bounded wait on a dependency
-// in this repository's request path rather than introducing a value nobody chose against the
-// others.
+// sessionCleanupTimeout bounds AbandonUserSession's delete once it is detached from the caller's
+// cancellation. Ten seconds, this repository's one value for a bounded wait on a dependency in the
+// request path.
 const sessionCleanupTimeout = 10 * time.Second
 
-// userSessionStore is what the manager calls on the browser session store. A rotation is in it,
-// so a store that cannot rotate does not compile here, where it used to fall back to a plain save
-// that bound the new user session to the identifier the browser arrived with (#431). It is the
-// conditional rotation, which only sessionstore.ConditionalStore has, so the new user session is
-// bound only to a browser session that still holds the ceremony completing (#579).
-type userSessionStore interface {
-	Get(r *http.Request, name string) (*sessionstore.Session, error)
-	ChangeAndRegenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session,
-		change func(values map[string]any) error) error
-}
-
-// Manager creates, bumps and judges the user sessions a browser signs in to.
+// Manager creates, bumps and judges the user sessions a browser signs in to. It touches no HTTP:
+// the browser session the new session is bound to, and the device cookie, are written by the
+// caller (authflow.Completion, through the handler's per-request adapter).
 type Manager struct {
-	sessionStore userSessionStore
-	sessionName  string
-	database     userSessionManagerDatabase
-	// secureCookies is whether the auth server's base URL is https, which gives the device cookie
-	// its __Host- prefix and Secure, as it gives them to the session cookie.
-	secureCookies bool
+	database userSessionManagerDatabase
 	// now is the clock HasValidUserSession judges a session against, a field so a test can fix
 	// it, as sessionbackend's is.
 	now func() time.Time
 }
 
-// NewManager builds the manager. secureCookies is whether the auth server's base URL is https.
-func NewManager(sessionStore userSessionStore, sessionName string, database userSessionManagerDatabase,
-	secureCookies bool) *Manager {
+// NewManager builds the manager over the database.
+func NewManager(database userSessionManagerDatabase) *Manager {
 	return &Manager{
-		sessionStore:  sessionStore,
-		sessionName:   sessionName,
-		database:      database,
-		secureCookies: secureCookies,
-		now:           func() time.Time { return time.Now().UTC() },
+		database: database,
+		now:      func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -116,13 +95,6 @@ type Authentication struct {
 	// reached since the adoption is not one this ceremony may still write, however many of
 	// its methods it merges back (#538). Nil on every bind that adopted no session.
 	AdoptedAuthTime *time.Time
-	// BrowserSessionCondition is what StartNewUserSession's rotation of the browser session is
-	// written on, applied to the session's values as a fresh read finds them: the ceremony this
-	// sign-in completes must still be the one the browser holds (ceremony.Held). An error from it
-	// refuses the rotation, and the new user session is abandoned as a failed rotation abandons it
-	// (#579 decision 4). StartNewUserSession refuses nil before anything is written. The binds
-	// write no browser session and ignore it.
-	BrowserSessionCondition func(values map[string]any) error
 }
 
 // ErrStaleAuthentication is returned by a bind that refused to write onto a session a newer
@@ -150,7 +122,31 @@ type Removal struct {
 	Reason  string
 }
 
-// StartNewUserSession creates a session for a completed authentication ceremony.
+// Device is the browser a sign-in starts a session on, as the HTTP side read it: the device cookie
+// and the request's headers (#564 decision 4).
+type Device struct {
+	// Identifier is the device cookie's value, or a new one the caller minted. The session stores its
+	// digest, never the value, and the same-device sweep compares digests.
+	Identifier string
+	// New is whether Identifier was minted for this sign-in, the browser presenting no device cookie
+	// or one that does not parse. No earlier session can carry a new identifier, so the same-device
+	// sweep matches nothing for it.
+	New bool
+	// Name, Type and OS are the display labels (useragent.Labels), shown to the user and never
+	// compared (#281).
+	Name string
+	Type string
+	OS   string
+	// UserAgent is the raw User-Agent header, stored for display and bounded to the column's width
+	// here (useragent.BoundRaw).
+	UserAgent string
+}
+
+// StartNewUserSession creates a session for a completed authentication ceremony, in one
+// transaction, and answers it. It writes nothing outside the database: binding the new session to
+// the browser session (a conditional rotation of its identifier) and the device cookie are the
+// caller's, after this returns, and a caller whose binding fails deletes the new row through
+// AbandonUserSession.
 //
 // authStateGeneration comes from the AuthContext, so it is the generation the ceremony
 // authenticated under rather than the user's current value. A ceremony that began before
@@ -164,53 +160,36 @@ type Removal struct {
 // fail-closed direction and the only one a nil can safely take (#242).
 //
 // authentication.AuthTime is the instant this ceremony's last credential was accepted, captured by
-// the password handler and overwritten by the OTP handler. It becomes the session's AuthTime
-// and so the auth_time claim, which OIDC Core 3.1.2.1 makes max_age's reference point: "the
-// last time the End-User was actively authenticated by the OP". Reading the clock here
-// instead would name the moment this function ran, and the browser owns the hop between the
-// two -- a tab left sitting after the password was accepted and resumed hours later would
-// mint a session claiming the user had just authenticated, so a relying party asking for a
-// fresh sign-in with max_age would be told it got one (#252 decision 8). Started and
-// LastAccessed stay on now: they measure the session's own life, not the credential's.
-// Nil or zero is refused, before anything is written: a session with no credential instant
-// has nothing true to put in auth_time, and falling back to now would recreate the false
-// freshness this parameter exists to remove, one broken caller away. The one caller cannot
-// produce it, because /auth/completed refuses to mint a session without Level1AuthCompleted
-// and only the password handler sets that, alongside AuthenticatedAt; the refusal is what
-// makes that invariant fail closed rather than an argument in a comment.
-// authentication.PasswordAuthTime is refused alike: it is what a removal of the authenticator
-// lowers auth_time to (#542), and the same handler sets it. authentication.OTPClaim is checked on
-// the user under the user's row lock, first in the transaction, so a session is never created
-// claiming a code from an authenticator a removal took away meanwhile (otpcredential.OTPClaim.Recheck).
-// authentication.BrowserSessionCondition is what the rotation binding the new session to the browser
-// session is written on, and is refused alike when nil; a rotation it refuses abandons the new
-// session, as any failed rotation does (#579 decision 4).
+// authflow.PasswordSubmission and overwritten by authflow.OTPSubmission. It becomes the session's
+// AuthTime and so the auth_time claim, which OIDC Core 1.0 section 3.1.2.1 makes max_age's reference
+// point: "the last time the End-User was actively authenticated by the OP". The browser owns the
+// hops between the credential and this call, so the clock read here would be no such instant
+// (#252 decision 8). Started and LastAccessed stay on now: they measure the session's own life.
+// Nil or zero is refused before anything is written, never replaced by now. So is a nil or zero
+// authentication.PasswordAuthTime, what a removal of the authenticator lowers auth_time to (#542).
+// authentication.OTPClaim is checked on the user under the user's row lock, first in the
+// transaction, so a session is never created claiming a code from an authenticator a removal took
+// away meanwhile (otpcredential.OTPClaim.Recheck).
 //
-// ipAddress is the browser's address as the caller read it, and becomes the session's one
-// recorded address. The device is the browser's device cookie, which this function reads, records
-// on the session by its digest and writes back on success, minting one when the browser presents
-// none (#564 decision 4); the sweep deletes the user's other sessions recorded with the same one.
-// replacing is the session this sign-in replaces for the same user, the one the
-// browser's cookie named, or nil; it is deleted with the same-device sweep's rows, and every row
-// removed is returned with its reason so the caller can audit each. A replaced session's refresh tokens that are
-// bound to it stop, as they do when it expires, and its offline grants survive: a re-login
-// replaces a session and revokes nothing (#133, #243). A session of another user is not this
-// function's to end: the cross-user handover terminates it with revocation first and passes nil.
+// device is the browser, recorded on the session by its identifier's digest and its labels, and
+// refused when it has no identifier, whose digest every such browser would share. ipAddress is the
+// browser's address as the caller read it, the session's one recorded address.
 //
-// limits is the settings' bounds on the user's sessions. When the user would hold more than
-// limits.MaxSessionsPerUser once the new session exists, the same transaction deletes as many of
-// their other sessions as it takes, after the two removals above, and reports each with the reason
-// session_cap; sessionsOverCap says which. Those are deletions as the sweep's are, so their normal
-// refresh tokens stop and their offline grants survive (#564 decision 5).
+// The transaction deletes, besides creating the row:
+//   - replacing, the session this sign-in replaces for the same user (the one the browser's cookie
+//     named), or nil. A session of another user is refused: the cross-user handover terminates it
+//     with revocation first and passes nil. A re-login replaces a session and revokes nothing: the
+//     replaced session's bound refresh tokens stop, its offline grants survive (#133, #243).
+//   - the user's other sessions recorded with the same device identifier.
+//   - when the user would hold more than limits.MaxSessionsPerUser sessions with the new one, as
+//     many of their other sessions as it takes (sessionsOverCap), reported as session_cap (#564
+//     decision 5).
 //
-// The removals come back only when their deletion committed: with the session on success, and
-// alongside the error when the browser session write after the commit fails, since the rows are
-// gone either way and each is owed its audit event. Every other failure rolled them back and
-// returns none.
-func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
-	clientId int64, authentication Authentication,
-	authStateGeneration int64, otpConfigGeneration *int64,
-	ipAddress string, replacing *record.UserSession, limits SessionLimits) (*record.UserSession, []Removal, error) {
+// Every row removed comes back with its reason, so the caller can audit each, and only when the
+// transaction committed: every failure rolled them back.
+func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authentication Authentication,
+	authStateGeneration int64, otpConfigGeneration *int64, device Device, ipAddress string,
+	replacing *record.UserSession, limits SessionLimits) (*record.UserSession, []Removal, error) {
 
 	userId := authentication.UserId
 	if authentication.AuthTime == nil || authentication.AuthTime.IsZero() {
@@ -219,14 +198,13 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	if authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero() {
 		return nil, nil, errs.New("no password instant captured; refusing to mint a session whose password_auth_time would be invented")
 	}
-	if authentication.BrowserSessionCondition == nil {
-		return nil, nil, errs.New("no browser session condition given; refusing to bind a session to whatever the browser session holds")
+	if device.Identifier == "" {
+		return nil, nil, errs.New("no device identifier given; refusing to record a device every such browser would share")
 	}
 	if replacing != nil && replacing.UserId != userId {
 		return nil, nil, errs.Errorf("refusing to replace user session %v: it belongs to user %v, not %v",
 			replacing.Id, replacing.UserId, userId)
 	}
-	authTime := authentication.AuthTime.UTC()
 
 	utcNow := time.Now().UTC()
 
@@ -235,19 +213,8 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		observedOtpConfigGeneration = *otpConfigGeneration
 	}
 
-	// One parse of the request for all three display labels. They are derived from the
-	// Sec-CH-UA* Client Hints when the browser sends them and from the User-Agent otherwise,
-	// and nothing below reads them back, nor the raw header or the address: the sweep keys on
-	// the device identifier (#281, #564 decision 4).
-	deviceName, deviceType, deviceOS := useragent.Labels(r)
-
-	// The browser's device identifier, or a new one, drawn before the transaction so a rerun
-	// sweeps on the same value. The session stores its digest, never the value.
-	device, err := u.browserDevice(r)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	// The identifier is minted here, outside the transaction, so a rerun excludes the same row from
+	// the sweep.
 	userSession := &record.UserSession{
 		SessionIdentifier: uuid.New(),
 		Started:           utcNow,
@@ -255,14 +222,14 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		IpAddress:         ipAddress,
 		AuthMethods:       authentication.AuthMethods,
 		AcrLevel:          authentication.AcrLevel,
-		AuthTime:          authTime,
+		AuthTime:          authentication.AuthTime.UTC(),
 		PasswordAuthTime:  authentication.PasswordAuthTime.UTC(),
 		UserId:            userId,
-		DeviceName:        deviceName,
-		DeviceType:        deviceType,
-		DeviceOS:          deviceOS,
-		UserAgent:         useragent.BoundRaw(r.UserAgent()),
-		DeviceId:          deviceDigest(device),
+		DeviceName:        device.Name,
+		DeviceType:        device.Type,
+		DeviceOS:          device.OS,
+		UserAgent:         useragent.BoundRaw(device.UserAgent),
+		DeviceId:          deviceDigest(device.Identifier),
 
 		AuthStateGeneration: authStateGeneration,
 		OtpConfigGeneration: observedOtpConfigGeneration,
@@ -274,76 +241,41 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		ClientId:     clientId,
 	})
 
-	// The browser session is read before anything is written. It is a memoised per-request read
-	// that /auth/completed has already resolved by this point, so it consults no backend and
-	// writes nothing here; taking it first is what makes an unreadable cookie a refusal with an
-	// empty database rather than one leaving a session row behind (#198).
-	sess, err := u.sessionStore.Get(r, u.sessionName)
-	if err != nil {
-		return nil, nil, errs.Wrap(err, "unable to get the session")
-	}
-
-	// The session row, its client associations, the read of this user's other sessions and the
-	// same-device sweep below are one transaction, opened through RunInTransaction so a deadlock
-	// reruns the body (#301). The body is safe to rerun: the id CreateUserSession assigns is
-	// reassigned by the next attempt, the association loop ranges by value, so nothing an attempt
-	// wrote onto a copy is read by the attempt after it, and the identifier the sweep excludes
-	// itself by is minted above rather than inside, so it survives a rerun. A rolled-back attempt
-	// undoes its own deletions and the attempt after it re-reads, which is why the rows it removed
-	// are collected into a fresh slice on every attempt and copied out only once RunInTransaction
-	// has answered nil: an aborted attempt's deletions never happened, and an attempt that deletes
-	// a different set from the one before it reports its own.
-	//
-	// The sweep is in here rather than after the commit because a failure between the two left a
-	// committed session row that no cookie named, sometimes having already deleted the session the
-	// browser did have (#198). Only the browser-store write below is left after the commit, and it
-	// is compensated rather than prevented: see abandonUserSession.
+	// One transaction, opened through RunInTransaction, which reruns the body after a deadlock
+	// abort (#301). Each attempt collects its removals afresh and they are copied out only once the
+	// transaction answered nil, so an aborted attempt's deletions, which never happened, are not
+	// reported (#198).
 	var removed []Removal
-	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+	err := u.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var removedThisAttempt []Removal
 
-		if claimErr := authentication.OTPClaim.Recheck(r.Context(), u.database, tx, userId); claimErr != nil {
+		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, userId); claimErr != nil {
 			return claimErr
 		}
 
-		if createUserSessionErr := u.database.CreateUserSession(r.Context(), tx, userSession); createUserSessionErr != nil {
+		if createUserSessionErr := u.database.CreateUserSession(ctx, tx, userSession); createUserSessionErr != nil {
 			return createUserSessionErr
 		}
 
-		// The associations belong to the session row created just above, whose id no other caller
-		// holds, so this insert cannot lose the (session, client) key to a concurrent one and needs
-		// no rerun on it. Only a bump, which writes to a session that already exists, can (#249).
+		// The association belongs to the row created just above, whose id no other caller holds, so
+		// it cannot lose the (session, client) key to a concurrent insert (#249).
 		for _, client := range userSession.Clients {
 			client.UserSessionId = userSession.Id
-			if createUserSessionClientErr := u.database.CreateUserSessionClient(r.Context(), tx, &client); createUserSessionClientErr != nil {
+			if createUserSessionClientErr := u.database.CreateUserSessionClient(ctx, tx, &client); createUserSessionClientErr != nil {
 				return createUserSessionClientErr
 			}
 		}
 
-		allUserSessions, getUserSessionsErr := u.database.GetUserSessionsByUserId(r.Context(), tx, userId)
+		allUserSessions, getUserSessionsErr := u.database.GetUserSessionsByUserId(ctx, tx, userId)
 		if getUserSessionsErr != nil {
 			return getUserSessionsErr
 		}
 
-		// Delete this user's other sessions from the same device: the same device identifier,
-		// compared by its digest. The User-Agent header and the address are recorded and no longer
-		// compared: two windows of one browser, two profiles, and two machines behind one router on
-		// one browser version all send the same pair, so the pair ended the sessions of browsers
-		// that had nothing to do with this sign-in (#564 decision 4). The display labels were never
-		// the key either (#281).
-		//
-		// A session stored before the upgrade has an empty identifier, which matches nothing, so it
-		// expires on its own by idle timeout or max lifetime; so does the session of a browser whose
-		// cookies were cleared, since it comes back as a new device. Both fail in the safe
-		// direction, keeping a session rather than ending another browser's.
-		//
-		// replacing is the other reason a row goes: the session this browser's cookie named, which
-		// this sign-in supersedes wherever it was last seen. Without it a max_age or prompt=login
-		// sign-in from a new address left the old session behind, still listed and still bumped by
-		// its refresh tokens, with no browser able to reach it (#243). It is matched in this read
-		// rather than deleted blindly, so a row already gone is not reported as one this sign-in
-		// removed, and a row that is both replacing and a sweep match is removed and reported once,
-		// as the one replaced (#564 decision 7).
+		// The same device is the same device identifier, compared by its digest; the User-Agent and
+		// the address are recorded and never compared, since two browsers can send the same pair
+		// (#564 decision 4). An empty stored identifier matches nothing. replacing is matched in this
+		// read rather than deleted blindly, so a row already gone is not reported, and a row both
+		// replaced and on this device is removed and reported once, as replaced (#564 decision 7).
 		var kept []record.UserSession
 		for _, us := range allUserSessions {
 			if us.SessionIdentifier == userSession.SessionIdentifier {
@@ -353,23 +285,22 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 			switch {
 			case replacing != nil && us.Id == replacing.Id:
 				reason = audit.DeletedUserSessionReplacedBySignIn
-			case us.DeviceId != "" && us.DeviceId == userSession.DeviceId:
+			case !device.New && us.DeviceId != "" && us.DeviceId == userSession.DeviceId:
 				reason = audit.DeletedUserSessionSameDevice
 			default:
 				kept = append(kept, us)
 				continue
 			}
-			if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
+			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.Id); deleteUserSessionErr != nil {
 				return deleteUserSessionErr
 			}
 			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: reason})
 		}
 
-		// The per-user cap counts what the two rules above left, and the new session (#564 decision
-		// 5). The other sessions it ends are chosen by sessionsOverCap, never the new one, which is
-		// not among kept.
+		// The cap counts what the two rules above left, and the new session, which is not among kept
+		// and so is never chosen (#564 decision 5).
 		for _, us := range sessionsOverCap(kept, utcNow, limits) {
-			if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
+			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.Id); deleteUserSessionErr != nil {
 				return deleteUserSessionErr
 			}
 			removedThisAttempt = append(removedThisAttempt, Removal{Session: us, Reason: audit.DeletedUserSessionSessionCap})
@@ -378,66 +309,13 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		return nil
 	})
 	if err != nil {
-		// ceiling: this cannot always tell whether the commit happened. RunInTransaction's
-		// contract says a commit that fails for a reason the engine did not declare may have
-		// landed anyway, in which case the ceremony answers an error over a row that exists and
-		// no cookie names -- #198's shape, arriving through the helper rather than through a
-		// step of this ceremony.
-		//
-		// Nothing here can close it, and a compensating read is not the answer: a read that
-		// finds no row is not proof the commit rolled back, because the commit may still be
-		// completing while it runs. What bounds the window is the background worker's idle
-		// sweep, which removes the row at the configured idle timeout. So the cost is an entry
-		// in the admin console's session list until then, with nothing ever issued against it.
-		// The same unknown decides the removals: none is reported here, so a commit that landed
-		// anyway leaves the rows it swept gone without their audit events, where reporting them
-		// would audit deletions that may have rolled back.
-		// Revisit only if the row ever becomes reachable by something other than the cookie.
+		// ceiling: RunInTransaction cannot always tell whether a failed commit landed. When it did,
+		// the row exists with no cookie naming it until the background worker's idle sweep removes
+		// it, and the rows it swept are gone without their audit events; reporting them here would
+		// audit deletions that may have rolled back. Revisit if the row ever becomes reachable by
+		// something other than the cookie (#198).
 		return nil, nil, err
 	}
-
-	// The browser session's identifier is replaced as the user session is bound to it, so
-	// no identifier that existed before this ceremony can name the session the ceremony
-	// produced.
-	//
-	// This is the property a cookie store gave for free and a server-side one has to add.
-	// A cookie store is structurally immune to session fixation because the cookie IS the
-	// state: an attacker's planted copy stays the attacker's own stale state. A row is
-	// not, because a planted identifier names a row the victim's sign-in then fills in,
-	// and the attacker is signed in as the victim. Rotating here is what puts that
-	// immunity back, and it covers a different user signing in on the same browser for
-	// free, being the same code path (#266).
-	//
-	// The identifier is written into the session as part of the rotation rather than after
-	// it so that the whole sign-in reaches the browser as one Set-Cookie carrying the
-	// authenticated expiry. Nothing is persisted under the new identifier until the
-	// rotation runs, and the row it deletes never held the identifier, so the ordering
-	// changes no outcome an attacker could use.
-	//
-	// The rotation is conditional (#579 decision 4). It reads the browser session afresh, asks
-	// the caller's condition of what it found, that the ceremony completing is still the one the
-	// browser holds, and builds the new row from that read with only the identifier added,
-	// removing the old row on condition nothing wrote it in between. A rotation from the
-	// request's own copy put a ceremony another tab's /auth/authorize had replaced back over the
-	// newer one. A refusal, or a session gone since (sessionstore.ErrNotFound, which is not
-	// re-created), writes nothing to the browser session and is answered as a failed rotation.
-	//
-	// A failure here comes after the commit, so the rows the sweep removed are gone whatever
-	// abandonUserSession manages, and they go back to the caller beside the error to be audited.
-	regenerateErr := u.sessionStore.ChangeAndRegenerate(w, r, sess, func(values map[string]any) error {
-		if err := authentication.BrowserSessionCondition(values); err != nil {
-			return err
-		}
-		values[sessionkeys.SessionIdentifier] = userSession.SessionIdentifier
-		return nil
-	})
-	if regenerateErr != nil {
-		return nil, removed, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
-	}
-
-	// The device cookie is written only once the session it was recorded on is the browser's, and
-	// on every such sign-in, so a browser keeps its identifier for 400 days past its last one.
-	u.writeDeviceCookie(w, device)
 
 	return userSession, removed, nil
 }
@@ -484,35 +362,24 @@ func sessionsOverCap(others []record.UserSession, now time.Time, limits SessionL
 	return candidates[:excess]
 }
 
-// abandonUserSession deletes the session row the transaction above committed, after the browser
-// store write that was to bind it to a cookie failed, and returns cause unchanged: the ceremony
-// failed for that reason and the caller must be told that one, not what this cleanup did.
+// AbandonUserSession deletes userSession, which StartNewUserSession committed, when binding it to
+// the browser session failed, and returns cause unchanged: the ceremony failed for that reason and
+// the caller must be told that one, not what this cleanup did. A cleanup that fails in turn is
+// joined onto cause, so errors.Is still finds the original and the record says the row survived.
 //
-// It is the compensation for the single step that cannot join the transaction. RunInTransaction
-// reruns its body when the engine aborts it as a deadlock victim, and a rerun of the rotation
-// would write Set-Cookie twice, so the browser-store write stays after the commit. Without
-// this, the row stayed: no browser held a cookie naming it, nothing was ever issued against it,
-// and it sat in the admin console's session list until its own idle timeout expired (#198).
+// The binding cannot join StartNewUserSession's transaction: RunInTransaction reruns its body after
+// a deadlock abort, and a rerun of the rotation would write Set-Cookie twice. So it runs after the
+// commit and is compensated here. Without this the row stayed, named by no cookie, in the admin
+// console's session list until its idle timeout (#198).
 //
-// A cleanup that fails in turn is joined onto cause rather than replacing it, so errors.Is still
-// finds the original and the record still says the row survived.
+// The delete runs on ctx's values but not its cancellation, because a disconnected client is both
+// what cancels the request's context and why a browser-session write fails; it keeps the request id
+// on its records, and is bounded by sessionCleanupTimeout since nothing else stops it (#386).
 //
-// ceiling: the same-device sweep commits with the row, so undoing the row here cannot bring back
-// the sessions it superseded, and a user whose cookie write fails is left with neither the session
-// this ceremony created nor the one it replaced -- they sign in again. Closing that needs the
-// browser-store write staged inside the transaction, which it cannot be while a rerun can double
-// the Set-Cookie. Revisit if the store gains a two-phase write that can be prepared before the
-// commit and completed after it (#198).
-func (u *Manager) abandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error {
-	// The caller's VALUES, deliberately not the caller's cancellation, because the cancellation
-	// and the failure this compensates for are the same event: net/http cancels a request's
-	// context the instant the client disconnects, and a disconnected client is exactly why a
-	// browser-store write fails. Inheriting it would abandon the delete in the one case the
-	// compensation exists for, leaving #198's orphan behind and reporting nothing but the
-	// rotation error. WithoutCancel rather than a fresh root so the delete's own record still
-	// carries the request id, bounded because a detached context has no other stop signal and
-	// ten seconds is this repository's one value for a bounded wait on a dependency
-	// (#386 decision 6, and final review round 1 finding 9).
+// ceiling: the rows StartNewUserSession swept committed with the new one, so a user whose binding
+// fails is left with neither the session this ceremony created nor the ones it replaced, and signs
+// in again. Revisit if the browser session store gains a two-phase write (#198).
+func (u *Manager) AbandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sessionCleanupTimeout)
 	defer cancel()
 
@@ -521,6 +388,12 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *record.Us
 			"unable to delete the user session left behind by a failed browser session write"))
 	}
 	return cause
+}
+
+// deviceDigest is what a session stores of a device identifier: its SHA-256, so a database read
+// does not hand out a value a browser could present.
+func deviceDigest(identifier string) string {
+	return hashutil.HashString(identifier)
 }
 
 // BumpUserSession updates an existing session's last accessed time and client list.
@@ -605,10 +478,9 @@ func (u *Manager) BindUserSession(ctx context.Context, sessionIdentifier string,
 // refuse a bind of authentication (#538). It locks nothing and writes nothing, and a session that is
 // gone is not stale here: the bind answers that itself.
 //
-// /auth/completed asks it before rotating the browser session's identifier, because the rotation
-// writes the request's own copy of the browser session, read when the request began, over whatever
-// a newer ceremony saved there since, and a ceremony this would refuse must not do that. The bind
-// asks again under the row lock, for a sign-in that lands between the two.
+// /auth/completed's reuse arm asks it before it rotates the browser session's identifier, so a
+// ceremony the bind would refuse rotates nothing. The bind asks again under the row lock, for a
+// sign-in that lands between the two.
 func (u *Manager) AuthenticationIsStale(ctx context.Context, sessionIdentifier string,
 	authentication Authentication) (bool, error) {
 	userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
@@ -808,7 +680,7 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 // holds what the engine kept of the same instant, so a ceremony's own instant and the row it wrote
 // differ below a microsecond, in either direction when an engine rounds rather than truncates.
 //
-// The instants the password and OTP handlers stamp come from the auth server instance's clock, so
+// The instants authflow.PasswordSubmission and authflow.OTPSubmission stamp come from the auth server instance's clock, so
 // the first comparison assumes the instances of one deployment share a synchronized clock, as NTP
 // keeps them. A host minutes adrift can refuse a genuinely later sign-in, and the user's next
 // sign-in that enters a credential is stamped by the same slow clock, so it can be refused again

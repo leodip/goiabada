@@ -9,9 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -30,6 +29,68 @@ func isErrNoSettings(err error) bool {
 	return errors.Is(err, reqctx.ErrNoSettings)
 }
 
+// The authorization endpoint reads its settings before its parameters, so a request reached without
+// them answers the 500 page carrying reqctx.ErrNoSettings and reads nothing else: not a parked
+// request a handle names, not the validator, and no refusal page for a request that does not parse
+// (#580 decision 5).
+func TestMissingSettings_TheAuthorizationEndpointAnswersBeforeReadingItsRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"a request naming a parked request", "request_handle=" + strings.Repeat("A", 43)},
+		{"a request that does not parse", "client_id=test-client&state=%zz"},
+		{"a well-formed request", validAuthorizeQuery},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newAuthorizeEndpoint(t)
+			req := httptest.NewRequest(http.MethodGet, "/auth/authorize?"+tc.query, nil)
+			rr := httptest.NewRecorder()
+			e.pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+
+			e.handler.ServeHTTP(rr, req)
+
+			e.pageRenderer.AssertExpectations(t)
+			e.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything)
+			e.database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			e.validator.AssertNotCalled(t, "ValidateClientAndRedirectURI", mock.Anything, mock.Anything)
+			e.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			e.ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// A POST to the authorization endpoint reads its settings before its parameters too, so a request
+// reached without them answers the 500 page carrying reqctx.ErrNoSettings with nothing validated or
+// parked, and no refusal page for a body that does not parse (#580 decision 5).
+func TestMissingSettings_TheAuthorizationEndpointPostAnswersBeforeReadingItsRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"a body that does not parse", "client_id=test-client&state=%zz"},
+		{"a well-formed body", validAuthorizeQuery},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newAuthorizePostEndpoint(t)
+			req := httptest.NewRequest(http.MethodPost, "/auth/authorize", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+			e.pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+
+			e.handler.ServeHTTP(rr, req)
+
+			e.pageRenderer.AssertExpectations(t)
+			e.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+				mock.Anything, mock.Anything)
+			e.validator.AssertNotCalled(t, "ValidateClientAndRedirectURI", mock.Anything, mock.Anything)
+			e.database.AssertNotCalled(t, "CreateAuthorizeRequest", mock.Anything, mock.Anything, mock.Anything)
+			assert.Empty(t, rr.Header().Get("Location"))
+		})
+	}
+}
+
 // A browser page answers the 500 page through PageRenderer.
 func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -39,18 +100,65 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
 	rr := httptest.NewRecorder()
 
-	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
-		AuthState:  ceremony.AuthStateLevel1Password,
-		ClientId:   "test-client",
-	}, nil)
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	HandleAuthPwdGet(pageRenderer, ceremonyStore, database, auditLogger, testAdminConsoleBaseURL).ServeHTTP(rr, req)
+	buildAuthPwdGet(authPwdGetDeps{
+		pageRenderer:  pageRenderer,
+		ceremonyStore: ceremonyStore,
+		database:      database,
+		auditLogger:   auditLogger,
+	}).ServeHTTP(rr, req)
 
 	pageRenderer.AssertExpectations(t)
+	ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
 	database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// The routing hops read their settings through the route boundary before anything else, so a hop
+// reached without them answers the 500 page carrying reqctx.ErrNoSettings and never reads its
+// ceremony: no load, no save, no database read (#580 decision 5).
+func TestMissingSettings_TheRoutingHopsAnswerBeforeReadingTheirCeremony(t *testing.T) {
+	for _, hop := range []struct {
+		name  string
+		path  string
+		build func(t *testing.T, pageRenderer *handlersmocks.PageRenderer, ceremonyStore *handlersmocks.CeremonyStore,
+			database *datamocks.Database) http.Handler
+	}{
+		{"level1", "/auth/level1", func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			_ *datamocks.Database) http.Handler {
+			return buildAuthLevel1Get(authLevel1GetDeps{pageRenderer: pr, ceremonyStore: cs,
+				auditLogger: handlersmocks.NewAuditLogger(t)})
+		}},
+		{"level1completed", "/auth/level1completed", func(t *testing.T, pr *handlersmocks.PageRenderer,
+			cs *handlersmocks.CeremonyStore, db *datamocks.Database) http.Handler {
+			return buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{pageRenderer: pr, ceremonyStore: cs,
+				userSessionManager: handlersmocks.NewUserSessionManager(t), database: db,
+				auditLogger: handlersmocks.NewAuditLogger(t)})
+		}},
+		{"level2", "/auth/level2", func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			db *datamocks.Database) http.Handler {
+			return buildAuthLevel2Get(authLevel2GetDeps{pageRenderer: pr, ceremonyStore: cs, database: db,
+				auditLogger: handlersmocks.NewAuditLogger(t)})
+		}},
+	} {
+		t.Run(hop.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+
+			req := httptest.NewRequest(http.MethodGet, hop.path+"?ceremony="+testCeremonyId, nil)
+			rr := httptest.NewRecorder()
+			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
+
+			hop.build(t, pageRenderer, ceremonyStore, database).ServeHTTP(rr, req)
+
+			pageRenderer.AssertExpectations(t)
+			ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
+			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }
 
 // The token endpoint answers its 500 through the JSON writer, RFC 6749 section 5.2's shape, as

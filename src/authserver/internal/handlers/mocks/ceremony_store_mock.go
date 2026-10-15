@@ -360,6 +360,75 @@ func (_c *CeremonyStore_RegenerateSession_Call) RunAndReturn(run func(w http.Res
 	return _c
 }
 
+// RegenerateSessionAndBind provides a mock function for the type CeremonyStore
+func (_mock *CeremonyStore) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error {
+	ret := _mock.Called(w, r, ceremonyId, userSessionIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RegenerateSessionAndBind")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, string) error); ok {
+		r0 = returnFunc(w, r, ceremonyId, userSessionIdentifier)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// CeremonyStore_RegenerateSessionAndBind_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegenerateSessionAndBind'
+type CeremonyStore_RegenerateSessionAndBind_Call struct {
+	*mock.Call
+}
+
+// RegenerateSessionAndBind is a helper method to define mock.On call
+//   - w http.ResponseWriter
+//   - r *http.Request
+//   - ceremonyId string
+//   - userSessionIdentifier string
+func (_e *CeremonyStore_Expecter) RegenerateSessionAndBind(w any, r any, ceremonyId any, userSessionIdentifier any) *CeremonyStore_RegenerateSessionAndBind_Call {
+	return &CeremonyStore_RegenerateSessionAndBind_Call{Call: _e.mock.On("RegenerateSessionAndBind", w, r, ceremonyId, userSessionIdentifier)}
+}
+
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string)) *CeremonyStore_RegenerateSessionAndBind_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 http.ResponseWriter
+		if args[0] != nil {
+			arg0 = args[0].(http.ResponseWriter)
+		}
+		var arg1 *http.Request
+		if args[1] != nil {
+			arg1 = args[1].(*http.Request)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Return(err error) *CeremonyStore_RegenerateSessionAndBind_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error) *CeremonyStore_RegenerateSessionAndBind_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReplaceAuthContext provides a mock function for the type CeremonyStore
 func (_mock *CeremonyStore) ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error {
 	ret := _mock.Called(w, r, authContext)

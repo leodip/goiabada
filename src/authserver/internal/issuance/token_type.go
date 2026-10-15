@@ -26,3 +26,17 @@ func (tt TokenType) String() string {
 	}
 	return []string{"ID", "Bearer", "Refresh", "Offline"}[tt]
 }
+
+// IsNotIDTokenTyp reports whether typ is the typ claim of a token this server issues that is not an
+// ID Token: an access token's Bearer, or a refresh token's Refresh or Offline. The ID Token carries
+// no typ at all, and neither does the short-lived hint the account logout mints, so an
+// id_token_hint carrying one of these is no ID Token, which /auth/authorize and logout both refuse
+// (#401). It is a denylist rather than a requirement that typ be "ID" for exactly that reason:
+// requiring it would refuse every real hint.
+func IsNotIDTokenTyp(typ string) bool {
+	switch typ {
+	case TokenTypeBearer.String(), TokenTypeRefresh.String(), TokenTypeOffline.String():
+		return true
+	}
+	return false
+}

@@ -147,7 +147,7 @@ func TestBumpUserSession_WaitsForALoweringHoldingTheRow(t *testing.T) {
 	defer func() { _ = database.RollbackTransaction(ctx, tx) }()
 	require.NoError(t, database.LowerUserSessionsToPassword(ctx, tx, user.Id, "pwd"))
 
-	manager := usersession.NewManager(nil, "", other, false)
+	manager := usersession.NewManager(other)
 	bump := goBlocked(t, "the bump", tx, func(reached func()) error {
 		reached()
 		_, bumpErr := manager.BumpUserSession(ctx, session.SessionIdentifier, client.Id, "", "", "")

@@ -20,14 +20,11 @@ type responseParam struct{ name, value string }
 // component of a client's redirect URI. A registered field carrying one of them is dropped
 // by writeResponseParams whether or not the selected response emits it.
 //
-// Filtering only what a response actually emits is not enough, and the difference is
-// observable at the client's callback. A client registering "?error=stale" and completing
-// an authorization successfully received "?error=stale&code=fresh&state=...", a response
-// that says success and failure at once, and an RP that checks for "error" before reading
-// "code" (the usual order) reads it as a refusal. A client registering "?state=fixed" and
-// sending no state of its own received "?state=fixed&code=fresh", putting a state in front
-// of the client on the redirect carrying the authorization code that the client never sent
-// and cannot have bound to its user agent (#146).
+// Filtering only what a response actually emits is not enough. A client registering
+// "?error=stale" would read "?error=stale&code=fresh&state=...", success and failure at once,
+// and an RP that checks for "error" before reading "code" (the usual order) reads it as a
+// refusal. One registering "?state=fixed" and sending no state of its own would be handed a
+// state on the code redirect that it never sent and cannot have bound to its user agent (#146).
 //
 // The set is these four and not five: RFC 6749 section 4.1.2.1 also defines "error_uri",
 // but this server never emits it, so reserving it would only delete a registered field no
@@ -38,7 +35,7 @@ type responseParam struct{ name, value string }
 // Nothing in RFC 6749 forces this. Section 3.1.2 says the registered query "MUST be
 // retained when adding additional query parameters", which argues the other way; section
 // 4.1.2 says only that "The client MUST ignore unrecognized response parameters", and these
-// are recognized ones. It was settled as a judgement call in #146: the two shapes above are
+// are recognized ones. It is a judgement call (#146): the two shapes above are
 // worth more than a registered fixed value, which a client can keep by choosing a name this
 // server does not emit.
 //
@@ -74,10 +71,8 @@ func encodeResponseParams(params []responseParam) string {
 // nil, so a registered field survives there unless the response actually replaces it.
 //
 // This is the one construction in this package that writes response parameters into a
-// client's redirect URI. Every emitter goes through it, which is the point: #146 exists
-// because #109 fixed this in one place and left the other copies alone, so a second
-// implementation is the condition that produced the issue rather than duplication beside
-// it.
+// client's redirect URI, and every emitter goes through it, so the rule lives in one place
+// (#109, #146).
 //
 // Two defects it exists to prevent, both of which the obvious code has:
 //
@@ -85,7 +80,7 @@ func encodeResponseParams(params []responseParam) string {
 //     whose decoded name is one being written is dropped and the new one appended, so a
 //     client that registered "?state=fixed" reads back the state it actually sent rather
 //     than the registered one, and never both with the choice left to its parser. Adding
-//     without filtering emitted two, and Go's own url.Values.Get returns the first of
+//     without filtering would emit two, and Go's own url.Values.Get returns the first of
 //     them, which is the registered value the client never generated (#146). RFC 6749
 //     section 3.1 is explicit: "Request and response parameters MUST NOT be included more
 //     than once."
@@ -190,11 +185,13 @@ func isResponseParamName(name string, params []responseParam) bool {
 }
 
 // writeAuthorizationResponse answers the client at redirectURI with params, in responseMode:
-// "fragment", "form_post", or the query for anything else. The authorization code and the error
-// emitter both answer through it, so the three encodings are written once each (#437).
+// "fragment", "form_post", or the query for anything else. The authorization code, the implicit
+// tokens and the error emitter all answer through it, so the three encodings are written once each
+// (#437).
 //
-// Deciding whether a response may be emitted at all is the caller's: each runs gate 4, and the
-// error emitter its provenance and registration gates, above this call.
+// Deciding whether a response may be emitted at all is the caller's: each runs
+// checkRedirectURIEmittable, and the error emitter RedirectWillBeEmitted's provenance and
+// registration gates, above this call.
 func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, templateFS fs.FS,
 	responseMode string, redirectURI string, params []responseParam) error {
 
@@ -213,9 +210,8 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, template
 // any response carrying tokens, credentials or other sensitive information. A successful
 // authorization response carries an authorization code or an access token; an error carries
 // neither, and is marked all the same, so every authorization response follows one rule whatever
-// its mode and outcome. All three encodings call it: the two redirect writers below, which set
-// neither header before #573 and so left the credential in the Location of a response a cache was
-// free to store and replay, and writeFormPost.
+// its mode and outcome. All three encodings call it: the two redirect writers below, so a cache never
+// stores and replays a Location carrying the credential (#573), and writeFormPost.
 func noStoreAuthorizationResponse(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
@@ -232,8 +228,8 @@ func noStoreAuthorizationResponse(w http.ResponseWriter) {
 // refusal is itself answered through here, in the fragment, because it answers a request whose mode
 // it cannot honour. The empty string is the fragment, the default for these response types.
 //
-// One rule for the success path and the error path: both used to decide it separately, the error
-// emitter letting an explicit "query" through to the query component (#231, #437).
+// One rule for the success path and the error path, so an explicit "query" never reaches the query
+// component of either (#231, #437).
 func implicitResponseMode(requested string) string {
 	if requested == "form_post" {
 		return "form_post"
@@ -249,24 +245,20 @@ func implicitResponseMode(requested string) string {
 // registered one, is left exactly as it stands.
 func writeFragmentRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) {
 	noStoreAuthorizationResponse(w)
-	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
 	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 }
 
 // writeQueryRedirect redirects to redirectURI with params in its query component.
 //
-// writeResponseParams, not Query() then Encode(). Seeding url.Values from the registered URI's own
-// query and calling Add on top emitted two state parameters to a client that had registered
-// "?state=fixed", and Go's own url.Values.Get answers with the first, which is the registered one:
-// on the code redirect that defeats the RP's RFC 9700 2.1 CSRF check, and on an error redirect it
-// leaves that check to be made against a value the client never generated. Re-encoding also rewrote
-// the registered query in five separate ways, against RFC 6749 3.1.2's "MUST be retained". Both are
-// the shared helper's to prevent, and its comment carries the detail (#146).
+// writeResponseParams, not Query() then Encode(): seeding url.Values from the registered query and
+// adding on top would emit two state parameters to a client that registered "?state=fixed", and
+// url.Values.Get answers with the registered one, defeating the RP's RFC 9700 2.1 CSRF check;
+// re-encoding would also rewrite the registered query, against RFC 6749 3.1.2's "MUST be retained".
+// The shared helper's comment carries the detail (#146).
 //
 // authorizationResponseParamNames, so a registered "code" is dropped from an error response and a
-// registered "error" from a success response: without it a client registering "?code=stale" was
-// refused with a response carrying a code and an error at once, and one registering "?error=stale"
-// completed an authorization and read it as a refusal. It also drops a registered "?state=fixed"
+// registered "error" from a success response, and no response says success and failure at once. It
+// also drops a registered "?state=fixed"
 // when the request carried no state of its own, so the client is never handed a state it did not
 // send (#146).
 func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) error {
@@ -276,7 +268,6 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	}
 
 	noStoreAuthorizationResponse(w)
-	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 by every caller
 	http.Redirect(w, r, location, http.StatusFound)
 	return nil
 }

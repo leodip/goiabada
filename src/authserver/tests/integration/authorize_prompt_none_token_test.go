@@ -117,8 +117,8 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 //
 // Not a duplicate of TestPromptNone_ClientDefaultAcrHigher above, which reaches the same
 // interaction_required from the same client and session while sending no acr_values at all. This
-// is the only case proving the floor is applied on the silent path, where handlePromptNone reads
-// the target and decides without any UI.
+// is the only case proving the floor is applied on the silent path, where
+// authflow.SilentAuthentication reads the target and decides without any UI.
 func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	// Create session at level1
 	httpClient, _, _, _, _ := createSessionWithAcrLevel1AndPassword(t)

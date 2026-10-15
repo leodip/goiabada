@@ -28,7 +28,7 @@ import (
 // The two code and token emitters return this error and their callers answer 500, so an undelivered
 // authorization code simply expires and implicit tokens are never handed over. The error redirect
 // has somewhere better to go and treats a non-nil answer as a signal rather than a failure: it falls
-// through to the interstitial #108 built, which tells the user where the client wanted to send them.
+// through to the refusal interstitial (#108), which tells the user where the client wanted to send them.
 //
 // # What the log line carries, and what it must not
 //

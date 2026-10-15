@@ -17,9 +17,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -52,9 +53,16 @@ func newAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 		database:           datamocks.NewDatabase(t),
 		validator:          handlersmocks.NewAuthorizeValidator(t),
 	}
-	e.handler = HandleAuthorizeGet(e.pageRenderer, e.ceremonyStore, e.userSessionManager, e.database, nil,
-		e.validator, handlersmocks.NewAuditLogger(t), handlersmocks.NewPermissionChecker(t),
-		handlersmocks.NewTokenParser(t), testBaseURL)
+	e.handler = buildAuthorizeGet(authorizeGetDeps{
+		pageRenderer:       e.pageRenderer,
+		ceremonyStore:      e.ceremonyStore,
+		userSessionManager: e.userSessionManager,
+		database:           e.database,
+		authorizeValidator: e.validator,
+		auditLogger:        handlersmocks.NewAuditLogger(t),
+		permissionChecker:  handlersmocks.NewPermissionChecker(t),
+		tokenParser:        handlersmocks.NewTokenParser(t),
+	})
 	return e
 }
 
@@ -155,7 +163,7 @@ func TestHandleAuthorizeGet_ARepeatedDeliveryParameterIsAnsweredOnThePage(t *tes
 		"response_type": "response_type=token",
 		"response_mode": "response_mode=fragment",
 	}
-	for _, name := range authorizeDeliveryParameters {
+	for _, name := range authflow.AuthorizeDeliveryParameters() {
 		query := validAuthorizeQuery
 		if name == "response_mode" {
 			query += "&" + first[name]
@@ -398,24 +406,6 @@ func formReads(t *testing.T, file string, isReceiver func(ast.Expr) bool) []stri
 	})
 	require.NotEmpty(t, reads, "the walk found no parameter read in %v, so it proves nothing", file)
 	return reads
-}
-
-// A parameter read that is not listed is a parameter whose repeats are never checked, which is the
-// defect #228 closes coming back one read at a time.
-func TestAuthorizeRequestParameters_EveryReadIsListed(t *testing.T) {
-	reads := formReads(t, "handler_authorize.go", func(e ast.Expr) bool {
-		ident, ok := e.(*ast.Ident)
-		return ok && ident.Name == "params"
-	})
-	for _, name := range reads {
-		assert.Contains(t, authorizeRequestParameters, name, "handler_authorize.go reads %q", name)
-	}
-	for _, name := range authorizeDeliveryParameters {
-		assert.Contains(t, authorizeRequestParameters, name)
-	}
-	for _, name := range authorizeRequestParameters {
-		assert.True(t, slices.Contains(reads, name), "%q is listed but nothing reads it", name)
-	}
 }
 
 func TestTokenRequestParameters_EveryReadIsListed(t *testing.T) {
