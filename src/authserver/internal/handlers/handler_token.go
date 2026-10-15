@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
@@ -226,9 +225,8 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	// checkpoint.
 	var administrativeScopeRefused *protocolvalidation.AdministrativeScopeRefusedError
 	if errors.As(err, &administrativeScopeRefused) {
-		auditLogger.Log(r.Context(), audit.EventAdministrativeScopeRefused,
-			administrativeScopeRefusedDetails(administrativeScopeRefused.Client, administrativeScopeRefused.Scopes,
-				input.GrantType.String(), administrativeScopeRefused.UserId))
+		protocolvalidation.LogAdministrativeScopeRefused(r.Context(), auditLogger, administrativeScopeRefused.Client,
+			administrativeScopeRefused.Scopes, input.GrantType.String(), administrativeScopeRefused.UserId)
 	}
 
 	// The redemption half of #241's registration boundary. The validator refuses an
@@ -473,18 +471,4 @@ func percentDecoded(value string) string {
 		return value
 	}
 	return decoded
-}
-
-// administrativeScopeRefusedDetails is an administrative_scope_refused record's payload: the
-// client refused, the administrative scopes it asked for, the checkpoint that refused them, and the
-// user they were asked for (#499 decision 9). authflow declares the same payload for /auth/authorize
-// and /auth/issue.
-func administrativeScopeRefusedDetails(client *record.Client, scopes []string, checkpoint string, userId int64) map[string]interface{} {
-	return map[string]interface{}{
-		"client_id":         client.Id,
-		"client_identifier": client.ClientIdentifier,
-		"scopes":            scopes,
-		"checkpoint":        checkpoint,
-		"user_id":           userId,
-	}
 }

@@ -459,8 +459,8 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 				facts.sessionValid = &valid
 			}
 			if *facts.sessionValid {
-				o.auditLogger.Log(ctx, audit.EventAdministrativeScopeRefused,
-					administrativeScopeRefusedDetails(client, refusedAdministrativeScopes, "authorize", userSession.UserId))
+				protocolvalidation.LogAdministrativeScopeRefused(ctx, o.auditLogger, client, refusedAdministrativeScopes,
+					"authorize", userSession.UserId)
 			} else {
 				warnAdministrativeScopeRefused(ctx, client, refusedAdministrativeScopes)
 			}

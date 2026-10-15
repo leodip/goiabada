@@ -245,8 +245,8 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 	case issuanceRefuseAdministrativeScope:
 		// Somebody has authenticated by now, so the refusal is recorded against the ceremony's user
 		// (#499 decisions 7 and 9).
-		o.auditLogger.Log(ctx, audit.EventAdministrativeScopeRefused,
-			administrativeScopeRefusedDetails(client, facts.refusedAdministrativeScopes, "issue", authContext.UserId))
+		protocolvalidation.LogAdministrativeScopeRefused(ctx, o.auditLogger, client, facts.refusedAdministrativeScopes,
+			"issue", authContext.UserId)
 		return answerClient(browser, authContext, client, "invalid_scope",
 			protocolvalidation.AdministrativeScopeRefusal(facts.refusedAdministrativeScopes).Description()), nil
 
@@ -559,21 +559,4 @@ func (o *Issuance) issueImplicit(ctx context.Context, browser issuanceBrowser, s
 	o.issuedTokens.Issued(oidc.GrantTypeImplicit)
 
 	return IssuanceResult{Tokens: tokens, ClearErr: browser.ClearAuthContext(authContext.CeremonyId)}, nil
-}
-
-// administrativeScopeRefusedDetails is an administrative_scope_refused record's payload: the client
-// refused, the administrative scopes it asked for, the checkpoint that refused them, and the user
-// they were asked for (#499 decision 9). Authorization and Issuance record it here; handlers declares
-// the same payload for the token endpoint, and the audit log's key catalog holds both to the
-// documented keys.
-func administrativeScopeRefusedDetails(client *record.Client, scopes []string, checkpoint string,
-	userId int64) map[string]interface{} {
-
-	return map[string]interface{}{
-		"client_id":         client.Id,
-		"client_identifier": client.ClientIdentifier,
-		"scopes":            scopes,
-		"checkpoint":        checkpoint,
-		"user_id":           userId,
-	}
 }
