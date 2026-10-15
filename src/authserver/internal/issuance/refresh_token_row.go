@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -157,6 +158,13 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now 
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
+// errSessionRowGone names the swept-session condition behind a session-bound refresh token:
+// the row its max lifetime is computed from is gone, which is the ordinary state of an older
+// grant whose session idled out or reached its maximum lifetime. It is named rather than
+// failed over inline, because the initial code exchange answers it by minting the grant's
+// other tokens and no refresh token (#530).
+var errSessionRowGone = errors.New("the user session backing a session-bound refresh token is gone")
+
 // getRefreshTokenMaxLifetime is the instant a grant's refresh tokens stop being redeemable. A
 // session-bound token reads the session it is bound to, on tx when the caller holds one: sqlitedb
 // has one connection, so a read on nil waits on the connection the caller's transaction holds
@@ -177,9 +185,11 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 			return 0, err
 		}
 		if userSession == nil {
-			// The session backing this Refresh token no longer exists (e.g. it was
-			// concurrently torn down). Fail cleanly instead of dereferencing nil.
-			return 0, errs.Errorf("user session %q not found while computing refresh token max lifetime", sessionIdentifier)
+			// The session backing this Refresh token no longer exists: swept once it idled
+			// out or reached its maximum lifetime, or torn down by a sign-out or a newer
+			// sign-in from the same device. Named for the caller to answer: the initial
+			// code exchange mints no refresh token (#530).
+			return 0, errSessionRowGone
 		}
 		maxLifetime := userSession.Started.Add(
 			time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds)).Unix()

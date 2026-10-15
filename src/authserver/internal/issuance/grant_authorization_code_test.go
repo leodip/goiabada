@@ -402,6 +402,83 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
+// TestMintAuthorizationCodeTokens_SessionRowGone pins #530 at the unit tier. The validator
+// redeems a code whose session row has gone (see the SessionOwnership validator test), so
+// the mint must not fail on the session read behind a session-bound refresh token's max
+// lifetime: the grant answers the access and ID tokens and no refresh token. The strict
+// mock holds the last half: CreateRefreshToken is never taught, so an insert would fail.
+func TestMintAuthorizationCodeTokens_SessionRowGone(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
+
+	settings := &record.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInAccessToken: false,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	sub := fake.UUID()
+	sessionIdentifier := "test-session-123"
+
+	privateKeyBytes := getTestPrivateKey(t)
+
+	code := &record.Code{
+		Id:                2,
+		ClientId:          2,
+		UserId:            2,
+		Scope:             "openid",
+		Nonce:             "swept-nonce",
+		AuthenticatedAt:   now.Add(-120 * time.Second),
+		SessionIdentifier: sessionIdentifier,
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthMethods:       "pwd",
+	}
+	client := &record.Client{
+		Id:               2,
+		ClientIdentifier: "minimal-client",
+	}
+	user := &record.User{
+		Id:      2,
+		Subject: sub,
+		Email:   "swept@example.com",
+	}
+
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+	code.Client = *client
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
+	code.User = *user
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
+	// The swept row: the lookup finds nothing, which is not an error.
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
+	}, nil)
+
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+
+	require.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, "Bearer", response.TokenType)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.NotEmpty(t, response.IdToken)
+	assert.Equal(t, "openid", response.Scope)
+	assert.Empty(t, response.RefreshToken, "a grant whose session row is gone answers no refresh token")
+	assert.Zero(t, response.RefreshExpiresIn)
+
+	mockDB.AssertExpectations(t)
+}
+
 func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)

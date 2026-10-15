@@ -122,6 +122,13 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
 	if err != nil {
+		if errors.Is(err, errSessionRowGone) {
+			// A code whose session row has gone still redeems (the validator's contract:
+			// the ordinary state of an older grant), so the grant answers with the access
+			// and ID tokens alone. No refresh token is bound to a row that no longer
+			// exists (#530).
+			return &tokenResponse, nil
+		}
 		return nil, err
 	}
 	tokenResponse.RefreshToken = refreshToken
