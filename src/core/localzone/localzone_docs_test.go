@@ -28,7 +28,7 @@ func TestEnvironmentVariablesPage_TheTimeZoneSectionNamesTheVariableInstallReads
 	require.NoError(t, err, "unable to read the environment variables page")
 	section, found := docsreader.SectionText(string(page), timeZoneHeading)
 	require.Truef(t, found, "%s has no %q section", environmentVariablesPage, timeZoneHeading)
-	require.NotEmpty(t, section, "%s has no %q section", environmentVariablesPage, timeZoneHeading)
+	require.NotEmpty(t, section, "%s: the %q section is empty", environmentVariablesPage, timeZoneHeading)
 	assert.Contains(t, section, "`TZ`", "%s, %s: the section does not name `TZ`", environmentVariablesPage, timeZoneHeading)
 
 	withLocal(t, hostZone)

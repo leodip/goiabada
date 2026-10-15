@@ -67,7 +67,7 @@ func TestContributingPage_TheTierTableIsEveryTypeRunTestsAccepts(t *testing.T) {
 
 	section, found := docsreader.SectionText(readFile(t, filepath.Join(root, contributingPage)), testsHeading)
 	require.Truef(t, found, "%s has no %q section", contributingPage, testsHeading)
-	require.NotEmpty(t, section, "%s has no %q section", contributingPage, testsHeading)
+	require.NotEmpty(t, section, "%s: the %q section is empty", contributingPage, testsHeading)
 	listed := tableFirstColumnCode(section)
 
 	assert.ElementsMatch(t, accepted, listed,
@@ -81,7 +81,7 @@ func TestContributingPage_NamesEveryRegenerator(t *testing.T) {
 	root := SourceRoot(t)
 	section, found := docsreader.SectionText(readFile(t, filepath.Join(root, contributingPage)), generatedHeading)
 	require.Truef(t, found, "%s has no %q section", contributingPage, generatedHeading)
-	require.NotEmpty(t, section, "%s has no %q section", contributingPage, generatedHeading)
+	require.NotEmpty(t, section, "%s: the %q section is empty", contributingPage, generatedHeading)
 
 	for _, g := range regenerators {
 		_, err := os.Stat(filepath.Join(root, g.dir, filepath.FromSlash(g.needs)))
@@ -104,7 +104,7 @@ func TestContributingPage_TheDevelopmentValuesAreTheDevContainers(t *testing.T) 
 	config := readFile(t, filepath.Join(root, devcontainerConfig))
 	section, found := docsreader.SectionText(readFile(t, filepath.Join(root, contributingPage)), devHeading)
 	require.Truef(t, found, "%s has no %q section", contributingPage, devHeading)
-	require.NotEmpty(t, section, "%s has no %q section", contributingPage, devHeading)
+	require.NotEmpty(t, section, "%s: the %q section is empty", contributingPage, devHeading)
 
 	for _, key := range []string{
 		"GOIABADA_ADMIN_EMAIL",

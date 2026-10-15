@@ -118,10 +118,10 @@ func Rows(text string) [][]string {
 }
 
 // Row splits one table row into its cells, the way Tables reads every row of a table: a pipe
-// escaped inside a cell stays in it, a doubled backslash reads as the one backslash it escapes,
-// and every cell is trimmed. A guard that walks a page line by line for its own structure, such
-// as one holding a page to a line-numbered catalog, reads each line's cells through it, so the
-// one splitter lives here too (#536).
+// escaped inside a cell stays in it, any other backslash keeps the character after it, and every
+// cell is trimmed. A guard that walks a page line by line for its own structure, such as one
+// holding a page to a line-numbered catalog, reads each line's cells through it, so the one
+// splitter lives here too (#536).
 func Row(line string) []string {
 	return cells(line)
 }
@@ -149,16 +149,24 @@ func classify(rows [][]string) Table {
 	return table
 }
 
-// isDelimiterRow says whether every cell of a row is dashes, colons and spaces: the row under a
-// table's header, which is neither a header nor a data row.
+// isDelimiterRow says whether a row is the one under a table's header, which is neither a header
+// nor a data row: every cell dashes, with a colon at either end or both. A row of empty cells is a
+// data row.
 func isDelimiterRow(cells []string) bool {
-	return strings.Trim(strings.Join(cells, ""), "-: ") == ""
+	for _, cell := range cells {
+		dashes := strings.TrimSuffix(strings.TrimPrefix(cell, ":"), ":")
+		if dashes == "" || strings.Trim(dashes, "-") != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // cells splits one table row into its cells: on the pipes the row is written with, every
-// backslash read together with the character after it, so a pipe escaped inside a cell stays in
-// it and a doubled backslash reads as the one backslash it escapes, which leaves the pipe after
-// it a column separator. Every cell is trimmed.
+// backslash read together with the character after it. An escaped pipe stays in its cell as a
+// pipe, the one escape the table rather than the text reads; any other backslash is kept with the
+// character after it, so `\\|` is an escaped backslash and then the pipe that ends the cell, and a
+// cell reads as it is written, the way a code span keeps its backticks. Every cell is trimmed.
 func cells(line string) []string {
 	s := strings.TrimPrefix(line, "|")
 	var out []string
@@ -167,9 +175,6 @@ func cells(line string) []string {
 		switch {
 		case s[i] == '\\' && i+1 < len(s) && s[i+1] == '|':
 			cell.WriteByte('|')
-			i++
-		case s[i] == '\\' && i+1 < len(s) && s[i+1] == '\\':
-			cell.WriteByte('\\')
 			i++
 		case s[i] == '\\' && i+1 < len(s):
 			cell.WriteString(s[i : i+2])

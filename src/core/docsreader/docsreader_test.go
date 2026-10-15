@@ -149,22 +149,39 @@ func TestTables_AnEscapedPipeStaysInItsCell(t *testing.T) {
 }
 
 // TestRow_EveryBackslashReadsTheCharacterAfterIt: a pipe escaped inside a cell stays in it, a
-// doubled backslash reads as the one backslash it escapes — under CommonMark the pipe after it is
-// then a column separator — and any other backslash keeps the character after it. The empty
-// cell after a closing pipe is not a cell.
+// doubled backslash is kept as written — under CommonMark the pipe after it is then a column
+// separator — and any other backslash keeps the character after it, inside a code span or out of
+// one, since a cell is the text it is written as. The empty cell after a closing pipe is not a
+// cell.
 func TestRow_EveryBackslashReadsTheCharacterAfterIt(t *testing.T) {
 	for _, row := range []struct {
 		line string
 		want []string
 	}{
-		{`| C:\\| ready |`, []string{`C:\`, "ready"}},
+		{`| C:\\| ready |`, []string{`C:\\`, "ready"}},
 		{`| a\|b | x |`, []string{"a|b", "x"}},
 		{`| a \|`, []string{"a |"}},
 		{`| a | |`, []string{"a", ""}},
+		{"| `C:\\\\dir` | `a\\*b` |", []string{"`C:\\\\dir`", "`a\\*b`"}},
 	} {
 		if got := Row(row.line); !slices.Equal(got, row.want) {
 			t.Errorf("Row(%q) = %q, want %q", row.line, got, row.want)
 		}
+	}
+}
+
+// TestTables_ARowOfEmptyCellsIsData: a delimiter row is dashes in every cell, so a row whose cells
+// are all empty is a header or a data row, never the row under a header.
+func TestTables_ARowOfEmptyCellsIsData(t *testing.T) {
+	tables := Tables("| | |\n|:--|--:|\n| `a` | b |\n| | |\n")
+	if len(tables) != 1 {
+		t.Fatalf("tables %+v", tables)
+	}
+	if got, want := tables[0].Header, []string{"", ""}; !slices.Equal(got, want) {
+		t.Errorf("header %q, want %q", got, want)
+	}
+	if len(tables[0].Rows) != 2 || !slices.Equal(tables[0].Rows[1], []string{"", ""}) {
+		t.Errorf("rows %q, want the code row and the empty one", tables[0].Rows)
 	}
 }
 

@@ -118,6 +118,24 @@ func TestManageAccountRefreshDocs_APageGivingTheAnswersPasses(t *testing.T) {
 	}
 }
 
+// A row in a fenced example is not a row of the section's table, so it answers for no description.
+func TestManageAccountRefreshDocs_ARowInAFencedExampleIsNoRow(t *testing.T) {
+	root := t.TempDir()
+	writeRefreshDocFixture(t, root, "site/revoked.mdx", "## Other reasons\n\n| `error_description` | Why |\n|---|---|\n"+
+		"| \"No consent.\" | Checked for `authserver:manage-account` too. |\n\n"+
+		"```md\n| \"Not consented.\" | Checked for `authserver:manage-account` too. |\n```\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRefreshReasonRows(r, root, refreshDocSection{"site/revoked.mdx", "## Other reasons"},
+			[]string{"No consent.", "Not consented."}, "`authserver:manage-account`")
+	})
+
+	want := []string{"site/revoked.mdx: ## Other reasons has no row for \"Not consented.\""}
+	if report.Stopped || !slices.Equal(report.Errors, want) {
+		t.Errorf("failures %+v, want exactly %q", report, want)
+	}
+}
+
 func TestManageAccountRefreshDocs_AMissingSectionStops(t *testing.T) {
 	root := t.TempDir()
 	writeRefreshDocFixture(t, root, "site/revoked.mdx", "## Other reasons a refresh fails\n\n| `error_description` | Why |\n|---|---|\n")
