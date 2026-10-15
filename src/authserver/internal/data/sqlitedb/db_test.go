@@ -198,15 +198,12 @@ func TestDatabase_CloseLeavesOneFileAfterAnInterruptedQuery(t *testing.T) {
 	assert.Equal(t, 42, x)
 }
 
-// Close reports a checkpoint that did not complete (#570): PRAGMA wal_checkpoint answers with
-// three numbers, which ExecContext dropped, so a checkpoint a reader elsewhere kept from finishing
-// was reported as success and a stopped server said nothing while the -wal stayed beside the file.
-// A second connection holding a read transaction is such a reader: the checkpoint copies what it
-// can but cannot reset the WAL while the reader still needs its frames, so it answers busy, and
-// Close carries the three numbers in an error joined with the pool's close error, which main's
-// "unable to close the database" warning then says and TestMain_AStopLeavesTheSQLiteDatabaseInOneFile
-// already fails on. The busy timeout the pool's connection sets is what the checkpoint waits on,
-// so this test takes the five seconds of it.
+// Close reports a checkpoint that did not complete (#570). A second connection holding a read
+// transaction on the latest snapshot lets the checkpoint copy all three frames into the database
+// file but not reset the log, so it answers busy with the log wholly copied, and the -wal stays
+// beside the file holding nothing the file lacks. Close returns the three numbers as an error,
+// which main's "unable to close the database" warning then says and
+// TestMain_AStopLeavesTheSQLiteDatabaseInOneFile fails on.
 func TestDatabase_CloseReportsACheckpointThatDidNotComplete(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.db")
 	db, err := New(context.Background(), "file:"+filepath.ToSlash(path), false)
@@ -231,11 +228,14 @@ func TestDatabase_CloseReportsACheckpointThatDidNotComplete(t *testing.T) {
 	require.NoError(t, otherConn.QueryRowContext(context.Background(), "SELECT count(*) FROM t").Scan(&rows))
 	require.Positive(t, rows, "the read has to see a row, or the held transaction proves nothing")
 
+	// The pool's one connection runs the checkpoint. With no busy timeout it answers busy at once,
+	// rather than after the five seconds every connection is opened with.
+	_, err = db.DB.ExecContext(context.Background(), "PRAGMA busy_timeout = 0")
+	require.NoError(t, err)
+
 	closeErr := db.Close()
-	require.Error(t, closeErr, "a checkpoint the reader kept from finishing is not a close that succeeded")
-	assert.Contains(t, closeErr.Error(), "did not complete", "the error names the checkpoint that did not finish")
-	assert.Contains(t, closeErr.Error(), "busy=1", "and says the checkpoint was busy, with the numbers it answered")
-	assert.Contains(t, closeErr.Error(), "checkpointed=", "the error carries the checkpointed count too")
+	require.EqualError(t, closeErr, "the WAL checkpoint did not complete: busy=1, log=3, checkpointed=3",
+		"a checkpoint the reader kept from resetting the log is not a close that succeeded")
 	_, statErr := os.Stat(path + "-wal")
 	require.NoError(t, statErr, "the WAL the checkpoint could not reset is still beside the file")
 }

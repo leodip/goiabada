@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -110,8 +111,11 @@ func TestMain_AStopLeavesTheSQLiteDatabaseInOneFile(t *testing.T) {
 			code, records := runMainSignalledAt(t, path, at)
 
 			require.Equalf(t, 0, code, "a stop the platform asked for, carried out cleanly, exits 0\n%s", dump(records))
-			assert.NotContains(t, messagesOf(records), "unable to close the database")
-			if left := describeFilesLeftBesideTheDatabase(path); left != "" {
+			assert.NotContainsf(t, messagesOf(records), "unable to close the database",
+				"a close that failed says why in its record\n%s", dump(records))
+			left, err := describeFilesLeftBesideTheDatabase(path)
+			require.NoError(t, err, "what the stop left beside the database file can be read")
+			if left != "" {
 				require.FailNowf(t, "the database is left in more than one file",
 					"the stop left %s beside the database file\n%s", left, dump(records))
 			}
@@ -120,47 +124,62 @@ func TestMain_AStopLeavesTheSQLiteDatabaseInOneFile(t *testing.T) {
 }
 
 // describeFilesLeftBesideTheDatabase says what a stop left beside the database file, for the
-// failure message when the database is not the one file it should be. The -wal's size is what
-// tells the two failures apart (#570): 0 bytes is a checkpoint that ran but whose last close did
-// not delete the file, and non-empty is a WAL that was never folded in. An empty answer says
-// nothing was left.
-func describeFilesLeftBesideTheDatabase(path string) string {
+// failure message when the database is not the one file it should be, or "" when nothing was
+// left. The -wal's size tells a log the checkpoint emptied, 0 bytes, whose last close did not
+// delete it, from a log it did not reset. Whether a log it did not reset holds data the database
+// file lacks is what the checkpoint's numbers in the close's warning say (#570). A file that
+// cannot be read for any reason but its absence is an error.
+func describeFilesLeftBesideTheDatabase(path string) (string, error) {
 	walStat, walErr := os.Stat(path + "-wal")
 	_, shmErr := os.Stat(path + "-shm")
+	for _, err := range []error{walErr, shmErr} {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
+	}
 	if walErr != nil && shmErr != nil {
-		return ""
+		return "", nil
 	}
 	if walErr != nil {
-		return "the -shm file with no -wal beside it"
+		return "the -shm file with no -wal beside it", nil
 	}
 	shm := "absent"
 	if shmErr == nil {
 		shm = "present"
 	}
-	return fmt.Sprintf("the -wal file at %d bytes with the -shm %s", walStat.Size(), shm)
+	return fmt.Sprintf("the -wal file at %d bytes with the -shm %s", walStat.Size(), shm), nil
 }
 
 // TestDescribeFilesLeftBesideTheDatabase pins what the signal test's failure message says about
 // what a stop left beside the database file (#570): the -wal with its size and whether the -shm
-// is beside it, a -shm alone, or nothing. The size is the part that explains the next CI failure
-// by itself.
+// is beside it, a -shm alone, or nothing, and an error for a file that cannot be read.
 func TestDescribeFilesLeftBesideTheDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "s.db")
 	require.NoError(t, os.WriteFile(path, []byte("x"), 0o600))
+	describe := func() string {
+		t.Helper()
+		left, err := describeFilesLeftBesideTheDatabase(path)
+		require.NoError(t, err)
+		return left
+	}
 
-	assert.Empty(t, describeFilesLeftBesideTheDatabase(path), "nothing is left beside the database")
+	assert.Empty(t, describe(), "nothing is left beside the database")
 
 	require.NoError(t, os.WriteFile(path+"-wal", []byte("0123456789"), 0o600))
-	assert.Equal(t, "the -wal file at 10 bytes with the -shm absent", describeFilesLeftBesideTheDatabase(path))
+	assert.Equal(t, "the -wal file at 10 bytes with the -shm absent", describe())
 
 	require.NoError(t, os.WriteFile(path+"-shm", []byte("x"), 0o600))
-	assert.Equal(t, "the -wal file at 10 bytes with the -shm present", describeFilesLeftBesideTheDatabase(path))
+	assert.Equal(t, "the -wal file at 10 bytes with the -shm present", describe())
 
 	require.NoError(t, os.WriteFile(path+"-wal", nil, 0o600))
-	assert.Equal(t, "the -wal file at 0 bytes with the -shm present", describeFilesLeftBesideTheDatabase(path))
+	assert.Equal(t, "the -wal file at 0 bytes with the -shm present", describe())
 
 	require.NoError(t, os.Remove(path+"-wal"))
-	assert.Equal(t, "the -shm file with no -wal beside it", describeFilesLeftBesideTheDatabase(path))
+	assert.Equal(t, "the -shm file with no -wal beside it", describe())
+
+	// No platform can stat a path with a NUL byte in it, and not because it is absent.
+	_, err := describeFilesLeftBesideTheDatabase(path + "\x00")
+	require.Error(t, err, "a file that cannot be read is not a file that is absent")
 }
 
 // TestMain_ASignalDuringALegacyBootstrapStillSaysTheServerStopped is the same stop in the legacy

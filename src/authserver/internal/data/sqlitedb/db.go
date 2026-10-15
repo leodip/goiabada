@@ -162,13 +162,15 @@ func (c configuringConnector) Connect(ctx context.Context) (driver.Conn, error) 
 // connection, as on a server stopped while its first query ran, the -wal and -shm stayed beside
 // the file with the data in them (#562). The checkpoint runs on a connection without one, which
 // the pool's close then closes last. The pool is closed whether or not the checkpoint succeeds.
-// The checkpoint answers with three numbers, busy, the frames in the log, and how many of them
-// were checkpointed, which ExecContext dropped: a checkpoint that did not finish, a reader
-// elsewhere holding the WAL back, answered as success and the stop said nothing while the -wal
-// stayed beside the file (#570). QueryRowContext reads the numbers back: busy, or a checkpoint
-// short of the whole log, is an error carrying the three of them, joined with the pool's close
-// error as a refused checkpoint is. An in-memory database, which has no journal, answers
-// busy=0, log=-1, checkpointed=-1, and that passes.
+//
+// A checkpoint that runs can still fall short. Another connection to the file holding a read
+// transaction keeps it from resetting the log, and one reading an older snapshot also keeps it
+// from copying the frames written since. The checkpoint answers busy, the frames in the log and
+// how many of them it has copied into the database file, and Close returns busy, or a log not
+// wholly copied, as an error carrying the three numbers, joined with the pool's close error as a
+// refused checkpoint is (#570). The stop's warning then says whether the -wal left beside the file
+// holds data the file lacks. An in-memory database, which has no WAL, answers 0, -1 and -1, which
+// is no error.
 func (d *Database) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), closeCheckpointTimeout)
 	defer cancel()
