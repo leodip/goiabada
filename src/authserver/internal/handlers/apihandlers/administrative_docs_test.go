@@ -537,15 +537,6 @@ func assertNamesIn(r guard.Reporter, text string, check docNames) {
 	}
 }
 
-// docHeadingLevel is the number of #s a Markdown heading line opens with, or 0 for any other line.
-func docHeadingLevel(line string) int {
-	level := len(line) - len(strings.TrimLeft(line, "#"))
-	if level == 0 || !strings.HasPrefix(line[level:], " ") {
-		return 0
-	}
-	return level
-}
-
 // withoutTableColumn is text with the column headed header left out of every Markdown table that
 // has one, its header and delimiter cells included; every other line is kept as it is.
 func withoutTableColumn(text, header string) string {

@@ -944,15 +944,6 @@ type docSection struct {
 	heading string
 }
 
-// docHeadingLevel is the number of #s a Markdown heading line opens with, or 0 for any other line.
-func docHeadingLevel(line string) int {
-	level := len(line) - len(strings.TrimLeft(line, "#"))
-	if level == 0 || !strings.HasPrefix(line[level:], " ") {
-		return 0
-	}
-	return level
-}
-
 // writeDocFixture writes content to root/name, creating its directory.
 func writeDocFixture(t *testing.T, root, name, content string) {
 	t.Helper()
