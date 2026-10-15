@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
+	"golang.org/x/text/language"
 )
 
 // Renderer renders pages from the template file system it was built over, and writes JSON.
@@ -165,10 +166,14 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	layoutName = strings.TrimPrefix(layoutName, "/")
 
 	// Per-locale email template lookup. For emails (templateName under
-	// "emails/"), try <name>.<locale>.html before <name>.html so a translated
-	// copy of the whole email body wins over the English baseline. Falls
-	// through to the base template when no locale-specific copy exists.
-	// The default locale "en" is always served by the base file.
+	// "emails/"), a copy for exactly the recipient's tag still wins first,
+	// and when there is none the body copy is picked the way i18n.T picks the
+	// catalog for the subject: the locale is matched against the languages a
+	// copy of this email exists in, not taken literally. A regional variant
+	// then falls back to its base language (es-MX renders the .es copy, the
+	// subject renders from the es catalog), and a locale no copy relates to
+	// keeps <name>.html, the English baseline. The default locale "en" is
+	// always served by the base file (#531).
 	if strings.HasPrefix(templateName, "emails/") {
 		locale := i18n.LocaleTag(r.Context())
 		if locale != "" && locale != "en" {
@@ -177,6 +182,8 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 			candidate := base + "." + locale + ext
 			if _, err := fs.Stat(h.templateFS, candidate); err == nil {
 				templateName = candidate
+			} else {
+				templateName = localizedEmailTemplate(h.templateFS, templateName, locale)
 			}
 		}
 	}
@@ -204,6 +211,70 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		return nil, errs.Wrap(err, "unable to execute template")
 	}
 	return &buf, nil
+}
+
+// localizedEmailTemplate answers the name of the email template copy to render
+// for a recipient reading locale, or templateName itself when the English base
+// template is the right body. It is consulted only when no copy named for
+// exactly the locale exists, which the caller's own lookup settles.
+//
+// The choice mirrors how the catalog matcher resolves the subject
+// (core/i18n localizerFor): the languages a copy of this email exists in are
+// the available languages, English first because the base file renders it, and
+// whatever the matcher resolves wins. A base-language copy serves a regional
+// variant of that language, and a locale the matcher cannot relate to any copy
+// resolves to English - the base file. The returned name always maps back to a
+// file the directory actually holds, via the index the matcher answers rather
+// than the tag it prints, because a matched tag can come back region-extended
+// (es-MX matched against es answers "es-u-rg-mxzzzz") (#531).
+func localizedEmailTemplate(templateFS fs.FS, templateName, locale string) string {
+	ext := filepath.Ext(templateName)
+	base := strings.TrimSuffix(templateName, ext)
+	fileName := filepath.Base(templateName)
+	stem := strings.TrimSuffix(fileName, ext)
+
+	// suffixes[i] is the filename piece between the stem and the extension of
+	// the copy whose language tag is tags[i]; the empty suffix at index 0 is
+	// the English base file, the matcher's no-match answer.
+	suffixes := []string{""}
+	tags := []language.Tag{language.English}
+
+	entries, err := fs.ReadDir(templateFS, filepath.Dir(templateName))
+	if err != nil {
+		return templateName
+	}
+	seen := map[language.Tag]bool{language.English: true}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if name == fileName || !strings.HasPrefix(name, stem+".") || !strings.HasSuffix(name, ext) {
+			continue
+		}
+		suffix := strings.TrimSuffix(strings.TrimPrefix(name, stem+"."), ext)
+		tag, err := language.Parse(suffix)
+		// A suffix that is not a well-formed language tag, or a second copy of
+		// a language already listed, is not a choice this email offers.
+		if err != nil || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		suffixes = append(suffixes, suffix)
+		tags = append(tags, tag)
+	}
+
+	// The catalog side parses the same string with ParseAcceptLanguage, so a
+	// locale it would reject leaves the base template here too.
+	parsed, _, err := language.ParseAcceptLanguage(locale)
+	if err != nil || len(parsed) == 0 {
+		return templateName
+	}
+	_, idx, _ := language.NewMatcher(tags).Match(parsed...)
+	if suffixes[idx] == "" {
+		return templateName
+	}
+	return base + "." + suffixes[idx] + ext
 }
 
 func (h *Renderer) JSONError(w http.ResponseWriter, r *http.Request, err error) {
