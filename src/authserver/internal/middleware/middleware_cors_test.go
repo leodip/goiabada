@@ -36,6 +36,29 @@ func TestCORS(t *testing.T) {
 			setupMock:     func(db *datamocks.Database) {},
 		},
 		{
+			name:          "Allow CORS for oauth-authorization-server",
+			path:          "/.well-known/oauth-authorization-server",
+			origin:        "http://example.com",
+			expectedAllow: true,
+			setupMock:     func(db *datamocks.Database) {},
+		},
+		{
+			name:          "Allow CORS for oauth-authorization-server with trailing slash",
+			path:          "/.well-known/oauth-authorization-server/",
+			origin:        "http://example.com",
+			expectedAllow: true,
+			setupMock:     func(db *datamocks.Database) {},
+		},
+		{
+			// No route answers RFC 8414 section 3.1's path-suffixed form: the reverse proxy routes it
+			// to the address above, so it gets no CORS answer of its own here (#576).
+			name:          "Disallow CORS for a path below oauth-authorization-server",
+			path:          "/.well-known/oauth-authorization-server/tenant",
+			origin:        "http://example.com",
+			expectedAllow: false,
+			setupMock:     func(db *datamocks.Database) {},
+		},
+		{
 			name:          "Allow CORS for certs",
 			path:          "/certs",
 			origin:        "http://example.com",

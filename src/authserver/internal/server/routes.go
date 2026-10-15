@@ -101,7 +101,13 @@ func (s *Server) initRoutes(branches appBranches) {
 	// built from, so a link and the endpoint it names cannot drift apart (#112, #434).
 	pages.With(rateLimiter.LimitResetPwd).Get(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordGet(httpHelper, s.sessionStore, s.database, auditLogger, s.dataCipher))
 	pages.With(rateLimiter.LimitResetPwd).Post(emaillinks.ResetPasswordPath, accounthandlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger, adminConsoleBaseURL))
-	getAndHead(protocol, "/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper, baseURL))
+	// One discovery document at both well-known addresses, OIDC Discovery 1.0's and RFC 8414's, so
+	// the two cannot disagree: RFC 8414 section 3 allows more than one address and section 3.2 fields
+	// beyond its own. RFC 8414 section 3.1's path-suffixed form has no route; a reverse proxy serving
+	// an issuer with a path routes it here, as it strips the path for every other endpoint (#576).
+	discovery := handlers.HandleWellKnownOIDCConfigGet(httpHelper, baseURL)
+	getAndHead(protocol, "/.well-known/openid-configuration", discovery)
+	getAndHead(protocol, "/.well-known/oauth-authorization-server", discovery)
 	getAndHead(protocol, "/certs", handlers.HandleCertsGet(httpHelper, s.database))
 	// /userinfo takes a user's access token whose scope carries openid, which is what OIDC Core 1.0
 	// section 5.3 says the endpoint exists for (#449). The scope check comes first, as on every

@@ -44,7 +44,7 @@ If you're writing the tool, this is what it does the first time it runs.
 
 <Steps>
 
-1. Read `registration_endpoint` from the discovery document. If it isn't there, the auth server doesn't take registrations: ask its administrator for a client instead.
+1. Read `registration_endpoint` from the discovery document. An MCP client reads it at `/.well-known/oauth-authorization-server`, the address [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) defines for OAuth servers, where the auth server serves the same document as at `/.well-known/openid-configuration`. See [Where the document is](/reference/endpoints/discovery-and-jwks/#where-the-document-is). If `registration_endpoint` isn't there, the auth server doesn't take registrations: ask its administrator for a client instead.
 
 2. Register, naming your app and where the browser comes back to. A tool on the user's machine is a public client, with no secret, and receives its callback on a loopback address:
 

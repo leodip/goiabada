@@ -9,7 +9,7 @@ This page helps you configure a client or an API from the auth server's discover
 
 Two endpoints do this, and neither needs a token:
 
-- **`GET /.well-known/openid-configuration`**, the discovery document: where every endpoint is and what the auth server supports. Most OpenID Connect libraries need nothing else to configure themselves.
+- **`GET /.well-known/openid-configuration`**, the discovery document: where every endpoint is and what the auth server supports. Most OpenID Connect libraries need nothing else to configure themselves. The same document is at `/.well-known/oauth-authorization-server`, for OAuth clients that look there. See [Where the document is](#where-the-document-is).
 - **`GET /certs`**, the JSON Web Key Set (JWKS): the public keys the auth server signs tokens with. Its URL is the discovery document's `jwks_uri`.
 
 ## Configure from discovery
@@ -61,6 +61,19 @@ Two endpoints do this, and neither needs a token:
 
 Then it checks the token's `iss` against the discovery document's `issuer`, and its `aud` and `exp`. See [Tokens](/concepts/tokens/).
 
+## Where the document is
+
+The auth server serves its discovery document at two addresses, the one OpenID Connect Discovery 1.0 defines and the one [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) defines for OAuth servers in general:
+
+- `/.well-known/openid-configuration`, which OpenID Connect libraries read.
+- `/.well-known/oauth-authorization-server`, which OAuth clients read, MCP clients among them: the MCP specification has them find the auth server there.
+
+Both answer with the same document, so they can't disagree. Each answers `GET` and `HEAD`.
+
+When your issuer has a path, such as `https://example.com/goiabada`, RFC 8414 section 3.1 puts the address between the host and that path: `https://example.com/.well-known/oauth-authorization-server/goiabada`. That address is outside the path your reverse proxy forwards to the auth server, so add a rule that routes it to the auth server's `/.well-known/oauth-authorization-server`, just as the proxy already strips `/goiabada` from every other request. The auth server has no route for the address with the path after it.
+
+A client checks that the document's `issuer` is exactly the URL it put the well-known path into, and refuses the document when it isn't, as RFC 8414 section 3.3 and OpenID Connect Discovery 1.0 section 4.3 require. So keep the issuer the address the auth server is reached at: an issuer naming another host breaks discovery at both addresses.
+
 ## The discovery document
 
 The auth server describes what it implements, which no setting changes but two: the issuer, and whether `registration_endpoint` is there. Every grant and response type is listed even while the implicit flow or the password grant is off, as OpenID Connect Discovery 1.0 and RFC 8414 define these fields: a client that isn't allowed one is refused at the endpoint.
@@ -104,7 +117,7 @@ To rotate, choose **Rotate key** under **Admin**, **Keys** in the admin console.
 
 ## Calling them from a browser
 
-Both endpoints answer cross-origin requests from any origin, with nothing to register, so JavaScript in a browser can read them. See [web origins](/concepts/clients/#web-origins) for the endpoints that need one.
+The discovery document, at both its addresses, and `/certs` answer cross-origin requests from any origin, with nothing to register, so JavaScript in a browser can read them. See [web origins](/concepts/clients/#web-origins) for the endpoints that need one.
 
 ## Next steps
 
