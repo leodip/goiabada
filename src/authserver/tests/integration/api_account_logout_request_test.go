@@ -461,7 +461,8 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 //   - Script. A handler registered from /static/utils.js, the one script this server serves, can
 //     cancel the submit event. The sets below refuse an inline handler on the form and on the
 //     affirmative control, and refuse a <script> inside the form, which is the part the template
-//     declares; the rest needs a JavaScript engine.
+//     declares; the declining link's onclick is the one inline handler permitted, because with
+//     script unavailable the link still goes somewhere (#152); the rest needs a JavaScript engine.
 //   - An ancestor attribute outside consentHidingAttrs, which is a denylist for the reason recorded
 //     on it, so its tail is open by construction where every other set here is closed.
 //
@@ -472,10 +473,12 @@ var (
 	consentInputAttrs  = map[string]bool{"type": true, "name": true, "value": true, "class": true}
 	consentButtonAttrs = map[string]bool{"type": true, "name": true, "value": true, "class": true, "onclick": true}
 	consentLayoutAttrs = map[string]bool{"class": true}
+	consentAnchorAttrs = map[string]bool{"class": true, "href": true, "onclick": true}
 
 	consentFormTags = map[string]map[string]bool{
 		"input":  consentInputAttrs,
 		"button": consentButtonAttrs,
+		"a":      consentAnchorAttrs,
 		"div":    consentLayoutAttrs,
 		"p":      consentLayoutAttrs,
 	}
@@ -784,21 +787,22 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	// reports in Sec-Fetch-Site and httpmw.CSRF enforces, and no hidden field carries that.
 	// The loop above still pins the form's shape, which is what the rest of this helper needs.
 
-	// Which button gives which answer, read the way the End-User reads it. Identifying the affirmative
-	// control structurally is not enough on its own: swap the two translation references and the
-	// unscripted submit button is the one labelled No, so visible No logs the user out, visible Yes
-	// cancels, and every case below still passes.
+	// Which control gives which answer, read the way the End-User reads it. The affirmative control is
+	// the form's one button and the declining control is a link, and identifying either structurally
+	// is not enough on its own: swap the two translation references and the unscripted submit button
+	// is the one labelled No, so visible No logs the user out, visible Yes cancels, and every case
+	// below still passes.
 	buttons := formSel.Find("button")
-	require.Equal(t, 2, buttons.Length(),
-		"the consent form asks one question and carries one button per answer")
+	require.Equal(t, 1, buttons.Length(),
+		"the consent form's one button is its affirmative answer; the declining answer is a link (#152)")
 	affirmative := buttons.FilterFunction(func(_ int, button *goquery.Selection) bool {
 		return strings.TrimSpace(button.Text()) == labels.yes
 	})
-	declining := buttons.FilterFunction(func(_ int, button *goquery.Selection) bool {
-		return strings.TrimSpace(button.Text()) == labels.no
+	declining := formSel.Find("a").FilterFunction(func(_ int, anchor *goquery.Selection) bool {
+		return strings.TrimSpace(anchor.Text()) == labels.no
 	})
 	require.Equal(t, 1, affirmative.Length(), "exactly one button must read %q", labels.yes)
-	require.Equal(t, 1, declining.Length(), "exactly one button must read %q", labels.no)
+	require.Equal(t, 1, declining.Length(), "exactly one link must read %q", labels.no)
 
 	// The affirmative control must be one a browser would submit with, or the page is unusable however
 	// correct the handler is: no cancelling handler of its own, and a type that submits, which a button
@@ -810,13 +814,18 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	require.True(t, strings.EqualFold("submit", affirmative.AttrOr("type", "submit")),
 		"the affirmative control must be able to submit the form, got type=%q", affirmative.AttrOr("type", ""))
 
-	// And the declining control must not be able to submit it. Today an inline handler calls
-	// preventDefault(), since a button with no type attribute is a submit control; an explicit
-	// type="button" would do the same without script, and either satisfies this.
-	require.True(t,
-		!strings.EqualFold("submit", declining.AttrOr("type", "submit")) || declining.AttrOr("onclick", "") != "",
-		`the button labelled %q must not submit the form: give it type="button" or keep its cancelling handler`,
-		labels.no)
+	// And the declining control must neither be able to submit the form nor need script to go
+	// somewhere. A link cannot submit a form, so it is its element that carries the first half, and
+	// the href that carries the second: with JavaScript unavailable the button this control used to
+	// be was a submit control by HTML's missing-value default, and clicking No was answering Yes
+	// (#152). The destination is the consent page's own form action, which drops the query string
+	// the page may have been served with and re-renders the question, so a decline with no history
+	// to go back to — and no script to go back with — leaves the End-User signed in.
+	_, hasHref := declining.Attr("href")
+	require.True(t, hasHref,
+		"the link labelled %q needs a destination that works without script (#152)", labels.no)
+	require.Equal(t, action, declining.AttrOr("href", ""),
+		"the declining control's destination is the consent page's own path, which re-renders the question rather than answering it")
 
 	// A named submitter is itself a successful control, so a browser would send it too.
 	if name, hasName := affirmative.Attr("name"); hasName {
@@ -1061,6 +1070,62 @@ func TestLogout_Hintless_UILocalesSurvivesTheConsentForm(t *testing.T) {
 	// Every reference on the page, in pt-BR: the whole template has to follow the locale the consent
 	// page was read in, not only the line this case used to check.
 	assertSignedOutPage(t, resp, signedOutPortuguese, false)
+}
+
+// TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript is #152, end to end. The consent
+// page's declining control used to be a button with no type attribute, which HTML's missing-value
+// default makes a submit control, so the only thing standing between clicking No and answering Yes
+// was the control's inline preventDefault; with JavaScript unavailable the click POSTed the consent
+// form, and a hintless same-origin POST that passes the origin check is confirmation, so declining
+// tore the whole session down (#109 decision 13, #155).
+//
+// This case follows the control the way a browser without any script follows it: by resolving and
+// GETting its href. Both halves of the fix are asserted on what lands: the destination re-renders
+// the consent page — the one page a user with no history to go back to and no script to go back
+// with can be left on — and the End-User's session row survives the click that declined to end it.
+func TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript(t *testing.T) {
+	grant := createOfflineGrant(t)
+
+	resp, err := grant.httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/logout")
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode,
+		"a request with no id_token_hint must render the consent page, which the spec makes a MUST")
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(bodyString(t, resp)))
+	require.NoError(t, err)
+
+	declining := doc.Find("form a").FilterFunction(func(_ int, anchor *goquery.Selection) bool {
+		return strings.TrimSpace(anchor.Text()) == consentLabelsByLocale[""].no
+	})
+	require.Equal(t, 1, declining.Length(),
+		"the consent page's declining control is a link, which cannot submit the form (#152)")
+	href, ok := declining.Attr("href")
+	require.True(t, ok, "the declining control needs a destination that works without script (#152)")
+
+	// A browser resolves the href against the page's own URL, and so does this.
+	base, err := url.Parse(appConfig.AuthServer.BaseURL)
+	require.NoError(t, err)
+	destination, err := base.Parse(href)
+	require.NoError(t, err)
+
+	followed, err := grant.httpClient.Get(destination.String())
+	require.NoError(t, err)
+	defer func() { _ = followed.Body.Close() }()
+
+	// The question again, not the answer: the destination is the consent page, which is the
+	// difference between declining and the signed-out page a teardown renders.
+	require.Equal(t, http.StatusOK, followed.StatusCode,
+		"the declining control's destination must render a page, not redirect or fail")
+	followedDoc, err := goquery.NewDocumentFromReader(strings.NewReader(bodyString(t, followed)))
+	require.NoError(t, err)
+	require.Equal(t, 1, followedDoc.Find("form button.btn-primary").Length(),
+		"the declining control's destination re-renders the consent page, whose affirmative button must still be there")
+
+	// What the decline must never touch: the session row the sign-in ceremony left.
+	after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, after,
+		"#152: following the declining control without script tore the End-User's session down")
 }
 
 // The cases below drive POST /auth/logout the way a relying party's own page would: from a foreign
