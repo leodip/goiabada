@@ -1100,7 +1100,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 		pageRenderer.AssertExpectations(t)
@@ -1169,7 +1169,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		// Confirms redirect_uri and state were re-read from the POST body in the
 		// error closure (not from an empty query string).
 		location := rr.Header().Get("Location")
@@ -1322,7 +1322,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 
 		ceremonyStore.AssertExpectations(t)
 	})

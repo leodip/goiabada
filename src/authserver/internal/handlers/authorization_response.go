@@ -256,7 +256,9 @@ func implicitResponseMode(requested string) string {
 	return "fragment"
 }
 
-// writeFragmentRedirect redirects to redirectURI with params as its fragment.
+// writeFragmentRedirect redirects to redirectURI with params as its fragment, with redirectStatus's
+// code: 303 for the declined consent, which answers a POST, and 302 at /auth/issue and
+// /auth/authorize.
 //
 // Appended rather than written through writeResponseParams: the redirect URI cannot carry a
 // fragment of its own (RFC 6749 3.1.2 forbids it and checkRedirectURIEmittable refuses one above
@@ -264,10 +266,11 @@ func implicitResponseMode(requested string) string {
 // registered one, is left exactly as it stands.
 func writeFragmentRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) {
 	noStoreAuthorizationResponse(w)
-	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
+	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), redirectStatus(r))
 }
 
-// writeQueryRedirect redirects to redirectURI with params in its query component.
+// writeQueryRedirect redirects to redirectURI with params in its query component, with
+// redirectStatus's code, as writeFragmentRedirect does.
 //
 // writeResponseParams, not Query() then Encode(): seeding url.Values from the registered query and
 // adding on top would emit two state parameters to a client that registered "?state=fixed", and
@@ -287,7 +290,7 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	}
 
 	noStoreAuthorizationResponse(w)
-	http.Redirect(w, r, location, http.StatusFound)
+	http.Redirect(w, r, location, redirectStatus(r))
 	return nil
 }
 
