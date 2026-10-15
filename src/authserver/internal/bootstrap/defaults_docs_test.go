@@ -217,7 +217,7 @@ func defaultsTableRows(root string, section defaultsSection) ([][2]string, error
 		}
 		found = true
 		for _, cells := range table.Rows {
-			if len(cells) >= 2 && strings.Trim(cells[0], "-: ") != "" {
+			if len(cells) >= 2 {
 				value, _, _ := strings.Cut(cells[1], " ")
 				rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
 			}

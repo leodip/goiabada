@@ -185,6 +185,31 @@ func TestTables_ARowOfEmptyCellsIsData(t *testing.T) {
 	}
 }
 
+// TestTables_ARowOfDashesBelowTheDelimiterIsData: only the delimiter row under the header is
+// skipped, so a placeholder row of dashes in the body is a data row, as the page renders it.
+func TestTables_ARowOfDashesBelowTheDelimiterIsData(t *testing.T) {
+	tables := Tables("| Record | Level |\n|---|---|\n| `a` | `INFO` |\n| - | - |\n|---|---|\n")
+	if len(tables) != 1 {
+		t.Fatalf("tables %+v", tables)
+	}
+	want := [][]string{{"`a`", "`INFO`"}, {"-", "-"}, {"---", "---"}}
+	if got := tables[0].Rows; !slices.EqualFunc(got, want, slices.Equal[[]string]) {
+		t.Errorf("rows %q, want %q", got, want)
+	}
+}
+
+// TestTables_AFenceLineEndsATable: a fence line ends the table before it, so an empty fenced
+// block between two tables leaves them two tables.
+func TestTables_AFenceLineEndsATable(t *testing.T) {
+	tables := Tables("| A |\n|---|\n| a |\n```\n```\n| B |\n|---|\n| b |\n")
+	if len(tables) != 2 {
+		t.Fatalf("%d tables, want 2: %+v", len(tables), tables)
+	}
+	if got := tables[1].Header; !slices.Equal(got, []string{"B"}) {
+		t.Errorf("second header %q, want [B]", got)
+	}
+}
+
 // TestTables_ARowNoDelimiterFollowsIsData: a row a delimiter row does not follow is not a header,
 // so a table written without one reads as rows only.
 func TestTables_ARowNoDelimiterFollowsIsData(t *testing.T) {

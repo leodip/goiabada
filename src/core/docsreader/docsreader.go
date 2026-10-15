@@ -78,8 +78,9 @@ type Table struct {
 }
 
 // Tables returns every table in text, in the order the page reads them. Fenced code holds no
-// table: a line inside a code fence is never a row. A delimiter row, the one under a header, is
-// neither a header nor a data row, and the header is the row a delimiter row follows.
+// table: a line inside a code fence is never a row, and a fence line ends the table before it. The
+// delimiter row under a header is neither a header nor a data row, and the header is the row the
+// first delimiter row follows.
 func Tables(text string) []Table {
 	var (
 		tables  []Table
@@ -88,11 +89,11 @@ func Tables(text string) []Table {
 	)
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
+		fence := strings.HasPrefix(trimmed, "```")
+		if fence {
 			inFence = !inFence
-			continue
 		}
-		if inFence || !strings.HasPrefix(trimmed, "|") {
+		if fence || inFence || !strings.HasPrefix(trimmed, "|") {
 			if len(rows) > 0 {
 				tables = append(tables, classify(rows))
 				rows = nil
@@ -108,7 +109,7 @@ func Tables(text string) []Table {
 }
 
 // Rows returns the data rows of every table in text, in the order the page reads them. A header
-// row and a delimiter row are not data rows.
+// row and the delimiter row under it are not data rows.
 func Rows(text string) [][]string {
 	var rows [][]string
 	for _, table := range Tables(text) {
@@ -127,20 +128,21 @@ func Row(line string) []string {
 }
 
 // classify splits one table's rows into its header and its data rows: the row the first delimiter
-// row follows is the header, and with no delimiter row every row is a data row.
+// row follows is the header, and with no delimiter row every row is a data row. Only that one
+// delimiter row is skipped: a row of dashes further down is a data row, as the page renders it.
 func classify(rows [][]string) Table {
-	header := -1
-	for i, row := range rows {
-		if i > 0 && isDelimiterRow(row) {
-			header = i - 1
+	delimiter := -1
+	for i := 1; i < len(rows); i++ {
+		if isDelimiterRow(rows[i]) {
+			delimiter = i
 			break
 		}
 	}
 	var table Table
 	for i, row := range rows {
-		switch {
-		case isDelimiterRow(row):
-		case i == header:
+		switch i {
+		case delimiter:
+		case delimiter - 1:
 			table.Header = row
 		default:
 			table.Rows = append(table.Rows, row)
@@ -149,9 +151,8 @@ func classify(rows [][]string) Table {
 	return table
 }
 
-// isDelimiterRow says whether a row is the one under a table's header, which is neither a header
-// nor a data row: every cell dashes, with a colon at either end or both. A row of empty cells is a
-// data row.
+// isDelimiterRow says whether a row is shaped as the one under a table's header: every cell
+// dashes, with a colon at either end or both. A row of empty cells is not.
 func isDelimiterRow(cells []string) bool {
 	for _, cell := range cells {
 		dashes := strings.TrimSuffix(strings.TrimPrefix(cell, ":"), ":")

@@ -354,6 +354,19 @@ func TestKubernetesDocs_AMatchingContractPasses(t *testing.T) {
 	}
 }
 
+// A key two rows name is refused, so a later table cannot hide an earlier row that is wrong.
+func TestKubernetesDocs_AKeyTwoRowsNameIsRefused(t *testing.T) {
+	const header = "| Secret | Key | Variable | Read by | Value |\n|---|---|---|---|---|\n"
+	section := header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | admin console | the password |\n\n" +
+		header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | the password |\n"
+
+	_, err := contractTable(section)
+
+	if err == nil || !strings.Contains(err.Error(), "two rows for goiabada-secrets/db-password as GOIABADA_DB_PASSWORD") {
+		t.Errorf("a key two rows name was not refused naming it: %v", err)
+	}
+}
+
 func TestKubernetesDocs_AContractWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
@@ -585,8 +598,10 @@ func secretContractFindings(root string) ([]string, error) {
 	return findings, nil
 }
 
-// contractTable reads the table whose header begins contractHeader: each row's Secret, Key and
-// Variable, its Read by, and whether its Value opens with "Optional".
+// contractTable reads every table whose header begins contractHeader: each row's Secret, Key and
+// Variable, its Read by, and whether its Value opens with "Optional". A key two rows name is an
+// error, whichever tables they are in, because the check would hold only one of them to the
+// manifests.
 func contractTable(section string) (map[secretRef]secretReader, error) {
 	rows := map[secretRef]secretReader{}
 	for _, table := range docsreader.Tables(section) {
@@ -598,7 +613,11 @@ func contractTable(section string) (map[secretRef]secretReader, error) {
 				continue
 			}
 			cell := func(i int) string { return strings.Trim(strings.TrimSpace(cells[i]), "`") }
-			rows[secretRef{cell(0), cell(1), cell(2)}] = secretReader{cell(3), strings.HasPrefix(cell(4), "Optional")}
+			ref := secretRef{cell(0), cell(1), cell(2)}
+			if _, twice := rows[ref]; twice {
+				return nil, fmt.Errorf("%s: %s has two rows for %s; one row per key", kubernetesSecretsPage, contractSection, ref)
+			}
+			rows[ref] = secretReader{cell(3), strings.HasPrefix(cell(4), "Optional")}
 		}
 	}
 	if len(rows) == 0 {
