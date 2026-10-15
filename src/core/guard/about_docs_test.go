@@ -12,7 +12,6 @@ package guard
 // It is a test rather than a guard: it reads three files and two pages, and core's tier runs it.
 
 import (
-	"bufio"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,6 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/docsreader"
 )
 
 // The pages and the files they describe, relative to the source root.
@@ -64,7 +65,8 @@ func TestContributingPage_TheTierTableIsEveryTypeRunTestsAccepts(t *testing.T) {
 	accepted := acceptedTestTypes(t, script)
 	require.NotEmpty(t, accepted, "%s: no --type values read", runTestsScript)
 
-	section := pageSection(readFile(t, filepath.Join(root, contributingPage)), testsHeading)
+	section, found := docsreader.SectionText(readFile(t, filepath.Join(root, contributingPage)), testsHeading)
+	require.Truef(t, found, "%s has no %q section", contributingPage, testsHeading)
 	require.NotEmpty(t, section, "%s has no %q section", contributingPage, testsHeading)
 	listed := tableFirstColumnCode(section)
 
@@ -77,13 +79,14 @@ func TestContributingPage_TheTierTableIsEveryTypeRunTestsAccepts(t *testing.T) {
 // ones run-tests.sh's lint tier names.
 func TestContributingPage_NamesEveryRegenerator(t *testing.T) {
 	root := SourceRoot(t)
-	section := pageSection(readFile(t, filepath.Join(root, contributingPage)), generatedHeading)
+	section, found := docsreader.SectionText(readFile(t, filepath.Join(root, contributingPage)), generatedHeading)
+	require.Truef(t, found, "%s has no %q section", contributingPage, generatedHeading)
 	require.NotEmpty(t, section, "%s has no %q section", contributingPage, generatedHeading)
 
 	for _, g := range regenerators {
 		_, err := os.Stat(filepath.Join(root, g.dir, filepath.FromSlash(g.needs)))
 		require.NoError(t, err, "src/%s/%s, which %q needs, does not exist", g.dir, g.needs, g.command)
-		assert.True(t, slices.ContainsFunc(tableRows(section), func(row []string) bool {
+		assert.True(t, slices.ContainsFunc(docsreader.Rows(section), func(row []string) bool {
 			return len(row) == 3 && strings.Contains(row[1], "`"+g.command+"`") && strings.Contains(row[2], "`src/"+g.dir+"`")
 		}), "%s, %s: no row runs %q from src/%s", contributingPage, generatedHeading, g.command, g.dir)
 	}
@@ -99,7 +102,8 @@ func TestContributingPage_NamesEveryRegenerator(t *testing.T) {
 func TestContributingPage_TheDevelopmentValuesAreTheDevContainers(t *testing.T) {
 	root := SourceRoot(t)
 	config := readFile(t, filepath.Join(root, devcontainerConfig))
-	section := pageSection(readFile(t, filepath.Join(root, contributingPage)), devHeading)
+	section, found := docsreader.SectionText(readFile(t, filepath.Join(root, contributingPage)), devHeading)
+	require.Truef(t, found, "%s has no %q section", contributingPage, devHeading)
 	require.NotEmpty(t, section, "%s has no %q section", contributingPage, devHeading)
 
 	for _, key := range []string{
@@ -129,14 +133,13 @@ func TestAboutDocs_TheReaders(t *testing.T) {
 
 	page := "## Run the tests\n\n| Tier (`--type`) | What |\n|---|---|\n| `x` | one |\n| `y` and `z` | two |\n\n```\n| `fenced` | no |\n```\n" +
 		"### Narrow it\n\n| `nested` | a subsection is part of it |\n\n## Next\n\n| `after` | outside |\n"
-	assert.Equal(t, []string{"x", "y", "nested"}, tableFirstColumnCode(pageSection(page, testsHeading)))
-	assert.Empty(t, pageSection("## Run tests\n\n| `x` |\n", testsHeading), "a page with no such section reads nothing")
+	section, found := docsreader.SectionText(page, testsHeading)
+	require.True(t, found, "the page has a ## Run the tests section")
+	assert.Equal(t, []string{"x", "y", "nested"}, tableFirstColumnCode(section))
 
 	config := "{\n\t\"containerEnv\": {\n\t\t\"A_KEY\": \"a value\",\n\t\t// \"B_KEY\": \"commented\"\n\t}\n}\n"
 	assert.Equal(t, "a value", containerEnvValue(config, "A_KEY"))
 	assert.Empty(t, containerEnvValue(config, "B_KEY"), "a commented-out entry is not set")
-
-	assert.Equal(t, [][]string{{"A", "`b`"}, {"`c`", "d e"}}, tableRows("text\n| A | `b` |\n|---|:-:|\n| `c` | d e |\n"))
 
 	assert.Equal(t, []string{"one\ntwo", "three"}, fencedBlocks("text\n```text\none\ntwo\n```\nmore\n```\nthree\n```\n"))
 }
@@ -159,75 +162,21 @@ func acceptedTestTypes(t *testing.T, script string) []string {
 	return strings.Split(arm[1], "|")
 }
 
-// pageSection is the text of the section heading opens, up to the next heading of its level or
-// above, with fenced code left out, and empty when the page has no such section.
-func pageSection(page, heading string) string {
-	level := strings.Index(heading, " ")
-	var section strings.Builder
-	inSection, inFence := false, false
-	scanner := bufio.NewScanner(strings.NewReader(page))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
-			continue
-		}
-		if hashes := len(line) - len(strings.TrimLeft(line, "#")); hashes > 0 && strings.HasPrefix(line[hashes:], " ") {
-			if inSection && hashes <= level {
-				break
-			}
-			inSection = inSection || strings.TrimSpace(line) == heading
-			continue
-		}
-		if inSection {
-			section.WriteString(line + "\n")
-		}
-	}
-	return section.String()
-}
-
 // tableFirstColumnCode is the first code span of each table body row's first cell, in order. A
 // header row, the one a delimiter row follows, is not a body row, whatever its cell holds.
+// tableFirstColumnCode is the first code span of each table body row's first cell, in order.
 func tableFirstColumnCode(section string) []string {
 	code := regexp.MustCompile("`([^`]+)`")
-	delimiter := regexp.MustCompile(`^\|[\s:|-]+$`)
-	lines := strings.Split(section, "\n")
 	var out []string
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") || delimiter.MatchString(line) {
+	for _, row := range docsreader.Rows(section) {
+		if len(row) == 0 {
 			continue
 		}
-		if i+1 < len(lines) && delimiter.MatchString(strings.TrimSpace(lines[i+1])) {
-			continue
-		}
-		cell, _, _ := strings.Cut(strings.TrimPrefix(line, "|"), "|")
-		if m := code.FindStringSubmatch(cell); m != nil {
+		if m := code.FindStringSubmatch(row[0]); m != nil {
 			out = append(out, m[1])
 		}
 	}
 	return out
-}
-
-// tableRows is each table row of a section split into its cells, trimmed, delimiter rows left out.
-func tableRows(section string) [][]string {
-	delimiter := regexp.MustCompile(`^\|[\s:|-]+$`)
-	var rows [][]string
-	for _, line := range strings.Split(section, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") || delimiter.MatchString(line) {
-			continue
-		}
-		var cells []string
-		for _, cell := range strings.Split(strings.Trim(line, "|"), "|") {
-			cells = append(cells, strings.TrimSpace(cell))
-		}
-		rows = append(rows, cells)
-	}
-	return rows
 }
 
 // containerEnvValue is the value devcontainer.json gives key on a line of its own, and empty when no

@@ -31,6 +31,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -306,15 +307,14 @@ func assertRegistrationExample(r guard.Reporter, root string, section conceptSec
 // /connect/register is the request, and the first one opening with a status line is the answer. Each
 // one's body is what follows its first blank line.
 func guideRegistrationExample(root string, section conceptSection) (registrationExample, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
-		return registrationExample{}, fmt.Errorf("reading %s: %w", section.page, err)
+		return registrationExample{}, err
 	}
-	level := conceptHeadingLevel(section.heading)
 	var blocks [][]string
 	var block []string
-	inSection, inHTTP, inFence := false, false, false
-	for _, line := range strings.Split(string(content), "\n") {
+	inHTTP := false
+	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		fence := strings.HasPrefix(trimmed, "```")
 		switch {
@@ -323,21 +323,9 @@ func guideRegistrationExample(root string, section conceptSection) (registration
 			inHTTP, block = false, nil
 		case inHTTP:
 			block = append(block, trimmed)
-		case inFence:
-			inFence = !fence
-		case !inSection:
-			inSection = strings.TrimRight(line, " \r") == section.heading
 		case fence:
 			inHTTP = trimmed == "```http"
-			inFence = !inHTTP
-		default:
-			if headingLevel := conceptHeadingLevel(line); headingLevel > 0 && headingLevel <= level {
-				return readRegistrationBlocks(section, blocks)
-			}
 		}
-	}
-	if !inSection {
-		return registrationExample{}, fmt.Errorf("%s has no section headed %q", section.page, section.heading)
 	}
 	return readRegistrationBlocks(section, blocks)
 }

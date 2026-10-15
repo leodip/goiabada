@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -771,11 +772,11 @@ func rateLimitTableFindings(root string, section docSection, tiers []rateLimitTi
 	if len(tiers) == 0 {
 		return nil, fmt.Errorf("%s: %s was handed no tier to hold its table to", section.page, section.heading)
 	}
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
-	rows := docTableRows(text)
+	rows := docsreader.Rows(text)
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: %s holds no table of the rate limits", section.page, section.heading)
 	}
@@ -943,41 +944,6 @@ type docSection struct {
 	heading string
 }
 
-// docSectionText is the section's text, without its heading line: from the line after the heading
-// to the next heading of the same level or above. A line inside a code fence is never a heading,
-// so a shell comment in an example does not end the section.
-func docSectionText(root string, section docSection) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
-	if err != nil {
-		return "", fmt.Errorf("reading %s: %w", section.page, err)
-	}
-	level := docHeadingLevel(section.heading)
-	var body []string
-	inFence, inSection := false, false
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-		}
-		if !inFence {
-			if inSection {
-				if headingLevel := docHeadingLevel(line); headingLevel > 0 && headingLevel <= level {
-					return strings.Join(body, "\n"), nil
-				}
-			} else if strings.TrimRight(line, " \r") == section.heading {
-				inSection = true
-				continue
-			}
-		}
-		if inSection {
-			body = append(body, line)
-		}
-	}
-	if !inSection {
-		return "", fmt.Errorf("%s has no section headed %q", section.page, section.heading)
-	}
-	return strings.Join(body, "\n"), nil
-}
-
 // docHeadingLevel is the number of #s a Markdown heading line opens with, or 0 for any other line.
 func docHeadingLevel(line string) int {
 	level := len(line) - len(strings.TrimLeft(line, "#"))
@@ -985,35 +951,6 @@ func docHeadingLevel(line string) int {
 		return 0
 	}
 	return level
-}
-
-// docTableRows is the body rows of the first Markdown table in text, each trimmed cell in order:
-// the header row and the delimiter row under it are left out.
-func docTableRows(text string) [][]string {
-	var rows [][]string
-	inTable := false
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			if inTable {
-				break
-			}
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		if !inTable {
-			inTable = true // the header row
-			continue
-		}
-		if strings.Trim(strings.Join(cells, ""), "-: ") == "" {
-			continue // the delimiter row
-		}
-		rows = append(rows, cells)
-	}
-	return rows
 }
 
 // writeDocFixture writes content to root/name, creating its directory.

@@ -252,6 +252,11 @@ command itself and fails on a tree it changed.
 | `core/countries` | `All` | kernel | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | kernel | — |
+| `core/docsreader` | `Rows` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
+| `core/docsreader` | `Section` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's pages through it. |
+| `core/docsreader` | `SectionText` | test-support | Test support: compiled into no binary, and the docs tests of every module read already-read pages through it. |
+| `core/docsreader` | `Table` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
+| `core/docsreader` | `Tables` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
 | `core/errs` | `Errorf` | kernel | — |
 | `core/errs` | `Join` | both-apps | — |
 | `core/errs` | `New` | kernel | — |

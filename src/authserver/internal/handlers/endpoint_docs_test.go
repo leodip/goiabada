@@ -46,6 +46,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/guard"
 )
@@ -301,7 +302,7 @@ func TestEndpointDocs_AMissingImageSectionStops(t *testing.T) {
 // not hold verbatim; a stop for a section not found.
 func assertSectionSays(r guard.Reporter, root string, section conceptSection, texts []string) {
 	r.Helper()
-	text, err := conceptSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		r.Fatalf("%v", err)
 		return
@@ -325,7 +326,7 @@ func TestEndpointDocs_TheUserInfoProcedureChecksTheSubjectFirst(t *testing.T) {
 		"[OpenID Connect Core section 5.3.2](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse)",
 	})
 
-	text, err := conceptSectionText(root, readClaimsSection)
+	text, err := docsreader.Section(root, readClaimsSection.page, readClaimsSection.heading)
 	if err != nil {
 		t.Fatal(err)
 	}

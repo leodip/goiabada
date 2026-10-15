@@ -14,7 +14,6 @@ package protocolvalidation
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -136,7 +136,7 @@ func TestManageAccountRefreshDocs_AMissingSectionStops(t *testing.T) {
 // does not hold verbatim; a stop for a section not found.
 func assertRefreshSectionSays(r guard.Reporter, root string, section refreshDocSection, texts []string) {
 	r.Helper()
-	text, err := refreshDocSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		r.Fatalf("%v", err)
 		return
@@ -153,7 +153,7 @@ func assertRefreshSectionSays(r guard.Reporter, root string, section refreshDocS
 // section not found.
 func assertRefreshReasonRows(r guard.Reporter, root string, section refreshDocSection, descriptions []string, text string) {
 	r.Helper()
-	body, err := refreshDocSectionText(root, section)
+	body, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		r.Fatalf("%v", err)
 		return
@@ -190,47 +190,6 @@ func assertRefreshReasonRows(r guard.Reporter, root string, section refreshDocSe
 			r.Errorf("%s: %s has no row for %q", section.page, section.heading, description)
 		}
 	}
-}
-
-// refreshDocSectionText is the text under a heading, up to the next heading of the same level or
-// above, a heading inside a code fence not counting as one.
-func refreshDocSectionText(root string, section refreshDocSection) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
-	if err != nil {
-		return "", fmt.Errorf("reading %s: %w", section.page, err)
-	}
-	headingLevel := func(line string) int {
-		level := len(line) - len(strings.TrimLeft(line, "#"))
-		if level == 0 || !strings.HasPrefix(line[level:], " ") {
-			return 0
-		}
-		return level
-	}
-	level := headingLevel(section.heading)
-	var body []string
-	inFence, inSection := false, false
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-		}
-		if !inFence {
-			if inSection {
-				if l := headingLevel(line); l > 0 && l <= level {
-					return strings.Join(body, "\n"), nil
-				}
-			} else if strings.TrimRight(line, " \r") == section.heading {
-				inSection = true
-				continue
-			}
-		}
-		if inSection {
-			body = append(body, line)
-		}
-	}
-	if !inSection {
-		return "", fmt.Errorf("%s has no section headed %q", section.page, section.heading)
-	}
-	return strings.Join(body, "\n"), nil
 }
 
 func writeRefreshDocFixture(t *testing.T, root, name, content string) {

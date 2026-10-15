@@ -99,6 +99,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/builtin` | kernel | — |
 | `core/cmd` | kernel | — |
 | `core/countries` | kernel | — |
+| `core/docsreader` | kernel | — |
 | `core/errs` | kernel | — |
 | `core/gender` | kernel | — |
 | `core/guard` | kernel | — |
@@ -140,6 +141,13 @@ Notes on rows that are not self-evident:
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
   edge was noticed when `uuidutil` moved, and `fake` moved with it to the auth server, where it is
   `authserver/internal/fake` since #442. No admin console file ever imported it.
+- `core/docsreader` is kernel because it is test support compiled into no binary: the docs tests of
+  every module read the site's sections and tables through it, so a fix to how a heading inside a
+  fence or an escaped pipe in a cell is read is made once, where a dozen per-package copies each
+  had to be fixed before (#536). It is a leaf of its own rather than a file in `core/guard` because
+  the setup wizard's docs tests read through it too, and a test the wizard reaches may not import
+  `core/guard`, whose dependencies would land in the wizard's go.sum: it imports nothing but
+  `core/errs` and the standard library, and its own tests do the same (#500).
 - `core/metrics` is kernel because both servers expose their metrics through it: the registry whose
   labels take only declared values, the Prometheus text exposition and the request middleware. It is
   written here rather than taken from `prometheus/client_golang`, which would add eight modules and

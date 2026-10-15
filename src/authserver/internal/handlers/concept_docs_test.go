@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/require"
 )
@@ -523,24 +524,24 @@ func assertSignInTable(r guard.Reporter, root string, section conceptSection, wa
 // conceptTableColumns is the named columns of the first Markdown table in a section, row by row, each
 // cell with the backticks and double quotes around it removed.
 func conceptTableColumns(root string, section conceptSection, headers ...string) ([][]string, error) {
-	text, err := conceptSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
-	rows := conceptTableRows(text)
-	if len(rows) == 0 {
+	tables := docsreader.Tables(text)
+	if len(tables) == 0 {
 		return nil, fmt.Errorf("%s: %s has no table", section.page, section.heading)
 	}
 	var indexes []int
 	for _, header := range headers {
-		index := slices.Index(rows[0], header)
+		index := slices.Index(tables[0].Header, header)
 		if index < 0 {
 			return nil, fmt.Errorf("%s: %s's table has no column headed %s", section.page, section.heading, header)
 		}
 		indexes = append(indexes, index)
 	}
 	var columns [][]string
-	for _, row := range rows[1:] {
+	for _, row := range tables[0].Rows {
 		var cells []string
 		for _, index := range indexes {
 			cell := ""
@@ -552,73 +553,6 @@ func conceptTableColumns(root string, section conceptSection, headers ...string)
 		columns = append(columns, cells)
 	}
 	return columns, nil
-}
-
-// conceptSectionText is the text under a heading, up to the next heading of the same level or above,
-// a heading inside a code fence not counting as one.
-func conceptSectionText(root string, section conceptSection) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
-	if err != nil {
-		return "", fmt.Errorf("reading %s: %w", section.page, err)
-	}
-	level := conceptHeadingLevel(section.heading)
-	var body []string
-	inFence, inSection := false, false
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-		}
-		if !inFence {
-			if inSection {
-				if headingLevel := conceptHeadingLevel(line); headingLevel > 0 && headingLevel <= level {
-					return strings.Join(body, "\n"), nil
-				}
-			} else if strings.TrimRight(line, " \r") == section.heading {
-				inSection = true
-				continue
-			}
-		}
-		if inSection {
-			body = append(body, line)
-		}
-	}
-	if !inSection {
-		return "", fmt.Errorf("%s has no section headed %q", section.page, section.heading)
-	}
-	return strings.Join(body, "\n"), nil
-}
-
-// conceptHeadingLevel is the number of #s a Markdown heading line opens with, or 0 for any other line.
-func conceptHeadingLevel(line string) int {
-	level := len(line) - len(strings.TrimLeft(line, "#"))
-	if level == 0 || !strings.HasPrefix(line[level:], " ") {
-		return 0
-	}
-	return level
-}
-
-// conceptTableRows is the first Markdown table in text, its header row first and its delimiter row
-// left out, each cell trimmed.
-func conceptTableRows(text string) [][]string {
-	var rows [][]string
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			if len(rows) > 0 {
-				break
-			}
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		if len(rows) > 0 && strings.Trim(strings.Join(cells, ""), "-: ") == "" {
-			continue
-		}
-		rows = append(rows, cells)
-	}
-	return rows
 }
 
 func writeConceptFixture(t *testing.T, root, name, content string) {

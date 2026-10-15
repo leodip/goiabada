@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/require"
 )
@@ -200,50 +201,29 @@ func assertDefaultsTable(r guard.Reporter, root string, section defaultsSection,
 	}
 }
 
-// defaultsTableRows is the setting and the first word of the default of each row of the first
-// Setting and Default table in a section, the setting's bold removed. The section runs from its
-// heading to the next heading of the same level or above.
+// defaultsTableRows is the Setting and Default table of the section heading opens, one row per
+// setting: its name and the default the page shows. The section is read through the shared reader,
+// and the table the section's tables hold whose header names the two columns.
 func defaultsTableRows(root string, section defaultsSection) ([][2]string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", section.page, err)
+		return nil, err
 	}
-	level := strings.Index(section.heading, " ")
 	var rows [][2]string
-	inSection, inTable := false, false
-	for _, line := range strings.Split(string(content), "\n") {
-		if inSection {
-			if hashes := len(line) - len(strings.TrimLeft(line, "#")); hashes > 0 && hashes <= level &&
-				strings.HasPrefix(line[hashes:], " ") {
-				break
-			}
-		} else {
-			inSection = strings.TrimRight(line, " \r") == section.heading
+	found := false
+	for _, table := range docsreader.Tables(text) {
+		if len(table.Header) < 2 || table.Header[0] != "Setting" || table.Header[1] != "Default" {
 			continue
 		}
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			if inTable {
-				break
+		found = true
+		for _, cells := range table.Rows {
+			if len(cells) >= 2 && strings.Trim(cells[0], "-: ") != "" {
+				value, _, _ := strings.Cut(cells[1], " ")
+				rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
 			}
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		switch {
-		case !inTable:
-			inTable = len(cells) >= 2 && cells[0] == "Setting" && cells[1] == "Default"
-		case len(cells) >= 2 && strings.Trim(cells[0], "-: ") != "":
-			value, _, _ := strings.Cut(cells[1], " ")
-			rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
 		}
 	}
-	if !inSection {
-		return nil, fmt.Errorf("%s has no section headed %q", section.page, section.heading)
-	}
-	if !inTable {
+	if !found {
 		return nil, fmt.Errorf("%s: %s has no Setting and Default table", section.page, section.heading)
 	}
 	return rows, nil

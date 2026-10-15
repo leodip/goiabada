@@ -22,6 +22,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/mock"
 )
@@ -193,14 +194,13 @@ func assertExampleToken(r guard.Reporter, root string, section guideSection, cla
 // guideExampleClaims is the top-level names of the first json code block in a section, the section
 // being the text under its heading up to the next heading of the same level or above.
 func guideExampleClaims(root string, section guideSection) ([]string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", section.page, err)
+		return nil, err
 	}
-	level := guideHeadingLevel(section.heading)
 	var block []string
-	inSection, inExample, inFence := false, false, false
-	for _, line := range strings.Split(string(content), "\n") {
+	inExample := false
+	for _, line := range strings.Split(text, "\n") {
 		fence := strings.HasPrefix(strings.TrimSpace(line), "```")
 		switch {
 		case inExample && fence:
@@ -211,32 +211,11 @@ func guideExampleClaims(root string, section guideSection) ([]string, error) {
 			return claimNames(claims), nil
 		case inExample:
 			block = append(block, line)
-		case inFence:
-			inFence = !fence
 		case fence:
-			inExample = inSection && strings.TrimSpace(line) == "```json"
-			inFence = !inExample
-		case !inSection:
-			inSection = strings.TrimRight(line, " \r") == section.heading
-		default:
-			if headingLevel := guideHeadingLevel(line); headingLevel > 0 && headingLevel <= level {
-				return nil, fmt.Errorf("%s: %s has no json example", section.page, section.heading)
-			}
+			inExample = strings.TrimSpace(line) == "```json"
 		}
 	}
-	if !inSection {
-		return nil, fmt.Errorf("%s has no section headed %q", section.page, section.heading)
-	}
 	return nil, fmt.Errorf("%s: %s has no json example", section.page, section.heading)
-}
-
-// guideHeadingLevel is the number of #s a Markdown heading line opens with, or 0 for any other line.
-func guideHeadingLevel(line string) int {
-	level := len(line) - len(strings.TrimLeft(line, "#"))
-	if level == 0 || !strings.HasPrefix(line[level:], " ") {
-		return 0
-	}
-	return level
 }
 
 func writeGuideFixture(t *testing.T, root, name, content string) {

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,38 +91,30 @@ func schemaRecordsAStartWrites(t *testing.T) map[string][]string {
 // an empty list.
 func upgradeRecordsTable(t *testing.T, page string) map[string][]string {
 	t.Helper()
-	_, section, found := strings.Cut(page, "\n## How migrations run\n")
+	section, found := docsreader.SectionText(page, "## How migrations run")
 	require.Truef(t, found, "%s has no section headed ## How migrations run", upgradePage)
-	if next := strings.Index(section, "\n## "); next >= 0 {
-		section = section[:next]
-	}
 	rows := map[string][]string{}
-	inTable := false
-	for _, line := range strings.Split(section, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "| Record | When | Attributes |") {
-			inTable = true
+	holdsTable := false
+	for _, table := range docsreader.Tables(section) {
+		if len(table.Header) < 3 || table.Header[0] != "Record" || table.Header[1] != "When" || table.Header[2] != "Attributes" {
 			continue
 		}
-		if !inTable {
-			continue
-		}
-		if !strings.HasPrefix(line, "|") {
-			break
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		if len(cells) != 3 || strings.HasPrefix(strings.TrimSpace(cells[0]), "---") {
-			continue
-		}
-		attrs := []string{}
-		if cell := strings.TrimSpace(cells[2]); cell != "none" {
-			for _, name := range strings.Split(cell, ",") {
-				attrs = append(attrs, strings.Trim(strings.TrimSpace(name), "`"))
+		holdsTable = true
+		for _, cells := range table.Rows {
+			if len(cells) != 3 {
+				continue
 			}
+			attrs := []string{}
+			if cell := cells[2]; cell != "none" {
+				for _, name := range strings.Split(cell, ",") {
+					attrs = append(attrs, strings.Trim(strings.TrimSpace(name), "`"))
+				}
+			}
+			sort.Strings(attrs)
+			rows[strings.Trim(cells[0], "`")] = attrs
 		}
-		sort.Strings(attrs)
-		rows[strings.Trim(strings.TrimSpace(cells[0]), "`")] = attrs
 	}
+	require.Truef(t, holdsTable, "%s: ## How migrations run holds no table headed | Record | When | Attributes |", upgradePage)
 	require.NotEmptyf(t, rows, "%s: ## How migrations run holds no table headed | Record | When | Attributes |", upgradePage)
 	return rows
 }

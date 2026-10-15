@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -11,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/docsreader"
 )
 
 // setupWizardPage is the docs page about this wizard, flagsHeading its section listing every flag,
@@ -60,19 +60,25 @@ type flagRow struct {
 // readFlagRows reads the table in the section that heading opens. A page without the section, or a
 // section with no row naming a flag, is an error: a check that read nothing would pass whatever the
 // page said.
+// readFlagRows reads the table in the section that heading opens. A page without the section, or a
+// section with no row naming a flag, is an error: a check that read nothing would pass whatever the
+// page said.
 func readFlagRows(page []byte, heading string) ([]flagRow, error) {
-	lines, found := sectionTableLines(page, heading)
+	text, found := docsreader.SectionText(string(page), heading)
 	if !found {
 		return nil, fmt.Errorf("no %q section", heading)
 	}
 	var rows []flagRow
-	for _, line := range lines {
+	for _, row := range docsreader.Rows(text) {
+		if len(row) == 0 {
+			continue
+		}
 		var names []string
-		for _, match := range flagCode.FindAllStringSubmatch(firstCell(line), -1) {
+		for _, match := range flagCode.FindAllStringSubmatch(row[0], -1) {
 			names = append(names, match[1])
 		}
 		if len(names) > 0 {
-			rows = append(rows, flagRow{flags: names, text: line})
+			rows = append(rows, flagRow{flags: names, text: strings.Join(row, " | ")})
 		}
 	}
 	if len(rows) == 0 {
@@ -81,54 +87,8 @@ func readFlagRows(page []byte, heading string) ([]flagRow, error) {
 	return rows, nil
 }
 
-// sectionTableLines is every table line in the section that heading opens, which runs to the next
-// heading of its level or above, with fenced code ignored. found is false when the page has no such
-// section.
-func sectionTableLines(page []byte, heading string) (lines []string, found bool) {
-	level := strings.Index(heading, " ")
-	inSection, inFence := false, false
-	scanner := bufio.NewScanner(bytes.NewReader(page))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-			continue
-		}
-		if inFence {
-			continue
-		}
-		if hashes := headingLevel(line); hashes > 0 {
-			if inSection && hashes <= level {
-				break
-			}
-			if strings.TrimSpace(line) == heading {
-				inSection, found = true, true
-			}
-			continue
-		}
-		if inSection && strings.HasPrefix(line, "|") {
-			lines = append(lines, line)
-		}
-	}
-	return lines, found
-}
-
-// firstCell is the text of a table line's first cell.
-func firstCell(line string) string {
-	return strings.TrimSpace(strings.Split(strings.Trim(line, "| "), "|")[0])
-}
-
 // flagCode is a flag in a code span, `--name` or `-n`, with its value if the span shows one.
 var flagCode = regexp.MustCompile("`--?([a-z][a-z0-9-]*)[^`]*`")
-
-// headingLevel is the number of #s opening a Markdown heading, and 0 for any other line.
-func headingLevel(line string) int {
-	hashes := len(line) - len(strings.TrimLeft(line, "#"))
-	if hashes == 0 || hashes > 6 || !strings.HasPrefix(line[hashes:], " ") {
-		return 0
-	}
-	return hashes
-}
 
 // flagTableFindings compares the table with the flags the wizard declares, in both directions, and
 // each row of values with the values it must name.
@@ -266,23 +226,22 @@ func wizardQuestions() []string {
 	return questions
 }
 
-// tableDelimiter is the line under a table's header row.
-var tableDelimiter = regexp.MustCompile(`^\|[\s:|-]+$`)
-
+// readQuestions reads the first cell of every body row of the table in the section that heading
+// opens: a header row, the one above a delimiter line, names no question. A page without the
+// section, or a section with no question row, is an error.
 // readQuestions reads the first cell of every body row of the table in the section that heading
 // opens: a header row, the one above a delimiter line, names no question. A page without the
 // section, or a section with no question row, is an error.
 func readQuestions(page []byte, heading string) ([]string, error) {
-	lines, found := sectionTableLines(page, heading)
+	text, found := docsreader.SectionText(string(page), heading)
 	if !found {
 		return nil, fmt.Errorf("no %q section", heading)
 	}
 	var questions []string
-	for i, line := range lines {
-		if tableDelimiter.MatchString(line) || (i+1 < len(lines) && tableDelimiter.MatchString(lines[i+1])) {
-			continue
+	for _, row := range docsreader.Rows(text) {
+		if len(row) > 0 {
+			questions = append(questions, row[0])
 		}
-		questions = append(questions, firstCell(line))
 	}
 	if len(questions) == 0 {
 		return nil, fmt.Errorf("the %q section has no table row naming a question", heading)
