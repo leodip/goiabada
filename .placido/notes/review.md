@@ -28,10 +28,7 @@
 - **Browser tests:** the Playwright suite under `e2e/` runs against one shared
   environment on a VPS, and placido runs it whole as the last gate, after the
   review. Do not run `e2e` or the scripts under `e2e/` yourself, and do not count a
-  spec that has not run yet as missing evidence. Check instead that the specs the
-  agreement names are there; that a change to a page, a message, or a flow updates
-  the specs under `e2e/playwright/tests/` that assert it; that no `test.fail()`
-  marker is left for a gap the change closes (search for `#<this issue>`); that new
-  or changed specs follow the rules under "Browser tests" in `e2e/README.md`; and
-  that their types check on the host (`cd e2e/playwright && npm ci && npm run
-  typecheck`). A spec the agreement names but the change lacks is a finding.
+  spec that has not run yet as missing evidence. Check that the change adds or
+  updates the specs under `e2e/playwright/tests/` it needs, the ones the agreement
+  names among them, that they follow `e2e/README.md`, and that their types check on
+  the host (`cd e2e/playwright && npm ci && npm run typecheck`).

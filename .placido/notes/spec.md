@@ -19,22 +19,7 @@
   `src/authserver/web/openapi.yaml`. Use `site/STYLE.md` and its linked glossary
   for wording; breaking changes and migration steps belong in release notes.
 - **Browser tests:** `e2e/` holds a Playwright suite that runs against a real
-  deployment on a VPS (see `e2e/README.md`): the admin console's pages
-  (`admin-console/`), the test app's flows (`testapp/`), and the protocol, with
-  conformance suites for RFC 6749 and RFC 9700 (`rfc6749/`, `rfc9700/`, `oauth/`).
-  Placido runs it whole as the last gate, after the review, against an environment
-  rebuilt from the branch; no agent runs it. In every interview, before sealing,
-  settle the e2e work and name it in the agreement, in the slices that change the
-  behavior:
-  - **Gaps this issue closes:** search `e2e/playwright/tests/` for `#<this issue>`.
-    A known gap is a test marked `test.fail()`, with a comment naming its issue and
-    item. The slice that closes the gap removes the marker; left in, the test
-    passes and the suite fails.
-  - **Specs the change breaks:** search the suite for what the change alters
-    (routes, status codes, response parameters, discovery keys, messages, page
-    text, settings), and name each spec to update.
-  - **Coverage to add:** where the change adds or fixes behavior that a real
-    deployment shows better than the integration tier (a page in the browser, a
-    redirect across sites, a sign-in through the test app, mail, a protocol
-    response over HTTPS, a requirement of an RFC the suites cover), propose the
-    cases to add, and name the ones agreed.
+  deployment on a VPS (see `e2e/README.md`). Placido runs it whole as the last gate,
+  after the review; no agent runs it. In every interview, look at
+  `e2e/playwright/tests/`, decide which specs to add or update for this change, and
+  name them in the agreement, in the slices that change that behavior.
