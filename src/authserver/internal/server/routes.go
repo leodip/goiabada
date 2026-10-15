@@ -136,7 +136,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// ceremony load, its id check, the state gate, the step redirects and the error responses to a
 	// client are each written once.
 	ceremonyBoundary := handlers.NewCeremonyBoundary(httpHelper, ceremonyStore, auditLogger, baseURL, adminConsoleBaseURL)
-	clientErrorResponder := handlers.NewClientErrorResponder(s.database, httpHelper, s.templateFS)
+	clientErrorResponder := handlers.NewClientErrorResponder(s.database, httpHelper)
 
 	pages.Route("/auth", func(r chi.Router) {
 		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the

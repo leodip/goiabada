@@ -53,7 +53,7 @@ var (
 // a state.
 func implicitAnswerParameters(t *testing.T) []string {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/auth/issue", nil)
+	req := withResponseIssuer(httptest.NewRequest(http.MethodGet, "/auth/issue", nil))
 	rr := httptest.NewRecorder()
 	err := issueImplicitTokens(rr, req, nil, "", "https://app.example.com/callback", "af0ifjsldkj",
 		&issuance.ImplicitGrantResponse{

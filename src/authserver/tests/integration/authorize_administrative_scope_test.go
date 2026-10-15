@@ -197,7 +197,7 @@ func TestAuthorize_AdministrativeScope_RefusedForASignedInBrowser(t *testing.T) 
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	assert.Equal(t, administrativeScopeRedirectURI+"?error=invalid_scope"+
 		"&error_description="+url.QueryEscape(administrativeScopeRefusal)+
-		"&state="+administrativeScopeState, resp.Header.Get("Location"))
+		"&state="+administrativeScopeState+issParam(t), resp.Header.Get("Location"))
 	f.assertRefusedAtAuthorize(t)
 }
 
@@ -214,7 +214,7 @@ func TestAuthorize_AdministrativeScope_RefusedForPromptNone(t *testing.T) {
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	assert.Equal(t, administrativeScopeRedirectURI+"?error=invalid_scope"+
 		"&error_description="+url.QueryEscape(administrativeScopeRefusal)+
-		"&state="+administrativeScopeState, resp.Header.Get("Location"))
+		"&state="+administrativeScopeState+issParam(t), resp.Header.Get("Location"))
 	f.assertRefusedAtAuthorize(t)
 }
 
@@ -232,7 +232,7 @@ func TestAuthorize_AdministrativeScope_RefusedForTheImplicitFlow(t *testing.T) {
 			require.Equal(t, http.StatusFound, resp.StatusCode)
 			assert.Equal(t, administrativeScopeRedirectURI+"#error=invalid_scope"+
 				"&error_description="+url.QueryEscape(administrativeScopeRefusal)+
-				"&state="+administrativeScopeState, resp.Header.Get("Location"))
+				"&state="+administrativeScopeState+issParam(t), resp.Header.Get("Location"))
 		})
 	}
 
@@ -257,7 +257,7 @@ func TestAuthorize_AdministrativeScope_RefusedForASignedOutBrowserAfterTheSignIn
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	assert.Equal(t, administrativeScopeRedirectURI+"?error=invalid_scope"+
 		"&error_description="+url.QueryEscape(administrativeScopeRefusal)+
-		"&state="+administrativeScopeState, resp.Header.Get("Location"))
+		"&state="+administrativeScopeState+issParam(t), resp.Header.Get("Location"))
 	assert.Empty(t, administrativeScopeRefusedRows(t, f.client.ClientIdentifier),
 		"a refusal nobody had authenticated for leaves no audit row")
 }

@@ -84,7 +84,7 @@ func HandleIssueGet(
 				return
 			}
 			// A failure here leaves the code unredeemed rather than delivered; it expires in 60 seconds.
-			err = issueAuthCode(w, r, responder.templateFS, result.Code, authContext.ResponseMode)
+			err = issueAuthCode(w, r, responder.formPostFS, result.Code, authContext.ResponseMode)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 			}
@@ -94,7 +94,7 @@ func HandleIssueGet(
 				boundary.answerStepSaveFailure(w, r, result.ClearErr)
 				return
 			}
-			err = issueImplicitTokens(w, r, responder.templateFS, authContext.ResponseMode, authContext.RedirectURI,
+			err = issueImplicitTokens(w, r, responder.formPostFS, authContext.ResponseMode, authContext.RedirectURI,
 				authContext.State, result.Tokens)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
@@ -113,7 +113,7 @@ func HandleIssueGet(
 func issueImplicitTokens(
 	w http.ResponseWriter,
 	r *http.Request,
-	templateFS fs.FS,
+	formPostFS fs.FS,
 	responseMode string,
 	redirectURI string,
 	state string,
@@ -130,7 +130,8 @@ func issueImplicitTokens(
 		return err
 	}
 
-	// The response's parameters, in the order they reach the client.
+	// The response's parameters, in the order they reach the client, iss last: writeAuthorizationResponse
+	// appends it for every response.
 	//
 	// state is appended on its value being non-empty and nothing else. There is no TrimSpace: RFC
 	// 6749 section 3.1 says "Parameters sent without a value MUST be treated as if they were
@@ -172,10 +173,10 @@ func issueImplicitTokens(
 	//
 	// Field order is declaration order rather than Encode's alphabetical sort. Nothing depends on
 	// it: RFC 6749 4.2.2 defines a set of parameters and not a sequence.
-	return writeAuthorizationResponse(w, r, templateFS, implicitResponseMode(responseMode), redirectURI, params)
+	return writeAuthorizationResponse(w, r, formPostFS, implicitResponseMode(responseMode), redirectURI, params)
 }
 
-func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, code *record.Code, responseMode string) error {
+func issueAuthCode(w http.ResponseWriter, r *http.Request, formPostFS fs.FS, code *record.Code, responseMode string) error {
 
 	// checkRedirectURIEmittable, the last resort, above the response-mode dispatch so that it covers
 	// query, fragment and form_post alike. All three emit the stored value: the first two into a Location header,
@@ -190,7 +191,8 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 	}
 
 	// The response's parameters, in the order they reach the client, built once for all three
-	// response modes because all three answer with the same two fields.
+	// response modes because all three answer with the same fields. writeAuthorizationResponse
+	// appends iss after them.
 	//
 	// state is appended on its value being non-empty and nothing else, the same rule the error
 	// emitter states at length: RFC 6749 section 3.1 makes a parameter sent without a value an
@@ -204,5 +206,5 @@ func issueAuthCode(w http.ResponseWriter, r *http.Request, templateFS fs.FS, cod
 
 	// An empty response mode is the query, the default for response_type=code (OAuth 2.0 Multiple
 	// Response Type Encoding Practices 2.1).
-	return writeAuthorizationResponse(w, r, templateFS, responseMode, code.RedirectURI, params)
+	return writeAuthorizationResponse(w, r, formPostFS, responseMode, code.RedirectURI, params)
 }

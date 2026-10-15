@@ -155,8 +155,8 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		}
 	})
 
-	// The bind map holds exactly the parameters the fragment would carry, so an operator-supplied
-	// template that enumerates it sees the same set (#146), and an absent state is absent rather than
+	// The bind map holds exactly the parameters the fragment would carry, so a template that
+	// enumerates it sees the same set (#146), and an absent state is absent rather than
 	// empty.
 	t.Run("the bind map holds the redirect URI and the parameters, and no absent state", func(t *testing.T) {
 		const keysTemplate = `{{range $k, $v := .}}[{{$k}}]{{end}}`
@@ -166,11 +166,11 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 			want  string
 		}{
 			{name: "a state the client sent", state: "abc123",
-				want: `[access_token][expires_in][id_token][redirectURI][scope][state][token_type]`},
+				want: `[access_token][expires_in][id_token][iss][redirectURI][scope][state][token_type]`},
 			{name: "a whitespace-only state", state: "   ",
-				want: `[access_token][expires_in][id_token][redirectURI][scope][state][token_type]`},
+				want: `[access_token][expires_in][id_token][iss][redirectURI][scope][state][token_type]`},
 			{name: "no state at all", state: "",
-				want: `[access_token][expires_in][id_token][redirectURI][scope][token_type]`},
+				want: `[access_token][expires_in][id_token][iss][redirectURI][scope][token_type]`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
@@ -276,7 +276,7 @@ func TestIssueImplicitTokens_FragmentIsTheDefault(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusFound, w.Code)
 			assert.Equal(t,
-				"https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&id_token=id-token-123&scope=openid+profile&state=test-state",
+				"https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&id_token=id-token-123&scope=openid+profile&state=test-state&iss=https%3A%2F%2Fissuer.example",
 				w.Header().Get("Location"))
 		})
 	}
@@ -374,7 +374,7 @@ func TestRedirToClientWithError_ImplicitFlow_QueryIsAnsweredInTheFragment(t *tes
 	for _, responseType := range []string{"token", "id_token", "id_token token", "token id_token"} {
 		t.Run(responseType, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/authorize", nil)
+			r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r,
 				testRedirectError("invalid_request", "Implicit flow does not support response_mode=query.", "query",
@@ -393,7 +393,7 @@ func TestRedirToClientWithError_ImplicitFlow_QueryIsAnsweredInTheFragment(t *tes
 	// type returning tokens is moved.
 	t.Run("a code request's explicit query is still the query", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r,
 			testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "state123", "code"))

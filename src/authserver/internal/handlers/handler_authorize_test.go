@@ -1425,29 +1425,29 @@ func TestRedirectErrorFromAuthContext(t *testing.T) {
 
 func TestRedirToClientWithError_QueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("invalid_request", "Invalid request", "query", "https://example.com/callback", "abc123", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://example.com/callback?error=invalid_request&error_description=Invalid+request&state=abc123", w.Header().Get("Location"))
+	assert.Equal(t, "https://example.com/callback?error=invalid_request&error_description=Invalid+request&state=abc123&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 }
 
 func TestRedirToClientWithError_FragmentResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("unauthorized_client", "Unauthorized client", "fragment", "https://example.com/callback", "xyz789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://example.com/callback#error=unauthorized_client&error_description=Unauthorized+client&state=xyz789", w.Header().Get("Location"))
+	assert.Equal(t, "https://example.com/callback#error=unauthorized_client&error_description=Unauthorized+client&state=xyz789&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 }
 
 func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	templateFS := fstest.MapFS{
 		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
@@ -1470,15 +1470,15 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 // The form_post arm is the only one that can fail after the redirect URI has been validated, and it
 // can fail in two different places. A template that will not parse fails before anything is written,
 // which the per-site last-resort cases cover. A template that parses and then fails part way through
-// execution is the other member, and it is reachable in production: server.New serves templates from
-// os.DirFS(GOIABADA_AUTHSERVER_TEMPLATEDIR) when that variable is set, so the file is operator
-// supplied. Rendering straight to the ResponseWriter would commit a partial 200 the instant the
+// execution is the other member. The page is always the built-in one (#576), so no shipped template
+// fails that way, and the buffer is kept so that a later change to the page cannot ship one that
+// does. Rendering straight to the ResponseWriter would commit a partial 200 the instant the
 // template emitted its first byte, and the caller's last-resort InternalServerError could then no
 // longer change the status the client sees. The render therefore goes to a buffer and reaches w only
 // once Execute has returned successfully (#141).
 func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitted(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	// Parses cleanly. "missing" is absent from the map, so index yields an untyped nil, and
 	// indexing that fails at execution time, after the <form> prefix has been emitted.
@@ -1506,7 +1506,7 @@ func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitte
 // so the caller logs something instead of treating a dead connection as a delivered refusal (#141).
 func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 	w := &failingResponseWriter{}
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	templateFS := fstest.MapFS{
 		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
@@ -1521,13 +1521,13 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 
 func TestRedirToClientWithError_DefaultToQueryResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("server_error", "Internal server error", "", "https://example.com/callback", "ghi789", "code"))
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, "https://example.com/callback?error=server_error&error_description=Internal+server+error&state=ghi789", w.Header().Get("Location"))
+	assert.Equal(t, "https://example.com/callback?error=server_error&error_description=Internal+server+error&state=ghi789&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 }
 
 // Implicit flow error response tests
@@ -1546,7 +1546,7 @@ func TestRedirToClientWithError_ImplicitFlow_DefaultsToFragment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/authorize", nil)
+			r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 			// No response_mode specified, should default to fragment for implicit flow
 			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
@@ -1566,7 +1566,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 	// Even for implicit flow, explicit response_mode should be respected
 	t.Run("fragment response mode explicit", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("invalid_request", "Invalid request", "fragment", "https://example.com/callback", "state123", "token"))
 
@@ -1577,7 +1577,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 
 	t.Run("form_post response mode for implicit flow", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
@@ -1610,7 +1610,7 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/authorize", nil)
+			r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 			// No response_mode specified, should default to query for hybrid flow (contains code)
 			err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "", "https://example.com/callback", "state123", tt.responseType))
@@ -1636,7 +1636,7 @@ func TestRedirToClientWithError_HybridFlow_UsesQuery(t *testing.T) {
 func TestRedirToClientWithError_NoState(t *testing.T) {
 	t.Run("empty state not included", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "query", "https://example.com/callback", "", "code"))
 
@@ -1647,12 +1647,12 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 
 	t.Run("whitespace-only state echoed exactly", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied", "fragment", "https://example.com/callback", "   ", "token"))
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=+++",
+		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=+++&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 }
@@ -1671,7 +1671,7 @@ func TestRedirToClientWithError_NoState(t *testing.T) {
 func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 	t.Run("query mode replaces a registered state and keeps the rest", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "code"))
@@ -1679,13 +1679,13 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		require.NoError(t, err)
 		// Whole-string, not url.Values: parsing is the step that hid the duplicate, since Get
 		// answers with the first of the two and reports nothing wrong.
-		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
 	t.Run("query mode preserves a registered query that does not round-trip", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		// The retention half of the fix, which has nothing to do with state. url.Query discards
 		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
@@ -1694,13 +1694,13 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 			"query", "https://example.com/callback?lang=en;mode=dark", "abc123", "code"))
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?lang=en;mode=dark&error=access_denied&error_description=Access+denied&state=abc123",
+		assert.Equal(t, "https://example.com/callback?lang=en;mode=dark&error=access_denied&error_description=Access+denied&state=abc123&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
 	t.Run("fragment mode leaves the registered query alone", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		// The two branches construct differently and that difference is observable here: a
 		// registered "state=fixed" in the query is NOT replaced, because the response parameters
@@ -1709,7 +1709,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 			"fragment", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", "token"))
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#error=access_denied&error_description=Access+denied&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#error=access_denied&error_description=Access+denied&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -1718,7 +1718,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 	// place and both assertions fail (#146, decision 13).
 	t.Run("query mode drops a registered state the request did not supply", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?state=fixed&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?state=fixed&lang=en", "", "code"))
@@ -1726,13 +1726,13 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		require.NoError(t, err)
 		// No state is emitted, because the request carried none, and the registered one does not
 		// stand in for it: a state on this redirect is the client's own or it is absent.
-		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied",
+		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
 	t.Run("query mode drops a registered code from an error response", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback?code=stale&lang=en"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback?code=stale&lang=en", "client-csrf-token", "code"))
@@ -1740,7 +1740,7 @@ func TestRedirToClientWithError_RegisteredQuery(t *testing.T) {
 		require.NoError(t, err)
 		// Otherwise a refusal arrives carrying an authorization code, and an RP that reads "code"
 		// before "error" tries to redeem a value this server never issued on this request.
-		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?lang=en&error=access_denied&error_description=Access+denied&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 }
@@ -1755,31 +1755,31 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 
 	t.Run("query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"query", "https://example.com/callback", state, "code"))
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?error=access_denied&error_description=Access+denied&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+		assert.Equal(t, "https://example.com/callback?error=access_denied&error_description=Access+denied&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
 	t.Run("fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, nil).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",
 			"fragment", "https://example.com/callback", state, "token"))
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+		assert.Equal(t, "https://example.com/callback#error=access_denied&error_description=Access+denied&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
 	t.Run("form_post mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		// form_post carries the value in a form field rather than a URI, so what has to survive is
 		// the raw string reaching the template, HTML-escaped by html/template and nothing else.
@@ -1806,7 +1806,7 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 	t.Run("both headers are set on a rendered page", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		templateFS := fstest.MapFS{
 			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
@@ -1822,7 +1822,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 
 	t.Run("neither header is set when the render failed", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		// The companion to the uncommitted-response case above. A failed render must leave the
 		// response completely untouched, headers included, so the caller's last-resort 500 is
@@ -1897,7 +1897,7 @@ func TestRedirToClientWithError_NonAbsoluteRedirectURIRendersTheBlockedPage(t *t
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/authorize", nil)
+			r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 			pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 				mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -2124,7 +2124,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 func TestRedirToClientWithError_HonoursAnEarlierRefusal(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/authorize", nil)
+	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	pageRenderer.On("RenderTemplate", w, r, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -2193,7 +2193,7 @@ func TestRedirToClientWithError_PassesTheResponseTypeIntoTheGate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/authorize", nil)
+			r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 			database := datamocks.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "http://127.0.0.1/cb")
@@ -2236,7 +2236,7 @@ func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *tes
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/authorize", nil)
+		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		// The clear fails, which is the only path that builds the fallback at all.
 		ceremonyStore.On("ClearAuthContext", w, r, testCeremonyId).Return(errors.New("the session store is unreachable"))

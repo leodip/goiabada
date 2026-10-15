@@ -94,7 +94,7 @@ Every redirect URI must:
 
 The scheme, host and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect.
 
-**A query is allowed and comes back as you registered it.** The auth server adds its response to it rather than rewriting it. The one exception is a parameter the response owns: `code`, `state`, `error` and `error_description` are removed from the registered query in the default `query` response mode, even when the response doesn't set them. So a `state` in the callback is always the one your app sent, and no `state` comes back if your app sent none. With `response_mode=fragment` or `form_post`, the response doesn't travel in the query, and the registered query is left exactly as it is.
+**A query is allowed and comes back as you registered it.** The auth server adds its response to it rather than rewriting it. The one exception is a parameter the response owns: `code`, `state`, `error`, `error_description` and `iss` are removed from the registered query in the default `query` response mode, even when the response doesn't set them. So a `state` in the callback is always the one your app sent, and no `state` comes back if your app sent none. With `response_mode=fragment` or `form_post`, the response doesn't travel in the query, and the registered query is left exactly as it is.
 
 The authorization code is bound to the redirect URI it was issued for. Your app must send that same `redirect_uri` when it exchanges the code at `/auth/token`.
 

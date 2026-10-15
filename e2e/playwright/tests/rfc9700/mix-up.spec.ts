@@ -38,8 +38,6 @@ test("every authorization response names the issuer in iss, an error included, a
   users,
   request,
 }) => {
-  // #576 item 2: no authorization response carries iss today. Remove this line once they do.
-  test.fail();
   const metadata = await discovery(request);
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients);
