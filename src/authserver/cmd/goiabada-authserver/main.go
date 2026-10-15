@@ -29,6 +29,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -257,6 +258,15 @@ func run() int {
 		return 1
 	}
 
+	// The stored issuer is checked once, here, against the rule a save applies to a changed one.
+	// A read that fails stops nothing: the check only reports, and the settings middleware answers
+	// every request without settings with its own fault.
+	if settings, settingsErr := database.GetSettingsById(startupCtx, nil, 1); settingsErr != nil {
+		slog.Warn("unable to read the settings, so the stored issuer is not checked", "error", settingsErr)
+	} else if settings != nil {
+		logStoredIssuer(settings.Issuer, cfg.AuthServer.BaseURL)
+	}
+
 	// Validate and decode the session keys for normal operation, after the bootstrap check,
 	// which mints them on a fresh install. previousKeys is nil unless an operator is rotating
 	// the session keys: the store seals with the current pair and opens with the current pair
@@ -467,4 +477,20 @@ func newSessionStore(backend sessionstore.ConditionalBackend, secure bool,
 		return nil, err
 	}
 	return sessionstore.NewConditionalStore(store, backend)
+}
+
+// logStoredIssuer writes the record a start carries when the stored issuer is one the issuer rule
+// refuses, and nothing otherwise. Such an issuer is still served, in tokens, in discovery and in
+// iss, until the operator changes it: changing it makes every relying party that checks iss reject
+// tokens until reconfigured and signs every administrator out of the admin console, so the operator
+// picks the moment (#576 decision 4). The record is a Warn, as the plain-HTTP one is, since the
+// server runs as it did and somebody should still change a setting.
+func logStoredIssuer(issuer, baseURL string) {
+	if oidc.IssuerIsAcceptable(issuer, baseURL) {
+		return
+	}
+	slog.Warn("the stored issuer is neither an https URL nor the auth server's base URL, as RFC 8414, RFC 9207 and OpenID Connect Discovery require of an issuer; it is served unchanged until it is changed",
+		"issuer", issuer,
+		"auth_server_base_url", baseURL,
+		"remedy", "in the admin console's general settings, change the issuer to an https URL with no query, fragment or user info, or to the base URL, once the relying parties that check iss can be reconfigured with it")
 }

@@ -67,7 +67,7 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 		}
 		return settingsRefusal(http.MethodPut, "/api/v1/admin/settings/general", full, &record.Settings{}, nil,
 			func(t *testing.T, database *datamocks.Database) http.Handler {
-				return HandleSettingsGeneralPut(database, handlersmocks.NewAuditLogger(t))
+				return HandleSettingsGeneralPut(database, handlersmocks.NewAuditLogger(t), "http://localhost:9090")
 			})
 	}
 	sessions := func(idle, lifetime int) func(*testing.T, string) *httptest.ResponseRecorder {
@@ -117,40 +117,16 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			portuguese: "O nome do aplicativo é longo demais. O tamanho máximo é de 30 caracteres.",
 		},
 		{
-			name:       "an issuer that is not a URI",
-			serve:      general(map[string]any{"issuer": "https://"}),
+			name:       "an issuer that is neither an https URL nor the base URL",
+			serve:      general(map[string]any{"issuer": "goiabada"}),
 			status:     http.StatusBadRequest,
 			code:       "VALIDATION_ERROR",
-			english:    "Invalid issuer. Please enter a valid URI.",
-			portuguese: "Issuer inválido. Informe uma URI válida.",
-		},
-		{
-			name:       "an issuer that is not an identifier",
-			serve:      general(map[string]any{"issuer": "1abc"}),
-			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
-			english:    "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.",
-			portuguese: "Issuer inválido. Deve começar com uma letra, pode conter letras, números, hífens e sublinhados, mas não pode terminar com hífen ou sublinhado, nem conter dois hífens ou dois sublinhados consecutivos.",
-		},
-		{
-			name:       "an identifier issuer with two consecutive dashes",
-			serve:      general(map[string]any{"issuer": "ab--cd"}),
-			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
-			english:    "Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores.",
-			portuguese: "Issuer inválido. Deve começar com uma letra, pode conter letras, números, hífens e sublinhados, mas não pode terminar com hífen ou sublinhado, nem conter dois hífens ou dois sublinhados consecutivos.",
-		},
-		{
-			name:       "an issuer below the minimum length",
-			serve:      general(map[string]any{"issuer": "ab"}),
-			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
-			english:    "Issuer is too short. The minimum length is 3 characters.",
-			portuguese: "O issuer é curto demais. O tamanho mínimo é de 3 caracteres.",
+			english:    "Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL.",
+			portuguese: "Issuer inválido. Informe uma URL https sem query, fragmento ou informações de usuário, ou a URL base do servidor de autenticação.",
 		},
 		{
 			name:       "an issuer past the bound",
-			serve:      general(map[string]any{"issuer": "a" + strings.Repeat("b", 60)}),
+			serve:      general(map[string]any{"issuer": "https://auth.example.com/" + strings.Repeat("a", 36)}),
 			status:     http.StatusBadRequest,
 			code:       "VALIDATION_ERROR",
 			english:    "Issuer is too long. The maximum length is 60 characters.",

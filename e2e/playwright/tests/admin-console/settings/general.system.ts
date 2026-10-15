@@ -12,6 +12,7 @@ import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
 const general = "/admin/settings/general";
+const issuerRule = "Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL.";
 
 test("the app name is saved and names the console's and the sign-in pages", async ({ page, browser }) => {
   await withSettingsRestored(page, general, async () => {
@@ -31,8 +32,12 @@ test("the app name is saved and names the console's and the sign-in pages", asyn
 
 for (const { name, values, message } of [
   { name: "an app name that is too long", values: { appName: "x".repeat(100) }, message: "App name is too long." },
-  { name: "an issuer URI with no host", values: { issuer: "https://" }, message: "Invalid issuer. Please enter a valid URI." },
-  { name: "an issuer identifier with a space", values: { issuer: "not an identifier" }, message: "Invalid issuer. It must start with a letter" },
+  // The issuer is an https URL with no query, fragment or user info, or exactly the auth server's
+  // base URL (#576 decision 3); every other value gets the one sentence stating that rule.
+  { name: "an issuer URI with no host", values: { issuer: "https://" }, message: issuerRule },
+  { name: "an issuer with a space", values: { issuer: "not an identifier" }, message: issuerRule },
+  { name: "an issuer that is a plain name", values: { issuer: "goiabada" }, message: issuerRule },
+  { name: "an http issuer other than the base URL", values: { issuer: "http://auth.example.com" }, message: issuerRule },
 ]) {
   test(`${name} is refused`, async ({ page }) => {
     await withSettingsRestored(page, general, async () => {

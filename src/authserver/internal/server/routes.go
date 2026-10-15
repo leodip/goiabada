@@ -336,7 +336,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// Settings - General
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/general", apihandlers.HandleSettingsGeneralGet())
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/general", apihandlers.HandleSettingsGeneralPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/general", apihandlers.HandleSettingsGeneralPut(s.database, auditLogger, s.cfg.AuthServer.BaseURL))
 
 		// Settings - Email
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleSettingsEmailGet())

@@ -5,12 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -48,10 +47,12 @@ type settingsGeneralDatabase interface {
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
-// HandleSettingsGeneralPut - PUT /api/v1/admin/settings/general
+// HandleSettingsGeneralPut - PUT /api/v1/admin/settings/general. baseURL is the auth server's
+// configured base URL, the one issuer the rule accepts whatever its scheme.
 func HandleSettingsGeneralPut(
 	database settingsGeneralDatabase,
 	auditLogger AuditLogger,
+	baseURL string,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings, ok := reqctx.SettingsFrom(r.Context())
@@ -78,44 +79,27 @@ func HandleSettingsGeneralPut(
 			return
 		}
 
-		// Validation: Issuer
+		// Validation: Issuer. Only an issuer that differs from the stored one is checked: a stored
+		// issuer the rule refuses stands until the operator changes it, because changing it makes
+		// every relying party that checks iss reject tokens until reconfigured, so the operator picks
+		// the moment, and the other general settings still save around it (#576 decision 4).
 		issuer := strings.TrimSpace(req.Issuer)
-		if strings.Contains(issuer, ":") {
-			parsedUri, err := url.ParseRequestURI(issuer)
-			if err != nil || parsedUri.Scheme == "" || parsedUri.Host == "" {
+		if issuer != currentSettings.Issuer {
+			if !oidc.IssuerIsAcceptable(issuer, baseURL) {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-		} else {
-			invalidIdentifier := i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerIdentifierInvalid, nil)
-			match, _ := regexp.MatchString("^[a-zA-Z]([a-zA-Z0-9_-]*[a-zA-Z0-9])?$", issuer)
-			if !match {
-				writeLocalizedError(w, r, invalidIdentifier, "VALIDATION_ERROR", http.StatusBadRequest)
+			const issuerMaxLength = 60
+			if inputvalidation.TextLength(issuer) > issuerMaxLength {
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			if strings.Contains(issuer, "--") || strings.Contains(issuer, "__") {
-				writeLocalizedError(w, r, invalidIdentifier, "VALIDATION_ERROR", http.StatusBadRequest)
+			// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of
+			// every token this server signs (#275).
+			if err := accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
+				writeValidationError(w, r, err)
 				return
 			}
-			const issuerMinLength = 3
-			if len(issuer) < issuerMinLength {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooShort, map[string]any{"min": issuerMinLength}), "VALIDATION_ERROR", http.StatusBadRequest)
-				return
-			}
-		}
-		const issuerMaxLength = 60
-		if inputvalidation.TextLength(issuer) > issuerMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
-			return
-		}
-
-		// Both branches above pass this, but only the URL one can reach it holding a "<": the
-		// identifier branch's regex has already refused the character with its own message, while
-		// url.ParseRequestURI accepts "<" in a path or a host. The issuer is copied into the iss
-		// claim of every token this server signs (#275).
-		if err := accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
-			return
 		}
 
 		// Validation: Password policy
