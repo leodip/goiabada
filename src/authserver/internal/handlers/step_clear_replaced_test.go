@@ -322,8 +322,6 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)

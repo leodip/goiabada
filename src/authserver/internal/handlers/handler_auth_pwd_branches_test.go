@@ -24,7 +24,8 @@ import (
 // The branches of the password step that no other case reaches: a client that cannot be read, a
 // form that cannot be rendered, a lookup that fails, and a rotation or a save that fails other
 // than by finding the ceremony replaced. Each answers the 500 page with the error it met and goes
-// no further.
+// no further. The POST reads the client only for a form it shows again, so an accepted password
+// reads none, and a client that cannot be read fails a refusal after what the refusal did.
 
 // pwdStepMocks is one password step's doubles, strict, so a read or a write a case does not arm
 // fails it.
@@ -135,24 +136,39 @@ func TestHandleAuthPwdGet_AFormThatCannotRenderAnswers500(t *testing.T) {
 	m.get().ServeHTTP(rr, req)
 }
 
-func TestHandleAuthPwdPost_AClientReadFailingAnswers500BeforeTheCredentialCheck(t *testing.T) {
+// A wrong password whose form cannot be shown again, because the client cannot be read, answers 500
+// once the guess is refused: it is charged to the rate limiter and audited first, as every wrong
+// guess is, and nothing is rendered.
+func TestHandleAuthPwdPost_AClientReadFailingOnARefusalAnswers500AfterTheCredentialCheck(t *testing.T) {
 	m := newPwdStepMocks(t)
-	req := pwdPostRequest("test@example.com", "testpassword")
+	failures := &credentialFailureSpy{}
+	handler := buildAuthPwdPost(authPwdPostDeps{pageRenderer: m.pageRenderer, ceremonyStore: m.ceremonyStore,
+		database: m.database, auditLogger: m.auditLogger, credentialFailures: failures})
+	req := pwdPostRequest("test@example.com", "a-wrong-password")
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
+	passwordHash, err := passwordhash.Hash("testpassword")
+	require.NoError(t, err)
+	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
+		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
+	}, nil).Once()
+	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.Anything).Return().Once()
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(nil, assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
 
-	m.post().ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, req)
 
-	m.database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
-	m.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	assert.Len(t, failures.requests, 1, "the refused guess is charged before the client is read")
+	m.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything, mock.Anything)
 }
 
-func TestHandleAuthPwdPost_AClientNotFoundAnswers500BeforeTheCredentialCheck(t *testing.T) {
+// A submission refused before any lookup whose client is gone answers 500 as the GET does, and still
+// looks up no account.
+func TestHandleAuthPwdPost_AClientNotFoundOnARefusalAnswers500(t *testing.T) {
 	m := newPwdStepMocks(t)
-	req := pwdPostRequest("test@example.com", "testpassword")
+	req := pwdPostRequest("", "testpassword")
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -162,6 +178,27 @@ func TestHandleAuthPwdPost_AClientNotFoundAnswers500BeforeTheCredentialCheck(t *
 	m.post().ServeHTTP(rr, req)
 
 	m.database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
+	m.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything, mock.Anything)
+}
+
+// An accepted password shows no form, so it reads neither the client nor its logo: the step
+// redirects to /auth/level1completed with the ceremony saved.
+func TestHandleAuthPwdPost_AnAcceptedPasswordReadsNoClient(t *testing.T) {
+	m := newPwdStepMocks(t)
+	req := pwdPostRequest("test@example.com", "testpassword")
+	rr := httptest.NewRecorder()
+	m.armPasswordCeremony()
+	m.armAcceptedPassword(t, "")
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(nil).Once()
+	m.ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(nil).Once()
+
+	m.post().ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusFound, rr.Code)
+	assert.Equal(t, "https://auth.test/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+	m.database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	m.database.AssertNotCalled(t, "ClientHasLogo", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A failed lookup is a fault, not a refused credential: no audit record and no re-rendered form.
@@ -170,7 +207,6 @@ func TestHandleAuthPwdPost_ALookupFailingAnswers500(t *testing.T) {
 	req := pwdPostRequest("test@example.com", "testpassword")
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
-	m.armClient()
 	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").
 		Return(nil, assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
@@ -215,7 +251,6 @@ func TestHandleAuthPwdPost_ARotationFailingAnswers500AndSavesNothing(t *testing.
 	req := pwdPostRequest("test@example.com", "testpassword")
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
-	m.armClient()
 	m.armAcceptedPassword(t, "")
 	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, mock.Anything, isTheError(assert.AnError)).Return().Once()
@@ -231,7 +266,6 @@ func TestHandleAuthPwdPost_ASaveFailingAnswers500(t *testing.T) {
 	req := pwdPostRequest("test@example.com", "testpassword")
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
-	m.armClient()
 	m.armAcceptedPassword(t, "")
 	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(nil).Once()
 	m.ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(assert.AnError).Once()
@@ -298,7 +332,6 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 		req := pwdPostRequest("test@example.com", "testpassword")
 		rr := httptest.NewRecorder()
 		m.armPasswordCeremony()
-		m.armClient()
 		m.armAcceptedPassword(t, "pt-BR")
 		m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).
 			Return(ceremony.ErrCeremonyReplaced).Once()

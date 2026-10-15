@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"log/slog"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // ClientDisplayInfo is the client block the password, OTP and consent screens show: what of the
@@ -23,6 +25,31 @@ type ClientDisplayInfo struct {
 // show. data.Database satisfies it.
 type clientDisplayDatabase interface {
 	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+}
+
+// ceremonyClientDisplayDatabase is what loadClientDisplay reads: the ceremony's client, and whether
+// it has a logo to show. data.Database satisfies it.
+type ceremonyClientDisplayDatabase interface {
+	clientDisplayDatabase
+
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+}
+
+// loadClientDisplay loads the ceremony's client and returns its block (getClientDisplayInfo), for a
+// form the step is about to render. A failed read, or a client not found, is returned as an error.
+// A step loads it only when it renders a form: a submission that is accepted redirects, and has no
+// form to show it in.
+func loadClientDisplay(ctx context.Context, database ceremonyClientDisplayDatabase,
+	authContext *ceremony.AuthContext) (*ClientDisplayInfo, error) {
+
+	client, err := database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	if err != nil {
+		return nil, err
+	}
+	if client == nil {
+		return nil, errs.New("client not found")
+	}
+	return getClientDisplayInfo(ctx, database, client), nil
 }
 
 // getClientDisplayInfo is the client block for client, from its display settings. The logo is read

@@ -15,36 +15,25 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// otpStepDatabase is what both OTP operations read: the ceremony's user and client, and whether the
-// client has a logo for the form. data.Database satisfies it.
+// otpStepDatabase is what both OTP operations read: the ceremony's user, and the client and whether
+// it has a logo for the form. data.Database satisfies it.
 type otpStepDatabase interface {
-	clientDisplayDatabase
+	ceremonyClientDisplayDatabase
 
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
-// loadOTPStep reads the ceremony's user and client, and the client block, for either OTP form. A
-// failed read, or a user or a client not found, is returned as an error.
-func loadOTPStep(ctx context.Context, database otpStepDatabase,
-	authContext *ceremony.AuthContext) (*record.User, *ClientDisplayInfo, error) {
-
+// loadOTPUser reads the ceremony's user, whom either OTP form is for. A failed read, or a user not
+// found, is returned as an error.
+func loadOTPUser(ctx context.Context, database otpStepDatabase, authContext *ceremony.AuthContext) (*record.User, error) {
 	user, err := database.GetUserById(ctx, nil, authContext.UserId)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if user == nil {
-		return nil, nil, errs.New("user not found")
+		return nil, errs.New("user not found")
 	}
-
-	client, err := database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
-	if err != nil {
-		return nil, nil, err
-	}
-	if client == nil {
-		return nil, nil, errs.New("client not found")
-	}
-	return user, getClientDisplayInfo(ctx, database, client), nil
+	return user, nil
 }
 
 // otpKeyGenerator mints the otpauth:// URL of a new TOTP key for an enrolling user, under the
@@ -94,7 +83,8 @@ type OTPPromptResult struct {
 // Run prepares the OTP form for the ceremony. appName is the settings' application name, under
 // which a new key is minted. In order:
 //
-//  1. Loads the user and the client (loadOTPStep); a failure is returned as an error.
+//  1. Loads the user (loadOTPUser), then the client block (loadClientDisplay); a failure is returned
+//     as an error.
 //  2. A user with an authenticator: clears the ceremony's enrolment key and saves the ceremony, for
 //     OTPCodeForm. A key generated before the user enrolled elsewhere is dead, and the POST picks
 //     the form it shows again by whether one is present (#242).
@@ -106,7 +96,11 @@ type OTPPromptResult struct {
 func (o *OTPPrompt) Run(ctx context.Context, browser stepSaver, authContext *ceremony.AuthContext,
 	appName string) (OTPPromptResult, error) {
 
-	user, display, err := loadOTPStep(ctx, o.database, authContext)
+	user, err := loadOTPUser(ctx, o.database, authContext)
+	if err != nil {
+		return OTPPromptResult{}, err
+	}
+	display, err := loadClientDisplay(ctx, o.database, authContext)
 	if err != nil {
 		return OTPPromptResult{}, err
 	}
@@ -207,7 +201,8 @@ const (
 // OTPSubmissionResult is what OTPSubmission.Run did.
 type OTPSubmissionResult struct {
 	Answer OTPAnswer
-	// Display is the client block, for the form shown again beside a refusal.
+	// Display is the client block, for the form shown again beside a refusal: set on
+	// OTPAccountDisabled, OTPCodeMissing and OTPRefused, and nil on the two answers that show no form.
 	Display *ClientDisplayInfo
 	// EnrolmentSecret is the base32 secret of the ceremony's enrolment key, "" for a user with no key
 	// on the ceremony. The form shown again beside a refusal is the enrolment form when it is set.
@@ -226,7 +221,7 @@ type OTPSubmissionResult struct {
 //
 //  1. Parses the ceremony's enrolment key, when it holds one; a key that does not parse is returned
 //     as an error, before anything is read.
-//  2. Loads the user and the client (loadOTPStep); a failure is returned as an error.
+//  2. Loads the user (loadOTPUser); a failure is returned as an error.
 //  3. A disabled account: audits EventUserDisabled and answers OTPAccountDisabled.
 //  4. An enrolment key on the ceremony for a user who has an authenticator now, set up in another tab
 //     or on the account page since the form was shown: ends the lost enrolment (below), before the
@@ -248,6 +243,11 @@ type OTPSubmissionResult struct {
 //     the generation of the authenticator it was checked against, rotates the browser session's
 //     identifier, and only then saves the ceremony in authentication_completed.
 //
+// An answer that shows the form again, OTPAccountDisabled, OTPCodeMissing or OTPRefused, loads the
+// client block for it last (refuse), after everything else that answer does; a failed read, or a
+// client not found, is returned as an error. An accepted code redirects and a lost enrolment ends on
+// a page of its own, so neither reads the client.
+//
 // A lost enrolment (#471 decision 2, #144) logs a warn record and clears the ceremony, answering
 // OTPEnrolmentLost: nothing was stored, so the ceremony has no second factor to claim. Nothing is
 // audited, and the code's step stays spent, as #111 already accepts for a failed enable.
@@ -268,19 +268,18 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		}
 	}
 
-	user, display, err := loadOTPStep(ctx, o.database, authContext)
+	user, err := loadOTPUser(ctx, o.database, authContext)
 	if err != nil {
 		return OTPSubmissionResult{}, err
 	}
 
-	result := OTPSubmissionResult{Display: display, EnrolmentSecret: secret}
+	result := OTPSubmissionResult{EnrolmentSecret: secret}
 
 	if !user.Enabled {
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": user.Id,
 		})
-		result.Answer = OTPAccountDisabled
-		return result, nil
+		return o.refuse(ctx, authContext, result, OTPAccountDisabled)
 	}
 
 	if keyURL != "" && user.OTPEnabled {
@@ -288,8 +287,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 	}
 
 	if len(code) == 0 {
-		result.Answer = OTPCodeMissing
-		return result, nil
+		return o.refuse(ctx, authContext, result, OTPCodeMissing)
 	}
 
 	var verified otpcredential.VerifyResult
@@ -312,15 +310,13 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
 			"user_id": user.Id,
 		})
-		result.Answer = OTPRefused
-		return result, nil
+		return o.refuse(ctx, authContext, result, OTPRefused)
 	case otpcredential.OutcomeWrong:
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
 			"user_id": user.Id,
 		})
-		result.Answer = OTPRefused
-		return result, nil
+		return o.refuse(ctx, authContext, result, OTPRefused)
 	}
 
 	verifiedGeneration := user.OtpConfigGeneration
@@ -353,6 +349,20 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		return result, nil
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)
+	return result, nil
+}
+
+// refuse answers a submission whose form is shown again, with the client block for it, loaded now
+// (loadClientDisplay): a failed read, or a client not found, is returned as an error.
+func (o *OTPSubmission) refuse(ctx context.Context, authContext *ceremony.AuthContext, result OTPSubmissionResult,
+	answer OTPAnswer) (OTPSubmissionResult, error) {
+
+	display, err := loadClientDisplay(ctx, o.database, authContext)
+	if err != nil {
+		return OTPSubmissionResult{}, err
+	}
+	result.Answer = answer
+	result.Display = display
 	return result, nil
 }
 

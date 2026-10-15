@@ -1092,11 +1092,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-
 		// The verification claim, at the generation the user was read with, matched exactly
 		// rather than with mock.Anything: it is what binds the claim to the authenticator the
 		// passcode was checked against (#111 decision 10, #471 decision 3).
@@ -1133,6 +1128,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the code was accepted")
+		// An accepted code shows no form, so it reads neither the client nor its logo.
+		database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "ClientHasLogo", mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1183,8 +1181,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
 			OtpConfigGeneration: 3,
 		}, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&record.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(true, nil)
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
@@ -1247,11 +1243,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled: false,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// false, because enrollment claims before the enable write and otp_enabled is
 		// still off at that point (#111 decision 10). Matched exactly for the reason the
@@ -1385,11 +1376,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-
 		// The claim succeeds and the enable write then fails, which is the ordering §4
 		// asks for: a burned code and a retry beats OTP left enabled on a refused request.
 		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
@@ -1463,9 +1449,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		user := &record.User{Id: 1, Enabled: true, OTPEnabled: false}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-
-		client := &record.Client{ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil)
@@ -1745,11 +1728,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-
 		// A database fault must surface as a 500 rather than being collapsed into either
 		// answer: "not consumed" would refuse valid codes for the duration of the fault,
 		// and "consumed" would accept replays through it.
@@ -1898,8 +1876,6 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 
 			user := &record.User{Id: 1, Enabled: true, OTPEnabled: false, OtpConfigGeneration: 3}
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-				Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 				Return(true, nil)
 
@@ -1976,8 +1952,6 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 
 	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
@@ -2044,8 +2018,9 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		}
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		// Only a refusal reads it, for the form it shows again; this table covers both outcomes.
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
 		// The claim follows enrolled: the enrolled half asserts an authenticator, at the
 		// generation read with it, and the enrollment half establishes one (#111 decision 10,
 		// #471 decision 3).

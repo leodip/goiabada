@@ -838,8 +838,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			"user_id":      int64(31),
 		}).Return().Once()
 
+		// The client block is loaded once the guess is refused, and the form shows it as before.
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Authentication failed."
+			return data["error"] == "Authentication failed." &&
+				data["layoutShowClientSection"] == true && data["layoutClientName"] == "test-client"
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1000,11 +1002,6 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		client := &record.Client{
-			ClientIdentifier: "test-client",
-		}
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-
 		settings := &record.Settings{
 			SMTPEnabled: true,
 		}
@@ -1111,9 +1108,6 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&record.Client{ClientIdentifier: "test-client"}, nil)
-
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
@@ -1259,8 +1253,9 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only the accepted-password case reaches it, and this table covers both outcomes.
 		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		// Only a refusal reads it, for the form it shows again; this table covers both outcomes.
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&record.Client{ClientIdentifier: "test-client"}, nil)
+			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(account, nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",

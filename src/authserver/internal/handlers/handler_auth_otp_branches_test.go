@@ -23,7 +23,9 @@ import (
 // The branches of the OTP step that no other case reaches: settings that are missing, a user or a
 // client that cannot be read, an enrolment key that cannot be generated, parsed or drawn, a page
 // that cannot render, and a lost enrolment whose clear or page fails. Each 500 answers with the
-// error it met and goes no further: no save, no rotation, no verification.
+// error it met and goes no further: no save, no rotation, no verification. The POST reads the
+// client only for a form it shows again, so a client that cannot be read fails a refusal after what
+// the refusal did, and an accepted code or a lost enrolment reads none.
 
 // otpStepMocks is one OTP step's doubles, strict, so a read or a write a case does not arm fails it.
 type otpStepMocks struct {
@@ -372,27 +374,35 @@ func TestHandleAuthOtpPost_AUserReadFailingAnswers500(t *testing.T) {
 	m.assertNothingSaved(t)
 }
 
-func TestHandleAuthOtpPost_AClientReadFailingAnswers500BeforeTheCodeIsChecked(t *testing.T) {
+// A wrong code whose form cannot be shown again, because the client cannot be read, answers 500
+// once the code is refused: it is charged to the rate limiter and audited first, as every wrong
+// code is.
+func TestHandleAuthOtpPost_AClientReadFailingOnARefusalAnswers500AfterTheCodeIsChecked(t *testing.T) {
 	m := newOtpStepMocks(t)
+	failures := &credentialFailureSpy{}
+	handler := buildAuthOtpPost(authOtpPostDeps{pageRenderer: m.pageRenderer, ceremonyStore: m.ceremonyStore,
+		database: m.database, auditLogger: m.auditLogger, credentialFailures: failures})
 	req := otpPostRequest("123456")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true})
+	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true,
+		OTPSecretEncrypted: encryptOTPForTest(t, "test-secret")})
+	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{"user_id": int64(1)}).
+		Return().Once()
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(nil, assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
 
-	m.post().ServeHTTP(rr, req)
+	handler.ServeHTTP(rr, req)
 
-	m.database.AssertNotCalled(t, "TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, mock.Anything,
-		mock.Anything, mock.Anything)
-	m.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	assert.Len(t, failures.requests, 1, "the refused code is charged before the client is read")
 	m.assertNothingSaved(t)
 }
 
-func TestHandleAuthOtpPost_AClientNotFoundAnswers500BeforeTheCodeIsChecked(t *testing.T) {
+// A submission with no code whose client is gone answers 500 as the GET does, and checks no code.
+func TestHandleAuthOtpPost_AClientNotFoundOnARefusalAnswers500(t *testing.T) {
 	m := newOtpStepMocks(t)
-	req := otpPostRequest("123456")
+	req := otpPostRequest("")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
 	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true})
@@ -458,7 +468,6 @@ func TestHandleAuthOtpPost_ALostEnrolmentWhoseClearFailsStillAnswersItsPage(t *t
 	m.armOtpCeremony(otpTestKeyURL("JBSWY3DPEHPK3PXP"))
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4})
-	m.armClient()
 	m.ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(assert.AnError).Once()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -488,7 +497,6 @@ func TestHandleAuthOtpPost_ALostEnrolmentWhosePageCannotRenderAnswers500(t *test
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpTestKeyURL("JBSWY3DPEHPK3PXP"))
 	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4})
-	m.armClient()
 	m.ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.Anything).Return(assert.AnError).Once()

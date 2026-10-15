@@ -36,7 +36,8 @@ func HandleAuthPwdGet(
 
 // HandleAuthPwdPost is POST /auth/pwd, which accepts level1_password. It reads the form, refuses a
 // missing address or password itself, and runs authflow.PasswordSubmission on the rest, then answers
-// what it did: the form again beside a refusal, or the redirect to /auth/level1completed.
+// what it did: the form again beside a refusal, with the client block authflow.PasswordPrompt loads
+// for it, or the redirect to /auth/level1completed.
 //
 // The boundary refuses a submission naming another ceremony before the state gate and before the
 // credentials are read, so a login form left open in another tab gets the "no longer active" page
@@ -66,15 +67,16 @@ func HandleAuthPwdPost(
 		// Referer and every proxy's access log (#202).
 		password := r.PostFormValue("password")
 
-		displayInfo, err := prompt.Run(r.Context(), authContext)
-		if err != nil {
-			pageRenderer.InternalServerError(w, r, err)
-			return
-		}
-
 		// renderRefusal reads r when it is called, so a refusal after the password was verified is
-		// worded in the locale the user switched r to.
+		// worded in the locale the user switched r to. It loads the client block then and only then:
+		// an accepted submission redirects, and has no form to show it in. A failed read, or a client
+		// not found, answers 500, as it does on the GET.
 		renderRefusal := func(code string) {
+			displayInfo, err := prompt.Run(r.Context(), authContext)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
+			}
 			renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo,
 				i18n.NewLocalizedError(code, nil), email)
 		}

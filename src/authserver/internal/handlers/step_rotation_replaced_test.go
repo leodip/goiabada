@@ -79,8 +79,6 @@ func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 		CeremonyId: testCeremonyId,
 		ClientId:   "test-client",
 	}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{ClientIdentifier: "test-client"}, nil)
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
 		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
 	}, nil)
@@ -131,8 +129,6 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 		Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()), OtpConfigGeneration: 3,
 	}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{ClientIdentifier: "test-client"}, nil)
 	database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 		Return(true, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
@@ -396,8 +392,6 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 			close(release)
 		}
 	}()
-	databaseA.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{ClientIdentifier: "test-client"}, nil)
 	databaseA.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Run(func(mock.Arguments) {
 		close(reached)
 		<-release

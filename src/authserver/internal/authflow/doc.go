@@ -13,8 +13,9 @@
 //   - AuthorizationParking, POST /auth/authorize: refuses what the GET would refuse on the page, and
 //     parks the rest under a one-time handle for the GET the handler redirects to (#246).
 //   - SelectLevel1Method, GET /auth/level1: chooses the level 1 method, today always the password.
-//   - PasswordPrompt, GET /auth/pwd and every POST /auth/pwd: the client block of the password
-//     form, which the handler renders, on the POST only beside a refusal.
+//   - PasswordPrompt, GET /auth/pwd and a POST /auth/pwd that is refused: the client block of the
+//     password form, which the handler renders, on the POST only beside a refusal, and loaded only
+//     then.
 //   - PasswordSubmission, POST /auth/pwd: checks the password the handler read from the form, and
 //     records level 1 on the ceremony when it is right and the account enabled.
 //   - Level1Completion, GET /auth/level1completed: delivers an authorization error parked by
@@ -44,8 +45,9 @@
 //     authorization code or the implicit grant's tokens. The handler delivers them: the encoders of
 //     the authorization response are response writers and stay in internal/handlers.
 //
-// getClientDisplayInfo is the client block every sign-in screen shows, and ConsentClientName the
-// name the consent screen and the redirect-blocked page give a client.
+// getClientDisplayInfo is the client block every sign-in screen shows, loadClientDisplay reads it
+// for the ceremony's client when a password or OTP form is about to be rendered, and
+// ConsentClientName is the name the consent screen and the redirect-blocked page give a client.
 //
 // Rules every operation keeps:
 //

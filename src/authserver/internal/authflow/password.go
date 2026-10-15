@@ -9,43 +9,28 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 )
 
-// passwordPromptDatabase is what PasswordPrompt reads: the ceremony's client, and whether it has a
-// logo for the form. data.Database satisfies it.
+// PasswordPrompt is the client block of the password form, which GET /auth/pwd renders and POST
+// /auth/pwd renders again beside a refusal, and only then: an accepted submission redirects. The
+// route table builds one.
 //
 // No user session is read: the form prefills no address, because an ended session's address is
 // what a shared machine should not show (#248, #436).
-type passwordPromptDatabase interface {
-	clientDisplayDatabase
-
-	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-}
-
-// PasswordPrompt is the client block of the password form, which GET /auth/pwd renders and POST
-// /auth/pwd renders again beside a refusal. The route table builds one.
 type PasswordPrompt struct {
-	database passwordPromptDatabase
+	database ceremonyClientDisplayDatabase
 }
 
 // NewPasswordPrompt builds the operation over the database it reads.
-func NewPasswordPrompt(database passwordPromptDatabase) *PasswordPrompt {
+func NewPasswordPrompt(database ceremonyClientDisplayDatabase) *PasswordPrompt {
 	return &PasswordPrompt{database: database}
 }
 
-// Run loads the ceremony's client and returns its block (getClientDisplayInfo). A failed read, or a
+// Run loads the ceremony's client and returns its block (loadClientDisplay). A failed read, or a
 // client not found, is returned as an error. It writes nothing.
 func (o *PasswordPrompt) Run(ctx context.Context, authContext *ceremony.AuthContext) (*ClientDisplayInfo, error) {
-	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
-	if err != nil {
-		return nil, err
-	}
-	if client == nil {
-		return nil, errs.New("client not found")
-	}
-	return getClientDisplayInfo(ctx, o.database, client), nil
+	return loadClientDisplay(ctx, o.database, authContext)
 }
 
 // passwordSubmissionDatabase is what PasswordSubmission reads: the account the address names.
