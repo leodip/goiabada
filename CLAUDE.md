@@ -275,6 +275,12 @@ Core 3.1.2.6, since the server cannot encode a response in a mode it does not im
 one definition, `protocolvalidation.IsSupportedResponseMode`, shared by `authflow.Authorization` and
 `ValidateRequest`.
 
+A second response_mode rule, form_post's own, is refused with the ordinary invalid_request redirect:
+the redirect URI's scheme must be http or https, because the mode answers through an HTML form whose
+action is the URI and `html/template`'s URL filter — the one guard standing between a stored
+`javascript:` redirect URI and a live form action — rewrites every other scheme to `#ZgotmplZ`, so
+a private-use scheme (RFC 8252 7.1) used to get a form that posted the code to this server (#121).
+
 ### Key Logic in Level1Completed
 `authflow/level1_completion.go:Level1Completion.Run`, answered by `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
 - If a deferred error is parked → answer the client and stop (see above)

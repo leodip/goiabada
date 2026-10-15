@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -49,6 +50,7 @@ type ValidateRequestInput struct {
 	CodeChallengeMethod      string
 	CodeChallenge            string
 	ResponseMode             string
+	RedirectURI              string // The redirect URI the response is addressed to, empty when the caller has not resolved one (#121)
 	PKCERequired             bool
 	ImplicitGrantEnabled     bool   // Whether implicit flow is allowed for this client
 	AuthorizationCodeEnabled bool   // Whether the authorization code flow is allowed for this client
@@ -465,6 +467,25 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Implicit flow does not support response_mode=query. Use response_mode=fragment (the default for implicit flow) or response_mode=form_post.",
 			http.StatusBadRequest)
+	}
+
+	// response_mode=form_post answers through an HTML form whose action is the redirect URI, and
+	// html/template's URL filter — the one guard standing between a stored javascript: redirect URI
+	// and a live form action — rewrites every scheme outside http, https and mailto to "#ZgotmplZ"
+	// rather than let the form target it. A private-use scheme such as myapp:// (RFC 8252
+	// section 7.1) therefore renders a form that posts to this server and reaches nobody: the
+	// request used to complete, and the code died on the form with no error anywhere. The
+	// combination is refused here as invalid_request, the choice #121 made over widening the
+	// template's allowlist: query and fragment encode the response as a redirect, which the custom
+	// scheme survives, so the description names them. An empty RedirectURI is a caller that has
+	// not resolved one, and the authorization endpoint refuses a missing or unregistered redirect
+	// URI before this validation runs, so from there the field always holds one.
+	if input.ResponseMode == "form_post" && input.RedirectURI != "" {
+		if u, err := url.Parse(input.RedirectURI); err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+				"response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive. Use response_mode=query or response_mode=fragment instead.",
+				http.StatusBadRequest)
+		}
 	}
 
 	// A max_age that is not a non-negative integer is an invalid parameter value, which RFC 6749

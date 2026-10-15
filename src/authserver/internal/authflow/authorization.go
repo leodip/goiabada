@@ -384,6 +384,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 					CodeChallengeMethod:      authContext.CodeChallengeMethod,
 					CodeChallenge:            authContext.CodeChallenge,
 					ResponseMode:             authContext.ResponseMode,
+					RedirectURI:              authContext.RedirectURI,
 					PKCERequired:             client.IsPKCERequired(settings.PKCERequired),
 					ImplicitGrantEnabled:     client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
 					AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
