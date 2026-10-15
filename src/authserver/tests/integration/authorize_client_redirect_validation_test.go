@@ -95,7 +95,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 // #573 item 3 turned this refusal around: a client whose code flow is off is no longer answered
 // on the page but at its redirect URI, so the request that reaches the page answers only the
 // missing redirect_uri, and the code-flow message is gone from the page entirely. The delivery
-// to the client is the two tests below.
+// to the client is pinned beside the other deferrals, in authorize_deferred_error_test.go.
 func TestAuthorize_ValidateClientAndRedirectURI_TheCodeFlowIsNoLongerAPageAnswer(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -297,97 +297,6 @@ func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *t
 	assert.Equal(t, "Parâmetro client_id inválido. O cliente não existe.", errorMsg,
 		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
 }
-
-// newCodeFlowDisabledClient creates the client #573 item 3 is about, plus a user able to complete
-// a level 1 ceremony: administrator registered, the code flow off, one registered redirect URI.
-func newCodeFlowDisabledClient(t *testing.T) (*record.Client, *record.User, string) {
-	t.Helper()
-
-	client := &record.Client{
-		ClientIdentifier:         "code-off-client-" + fake.LetterN(8),
-		Enabled:                  true,
-		AuthorizationCodeEnabled: false,
-		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
-	}
-	err := database.CreateClient(context.Background(), nil, client)
-	require.NoError(t, err)
-
-	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id,
-		URI:      deferralRedirectURI,
-	})
-	require.NoError(t, err)
-
-	password := fake.Password(8)
-	passwordHashed, err := passwordhash.Hash(password)
-	require.NoError(t, err)
-
-	user := &record.User{
-		Subject:      fake.UUID(),
-		Enabled:      true,
-		Email:        fake.Email(),
-		PasswordHash: passwordHashed,
-	}
-	err = database.CreateUser(context.Background(), nil, user)
-	require.NoError(t, err)
-
-	return client, user, password
-}
-
-// codeFlowDisabledAuthorizeURL builds a code request that fails only the code flow's enablement:
-// the response type, the challenge, the method and the scope are all valid, and the URI is the
-// one registered on the client.
-func codeFlowDisabledAuthorizeURL(clientIdentifier string) string {
-	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
-		"&response_type=code" +
-		"&code_challenge_method=S256" +
-		"&code_challenge=" + fake.LetterN(43) +
-		"&state=" + url.QueryEscape(deferralState) +
-		"&scope=openid"
-}
-
-// The refusal reaches a browser that already holds a session at once, the same delivery every
-// other redirect answer gets.
-func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAtOnce(t *testing.T) {
-	client, _, _ := newCodeFlowDisabledClient(t)
-	httpClient := createAuthenticatedHttpClient(t)
-
-	resp, err := httpClient.Get(codeFlowDisabledAuthorizeURL(client.ClientIdentifier))
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-
-	require.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t,
-		deferralRedirectURI+"?error=unauthorized_client"+
-			"&error_description="+url.QueryEscape(codeFlowDisabledDescription)+
-			"&state="+deferralStateEscaped,
-		resp.Header.Get("Location"))
-}
-
-// The same refusal, delivered to a browser that arrived with no session only after the password:
-// RFC 9700 4.11.2 authenticates the visitor first, and /auth/level1completed answers the client
-// after them, carrying the state through the cookie in between.
-func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAfterThePassword(t *testing.T) {
-	client, user, password := newCodeFlowDisabledClient(t)
-
-	resp := driveDeferral(t, createHttpClient(t),
-		codeFlowDisabledAuthorizeURL(client.ClientIdentifier), user, password)
-	defer func() { _ = resp.Body.Close() }()
-
-	require.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t,
-		deferralRedirectURI+"?error=unauthorized_client"+
-			"&error_description="+url.QueryEscape(codeFlowDisabledDescription)+
-			"&state="+deferralStateEscaped,
-		resp.Header.Get("Location"))
-}
-
-// codeFlowDisabledDescription is the refusal ValidateRequest gives, byte for byte: the one the
-// token endpoint and issuance give for the same condition, so the client hears one answer
-// wherever it asks (#197).
-const codeFlowDisabledDescription = "The client associated with the provided client_id does not support authorization code flow."
 
 // TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode pins the
 // other half of the RFC 9700 section 2.6 fix: the http rule is a save gate, not an authorize

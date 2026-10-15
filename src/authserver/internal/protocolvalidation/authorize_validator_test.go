@@ -1557,36 +1557,6 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 	mockDB.AssertExpectations(t)
 }
 
-func TestValidateClientAndRedirectURI_AuthCodeFlow_TheEnablementIsNotAskedHereEither(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	client := &record.Client{
-		Id:                       1,
-		ClientIdentifier:         "code-disabled-client",
-		Enabled:                  true,
-		AuthorizationCodeEnabled: false,
-		RedirectURIs: []record.RedirectURI{
-			{ClientId: 1, URI: "https://example.com/callback"},
-		},
-	}
-
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "code-disabled-client").Return(client, nil)
-	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
-
-	// A code request against a client with the code flow off passes this layer too, with the URI
-	// registered; ValidateRequest answers the client at it (#573).
-	input := ValidateClientAndRedirectURIInput{
-		ClientId:     "code-disabled-client",
-		RedirectURI:  "https://example.com/callback",
-		ResponseType: "code",
-	}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
-
-	require.NoError(t, err)
-	mockDB.AssertExpectations(t)
-}
-
 // ============================================================================
 // ValidatePrompt Tests - OIDC prompt parameter validation
 // ============================================================================

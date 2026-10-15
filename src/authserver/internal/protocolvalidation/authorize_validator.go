@@ -367,7 +367,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	// The description is the one the token endpoint and issuance give for the same condition, so
 	// the client hears one answer wherever it asks (#197). Read here rather than in
 	// ValidateClientAndRedirectURI, which can only answer on the page.
-	if !rtInfo.IsImplicitFlow() && !input.AuthorizationCodeEnabled {
+	if !isImplicitFlow && !input.AuthorizationCodeEnabled {
 		return oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			AuthorizationCodeNotSupportedErrorMsg, http.StatusBadRequest)
 	}
