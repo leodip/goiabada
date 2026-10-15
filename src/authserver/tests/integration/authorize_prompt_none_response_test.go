@@ -157,7 +157,7 @@ func TestPromptNone_Success_QueryMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Follow redirect to /auth/issue
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
@@ -202,7 +202,7 @@ func TestPromptNone_Success_FragmentMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Follow redirect to /auth/issue
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
@@ -252,7 +252,7 @@ func TestPromptNone_Success_FormPostMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Follow redirect to /auth/issue
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
@@ -356,7 +356,7 @@ func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)

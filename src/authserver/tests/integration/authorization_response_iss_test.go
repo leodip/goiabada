@@ -101,7 +101,7 @@ func TestAuthorizationResponseIss_ACodeCarriesTheDiscoveryIssuer(t *testing.T) {
 
 			resp, err := httpClient.Get(silentCodeURL(client.ClientIdentifier, redirectUri.URI, state, mode))
 			require.NoError(t, err)
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/issue"))
 			defer func() { _ = resp.Body.Close() }()
