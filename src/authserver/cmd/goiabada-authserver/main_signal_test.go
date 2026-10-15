@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -112,12 +111,56 @@ func TestMain_AStopLeavesTheSQLiteDatabaseInOneFile(t *testing.T) {
 
 			require.Equalf(t, 0, code, "a stop the platform asked for, carried out cleanly, exits 0\n%s", dump(records))
 			assert.NotContains(t, messagesOf(records), "unable to close the database")
-			for _, suffix := range []string{"-wal", "-shm"} {
-				_, err := os.Stat(path + suffix)
-				require.ErrorIsf(t, err, fs.ErrNotExist, "the database's %s file is left beside it\n%s", suffix, dump(records))
+			if left := describeFilesLeftBesideTheDatabase(path); left != "" {
+				require.FailNowf(t, "the database is left in more than one file",
+					"the stop left %s beside the database file\n%s", left, dump(records))
 			}
 		})
 	}
+}
+
+// describeFilesLeftBesideTheDatabase says what a stop left beside the database file, for the
+// failure message when the database is not the one file it should be. The -wal's size is what
+// tells the two failures apart (#570): 0 bytes is a checkpoint that ran but whose last close did
+// not delete the file, and non-empty is a WAL that was never folded in. An empty answer says
+// nothing was left.
+func describeFilesLeftBesideTheDatabase(path string) string {
+	walStat, walErr := os.Stat(path + "-wal")
+	_, shmErr := os.Stat(path + "-shm")
+	if walErr != nil && shmErr != nil {
+		return ""
+	}
+	if walErr != nil {
+		return "the -shm file with no -wal beside it"
+	}
+	shm := "absent"
+	if shmErr == nil {
+		shm = "present"
+	}
+	return fmt.Sprintf("the -wal file at %d bytes with the -shm %s", walStat.Size(), shm)
+}
+
+// TestDescribeFilesLeftBesideTheDatabase pins what the signal test's failure message says about
+// what a stop left beside the database file (#570): the -wal with its size and whether the -shm
+// is beside it, a -shm alone, or nothing. The size is the part that explains the next CI failure
+// by itself.
+func TestDescribeFilesLeftBesideTheDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.db")
+	require.NoError(t, os.WriteFile(path, []byte("x"), 0o600))
+
+	assert.Empty(t, describeFilesLeftBesideTheDatabase(path), "nothing is left beside the database")
+
+	require.NoError(t, os.WriteFile(path+"-wal", []byte("0123456789"), 0o600))
+	assert.Equal(t, "the -wal file at 10 bytes with the -shm absent", describeFilesLeftBesideTheDatabase(path))
+
+	require.NoError(t, os.WriteFile(path+"-shm", []byte("x"), 0o600))
+	assert.Equal(t, "the -wal file at 10 bytes with the -shm present", describeFilesLeftBesideTheDatabase(path))
+
+	require.NoError(t, os.WriteFile(path+"-wal", nil, 0o600))
+	assert.Equal(t, "the -wal file at 0 bytes with the -shm present", describeFilesLeftBesideTheDatabase(path))
+
+	require.NoError(t, os.Remove(path+"-wal"))
+	assert.Equal(t, "the -shm file with no -wal beside it", describeFilesLeftBesideTheDatabase(path))
 }
 
 // TestMain_ASignalDuringALegacyBootstrapStillSaysTheServerStopped is the same stop in the legacy

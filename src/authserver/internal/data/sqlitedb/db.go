@@ -162,13 +162,24 @@ func (c configuringConnector) Connect(ctx context.Context) (driver.Conn, error) 
 // connection, as on a server stopped while its first query ran, the -wal and -shm stayed beside
 // the file with the data in them (#562). The checkpoint runs on a connection without one, which
 // the pool's close then closes last. The pool is closed whether or not the checkpoint succeeds.
+// The checkpoint answers with three numbers, busy, the frames in the log, and how many of them
+// were checkpointed, which ExecContext dropped: a checkpoint that did not finish, a reader
+// elsewhere holding the WAL back, answered as success and the stop said nothing while the -wal
+// stayed beside the file (#570). QueryRowContext reads the numbers back: busy, or a checkpoint
+// short of the whole log, is an error carrying the three of them, joined with the pool's close
+// error as a refused checkpoint is. An in-memory database, which has no journal, answers
+// busy=0, log=-1, checkpointed=-1, and that passes.
 func (d *Database) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), closeCheckpointTimeout)
 	defer cancel()
-	_, checkpointErr := d.DB.ExecContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE);")
+	var busy, log, checkpointed int
+	checkpointErr := d.DB.QueryRowContext(ctx, "PRAGMA wal_checkpoint(TRUNCATE);").Scan(&busy, &log, &checkpointed)
 	closeErr := d.Database.Close()
 	if checkpointErr != nil {
 		return errs.Join(errs.Wrap(checkpointErr, "unable to checkpoint the WAL"), closeErr)
+	}
+	if busy != 0 || checkpointed != log {
+		return errs.Join(errs.Errorf("the WAL checkpoint did not complete: busy=%d, log=%d, checkpointed=%d", busy, log, checkpointed), closeErr)
 	}
 	return closeErr
 }

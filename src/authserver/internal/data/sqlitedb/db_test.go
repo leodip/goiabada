@@ -197,3 +197,54 @@ func TestDatabase_CloseLeavesOneFileAfterAnInterruptedQuery(t *testing.T) {
 	require.NoError(t, copied.QueryRowContext(context.Background(), "SELECT x FROM t").Scan(&x))
 	assert.Equal(t, 42, x)
 }
+
+// Close reports a checkpoint that did not complete (#570): PRAGMA wal_checkpoint answers with
+// three numbers, which ExecContext dropped, so a checkpoint a reader elsewhere kept from finishing
+// was reported as success and a stopped server said nothing while the -wal stayed beside the file.
+// A second connection holding a read transaction is such a reader: the checkpoint copies what it
+// can but cannot reset the WAL while the reader still needs its frames, so it answers busy, and
+// Close carries the three numbers in an error joined with the pool's close error, which main's
+// "unable to close the database" warning then says and TestMain_AStopLeavesTheSQLiteDatabaseInOneFile
+// already fails on. The busy timeout the pool's connection sets is what the checkpoint waits on,
+// so this test takes the five seconds of it.
+func TestDatabase_CloseReportsACheckpointThatDidNotComplete(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.db")
+	db, err := New(context.Background(), "file:"+filepath.ToSlash(path), false)
+	require.NoError(t, err)
+	_, err = db.DB.ExecContext(context.Background(), "CREATE TABLE t (x INTEGER)")
+	require.NoError(t, err)
+	_, err = db.DB.ExecContext(context.Background(), "INSERT INTO t VALUES (42)")
+	require.NoError(t, err)
+
+	// A second connection takes a read transaction on the same file and holds it: a deferred
+	// BEGIN and then the read leave the read mark the checkpoint cannot reset, until the
+	// transaction ends after Close has answered.
+	other, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = other.Close() })
+	otherConn, err := other.Conn(context.Background())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = otherConn.Close() })
+	_, err = otherConn.ExecContext(context.Background(), "BEGIN")
+	require.NoError(t, err)
+	var rows int
+	require.NoError(t, otherConn.QueryRowContext(context.Background(), "SELECT count(*) FROM t").Scan(&rows))
+	require.Positive(t, rows, "the read has to see a row, or the held transaction proves nothing")
+
+	closeErr := db.Close()
+	require.Error(t, closeErr, "a checkpoint the reader kept from finishing is not a close that succeeded")
+	assert.Contains(t, closeErr.Error(), "did not complete", "the error names the checkpoint that did not finish")
+	assert.Contains(t, closeErr.Error(), "busy=1", "and says the checkpoint was busy, with the numbers it answered")
+	assert.Contains(t, closeErr.Error(), "checkpointed=", "the error carries the checkpointed count too")
+	_, statErr := os.Stat(path + "-wal")
+	require.NoError(t, statErr, "the WAL the checkpoint could not reset is still beside the file")
+}
+
+// The in-memory default has no journal to checkpoint, so wal_checkpoint answers busy=0, log=-1,
+// checkpointed=-1, and that passes: the -1s are an equal pair, the answer of a database with no
+// WAL (#570).
+func TestDatabase_CloseOfTheInMemoryDefaultPasses(t *testing.T) {
+	db, err := New(context.Background(), "", false)
+	require.NoError(t, err)
+	require.NoError(t, db.Close(), "an in-memory database has no WAL to fold in")
+}
