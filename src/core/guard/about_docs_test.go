@@ -164,7 +164,6 @@ func acceptedTestTypes(t *testing.T, script string) []string {
 
 // tableFirstColumnCode is the first code span of each table body row's first cell, in order. A
 // header row, the one a delimiter row follows, is not a body row, whatever its cell holds.
-// tableFirstColumnCode is the first code span of each table body row's first cell, in order.
 func tableFirstColumnCode(section string) []string {
 	code := regexp.MustCompile("`([^`]+)`")
 	var out []string

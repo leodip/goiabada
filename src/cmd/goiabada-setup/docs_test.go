@@ -60,9 +60,6 @@ type flagRow struct {
 // readFlagRows reads the table in the section that heading opens. A page without the section, or a
 // section with no row naming a flag, is an error: a check that read nothing would pass whatever the
 // page said.
-// readFlagRows reads the table in the section that heading opens. A page without the section, or a
-// section with no row naming a flag, is an error: a check that read nothing would pass whatever the
-// page said.
 func readFlagRows(page []byte, heading string) ([]flagRow, error) {
 	text, found := docsreader.SectionText(string(page), heading)
 	if !found {
@@ -226,9 +223,6 @@ func wizardQuestions() []string {
 	return questions
 }
 
-// readQuestions reads the first cell of every body row of the table in the section that heading
-// opens: a header row, the one above a delimiter line, names no question. A page without the
-// section, or a section with no question row, is an error.
 // readQuestions reads the first cell of every body row of the table in the section that heading
 // opens: a header row, the one above a delimiter line, names no question. A page without the
 // section, or a section with no question row, is an error.

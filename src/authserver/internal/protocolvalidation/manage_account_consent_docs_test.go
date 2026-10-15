@@ -158,23 +158,7 @@ func assertRefreshReasonRows(r guard.Reporter, root string, section refreshDocSe
 		r.Fatalf("%v", err)
 		return
 	}
-	var rows [][]string
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		rows = append(rows, cells)
-	}
-	if len(rows) > 2 {
-		rows = rows[2:] // the header and the delimiter
-	} else {
-		rows = nil
-	}
+	rows := docsreader.Rows(body)
 	for _, description := range descriptions {
 		found := false
 		for i, row := range rows {

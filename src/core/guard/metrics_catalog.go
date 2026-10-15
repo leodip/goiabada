@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/metrics"
 )
@@ -280,13 +281,10 @@ func readMetricsCatalog(path string) ([]catalogRow, error) {
 }
 
 func parseCatalogRow(path string, lineNo int, line string) (catalogRow, error) {
-	cells := strings.Split(strings.Trim(line, "|"), "|")
+	cells := docsreader.Row(line)
 	if len(cells) != 5 {
 		return catalogRow{}, errs.Errorf("%s:%d has %d cells rather than 5; an unescaped | in a cell is the usual cause",
 			path, lineNo, len(cells))
-	}
-	for i := range cells {
-		cells[i] = strings.TrimSpace(cells[i])
 	}
 
 	metric, ok := backtickedCode(cells[0])

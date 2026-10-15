@@ -117,6 +117,15 @@ func Rows(text string) [][]string {
 	return rows
 }
 
+// Row splits one table row into its cells, the way Tables reads every row of a table: a pipe
+// escaped inside a cell stays in it, a doubled backslash reads as the one backslash it escapes,
+// and every cell is trimmed. A guard that walks a page line by line for its own structure, such
+// as one holding a page to a line-numbered catalog, reads each line's cells through it, so the
+// one splitter lives here too (#536).
+func Row(line string) []string {
+	return cells(line)
+}
+
 // classify splits one table's rows into its header and its data rows: the row the first delimiter
 // row follows is the header, and with no delimiter row every row is a data row.
 func classify(rows [][]string) Table {
@@ -146,19 +155,24 @@ func isDelimiterRow(cells []string) bool {
 	return strings.Trim(strings.Join(cells, ""), "-: ") == ""
 }
 
-// cells splits one table row into its cells: on the pipes the row is written with, a pipe escaped
-// inside a cell staying in it. Every cell is trimmed.
+// cells splits one table row into its cells: on the pipes the row is written with, every
+// backslash read together with the character after it, so a pipe escaped inside a cell stays in
+// it and a doubled backslash reads as the one backslash it escapes, which leaves the pipe after
+// it a column separator. Every cell is trimmed.
 func cells(line string) []string {
 	s := strings.TrimPrefix(line, "|")
-	if strings.HasSuffix(s, "|") && !strings.HasSuffix(s, `\|`) {
-		s = s[:len(s)-1]
-	}
 	var out []string
 	var cell strings.Builder
 	for i := 0; i < len(s); i++ {
 		switch {
 		case s[i] == '\\' && i+1 < len(s) && s[i+1] == '|':
 			cell.WriteByte('|')
+			i++
+		case s[i] == '\\' && i+1 < len(s) && s[i+1] == '\\':
+			cell.WriteByte('\\')
+			i++
+		case s[i] == '\\' && i+1 < len(s):
+			cell.WriteString(s[i : i+2])
 			i++
 		case s[i] == '|':
 			out = append(out, strings.TrimSpace(cell.String()))
@@ -167,7 +181,11 @@ func cells(line string) []string {
 			cell.WriteByte(s[i])
 		}
 	}
-	return append(out, strings.TrimSpace(cell.String()))
+	// The empty cell after a closing pipe is not a cell.
+	if last := strings.TrimSpace(cell.String()); last != "" || len(out) == 0 {
+		out = append(out, last)
+	}
+	return out
 }
 
 // headingLevel is the number of #s opening a Markdown heading, and 0 for any other line.

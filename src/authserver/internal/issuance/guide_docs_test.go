@@ -168,6 +168,24 @@ func TestGuideDocs_ATokenSectionWithNoExampleStops(t *testing.T) {
 	}
 }
 
+func TestGuideDocs_AnExampleInsideAnotherFenceIsNotTheSectionsExample(t *testing.T) {
+	root := t.TempDir()
+	writeGuideFixture(t, root, "site/api.mdx", "### The token\n\n"+
+		"````md\n"+
+		"```json\n"+
+		"{\"sub\": \"x\"}\n"+
+		"```\n"+
+		"````\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertExampleToken(r, root, guideSection{"site/api.mdx", "### The token"}, []string{"iss"}, "a token")
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "no json example") {
+		t.Errorf("an example inside another fence was read as the section's example: %+v", report)
+	}
+}
+
 // assertExampleToken is the reporting half of the example token checks: one failure per claim the
 // example names that the token never carries, and per claim the token carries that the example
 // leaves out; a stop for a section, or an example in it, not found or not read. token names the
@@ -192,14 +210,16 @@ func assertExampleToken(r guard.Reporter, root string, section guideSection, cla
 }
 
 // guideExampleClaims is the top-level names of the first json code block in a section, the section
-// being the text under its heading up to the next heading of the same level or above.
+// being the text under its heading up to the next heading of the same level or above. A json fence
+// inside another fence is literal text under Markdown's fence rules, so it is not the
+// section's example.
 func guideExampleClaims(root string, section guideSection) ([]string, error) {
 	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
 	var block []string
-	inExample := false
+	inExample, inFence := false, false
 	for _, line := range strings.Split(text, "\n") {
 		fence := strings.HasPrefix(strings.TrimSpace(line), "```")
 		switch {
@@ -211,8 +231,11 @@ func guideExampleClaims(root string, section guideSection) ([]string, error) {
 			return claimNames(claims), nil
 		case inExample:
 			block = append(block, line)
+		case inFence:
+			inFence = !fence
 		case fence:
 			inExample = strings.TrimSpace(line) == "```json"
+			inFence = !inExample
 		}
 	}
 	return nil, fmt.Errorf("%s: %s has no json example", section.page, section.heading)

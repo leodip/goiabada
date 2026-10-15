@@ -274,6 +274,26 @@ func TestGuideDocs_ARegistrationSectionWithNoAnswerStops(t *testing.T) {
 	}
 }
 
+func TestGuideDocs_ARegistrationExampleInsideAnotherFenceIsNotRead(t *testing.T) {
+	root := t.TempDir()
+	writeConceptFixture(t, root, "site/dcr.mdx", "## Register your app\n\n"+
+		"````md\n"+
+		"```http\n"+
+		"POST /connect/register HTTP/1.1\n"+
+		"\n"+
+		"{}\n"+
+		"```\n"+
+		"````\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRegistrationExample(r, root, conceptSection{"site/dcr.mdx", "## Register your app"}, "201 Created", nil)
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "has no example request to POST /connect/register") {
+		t.Errorf("an example inside another fence was read as the section's example: %+v", report)
+	}
+}
+
 // assertRegistrationExample is the reporting half of the registration check: one failure for a
 // status line other than the one the handler answers, and one per field the example answer names
 // that the handler does not send, or that the handler sends and the example leaves out; a stop for
@@ -313,7 +333,7 @@ func guideRegistrationExample(root string, section conceptSection) (registration
 	}
 	var blocks [][]string
 	var block []string
-	inHTTP := false
+	inHTTP, inFence := false, false
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		fence := strings.HasPrefix(trimmed, "```")
@@ -323,8 +343,11 @@ func guideRegistrationExample(root string, section conceptSection) (registration
 			inHTTP, block = false, nil
 		case inHTTP:
 			block = append(block, trimmed)
+		case inFence:
+			inFence = !fence
 		case fence:
 			inHTTP = trimmed == "```http"
+			inFence = !inHTTP
 		}
 	}
 	return readRegistrationBlocks(section, blocks)

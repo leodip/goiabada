@@ -115,7 +115,7 @@ func upgradeRecordsTable(t *testing.T, page string) map[string][]string {
 		}
 	}
 	require.Truef(t, holdsTable, "%s: ## How migrations run holds no table headed | Record | When | Attributes |", upgradePage)
-	require.NotEmptyf(t, rows, "%s: ## How migrations run holds no table headed | Record | When | Attributes |", upgradePage)
+	require.NotEmptyf(t, rows, "%s: the table under ## How migrations run headed | Record | When | Attributes | holds no row", upgradePage)
 	return rows
 }
 

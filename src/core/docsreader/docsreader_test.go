@@ -7,6 +7,7 @@ package docsreader
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -144,6 +145,26 @@ func TestTables_AnEscapedPipeStaysInItsCell(t *testing.T) {
 	}
 	if got, want := tables[0].Rows[0][1], "`x`"; got != want {
 		t.Errorf("a code span lost its backticks: %q, want %q", got, want)
+	}
+}
+
+// TestRow_EveryBackslashReadsTheCharacterAfterIt: a pipe escaped inside a cell stays in it, a
+// doubled backslash reads as the one backslash it escapes — under CommonMark the pipe after it is
+// then a column separator — and any other backslash keeps the character after it. The empty
+// cell after a closing pipe is not a cell.
+func TestRow_EveryBackslashReadsTheCharacterAfterIt(t *testing.T) {
+	for _, row := range []struct {
+		line string
+		want []string
+	}{
+		{`| C:\\| ready |`, []string{`C:\`, "ready"}},
+		{`| a\|b | x |`, []string{"a|b", "x"}},
+		{`| a \|`, []string{"a |"}},
+		{`| a | |`, []string{"a", ""}},
+	} {
+		if got := Row(row.line); !slices.Equal(got, row.want) {
+			t.Errorf("Row(%q) = %q, want %q", row.line, got, row.want)
+		}
 	}
 }
 
