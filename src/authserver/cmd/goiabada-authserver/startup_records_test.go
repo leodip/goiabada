@@ -127,7 +127,7 @@ func TestLogConfiguration_NamesTheRateLimiterSwitch(t *testing.T) {
 // and what to change it to (#576 decision 4). It is not an Error: nothing is broken that was not
 // before, and the auth server runs as it did.
 func TestLogStoredIssuer_AnIssuerTheRuleRefusesIsReportedOnce(t *testing.T) {
-	for _, stored := range []string{"goiabada", "http://auth.example.com", "https://auth.example.com?tenant=a"} {
+	for _, stored := range []string{"goiabada", "http://auth.example.com", "https://auth.example.com?tenant=a", "https://:443"} {
 		t.Run(stored, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 

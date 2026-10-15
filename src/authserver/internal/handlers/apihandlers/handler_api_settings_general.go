@@ -79,27 +79,26 @@ func HandleSettingsGeneralPut(
 			return
 		}
 
-		// Validation: Issuer. Only an issuer that differs from the stored one is checked: a stored
-		// issuer the rule refuses stands until the operator changes it, because changing it makes
-		// every relying party that checks iss reject tokens until reconfigured, so the operator picks
-		// the moment, and the other general settings still save around it (#576 decision 4).
+		// Validation: Issuer. Only the issuer rule is limited to an issuer that differs from the stored
+		// one: a stored issuer the rule refuses stands until the operator changes it, because changing
+		// it makes every relying party that checks iss reject tokens until reconfigured, so the
+		// operator picks the moment, and the other general settings still save around it (#576
+		// decision 4). The length limit and the angle-bracket refusal hold every save, as before it.
 		issuer := strings.TrimSpace(req.Issuer)
-		if issuer != currentSettings.Issuer {
-			if !oidc.IssuerIsAcceptable(issuer, baseURL) {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
-				return
-			}
-			const issuerMaxLength = 60
-			if inputvalidation.TextLength(issuer) > issuerMaxLength {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
-				return
-			}
-			// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of
-			// every token this server signs (#275).
-			if err := accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
-				writeValidationError(w, r, err)
-				return
-			}
+		if issuer != currentSettings.Issuer && !oidc.IssuerIsAcceptable(issuer, baseURL) {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+		const issuerMaxLength = 60
+		if inputvalidation.TextLength(issuer) > issuerMaxLength {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+		// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of
+		// every token this server signs (#275).
+		if err := accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
+			writeValidationError(w, r, err)
+			return
 		}
 
 		// Validation: Password policy

@@ -16,7 +16,9 @@ import (
 //
 // The comparison with baseURL is exact, as a client's comparison of iss is. A trailing "?" or "#"
 // counts as a query or a fragment, and no URL holding a space or a control character is accepted,
-// since a client compares the issuer as the string it is.
+// since a client compares the issuer as the string it is. The host is read without the port, so
+// an authority that is a port alone, "https://:443", names no host, which RFC 9110 section 4.2.2
+// forbids of an https URI.
 func IssuerIsAcceptable(issuer, baseURL string) bool {
 	if issuer == "" {
 		return false
@@ -33,5 +35,5 @@ func IssuerIsAcceptable(issuer, baseURL string) bool {
 	if err != nil {
 		return false
 	}
-	return parsed.Scheme == "https" && parsed.Opaque == "" && parsed.Host != "" && parsed.User == nil
+	return parsed.Scheme == "https" && parsed.Opaque == "" && parsed.Hostname() != "" && parsed.User == nil
 }

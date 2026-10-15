@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -91,6 +92,8 @@ func TestHandleSettingsGeneralPut_TheIssuerRule(t *testing.T) {
 		{"an empty fragment", "https://auth.example.com#"},
 		{"no host", "https://"},
 		{"no host before a path", "https:///tenant-a"},
+		{"a port and no host", "https://:443"},
+		{"an empty port and no host before a path", "https://:/tenant-a"},
 		{"an opaque URL", "https:auth.example.com"},
 		{"a space in the host", "https://auth example.com"},
 		{"a space in the path", "https://auth.example.com/my tenant"},
@@ -127,6 +130,28 @@ func TestHandleSettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(
 			_, description := decodeErrorEnvelope(t, rr)
 			assert.Equal(t, issuerRuleRefusal, description)
 			assert.Nil(t, saved)
+		})
+	}
+}
+
+// The 60-character limit and the angle-bracket refusal hold every save, an unchanged issuer
+// included: only the issuer rule stands aside for a stored issuer (#576 decisions 3 and 4).
+func TestHandleSettingsGeneralPut_AnUnchangedIssuerIsStillHeldToItsBounds(t *testing.T) {
+	cases := []struct{ name, stored, code, description string }{
+		{"longer than 60 characters", "https://auth.example.com/" + strings.Repeat("a", 36),
+			"VALIDATION_ERROR", "Issuer is too long. The maximum length is 60 characters."},
+		{"holding an angle bracket", "https://example.org/<b>",
+			"validator.settings.issuer_angle_brackets", "The issuer cannot contain the characters < or >."},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rr, saved := putGeneralIssuer(t, c.stored, c.stored)
+
+			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, c.code, code)
+			assert.Equal(t, c.description, description)
+			assert.Nil(t, saved, "a refused save writes nothing")
 		})
 	}
 }

@@ -83,7 +83,7 @@ The issuer is the name clients check every token and every authorization respons
 
 Anything else is refused, such as a plain name like `goiabada`, or an `http` URL other than the base URL. An empty query or fragment, a trailing `?` or `#`, counts as one. The issuer is at most 60 characters.
 
-An issuer already stored that these rules refuse keeps working until you change it: tokens, discovery and `iss` go on carrying it, and the other general settings still save around it. The auth server logs a warning about it at every start. Change it when you can update your clients at the same time, since every client that checks `iss` refuses tokens until it knows the new issuer, and every administrator is signed out of the admin console.
+An issuer already stored that is neither of these two kinds keeps working until you change it: tokens, discovery and `iss` go on carrying it, and the other general settings still save around it, as long as it's within the 60 characters and holds no `<` or `>`. The auth server logs a warning about it at every start. Change it when you can update your clients at the same time, since every client that checks `iss` refuses tokens until it knows the new issuer, and every administrator is signed out of the admin console.
 
 ## The discovery document
 
