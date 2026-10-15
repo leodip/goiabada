@@ -1572,6 +1572,7 @@
 "handler.client_redirect_uris.empty" = "A URI de redirecionamento não pode ficar vazia"
 "handler.client_redirect_uris.too_long" = "A URI de redirecionamento é longa demais ({{.length}} bytes, o máximo é {{.max}}): {{.prefix}}..."
 "handler.client_redirect_uris.invalid" = "URI de redirecionamento inválida: {{.uri}}"
+"handler.client_redirect_uris.insecure_http" = "A URI de redirecionamento não pode usar http simples em um host que não seja a interface de loopback (127.0.0.1, [::1] ou localhost): {{.uri}}"
 "handler.client_redirect_uris.not_absolute" = "A URI de redirecionamento precisa ser absoluta (o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host): {{.uri}}"
 "handler.client_redirect_uris.duplicate" = "URIs de redirecionamento duplicadas não são permitidas"
 "handler.client_web_origins.empty" = "A origem web não pode ficar vazia"

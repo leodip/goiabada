@@ -182,9 +182,10 @@ const (
 	ErrCodeClientRedirectURIsNoRedirectFlow = "handler.client_redirect_uris.no_redirect_flow"
 	ErrCodeClientRedirectURIsTooMany        = "handler.client_redirect_uris.too_many" // Args: {"max": int, "count": int}
 	ErrCodeClientRedirectURIEmpty           = "handler.client_redirect_uris.empty"
-	ErrCodeClientRedirectURITooLong         = "handler.client_redirect_uris.too_long"     // Args: {"length": int, "max": int, "prefix": string}
-	ErrCodeClientRedirectURIInvalid         = "handler.client_redirect_uris.invalid"      // Args: {"uri": string}
-	ErrCodeClientRedirectURINotAbsolute     = "handler.client_redirect_uris.not_absolute" // Args: {"uri": string}
+	ErrCodeClientRedirectURITooLong         = "handler.client_redirect_uris.too_long"      // Args: {"length": int, "max": int, "prefix": string}
+	ErrCodeClientRedirectURIInvalid         = "handler.client_redirect_uris.invalid"       // Args: {"uri": string}
+	ErrCodeClientRedirectURIInsecureHTTP    = "handler.client_redirect_uris.insecure_http" // Args: {"uri": string}
+	ErrCodeClientRedirectURINotAbsolute     = "handler.client_redirect_uris.not_absolute"  // Args: {"uri": string}
 	ErrCodeClientRedirectURIsDuplicate      = "handler.client_redirect_uris.duplicate"
 
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"

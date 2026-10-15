@@ -321,3 +321,39 @@ func TestRedirectURIIsRegistered(t *testing.T) {
 		})
 	}
 }
+
+// TestIsInsecureHTTPRedirectURI owns the RFC 9700 section 2.6 predicate: plain http is
+// refused everywhere but the loopback interface of RFC 8252 section 7.3. The loopback rows
+// lean on TestIsLoopbackHost's table for their host halves; these rows pin which URIs reach
+// that decision at all, so every non-http scheme answers false whatever its host.
+func TestIsInsecureHTTPRedirectURI(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		// Plain http off the loopback interface, which RFC 9700 section 2.6 forbids.
+		{"http://app.example.com/callback", true},
+		{"http://app.example.com:8443/callback", true},
+		{"http://192.168.1.50/callback", true},
+		{"http://[2001:db8::1]/callback", true},
+		{"HTTP://app.example.com/callback", true}, // the parse folds the scheme to lower case
+		{"http:///callback", true},                // hostless: callers' absolute-URI gate refuses it first, and on its own it is not loopback either
+
+		// Loopback http stays, for RFC 8252 native and MCP clients.
+		{"http://127.0.0.1:8765/callback", false},
+		{"http://[::1]:9000/callback", false},
+		{"http://localhost:3000/callback", false},
+		{"http://LOCALHOST:80/callback", false},
+
+		// Every other scheme is out of this predicate's scope.
+		{"https://app.example.com/callback", false},
+		{"com.example.app:/oauth2redirect", false},
+
+		// A value that does not parse is not this predicate's to refuse: the intakes'
+		// parse and absolute-URI gates ahead of it own that refusal.
+		{"not-a-url", false},
+	}
+	for _, tc := range tests {
+		assert.Equal(t, tc.want, IsInsecureHTTPRedirectURI(tc.uri), tc.uri)
+	}
+}
