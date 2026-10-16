@@ -83,6 +83,7 @@ func HandleIssueGet(
 				boundary.answerStepSaveFailure(w, r, result.ClearErr)
 				return
 			}
+			warnInsecureHTTPRedirect(r.Context(), "issueAuthCode", authContext.ClientId, result.Code.RedirectURI)
 			// A failure here leaves the code unredeemed rather than delivered; it expires in 60 seconds.
 			err = issueAuthCode(w, r, responder.formPostFS, result.Code, authContext.ResponseMode)
 			if err != nil {
@@ -94,6 +95,7 @@ func HandleIssueGet(
 				boundary.answerStepSaveFailure(w, r, result.ClearErr)
 				return
 			}
+			warnInsecureHTTPRedirect(r.Context(), "issueImplicitTokens", authContext.ClientId, authContext.RedirectURI)
 			err = issueImplicitTokens(w, r, responder.formPostFS, authContext.ResponseMode, authContext.RedirectURI,
 				authContext.State, result.Tokens)
 			if err != nil {
