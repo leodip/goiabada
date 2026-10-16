@@ -419,9 +419,10 @@ func TestCrossUser_PromptLogin_BindsToTheAuthenticatingUsersSession(t *testing.T
 // TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr covers the second entry
 // path, and it is the shape that minted a cross-bound code.
 //
-// An id_token_hint naming a third party is refused at /auth/issue, where the hint's subject is
-// compared with the authenticated user. A hint naming B is the ordinary use of the parameter, a
-// relying party saying who should sign in, so nothing refuses it and a code really is issued.
+// An id_token_hint naming a third party is refused before the ceremony binds a session, at
+// /auth/completed, which leaves /auth/issue's comparison as the last line (#535). A hint naming B
+// is the ordinary use of the parameter, a relying party saying who should sign in, so nothing
+// refuses it and a code really is issued.
 //
 // Its own assertion is decision 3, the ACR. The ceremony asks for level1 while A's session holds
 // level2_optional, and the ACR used to be the maximum taken against whatever session the browser

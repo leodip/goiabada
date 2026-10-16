@@ -18,12 +18,13 @@ import (
 // id_token_hint Persistence Tests
 // =============================================================================
 
-// TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance verifies that:
-// 1. id_token_hint is stored in AuthContext from the authorize endpoint
-// 2. The hint persists through the entire authentication state machine
-// 3. The issuance endpoint detects user mismatch and returns error=login_required
-// 4. State parameter is preserved in the error response
-func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
+// TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding verifies that:
+//  1. id_token_hint is stored in AuthContext from the authorize endpoint
+//  2. The hint persists through the entire authentication state machine
+//  3. /auth/completed answers a sign-in by another user with error=login_required before a session
+//     is bound (#535), so the mismatched sign-in leaves nothing behind
+//  4. State parameter is preserved in the error response
+func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	// =========================================================================
 	// Step 1: Create User A and User B
 	// =========================================================================
@@ -204,12 +205,8 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	// =========================================================================
-	// Step 6: At /auth/issue, expect error=login_required due to mismatch
+	// Step 6: /auth/completed answers login_required before a session is bound
 	// =========================================================================
-	issueUrl := assertRedirect(t, respB, "/auth/issue")
-	respB = loadPage(t, httpClientB, issueUrl)
-	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
-
 	// Should redirect back to client with error
 	assert.Equal(t, 302, respB.StatusCode, "Expected redirect to client callback")
 
@@ -231,11 +228,9 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// =========================================================================
 	// Step 7: The refusal ended the ceremony, so it cannot be replayed
 	// =========================================================================
-	// This is the one refusal that left the browser holding a ready_to_issue_code context, the
-	// state that mints codes, with only the id_token_hint comparison between a replay and a code.
-	// The clear now reaches the browser, so replaying /auth/issue on the same jar has no context
+	// The clear reaches the browser, so replaying /auth/completed on the same jar has no context
 	// to resume and lands on the account profile instead of refusing a second time (#141).
-	respB = loadPage(t, httpClientB, issueUrl)
+	respB = loadPage(t, httpClientB, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	assert.Equal(t, 302, respB.StatusCode)
@@ -435,9 +430,9 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	assert.Equal(t, user.Subject, newIdClaims["sub"])
 }
 
-// TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance verifies that
+// TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding verifies that
 // id_token_hint works even without prompt=login parameter.
-func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
+func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	// Create two users
 	passwordA := fake.Password(10)
 	passwordHashedA, err := passwordhash.Hash(passwordA)
@@ -589,13 +584,10 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	redirectLocation = assertRedirect(t, respB, "/auth/completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
-	redirectLocation = assertRedirect(t, respB, "/auth/issue")
-	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
-
-	// Should get error=login_required even without prompt parameter
+	// Should get error=login_required even without prompt parameter, answered by /auth/completed
+	// before anything is bound
 	errorCode, errorDescription, state := getErrorFromUrl(t, respB)
 	assert.Equal(t, "login_required", errorCode,
 		"Should return login_required error when user differs from id_token_hint, even without prompt parameter")

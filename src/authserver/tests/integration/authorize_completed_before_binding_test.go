@@ -37,7 +37,9 @@ type signedInUpToCompleted struct {
 
 // signInUpToCompleted runs a code ceremony as far as the redirect to /auth/completed. The client
 // requires consent, so a ceremony that /auth/completed lets through goes on to the consent screen.
-func signInUpToCompleted(t *testing.T) *signedInUpToCompleted {
+// extraAuthorizeQuery is appended to the authorize request's query, encoded by the caller: the
+// id_token_hint case carries its token there (#535).
+func signInUpToCompleted(t *testing.T, extraAuthorizeQuery string) *signedInUpToCompleted {
 	t.Helper()
 
 	client := &record.Client{
@@ -74,7 +76,7 @@ func signInUpToCompleted(t *testing.T) *signedInUpToCompleted {
 		"&code_challenge=" + fake.LetterN(43) +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + state +
-		"&nonce=" + fake.LetterN(8))
+		"&nonce=" + fake.LetterN(8) + extraAuthorizeQuery)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 
@@ -136,7 +138,7 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	adminToken, adminClient := createAdminClientWithToken(t)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
 
-	signIn := signInUpToCompleted(t)
+	signIn := signInUpToCompleted(t, "")
 
 	resp := makeAPIRequest(t, http.MethodPut, appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+
 		strconv.FormatInt(signIn.user.Id, 10)+"/enabled", adminToken, api.UpdateUserEnabledRequest{Enabled: false})
@@ -158,6 +160,38 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	signIn.assertNothingWasBound(t, adminToken, requestId)
 }
 
+// A sign-in by someone other than the id_token_hint's user is answered login_required before
+// anything is bound (#535): the hint names the user the client expects, and the sign-in leaves no
+// session row, no rotated identifier, no record of a session start and no consent screen behind it,
+// since the answer goes to the client rather than to the consent screen this client requires. The
+// hint's ID token belongs to a user of its own, who never signs in here.
+func TestAuthCompleted_AHintMismatchIsRefusedBeforeAnythingIsBound(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, adminClient := createAdminClientWithToken(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+
+	tokens, hintCode, _, _ := userTokenResponseWithScope(t, "openid", nil)
+	idToken, ok := tokens["id_token"].(string)
+	require.True(t, ok, "the hint flow should have issued an id_token: %v", tokens)
+
+	signIn := signInUpToCompleted(t, "&id_token_hint="+url.QueryEscape(idToken))
+	require.NotEqual(t, hintCode.User.Subject, signIn.user.Subject,
+		"the hint must name someone other than the user who signs in")
+
+	resp, requestId := signIn.loadCompleted(t)
+	defer func() { _ = resp.Body.Close() }()
+
+	destination, params := clientAnswer(t, resp, "code")
+	assert.Equal(t, signIn.redirectURI.URI, destination)
+	assert.Equal(t, "login_required", params.Get("error"))
+	assert.Equal(t, "The authenticated user does not match the id_token_hint",
+		params.Get("error_description"))
+	assert.Equal(t, signIn.state, params.Get("state"))
+	assert.Empty(t, params.Get("code"))
+
+	signIn.assertNothingWasBound(t, adminToken, requestId)
+}
+
 // A user whose password an administrator resets between the password step and /auth/completed is
 // sent back to sign in with the new one: no session is written, and no consent screen is shown
 // whose answer /auth/issue would throw away.
@@ -166,7 +200,7 @@ func TestAuthCompleted_APasswordResetMidSignInRestartsTheSignIn(t *testing.T) {
 	adminToken, adminClient := createAdminClientWithToken(t)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
 
-	signIn := signInUpToCompleted(t)
+	signIn := signInUpToCompleted(t, "")
 
 	newPassword := "newSecurePassword123!" + fake.LetterN(4)
 	resp := makeAPIRequest(t, http.MethodPut, appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+

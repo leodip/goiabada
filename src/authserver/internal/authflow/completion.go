@@ -8,6 +8,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
@@ -22,6 +23,13 @@ import (
 // answers the same condition with its own description, which the silent checks table on the docs'
 // prompt page holds.
 const userDisabledDescription = "The user account is disabled."
+
+// hintMismatchDescription is the error_description of the login_required a ceremony is answered
+// with when its user is not the id_token_hint's. /auth/completed answers with it before anything
+// is bound, so the mismatched sign-in leaves no session behind (#535), and /auth/issue answers
+// with it as the last line. DecideSilentAuthentication answers the same condition with its own
+// description, which the silent checks table on the docs' prompt page holds.
+const hintMismatchDescription = "The authenticated user does not match the id_token_hint"
 
 // completionDatabase is what Completion reads and writes: the browser's session with its user, the
 // client, the ceremony's user, the stored consent, and the OTP configuration generation it promotes.
@@ -138,9 +146,9 @@ type CompletionResult struct {
 //     read or a client not found is returned as an error.
 //  2. Decides the mode (decideCompletion): reuseSession, createSession or restartAtLevel1.
 //  3. Unless it restarts, loads the ceremony's user and decides on it before anything is bound
-//     (decideBeforeBinding): a missing user is an error, a disabled one is audited and answered
-//     access_denied after the ceremony is cleared, and a moved generation or a removed
-//     authenticator restarts.
+//     (decideBeforeBinding): a missing user is an error, a user who is not the id_token_hint's is
+//     answered login_required, a disabled one is audited and answered access_denied, each refusal
+//     after the ceremony is cleared, and a moved generation or a removed authenticator restarts.
 //  4. A restart (restart route 1) discards the attempt (AuthContext.Restart) and saves the ceremony
 //     towards /auth/level1.
 //  5. Binds: the reuse arm (bindReusedSession) or the create arm (bindNewSession). The write asking
@@ -203,9 +211,16 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			return CompletionResult{}, err
 		}
 
-		switch decideBeforeBinding(user, authContext.AuthStateGeneration, otpClaimOf(authContext)) {
+		switch decideBeforeBinding(user, authContext.AuthStateGeneration, otpClaimOf(authContext),
+			authContext.IdTokenHintSub) {
 		case beforeBindingUserMissing:
 			return CompletionResult{}, errs.New("user not found")
+		case beforeBindingHintMismatch:
+			return CompletionResult{
+				ClientError: &ClientError{Client: client, Code: oidc.ErrorLoginRequired,
+					Description: hintMismatchDescription},
+				ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
+			}, nil
 		case beforeBindingUserDisabled:
 			o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
 				"user_id": user.Id,

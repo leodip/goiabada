@@ -186,6 +186,8 @@ const (
 	beforeBindingBind beforeBindingAnswer = iota + 1
 	// beforeBindingUserMissing answers 500: the ceremony's user no longer exists.
 	beforeBindingUserMissing
+	// beforeBindingHintMismatch answers login_required: the ceremony's user is not the id_token_hint's.
+	beforeBindingHintMismatch
 	// beforeBindingUserDisabled answers access_denied: the ceremony's user has been disabled.
 	beforeBindingUserDisabled
 	// beforeBindingGenerationMoved restarts the ceremony at level 1 (restart route 1).
@@ -198,9 +200,14 @@ const (
 // decideBeforeBinding decides on the ceremony's user before either arm binds a session, so a refused
 // or restarted ceremony leaves no session row behind that /auth/issue would refuse to use (#522
 // decision 6). ceremonyGeneration is the authentication generation the ceremony holds, captured at
-// its password step or inherited from the session it reused. In order of precedence:
+// its password step or inherited from the session it reused. hintSubject is the id_token_hint's
+// sub, empty when the request carried none. In order of precedence:
 //
 //   - a missing user is refused;
+//   - a user who is not the hint's is refused, the answer /auth/issue gives the same ceremony one
+//     step later (#535). It is asked before the disabled user, as /auth/issue asks it there: the
+//     client is owed login_required for the user its hint named, not access_denied about an
+//     account the hint never named;
 //   - a disabled user is refused, as /auth/issue refuses one. It is asked before the generation,
 //     which a disable moves on too: the client is owed access_denied, not a password form the
 //     disabled account cannot get past;
@@ -214,9 +221,13 @@ const (
 //     would merge otp back into the lowered session. An authenticator set up since makes no
 //     difference: the code came from the one removed. The write asks again under the user's row
 //     lock, for a removal landing after this (#542 decision 1).
-func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim otpcredential.OTPClaim) beforeBindingAnswer {
+func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim otpcredential.OTPClaim,
+	hintSubject string) beforeBindingAnswer {
 	if user == nil {
 		return beforeBindingUserMissing
+	}
+	if hintSubject != "" && user.Subject != hintSubject {
+		return beforeBindingHintMismatch
 	}
 	if !user.Enabled {
 		return beforeBindingUserDisabled
