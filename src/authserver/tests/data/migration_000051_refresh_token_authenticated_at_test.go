@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,18 +57,18 @@ func TestMigration000051_RefreshTokenAuthenticatedAt(t *testing.T) {
 }
 
 // seedPreMigration000051ROPCRefreshToken inserts an ROPC refresh token as a release before 000051
-// wrote it: user_id and client_id set, no code. The user goes through the ORM, whose model matches
-// the 000050 schema for users; the client and the token row are literal SQL, because the Go models
-// already name columns 000050 does not have: clients.administrative_scopes_allowed (000060) and
-// refresh_tokens.authenticated_at. Literals rather than placeholders because the four
+// wrote it: user_id and client_id set, no code. The user, the client and the token row are all
+// seeded in SQL rather than through the ORM, because the records follow the head schema and the
+// next column any migration adds would break the seeding at 000050 for a reason this migration
+// does not own: clients.administrative_scopes_allowed (000060) already does, and users is one
+// migration away from the same (#510). Literals rather than placeholders because the four
 // dialects disagree on placeholder syntax, and every value here is test-controlled.
 func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string {
 	t.Helper()
 	random := fake.LetterN(6)
 
 	clientId := seedClient000035(t, h, "mig51_client_"+random)
-	user := &record.User{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random}
-	require.NoError(t, h.DB.CreateUser(context.Background(), nil, user), "seed user")
+	userId := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random})
 
 	falseLit, _ := boolLiterals000031()
 	jti := fake.UUID()
@@ -77,7 +76,7 @@ func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string 
 		(user_id, client_id, refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti,
 		 session_identifier, refresh_token_type, scope, revoked)
 		VALUES (%d, %d, '%s', '', '%s', '', 'Offline', 'openid', %s)`,
-		user.Id, clientId, jti, jti, falseLit)
+		userId, clientId, jti, jti, falseLit)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed a pre-000051 ROPC refresh token")
 	return jti

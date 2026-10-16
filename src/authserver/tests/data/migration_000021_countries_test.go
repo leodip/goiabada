@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -244,46 +242,43 @@ func migration000021Fixtures() []migFixture {
 
 func seedMigrationFixture(t *testing.T, h *isolatedDB, f migFixture) int64 {
 	t.Helper()
-	u := &record.User{
-		Subject: fake.UUID(),
-		// username is varchar(32); the fixture label is unique and short.
-		Username:                      f.label,
-		Email:                         fake.UUID() + "@example.com",
-		PasswordHash:                  "x",
-		PhoneNumberCountryUniqueId:    f.uid,
-		PhoneNumberCountryCallingCode: f.cc,
-		PhoneNumber:                   f.phone,
-		PhoneNumberVerified:           f.verified,
-		AddressCountry:                f.addr,
-	}
-	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, u), "%s: CreateUser", f.label)
+	// Seeded through the shared SQL seed rather than the ORM: the schema is at 000058 and the
+	// record follows the head schema, so the next column any migration adds to users would
+	// break the seeding for a reason this migration does not own (#510). The username is the
+	// fixture label, unique and short for varchar(32).
+	id := seedUser(t, h, userSeed{Username: f.label})
 
-	// Apply what CreateUser cannot produce: the NULL injections (Go string -> ''), and the
-	// pending phone verification code, whose two columns the model no longer names (#471).
-	var sets []string
+	// Apply what the shared seed leaves alone: the country columns 000021 transforms, the NULL
+	// injections (Go string -> ''), and the pending phone verification code, whose two columns
+	// the model no longer names (#471). Every fixture sets every country column, so the UPDATE
+	// always runs.
+	falseLit, trueLit := boolLiterals000031()
+	verifiedLit := falseLit
+	if f.verified {
+		verifiedLit = trueLit
+	}
+	valueOrNULL := func(value string, null bool) string {
+		if null {
+			return "NULL"
+		}
+		return fmt.Sprintf("'%s'", value)
+	}
+	sets := []string{
+		"phone_number_country_uniqueid = " + valueOrNULL(f.uid, f.nullUID),
+		"phone_number_country_callingcode = " + valueOrNULL(f.cc, f.nullCC),
+		"phone_number = " + valueOrNULL(f.phone, f.nullPhone),
+		"phone_number_verified = " + verifiedLit,
+		"address_country = " + valueOrNULL(f.addr, f.nullAddr),
+	}
 	if f.pending {
 		sets = append(sets,
 			"phone_number_verification_code_encrypted = "+pendingCodeLiteral000021(),
 			"phone_number_verification_code_issued_at = CURRENT_TIMESTAMP")
 	}
-	if f.nullPhone {
-		sets = append(sets, "phone_number = NULL")
-	}
-	if f.nullUID {
-		sets = append(sets, "phone_number_country_uniqueid = NULL")
-	}
-	if f.nullCC {
-		sets = append(sets, "phone_number_country_callingcode = NULL")
-	}
-	if f.nullAddr {
-		sets = append(sets, "address_country = NULL")
-	}
-	if len(sets) > 0 {
-		q := fmt.Sprintf("UPDATE users SET %s WHERE id = %d", strings.Join(sets, ", "), u.Id)
-		_, err := h.SQL.Exec(q)
-		require.NoErrorf(t, err, "%s: NULL injection", f.label)
-	}
-	return u.Id
+	q := fmt.Sprintf("UPDATE users SET %s WHERE id = %d", strings.Join(sets, ", "), id)
+	_, err := h.SQL.Exec(q)
+	require.NoErrorf(t, err, "%s: country and verification columns", f.label)
+	return id
 }
 
 func assertMigration000021(t *testing.T, h *isolatedDB, fixtures []migFixture, ids map[string]int64, phase string) {

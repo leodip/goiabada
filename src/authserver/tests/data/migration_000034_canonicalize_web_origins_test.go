@@ -3,6 +3,7 @@ package datatests
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -310,15 +311,17 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 			"the same invariant and be unusable by WebOriginExists", phase, webOriginsIndex000034)
 
 	// Enforced, not merely declared.
-	dup := &record.WebOrigin{Origin: "https://dup.example.com", ClientId: clientAId}
-	require.Errorf(t, h.DB.CreateWebOrigin(context.Background(), nil, dup),
-		"[%s] a second row with the same origin for the same client must be refused", phase)
+	// The probe is SQL rather than the ORM, and held to its cause: the index is the subject
+	// here and the record is incidental (#510), so the write names only the columns the
+	// 000033 schema carries, and a refusal any other fault produced fails the assertion.
+	_, dupErr := h.SQL.Exec(fmt.Sprintf(
+		"INSERT INTO web_origins (origin, client_id) VALUES ('https://dup.example.com', %d)", clientAId))
+	assertUniqueRefusal(t, dupErr, "web_origins.origin, web_origins.client_id", webOriginsIndex000034,
+		fmt.Sprintf("[%s] a second row with the same origin for the same client must be refused", phase))
 
 	// And enforced no more widely than that.
-	spare := &record.WebOrigin{Origin: "https://spare.example.com", ClientId: clientBId}
-	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, spare),
-		"[%s] an origin no client lists yet must still be insertable", phase)
-	require.NoErrorf(t, h.DB.DeleteWebOrigin(context.Background(), nil, spare.Id), "[%s] clean up the spare row", phase)
+	spareId := seedWebOrigin(t, h, clientBId, "https://spare.example.com")
+	require.NoError(t, h.DB.DeleteWebOrigin(context.Background(), nil, spareId), "[%s] clean up the spare row", phase)
 }
 
 // seedClient000034 writes the client in SQL rather than through the ORM: the database is at 000033,
@@ -329,16 +332,14 @@ func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *record.Cl
 	return &record.Client{Id: seedClient000035(t, h, identifier), ClientIdentifier: identifier}
 }
 
-// seedWebOrigin000034 stores raw verbatim and returns its id. It goes through the
-// ORM rather than raw SQL because the data layer stores what it is given: the
-// validation this migration exists to backfill has only ever lived in the API
-// handler.
+// seedWebOrigin000034 stores raw verbatim and returns its id, through the shared SQL seed
+// (#510): the database is at 000033 and the record follows the head schema, and the insert
+// stores what it is given either way -- the validation this migration exists to backfill has
+// only ever lived in the API handler.
 func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientId int64, raw string) int64 {
 	t.Helper()
 
-	webOrigin := &record.WebOrigin{Origin: raw, ClientId: clientId}
-	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, webOrigin), "seed web origin %q", raw)
-	return webOrigin.Id
+	return seedWebOrigin(t, h, clientId, raw)
 }
 
 func isSQLite000034() bool {

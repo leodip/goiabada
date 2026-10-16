@@ -228,22 +228,21 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 
 // seedUserEmail000047 stores raw verbatim and returns the row's id.
 //
-// Through the ORM rather than raw SQL: the placeholder differs on all four engines and the models
-// write every column the table needs. The data layer stores what it is given -- the lowercasing
-// every endpoint does lives in the handlers -- which is exactly why a legacy database can hold one
-// of these and this migration has to exist.
+// In SQL rather than through the ORM: the record follows the head schema, and the next column
+// any migration adds to users would break the seeding at 000046 (#510). The insert stores what
+// it is given verbatim either way -- the lowercasing every endpoint does lives in the handlers
+// -- which is exactly why a legacy database can hold one of these and this migration has to
+// exist.
 func seedUserEmail000047(t *testing.T, h *isolatedDB, n int, raw string) int64 {
 	t.Helper()
 
-	user := &record.User{
+	return seedUser(t, h, userSeed{
 		Enabled:      true,
 		Subject:      fmt.Sprintf("00000000-0000-0000-0000-0000000470%02d", n),
 		Username:     fmt.Sprintf("mig47user%d", n),
 		Email:        raw,
 		PasswordHash: "not-a-real-hash",
-	}
-	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, user), "seed user with email %q", raw)
-	return user.Id
+	})
 }
 
 // storedEmail000047 reads one address back through the ORM, which is what a credential path would
@@ -267,15 +266,16 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 		"[%s] idx_email must still be UNIQUE: it is what makes an email case collision impossible to create, and this migration writes to the column it covers",
 		phase)
 
-	taken := &record.User{
-		Enabled:      true,
-		Subject:      "00000000-0000-0000-0000-000000047099",
-		Username:     "mig47dup",
-		Email:        strings.ToLower(lowercaseCases000047()[0].raw),
-		PasswordHash: "not-a-real-hash",
-	}
-	assert.Errorf(t, h.DB.CreateUser(context.Background(), nil, taken),
-		"[%s] a second row holding an address already stored must be refused", phase)
+	// The probe is SQL rather than the ORM, and held to its cause: the index is the subject
+	// here and the record is incidental (#510), so the write names only the columns the
+	// 000046 schema carries, and a refusal any other fault produced fails the assertion.
+	falseLit, trueLit := boolLiterals000031()
+	_, takenErr := h.SQL.Exec(fmt.Sprintf(
+		"INSERT INTO users (enabled, subject, username, email, email_verified, phone_number_verified, password_hash, otp_enabled)"+
+			" VALUES (%s, '00000000-0000-0000-0000-000000047099', 'mig47dup', '%s', %s, %s, 'not-a-real-hash', %s)",
+		trueLit, strings.ToLower(lowercaseCases000047()[0].raw), falseLit, falseLit, falseLit))
+	assertUniqueRefusal(t, takenErr, "users.email", "idx_email",
+		fmt.Sprintf("[%s] a second row holding an address already stored must be refused", phase))
 }
 
 // TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup is the OTHER entry point. The pre-flight

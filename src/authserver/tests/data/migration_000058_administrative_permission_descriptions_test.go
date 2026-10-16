@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -59,20 +60,23 @@ func seedDescriptionsFixture000058(t *testing.T, h *isolatedDB, authserverDescri
 		describeAdministrativeBoundary000058-1, dbType())
 
 	f := &descriptionsFixture000058{h: h}
-	f.authserver = &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
-	require.NoError(t, h.DB.CreateResource(ctx, nil, f.authserver))
+	// Seeded through the shared SQL seeds rather than the ORM: the database is at 000057, the
+	// records follow the head schema, and the next column any migration adds to resources or
+	// permissions would break the seeding for a reason this migration does not own (#510).
+	f.authserver = &record.Resource{
+		Id:                 seedResource(t, h, builtin.AuthServerResourceIdentifier, "Authorization server (system-level)"),
+		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
+	}
 	for identifier, description := range authserverDescriptions {
-		require.NoError(t, h.DB.CreatePermission(ctx, nil, &record.Permission{
-			PermissionIdentifier: identifier, Description: description, ResourceId: f.authserver.Id,
-		}))
+		seedPermission(t, h, f.authserver.Id, identifier, description)
 	}
 
-	f.other = &record.Resource{ResourceIdentifier: "mig58-other", Description: "Migration 000058 test resource"}
-	require.NoError(t, h.DB.CreateResource(ctx, nil, f.other))
+	f.other = &record.Resource{
+		Id:                 seedResource(t, h, "mig58-other", "Migration 000058 test resource"),
+		ResourceIdentifier: "mig58-other",
+	}
 	for identifier, description := range f.otherDescriptions() {
-		require.NoError(t, h.DB.CreatePermission(ctx, nil, &record.Permission{
-			PermissionIdentifier: identifier, Description: description, ResourceId: f.other.Id,
-		}))
+		seedPermission(t, h, f.other.Id, identifier, description)
 	}
 
 	require.Equal(t, authserverDescriptions, f.descriptions(t, f.authserver), "the fixture: the authserver resource as written")
@@ -170,9 +174,13 @@ func TestMigration000058_KeepsAnOperatorsOwnWording(t *testing.T) {
 		afterUp[identifier] = description + " (edited)"
 	}
 	for identifier, description := range afterUp {
-		permission := f.permission(t, identifier)
-		permission.Description = description
-		require.NoError(t, h.DB.UpdatePermission(ctx, nil, permission))
+		// Written in SQL rather than through UpdatePermission: the write happens at 000058,
+		// the record follows the head schema, and the next column any migration adds to
+		// permissions would break it (#510). The description is all the edit is of.
+		_, err := f.h.SQL.ExecContext(ctx, fmt.Sprintf(
+			"UPDATE permissions SET description = '%s' WHERE permission_identifier = '%s' AND resource_id = %d",
+			description, identifier, f.authserver.Id))
+		require.NoErrorf(t, err, "write the operator's edit of %s", identifier)
 	}
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, describeAdministrativeBoundary000058-1), "roll back 000058 on %s", dbType())
 	assert.Equalf(t, afterUp, f.descriptions(t, f.authserver),
