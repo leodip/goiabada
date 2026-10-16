@@ -167,13 +167,14 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 
 	// Per-locale email template lookup. For emails (templateName under
 	// "emails/"), a copy for exactly the recipient's tag still wins first,
-	// and when there is none the body copy is picked the way i18n.T picks the
-	// catalog for the subject: the locale is matched against the languages a
-	// copy of this email exists in, not taken literally. A regional variant
+	// and when there is none the locale is matched against the languages a
+	// copy of this email exists in, not taken literally, with the English
+	// fallback the stored-locale senders give the subject
+	// (i18n.WithLocale(ctx, true, user.Locale, "en")). A regional variant
 	// then falls back to its base language (es-MX renders the .es copy, the
-	// subject renders from the es catalog), and a locale no copy relates to
-	// keeps <name>.html, the English baseline. The default locale "en" is
-	// always served by the base file (#531).
+	// subject renders from the es catalog), and a locale no copy shares a
+	// language with keeps <name>.html, the English baseline. The default
+	// locale "en" is always served by the base file (#531).
 	if strings.HasPrefix(templateName, "emails/") {
 		locale := i18n.LocaleTag(r.Context())
 		if locale != "" && locale != "en" {
@@ -221,12 +222,16 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 // The choice mirrors how the catalog matcher resolves the subject
 // (core/i18n localizerFor): the languages a copy of this email exists in are
 // the available languages, English first because the base file renders it, and
-// whatever the matcher resolves wins. A base-language copy serves a regional
-// variant of that language, and a locale the matcher cannot relate to any copy
-// resolves to English - the base file. The returned name always maps back to a
-// file the directory actually holds, via the index the matcher answers rather
-// than the tag it prints, because a matched tag can come back region-extended
-// (es-MX matched against es answers "es-u-rg-mxzzzz") (#531).
+// the locale is matched followed by English, the fallback the stored-locale
+// senders attach beside it. A base-language copy serves a regional variant of
+// that language. Without the fallback the matcher answers a guess in another
+// language or script (an sr copy for ru, zh for zh-TW, a stray note.bak.html,
+// Bashkir, for ru) where the subject's English fallback wins; with it, a locale
+// no copy shares a language with resolves to English - the base file. The
+// returned name always maps back to a file the directory actually holds, via
+// the index the matcher answers rather than the tag it prints, because a
+// matched tag can come back region-extended (es-MX matched against es answers
+// "es-u-rg-mxzzzz") (#531).
 func localizedEmailTemplate(templateFS fs.FS, templateName, locale string) string {
 	ext := filepath.Ext(templateName)
 	base := strings.TrimSuffix(templateName, ext)
@@ -270,7 +275,7 @@ func localizedEmailTemplate(templateFS fs.FS, templateName, locale string) strin
 	if err != nil || len(parsed) == 0 {
 		return templateName
 	}
-	_, idx, _ := language.NewMatcher(tags).Match(parsed...)
+	_, idx, _ := language.NewMatcher(tags).Match(append(parsed, language.English)...)
 	if suffixes[idx] == "" {
 		return templateName
 	}
