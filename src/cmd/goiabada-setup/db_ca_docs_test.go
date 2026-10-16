@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/docsreader"
 )
 
 // The Kubernetes pages tell an operator where the manifest keeps the database's CA and how to
@@ -44,7 +46,7 @@ func TestKubernetesDocs_SayWhereTheDatabaseCALivesAndHowToChangeIt(t *testing.T)
 	if err != nil {
 		t.Fatalf("unable to read the Kubernetes security page: %v", err)
 	}
-	section, found := sectionText(page, databaseCAHeading)
+	section, found := docsreader.SectionText(string(page), databaseCAHeading)
 	if !found {
 		t.Fatalf("%s has no %q section", kubernetesSecurityPage, databaseCAHeading)
 	}
@@ -67,38 +69,11 @@ func TestKubernetesDocs_SayWhereTheDatabaseCALivesAndHowToChangeIt(t *testing.T)
 	if err != nil {
 		t.Fatalf("unable to read the Kubernetes overview: %v", err)
 	}
-	generated, found := sectionText(overview, "## What the wizard generates")
+	generated, found := docsreader.SectionText(string(overview), "## What the wizard generates")
 	if !found {
 		t.Fatalf("%s has no section listing what the wizard generates", kubernetesOverviewPage)
 	}
 	if !strings.Contains(generated, "`"+dbCAConfigMap+"`") {
 		t.Errorf("%s: what the wizard generates leaves out the %s ConfigMap", kubernetesOverviewPage, dbCAConfigMap)
 	}
-}
-
-// sectionText is the text of the section heading opens, up to the next heading of its level or
-// above, a line in a fenced code block being no heading.
-func sectionText(page []byte, heading string) (string, bool) {
-	level := strings.Index(heading, " ")
-	var b strings.Builder
-	inSection, inFence, found := false, false, false
-	for _, line := range strings.Split(string(page), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-		}
-		if hashes := headingLevel(line); !inFence && hashes > 0 {
-			if inSection && hashes <= level {
-				break
-			}
-			if strings.TrimSpace(line) == heading {
-				inSection, found = true, true
-				continue
-			}
-		}
-		if inSection {
-			b.WriteString(line)
-			b.WriteByte('\n')
-		}
-	}
-	return b.String(), found
 }
