@@ -328,6 +328,60 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 	h.userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 }
 
+// The activation mail takes the language the registration page was matched to, not the first
+// Accept-Language tag alone. The page's matcher reads every preference and answers pt-BR for
+// "fr-CA,fr;q=0.9,pt-BR;q=0.8", which is the language the guide says these emails are written in;
+// the first tag alone sent the mail in English, and for a first tag naming no catalog of its own
+// let the subject's catalog guess and the body's exact-tag copy disagree (#607). The locale is
+// attached the way the request chain attaches it, so the page's matcher is the production one.
+func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguage(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		accept string
+	}{
+		{name: "the page's matched language, not the first Accept-Language tag alone",
+			accept: "fr-CA,fr;q=0.9,pt-BR;q=0.8"},
+		{name: "a first tag naming no catalog of its own, so subject and body agree",
+			accept: "pt"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newRegisterHarness(t)
+			req := registrationRequest(registerSomeoneEmail)
+			req.Header.Set("Accept-Language", tc.accept)
+			req = req.WithContext(i18n.ResolveRequestLocale(req.Context(), req))
+			rr := httptest.NewRecorder()
+
+			h.expectLookups(registerSomeoneEmail, nil, nil)
+			h.expectCheckEmailPage(rr, req)
+			h.database.On("CreatePreRegistration", mock.Anything, (*sql.Tx)(nil),
+				mock.AnythingOfType("*record.PreRegistration")).
+				Run(func(args mock.Arguments) {
+					args.Get(2).(*record.PreRegistration).Id = 42
+				}).Return(nil).Once()
+			captureRequestedRegistration(h.auditLogger, nil)
+
+			var mailReq *http.Request
+			h.pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+				"/emails/email_register_activate.html", mock.Anything).
+				Run(func(args mock.Arguments) { mailReq = args.Get(0).(*http.Request) }).
+				Return(bytes.NewBufferString("activation mail"), nil).Once()
+			var sent *emaildelivery.SendEmailInput
+			h.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com"}, mock.Anything).
+				Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
+				Return(nil).Once()
+
+			h.handler.ServeHTTP(rr, req)
+			h.jobs.runAll(t, afterresponse.ClassRegistration)
+
+			require.NotNil(t, mailReq)
+			assert.Equal(t, "pt-BR", i18n.LocaleTag(mailReq.Context()),
+				"the mail is rendered in the page's language, which is also what picks its body copy")
+			require.NotNil(t, sent)
+			assert.Equal(t, "Ative sua conta", sent.Subject)
+		})
+	}
+}
+
 // A verified, enabled account is sent the notice: no code, a pointer to the forgot-password page,
 // rendered in the account's stored locale and falling back to English (#207 decisions 5 and 13).
 func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNotice(t *testing.T) {

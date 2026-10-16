@@ -875,6 +875,74 @@ func TestHandleRegisterPost(t *testing.T) {
 	})
 }
 
+// The welcome mail takes the language the registration page was matched to, as the activation
+// mail does: the page's matcher answers pt-BR for "fr-CA,fr;q=0.9,pt-BR;q=0.8", and the first
+// Accept-Language tag alone sent the mail in English (#607). The locale is attached the way the
+// request chain attaches it, so the page's matcher is the production one.
+func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
+	pageRenderer := handlersmocks.NewPageRenderer(t)
+	database := datamocks.NewDatabase(t)
+	userCreator := accounthandlersmocks.NewUserCreator(t)
+	emailValidator := accounthandlersmocks.NewEmailValidator(t)
+	passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
+	emailSender := accounthandlersmocks.NewEmailSender(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	handler := HandleRegisterPost(pageRenderer, database, userCreator, emailValidator, passwordValidator,
+		emailSender, auditLogger, &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
+
+	form := url.Values{}
+	form.Add("email", "test@example.com")
+	form.Add("password", "password123")
+	form.Add("passwordConfirmation", "password123")
+	req, err := http.NewRequest("POST", "/register", strings.NewReader(form.Encode()))
+	require.NoError(t, err)
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept-Language", "fr-CA,fr;q=0.9,pt-BR;q=0.8")
+	rr := httptest.NewRecorder()
+
+	settings := &record.Settings{
+		SelfRegistrationEnabled: true,
+		SMTPEnabled:             true,
+		SMTPHost:                "smtp.example.com",
+		SMTPPort:                2525,
+		PasswordPolicy:          record.PasswordPolicyHigh,
+		SelfRegistrationRequiresEmailVerification: false,
+	}
+	req = req.WithContext(i18n.ResolveRequestLocale(reqctx.WithSettings(req.Context(), settings), req))
+
+	emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
+	database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyHigh, "password123").Return(nil)
+	userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
+		return input.Email == "test@example.com" && !input.EmailVerified
+	})).Return(&record.User{}, nil)
+	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return()
+
+	var mailReq *http.Request
+	pageRenderer.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+		"/emails/email_register_confirmation.html", mock.Anything).
+		Run(func(args mock.Arguments) { mailReq = args.Get(0).(*http.Request) }).
+		Return(bytes.NewBufferString("email content"), nil)
+	var sent *emaildelivery.SendEmailInput
+	emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
+		mock.Anything).
+		Run(func(args mock.Arguments) { sent = args.Get(2).(*emaildelivery.SendEmailInput) }).
+		Return(nil)
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html",
+		mock.Anything).Return(nil)
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	require.NotNil(t, mailReq)
+	assert.Equal(t, "pt-BR", i18n.LocaleTag(mailReq.Context()),
+		"the mail is rendered in the page's language, which is also what picks its body copy")
+	require.NotNil(t, sent)
+	assert.Equal(t, "Bem-vindo(a)!", sent.Subject)
+}
+
 // Decision 6: a wire-meaning error is matched with errors.As, never a bare assertion. A type
 // switch is a bare assertion in different syntax -- both read the dynamic type, and both fall to
 // the default arm on a wrapped value. This handler used one, so a wrap anywhere between the
