@@ -75,11 +75,11 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	pwdLocation := assertRedirect(t, resp, "/auth/pwd")
 	pwdPage := loadPage(t, httpClient, pwdLocation)
@@ -95,15 +95,15 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 	assertStateMismatchPage(t, mismatch)
 
 	resp = authenticateWithPassword(t, httpClient, pwdLocation, pwdPage, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
