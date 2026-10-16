@@ -6,6 +6,8 @@
 package config
 
 import (
+	"crypto/x509"
+	"errors"
 	"flag"
 	"log/slog"
 	"net"
@@ -50,6 +52,11 @@ type AdminConsoleConfig struct {
 	// catalogs, or empty for none. It has no flag, like the auth server's, so the one variable
 	// configures both servers the same way (#431).
 	I18nOverridesDir string
+	// InternalCAFile is the PEM file whose authorities the console appends to the system roots
+	// before it verifies the auth server's certificate on an https internal URL, so a private CA
+	// can sign that URL without the process's own roots being replaced. Empty, its calls verify
+	// against the system roots alone (#525).
+	InternalCAFile string
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -72,6 +79,45 @@ func (c *AdminConsoleConfig) TrustedProxyRanges() ([]*net.IPNet, error) {
 		return nil, errs.Wrap(err, "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES (--adminconsole-trusted-proxies)")
 	}
 	return ranges, nil
+}
+
+// InternalRoots answers the root pool the console verifies the auth server's certificate against
+// on every call it makes over the wire: the system roots alone while InternalCAFile is unset, and
+// that file's authorities appended to the system roots once it is. Appended rather than in their
+// place, because SSL_CERT_FILE and SSL_CERT_DIR are the way to replace the roots wholesale, and
+// an operator naming one CA has asked to trust it beside the roots the process already had, not
+// to stop trusting them (#525).
+//
+// main calls this once, at start, and hands the pool to every client it builds, so the file is
+// read once and a refusal stops the console before it serves anything: a file that cannot be
+// read, or that holds no PEM certificate, is the same refusal the auth server's database CA file
+// answers, under this process's own variable names (#502), rather than a certificate failure on
+// the first page an administrator opens.
+func (c *AdminConsoleConfig) InternalRoots() (*x509.CertPool, error) {
+	if c.InternalCAFile == "" {
+		return nil, nil
+	}
+
+	const setting = "GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (--adminconsole-internal-ca-file) is "
+	file := strconv.Quote(c.InternalCAFile)
+	pemBytes, err := os.ReadFile(c.InternalCAFile)
+	if err != nil {
+		// The cause alone: the path is quoted above, and the error repeats it unquoted.
+		reason := err.Error()
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			reason = pathErr.Err.Error()
+		}
+		return nil, errs.Errorf("%s%s, which cannot be read: %s", setting, file, reason)
+	}
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, errs.Wrap(err, setting+file)
+	}
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		return nil, errs.Errorf("%s%s, which holds no PEM certificate", setting, file)
+	}
+	return roots, nil
 }
 
 // isHTTPSURL reports whether a URL uses the https scheme (case-insensitive).
@@ -143,6 +189,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ListenHostMetrics:                getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS", "0.0.0.0"),
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", 9191, &malformed),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
+			InternalCAFile:                   getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", ""),
 		},
 		AuthServer: AuthServerConfig{
 			BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
@@ -166,6 +213,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
 	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
 	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
+	fs.StringVar(&c.AdminConsole.InternalCAFile, "adminconsole-internal-ca-file", c.AdminConsole.InternalCAFile, "PEM file of certificate authorities trusted on top of the system roots for the calls to the auth server (admin console)")
 	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")
 	fs.StringVar(&c.AdminConsole.ListenHostMetrics, "adminconsole-listen-host-metrics", c.AdminConsole.ListenHostMetrics, "Admin console metrics host")

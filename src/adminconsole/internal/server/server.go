@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -57,6 +58,10 @@ type Server struct {
 	// shares the HTTP client (#441).
 	authServerHTTPClient *http.Client
 	tokenClient          *oauthclient.TokenClient
+	// The root pool main built from GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE appended to the system
+	// roots, which the admin API client the route table builds verifies the auth server's
+	// certificate against. nil is the system roots alone (#525).
+	rootCAs *x509.CertPool
 
 	// The families this console exposes on its metrics listener (#400 decision 6). main creates the
 	// registry, because the clients it builds before the server, the session backend's, the token
@@ -69,7 +74,8 @@ type Server struct {
 
 func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
 	trustedProxies []*net.IPNet, cfg *config.Config, authServerHTTPClient *http.Client,
-	tokenClient *oauthclient.TokenClient, registry *metrics.Registry, upstream *upstreammetrics.Recorder) *Server {
+	rootCAs *x509.CertPool, tokenClient *oauthclient.TokenClient, registry *metrics.Registry,
+	upstream *upstreammetrics.Recorder) *Server {
 
 	s := Server{
 		router:        router,
@@ -82,6 +88,7 @@ func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, sett
 
 		authServerHTTPClient: authServerHTTPClient,
 		tokenClient:          tokenClient,
+		rootCAs:              rootCAs,
 
 		metrics:  registry,
 		upstream: upstream,

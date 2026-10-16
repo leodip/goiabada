@@ -79,7 +79,7 @@ func TestInitRoutes_TheSignInUsesTheTokenClientTheServerWasHanded(t *testing.T) 
 	httpClient := &http.Client{Transport: transport, Timeout: oauthclient.TokenExchangeTimeout}
 	tokenClient := oauthclient.NewTokenClient(oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()), builtin.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, httpClient, nil)
 
-	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, httpClient, tokenClient, metrics.NewRegistry(), nil)
+	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, httpClient, nil, tokenClient, metrics.NewRegistry(), nil)
 	s.initRoutes(s.router)
 
 	start := httptest.NewRecorder()

@@ -44,7 +44,7 @@ func TestClient_ABodyExactlyAtTheCeilingIsAccepted(t *testing.T) {
 	body := publicSettingsBodyOf(t, 1<<20)
 	require.Len(t, body, 1<<20)
 
-	settings, err := NewClient(serveBody(t, body).URL, nil).GetPublicSettings(context.Background())
+	settings, err := NewClient(serveBody(t, body).URL, nil, nil).GetPublicSettings(context.Background())
 	require.NoError(t, err, "the ceiling is inclusive: a body of exactly 1 MiB is answered")
 	assert.Len(t, settings.AppName, 1<<20-len(`{"appName":""}`))
 }
@@ -53,7 +53,7 @@ func TestClient_RefusesAnOversizedAnswerRatherThanDecodingAPrefix(t *testing.T) 
 	// Deliberately not an appName: a decoder over the body would stop at the first complete value
 	// and accept this truncated-looking document with the issuer missing, which is the shape
 	// #386 decision 4 calls unsound.
-	settings, err := NewClient(serveBody(t, publicSettingsBodyOf(t, 1<<20+1)).URL, nil).
+	settings, err := NewClient(serveBody(t, publicSettingsBodyOf(t, 1<<20+1)).URL, nil, nil).
 		GetPublicSettings(context.Background())
 	require.Error(t, err)
 	assert.Nil(t, settings)
@@ -73,7 +73,7 @@ func TestClient_CarriesTheCallersContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := NewClient(server.URL, nil).GetPublicSettings(ctx)
+	_, err := NewClient(server.URL, nil, nil).GetPublicSettings(ctx)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.Canceled, "got %v", err)
 }
@@ -82,7 +82,7 @@ func TestClient_CarriesTheCallersContext(t *testing.T) {
 // waiting out ten seconds proves a contract net/http already holds, at a cost on every run. It is
 // the only bound on the cache's shared fetch, which no caller's cancellation ends.
 func TestNewClient_CarriesADeadline(t *testing.T) {
-	client := NewClient("http://auth.example.com", nil)
+	client := NewClient("http://auth.example.com", nil, nil)
 
 	assert.Equal(t, 10*time.Second, client.httpClient.Timeout,
 		"the value every client on the console's page-load path carries (#386 decision 6)")
@@ -97,7 +97,7 @@ func TestClient_ReadsTheSettingsItIsGiven(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	settings, err := NewClient(server.URL, nil).GetPublicSettings(context.Background())
+	settings, err := NewClient(server.URL, nil, nil).GetPublicSettings(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, "Goiabada", settings.AppName)
@@ -114,7 +114,7 @@ func TestClient_ANonOKAnswerNamesItsStatus(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	_, err := NewClient(server.URL, nil).GetPublicSettings(context.Background())
+	_, err := NewClient(server.URL, nil, nil).GetPublicSettings(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "503")
 	assert.Contains(t, err.Error(), "the settings row is missing")
