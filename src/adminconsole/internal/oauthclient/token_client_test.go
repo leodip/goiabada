@@ -182,7 +182,8 @@ func TestExchangeCode_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 
 // The refresh grant's form is RFC 6749 section 6's, with no client credentials in it:
 // every grant of this client authenticates as Basic (#474). It is the form the
-// middleware posted before #441, parameter for parameter.
+// middleware posted before #441 less client_id and client_secret, which ride the
+// Authorization header since #474.
 func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
 
@@ -206,8 +207,8 @@ func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 
 // The client-credentials grant's form is RFC 6749 section 4.4.2's, with the scope the
 // caller asks for and no client credentials in it: every grant of this client
-// authenticates as Basic (#474). It is the form SessionTokenSource posted before #441,
-// parameter for parameter.
+// authenticates as Basic (#474). It is the form SessionTokenSource posted before #441
+// less client_id and client_secret, which ride the Authorization header since #474.
 func TestClientCredentials_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{"access_token":"at"}`)
 
@@ -258,7 +259,10 @@ func TestTokenClient_AuthenticatesAsBasicOnEveryGrant(t *testing.T) {
 // its handler_token.go). The decode below is that parser's -- split on the first
 // colon, then un-escape each half -- so the pair here is the one the endpoint accepts.
 func TestTokenClient_EncodesTheSecretTheServerDecodes(t *testing.T) {
-	const secret = "a%25b+c d:e" // the characters the encoding and the parser disagree over
+	// The characters the encoding and the parser disagree over, then "~~~", which
+	// url.PathEscape leaves alone and which puts a '+' in the header's Base64, the one
+	// place the standard alphabet the parser decodes and the URL-safe one differ.
+	const secret = "a%25b+c d:e~~~"
 
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
 	_, err := NewTokenClient(tokenURL, "the-client-id", secret, nil, nil).
