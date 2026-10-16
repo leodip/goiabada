@@ -12,7 +12,7 @@ import { join, relative, sep } from 'node:path';
 
 import { fromHtml } from 'hast-util-from-html';
 import { select, selectAll } from 'hast-util-select';
-import { toMdast } from 'hast-util-to-mdast';
+import { defaultHandlers, toMdast } from 'hast-util-to-mdast';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { gfmStrikethroughToMarkdown } from 'mdast-util-gfm-strikethrough';
 import { gfmTableToMarkdown } from 'mdast-util-gfm-table';
@@ -182,7 +182,7 @@ export function writeLlmsFiles({ distDir, site, title, summary }) {
 	writeFileSync(join(distDir, indexFile), toMarkdown({ type: 'root', children: index }, markdownOptions));
 
 	const entries = ordered.flatMap((section) => section.pages).map((page) => {
-		const body = toMdast({ type: 'root', children: transform(page.content.children, page.url) });
+		const body = toMdast({ type: 'root', children: transform(page.content.children, page.url) }, { handlers: { ul: schemaList } });
 		const entry = [
 			{ type: 'heading', depth: 1, children: [text(page.title)] },
 			paragraph([text(`Source: ${page.url}`)]),
@@ -213,13 +213,17 @@ function element(tagName, properties, children) {
 
 // Rewrites what Starlight renders from its components into the plain HTML a
 // Markdown converter knows: a code frame into a fenced block, tabs into each
-// panel under its label, an aside into a block quote under its title, and a link
-// card into a link and its description. Links and images become absolute, since
-// the file is read away from the site.
+// panel under its label, an aside into a block quote under its title, a card
+// into its body under its title, a link card into a link and its description,
+// a hero's buttons into a list of links, and an API operation as openAPIElement
+// lays it out. Links and images become absolute, since the file is read away
+// from the site.
 function transform(nodes, pageUrl) {
 	return nodes.flatMap((node) => {
 		if (node.type !== 'element') return [node];
 		const classes = node.properties.className ?? [];
+		const openAPI = openAPIElement(node, pageUrl);
+		if (openAPI) return openAPI;
 		if (classes.includes('expressive-code')) return codeFrame(node);
 		if (node.tagName === 'starlight-tabs') return tabs(node, pageUrl);
 		if (classes.includes('starlight-aside')) {
@@ -231,6 +235,18 @@ function transform(nodes, pageUrl) {
 					...transform(body?.children ?? [], pageUrl),
 				]),
 			];
+		}
+		if (node.tagName === 'article' && classes.includes('card')) {
+			const title = select('.title', node);
+			const body = select('.body', node);
+			return [
+				element('p', {}, [element('strong', {}, [text(oneLine(textOf(title)))])]),
+				...transform(body?.children ?? [], pageUrl),
+			];
+		}
+		if (classes.includes('actions') && node.children.some((child) => hasClass(child, 'sl-link-button'))) {
+			const buttons = node.children.filter((child) => hasClass(child, 'sl-link-button'));
+			return [element('ul', {}, buttons.map((button) => element('li', {}, transform([button], pageUrl))))];
 		}
 		if (classes.includes('sl-link-card')) {
 			const anchor = select('a[href]', node);
@@ -247,6 +263,182 @@ function transform(nodes, pageUrl) {
 		if (node.tagName === 'img' && properties.src !== undefined) properties.src = absolute(properties.src, pageUrl);
 		return [{ ...node, properties, children: transform(node.children, pageUrl) }];
 	});
+}
+
+// Rewrites what starlight-openapi renders for an operation, which lays out each
+// fact in a box of its own and so converts to a paragraph per word, into the
+// lines a reader of Markdown expects: the method and path as one code line, each
+// server's URL under its label, a tag's operations as a list of method and link,
+// a security scheme's facts as a label and a value, the media type labeled, the
+// schemas a body may take numbered, and a schema as a nested list, one item per
+// property, its type, tags and required on the property's line and its
+// description after them. Returns undefined for anything else.
+function openAPIElement(node, pageUrl) {
+	const classes = node.properties.className ?? [];
+	if (classes.includes('sl-openapi-operation-description')) {
+		const method = oneLine(textOf(select('.sl-openapi-operation-method-badge', node)));
+		const path = oneLine(textOf(select('.sl-openapi-operation-method-path', node)));
+		const result = [element('p', {}, [element('code', {}, [text(`${method} ${path}`)])])];
+		const snippets = selectAll('.sl-openapi-snippet', node);
+		const label = oneLine(textOf(select('.sl-openapi-snippet-picker-value', node)));
+		if (snippets.length > 0 && label !== '') result.push(element('p', {}, [element('em', {}, [text(label)])]));
+		for (const snippet of snippets) result.push(...transform(snippet.children, pageUrl));
+		return result;
+	}
+	if (classes.includes('sl-openapi-overview-navigation-links')) {
+		const links = node.children.filter((child) => hasClass(child, 'sl-openapi-overview-navigation-link'));
+		return [
+			element(
+				'ul',
+				{},
+				links.map((link) => {
+					const method = oneLine(textOf(select('.sl-openapi-operation-method-badge', link)));
+					const content = select('.sl-openapi-overview-navigation-link-content', link);
+					return element('li', {}, [element('code', {}, [text(method)]), text(' '), ...transform(content?.children ?? [], pageUrl)]);
+				}),
+			),
+		];
+	}
+	if (classes.includes('sl-openapi-operation-description-urls')) {
+		return selectAll('label', node).map((label) => {
+			const url = select('input', label)?.properties.value;
+			const name = oneLine(textOf(label));
+			return element('p', {}, url === undefined ? [text(name)] : [text(`${name}: `), element('code', {}, [text(String(url))])]);
+		});
+	}
+	if (classes.includes('sl-openapi-content-picker-select')) return [];
+	if (node.properties.role === 'tabpanel' && node.properties.dataOpenapiContentType !== undefined) {
+		const result = [
+			element('p', {}, [text('Media type: '), element('code', {}, [text(String(node.properties.dataOpenapiContentType))])]),
+		];
+		let alternatives = false;
+		for (const child of node.children) {
+			if (alternatives && child.type === 'element' && child.tagName === 'starlight-tabs') {
+				result.push(...schemaAlternatives(child, pageUrl));
+				alternatives = false;
+				continue;
+			}
+			if (hasClass(child, 'sl-openapi-schema-objects')) alternatives = true;
+			result.push(...transform([child], pageUrl));
+		}
+		return result;
+	}
+	if (classes.includes('sl-openapi-text')) {
+		const label = oneLine(node.children.filter((child) => !hasClass(child, 'sl-openapi-tag')).map(textOf).join(''));
+		const tags = selectAll('.sl-openapi-tag', node).map((tag) => [element('code', {}, [text(oneLine(textOf(tag)))])]);
+		return [element('p', {}, [text(`${label} `), ...joined(tags)])];
+	}
+	if (classes.includes('sl-openapi-schema-object-root')) {
+		const summary = node.children.find((child) => child.type === 'element' && child.tagName === 'summary');
+		const facts = schemaFacts(summary);
+		const rest = node.children.filter((child) => child !== summary);
+		return [...(facts.length > 0 ? [element('p', {}, [text('Type: '), ...joined(facts)])] : []), ...transform(rest, pageUrl)];
+	}
+	if (classes.includes('sl-openapi-keys')) {
+		const keys = node.children.filter((child) => hasClass(child, 'sl-openapi-key'));
+		return [element('ul', { dataLlmsSchema: true }, keys.map((key) => schemaKey(key, pageUrl)))];
+	}
+	if (classes.includes('sl-openapi-request-body-required')) return [text(' (required)')];
+	return undefined;
+}
+
+// One property of a schema as a list item, on one line: its name, then in
+// parentheses its type, its tags and whether it is required, then its
+// description's paragraphs and any labeled row of tags, such as its allowed
+// values, each as a sentence; then any other block of its description, and the
+// properties of an object or of an array's items as a nested list. Keeping
+// paragraphs on the line keeps the list tight, a blank line between items being
+// what one item of two paragraphs would cost every item of its list.
+function schemaKey(key, pageUrl) {
+	const name = key.children.find((child) => hasClass(child, 'sl-openapi-key-name'));
+	const description = key.children.find((child) => hasClass(child, 'sl-openapi-key-description'));
+	const facts = [];
+	const blocks = [];
+	const labeled = [];
+	const nested = [];
+	for (const part of description?.children ?? []) {
+		if (part.type !== 'element') continue;
+		if (part.tagName === 'details') {
+			const summary = part.children.find((child) => child.type === 'element' && child.tagName === 'summary');
+			const items = schemaFacts(summary);
+			const type = facts[0] && oneLine(facts[0].map(textOf).join(''));
+			const item = items[0] && oneLine(items[0].map(textOf).join(''));
+			if (!type) facts.push(...items);
+			else if (item && !type.includes(item)) facts[0] = [...facts[0], text(' of '), ...items[0]];
+			nested.push(...transform(part.children.filter((child) => child !== summary), pageUrl));
+		} else if (hasClass(part, 'sl-openapi-markdown')) {
+			blocks.push(...transform(part.children, pageUrl).filter((child) => child.type === 'element'));
+		} else if (hasClass(part, 'sl-openapi-tags')) {
+			const label = oneLine(part.children.filter((child) => child.type === 'text').map((child) => child.value).join(''));
+			if (label === '') {
+				facts.push(...schemaFacts(part));
+			} else {
+				const tags = selectAll('.sl-openapi-tag', part).map((tag) => [element('code', {}, [text(oneLine(textOf(tag)))])]);
+				labeled.push([text(`${label} `), ...joined(tags)]);
+			}
+		} else {
+			facts.push(...schemaFacts(part));
+		}
+	}
+	for (const marker of name?.children ?? []) {
+		if (marker.type === 'element' && marker.tagName !== 'strong') facts.push([text(oneLine(textOf(marker)))]);
+	}
+	const line = [element('code', {}, [text(oneLine(textOf(select('strong', name ?? key))))])];
+	if (facts.length > 0) line.push(text(' ('), ...joined(facts), text(')'));
+	const sentences = [...blocks.filter((block) => block.tagName === 'p').map((block) => block.children), ...labeled];
+	sentences.forEach((sentence, index) => {
+		const before = oneLine(line.map(textOf).join(''));
+		line.push(text(index === 0 && blocks[0]?.tagName === 'p' ? ': ' : /[.!?:]$/.test(before) ? ' ' : '. '), ...sentence);
+	});
+	const rest = blocks.filter((block) => block.tagName !== 'p');
+	return element('li', {}, [element('p', {}, line), ...rest, ...nested]);
+}
+
+// The schemas a body may take, each one a tab starlight-openapi labels with its
+// type alone, as numbered options: tabs labeled object, object and object would
+// read as one schema said three times.
+function schemaAlternatives(node, pageUrl) {
+	const labels = selectAll('[role=tablist] [role=tab]', node).map((tab) => oneLine(textOf(tab)));
+	const panels = node.children.filter((child) => child.type === 'element' && child.properties.role === 'tabpanel');
+	return panels.flatMap((panel, index) => [
+		element('p', {}, [
+			element('strong', {}, [text(`Option ${index + 1}`)]),
+			...(labels[index] ? [text(' ('), element('code', {}, [text(labels[index])]), text(')')] : []),
+		]),
+		...transform(panel.children, pageUrl),
+	]);
+}
+
+// The type and tags an element renders, in its order, each as inline nodes: a
+// type as code, and a tag as its text, or as code when it holds more than
+// words, such as a pattern or a bound, which Markdown would escape.
+function schemaFacts(node) {
+	if (!node) return [];
+	return selectAll('.sl-openapi-type, .sl-openapi-tag', node).map((fact) => {
+		const value = oneLine(textOf(fact));
+		const code = hasClass(fact, 'sl-openapi-type') || /[^\p{L}\p{N}\s:.,-]/u.test(value);
+		return [code ? element('code', {}, [text(value)]) : text(value)];
+	});
+}
+
+// A schema's list as Markdown, written tight: an item spreads out only when it
+// holds a paragraph besides its property's line, since one line and a nested
+// list read as one item. Any other list is converted as the converter would.
+function schemaList(state, node) {
+	const list = defaultHandlers.ul(state, node);
+	if (node.properties.dataLlmsSchema) {
+		for (const item of list.children) item.spread = item.children.filter((child) => child.type !== 'list').length > 1;
+		list.spread = list.children.some((item) => item.spread);
+	}
+	return list;
+}
+
+function joined(runs) {
+	return runs.flatMap((run, index) => (index === 0 ? run : [text(', '), ...run]));
+}
+
+function hasClass(node, name) {
+	return node.type === 'element' && (node.properties.className ?? []).includes(name);
 }
 
 function absolute(href, pageUrl) {
