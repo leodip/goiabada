@@ -165,7 +165,7 @@ The names of countries and phone country codes, and the country in each time zon
 
 ## Email bodies
 
-An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). The auth server uses it for a recipient whose language is exactly that tag, `es` here, and the English template for everyone else.
+An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `es` serves a recipient reading `es-MX`, and `pt-BR` one reading `pt`. With copies for two regions, the closer one can win over the plain language, so `es-419` beats `es` for `es-MX`. A recipient with no copy in their language gets the English template.
 
 ## Templates and static files
 
