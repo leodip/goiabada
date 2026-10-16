@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -5481,6 +5482,41 @@ func TestHandleIssueGet_WarnsWhenAResponseGoesToAStoredPlainHTTPRedirectURI(t *t
 		assert.Contains(t, remedy, "/auth/callback")
 		assert.Contains(t, remedy, "only then remove the http URIs")
 	})
+
+	// The short ASCII URIs above are ones logging.FieldForLog returns unchanged, so they would pass
+	// with the URI written raw. A stored URI may be up to record.RedirectURIMaxBytes, past
+	// logging.MaxLoggedField, and may carry non-ASCII text: the record must hold the bounded,
+	// escaped rendering, while the response still goes to the whole stored URI.
+	for name, storedURI := range map[string]string{
+		"a stored URI longer than a logged field is bounded in the record": "http://app.example.com/" + strings.Repeat("a", 2000),
+		"a stored URI with non-ASCII text is escaped in the record":        "http://app.example.com/ação",
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.LessOrEqual(t, len(storedURI), record.RedirectURIMaxBytes)
+			require.NotEqual(t, storedURI, logging.FieldForLog(storedURI), "the fixture must be one FieldForLog changes")
+
+			f := newFixture(t, "code", "query", storedURI)
+			armCodeIssuer(f, storedURI)
+			armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+			logs := logtest.CaptureSlog(t)
+			f.handler.ServeHTTP(f.rr, f.req)
+
+			assert.Equal(t, http.StatusFound, f.rr.Code)
+			location, err := url.Parse(f.rr.Header().Get("Location"))
+			require.NoError(t, err)
+			location.RawQuery = ""
+			want, err := url.Parse(storedURI)
+			require.NoError(t, err)
+			assert.Equal(t, want.String(), location.String())
+
+			warning, ok := warningSaying(t, logs, "uses plain http off the loopback interface")
+			if !ok {
+				return
+			}
+			assert.Equal(t, logging.FieldForLog(storedURI), warning.Attrs["redirect_uri"])
+		})
+	}
 
 	t.Run("a loopback http redirect URI delivers with no warn record", func(t *testing.T) {
 		const storedURI = "http://127.0.0.1:9090/callback"
