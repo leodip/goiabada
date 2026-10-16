@@ -2,10 +2,12 @@ package datatests
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -15,7 +17,36 @@ import (
 // against every supported engine, which is the point: the claim is a conditional
 // UPDATE rather than an engine-specific advisory lock.
 
-// setLastCleanupAt puts settings row 1 into a known state.
+// engineExecer is the exec the data layer's own writers go through. Every
+// database the factory builds embeds commondb.Database, so whichever of the
+// four engines this run targets carries the method.
+type engineExecer interface {
+	ExecSQL(ctx context.Context, tx *sql.Tx, query string, args ...any) (sql.Result, error)
+}
+
+// flavorOf mirrors the builder flavor each engine's New builds its statements
+// with (sqlitedb, mysqldb, postgresdb and mssqldb each pass one to
+// commondb.New), so a direct statement renders the placeholders its engine
+// reads.
+func flavorOf(dialect data.Dialect) sqlbuilder.Flavor {
+	switch dialect {
+	case data.SQLite:
+		return sqlbuilder.SQLite
+	case data.MySQL:
+		return sqlbuilder.MySQL
+	case data.Postgres:
+		return sqlbuilder.PostgreSQL
+	case data.MSSQL:
+		return sqlbuilder.SQLServer
+	}
+	panic("unknown dialect: " + string(dialect))
+}
+
+// setLastCleanupAt puts settings row 1 into a known state. last_cleanup_at is
+// dont-update (#407), so no settings write can arrange it any more, and
+// arranging it through TryClaimCleanupRun would make the setup depend on the
+// very conditional these tests are about to exercise. The column is therefore
+// written directly, as the one-column UPDATE the claim itself is.
 func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 	t.Helper()
 
@@ -39,16 +70,33 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 		}
 	}
 
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("settings")
 	if at == nil {
-		settings.LastCleanupAt.Valid = false
+		settings.LastCleanupAt = sql.NullTime{}
+		ub.Set("last_cleanup_at = NULL")
 	} else {
-		settings.LastCleanupAt.Time = *at
-		settings.LastCleanupAt.Valid = true
+		settings.LastCleanupAt = sql.NullTime{Time: *at, Valid: true}
+		ub.Set(ub.Assign("last_cleanup_at", *at))
 	}
-	if err := database.UpdateSettings(context.Background(), nil, settings); err != nil {
-		t.Fatalf("Failed to update settings: %v", err)
+	ub.Where(ub.Equal("id", 1))
+	query, args := ub.BuildWithFlavor(flavorOf(dbType()))
+	if err := execLastCleanupAt(t, query, args...); err != nil {
+		t.Fatalf("Failed to set last_cleanup_at: %v", err)
 	}
 	return settings
+}
+
+// execLastCleanupAt runs one of setLastCleanupAt's statements through the engine
+// exec, so the arrange reaches the column no settings write can.
+func execLastCleanupAt(t *testing.T, query string, args ...any) error {
+	t.Helper()
+	exec, ok := database.(engineExecer)
+	if !ok {
+		t.Fatal("the database does not expose the engine exec this arrange needs")
+	}
+	_, err := exec.ExecSQL(context.Background(), nil, query, args...)
+	return err
 }
 
 func TestTryClaimCleanupRun_ClaimableWhenNeverRun(t *testing.T) {
@@ -158,6 +206,67 @@ func TestTryClaimCleanupRun_ClaimBlocksTheNextInterval(t *testing.T) {
 	}
 	if claimed {
 		t.Error("Expected the follow-up poll to lose the claim")
+	}
+}
+
+// A settings save must not release the claim (#407's acceptance case). Every settings
+// PUT writes the whole row back from the request-start snapshot, so before
+// last_cleanup_at was dont-update a save landing inside the interval wrote the
+// pre-claim timestamp back over the claim, and a second instance could claim a
+// sweep already running.
+func TestTryClaimCleanupRun_ASettingsSaveDoesNotReleaseTheClaim(t *testing.T) {
+	longAgo := time.Now().UTC().Add(-24 * time.Hour).Truncate(time.Second)
+	setLastCleanupAt(t, &longAgo)
+
+	// The snapshot a settings PUT's middleware loads at request start, read before
+	// the claim is taken.
+	snapshot, err := database.GetSettingsById(context.Background(), nil, 1)
+	if err != nil {
+		t.Fatalf("Failed to read settings: %v", err)
+	}
+	if snapshot == nil {
+		t.Skip("settings row 1 does not exist in this database; the claim targets id = 1")
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
+	if err != nil {
+		t.Fatalf("TryClaimCleanupRun failed: %v", err)
+	}
+	if !claimed {
+		t.Fatal("Expected the claim to succeed")
+	}
+
+	// The save lands with its own section changed and the stale snapshot behind
+	// it, which is the shape the settings handlers write.
+	snapshot.TokenExpirationInSeconds = snapshot.TokenExpirationInSeconds + 1
+	if err := database.UpdateSettings(context.Background(), nil, snapshot); err != nil {
+		t.Fatalf("Failed to update settings: %v", err)
+	}
+
+	// The save itself must still have landed.
+	saved, err := database.GetSettingsById(context.Background(), nil, 1)
+	if err != nil {
+		t.Fatalf("Failed to re-read settings: %v", err)
+	}
+	if saved.TokenExpirationInSeconds != snapshot.TokenExpirationInSeconds {
+		t.Errorf("Expected the settings save to land, TokenExpirationInSeconds %d",
+			saved.TokenExpirationInSeconds)
+	}
+
+	// The claim holds: the row still names the claim time, and a poll a minute
+	// later, inside the interval, loses exactly as it did before the save.
+	if !saved.LastCleanupAt.Valid || !saved.LastCleanupAt.Time.Equal(now) {
+		t.Errorf("Expected last_cleanup_at to hold the claim at %v, got %v",
+			now, saved.LastCleanupAt)
+	}
+	later := now.Add(time.Minute)
+	claimedAgain, err := database.TryClaimCleanupRun(context.Background(), nil, later, later.Add(-12*time.Hour))
+	if err != nil {
+		t.Fatalf("TryClaimCleanupRun failed after the save: %v", err)
+	}
+	if claimedAgain {
+		t.Error("Expected the claim to still hold the interval after a settings save")
 	}
 }
 
