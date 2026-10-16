@@ -2,6 +2,7 @@ package oauthclient
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -25,12 +26,24 @@ import (
 // read bound and the refusal are TokenClient's, and token_client_test.go covers them once per
 // grant; what is here is the cache and the one request it makes.
 
-// tokenStub records the form each request carried and answers from a script.
+// tokenStub records the form and the Authorization header each request carried, and
+// answers from a script.
 type tokenStub struct {
 	server *httptest.Server
 
-	mu    sync.Mutex
-	forms []url.Values
+	mu             sync.Mutex
+	forms          []url.Values
+	authorizations []string
+}
+
+// recordedAuthorizations is the Authorization headers the requests carried, in order.
+func (s *tokenStub) recordedAuthorizations() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := make([]string, len(s.authorizations))
+	copy(out, s.authorizations)
+	return out
 }
 
 func newTokenStub(t *testing.T, answer func(w http.ResponseWriter, attempt int)) *tokenStub {
@@ -45,6 +58,7 @@ func newTokenStub(t *testing.T, answer func(w http.ResponseWriter, attempt int))
 
 		stub.mu.Lock()
 		stub.forms = append(stub.forms, r.PostForm)
+		stub.authorizations = append(stub.authorizations, r.Header.Get("Authorization"))
 		attempt := len(stub.forms)
 		stub.mu.Unlock()
 
@@ -97,8 +111,13 @@ func TestSessionTokenSource_RequestsClientCredentialsWithTheNarrowScope(t *testi
 	recorded := stub.recorded()
 	require.Len(t, recorded, 1)
 	assert.Equal(t, "client_credentials", recorded[0].Get("grant_type"))
-	assert.Equal(t, "admin-console-client", recorded[0].Get("client_id"))
-	assert.Equal(t, "the-secret", recorded[0].Get("client_secret"))
+	// The credentials the source's client was built with, Basic-encoded, and nothing in
+	// the body: every grant of this client authenticates as Basic (#474).
+	assert.Equal(t,
+		"Basic "+base64.StdEncoding.EncodeToString([]byte("admin-console-client:the-secret")),
+		stub.recordedAuthorizations()[0])
+	assert.Empty(t, recorded[0].Get("client_id"))
+	assert.Empty(t, recorded[0].Get("client_secret"))
 	// The literal rather than the constants concatenated, so this does not pass by building
 	// the expected value the way the code does.
 	assert.Equal(t, "authserver:browser-sessions", recorded[0].Get("scope"))
