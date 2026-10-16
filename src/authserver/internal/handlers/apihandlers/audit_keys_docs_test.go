@@ -34,6 +34,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -424,11 +425,11 @@ func assertAuditDetailsKeys(r guard.Reporter, root, codeDir string, section docS
 // snake_case key written with no row. It returns an error, and no findings, for a section not
 // found or holding no table, and for a walk that reached no audit Log call.
 func auditDetailsKeyFindings(root, codeDir string, section docSection) ([]string, error) {
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
-	rows := docTableRows(text)
+	rows := docsreader.Rows(text)
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: %s holds no table of the audit details keys", section.page, section.heading)
 	}

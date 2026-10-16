@@ -70,7 +70,7 @@ The auth server checks the request before it shows the user anything. A check it
 |---|---|---|
 | The parameters can be read | 400 | "The authorization request could not be read: one of its parameters is not correctly encoded." |
 | `client_id`, `redirect_uri`, `response_type` and `response_mode` are each sent once | 400 | "The *name* parameter was included more than once." |
-| `client_id` names a client that exists, is enabled and has the authorization code flow on (for the implicit flow, it's checked later) | 200 | "Invalid client_id parameter." and why |
+| `client_id` names a client that exists and is enabled | 200 | "Invalid client_id parameter." and why |
 | `redirect_uri` is absolute and registered on the client | 200 | "Invalid redirect_uri parameter." and why. See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/). |
 | `response_mode` is `query`, `fragment` or `form_post` | 400 | "Invalid response_mode parameter. Supported values are: query, fragment, form_post." |
 
@@ -86,6 +86,7 @@ Every other check is answered with an error response to your redirect URI, carry
 | There's no `request` or `request_uri`: request objects aren't supported | `request_not_supported`, `request_uri_not_supported` |
 | `response_type` is there, separated by single spaces, and one the auth server supports | `invalid_request`, `unsupported_response_type` |
 | The implicit flow is on for the client, when `response_type` asks for it | `unauthorized_client` |
+| The authorization code flow is on for the client, when `response_type` asks for it | `unauthorized_client` |
 | `scope` has `openid`, when `response_type` asks for an ID token | `invalid_request` |
 | `nonce` is there, when the implicit flow asks for an ID token | `invalid_request` |
 | `state` and `nonce` are at most 2048 bytes | `invalid_request` |

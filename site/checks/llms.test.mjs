@@ -225,6 +225,167 @@ test('a generated API page with no description meta tag is listed with the first
 	);
 });
 
+// An operation page holding what starlight-openapi renders for an operation: the
+// method and path with a code sample and the URL popover, a path parameter, a
+// required request body whose schema nests an object and an array of objects and
+// gives allowed values, a default, a bound, a pattern and an additional
+// properties key, and a response that is one of two schemas.
+const schemaKey = (name, description, { required = true, marker = '' } = {}) =>
+	`<div class="sl-openapi-key not-content"><div class="sl-openapi-key-name"><strong>${name}</strong>${required ? '<div class="sl-openapi-key-required">required</div>' : ''}${marker}</div><div class="sl-openapi-key-description">${description}</div></div>`;
+const typeLine = (type, tags = '') => `<div><span class="sl-openapi-type">${type}</span>${tags}</div>`;
+const tag = (value) => ` <span class="sl-openapi-tag">${value}</span>`;
+const prose = (html) => `<div class="sl-openapi-markdown">${html}</div>`;
+const objectOf = (keys, root = false) =>
+	`<details${root ? ' class="sl-openapi-schema-object-root" open' : ''}><summary><span class="sl-openapi-type">object</span></summary><div class="sl-openapi-keys">${keys.join('')}</div></details>`;
+const mediaType = (content) =>
+	`<starlight-openapi-content-picker><div class="not-content sl-openapi-content-picker-select"><span class="sr-only">Media type</span><span class="sl-openapi-content-picker-select-value">application/json</span></div><div data-openapi-content-type="application/json" role="tabpanel">${content}</div></starlight-openapi-content-picker>`;
+
+const apiOperationPage = page({
+	title: 'Update client',
+	withSidebar: false,
+	body: `<div class="not-content sl-openapi-operation-description"><div class="sl-openapi-operation-description-header"><button aria-label="Toggle operation URLs" class="sl-openapi-operation-description-button"></button><div class="sl-openapi-operation-method"><div class="sl-openapi-operation-method-badge put">PUT</div><div class="sl-openapi-operation-method-path">/api/v1/admin/clients/{id}</div></div><sl-openapi-snippet-picker><div class="sl-openapi-snippet-picker"><span class="sr-only">Code sample: </span><span class="sl-openapi-snippet-picker-value">Shell / cURL</span></div></sl-openapi-snippet-picker></div>
+<div class="sl-openapi-snippets"><div class="sl-openapi-snippet" data-openapi-snippet-id="shell:curl"><div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="sh"><code><div class="ec-line"><div class="code"><span>curl --request PUT</span></div></div></code></pre></figure></div></div></div></div>
+<div id="sl-openapi-operation-description-popover" popover><ul class="sl-openapi-operation-description-urls"><li class="sl-openapi-operation-url"><label>Auth server base URL<input readonly type="text" value="{baseUrl}/api/v1/admin/clients/{id}"></label></li></ul></div>
+<div class="sl-openapi-markdown"><p>Update a client.</p></div>
+<section class="sl-openapi-section"><div class="sl-heading-wrapper level-h2"><h2 id="parameters" class="sl-openapi-heading">Parameters</h2></div><section class="sl-openapi-section"><div class="sl-heading-wrapper level-h3"><h3 id="path-parameters" class="sl-openapi-heading">Path Parameters</h3></div><div class="sl-openapi-section-panel"><div class="sl-openapi-keys">${schemaKey('id', typeLine('integer', tag('format: int64')) + prose('<p>Client ID</p>'))}</div></div></section></section>
+<section class="sl-openapi-section"><div class="sl-heading-wrapper level-h2"><h2 id="request-body" class="sl-openapi-heading">Request Body<sup class="sl-openapi-request-body-required">required</sup></h2></div><div class="sl-openapi-section-panel">${mediaType(
+		objectOf(
+			[
+				schemaKey('displayName', prose('<p>A name for the client</p>') + typeLine('string'), { required: false }),
+				schemaKey(
+					'consent',
+					prose('<p>Whether consent is asked.</p>') +
+						typeLine('string') +
+						'<div class="sl-openapi-tags">Allowed values: <span class="sl-openapi-tag">on</span> <span class="sl-openapi-tag">off</span></div>',
+				),
+				schemaKey('size', typeLine('integer') + `<div class="sl-openapi-tags">${tag('default: 20')}${tag('&lt;= 200')}</div>`, { required: false }),
+				schemaKey('country', typeLine('string', tag('/^([A-Z]{2})?$/')), { required: false }),
+				schemaKey(
+					'logo',
+					objectOf([
+						schemaKey('url', typeLine('string', tag('format: uri')) + '<div class="sl-openapi-tags"> <span class="sl-openapi-tag">nullable</span></div>'),
+					]),
+				),
+				schemaKey(
+					'redirectURIs',
+					prose('<p>Null when not loaded.</p>') +
+						typeLine('Array&lt;object&gt;') +
+						prose('<p>The redirect URIs.</p><p>Each one is a URI.</p>') +
+						objectOf([schemaKey('uri', typeLine('string'))]),
+				),
+				schemaKey('webOrigins', typeLine('Array') + objectOf([schemaKey('origin', typeLine('string'))])),
+				schemaKey('params', objectOf([schemaKey('<em>key</em>', typeLine('string'), { required: false, marker: '<div class="sl-openapi-key-additional">additional properties</div>' })])),
+			],
+			true,
+		),
+	)}</div></section>
+<div class="sl-heading-wrapper level-h2"><h2 id="responses" class="sl-openapi-heading">Responses</h2></div>
+<section class="sl-openapi-section"><div class="sl-heading-wrapper level-h3"><h3 id="200" class="sl-openapi-heading">200</h3></div><div class="sl-openapi-section-pre-panel"><div class="sl-openapi-markdown"><p>Client updated</p></div></div><div class="sl-openapi-section-panel">${mediaType(
+		`<div class="sl-openapi-schema-objects"><span class="sl-openapi-schema-objects-type">One of:</span></div><starlight-tabs><div class="tablist-wrapper not-content"><ul role="tablist"><li role="presentation" class="tab"><a role="tab" href="#tab-panel-0-0" id="tab-0-0" aria-selected="true" tabindex="0">object</a></li><li role="presentation" class="tab"><a role="tab" href="#tab-panel-0-1" id="tab-0-1" aria-selected="false" tabindex="-1">object</a></li></ul></div><div id="tab-panel-0-0" aria-labelledby="tab-0-0" role="tabpanel">${objectOf([schemaKey('logoutUrl', typeLine('string'))], true)}</div><div id="tab-panel-0-1" aria-labelledby="tab-0-1" role="tabpanel" hidden>${objectOf([schemaKey('method', typeLine('string'))], true)}</div></starlight-tabs>`,
+	)}</div></section>`,
+});
+
+// A tag's page and an API's overview, as starlight-openapi renders them: the
+// tag's operations, each its method beside a link, and a security scheme's
+// facts, each a label and a value.
+const apiTagPage = page({
+	title: 'Clients',
+	withSidebar: false,
+	body: `<div class="sl-openapi-overview-navigation"><div class="sl-heading-wrapper level-h2"><h2 id="operations" class="sl-openapi-heading">Operations</h2></div><div class="sl-openapi-overview-navigation-links not-content"><div class="sl-openapi-overview-navigation-link"><div class="sl-openapi-operation-method-badge get">GET</div><span class="sl-openapi-overview-navigation-link-content"><a href="/reference/api/admin/operations/getclient/">/api/v1/admin/clients/{id}</a></span></div><div class="sl-openapi-overview-navigation-link"><div class="sl-openapi-operation-method-badge put">PUT</div><span class="sl-openapi-overview-navigation-link-content"><a href="/reference/api/admin/operations/updateclient/">/api/v1/admin/clients/{id}</a></span></div></div></div>
+<p class="sl-openapi-text"><b>Security scheme type: </b> <span class="sl-openapi-tag">http</span></p><p class="sl-openapi-text"><b>Bearer format: </b> <span class="sl-openapi-tag">JWT</span></p>`,
+});
+
+test('a generated API page is converted to Markdown: the operation on one line, each schema a nested list of its properties', async (t) => {
+	const root = builtSite({
+		'reference/api/admin/operations/updateclient/index.html': apiOperationPage,
+		'reference/api/admin/operations/tags/clients/index.html': apiTagPage,
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+
+	const { error } = await runBuild(root, 'https://goiabada.dev/reference/api/admin/operations/updateclient/');
+
+	assert.equal(error, undefined);
+	assert.equal(
+		read(root, 'llms-full.txt'),
+		`# Clients
+
+Source: https://goiabada.dev/reference/api/admin/operations/tags/clients/
+
+## Operations
+
+- \`GET\` [/api/v1/admin/clients/{id}](https://goiabada.dev/reference/api/admin/operations/getclient/)
+- \`PUT\` [/api/v1/admin/clients/{id}](https://goiabada.dev/reference/api/admin/operations/updateclient/)
+
+Security scheme type: \`http\`
+
+Bearer format: \`JWT\`
+
+# Update client
+
+Source: https://goiabada.dev/reference/api/admin/operations/updateclient/
+
+\`PUT /api/v1/admin/clients/{id}\`
+
+*Shell / cURL*
+
+\`\`\`sh
+curl --request PUT
+\`\`\`
+
+Auth server base URL: \`{baseUrl}/api/v1/admin/clients/{id}\`
+
+Update a client.
+
+## Parameters
+
+### Path Parameters
+
+- \`id\` (\`integer\`, format: int64, required): Client ID
+
+## Request Body (required)
+
+Media type: \`application/json\`
+
+Type: \`object\`
+
+- \`displayName\` (\`string\`): A name for the client
+- \`consent\` (\`string\`, required): Whether consent is asked. Allowed values: \`on\`, \`off\`
+- \`size\` (\`integer\`, default: 20, \`<= 200\`)
+- \`country\` (\`string\`, \`/^([A-Z]{2})?$/\`)
+- \`logo\` (\`object\`, required)
+  - \`url\` (\`string\`, format: uri, nullable, required)
+- \`redirectURIs\` (\`Array<object>\`, required): Null when not loaded. The redirect URIs. Each one is a URI.
+  - \`uri\` (\`string\`, required)
+- \`webOrigins\` (\`Array\` of \`object\`, required)
+  - \`origin\` (\`string\`, required)
+- \`params\` (\`object\`, required)
+  - \`key\` (\`string\`, additional properties)
+
+## Responses
+
+### 200
+
+Client updated
+
+Media type: \`application/json\`
+
+One of:
+
+**Option 1** (\`object\`)
+
+Type: \`object\`
+
+- \`logoutUrl\` (\`string\`, required)
+
+**Option 2** (\`object\`)
+
+Type: \`object\`
+
+- \`method\` (\`string\`, required)
+`,
+	);
+});
+
 // One page holding what Starlight renders from Markdown and its components.
 const richPage = page({
 	title: 'A guide',
@@ -238,10 +399,12 @@ const richPage = page({
 <aside aria-label="Caution" class="starlight-aside starlight-aside--caution"><p class="starlight-aside__title" aria-hidden="true"><svg aria-hidden="true" class="starlight-aside__icon"><path d="M1"/></svg>Caution</p><div class="starlight-aside__content"><p>Not for production.</p></div></aside>
 <table><thead><tr><th>Variable</th><th>Default</th></tr></thead><tbody><tr><td><code dir="auto">GOIABADA_PORT</code></td><td>9090 | 9091</td></tr></tbody></table>
 <div class="sl-link-card"><span class="sl-flex stack"><a href="/concepts/clients/"><span class="title">Clients</span></a><span class="description">Applications that request access.</span></span><svg aria-hidden="true" class="icon"><path d="M17"/></svg></div>
+<div class="card-grid"><article class="card sl-flex"><p class="title sl-flex"><svg aria-hidden="true" class="icon"><path d="M2"/></svg><span>Single sign-on</span></p><div class="body"><p>Users sign in once.</p></div></article></div>
+<div class="sl-flex actions"><a class="sl-link-button not-content primary" href="/get-started/introduction/">Get started</a><a class="sl-link-button not-content minimal" href="https://github.com/leodip/goiabada">View on GitHub<svg aria-hidden="true"><path d="M3"/></svg></a></div>
 <p><img src="/_astro/logo.png" alt="The logo"> Escapes: 1 * 2 and _b_, but not snake_case.</p>`,
 });
 
-test('a page is converted to Markdown: links absolute, code as fences, tabs labeled, controls left out', async (t) => {
+test('a page is converted to Markdown: links absolute, code as fences, tabs labeled, cards titled, buttons listed, controls left out', async (t) => {
 	const root = builtSite({ 'guides/a-guide/index.html': richPage });
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -286,6 +449,13 @@ Run it on Windows.
 | \`GOIABADA_PORT\` | 9090 \\| 9091 |
 
 [Clients](https://goiabada.dev/concepts/clients/): Applications that request access.
+
+**Single sign-on**
+
+Users sign in once.
+
+- [Get started](https://goiabada.dev/get-started/introduction/)
+- [View on GitHub](https://github.com/leodip/goiabada)
 
 ![The logo](https://goiabada.dev/_astro/logo.png) Escapes: 1 \\* 2 and \\_b\\_, but not snake_case.
 `,

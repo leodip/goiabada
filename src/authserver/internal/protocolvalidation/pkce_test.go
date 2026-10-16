@@ -108,11 +108,12 @@ func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 
 		request := func(challenge string) *ValidateRequestInput {
 			return &ValidateRequestInput{
-				ResponseType:        "code",
-				CodeChallengeMethod: "S256",
-				CodeChallenge:       challenge,
-				PKCERequired:        pkceRequired,
-				Scope:               "openid",
+				AuthorizationCodeEnabled: true,
+				ResponseType:             "code",
+				CodeChallengeMethod:      "S256",
+				CodeChallenge:            challenge,
+				PKCERequired:             pkceRequired,
+				Scope:                    "openid",
 			}
 		}
 
@@ -172,8 +173,9 @@ func TestValidateRequest_CodeChallengeGrammar(t *testing.T) {
 
 	t.Run("no PKCE at all needs no challenge and is not judged", func(t *testing.T) {
 		assert.NoError(t, validator.ValidateRequest(&ValidateRequestInput{
-			ResponseType: "code",
-			Scope:        "openid",
+			AuthorizationCodeEnabled: true,
+			ResponseType:             "code",
+			Scope:                    "openid",
 		}))
 	})
 }

@@ -19,3 +19,17 @@ func TestAdminPassword_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) 
 		"A refusal message that needs localizing, or anything else that needs a dependency, belongs "+
 		"with the caller that renders it, not in the rule both callers share (#500).")
 }
+
+// TestDocsReader_ImportsNothingButErrsAndTheStandardLibrary holds core/docsreader to being a leaf.
+// The setup wizard's docs tests read the site through it, and go mod tidy reads the tests of every
+// package a module imports, so whatever this package reaches lands in the wizard's go.sum. A test
+// the wizard reaches may not import core/guard, whose own dependencies, chi and TOML among them,
+// would arrive that way (#500); the section and table readers the docs tests share reach this
+// package instead, so it stays importable from every module's tests (#536).
+func TestDocsReader_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) {
+	AssertImportsOnly(t, "core/docsreader", map[string]string{
+		"github.com/leodip/goiabada/core/errs": "the error constructor pattern 7 requires",
+	}, "The setup wizard's docs tests read the site through this package, and go mod tidy reads "+
+		"the tests of every package a module imports, so a dependency reached from here lands in "+
+		"the wizard's go.sum (#500, #536).")
+}

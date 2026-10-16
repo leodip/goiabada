@@ -11,7 +11,7 @@ Find your case by what the user sees.
 
 ## The user sees the sign-in page
 
-Your request had a mistake, such as a scope that doesn't exist or a missing `code_challenge`, but the user is asked for their password as if nothing were wrong. Only once they sign in does your app get the `error` and `error_description`.
+Your request had a mistake, such as a scope that doesn't exist, a missing `code_challenge` or a flow that's off for its client, but the user is asked for their password as if nothing were wrong. Only once they sign in does your app get the `error` and `error_description`.
 
 That's on purpose. The auth server won't send an unauthenticated browser to a client's redirect URI with an error, because an attacker could use that to bounce visitors through a trusted sign-in page to wherever the redirect URI points ([RFC 9700 section 4.11.2](https://www.rfc-editor.org/rfc/rfc9700.html#section-4.11.2)). So it keeps the error, signs the user in, and then redirects with it. That sign-in creates no session.
 
@@ -28,7 +28,7 @@ The error is sent straight away, without asking for a password, when:
 
 The auth server couldn't tell where to send an error, so it shows it to the user instead. That covers:
 
-- a missing, unknown or disabled `client_id`, or a client without the authorization code flow;
+- a missing, unknown or disabled `client_id`;
 - a missing, malformed or unregistered `redirect_uri`, as [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/) explains;
 - a `response_mode` other than `query`, `fragment` or `form_post`: "Invalid response_mode parameter. Supported values are: query, fragment, form_post.";
 - `client_id`, `redirect_uri`, `response_type` or `response_mode` sent twice, or a request that isn't correctly encoded;

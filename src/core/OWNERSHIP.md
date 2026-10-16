@@ -252,6 +252,12 @@ command itself and fails on a tree it changed.
 | `core/countries` | `All` | kernel | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | kernel | — |
+| `core/docsreader` | `Row` | kernel | — |
+| `core/docsreader` | `Rows` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
+| `core/docsreader` | `Section` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's pages through it. |
+| `core/docsreader` | `SectionText` | test-support | Test support: compiled into no binary, and the docs tests of every module read already-read pages through it. |
+| `core/docsreader` | `Table` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
+| `core/docsreader` | `Tables` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
 | `core/errs` | `Errorf` | kernel | — |
 | `core/errs` | `Join` | both-apps | — |
 | `core/errs` | `New` | kernel | — |
@@ -347,7 +353,6 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeAttributeKeyRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeAttributeValueAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAttributeValueTooLong` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeAuthorizeAuthCodeNotEnabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAuthorizeClientDisabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAuthorizeClientIdMissing` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAuthorizeClientNotFound` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |

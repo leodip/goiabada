@@ -62,3 +62,13 @@ about = "Rebuilds the one shared e2e environment on the VPS from this worktree's
 slice = ["vet", "unit"]
 final = ["lint", "setup-wizard", "data-sqlite", "integration-sqlite"]
 last  = ["e2e"]   # after the review, before the push: the browser suite against an environment built from the branch
+
+# placido pr: reviewing contributors' pull requests. The reviewers are placido's
+# defaults (claude opus xhigh, then codex gpt-6.1-sol max fast); the gates default to
+# the slice and final ones above. src/.devcontainer joins the host paths because
+# stack.sh builds its image and its compose files decide what the containers mount
+# from this machine. e2e joins them because the last gate, which the menu offers, runs
+# the worktree's e2e/run.sh and its Playwright suite here, with the SSH key the VPS
+# accepts, and installs the suite's packages here.
+[pr]
+host_paths = [".placido", ".claude", ".codex", ".mcp.json", "src/.devcontainer", "e2e"]

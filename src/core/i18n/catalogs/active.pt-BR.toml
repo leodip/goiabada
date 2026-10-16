@@ -1694,7 +1694,6 @@
 "validator.authorize.client_id_missing" = "O parâmetro client_id está ausente."
 "validator.authorize.client_not_found" = "Parâmetro client_id inválido. O cliente não existe."
 "validator.authorize.client_disabled" = "Parâmetro client_id inválido. O cliente está desativado."
-"validator.authorize.auth_code_not_enabled" = "Parâmetro client_id inválido. O cliente não oferece suporte ao fluxo de código de autorização."
 "validator.authorize.redirect_uri_missing" = "O parâmetro redirect_uri está ausente."
 "validator.authorize.redirect_uri_not_absolute" = "Parâmetro redirect_uri inválido. A URI de redirecionamento precisa ser absoluta: o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host."
 "validator.authorize.redirect_uri_not_registered" = "Parâmetro redirect_uri inválido. O cliente não tem esta URI de redirecionamento registrada."

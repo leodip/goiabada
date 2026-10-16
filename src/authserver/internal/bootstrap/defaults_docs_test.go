@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/require"
 )
@@ -154,6 +155,24 @@ func TestConceptDocs_AMissingDefaultsSectionStops(t *testing.T) {
 	}
 }
 
+// A row missing its default stops the check rather than dropping out of it, so a complete row in a
+// later table cannot stand in for it.
+func TestConceptDocs_ADefaultsRowMissingACellStops(t *testing.T) {
+	root := t.TempDir()
+	writeDefaultsFixture(t, root, "site/tokens.mdx", "## How long tokens last\n\n"+
+		"| Setting | Default |\n|---|---|\n| **Token expiration in seconds** |\n\n"+
+		"| Setting | Default |\n|---|---|\n| **Token expiration in seconds** | 300 |\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertDefaultsTable(r, root, defaultsSection{"site/tokens.mdx", "## How long tokens last",
+			[]string{"Token expiration in seconds"}}, map[string]string{"Token expiration in seconds": "300"})
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "a row of 1 cells under a header of 2") {
+		t.Errorf("a row missing its default did not stop the check: %+v", report)
+	}
+}
+
 func TestConceptDocs_ADefaultsSectionWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeDefaultsFixture(t, root, "site/tokens.mdx", "## How long tokens last\n\nFive minutes.\n")
@@ -170,8 +189,8 @@ func TestConceptDocs_ADefaultsSectionWithNoTableStops(t *testing.T) {
 
 // assertDefaultsTable is the reporting half of the defaults check: one failure per row whose
 // default is not the seed's, per row naming a setting the section does not owe, and per owed
-// setting with no row; a stop for a section or table not found. A default is read as its first
-// word, so "300 (5 minutes)" is 300.
+// setting with no row; a stop for a section or table not found, or a row that cannot be read. A
+// default is read as its first word, so "300 (5 minutes)" is 300.
 func assertDefaultsTable(r guard.Reporter, root string, section defaultsSection, seeded map[string]string) {
 	r.Helper()
 	rows, err := defaultsTableRows(root, section)
@@ -200,50 +219,33 @@ func assertDefaultsTable(r guard.Reporter, root string, section defaultsSection,
 	}
 }
 
-// defaultsTableRows is the setting and the first word of the default of each row of the first
-// Setting and Default table in a section, the setting's bold removed. The section runs from its
-// heading to the next heading of the same level or above.
+// defaultsTableRows is the Setting and Default tables of the section heading opens, one row per
+// setting: its name and the default the page shows. The section is read through the shared reader,
+// and every table in it whose header names the two columns. A row whose cells are not its
+// header's is an error, so a row missing its default stops the check rather than dropping out of
+// it.
 func defaultsTableRows(root string, section defaultsSection) ([][2]string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", section.page, err)
+		return nil, err
 	}
-	level := strings.Index(section.heading, " ")
 	var rows [][2]string
-	inSection, inTable := false, false
-	for _, line := range strings.Split(string(content), "\n") {
-		if inSection {
-			if hashes := len(line) - len(strings.TrimLeft(line, "#")); hashes > 0 && hashes <= level &&
-				strings.HasPrefix(line[hashes:], " ") {
-				break
-			}
-		} else {
-			inSection = strings.TrimRight(line, " \r") == section.heading
+	found := false
+	for _, table := range docsreader.Tables(text) {
+		if len(table.Header) < 2 || table.Header[0] != "Setting" || table.Header[1] != "Default" {
 			continue
 		}
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			if inTable {
-				break
+		found = true
+		for _, cells := range table.Rows {
+			if len(cells) != len(table.Header) {
+				return nil, fmt.Errorf("%s: %s has a row of %d cells under a header of %d: %q",
+					section.page, section.heading, len(cells), len(table.Header), cells)
 			}
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		switch {
-		case !inTable:
-			inTable = len(cells) >= 2 && cells[0] == "Setting" && cells[1] == "Default"
-		case len(cells) >= 2 && strings.Trim(cells[0], "-: ") != "":
 			value, _, _ := strings.Cut(cells[1], " ")
 			rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
 		}
 	}
-	if !inSection {
-		return nil, fmt.Errorf("%s has no section headed %q", section.page, section.heading)
-	}
-	if !inTable {
+	if !found {
 		return nil, fmt.Errorf("%s: %s has no Setting and Default table", section.page, section.heading)
 	}
 	return rows, nil

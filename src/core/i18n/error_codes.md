@@ -333,7 +333,6 @@ these are rendered on the refusal page rather than returned to the client
 | `validator.authorize.client_id_missing` | (none) | The client_id parameter is missing. |
 | `validator.authorize.client_not_found` | (none) | Invalid client_id parameter. The client does not exist. |
 | `validator.authorize.client_disabled` | (none) | Invalid client_id parameter. The client is disabled. |
-| `validator.authorize.auth_code_not_enabled` | (none) | Invalid client_id parameter. The client does not support the authorization code flow. |
 | `validator.authorize.redirect_uri_missing` | (none) | The redirect_uri parameter is missing. |
 | `validator.authorize.redirect_uri_not_absolute` | (none) | Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host. |
 | `validator.authorize.redirect_uri_not_registered` | (none) | Invalid redirect_uri parameter. The client does not have this redirect URI registered. |

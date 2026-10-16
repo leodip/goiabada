@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,7 +39,7 @@ func TestDocs_NameEveryRefusedLibpqVariable(t *testing.T) {
 	}
 	require.Len(t, refusals, 7, "libpq's seven TLS variables")
 
-	text, err := docSectionText(root, libpqVariableSection)
+	text, err := docsreader.Section(root, libpqVariableSection.page, libpqVariableSection.heading)
 	require.NoError(t, err)
 	require.NotEmpty(t, text, "%s exists", libpqVariableSection)
 	for name, refusal := range refusals {
@@ -58,7 +59,7 @@ func TestDocs_TheDatabaseTransportNamesTheSettings(t *testing.T) {
 		{productionChecklistPage, "## Database"},
 		{securityReferencePage, "## The network"},
 	} {
-		text, err := docSectionText(root, section)
+		text, err := docsreader.Section(root, section.page, section.heading)
 		require.NoError(t, err)
 		require.NotEmpty(t, text, "%s exists", section)
 		for _, name := range []string{"GOIABADA_DB_TLS_MODE", "GOIABADA_DB_TLS_CA_FILE", "verify-full"} {
@@ -84,7 +85,7 @@ func TestDocs_PreferSaysWhatSQLServerEncrypts(t *testing.T) {
 		{docSection{productionChecklistPage, "## Database"}, "`GOIABADA_DB_TLS_MODE` unset"},
 		{docSection{"site/src/content/docs/deploy/database.mdx", "## Where the database sits"}, "| `prefer`"},
 	} {
-		text, err := docSectionText(root, tc.section)
+		text, err := docsreader.Section(root, tc.section.page, tc.section.heading)
 		require.NoError(t, err)
 		require.NotEmpty(t, text, "%s exists", tc.section)
 		var prefer string

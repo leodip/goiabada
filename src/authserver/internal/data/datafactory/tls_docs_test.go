@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/tlstest"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,11 +35,8 @@ const (
 func databasePageSection(t *testing.T, heading string) string {
 	t.Helper()
 	page := troubleshootingPage(t, databasePage)
-	_, section, found := strings.Cut(page, "\n"+heading+"\n")
+	section, found := docsreader.SectionText(page, heading)
 	require.Truef(t, found, "%s has no section headed %s", databasePage, heading)
-	if next := strings.Index(section, "\n## "); next >= 0 {
-		section = section[:next]
-	}
 	return section
 }
 

@@ -34,6 +34,7 @@ import (
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -271,7 +272,7 @@ func TestAdministrativeScopesDocs_AMissingSectionStopsTheTextCheck(t *testing.T)
 // section does not hold verbatim, and per text in absent it does; a stop for a section not found.
 func assertSectionText(r guard.Reporter, root string, section docSection, present, absent []string) {
 	r.Helper()
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		r.Fatalf("%v", err)
 		return

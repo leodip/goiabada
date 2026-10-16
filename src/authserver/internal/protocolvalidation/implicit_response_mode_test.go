@@ -26,11 +26,12 @@ import (
 // mode is the one thing a case varies.
 func implicitRequest(responseType string, responseMode string) *ValidateRequestInput {
 	return &ValidateRequestInput{
-		ResponseType:         responseType,
-		ResponseMode:         responseMode,
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "test-nonce-123",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             responseType,
+		ResponseMode:             responseMode,
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "test-nonce-123",
 	}
 }
 
@@ -84,10 +85,11 @@ func TestValidateRequest_CodeFlow_ResponseModeUnchanged(t *testing.T) {
 	for _, mode := range []string{"", "query", "fragment", "form_post"} {
 		t.Run("response_mode="+mode, func(t *testing.T) {
 			err := validator.ValidateRequest(&ValidateRequestInput{
-				ResponseType:        "code",
-				ResponseMode:        mode,
-				CodeChallengeMethod: "S256",
-				CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+				AuthorizationCodeEnabled: true,
+				ResponseType:             "code",
+				ResponseMode:             mode,
+				CodeChallengeMethod:      "S256",
+				CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
 			})
 
 			assert.NoError(t, err)

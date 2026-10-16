@@ -85,11 +85,12 @@ func claimScopesOfBytes(t *testing.T, n int) string {
 
 func validCodeFlowInput() ValidateRequestInput {
 	return ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "query",
-		Scope:               "openid",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "query",
+		Scope:                    "openid",
 	}
 }
 
@@ -132,11 +133,12 @@ func TestValidateRequest_StateAndNonceBoundHoldsForImplicitRequests(t *testing.T
 	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 	implicit := func(responseType, state, nonce string) *ValidateRequestInput {
 		return &ValidateRequestInput{
-			ResponseType:         responseType,
-			ImplicitGrantEnabled: true,
-			Scope:                "openid",
-			State:                state,
-			Nonce:                nonce,
+			AuthorizationCodeEnabled: true,
+			ResponseType:             responseType,
+			ImplicitGrantEnabled:     true,
+			Scope:                    "openid",
+			State:                    state,
+			Nonce:                    nonce,
 		}
 	}
 	over := func(bound int) string { return strings.Repeat("a", bound+1) }
