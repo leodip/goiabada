@@ -45,16 +45,17 @@ type ValidateUnsupportedRequestParametersInput struct {
 }
 
 type ValidateRequestInput struct {
-	ResponseType         string
-	CodeChallengeMethod  string
-	CodeChallenge        string
-	ResponseMode         string
-	PKCERequired         bool
-	ImplicitGrantEnabled bool   // Whether implicit flow is allowed for this client
-	Scope                string // Needed to validate openid requirement for id_token
-	Nonce                string // Needed to validate nonce requirement for id_token, and bounded (#437)
-	State                string // Bounded, because the ceremony stores it (#437)
-	MaxAge               string // The raw max_age parameter, empty when absent
+	ResponseType             string
+	CodeChallengeMethod      string
+	CodeChallenge            string
+	ResponseMode             string
+	PKCERequired             bool
+	ImplicitGrantEnabled     bool   // Whether implicit flow is allowed for this client
+	AuthorizationCodeEnabled bool   // Whether the authorization code flow is allowed for this client
+	Scope                    string // Needed to validate openid requirement for id_token
+	Nonce                    string // Needed to validate nonce requirement for id_token, and bounded (#437)
+	State                    string // Bounded, because the ceremony stores it (#437)
+	MaxAge                   string // The raw max_age parameter, empty when absent
 }
 
 func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValidator {
@@ -165,17 +166,12 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientDisabled, nil)
 	}
 
-	// Parse response_type to determine which flow is being requested
-	// For implicit flow, we check later in ValidateRequest if it's actually enabled
-	// Here we just need to verify the client supports at least one of the requested flows
+	// Parse response_type for the loopback port rule alone. Which flows the request asks for no
+	// longer decides anything here: the enablement of both flows is ValidateRequest's question,
+	// which it answers at the client's redirect URI (#573), so a client whose flow is off is
+	// refused there rather than on the page, and this function is back to RFC 6749 4.1.2.1's page
+	// answer alone: a missing or invalid client identifier or redirect URI.
 	rtInfo := ParseResponseType(input.ResponseType)
-
-	// Authorization code flow requires AuthorizationCodeEnabled. Implicit flow does not: the
-	// actual implicit grant enablement is checked in ValidateRequest, and here the client only
-	// needs to be enabled, which is checked above.
-	if !rtInfo.IsImplicitFlow() && !client.AuthorizationCodeEnabled {
-		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeAuthCodeNotEnabled, nil)
-	}
 
 	// RFC 8252 section 7.3 port flexibility for http loopback redirect URIs is for the
 	// authorization code flow only. Without this gate the relaxation would also permit
@@ -359,6 +355,21 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	if isImplicitFlow && !input.ImplicitGrantEnabled {
 		return oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			ImplicitNotAuthorizedErrorMsg, http.StatusBadRequest)
+	}
+
+	// The authorization code flow asks the same question here as the implicit one above it, and
+	// for the same reason (#573): RFC 6749 4.1.2.1 keeps a refusal on the server's own page only
+	// for a missing or invalid client identifier or redirect URI, and a client whose code flow is
+	// off is neither of those. It exists, it is enabled, and its redirect URI is registered, so
+	// the refusal travels to the client as unauthorized_client, with the delivery every other
+	// redirect answer gets: answered at once for a browser holding a session, deferred until the
+	// password is verified for one without (RFC 9700 4.11.2, #213), answered at once when silent.
+	// The description is the one the token endpoint and issuance give for the same condition, so
+	// the client hears one answer wherever it asks (#197). Read here rather than in
+	// ValidateClientAndRedirectURI, which can only answer on the page.
+	if !isImplicitFlow && !input.AuthorizationCodeEnabled {
+		return oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
+			AuthorizationCodeNotSupportedErrorMsg, http.StatusBadRequest)
 	}
 
 	// OIDC: id_token requires openid scope

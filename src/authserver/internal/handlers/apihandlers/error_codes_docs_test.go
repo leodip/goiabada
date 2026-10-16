@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -137,11 +138,11 @@ func assertErrorCodeCatalog(r guard.Reporter, root string, section docSection, c
 // second time, or gives it no meaning, and then one per code in codes with no row. It returns an
 // error, and no findings, for a section not found or holding no table.
 func errorCodeCatalogFindings(root string, section docSection, codes []string) ([]string, error) {
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
-	rows := docTableRows(text)
+	rows := docsreader.Rows(text)
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: %s holds no table of the error codes", section.page, section.heading)
 	}

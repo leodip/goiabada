@@ -31,6 +31,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -273,6 +274,26 @@ func TestGuideDocs_ARegistrationSectionWithNoAnswerStops(t *testing.T) {
 	}
 }
 
+func TestGuideDocs_ARegistrationExampleInsideAnotherFenceIsNotRead(t *testing.T) {
+	root := t.TempDir()
+	writeConceptFixture(t, root, "site/dcr.mdx", "## Register your app\n\n"+
+		"````md\n"+
+		"```http\n"+
+		"POST /connect/register HTTP/1.1\n"+
+		"\n"+
+		"{}\n"+
+		"```\n"+
+		"````\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRegistrationExample(r, root, conceptSection{"site/dcr.mdx", "## Register your app"}, "201 Created", nil)
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "has no example request to POST /connect/register") {
+		t.Errorf("an example inside another fence was read as the section's example: %+v", report)
+	}
+}
+
 // assertRegistrationExample is the reporting half of the registration check: one failure for a
 // status line other than the one the handler answers, and one per field the example answer names
 // that the handler does not send, or that the handler sends and the example leaves out; a stop for
@@ -306,15 +327,14 @@ func assertRegistrationExample(r guard.Reporter, root string, section conceptSec
 // /connect/register is the request, and the first one opening with a status line is the answer. Each
 // one's body is what follows its first blank line.
 func guideRegistrationExample(root string, section conceptSection) (registrationExample, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(section.page)))
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
-		return registrationExample{}, fmt.Errorf("reading %s: %w", section.page, err)
+		return registrationExample{}, err
 	}
-	level := conceptHeadingLevel(section.heading)
 	var blocks [][]string
 	var block []string
-	inSection, inHTTP, inFence := false, false, false
-	for _, line := range strings.Split(string(content), "\n") {
+	inHTTP, inFence := false, false
+	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
 		fence := strings.HasPrefix(trimmed, "```")
 		switch {
@@ -325,19 +345,10 @@ func guideRegistrationExample(root string, section conceptSection) (registration
 			block = append(block, trimmed)
 		case inFence:
 			inFence = !fence
-		case !inSection:
-			inSection = strings.TrimRight(line, " \r") == section.heading
 		case fence:
 			inHTTP = trimmed == "```http"
 			inFence = !inHTTP
-		default:
-			if headingLevel := conceptHeadingLevel(line); headingLevel > 0 && headingLevel <= level {
-				return readRegistrationBlocks(section, blocks)
-			}
 		}
-	}
-	if !inSection {
-		return registrationExample{}, fmt.Errorf("%s has no section headed %q", section.page, section.heading)
 	}
 	return readRegistrationBlocks(section, blocks)
 }

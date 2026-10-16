@@ -92,7 +92,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", errorMsg)
 }
 
-func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthorizationCodeFlow(t *testing.T) {
+// #573 item 3 turned this refusal around: a client whose code flow is off is no longer answered
+// on the page but at its redirect URI, so the request that reaches the page answers only the
+// missing redirect_uri, and the code-flow message is gone from the page entirely. The delivery
+// to the client is pinned beside the other deferrals, in authorize_deferred_error_test.go.
+func TestAuthorize_ValidateClientAndRedirectURI_TheCodeFlowIsNoLongerAPageAnswer(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -122,7 +126,9 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthoriza
 	}
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", errorMsg)
+	assert.Equal(t, "The redirect_uri parameter is missing.", errorMsg)
+	assert.NotContains(t, errorMsg, "authorization code flow",
+		"the code flow refusal must not be rendered on the page anymore (#573)")
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.T) {

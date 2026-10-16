@@ -240,20 +240,32 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", locErr.EnglishFallback())
 }
 
-func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *testing.T) {
+// The code flow's enablement is no longer this layer's question (#573): a client with the flow
+// off passes here as long as its identifier is valid and its redirect URI is registered, and
+// ValidateRequest refuses it at the redirect URI as unauthorized_client instead. The page keeps
+// only RFC 6749 4.1.2.1's answers: a missing or invalid client identifier or redirect URI.
+func TestValidateClientAndRedirectURI_TheCodeFlowsEnablementIsNotAskedHere(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-auth-code-client").Return(&record.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
+	client := &record.Client{
+		Id:                       1,
+		ClientIdentifier:         "no-auth-code-client",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: false,
+		RedirectURIs: []record.RedirectURI{
+			{ClientId: 1, URI: "https://example.com/callback"},
+		},
+	}
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "http://example.com"}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-auth-code-client").Return(client, nil)
+	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "https://example.com/callback", ResponseType: "code"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
-	require.Error(t, err)
-	var locErr *i18n.LocalizedError
-	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeAuthCodeNotEnabled, locErr.Code)
-	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", locErr.EnglishFallback())
+	require.NoError(t, err)
+	mockDB.AssertExpectations(t)
 }
 
 func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
@@ -525,9 +537,10 @@ func TestValidateRequest_InvalidResponseType(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:        "invalid_type",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "valid_challenge",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "invalid_type",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "valid_challenge",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -542,8 +555,9 @@ func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "token",
-		ImplicitGrantEnabled: false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "token",
+		ImplicitGrantEnabled:     false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -554,16 +568,55 @@ func TestValidateRequest_ImplicitFlowNotEnabled(t *testing.T) {
 	assert.Contains(t, customErr.Description(), "admin console")
 }
 
+// The code flow's own question, asked beside the implicit one since #573: a client whose code
+// flow is off is answered unauthorized_client with the description the token endpoint and
+// issuance give for the same condition, so the client hears one answer wherever it asks (#197).
+func TestValidateRequest_TheCodeFlowsEnablement(t *testing.T) {
+	for name, tc := range map[string]struct {
+		responseType             string
+		authorizationCodeEnabled bool
+		implicitGrantEnabled     bool
+		wantErr                  bool
+	}{
+		"a code request against a client with the flow off is refused as unauthorized_client": {"code", false, false, true},
+		"a code request against a client with the flow on passes":                             {"code", true, false, false},
+		"the question is not asked of the implicit flow":                                      {"token", false, true, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mockDB := datamocks.NewDatabase(t)
+			validator := NewAuthorizeValidator(mockDB)
+
+			input := ValidateRequestInput{
+				ResponseType:             tc.responseType,
+				AuthorizationCodeEnabled: tc.authorizationCodeEnabled,
+				ImplicitGrantEnabled:     tc.implicitGrantEnabled,
+			}
+			err := validator.ValidateRequest(&input)
+
+			if !tc.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			var customErr *oauth.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "unauthorized_client", customErr.Code())
+			assert.Equal(t, AuthorizationCodeNotSupportedErrorMsg, customErr.Description())
+		})
+	}
+}
+
 func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
 	// When PKCE is optional but provided, invalid method should be rejected
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "plain",
-		CodeChallenge:       "valid_challenge",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "plain",
+		CodeChallenge:            "valid_challenge",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -579,10 +632,11 @@ func TestValidateRequest_InvalidCodeChallengeMethod_PKCERequired(t *testing.T) {
 
 	// When PKCE is required, missing or invalid method should show different message
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "plain",
-		CodeChallenge:       "valid_challenge",
-		PKCERequired:        true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "plain",
+		CodeChallenge:            "valid_challenge",
+		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -598,10 +652,11 @@ func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
 
 	// When PKCE is optional but provided, invalid challenge length should be rejected
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "short",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "short",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -617,10 +672,11 @@ func TestValidateRequest_CodeChallengeTooShort_PKCERequired(t *testing.T) {
 
 	// When PKCE is required, invalid challenge length shows different message
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "short",
-		PKCERequired:        true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "short",
+		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -636,10 +692,11 @@ func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
 
 	// When PKCE is optional but provided, invalid challenge length should be rejected
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       string(make([]byte, 129)),
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            string(make([]byte, 129)),
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -655,10 +712,11 @@ func TestValidateRequest_CodeChallengeTooLong_PKCERequired(t *testing.T) {
 
 	// When PKCE is required, invalid challenge length shows different message
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       string(make([]byte, 129)),
-		PKCERequired:        true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            string(make([]byte, 129)),
+		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -673,10 +731,11 @@ func TestValidateRequest_InvalidResponseMode(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "invalid_mode",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "invalid_mode",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -737,12 +796,13 @@ func TestSupportedResponseTypes(t *testing.T) {
 	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 	for _, responseType := range types {
 		input := ValidateRequestInput{
-			ResponseType:         responseType,
-			ImplicitGrantEnabled: true,
-			Scope:                "openid",
-			Nonce:                "test-nonce-123",
-			CodeChallengeMethod:  "S256",
-			CodeChallenge:        "a_valid_code_challenge_that_meets_length_requirements",
+			AuthorizationCodeEnabled: true,
+			ResponseType:             responseType,
+			ImplicitGrantEnabled:     true,
+			Scope:                    "openid",
+			Nonce:                    "test-nonce-123",
+			CodeChallengeMethod:      "S256",
+			CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
 		}
 		require.NoError(t, validator.ValidateRequest(&input), "%q is advertised and must be accepted", responseType)
 	}
@@ -756,10 +816,11 @@ func TestValidateRequest_ValidInput(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "query",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "query",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -773,11 +834,12 @@ func TestValidateRequest_MaxAge(t *testing.T) {
 	validator := NewAuthorizeValidator(datamocks.NewDatabase(t))
 	inputWith := func(maxAge string) *ValidateRequestInput {
 		return &ValidateRequestInput{
-			ResponseType:        "code",
-			CodeChallengeMethod: "S256",
-			CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-			ResponseMode:        "query",
-			MaxAge:              maxAge,
+			AuthorizationCodeEnabled: true,
+			ResponseType:             "code",
+			CodeChallengeMethod:      "S256",
+			CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+			ResponseMode:             "query",
+			MaxAge:                   maxAge,
 		}
 	}
 
@@ -880,10 +942,11 @@ func TestValidateRequest_EmptyResponseMode(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -922,11 +985,12 @@ func TestValidateRequest_PKCEOptional_NoPKCEParams_Success(t *testing.T) {
 
 	// When PKCE is optional and no PKCE params provided, should succeed
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "",
-		CodeChallenge:       "",
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "",
+		CodeChallenge:            "",
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -939,11 +1003,12 @@ func TestValidateRequest_PKCEOptional_ValidPKCEParams_Success(t *testing.T) {
 
 	// When PKCE is optional and valid PKCE params provided, should succeed
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -957,11 +1022,12 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallenge_Fails(t *testing.T) {
 	// When PKCE is optional but only code_challenge is provided (partial PKCE),
 	// should fail because pkceProvided is true but method is invalid
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -978,11 +1044,12 @@ func TestValidateRequest_PKCEOptional_OnlyCodeChallengeMethod_Fails(t *testing.T
 	// When PKCE is optional but only code_challenge_method is provided (partial PKCE),
 	// should fail because pkceProvided is true but challenge is missing/invalid
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "",
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "",
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -998,11 +1065,12 @@ func TestValidateRequest_PKCERequired_NoPKCEParams_Fails(t *testing.T) {
 
 	// When PKCE is required and no PKCE params provided, should fail
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "",
-		CodeChallenge:       "",
-		ResponseMode:        "query",
-		PKCERequired:        true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "",
+		CodeChallenge:            "",
+		ResponseMode:             "query",
+		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1018,11 +1086,12 @@ func TestValidateRequest_PKCERequired_ValidPKCEParams_Success(t *testing.T) {
 
 	// When PKCE is required and valid PKCE params provided, should succeed
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-		ResponseMode:        "query",
-		PKCERequired:        true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:             "query",
+		PKCERequired:             true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1036,11 +1105,12 @@ func TestValidateRequest_CodeChallenge_Exactly43Chars_Success(t *testing.T) {
 	// Boundary test: exactly 43 characters should be valid
 	codeChallenge := strings.Repeat("a", 43)
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       codeChallenge,
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            codeChallenge,
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1054,11 +1124,12 @@ func TestValidateRequest_CodeChallenge_Exactly42Chars_Fails(t *testing.T) {
 	// Boundary test: 42 characters should be invalid (just under minimum)
 	codeChallenge := strings.Repeat("a", 42)
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       codeChallenge,
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            codeChallenge,
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1075,11 +1146,12 @@ func TestValidateRequest_CodeChallenge_Exactly128Chars_Success(t *testing.T) {
 	// Boundary test: exactly 128 characters should be valid
 	codeChallenge := strings.Repeat("a", 128)
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       codeChallenge,
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            codeChallenge,
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1093,11 +1165,12 @@ func TestValidateRequest_CodeChallenge_Exactly129Chars_Fails(t *testing.T) {
 	// Boundary test: 129 characters should be invalid (just over maximum)
 	codeChallenge := strings.Repeat("a", 129)
 	input := ValidateRequestInput{
-		ResponseType:        "code",
-		CodeChallengeMethod: "S256",
-		CodeChallenge:       codeChallenge,
-		ResponseMode:        "query",
-		PKCERequired:        false,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code",
+		CodeChallengeMethod:      "S256",
+		CodeChallenge:            codeChallenge,
+		ResponseMode:             "query",
+		PKCERequired:             false,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1116,11 +1189,12 @@ func TestValidateRequest_ValidResponseModes(t *testing.T) {
 	for _, mode := range validModes {
 		t.Run(fmt.Sprintf("ResponseMode_%s", mode), func(t *testing.T) {
 			input := ValidateRequestInput{
-				ResponseType:        "code",
-				CodeChallengeMethod: "S256",
-				CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
-				ResponseMode:        mode,
-				PKCERequired:        false,
+				AuthorizationCodeEnabled: true,
+				ResponseType:             "code",
+				CodeChallengeMethod:      "S256",
+				CodeChallenge:            "a_valid_code_challenge_that_meets_length_requirements",
+				ResponseMode:             mode,
+				PKCERequired:             false,
 			}
 			err := validator.ValidateRequest(&input)
 
@@ -1138,9 +1212,10 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeToken_Success(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1152,10 +1227,11 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeIdToken_Success(t *testing.T) 
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "id_token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "test-nonce-123",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "id_token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "test-nonce-123",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1167,10 +1243,11 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeIdTokenToken_Success(t *testin
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "id_token token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "test-nonce-123",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "id_token token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "test-nonce-123",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1183,10 +1260,11 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIdToken_OrderIndependent(
 
 	// Test that "token id_token" works the same as "id_token token"
 	input := ValidateRequestInput{
-		ResponseType:         "token id_token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "test-nonce-123",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "token id_token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "test-nonce-123",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1198,10 +1276,11 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) 
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "id_token",
-		ImplicitGrantEnabled: true,
-		Scope:                "profile email", // Missing "openid" scope
-		Nonce:                "test-nonce-123",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "id_token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "profile email", // Missing "openid" scope
+		Nonce:                    "test-nonce-123",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1217,10 +1296,11 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testin
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "id_token token",
-		ImplicitGrantEnabled: true,
-		Scope:                "profile", // Missing "openid" scope
-		Nonce:                "test-nonce-123",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "id_token token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "profile", // Missing "openid" scope
+		Nonce:                    "test-nonce-123",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1235,10 +1315,11 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "id_token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "", // Missing nonce
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "id_token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "", // Missing nonce
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1254,10 +1335,11 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresNonce(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType:         "id_token token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "", // Missing nonce
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "id_token token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "", // Missing nonce
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1273,10 +1355,11 @@ func TestValidateRequest_ImplicitFlow_Token_DoesNotRequireNonce(t *testing.T) {
 
 	// response_type=token does NOT require nonce (only id_token does)
 	input := ValidateRequestInput{
-		ResponseType:         "token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		Nonce:                "", // No nonce - should still work for token-only
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		Nonce:                    "", // No nonce - should still work for token-only
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1289,10 +1372,11 @@ func TestValidateRequest_ImplicitFlow_NoPKCERequired(t *testing.T) {
 
 	// Implicit flow should NOT require PKCE (PKCE is for authorization code flow only)
 	input := ValidateRequestInput{
-		ResponseType:         "token",
-		ImplicitGrantEnabled: true,
-		Scope:                "openid",
-		PKCERequired:         true, // Even if PKCE is "required", it shouldn't affect implicit flow
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "token",
+		ImplicitGrantEnabled:     true,
+		Scope:                    "openid",
+		PKCERequired:             true, // Even if PKCE is "required", it shouldn't affect implicit flow
 		// No CodeChallenge or CodeChallengeMethod provided
 	}
 	err := validator.ValidateRequest(&input)
@@ -1316,10 +1400,11 @@ func TestValidateRequest_ImplicitFlow_ClientNotEnabled(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			input := ValidateRequestInput{
-				ResponseType:         tc.responseType,
-				ImplicitGrantEnabled: false,
-				Scope:                "openid",
-				Nonce:                "test-nonce",
+				AuthorizationCodeEnabled: true,
+				ResponseType:             tc.responseType,
+				ImplicitGrantEnabled:     false,
+				Scope:                    "openid",
+				Nonce:                    "test-nonce",
 			}
 			err := validator.ValidateRequest(&input)
 
@@ -1339,8 +1424,9 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeToken(t *testing
 
 	// "code token" is a hybrid flow - not supported
 	input := ValidateRequestInput{
-		ResponseType:         "code token",
-		ImplicitGrantEnabled: true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code token",
+		ImplicitGrantEnabled:     true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1357,8 +1443,9 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testi
 
 	// "code id_token" is a hybrid flow - not supported
 	input := ValidateRequestInput{
-		ResponseType:         "code id_token",
-		ImplicitGrantEnabled: true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code id_token",
+		ImplicitGrantEnabled:     true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1374,8 +1461,9 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdTokenToken(t *
 
 	// "code id_token token" is a hybrid flow - not supported
 	input := ValidateRequestInput{
-		ResponseType:         "code id_token token",
-		ImplicitGrantEnabled: true,
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "code id_token token",
+		ImplicitGrantEnabled:     true,
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1390,7 +1478,8 @@ func TestValidateRequest_MissingResponseType(t *testing.T) {
 	validator := NewAuthorizeValidator(mockDB)
 
 	input := ValidateRequestInput{
-		ResponseType: "",
+		AuthorizationCodeEnabled: true,
+		ResponseType:             "",
 	}
 	err := validator.ValidateRequest(&input)
 
@@ -1421,10 +1510,11 @@ func TestValidateRequest_AllSupportedResponseTypes(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			input := ValidateRequestInput{
-				ResponseType:         tc.responseType,
-				ImplicitGrantEnabled: true,
-				Scope:                "openid",
-				Nonce:                "test-nonce",
+				AuthorizationCodeEnabled: true,
+				ResponseType:             tc.responseType,
+				ImplicitGrantEnabled:     true,
+				Scope:                    "openid",
+				Nonce:                    "test-nonce",
 			}
 			if !tc.isImplicitFlow {
 				// For code flow, provide PKCE
@@ -1464,35 +1554,6 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.NoError(t, err)
-	mockDB.AssertExpectations(t)
-}
-
-func TestValidateClientAndRedirectURI_AuthCodeFlow_RequiresAuthCodeEnabled(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	validator := NewAuthorizeValidator(mockDB)
-
-	client := &record.Client{
-		Id:                       1,
-		ClientIdentifier:         "implicit-only-client",
-		Enabled:                  true,
-		AuthorizationCodeEnabled: false, // Auth code disabled
-	}
-
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "implicit-only-client").Return(client, nil)
-
-	// For auth code flow, AuthorizationCodeEnabled IS required
-	input := ValidateClientAndRedirectURIInput{
-		ClientId:     "implicit-only-client",
-		RedirectURI:  "https://example.com/callback",
-		ResponseType: "code", // Authorization code flow
-	}
-	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
-
-	require.Error(t, err)
-	var locErr *i18n.LocalizedError
-	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, i18n.ErrCodeAuthorizeAuthCodeNotEnabled, locErr.Code)
-	assert.Contains(t, locErr.EnglishFallback(), "does not support the authorization code flow")
 	mockDB.AssertExpectations(t)
 }
 

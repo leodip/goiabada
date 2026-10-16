@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -205,11 +206,11 @@ func assertEnvironmentVariablesDocs(r guard.Reporter, root string, section docSe
 // no row. A row naming only the other server's variable is that server's tier to check. It returns
 // an error, and no findings, for a section not found or holding no table.
 func environmentVariablesDocsFindings(root string, section docSection, vars []configVar) ([]string, error) {
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
-	rows := docEveryTableRows(text)
+	rows := docsreader.Rows(text)
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: %s holds no table of the environment variables", section.page, section.heading)
 	}
@@ -347,31 +348,4 @@ func docDefaultCell(def any) string {
 	default:
 		return fmt.Sprintf("`%v`", d)
 	}
-}
-
-// docEveryTableRows is the body rows of every Markdown table in text, in order, each trimmed cell
-// in order: each table's header row and the delimiter row under it are left out.
-func docEveryTableRows(text string) [][]string {
-	var rows [][]string
-	inTable := false
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			inTable = false
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		if !inTable {
-			inTable = true // a table's header row
-			continue
-		}
-		if strings.Trim(strings.Join(cells, ""), "-: ") == "" {
-			continue // the delimiter row
-		}
-		rows = append(rows, cells)
-	}
-	return rows
 }

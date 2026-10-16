@@ -380,16 +380,17 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		case authorizeFactValidation:
 			validation, validationErr := validateAuthorizeRequest(ctx, o.validator, o.tokenParser,
 				settings, client, params, &protocolvalidation.ValidateRequestInput{
-					ResponseType:         authContext.ResponseType,
-					CodeChallengeMethod:  authContext.CodeChallengeMethod,
-					CodeChallenge:        authContext.CodeChallenge,
-					ResponseMode:         authContext.ResponseMode,
-					PKCERequired:         client.IsPKCERequired(settings.PKCERequired),
-					ImplicitGrantEnabled: client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
-					Scope:                requestedScope,
-					Nonce:                authContext.Nonce,
-					State:                authContext.State,
-					MaxAge:               authContext.MaxAge,
+					ResponseType:             authContext.ResponseType,
+					CodeChallengeMethod:      authContext.CodeChallengeMethod,
+					CodeChallenge:            authContext.CodeChallenge,
+					ResponseMode:             authContext.ResponseMode,
+					PKCERequired:             client.IsPKCERequired(settings.PKCERequired),
+					ImplicitGrantEnabled:     client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled),
+					AuthorizationCodeEnabled: client.AuthorizationCodeEnabled,
+					Scope:                    requestedScope,
+					Nonce:                    authContext.Nonce,
+					State:                    authContext.State,
+					MaxAge:                   authContext.MaxAge,
 				})
 			if validationErr != nil {
 				return AuthorizationResult{}, validationErr

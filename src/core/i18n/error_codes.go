@@ -331,7 +331,6 @@ const (
 	ErrCodeAuthorizeClientIdMissing          = "validator.authorize.client_id_missing"
 	ErrCodeAuthorizeClientNotFound           = "validator.authorize.client_not_found"
 	ErrCodeAuthorizeClientDisabled           = "validator.authorize.client_disabled"
-	ErrCodeAuthorizeAuthCodeNotEnabled       = "validator.authorize.auth_code_not_enabled"
 	ErrCodeAuthorizeRedirectURIMissing       = "validator.authorize.redirect_uri_missing"
 	ErrCodeAuthorizeRedirectURINotAbsolute   = "validator.authorize.redirect_uri_not_absolute"
 	ErrCodeAuthorizeRedirectURINotRegistered = "validator.authorize.redirect_uri_not_registered"

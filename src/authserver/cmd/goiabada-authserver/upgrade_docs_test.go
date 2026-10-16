@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -26,12 +27,8 @@ func TestUpgradePage_TheRollbackIsWhatMigrateDoes(t *testing.T) {
 	const page = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
 	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
 	require.NoError(t, err)
-	_, section, found := strings.Cut(string(body), "\n## Roll back to an earlier release\n")
+	section, found := docsreader.SectionText(string(body), "## Roll back to an earlier release")
 	require.Truef(t, found, "%s has no section headed ## Roll back to an earlier release", page)
-	if next := strings.Index(section, "\n## "); next >= 0 {
-		section = section[:next]
-	}
-
 	commands := usageCommand.FindAllString(migrateUsage, -1)
 	require.Len(t, commands, 2, "the usage spells out the two subcommands")
 	for _, command := range commands {
@@ -60,7 +57,7 @@ func TestUpgradePage_TheNativeRollbackRunsAsTheService(t *testing.T) {
 
 	upgrade, err := os.ReadFile(filepath.Join(root, "site/src/content/docs/deploy/upgrade-goiabada.mdx"))
 	require.NoError(t, err)
-	_, section, found := strings.Cut(string(upgrade), "\n## Roll back to an earlier release\n")
+	section, found := docsreader.SectionText(string(upgrade), "## Roll back to an earlier release")
 	require.True(t, found, "upgrade-goiabada.mdx has no section headed ## Roll back to an earlier release")
 	_, tab, found := strings.Cut(section, `<TabItem label="Native binaries">`)
 	require.True(t, found, "upgrade-goiabada.mdx: the rollback has a Native binaries tab")

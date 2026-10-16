@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"gopkg.in/yaml.v3"
 )
@@ -354,6 +354,33 @@ func TestKubernetesDocs_AMatchingContractPasses(t *testing.T) {
 	}
 }
 
+// A key two rows name is refused, so a later table cannot hide an earlier row that is wrong.
+func TestKubernetesDocs_AKeyTwoRowsNameIsRefused(t *testing.T) {
+	const header = "| Secret | Key | Variable | Read by | Value |\n|---|---|---|---|---|\n"
+	section := header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | admin console | the password |\n\n" +
+		header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | the password |\n"
+
+	_, err := contractTable(section)
+
+	if err == nil || !strings.Contains(err.Error(), "two rows for goiabada-secrets/db-password as GOIABADA_DB_PASSWORD") {
+		t.Errorf("a key two rows name was not refused naming it: %v", err)
+	}
+}
+
+// A row missing a cell is refused rather than skipped, so a complete row in a later table cannot
+// stand in for it.
+func TestKubernetesDocs_ARowMissingACellIsRefused(t *testing.T) {
+	const header = "| Secret | Key | Variable | Read by | Value |\n|---|---|---|---|---|\n"
+	section := header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | admin console |\n\n" +
+		header + "| `goiabada-secrets` | `db-password` | `GOIABADA_DB_PASSWORD` | auth server | the password |\n"
+
+	_, err := contractTable(section)
+
+	if err == nil || !strings.Contains(err.Error(), "a row of 4 cells under a header of 5") {
+		t.Errorf("a row missing a cell was not refused: %v", err)
+	}
+}
+
 func TestKubernetesDocs_AContractWithNoTableStops(t *testing.T) {
 	root := t.TempDir()
 	writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", contractManifest)
@@ -386,7 +413,7 @@ var docVariable = regexp.MustCompile(`GOIABADA_[A-Z0-9_]*[A-Z0-9]`)
 func secretsDocsVariableFindings(root string, sections []docSection, read map[string]bool) ([]string, error) {
 	var findings []string
 	for _, s := range sections {
-		text, err := docSectionText(root, s)
+		text, err := docsreader.Section(root, s.page, s.heading)
 		if err != nil {
 			return nil, err
 		}
@@ -421,7 +448,7 @@ var tabItem = regexp.MustCompile(`(?s)<TabItem label="([^"]+)"[^>]*>(.*?)</TabIt
 // _PREVIOUS variable read holds that a platform's tabs, taken together, never name. A page with no
 // tab at all is an error, since the check would then read nothing.
 func rotationTabFindings(root, page string, platforms []string, read map[string]bool) ([]string, error) {
-	text, err := docSectionText(root, docSection{page, ""})
+	text, err := docsreader.Section(root, page, "")
 	if err != nil {
 		return nil, err
 	}
@@ -458,50 +485,6 @@ func rotationTabFindings(root, page string, platforms []string, read map[string]
 		}
 	}
 	return findings, nil
-}
-
-// docSectionText is a page's section: the lines after its heading up to the next heading of the
-// same or a higher level, a line in a fenced code block being no heading. A section with no
-// heading is the whole page.
-func docSectionText(root string, s docSection) (string, error) {
-	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(s.page)))
-	if err != nil {
-		return "", err
-	}
-	if s.heading == "" {
-		return string(content), nil
-	}
-	level := strings.Index(s.heading, " ")
-	var b strings.Builder
-	inSection, inFence, found := false, false, false
-	scanner := bufio.NewScanner(bytes.NewReader(content))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-		}
-		if !inFence && strings.HasPrefix(line, "#") {
-			hashes := len(line) - len(strings.TrimLeft(line, "#"))
-			if line == s.heading {
-				inSection, found = true, true
-				continue
-			}
-			if hashes <= level && strings.HasPrefix(line[hashes:], " ") {
-				inSection = false
-			}
-		}
-		if inSection {
-			b.WriteString(line)
-			b.WriteByte('\n')
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-	if !found {
-		return "", fmt.Errorf("%s has no %q section, so this check read nothing", s.page, s.heading)
-	}
-	return b.String(), nil
 }
 
 // secretRef is one variable a container reads from a Secret.
@@ -550,7 +533,7 @@ var createCommandDocs = []docSection{
 // contractSection, to every Kubernetes golden, and each `kubectl create secret generic` in
 // createCommandDocs to the keys the goldens read from that Secret.
 func secretContractFindings(root string) ([]string, error) {
-	section, err := docSectionText(root, docSection{kubernetesSecretsPage, contractSection})
+	section, err := docsreader.Section(root, kubernetesSecretsPage, contractSection)
 	if err != nil {
 		return nil, err
 	}
@@ -613,7 +596,7 @@ func secretContractFindings(root string) ([]string, error) {
 	}
 
 	for _, section := range createCommandDocs {
-		text, err := docSectionText(root, section)
+		text, err := docsreader.Section(root, section.page, section.heading)
 		if err != nil {
 			return nil, err
 		}
@@ -629,29 +612,28 @@ func secretContractFindings(root string) ([]string, error) {
 	return findings, nil
 }
 
-// contractTable reads the table whose header begins contractHeader: each row's Secret, Key and
-// Variable, its Read by, and whether its Value opens with "Optional".
+// contractTable reads every table whose header begins contractHeader: each row's Secret, Key and
+// Variable, its Read by, and whether its Value opens with "Optional". A key two rows name is an
+// error, whichever tables they are in, because the check would hold only one of them to the
+// manifests, and so is a row whose cells are not its header's, which could not be read.
 func contractTable(section string) (map[secretRef]secretReader, error) {
 	rows := map[secretRef]secretReader{}
-	inTable := false
-	for _, line := range strings.Split(section, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, contractHeader) {
-			inTable = true
+	for _, table := range docsreader.Tables(section) {
+		if len(table.Header) < 5 || !strings.HasPrefix("| "+strings.Join(table.Header, " | ")+" |", contractHeader) {
 			continue
 		}
-		if !inTable {
-			continue
+		for _, cells := range table.Rows {
+			if len(cells) != len(table.Header) {
+				return nil, fmt.Errorf("%s: %s has a row of %d cells under a header of %d: %q",
+					kubernetesSecretsPage, contractSection, len(cells), len(table.Header), cells)
+			}
+			cell := func(i int) string { return strings.Trim(strings.TrimSpace(cells[i]), "`") }
+			ref := secretRef{cell(0), cell(1), cell(2)}
+			if _, twice := rows[ref]; twice {
+				return nil, fmt.Errorf("%s: %s has two rows for %s; one row per key", kubernetesSecretsPage, contractSection, ref)
+			}
+			rows[ref] = secretReader{cell(3), strings.HasPrefix(cell(4), "Optional")}
 		}
-		if !strings.HasPrefix(line, "|") {
-			break
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		if len(cells) < 5 || strings.HasPrefix(strings.TrimSpace(cells[0]), "---") {
-			continue
-		}
-		cell := func(i int) string { return strings.Trim(strings.TrimSpace(cells[i]), "`") }
-		rows[secretRef{cell(0), cell(1), cell(2)}] = secretReader{cell(3), strings.HasPrefix(cell(4), "Optional")}
 	}
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: %s holds no table headed %s", kubernetesSecretsPage, contractSection, contractHeader)
@@ -894,7 +876,7 @@ func secretKeyCommandFindings(root string, sections []docSection) ([]string, err
 	var findings []string
 	named := 0
 	for _, s := range sections {
-		text, err := docSectionText(root, s)
+		text, err := docsreader.Section(root, s.page, s.heading)
 		if err != nil {
 			return nil, err
 		}
