@@ -33,11 +33,18 @@ type CLIFlags struct {
 	DBPasswordFile    string
 	// DBTLSMode is --db-tls-mode and DBTLSCAFile --db-tls-ca-file, read by Kubernetes and native
 	// binaries alone, as --db-host is.
-	DBTLSMode   string
-	DBTLSCAFile string
-	SkipDBTest  bool
-	NoColor     bool
-	Overwrite   bool
+	// DBTLSClientCertFile is --db-tls-client-cert-file and DBTLSClientKeyFile
+	// --db-tls-client-key-file, the pair the connection presents to the database, and DBTLSServerName
+	// --db-tls-server-name, the host name verify-full checks the certificate against when the address
+	// dialed is not the name certified (#546).
+	DBTLSMode           string
+	DBTLSCAFile         string
+	DBTLSClientCertFile string
+	DBTLSClientKeyFile  string
+	DBTLSServerName     string
+	SkipDBTest          bool
+	NoColor             bool
+	Overwrite           bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
 	// GatewayTrafficPolicy is --gateway-traffic-policy and NetworkPolicy --network-policy, read by
@@ -146,6 +153,9 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.StringVar(&flags.DBPasswordFile, "db-password-file", "", "Read the database password from a file, - for standard input")
 	fs.StringVar(&flags.DBTLSMode, "db-tls-mode", "", "Database TLS mode: "+orList(tlsModeNames())+" (default: prefer)")
 	fs.StringVar(&flags.DBTLSCAFile, "db-tls-ca-file", "", "With verify-ca or verify-full, the PEM file of the authorities the database's certificate is checked against (default: the system's roots)")
+	fs.StringVar(&flags.DBTLSClientCertFile, "db-tls-client-cert-file", "", "With require, verify-ca or verify-full, the PEM file of the client certificate the connection presents to the database, with --db-tls-client-key-file beside it; not for SQL Server (default: none)")
+	fs.StringVar(&flags.DBTLSClientKeyFile, "db-tls-client-key-file", "", "The PEM file of the client certificate's private key, beside --db-tls-client-cert-file (default: none)")
+	fs.StringVar(&flags.DBTLSServerName, "db-tls-server-name", "", "With verify-full, the host name the database's certificate is checked against when the address dialed is not the name certified (default: the host dialed)")
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.BoolVar(&flags.Overwrite, "overwrite", false, "Overwrite output files that already exist, and the secrets in them")
@@ -199,6 +209,17 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("                         (default: prefer, which checks no certificate)\n")
 		p("  --db-tls-ca-file FILE  With verify-ca or verify-full, the PEM file of the authorities the\n")
 		p("                         database's certificate is checked against (default: the system's roots)\n")
+		p("  --db-tls-client-cert-file FILE\n")
+		p("                         With require, verify-ca or verify-full, the PEM file of the client\n")
+		p("                         certificate the connection presents to the database, with\n")
+		p("                         --db-tls-client-key-file beside it; not for SQL Server (default: none)\n")
+		p("  --db-tls-client-key-file FILE\n")
+		p("                         The PEM file of the client certificate's private key, beside\n")
+		p("                         --db-tls-client-cert-file (default: none)\n")
+		p("  --db-tls-server-name NAME\n")
+		p("                         With verify-full, the host name the database's certificate is\n")
+		p("                         checked against when the address dialed is not the name\n")
+		p("                         certified (default: the host dialed)\n")
 		p("  --skip-db-test         Skip database connection test\n\n")
 		p("Rate Limiter Options (for production/kubernetes/native):\n")
 		p("  --rate-limiter=BOOL    Turn on the auth server's built-in rate limiter (default: true, but\n")
@@ -266,6 +287,9 @@ func (f *CLIFlags) checkWritable() error {
 		{"--db-user", f.DBUsername},
 		{"--db-password", f.DBPassword},
 		{"--db-tls-ca-file", f.DBTLSCAFile},
+		{"--db-tls-client-cert-file", f.DBTLSClientCertFile},
+		{"--db-tls-client-key-file", f.DBTLSClientKeyFile},
+		{"--db-tls-server-name", f.DBTLSServerName},
 	} {
 		if err := checkWritable(entry.value); err != nil {
 			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)

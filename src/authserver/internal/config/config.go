@@ -7,6 +7,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
@@ -134,9 +135,20 @@ type DatabaseConfig struct {
 	// its flag sets it, which is what the start's warning keys on; read the mode in effect through
 	// EffectiveTLSMode. TLSCAFile names the PEM file whose authorities replace the system's roots,
 	// and TLSRoots is those authorities, read once by the load; nil means the system's roots.
+	//
+	// TLSClientCertFile and TLSClientKeyFile name the certificate and key the connection presents,
+	// and TLSClientCertificate is that pair read once by the load, nil presenting none. TLSServerName
+	// is the host name GOIABADA_DB_TLS_SERVER_NAME wants verify-full to check the certificate against,
+	// empty leaving the host dialed. All three cover every connection the engines open, the
+	// maintenance ones included, beside the mode and the CA file (#546).
 	TLSMode   string
 	TLSCAFile string
 	TLSRoots  *x509.CertPool
+
+	TLSClientCertFile    string
+	TLSClientKeyFile     string
+	TLSClientCertificate *tls.Certificate
+	TLSServerName        string
 }
 
 // EffectiveTLSMode is the mode the engines are given: the one set or, unset, prefer.
@@ -251,8 +263,11 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ConnMaxLifetime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_LIFETIME", defaultConnMaxLifetime, &malformed),
 			ConnMaxIdleTime: getEnvAsDuration("GOIABADA_DB_CONN_MAX_IDLE_TIME", defaultConnMaxIdleTime, &malformed),
 
-			TLSMode:   getEnvAsTLSMode("GOIABADA_DB_TLS_MODE", &malformed),
-			TLSCAFile: getEnv("GOIABADA_DB_TLS_CA_FILE", ""),
+			TLSMode:           getEnvAsTLSMode("GOIABADA_DB_TLS_MODE", &malformed),
+			TLSCAFile:         getEnv("GOIABADA_DB_TLS_CA_FILE", ""),
+			TLSClientCertFile: getEnv("GOIABADA_DB_TLS_CLIENT_CERT_FILE", ""),
+			TLSClientKeyFile:  getEnv("GOIABADA_DB_TLS_CLIENT_KEY_FILE", ""),
+			TLSServerName:     getEnv("GOIABADA_DB_TLS_SERVER_NAME", ""),
 		},
 		AdminEmail:               getEnv("GOIABADA_ADMIN_EMAIL", "admin@example.com"),
 		AdminPassword:            getEnv("GOIABADA_ADMIN_PASSWORD", ""),
@@ -368,6 +383,9 @@ func RegisterDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) {
 	fs.DurationVar(&c.ConnMaxIdleTime, "db-conn-max-idle-time", c.ConnMaxIdleTime, "Longest a connection stays idle before it is closed, such as 5m; 0 is no limit (only for mysql, postgres, mssql)")
 	fs.StringVar(&c.TLSMode, "db-tls-mode", c.TLSMode, "How the database connection is protected. Options: disable, prefer, require, verify-ca, verify-full; unset is prefer, which checks no certificate (only for mysql, postgres, mssql)")
 	fs.StringVar(&c.TLSCAFile, "db-tls-ca-file", c.TLSCAFile, "PEM file of the authorities verify-ca and verify-full trust instead of the system's roots (only for mysql, postgres, mssql)")
+	fs.StringVar(&c.TLSClientCertFile, "db-tls-client-cert-file", c.TLSClientCertFile, "PEM file of the client certificate require, verify-ca and verify-full present to the database, with --db-tls-client-key-file beside it (only for mysql, postgres)")
+	fs.StringVar(&c.TLSClientKeyFile, "db-tls-client-key-file", c.TLSClientKeyFile, "PEM file of the client certificate's private key, beside --db-tls-client-cert-file (only for mysql, postgres)")
+	fs.StringVar(&c.TLSServerName, "db-tls-server-name", c.TLSServerName, "Host name verify-full checks the database's certificate against when the address dialed is not the name certified (only for mysql, postgres, mssql)")
 }
 
 // optionalIntFlag is a flag over an *int that stays nil until the flag is given, which is how the
@@ -402,10 +420,12 @@ func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 	return malformed.err()
 }
 
-// CheckDatabaseTLS refuses a CA file the connection cannot use and, on PostgreSQL, libpq's TLS
-// variables, in the one malformed-configuration line Load answers with, and reads the CA file into
-// c.TLSRoots. Load leaves both to the `migrate` subcommand, which calls this once its --db-* flags
-// are applied, so they are checked against the configuration it runs with (#502).
+// CheckDatabaseTLS refuses a CA file, a client certificate pair and a host name override the
+// connection cannot use, and on PostgreSQL libpq's TLS variables, in the one malformed-configuration
+// line Load answers with, and reads the CA file into c.TLSRoots and the pair into
+// c.TLSClientCertificate. Load leaves all of it to the `migrate` subcommand, which calls this once
+// its --db-* flags are applied, so they are checked against the configuration it runs with
+// (#502, #546).
 func CheckDatabaseTLS(c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseTLS(c, &malformed)
@@ -446,30 +466,37 @@ func checkDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig, malformed *malforme
 	}
 }
 
-// checkDatabaseTLS reads the CA file into c.TLSRoots, refusing one the connection cannot use, and
-// refuses libpq's TLS variables on PostgreSQL. Both depend on the engine, the mode and the file
-// together, so they are checked once, against the configuration the command runs with (#502).
+// checkDatabaseTLS reads the CA file into c.TLSRoots and the client certificate pair into
+// c.TLSClientCertificate, refusing either the connection cannot use, refuses a host name override
+// beside any mode but verify-full, and refuses libpq's TLS variables on PostgreSQL. All depend on
+// the engine, the mode and the file together, so they are checked once, against the configuration
+// the command runs with (#502, #546).
 func checkDatabaseTLS(c *DatabaseConfig, malformed *malformedValues) {
 	readDatabaseTLSRoots(c, malformed)
+	readDatabaseTLSClientCertificate(c, malformed)
+	refuseTheServerNameTheModeCannotCheck(c, malformed)
 	refuseLibpqTLSVariables(c, malformed)
 }
 
 // libpqTLSVariables are libpq's TLS variables, each with what to do instead, in the words of the
-// refusal. The PostgreSQL connection's TLS is GOIABADA_DB_TLS_MODE and GOIABADA_DB_TLS_CA_FILE and
-// nothing else, so none of these is read any more (#502 decision 5).
+// refusal. The PostgreSQL connection's TLS is Goiabada's five TLS settings and nothing else, so
+// none of these is read any more (#502 decision 5, #546).
 var libpqTLSVariables = []struct{ name, instead string }{
 	{"PGSSLMODE", "unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead"},
 	{"PGSSLROOTCERT", "unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead"},
-	{"PGSSLCERT", libpqNoClientCertificate},
-	{"PGSSLKEY", libpqNoClientCertificate},
-	{"PGSSLPASSWORD", libpqNoClientCertificate},
+	{"PGSSLCERT", "unset it and set GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) instead"},
+	{"PGSSLKEY", "unset it and set GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) instead"},
+	{"PGSSLPASSWORD", libpqNoKeyPassphrase},
 	{"PGSSLSNI", "unset it; " + libpqTLSSettings},
 	{"PGSSLNEGOTIATION", "unset it; " + libpqTLSSettings},
 }
 
 const (
-	libpqTLSSettings         = "GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS"
-	libpqNoClientCertificate = "unset it; the auth server presents no client certificate, and " + libpqTLSSettings
+	libpqTLSSettings = "GOIABADA_DB_TLS_MODE (--db-tls-mode), GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file), " +
+		"GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file), GOIABADA_DB_TLS_CLIENT_KEY_FILE " +
+		"(--db-tls-client-key-file) and GOIABADA_DB_TLS_SERVER_NAME (--db-tls-server-name) decide the connection's TLS"
+	// The pair is read as Go reads it, with no passphrase to decrypt the key with.
+	libpqNoKeyPassphrase = "unset it; the auth server reads no passphrase for the client key, and " + libpqTLSSettings
 )
 
 // refuseLibpqTLSVariables stops a PostgreSQL start that has any of libpq's TLS variables set and
@@ -553,6 +580,112 @@ func readDatabaseTLSRoots(c *DatabaseConfig, malformed *malformedValues) {
 		return
 	}
 	c.TLSRoots = roots
+}
+
+// readDatabaseTLSClientCertificate reads the certificate and key files into
+// c.TLSClientCertificate, which is how the pair is read once, at start, and refuses one the
+// connection cannot present (#546): half a pair, one on SQL Server, whose driver takes no client
+// certificate, one beside a mode that may send no TLS, a half that cannot be read, and two halves
+// that do not pair. SQLite has no connection to carry one, and reads no file. Neither does a mode
+// that is itself malformed, which is refused already.
+func readDatabaseTLSClientCertificate(c *DatabaseConfig, malformed *malformedValues) {
+	c.TLSClientCertificate = nil
+	if c.TLSClientCertFile == "" && c.TLSClientKeyFile == "" {
+		return
+	}
+	if c.TLSClientCertFile == "" || c.TLSClientKeyFile == "" {
+		half, other := "GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file)",
+			"GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file)"
+		named := c.TLSClientCertFile
+		if named == "" {
+			half, other = other, half
+			named = c.TLSClientKeyFile
+		}
+		malformed.addLine(half + " is " + strconv.Quote(named) + " without " + other + ": name both or neither")
+		return
+	}
+	dialect, err := data.ParseDialect(c.Type)
+	if err != nil || dialect == data.SQLite {
+		return
+	}
+	const certSetting = "GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "
+	if dialect == data.MSSQL {
+		malformed.addLine(certSetting + strconv.Quote(c.TLSClientCertFile) +
+			" while GOIABADA_DB_TYPE (--db-type) is mssql, whose driver takes no client certificate")
+		return
+	}
+	mode := c.EffectiveTLSMode()
+	if !mode.Known() {
+		return
+	}
+	if mode == data.TLSDisable || mode == data.TLSPrefer {
+		sends := "sends no TLS"
+		if mode == data.TLSPrefer {
+			sends = "may send no TLS"
+		}
+		described := string(mode)
+		if c.TLSMode == "" {
+			described = "unset, so prefer"
+		}
+		malformed.addLine(certSetting + strconv.Quote(c.TLSClientCertFile) +
+			" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is " + described + ", which " + sends +
+			": only require, verify-ca and verify-full carry a client certificate")
+		return
+	}
+	certPEM, err := os.ReadFile(c.TLSClientCertFile)
+	if err != nil {
+		malformed.addLine(certSetting + strconv.Quote(c.TLSClientCertFile) + ", which cannot be read: " + cannotBeRead(err))
+		return
+	}
+	keyPEM, err := os.ReadFile(c.TLSClientKeyFile)
+	if err != nil {
+		malformed.addLine("GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is " +
+			strconv.Quote(c.TLSClientKeyFile) + ", which cannot be read: " + cannotBeRead(err))
+		return
+	}
+	pair, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		malformed.addLine(certSetting + strconv.Quote(c.TLSClientCertFile) +
+			" and GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is " + strconv.Quote(c.TLSClientKeyFile) +
+			", which do not pair: " + err.Error())
+		return
+	}
+	c.TLSClientCertificate = &pair
+}
+
+// refuseTheServerNameTheModeCannotCheck refuses a host name override beside any mode but
+// verify-full, the only one that checks the certificate against a host name, so an override beside
+// another cannot read as a check the mode does not give (#546). SQLite has no connection to check
+// and reads none of it, and neither does a mode that is itself malformed, which is refused already.
+func refuseTheServerNameTheModeCannotCheck(c *DatabaseConfig, malformed *malformedValues) {
+	if c.TLSServerName == "" {
+		return
+	}
+	if dialect, err := data.ParseDialect(c.Type); err != nil || dialect == data.SQLite {
+		return
+	}
+	mode := c.EffectiveTLSMode()
+	if !mode.Known() || mode == data.TLSVerifyFull {
+		return
+	}
+	described := string(mode)
+	if c.TLSMode == "" {
+		described = "unset, so prefer"
+	}
+	malformed.addLine("GOIABADA_DB_TLS_SERVER_NAME (--db-tls-server-name) is " + strconv.Quote(c.TLSServerName) +
+		" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is " + described +
+		", which checks no host name: only verify-full checks the certificate's host name")
+}
+
+// cannotBeRead is os.ReadFile's error with the path stripped out of it, the path being quoted
+// beside it in the refusal: the cause alone, as the CA file's refusal takes it.
+func cannotBeRead(err error) string {
+	reason := err.Error()
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		reason = pathErr.Err.Error()
+	}
+	return reason
 }
 
 // DataKeys decodes the data-encryption keys: the current one, which must be present,

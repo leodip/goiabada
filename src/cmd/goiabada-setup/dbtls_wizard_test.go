@@ -15,8 +15,11 @@ import (
 // database password: the mode, prefer by default, and for verify-ca and verify-full the CA file,
 // blank for the system's roots (#502 decision 7).
 const (
-	tlsModePrompt = "Select TLS mode [1-5] [2]: "
-	caFilePrompt  = "CA file the database's certificate chains to (PEM), blank for the system's roots: "
+	tlsModePrompt    = "Select TLS mode [1-5] [2]: "
+	caFilePrompt     = "CA file the database's certificate chains to (PEM), blank for the system's roots: "
+	clientCertPrompt = "Client certificate the auth server presents to the database (PEM), blank for none: "
+	clientKeyPrompt  = "Client certificate's private key (PEM), blank to name the certificate again: "
+	serverNamePrompt = "Host name verify-full checks the certificate against when the address dialed is not the name certified, blank for the host dialed: "
 )
 
 // testCAFile is a CA certificate, the PEM of a self-signed test authority.
@@ -55,6 +58,15 @@ func withTLSAnswers(t *testing.T, kind deploymentType, mode string, caAnswers ..
 			var ca []scriptedStep
 			for _, answer := range caAnswers {
 				ca = append(ca, scriptedStep{prompt: caFilePrompt, answer: answer})
+			}
+			// The pair is offered to the three modes that carry one, answered blank for none, and
+			// the host name override to verify-full alone (#546).
+			switch mode {
+			case "3", "4", "5":
+				ca = append(ca, scriptedStep{prompt: clientCertPrompt, answer: ""})
+			}
+			if mode == "5" {
+				ca = append(ca, scriptedStep{prompt: serverNamePrompt, answer: ""})
 			}
 			return slices.Concat(steps[:i+1], ca, steps[i+1:])
 		}
@@ -289,7 +301,10 @@ func TestWizard_AFailedTestAsksTheTLSModeAgain(t *testing.T) {
 	before, database, confirmation := full[:len(full)-8], full[len(full)-8:len(full)-1], full[len(full)-1]
 	again := slices.Clone(database)
 	again[5].answer = "5"
-	again = slices.Insert(again, 6, scriptedStep{prompt: caFilePrompt, answer: caPath})
+	again = slices.Insert(again, 6,
+		scriptedStep{prompt: caFilePrompt, answer: caPath},
+		scriptedStep{prompt: clientCertPrompt, answer: ""},
+		scriptedStep{prompt: serverNamePrompt, answer: ""})
 	steps := slices.Concat(before, database, []scriptedStep{{prompt: "Select option [1-3] [1]: ", answer: "1"}}, again, []scriptedStep{confirmation})
 
 	w, in, out, calls := testWizard(t, &CLIFlags{}, steps, false, true)
@@ -302,6 +317,132 @@ func TestWizard_AFailedTestAsksTheTLSModeAgain(t *testing.T) {
 	}
 	if w.config.DBTLSMode != "verify-full" || w.config.DBTLSCA != ca {
 		t.Errorf("kept mode %q with %d bytes of PEM", w.config.DBTLSMode, len(w.config.DBTLSCA))
+	}
+}
+
+// testClientPair is the pair of the test certificate, which the auth server's own tests read.
+func testClientPair(t *testing.T) (cert, key string) {
+	t.Helper()
+	certFile, err := os.ReadFile("testdata/db-client-cert.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyFile, err := os.ReadFile("testdata/db-client-key.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(certFile), string(keyFile)
+}
+
+// The pair and the host name override are asked after the CA file, for verify-full, and reach the
+// configuration as the generated files write them: the two paths made absolute, the two files'
+// contents, and the name. The key beside a certificate the wizard cannot pair is asked again
+// (#546).
+func TestWizard_AsksTheClientCertificateAndTheHostName(t *testing.T) {
+	cert, key := testClientPair(t)
+	certPath := writeFile(t, "client-cert.pem", cert)
+	keyPath := writeFile(t, "client-key.pem", key)
+	caPath := writeFile(t, "db-ca.pem", readTestCA(t))
+
+	steps := withTLSAnswers(t, deploymentNative, "5", caPath)
+	certAt, nameAt := -1, -1
+	for i, s := range steps {
+		switch s.prompt {
+		case clientCertPrompt:
+			certAt = i
+		case serverNamePrompt:
+			nameAt = i
+		}
+	}
+	if certAt < 0 || nameAt < 0 {
+		t.Fatal("the script never asks for the client certificate or the host name")
+	}
+	steps[certAt].answer = certPath
+	// The CA file is a certificate, not a private key: the pair is refused, as the auth server
+	// refuses two files that do not pair, and the key is asked again (#546).
+	steps = slices.Insert(steps, certAt+1, scriptedStep{prompt: clientKeyPrompt, answer: caPath},
+		scriptedStep{prompt: clientKeyPrompt, answer: keyPath})
+	if nameAt > certAt {
+		nameAt += 2
+	}
+	steps[nameAt].answer = "db.internal.example.com"
+
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if !strings.Contains(out.String(), "do not pair") {
+		t.Errorf("a key that pairs with nothing is not refused:\n%s", out)
+	}
+	c := w.config
+	if c.DBTLSClientCertFile != certPath || c.DBTLSClientKeyFile != keyPath {
+		t.Errorf("pair is %q and %q, want %q and %q", c.DBTLSClientCertFile, c.DBTLSClientKeyFile, certPath, keyPath)
+	}
+	if c.DBTLSClientCert != cert || c.DBTLSClientKey != key {
+		t.Error("the configuration holds what the two files hold")
+	}
+	if c.DBTLSServerName != "db.internal.example.com" {
+		t.Errorf("host name is %q, want db.internal.example.com", c.DBTLSServerName)
+	}
+	env, err := os.ReadFile(w.paths.description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"GOIABADA_DB_TLS_CLIENT_CERT_FILE=\"" + certPath + "\"",
+		"GOIABADA_DB_TLS_CLIENT_KEY_FILE=\"" + keyPath + "\"",
+		"GOIABADA_DB_TLS_SERVER_NAME=\"db.internal.example.com\"",
+	} {
+		if !strings.Contains(string(env), want) {
+			t.Errorf("the env file omits %s:\n%s", want, env)
+		}
+	}
+}
+
+// The TLS flags are refused as the auth server refuses the settings they write: half a pair, a
+// pair on SQL Server, whose driver takes none, a pair beside a mode that may send no TLS, and a
+// host name override beside a mode that checks no host name (#546).
+func TestWizard_RefusesTheTLSFlagsTheServerRefuses(t *testing.T) {
+	cert, key := testClientPair(t)
+	certPath := writeFile(t, "client-cert.pem", cert)
+	keyPath := writeFile(t, "client-key.pem", key)
+	native := CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org",
+		DBHost: "pg.internal", SkipDBTest: true}
+	for _, tc := range []struct {
+		name  string
+		flags CLIFlags
+		want  string
+	}{
+		{"half a pair", func() CLIFlags {
+			f := native
+			f.DBTLSMode, f.DBTLSClientCertFile = "require", certPath
+			return f
+		}(), `without --db-tls-client-key-file: name both or neither`},
+		{"a pair on SQL Server", func() CLIFlags {
+			f := native
+			f.DBType, f.DBTLSMode = "mssql", "require"
+			f.DBTLSClientCertFile, f.DBTLSClientKeyFile = certPath, keyPath
+			return f
+		}(), "while --db is mssql, whose driver takes no client certificate"},
+		{"a pair beside prefer", func() CLIFlags {
+			f := native
+			f.DBTLSClientCertFile, f.DBTLSClientKeyFile = certPath, keyPath
+			return f
+		}(), "while --db-tls-mode is left out, so prefer, which may send no TLS"},
+		{"a host name beside verify-ca", func() CLIFlags {
+			f := native
+			f.DBTLSMode, f.DBTLSServerName = "verify-ca", "db.internal.example.com"
+			return f
+		}(), "while --db-tls-mode is verify-ca, which checks no host name"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _, out, _ := testWizard(t, &tc.flags, nil)
+			err := w.setup()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("setup refused with %v, want it to say %q\n%s", err, tc.want, out)
+			}
+		})
 	}
 }
 

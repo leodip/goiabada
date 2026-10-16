@@ -27,8 +27,14 @@ type dbTarget struct {
 	Name     string
 	// TLSMode is GOIABADA_DB_TLS_MODE as the auth server will read it, empty for unset, which is
 	// prefer. TLSRoots is the authorities GOIABADA_DB_TLS_CA_FILE holds, nil for the system's roots.
+	// TLSClientCertificate is the pair GOIABADA_DB_TLS_CLIENT_CERT_FILE and GOIABADA_DB_TLS_CLIENT_KEY_FILE
+	// hold, nil presenting none, and TLSServerName the host name GOIABADA_DB_TLS_SERVER_NAME wants
+	// verify-full to check the certificate against, empty leaving the host dialed (#546).
 	TLSMode  string
 	TLSRoots *x509.CertPool
+
+	TLSClientCertificate *tls.Certificate
+	TLSServerName        string
 }
 
 // The connections below are copies of the auth server's, in
@@ -88,8 +94,16 @@ func postgresConnectionFor(t dbTarget, dsn string) (dbConnection, error) {
 	if err != nil {
 		return dbConnection{}, errs.Wrap(err, "unable to parse the connection URL")
 	}
-	if checksCertificate(t.TLSMode) && c.TLSConfig != nil {
-		c.TLSConfig.RootCAs = t.TLSRoots
+	if c.TLSConfig != nil {
+		if checksCertificate(t.TLSMode) {
+			c.TLSConfig.RootCAs = t.TLSRoots
+		}
+		if t.TLSClientCertificate != nil {
+			c.TLSConfig.Certificates = []tls.Certificate{*t.TLSClientCertificate}
+		}
+		if t.TLSServerName != "" {
+			c.TLSConfig.ServerName = t.TLSServerName
+		}
 	}
 	return dbConnection{driver: "pgx", dsn: dsn, postgres: c}, nil
 }
@@ -144,21 +158,44 @@ func mysqlConfig(t dbTarget) (*mysqldriver.Config, error) {
 		c.TLSConfig = "preferred"
 		_ = c.Apply(mysqldriver.BeforeConnect(func(context.Context, *mysqldriver.Config) error { return nil }))
 	case "require":
-		c.TLSConfig = "skip-verify"
+		if t.TLSClientCertificate == nil {
+			c.TLSConfig = "skip-verify"
+			break
+		}
+		// The driver's skip-verify string carries no certificate; the builder's own configuration
+		// carries the pair and checks nothing, as require does (#546).
+		c.TLS = &tls.Config{
+			ServerName:         serverName(t),
+			InsecureSkipVerify: true, //nolint:gosec // G402: require checks no certificate, by design
+			MinVersion:         tls.VersionTLS12,
+		}
 	case "verify-ca":
 		c.TLS = &tls.Config{
-			ServerName:         hostport.Unbracket(t.Host),
+			ServerName:         serverName(t),
 			RootCAs:            t.TLSRoots,
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: true, //nolint:gosec // G402: VerifyConnection checks the chain against RootCAs
 			VerifyConnection:   verifyChainOnly(t.TLSRoots),
 		}
 	case "verify-full":
-		c.TLS = &tls.Config{ServerName: hostport.Unbracket(t.Host), RootCAs: t.TLSRoots, MinVersion: tls.VersionTLS12}
+		c.TLS = &tls.Config{ServerName: serverName(t), RootCAs: t.TLSRoots, MinVersion: tls.VersionTLS12}
 	default:
 		return nil, errs.Errorf("GOIABADA_DB_TLS_MODE %q is not one of the five modes", mode)
 	}
+	if t.TLSClientCertificate != nil && c.TLS != nil {
+		c.TLS.Certificates = []tls.Certificate{*t.TLSClientCertificate}
+	}
 	return c, nil
+}
+
+// serverName is who the TLS configuration the builder writes names: the host name the operator
+// gave GOIABADA_DB_TLS_SERVER_NAME or, with none, the host dialed. Only verify-full checks the
+// name; the wizard refuses the override beside any other mode (#546).
+func serverName(t dbTarget) string {
+	if t.TLSServerName != "" {
+		return t.TLSServerName
+	}
+	return hostport.Unbracket(t.Host)
 }
 
 // mssqlDSN is mssqldb.DSN: the query carries the TLS mode's parameters, none for prefer, which
@@ -187,6 +224,13 @@ func mssqlURL(t dbTarget, database string) string {
 	}
 	q := url.Values{}
 	q.Add("database", database)
+	// The host name verify-full checks the certificate against, in go-mssqldb's own parameter: the
+	// URL's host names the address dialed and nothing else, and an operator connecting through an
+	// address the certificate does not name — an IP address, a pooler, a private endpoint — has
+	// nowhere else to put the name that is certified (#546).
+	if t.TLSServerName != "" {
+		q.Add("hostNameInCertificate", t.TLSServerName)
+	}
 	u := url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(t.Username, t.Password),
@@ -284,16 +328,37 @@ func testDatabaseConnection(out *console, c *Config) bool {
 	return checkConfiguredDatabase(out, openSQL, c)
 }
 
-// checkConfiguredDatabase is checkDatabase on the database c describes, dialled with its TLS mode
-// and its CA file's authorities, as the auth server will dial it (#502 decision 7).
+// clientPair is the pair the wizard read into c, parsed as the auth server's load parses it, so the
+// check dials with the certificate the operator named (#546). The wizard already refused a pair
+// the server would.
+func clientPair(out *console, c *Config) *tls.Certificate {
+	if c.DBTLSClientCert == "" && c.DBTLSClientKey == "" {
+		return nil
+	}
+	pair, err := tls.X509KeyPair([]byte(c.DBTLSClientCert), []byte(c.DBTLSClientKey))
+	if err != nil {
+		out.fail("The database client certificate and key do not pair: %v", err)
+		return nil
+	}
+	return &pair
+}
+
+// checkConfiguredDatabase is checkDatabase on the database c describes, dialled with its TLS mode,
+// its CA file's authorities, its client certificate pair and its host name override, as the auth
+// server will dial it (#502 decision 7, #546).
 func checkConfiguredDatabase(out *console, open dbOpener, c *Config) bool {
 	port, err := strconv.Atoi(c.DBPort)
 	if err != nil {
 		out.fail("Invalid port %q", c.DBPort)
 		return false
 	}
+	pair := clientPair(out, c)
+	if c.DBTLSClientCert != "" && pair == nil {
+		return false
+	}
 	return checkDatabase(out, open, c.Engine, dbTarget{Host: c.DBHost, Port: port, Username: c.DBUsername,
-		Password: c.DBPassword, Name: c.DBName, TLSMode: c.DBTLSMode, TLSRoots: tlsRoots(c.DBTLSCA)})
+		Password: c.DBPassword, Name: c.DBName, TLSMode: c.DBTLSMode, TLSRoots: tlsRoots(c.DBTLSCA),
+		TLSClientCertificate: pair, TLSServerName: c.DBTLSServerName})
 }
 
 // checkDatabase follows the auth server's startup order under the files the wizard writes, which

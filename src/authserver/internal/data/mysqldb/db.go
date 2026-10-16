@@ -6,6 +6,7 @@ package mysqldb
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
 	"embed"
@@ -57,8 +58,16 @@ type DatabaseConfig struct {
 	// TLSMode is GOIABADA_DB_TLS_MODE, the zero value reading as prefer, and TLSRoots the
 	// authorities GOIABADA_DB_TLS_CA_FILE holds, nil for the system's roots. Both cover every
 	// connection the constructor opens, the maintenance one included (#502).
+	//
+	// TLSClientCertificate is the pair GOIABADA_DB_TLS_CLIENT_CERT_FILE and
+	// GOIABADA_DB_TLS_CLIENT_KEY_FILE hold, nil presenting none, and TLSServerName the host name
+	// GOIABADA_DB_TLS_SERVER_NAME wants verify-full to check the certificate against, empty
+	// leaving the host dialed. Both cover every connection the constructor opens too (#546).
 	TLSMode  data.TLSMode
 	TLSRoots *x509.CertPool
+
+	TLSClientCertificate *tls.Certificate
+	TLSServerName        string
 }
 
 // New opens the MySQL database dbConfig names, creating it first when dbConfig.Create says so.

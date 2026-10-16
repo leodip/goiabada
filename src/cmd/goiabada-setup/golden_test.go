@@ -128,6 +128,20 @@ var answerCases = []goldenCase{
 	{name: "kubernetes-verify-ca-mysql", deployment: deploymentKubernetes, engine: "mysql", answers: func(c *Config) {
 		c.DBTLSMode = "verify-ca"
 	}},
+	// A client certificate pair with a host name override: native binaries name the two files, and
+	// Kubernetes carries their contents in a Secret mounted into the auth server's pod (#546).
+	{name: "native-client-certificate-postgres", deployment: deploymentNative, engine: "postgres", answers: func(c *Config) {
+		c.DBTLSMode = "verify-full"
+		c.DBTLSClientCertFile, c.DBTLSClientKeyFile = "/etc/ssl/goiabada/client-cert.pem", "/etc/ssl/goiabada/client-key.pem"
+		c.DBTLSClientCert, c.DBTLSClientKey = goldenClientCertificate()
+		c.DBTLSServerName = "db.internal.example.com"
+	}},
+	{name: "kubernetes-client-certificate-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.DBTLSMode, c.DBTLSCAFile, c.DBTLSCA = "verify-full", "/home/operator/db-ca.pem", goldenCA()
+		c.DBTLSClientCertFile, c.DBTLSClientKeyFile = "/home/operator/client-cert.pem", "/home/operator/client-key.pem"
+		c.DBTLSClientCert, c.DBTLSClientKey = goldenClientCertificate()
+		c.DBTLSServerName = "db.internal.example.com"
+	}},
 }
 
 // goldenCA is the test authority's certificate, which the CA file's goldens carry.
@@ -137,6 +151,20 @@ func goldenCA() string {
 		panic(err)
 	}
 	return string(content)
+}
+
+// goldenClientCertificate is the test client pair: the certificate and key the pair's goldens
+// carry, the certificate and the key the auth server's own tests read (#546).
+func goldenClientCertificate() (string, string) {
+	cert, err := os.ReadFile("testdata/db-client-cert.pem")
+	if err != nil {
+		panic(err)
+	}
+	key, err := os.ReadFile("testdata/db-client-key.pem")
+	if err != nil {
+		panic(err)
+	}
+	return string(cert), string(key)
 }
 
 // hostileCases are one configuration per format, Compose, Kubernetes and the env file, whose

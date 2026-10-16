@@ -14,9 +14,21 @@ type Config struct {
 	// DBTLSCAFile is the absolute path of the CA file the operator named, for verify-ca and
 	// verify-full only, empty for the system's roots, and DBTLSCA the certificates it holds, as PEM:
 	// native binaries name the file, and Kubernetes carries the certificates in a ConfigMap (#502).
-	DBTLSMode           string
-	DBTLSCAFile         string
-	DBTLSCA             string
+	DBTLSMode   string
+	DBTLSCAFile string
+	DBTLSCA     string
+	// DBTLSClientCertFile and DBTLSClientKeyFile are the absolute paths of the client certificate
+	// pair the operator named, for require, verify-ca and verify-full on MySQL and PostgreSQL
+	// alone, empty for none, and DBTLSClientCert and DBTLSClientKey the two files' contents, as
+	// PEM, which the Kubernetes Secret is written from: native binaries name the files, and the
+	// connection check pairs the contents as the auth server will (#546). DBTLSServerName is the
+	// host name GOIABADA_DB_TLS_SERVER_NAME wants verify-full to check the certificate against,
+	// empty leaving the host dialed.
+	DBTLSClientCertFile string
+	DBTLSClientKeyFile  string
+	DBTLSClientCert     string
+	DBTLSClientKey      string
+	DBTLSServerName     string
 	AuthServerURL       string
 	AdminConsoleURL     string
 	AdminEmail          string

@@ -59,8 +59,15 @@ type DatabaseConfig struct {
 	// TLSMode is GOIABADA_DB_TLS_MODE, the zero value reading as prefer, and TLSRoots the
 	// authorities GOIABADA_DB_TLS_CA_FILE holds, nil for the system's roots. Both cover every
 	// connection the constructor opens, the maintenance one included (#502).
+	//
+	// TLSServerName is the host name GOIABADA_DB_TLS_SERVER_NAME wants verify-full to check the
+	// certificate against, empty leaving the host dialed, and it reaches the driver as its
+	// hostNameInCertificate parameter. A client certificate is refused at the load outright, since
+	// go-mssqldb takes none, so this configuration carries no pair (#546).
 	TLSMode  data.TLSMode
 	TLSRoots *x509.CertPool
+
+	TLSServerName string
 }
 
 // New opens the SQL Server database dbConfig names, creating it first when dbConfig.Create says

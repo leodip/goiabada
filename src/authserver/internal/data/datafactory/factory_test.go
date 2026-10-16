@@ -2,6 +2,7 @@ package datafactory
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"log/slog"
 	"os"
@@ -44,15 +45,21 @@ func sourceConfig() *config.DatabaseConfig {
 		ConnMaxLifetime: 43 * time.Minute,
 		ConnMaxIdleTime: 7 * time.Minute,
 
-		TLSMode:   "verify-ca",
-		TLSCAFile: "source-ca-file",
-		TLSRoots:  sourceRoots,
+		TLSMode:              "verify-ca",
+		TLSCAFile:            "source-ca-file",
+		TLSRoots:             sourceRoots,
+		TLSClientCertificate: sourceClientCertificate,
+		TLSServerName:        "source-server-name",
 	}
 }
 
 // sourceRoots is the authorities sourceConfig's CA file held, compared by identity: a mapper hands
 // the engines the pool the load read rather than a copy of it.
 var sourceRoots = x509.NewCertPool()
+
+// sourceClientCertificate is the pair sourceConfig's two files held, compared by identity too: the
+// pair the load read is what the engines present (#546).
+var sourceClientCertificate = &tls.Certificate{}
 
 // sourcePool is the pool sourceConfig describes, written out rather than read off it, so a mapper
 // that read the wrong field cannot agree with the expectation by construction.
@@ -122,6 +129,8 @@ func TestMysqlConfig_CopiesEveryField(t *testing.T) {
 		{"Pool", poolOf(got.Pool), sourcePool},
 		{"TLSMode", got.TLSMode, data.TLSVerifyCA},
 		{"TLSRoots", got.TLSRoots == sourceRoots, true},
+		{"TLSClientCertificate", got.TLSClientCertificate == sourceClientCertificate, true},
+		{"TLSServerName", got.TLSServerName, "source-server-name"},
 	})
 }
 
@@ -140,6 +149,8 @@ func TestPostgresConfig_CopiesEveryField(t *testing.T) {
 		{"Pool", poolOf(got.Pool), sourcePool},
 		{"TLSMode", got.TLSMode, data.TLSVerifyCA},
 		{"TLSRoots", got.TLSRoots == sourceRoots, true},
+		{"TLSClientCertificate", got.TLSClientCertificate == sourceClientCertificate, true},
+		{"TLSServerName", got.TLSServerName, "source-server-name"},
 	})
 }
 
@@ -158,6 +169,7 @@ func TestMssqlConfig_CopiesEveryField(t *testing.T) {
 		{"Pool", poolOf(got.Pool), sourcePool},
 		{"TLSMode", got.TLSMode, data.TLSVerifyCA},
 		{"TLSRoots", got.TLSRoots == sourceRoots, true},
+		{"TLSServerName", got.TLSServerName, "source-server-name"},
 	})
 }
 

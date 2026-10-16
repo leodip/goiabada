@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -12,16 +13,19 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data/tlstest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The connection's TLS settings at the load: GOIABADA_DB_TLS_MODE and GOIABADA_DB_TLS_CA_FILE,
-// their flags, and every refusal a start makes of them before anything is opened (#502).
+// The connection's TLS settings at the load: GOIABADA_DB_TLS_MODE, GOIABADA_DB_TLS_CA_FILE, the
+// client certificate pair and the host name override, their flags, and every refusal a start
+// makes of them before anything is opened (#502, #546).
 
 // testAuthority is a certificate authority made for one test, and a server certificate it signed.
 type testAuthority struct {
@@ -284,6 +288,15 @@ func TestCheckDatabaseFlags_HoldsTheTLSFlagsGivenAfterMigrate(t *testing.T) {
 			args: []string{"-db-tls-ca-file=" + good}, roots: true},
 		{name: "a type changed to sqlite ignores the CA file", base: DatabaseConfig{Type: "postgres", TLSMode: "verify-ca", TLSCAFile: missing},
 			args: []string{"-db-type=sqlite"}},
+		{name: "a host name beside the loaded mode, which checks none", base: DatabaseConfig{Type: "postgres", TLSMode: "require"},
+			args: []string{"-db-tls-server-name=db.example.com"},
+			want: `malformed configuration: GOIABADA_DB_TLS_SERVER_NAME (--db-tls-server-name) is "db.example.com" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no host name: only verify-full checks the certificate's host name`},
+		{name: "a client certificate beside the loaded mode, which may send no TLS", base: DatabaseConfig{Type: "postgres", TLSMode: "prefer"},
+			args: []string{"-db-tls-client-cert-file=" + good, "-db-tls-client-key-file=" + good},
+			want: `malformed configuration: GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "` + good +
+				`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is prefer, which may send no TLS: only require, verify-ca and verify-full carry a client certificate`},
+		{name: "a host name the loaded verify-full checks", base: DatabaseConfig{Type: "postgres", TLSMode: "verify-full"},
+			args: []string{"-db-tls-server-name=db.example.com"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -334,16 +347,12 @@ func TestRegisterDatabaseFlags_TheTLSHelpNamesEveryMode(t *testing.T) {
 var libpqTLSRefusals = map[string]string{
 	"PGSSLMODE":     "PGSSLMODE is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_MODE (--db-tls-mode) instead",
 	"PGSSLROOTCERT": "PGSSLROOTCERT is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead",
-	"PGSSLCERT": "PGSSLCERT is set, which the auth server no longer reads: unset it; the auth server presents no client certificate, " +
-		"and GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
-	"PGSSLKEY": "PGSSLKEY is set, which the auth server no longer reads: unset it; the auth server presents no client certificate, " +
-		"and GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
-	"PGSSLPASSWORD": "PGSSLPASSWORD is set, which the auth server no longer reads: unset it; the auth server presents no client certificate, " +
-		"and GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
-	"PGSSLSNI": "PGSSLSNI is set, which the auth server no longer reads: unset it; " +
-		"GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
-	"PGSSLNEGOTIATION": "PGSSLNEGOTIATION is set, which the auth server no longer reads: unset it; " +
-		"GOIABADA_DB_TLS_MODE (--db-tls-mode) and GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) decide the connection's TLS",
+	"PGSSLCERT":     "PGSSLCERT is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) instead",
+	"PGSSLKEY":      "PGSSLKEY is set, which the auth server no longer reads: unset it and set GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) instead",
+	"PGSSLPASSWORD": "PGSSLPASSWORD is set, which the auth server no longer reads: unset it; the auth server reads no passphrase for the client key, and " +
+		libpqTLSSettings,
+	"PGSSLSNI":         "PGSSLSNI is set, which the auth server no longer reads: unset it; " + libpqTLSSettings,
+	"PGSSLNEGOTIATION": "PGSSLNEGOTIATION is set, which the auth server no longer reads: unset it; " + libpqTLSSettings,
 }
 
 // TestLoad_RefusesLibpqsTLSVariablesOnPostgres: on PostgreSQL, any of the seven PGSSL* variables
@@ -421,4 +430,186 @@ func TestCheckDatabaseTLS_RefusesLibpqsTLSVariablesUnderMigrate(t *testing.T) {
 	err := CheckDatabaseTLS(&local)
 	require.Error(t, err)
 	assert.Equal(t, "malformed configuration: "+libpqTLSRefusals["PGSSLMODE"], err.Error())
+}
+
+// writeTestClientPair writes a client certificate and its key, as the load reads the pair, and
+// answers their paths beside the pair itself (#546).
+func writeTestClientPair(t *testing.T) (certFile, keyFile string, pair tls.Certificate) {
+	t.Helper()
+	authority := tlstest.NewAuthority(t, "the client's")
+	pair = authority.IssueClient(t, "goiabada")
+	keyDER, err := x509.MarshalPKCS8PrivateKey(pair.PrivateKey)
+	require.NoError(t, err)
+	return writeFile(t, "client.pem", pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: pair.Certificate[0]})),
+		writeFile(t, "client.key", pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})),
+		pair
+}
+
+// TestLoad_TheClientCertificatePairIsRead: beside a mode that always sends TLS, the load reads
+// the pair once and what it answers is what the engines are handed, from the variables or the
+// flags alike (#546).
+func TestLoad_TheClientCertificatePairIsRead(t *testing.T) {
+	certFile, keyFile, pair := writeTestClientPair(t)
+	for _, mode := range []string{"require", "verify-ca", "verify-full"} {
+		for _, source := range []struct {
+			name string
+			env  map[string]string
+			args []string
+		}{
+			{"the variables", map[string]string{"GOIABADA_DB_TLS_MODE": mode,
+				"GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile}, nil},
+			{"the flags", nil, []string{"-db-tls-mode=" + mode,
+				"-db-tls-client-cert-file=" + certFile, "-db-tls-client-key-file=" + keyFile}},
+		} {
+			t.Run(mode+" from "+source.name, func(t *testing.T) {
+				env := map[string]string{"GOIABADA_DB_TYPE": "postgres"}
+				for k, v := range source.env {
+					env[k] = v
+				}
+				_, c := loadMatrix(t, env, source.args)
+
+				loaded := c.Database.TLSClientCertificate
+				require.NotNil(t, loaded, "the pair is what the engines are handed")
+				assert.Equal(t, pair.Certificate, loaded.Certificate, "the certificate is the file's")
+				assert.Equal(t, pair.PrivateKey, loaded.PrivateKey, "the key is the file's")
+			})
+		}
+	}
+
+	t.Run("no pair presents none", func(t *testing.T) {
+		_, c := loadMatrix(t, map[string]string{"GOIABADA_DB_TYPE": "mysql", "GOIABADA_DB_TLS_MODE": "verify-full"}, nil)
+		assert.Nil(t, c.Database.TLSClientCertificate)
+	})
+}
+
+// TestLoad_RefusesAClientPairItCannotUse: half a pair, one beside a mode that may send no TLS, a
+// half that cannot be read, and two halves that do not pair each stop the load on PostgreSQL and
+// MySQL, on SQL Server the pair itself does, whose driver takes no client certificate, and SQLite
+// reads none of it, naming the file under both its variable and its flag (#546).
+func TestLoad_RefusesAClientPairItCannotUse(t *testing.T) {
+	certFile, keyFile, _ := writeTestClientPair(t)
+	_, otherKey, _ := writeTestClientPair(t)
+	missing := filepath.Join(t.TempDir(), "absent.pem")
+
+	const certSetting = "GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "
+	const keySetting = "GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is "
+	beside := func(mode, sends string) string {
+		described := mode
+		if mode == "" {
+			described = "unset, so prefer"
+		}
+		return certSetting + strconv.Quote(certFile) + " while GOIABADA_DB_TLS_MODE (--db-tls-mode) is " + described +
+			", which " + sends + ": only require, verify-ca and verify-full carry a client certificate"
+	}
+
+	tests := []struct {
+		name    string
+		env     map[string]string
+		refusal string
+	}{
+		{name: "the certificate without the key",
+			env:     map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile},
+			refusal: certSetting + strconv.Quote(certFile) + " without GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file): name both or neither"},
+		{name: "the key without the certificate",
+			env:     map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile},
+			refusal: keySetting + strconv.Quote(keyFile) + " without GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file): name both or neither"},
+		{name: "beside disable", env: map[string]string{"GOIABADA_DB_TLS_MODE": "disable",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile},
+			refusal: beside("disable", "sends no TLS")},
+		{name: "beside prefer", env: map[string]string{"GOIABADA_DB_TLS_MODE": "prefer",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile},
+			refusal: beside("prefer", "may send no TLS")},
+		{name: "beside an unset mode, which is prefer", env: map[string]string{
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile},
+			refusal: beside("", "may send no TLS")},
+		{name: "a certificate that is not there",
+			env:     map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": missing, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile},
+			refusal: certSetting + strconv.Quote(missing) + ", which cannot be read: no such file or directory"},
+		{name: "a key that is not there",
+			env:     map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": missing},
+			refusal: keySetting + strconv.Quote(missing) + ", which cannot be read: no such file or directory"},
+		{name: "a certificate and a key that do not pair",
+			env: map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": otherKey},
+			refusal: certSetting + strconv.Quote(certFile) + " and GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is " +
+				strconv.Quote(otherKey) + ", which do not pair: tls: private key does not match public key"},
+	}
+	for _, engine := range []string{"mysql", "postgres"} {
+		for _, tt := range tests {
+			t.Run(engine+": "+tt.name, func(t *testing.T) {
+				env := map[string]string{"GOIABADA_DB_TYPE": engine}
+				for k, v := range tt.env {
+					env[k] = v
+				}
+				_, c, err := loadMatrixRefusing(t, env, nil)
+
+				require.Error(t, err)
+				assert.Equal(t, "malformed configuration: "+tt.refusal, err.Error())
+				assert.NotContains(t, err.Error(), "\n", "the refusal is one line on stderr")
+				assert.Nil(t, c, "a refusal answers no configuration")
+			})
+		}
+	}
+
+	t.Run("mssql, whose driver takes no client certificate", func(t *testing.T) {
+		_, _, err := loadMatrixRefusing(t, map[string]string{"GOIABADA_DB_TYPE": "mssql", "GOIABADA_DB_TLS_MODE": "verify-full",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": keyFile}, nil)
+		require.Error(t, err)
+		assert.Equal(t, "malformed configuration: "+certSetting+strconv.Quote(certFile)+
+			" while GOIABADA_DB_TYPE (--db-type) is mssql, whose driver takes no client certificate", err.Error())
+	})
+
+	t.Run("sqlite ignores the pair, as it ignores the CA file", func(t *testing.T) {
+		_, c := loadMatrix(t, map[string]string{"GOIABADA_DB_TYPE": "sqlite",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE": missing, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": missing}, nil)
+		assert.Nil(t, c.Database.TLSClientCertificate, "SQLite reads no pair")
+	})
+}
+
+// TestLoad_RefusesAServerNameTheModeCannotCheck: the host name override is read only beside
+// verify-full, the only mode that checks the certificate against a host name, and SQLite ignores
+// it, as it ignores the CA file (#546).
+func TestLoad_RefusesAServerNameTheModeCannotCheck(t *testing.T) {
+	const setting = "GOIABADA_DB_TLS_SERVER_NAME (--db-tls-server-name) is "
+	beside := func(described string) string {
+		return setting + `"db-1.internal.example" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is ` + described +
+			", which checks no host name: only verify-full checks the certificate's host name"
+	}
+	tests := []struct {
+		name    string
+		mode    string // the mode's variable; "" leaves it unset
+		refusal string
+	}{
+		{"beside disable", "disable", beside("disable")},
+		{"beside prefer", "prefer", beside("prefer")},
+		{"beside require", "require", beside("require")},
+		{"beside verify-ca", "verify-ca", beside("verify-ca")},
+		{"beside an unset mode, which is prefer", "", beside("unset, so prefer")},
+	}
+	for _, engine := range []string{"mysql", "postgres", "mssql"} {
+		for _, tt := range tests {
+			t.Run(engine+": "+tt.name, func(t *testing.T) {
+				env := map[string]string{"GOIABADA_DB_TYPE": engine, "GOIABADA_DB_TLS_SERVER_NAME": "db-1.internal.example"}
+				if tt.mode != "" {
+					env["GOIABADA_DB_TLS_MODE"] = tt.mode
+				}
+				_, c, err := loadMatrixRefusing(t, env, nil)
+
+				require.Error(t, err)
+				assert.Equal(t, "malformed configuration: "+tt.refusal, err.Error())
+				assert.Nil(t, c, "a refusal answers no configuration")
+			})
+		}
+	}
+
+	t.Run("beside verify-full, on every engine that has a connection", func(t *testing.T) {
+		for _, engine := range []string{"mysql", "postgres", "mssql"} {
+			_, c := loadMatrix(t, map[string]string{"GOIABADA_DB_TYPE": engine, "GOIABADA_DB_TLS_MODE": "verify-full",
+				"GOIABADA_DB_TLS_SERVER_NAME": "db-1.internal.example"}, nil)
+			assert.Equal(t, "db-1.internal.example", c.Database.TLSServerName)
+		}
+	})
+
+	t.Run("sqlite ignores it", func(t *testing.T) {
+		loadMatrix(t, map[string]string{"GOIABADA_DB_TYPE": "sqlite", "GOIABADA_DB_TLS_SERVER_NAME": "db-1.internal.example"}, nil)
+	})
 }
