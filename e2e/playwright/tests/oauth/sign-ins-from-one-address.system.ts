@@ -44,8 +44,9 @@ async function signInAtForm(browser: Browser, clientId: string, user: { email: s
   }
 }
 
-// Submits the password form and reads the answer to the POST: a redirect on to the client, the form
-// again with the failure, or the limiter's refusal.
+// Submits the password form and reads the answer to the POST: a redirect on to the client, which
+// answers a POST with 303 (RFC 9700 section 4.12), the form again with the failure, or the limiter's
+// refusal.
 async function submitAndRead(page: Page, email: string, password: string): Promise<Outcome> {
   const [answer] = await Promise.all([
     page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/auth/pwd"),
@@ -55,7 +56,7 @@ async function submitAndRead(page: Page, email: string, password: string): Promi
     await expect(page.getByRole("heading", { name: "Too many attempts" })).toBeVisible();
     return "too many attempts";
   }
-  if (answer.status() === 302) {
+  if (answer.status() === 303) {
     await page.waitForURL((url) => url.href.startsWith(testRedirectUri));
     return "signed in";
   }

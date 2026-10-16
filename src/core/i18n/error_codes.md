@@ -201,6 +201,7 @@ failures are one key per cause, each a whole sentence.
 | `handler.client_redirect_uris.empty` | (none) | Redirect URI cannot be empty |
 | `handler.client_redirect_uris.too_long` | `length` (int), `max` (int), `prefix` (string) | Redirect URI is too long ({{.length}} bytes, the maximum is {{.max}}): {{.prefix}}... |
 | `handler.client_redirect_uris.invalid` | `uri` (string) | Invalid redirect URI: {{.uri}} |
+| `handler.client_redirect_uris.insecure_http` | `uri` (string) | Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): {{.uri}} |
 | `handler.client_redirect_uris.not_absolute` | `uri` (string) | Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): {{.uri}} |
 | `handler.client_redirect_uris.duplicate` | (none) | Duplicate redirect URIs are not allowed |
 | `handler.client_web_origins.empty` | (none) | Web origin cannot be empty |
@@ -231,9 +232,7 @@ failures are one key per cause, each a whole sentence.
 | `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
 | `handler.account_logout.post_logout_redirect_uri_not_registered` | (none) | postLogoutRedirectUri is not registered for the client |
 | `handler.settings_general.app_name_too_long` | `max` (int) | App name is too long. The maximum length is {{.max}} characters. |
-| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Please enter a valid URI. |
-| `handler.settings_general.issuer_identifier_invalid` | (none) | Invalid issuer. It must start with a letter, can include letters, numbers, dashes, and underscores, but cannot end with a dash or underscore, or have two consecutive dashes or underscores. |
-| `handler.settings_general.issuer_too_short` | `min` (int) | Issuer is too short. The minimum length is {{.min}} characters. |
+| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
 | `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
 | `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
 | `handler.settings_sessions.idle_timeout_not_positive` | (none) | User session - idle timeout in seconds must be greater than zero. |
@@ -334,7 +333,6 @@ these are rendered on the refusal page rather than returned to the client
 | `validator.authorize.client_id_missing` | (none) | The client_id parameter is missing. |
 | `validator.authorize.client_not_found` | (none) | Invalid client_id parameter. The client does not exist. |
 | `validator.authorize.client_disabled` | (none) | Invalid client_id parameter. The client is disabled. |
-| `validator.authorize.auth_code_not_enabled` | (none) | Invalid client_id parameter. The client does not support the authorization code flow. |
 | `validator.authorize.redirect_uri_missing` | (none) | The redirect_uri parameter is missing. |
 | `validator.authorize.redirect_uri_not_absolute` | (none) | Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host. |
 | `validator.authorize.redirect_uri_not_registered` | (none) | Invalid redirect_uri parameter. The client does not have this redirect URI registered. |

@@ -379,18 +379,20 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		return errs.Errorf("redirect_uri scheme %q is not permitted: %s", parsed.Scheme, uri)
 	}
 
+	// RFC 9700 section 2.6: http only on the loopback interface (RFC 8252 section 7.3),
+	// whatever the client type. The rule is the predicate the admin API applies too, so the
+	// two intakes cannot drift (#575). Its host comparison is exact: this used to be a
+	// strings.HasPrefix test, which accepted any host merely starting with a loopback name,
+	// localhost.attacker.com included, in both client-type branches below (#105).
+	if urlmatch.IsInsecureHTTPRedirectURI(uri) {
+		return errs.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
+	}
+
 	// For public clients (MCP use case), only allow loopback http or custom schemes.
-	//
-	// The host comparison is exact, via the shared predicate in authserver/internal/urlmatch. It used to be
-	// a strings.HasPrefix test, which accepted any host merely starting with a loopback
-	// name, localhost.attacker.com included. See issue #105.
 	if isPublic {
-		// Allow loopback HTTP (MCP use case)
+		// Allow loopback HTTP (MCP use case); any other host was refused above.
 		if parsed.Scheme == "http" {
-			if urlmatch.IsLoopbackHost(parsed.Host) {
-				return nil
-			}
-			return errs.Errorf("public clients can only use http redirect_uris on the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
+			return nil
 		}
 
 		// Allow custom schemes (native apps)
@@ -402,17 +404,9 @@ func validateRedirectURI(uri string, isPublic bool) error {
 		return errs.Errorf("public clients registered via DCR cannot use https redirect_uris (security restriction): %s", uri)
 	}
 
-	// For confidential clients, allow HTTPS or loopback http. Same exact-host comparison as
-	// the public branch above: the prefix bug was duplicated across both.
-	if parsed.Scheme == "https" {
+	// For confidential clients, allow HTTPS or loopback http.
+	if parsed.Scheme == "https" || parsed.Scheme == "http" {
 		return nil
-	}
-
-	if parsed.Scheme == "http" {
-		if urlmatch.IsLoopbackHost(parsed.Host) {
-			return nil
-		}
-		return errs.Errorf("http redirect_uris must use the loopback hosts 127.0.0.1, [::1] or localhost: %s", uri)
 	}
 
 	// Custom schemes are for public clients only, which is what this branch not accepting

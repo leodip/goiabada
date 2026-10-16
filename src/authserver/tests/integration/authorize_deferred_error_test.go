@@ -52,6 +52,11 @@ const deferralStateEscaped = "csrf+a%2Bb%2Fc%3D"
 const invalidScopeDescription = "Invalid scope format: 'not_a_valid_scope'. Scopes must adhere to " +
 	"the resource-identifier:permission-identifier format. For instance: backend-service:create-product."
 
+// codeFlowDisabledDescription is the refusal ValidateRequest gives a code request from a client whose
+// authorization code flow is off, byte for byte: the one the token endpoint and issuance give for the
+// same condition, so the client hears one answer wherever it asks (#197, #573).
+const codeFlowDisabledDescription = "The client associated with the provided client_id does not support authorization code flow."
+
 // TestAuthorize_Deferred_CookielessRequestIsSentToLogin is probe/repro.md inverted: the exact
 // request that used to be answered with a redirect to the client is now answered with the login
 // page.
@@ -104,7 +109,7 @@ func TestAuthorize_Deferred_QueryMode_DeliversAfterLogin(t *testing.T) {
 	assert.Equal(t,
 		deferralRedirectURI+"?error=invalid_scope"+
 			"&error_description="+url.QueryEscape(invalidScopeDescription)+
-			"&state="+deferralStateEscaped,
+			"&state="+deferralStateEscaped+issParam(t),
 		location)
 }
 
@@ -128,7 +133,7 @@ func TestAuthorize_Deferred_FragmentMode_DeliversAfterLogin(t *testing.T) {
 	assert.Equal(t,
 		deferralRedirectURI+"#error=invalid_scope"+
 			"&error_description="+url.QueryEscape(invalidScopeDescription)+
-			"&state="+deferralStateEscaped,
+			"&state="+deferralStateEscaped+issParam(t),
 		location)
 }
 
@@ -157,7 +162,7 @@ func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 	assert.Equal(t,
 		deferralRedirectURI+"?error=invalid_request"+
 			"&error_description="+url.QueryEscape("The max_age parameter must be a non-negative integer.")+
-			"&state="+deferralStateEscaped,
+			"&state="+deferralStateEscaped+issParam(t),
 		resp.Header.Get("Location"))
 }
 
@@ -312,6 +317,57 @@ func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 	assertRedirect(t, second, "/auth/level1")
 }
 
+// A client whose authorization code flow is off is refused at its redirect URI, not on the page: RFC
+// 6749 4.1.2.1 keeps the page for a missing or invalid client identifier or redirect URI, and this
+// client exists, is enabled and has the URI registered (#573). The refusal reaches a browser that
+// already holds a session at once, the same delivery every other redirect answer gets.
+func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAtOnce(t *testing.T) {
+	client, _, _ := newCodeFlowDisabledClient(t)
+	httpClient := createAuthenticatedHttpClient(t)
+
+	resp, err := httpClient.Get(codeFlowDisabledAuthorizeURL(client.ClientIdentifier))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t,
+		deferralRedirectURI+"?error=unauthorized_client"+
+			"&error_description="+url.QueryEscape(codeFlowDisabledDescription)+
+			"&state="+deferralStateEscaped+issParam(t),
+		resp.Header.Get("Location"))
+}
+
+// The same refusal, delivered to a browser that arrived with no session only after the password:
+// RFC 9700 4.11.2 authenticates the visitor first, and /auth/level1completed answers the client
+// after them, carrying the state through the cookie in between.
+func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAfterThePassword(t *testing.T) {
+	client, user, password := newCodeFlowDisabledClient(t)
+
+	resp := driveDeferral(t, createHttpClient(t),
+		codeFlowDisabledAuthorizeURL(client.ClientIdentifier), user, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t,
+		deferralRedirectURI+"?error=unauthorized_client"+
+			"&error_description="+url.QueryEscape(codeFlowDisabledDescription)+
+			"&state="+deferralStateEscaped+issParam(t),
+		resp.Header.Get("Location"))
+}
+
+// codeFlowDisabledAuthorizeURL builds a code request that fails only the code flow's enablement:
+// the response type, the challenge, the method and the scope are all valid, and the URI is the
+// one registered on the client.
+func codeFlowDisabledAuthorizeURL(clientIdentifier string) string {
+	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + fake.LetterN(43) +
+		"&state=" + url.QueryEscape(deferralState) +
+		"&scope=openid"
+}
+
 // deferralAuthorizeURL builds an authorization request that fails ValidateScopes and nothing else:
 // the response type, the challenge and the challenge method are all valid, so the first four
 // validations pass and the scope is what the client is answered about. responseMode is omitted from
@@ -416,6 +472,19 @@ func newDeferralClient(t *testing.T) (*record.Client, *record.User, string) {
 	}
 	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
+
+	return client, user, password
+}
+
+// newCodeFlowDisabledClient is newDeferralClient's client with the authorization code flow turned
+// off afterwards, as an administrator turns it off on the client's OAuth2 flows tab: the client and
+// its registered redirect URI stay, so a code request against it passes the page checks (#573).
+func newCodeFlowDisabledClient(t *testing.T) (*record.Client, *record.User, string) {
+	t.Helper()
+
+	client, user, password := newDeferralClient(t)
+	client.AuthorizationCodeEnabled = false
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	return client, user, password
 }

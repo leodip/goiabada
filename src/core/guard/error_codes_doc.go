@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -210,8 +211,8 @@ func readErrorCodeDocRows(path string) (map[string][]string, error) {
 		if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
 			continue
 		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		code, ok := backtickedCode(strings.TrimSpace(cells[0]))
+		cells := docsreader.Row(line)
+		code, ok := backtickedCode(cells[0])
 		if !ok {
 			continue
 		}
@@ -220,7 +221,7 @@ func readErrorCodeDocRows(path string) (map[string][]string, error) {
 				"%s: the row for %q has %d cells rather than 3, so its message cannot be read; an unescaped | in a message is the usual cause",
 				path, code, len(cells))
 		}
-		rows[code] = append(rows[code], strings.TrimSpace(cells[2]))
+		rows[code] = append(rows[code], cells[2])
 	}
 	return rows, nil
 }

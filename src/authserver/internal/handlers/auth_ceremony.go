@@ -209,7 +209,7 @@ func (b *CeremonyBoundary) loadAuthContext(w http.ResponseWriter, r *http.Reques
 		if errors.Is(err, ceremony.ErrNoAuthContext) {
 			var profileUrl = profileURL(b.adminConsoleBaseURL)
 			slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
-			http.Redirect(w, r, profileUrl, http.StatusFound)
+			http.Redirect(w, r, profileUrl, redirectStatus(r))
 		} else {
 			b.pageRenderer.InternalServerError(w, r, err)
 		}
@@ -247,13 +247,28 @@ func ceremonyStepURL(baseURL string, path string, authContext *ceremony.AuthCont
 	return baseURL + path + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyId}}.Encode()
 }
 
-// stepRedirect answers with a 302 to the ceremony's next step, at path under the auth server's base
-// URL and naming the ceremony (ceremonyStepURL). path is always one of the ceremony's own routes, a
-// constant in the step's handler or its authflow operation, never anything the request carries.
+// stepRedirect redirects to the ceremony's next step, at path under the auth server's base URL and
+// naming the ceremony (ceremonyStepURL), with redirectStatus's code. path is always one of the
+// ceremony's own routes, a constant in the step's handler or its authflow operation, never anything
+// the request carries.
 func (b *CeremonyBoundary) stepRedirect(w http.ResponseWriter, r *http.Request, path string,
 	authContext *ceremony.AuthContext) {
 
-	http.Redirect(w, r, ceremonyStepURL(b.baseURL, path, authContext), http.StatusFound)
+	http.Redirect(w, r, ceremonyStepURL(b.baseURL, path, authContext), redirectStatus(r))
+}
+
+// redirectStatus is the code of every redirect the sign-in ceremony sends: 303 when it answers a
+// POST, and 302 when it answers anything else. RFC 9700 section 4.12 says a redirect of a request
+// that "potentially contains the user's credentials" MUST NOT be 307 and SHOULD be 303, which RFC 9110
+// section 15.4.4 has the browser follow with a GET, so the form's body is never sent on. A 302 leaves
+// the method to the browser (section 15.4.3). The password, one-time code and consent submissions,
+// a POST that finds no ceremony, and the declined consent's redirect to the client all answer a POST;
+// a step reached by a GET keeps its 302, which changes nothing for it (#576, decision 6).
+func redirectStatus(r *http.Request) int {
+	if r.Method == http.MethodPost {
+		return http.StatusSeeOther
+	}
+	return http.StatusFound
 }
 
 // requireAuthState is every step's check that the ceremony is on a step the route accepts. When it is

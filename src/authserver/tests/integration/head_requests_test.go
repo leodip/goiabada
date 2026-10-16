@@ -68,6 +68,7 @@ func TestHead_TheReadOnlyResourcesAnswerAsGetDoes(t *testing.T) {
 		"/favicon.ico",
 		"/health",
 		"/.well-known/openid-configuration",
+		"/.well-known/oauth-authorization-server",
 		"/certs",
 		"/client/logo/" + client.ClientIdentifier,
 		"/client/logo/no-such-client-" + fake.LetterN(8),

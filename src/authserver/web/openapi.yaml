@@ -5751,8 +5751,9 @@ components:
           maxItems: 60
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
-            longer than 2048 bytes, or one listed twice is refused with VALIDATION_ERROR before
-            anything is written.
+            longer than 2048 bytes, one listed twice, or a plain http one on a host other than
+            loopback (127.0.0.1, [::1] or localhost) that expectedRedirectURIs does not list is
+            refused with VALIDATION_ERROR before anything is written.
           items:
             type: string
         expectedRedirectURIs:
@@ -5936,6 +5937,15 @@ components:
           type: string
         issuer:
           type: string
+          maxLength: 60
+          description: >-
+            The issuer, at most 60 characters, with no < or >. It must be an https URL with no
+            query, fragment or user info (a trailing ? or # counts as one), or exactly the auth
+            server's base URL (GOIABADA_AUTHSERVER_BASEURL) whatever its scheme, as RFC 8414
+            section 2, RFC 9207 section 2 and OpenID Connect Discovery 1.0 section 3 require.
+            Anything else is refused with 400 VALIDATION_ERROR. The rule applies only when the
+            value differs from the stored issuer, so a stored issuer it refuses can be sent back
+            unchanged while the other general settings are saved.
         selfRegistrationEnabled:
           type: boolean
         selfRegistrationRequiresEmailVerification:

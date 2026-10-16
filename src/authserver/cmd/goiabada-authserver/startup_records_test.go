@@ -121,3 +121,45 @@ func TestLogConfiguration_NamesTheRateLimiterSwitch(t *testing.T) {
 		})
 	}
 }
+
+// A stored issuer the issuer rule refuses goes on being served, in tokens, in discovery and in
+// iss, until the operator changes it, so the start says so once, as a Warn naming the stored value
+// and what to change it to (#576 decision 4). It is not an Error: nothing is broken that was not
+// before, and the auth server runs as it did.
+func TestLogStoredIssuer_AnIssuerTheRuleRefusesIsReportedOnce(t *testing.T) {
+	for _, stored := range []string{"goiabada", "http://auth.example.com", "https://auth.example.com?tenant=a", "https://:443"} {
+		t.Run(stored, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+
+			logStoredIssuer(stored, "https://auth.example.com")
+
+			records := logs.Records()
+			require.Len(t, records, 1)
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Contains(t, records[0].Message, "issuer")
+			assert.Equal(t, stored, records[0].Attrs["issuer"])
+			assert.Equal(t, "https://auth.example.com", records[0].Attrs["auth_server_base_url"])
+			assert.Contains(t, records[0].Attrs["remedy"], "https URL",
+				"the record says what the issuer may be changed to")
+			assert.Contains(t, records[0].Attrs["remedy"], "base URL")
+		})
+	}
+}
+
+// An issuer the rule accepts, an https URL or the base URL in whatever scheme, starts with no
+// record about it, so a deployment that needs no change hears nothing.
+func TestLogStoredIssuer_AnIssuerTheRuleAcceptsIsNotReported(t *testing.T) {
+	for _, c := range []struct{ issuer, baseURL string }{
+		{"https://auth.example.com", "https://auth.example.com"},
+		{"https://id.example.org/tenant-a", "https://auth.example.com"},
+		{"http://localhost:9090", "http://localhost:9090"},
+	} {
+		t.Run(c.issuer, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+
+			logStoredIssuer(c.issuer, c.baseURL)
+
+			assert.Empty(t, logs.Records())
+		})
+	}
+}

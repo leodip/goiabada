@@ -113,7 +113,7 @@ func (fx *reauthFixture) signIn(t *testing.T, browser *http.Client, client *reco
 	resp := loadPage(t, browser, authorizeURL)
 	for range 20 {
 		_ = resp.Body.Close()
-		require.Equal(t, http.StatusFound, resp.StatusCode, "steps so far: %v", steps)
+		require.Equal(t, ceremonyRedirectStatus(resp), resp.StatusCode, "steps so far: %v", steps)
 		location := resp.Header.Get("Location")
 		if strings.HasPrefix(location, redirectURI.URI) {
 			parsed, err := url.Parse(location)

@@ -239,7 +239,7 @@ func (f *manageAccountConsentFixture) assertTheAccountAPIAccepts(t *testing.T, a
 // errorCode and errorDescription in the query, the state echoed, and no code.
 func assertAnswered(t *testing.T, resp *http.Response, errorCode, errorDescription string) {
 	t.Helper()
-	require.Equal(t, http.StatusFound, resp.StatusCode)
+	require.Equal(t, ceremonyRedirectStatus(resp), resp.StatusCode)
 	location := resp.Header.Get("Location")
 	require.True(t, strings.HasPrefix(location, manageAccountRedirectURI+"?"), "answered at the client's callback: %s", location)
 	gotCode, gotDescription, gotState := getErrorFromUrl(t, resp)

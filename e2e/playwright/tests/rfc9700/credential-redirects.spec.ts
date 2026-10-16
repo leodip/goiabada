@@ -86,18 +86,18 @@ test("no POST of the sign-in is redirected with 307 or 308, so no password is se
   }
 });
 
-test("a POST carrying the user's password or one-time code is redirected with 303 (section 4.12 SHOULD)", async ({
+test("every POST of the sign-in, the password, the one-time code and the consent approved or cancelled, is redirected with 303 (section 4.12 SHOULD)", async ({
   page,
   browser,
   clients,
   users,
   request,
 }) => {
-  // #576 item 3: the password and one-time code POSTs answer 302 today. Remove this line once they answer 303.
-  test.fail();
   const user = await users.create({ emailVerified: true });
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
-  // The password reset answers its page itself, redirecting nowhere.
-  const { password, otp } = await signInPostStatuses(page, browser, request, client, user);
-  expect({ password, otp }).toEqual({ password: 303, otp: 303 });
+  // The password reset answers its page itself, redirecting nowhere. The cancelled consent answers the
+  // client itself, with access_denied, and carries no credential; it is a 303 all the same, since one
+  // rule, a POST is answered with 303, is what the docs state.
+  const { password, otp, consentGiven, consentCancelled } = await signInPostStatuses(page, browser, request, client, user);
+  expect({ password, otp, consentGiven, consentCancelled }).toEqual({ password: 303, otp: 303, consentGiven: 303, consentCancelled: 303 });
 });

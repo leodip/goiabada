@@ -705,7 +705,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com/callback?error=access_denied")
 
 		assert.Equal(t, clearedContextCookie, rr.Result().Header.Get("Set-Cookie"),
@@ -759,7 +759,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		// pageRenderer has no InternalServerError expectation, so the mock fails the test if the
 		// handler answers with a bare 500 instead of redirecting the client.
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		location := rr.Result().Header.Get("Location")
 		assert.Contains(t, location, "error=server_error")
 		assert.Contains(t, location, "error_description=Internal+server+error")
@@ -950,7 +950,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
@@ -1083,7 +1083,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
@@ -1163,7 +1163,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		if assert.NotNil(t, persisted) {
@@ -1310,7 +1310,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 
 		location, err := url.Parse(rr.Header().Get("Location"))
 		require.NoError(t, err)
@@ -1393,7 +1393,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		// No InternalServerError expectation, so a bare 500 fails the mock rather than passing
 		// silently the way it would if the client were simply left unanswered.
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		location := rr.Result().Header.Get("Location")
 		assert.Contains(t, location, "error=server_error")
 		assert.Contains(t, location, "error_description=Internal+server+error")
@@ -1599,7 +1599,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "https://example.com/callback?error=access_denied")
 
 		// The description is pinned here and in "A selection the filter empties is refused", and
@@ -1657,7 +1657,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		// No InternalServerError expectation, so a bare 500 fails the mock instead of passing
 		// silently the way it would if the client were simply left unanswered.
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		location := rr.Result().Header.Get("Location")
 		assert.Contains(t, location, "error=server_error")
 		assert.Contains(t, location, "error_description=Internal+server+error")
@@ -2060,7 +2060,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 					handler.ServeHTTP(rr, req)
 
-					assert.Equal(t, http.StatusFound, rr.Code)
+					assert.Equal(t, http.StatusSeeOther, rr.Code)
 					assert.Contains(t, rr.Header().Get("Location"),
 						"https://example.com/callback?error=access_denied")
 				default:
@@ -2097,7 +2097,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 					handler.ServeHTTP(rr, req)
 
-					assert.Equal(t, http.StatusFound, rr.Code)
+					assert.Equal(t, http.StatusSeeOther, rr.Code)
 					assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 					if assert.NotNil(t, persisted) {
@@ -2176,7 +2176,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)

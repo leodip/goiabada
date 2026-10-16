@@ -54,11 +54,13 @@ Fix it in one of these ways:
 - **Call the Admin API** with a client of your own allowed `authserver:manage`: [`PUT /api/v1/admin/clients/{id}/redirect-uris`](/reference/api/admin/operations/updateclientredirecturis/). The admin console's client is an [administrator](/reference/api/administrators/), so a token with only `authserver:manage-clients` is refused.
 - **Start from an empty database,** when the one you have holds nothing worth keeping.
 
+The new addresses follow the [redirect URI rules](/concepts/clients/#redirect-uris), so the new URL must be `https`, or `http` on loopback.
+
 ## How redirect URIs are checked
 
 The checks run in this order, and each failure shows the page:
 
-1. `client_id` is missing, names no client, names a disabled client, or names a client without the authorization code flow.
+1. `client_id` is missing, names no client, or names a disabled client.
 2. `redirect_uri` is missing.
 3. `redirect_uri` isn't absolute: it has no scheme, has a fragment, has a malformed percent-escape, or is `http` or `https` with no host.
 4. `redirect_uri` isn't registered on the client.

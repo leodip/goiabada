@@ -68,7 +68,7 @@ func TestHandleSettingsGeneralPut_KeepsEmailVerificationWhileSelfRegistrationIsO
 			&record.Settings{Id: 1, SelfRegistrationEnabled: true, SelfRegistrationRequiresEmailVerification: !requiresVerification}))
 		rr := httptest.NewRecorder()
 
-		HandleSettingsGeneralPut(database, auditLogger).ServeHTTP(rr, req)
+		HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090").ServeHTTP(rr, req)
 
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 		require.NotNil(t, saved)

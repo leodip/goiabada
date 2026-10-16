@@ -26,4 +26,7 @@ type WellKnownConfig struct {
 	// is always false (#231, #437).
 	RequestParameterSupported    bool `json:"request_parameter_supported"`
 	RequestURIParameterSupported bool `json:"request_uri_parameter_supported"`
+	// RFC 9207 section 3. Written true, never omitted: every authorization response carries iss,
+	// and a client reads an absent flag as false and then ignores the iss it receives (#576).
+	AuthorizationResponseIssParameterSupported bool `json:"authorization_response_iss_parameter_supported"`
 }

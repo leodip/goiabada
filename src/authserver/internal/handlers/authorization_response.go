@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -26,7 +27,11 @@ type responseParam struct{ name, value string }
 // refusal. One registering "?state=fixed" and sending no state of its own would be handed a
 // state on the code redirect that it never sent and cannot have bound to its user agent (#146).
 //
-// The set is these four and not five: RFC 6749 section 4.1.2.1 also defines "error_uri",
+// iss is among them because every authorization response writes it (RFC 9207 section 2), so a
+// registered "iss" is always replaced and reserving it changes nothing a client sees; it is listed
+// so that the set names what this server emits (#576).
+//
+// The set is these five and not six: RFC 6749 section 4.1.2.1 also defines "error_uri",
 // but this server never emits it, so reserving it would only delete a registered field no
 // response of ours can collide with. Adding a name here is therefore a decision about what
 // this server emits, not a tidy-up, and it takes a field away from every client that
@@ -42,7 +47,7 @@ type responseParam struct{ name, value string }
 // The end_session_endpoint deliberately reserves nothing, so buildPostLogoutRedirect passes
 // nil and a registered post-logout "?state=fixed" survives. See its comment: the two
 // endpoints differ because their specifications do.
-var authorizationResponseParamNames = []string{"code", "state", "error", "error_description"}
+var authorizationResponseParamNames = []string{"code", "state", "error", "error_description", "iss"}
 
 // encodeResponseParams renders params as an "application/x-www-form-urlencoded" field
 // list, in the order given, and returns "" for an empty slice.
@@ -189,18 +194,32 @@ func isResponseParamName(name string, params []responseParam) bool {
 // tokens and the error emitter all answer through it, so the three encodings are written once each
 // (#437).
 //
+// It appends iss after the caller's params, which end with state when there is one, in the order of
+// RFC 9207 section 2.1's example. iss is the issuer setting as read for this request, the value
+// discovery's issuer and every token's iss carry, so the three a client compares under RFC 9207
+// section 2.4 are one. Appending it here, the one place every encoding and every outcome passes,
+// is what makes "every authorization response carries iss" hold, as discovery advertises it does.
+// A request without its settings has no issuer to send: it is an error, and nothing is written,
+// since a response without iss is one section 2.4 has the client reject (#576, decision 2).
+//
 // Deciding whether a response may be emitted at all is the caller's: each runs
 // checkRedirectURIEmittable, and the error emitter RedirectWillBeEmitted's provenance and
 // registration gates, above this call.
-func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, templateFS fs.FS,
+func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, formPostFS fs.FS,
 	responseMode string, redirectURI string, params []responseParam) error {
+
+	settings, ok := reqctx.SettingsFrom(r.Context())
+	if !ok {
+		return errs.Wrap(reqctx.ErrNoSettings, "unable to read the issuer for the authorization response")
+	}
+	params = append(slices.Clip(params), responseParam{"iss", settings.Issuer})
 
 	switch responseMode {
 	case "fragment":
 		writeFragmentRedirect(w, r, redirectURI, params)
 		return nil
 	case "form_post":
-		return writeFormPost(w, templateFS, redirectURI, params)
+		return writeFormPost(w, formPostFS, redirectURI, params)
 	default:
 		return writeQueryRedirect(w, r, redirectURI, params)
 	}
@@ -237,7 +256,9 @@ func implicitResponseMode(requested string) string {
 	return "fragment"
 }
 
-// writeFragmentRedirect redirects to redirectURI with params as its fragment.
+// writeFragmentRedirect redirects to redirectURI with params as its fragment, with redirectStatus's
+// code: 303 for the declined consent, which answers a POST, and 302 at /auth/issue and
+// /auth/authorize.
 //
 // Appended rather than written through writeResponseParams: the redirect URI cannot carry a
 // fragment of its own (RFC 6749 3.1.2 forbids it and checkRedirectURIEmittable refuses one above
@@ -245,10 +266,11 @@ func implicitResponseMode(requested string) string {
 // registered one, is left exactly as it stands.
 func writeFragmentRedirect(w http.ResponseWriter, r *http.Request, redirectURI string, params []responseParam) {
 	noStoreAuthorizationResponse(w)
-	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
+	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), redirectStatus(r))
 }
 
-// writeQueryRedirect redirects to redirectURI with params in its query component.
+// writeQueryRedirect redirects to redirectURI with params in its query component, with
+// redirectStatus's code, as writeFragmentRedirect does.
 //
 // writeResponseParams, not Query() then Encode(): seeding url.Values from the registered query and
 // adding on top would emit two state parameters to a client that registered "?state=fixed", and
@@ -268,26 +290,30 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	}
 
 	noStoreAuthorizationResponse(w)
-	http.Redirect(w, r, location, http.StatusFound)
+	http.Redirect(w, r, location, redirectStatus(r))
 	return nil
 }
 
 // writeFormPost answers with form_post.html, an auto-submitting form posting params to redirectURI.
 //
+// formPostFS is the built-in template set in every server (NewClientErrorResponder), never
+// GOIABADA_AUTHSERVER_TEMPLATEDIR: the page is how an authorization response is encoded on the wire,
+// as the query string is for the query encoding, and a copy taken from an older release would drop
+// a parameter, iss among them, that discovery says every response carries (#576, decision 5).
+//
 // The bind map holds redirectURI and exactly the parameters in params, so a parameter the caller
 // left out, an empty state above all, is absent rather than present and empty. {{.state}} and
 // {{if .state}} cannot tell the two apart, but a template that enumerates the map can: range yields
-// the key only when it is present, and len counts it. form_post.html is operator supplied whenever
-// GOIABADA_AUTHSERVER_TEMPLATEDIR is set, so that is a real reader, and
-// TestFormPostBindMapOmitsAnAbsentState pins it through both emitters (#146).
-func writeFormPost(w http.ResponseWriter, templateFS fs.FS, redirectURI string, params []responseParam) error {
+// the key only when it is present, and len counts it. TestFormPostBindMapOmitsAnAbsentState pins it
+// through both emitters (#146).
+func writeFormPost(w http.ResponseWriter, formPostFS fs.FS, redirectURI string, params []responseParam) error {
 	m := make(map[string]interface{}, 1+len(params))
 	m["redirectURI"] = redirectURI
 	for _, param := range params {
 		m[param.name] = param.value
 	}
 
-	t, err := template.ParseFS(templateFS, "form_post.html")
+	t, err := template.ParseFS(formPostFS, "form_post.html")
 	if err != nil {
 		return errs.Wrap(err, "unable to parse template")
 	}

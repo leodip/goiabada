@@ -25,9 +25,11 @@ var testSessionLimits = usersession.SessionLimits{
 }
 
 // withSessionSettings puts settings carrying the three values above on the request, where
-// middleware.Settings puts them in production.
+// middleware.Settings puts them in production, with testResponseIssuer as the issuer every
+// authorization response carries.
 func withSessionSettings(r *http.Request) *http.Request {
 	return withSettings(r, &record.Settings{
+		Issuer:                          testResponseIssuer,
 		UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,
 		UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds,
 		MaxUserSessionsPerUser:          testMaxUserSessionsPerUser,

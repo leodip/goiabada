@@ -232,7 +232,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Assertions
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", rr.Header().Get("Location"))
 
 		// Verify that all expected actions were performed
 		pageRenderer.AssertExpectations(t)
@@ -2491,7 +2491,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "   ", tokenResponse)
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=+++",
+		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=+++&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -2513,7 +2513,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback", "a b+c/d=e#f&g=h", tokenResponse)
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+		assert.Equal(t, "https://example.com/callback#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -2535,7 +2535,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		err := issueImplicitTokens(w, r, nil, "", "https://example.com/callback?state=fixed&lang=en", "client-csrf-token", tokenResponse)
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#access_token=access-token-123&token_type=Bearer&expires_in=3600&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -2899,7 +2899,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
-		assert.Equal(t, "https://example.com/callback?code=test_code&state=test_state", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=test_state&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 
 	t.Run("Fragment response mode", func(t *testing.T) {
@@ -2916,7 +2916,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
-		assert.Equal(t, "https://example.com/callback#code=test_code&state=test_state", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback#code=test_code&state=test_state&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 
 	t.Run("Form post response mode", func(t *testing.T) {
@@ -2959,7 +2959,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
-		assert.Equal(t, "https://example.com/callback?code=test_code&state=test_state", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=test_state&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 
 	t.Run("Error parsing template", func(t *testing.T) {
@@ -3081,7 +3081,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusFound, w.Code)
-		assert.Equal(t, "http://127.0.0.1/cb?a=1&code=test_code&state=test_state", w.Header().Get("Location"))
+		assert.Equal(t, "http://127.0.0.1/cb?a=1&code=test_code&state=test_state&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 }
 
@@ -3113,7 +3113,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		require.NoError(t, err)
 		// Whole-string, not url.Values: parsing is the step that hid the duplicate, since Get
 		// answers with the first of the two and reports nothing wrong.
-		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3134,7 +3134,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		// than one place could register a "code" of its own, and two of them would leave which
 		// authorization code gets redeemed to the parser. RFC 6749 section 3.1 forbids the shape
 		// outright: "Request and response parameters MUST NOT be included more than once."
-		assert.Equal(t, "https://example.com/callback?code=test_code&state=abc123",
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=abc123&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3154,7 +3154,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		// The retention half of the fix, which has nothing to do with state. url.Query discards
 		// ParseQuery's error, so this field used to be deleted outright and the client was sent to
 		// a URI it had not registered.
-		assert.Equal(t, "https://example.com/callback?lang=en;mode=dark&code=test_code&state=abc123",
+		assert.Equal(t, "https://example.com/callback?lang=en;mode=dark&code=test_code&state=abc123&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3174,7 +3174,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		// The two branches construct differently and that difference is observable here: the
 		// registered "state=fixed" in the query is NOT replaced, because the response parameters
 		// are going into the fragment and the query is not the field list being written.
-		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#code=test_code&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?state=fixed&lang=en#code=test_code&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3197,7 +3197,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		// This is the redirect carrying the authorization code, so a state on it is what an RP's
 		// RFC 9700 2.1 CSRF check compares against. A client that sent none must read none back
 		// rather than a value it never bound to the user agent.
-		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code",
+		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3217,7 +3217,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 		// Otherwise the callback says success and failure at once, and an RP that checks for
 		// "error" before reading "code", which is the usual order, treats the authorization the
 		// user just granted as a refusal.
-		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token",
+		assert.Equal(t, "https://example.com/callback?lang=en&code=test_code&state=client-csrf-token&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 }
@@ -3241,7 +3241,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		err := issueAuthCode(w, r, nil, code, "query")
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?code=test_code", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test_code&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 
 	t.Run("an empty state is omitted in fragment mode", func(t *testing.T) {
@@ -3253,7 +3253,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#code=test_code", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback#code=test_code&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 
 	t.Run("a whitespace-only state is echoed exactly in query mode", func(t *testing.T) {
@@ -3265,7 +3265,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		err := issueAuthCode(w, r, nil, code, "query")
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?code=test_code&state=+++", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=+++&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 
 	t.Run("a whitespace-only state is echoed exactly in fragment mode", func(t *testing.T) {
@@ -3277,7 +3277,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#code=test_code&state=+++", w.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback#code=test_code&state=+++&iss=https%3A%2F%2Fissuer.example", w.Header().Get("Location"))
 	})
 }
 
@@ -3298,7 +3298,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		err := issueAuthCode(w, r, nil, code, "query")
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback?code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+		assert.Equal(t, "https://example.com/callback?code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3311,7 +3311,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 		err := issueAuthCode(w, r, nil, code, "fragment")
 
 		require.NoError(t, err)
-		assert.Equal(t, "https://example.com/callback#code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh",
+		assert.Equal(t, "https://example.com/callback#code=test_code&state=a+b%2Bc%2Fd%3De%23f%26g%3Dh&iss=https%3A%2F%2Fissuer.example",
 			w.Header().Get("Location"))
 	})
 
@@ -3388,8 +3388,8 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 // response is committed changes nothing, so the client was told 200 for a page that was never
 // finished: here, a form carrying an authorization code with no submit to deliver it.
 //
-// form_post.html is operator supplied whenever GOIABADA_AUTHSERVER_TEMPLATEDIR is set, which is
-// what makes a mid-render failure reachable in a real deployment rather than only under a stub.
+// form_post.html is always the built-in page (#576), so a mid-render failure would take a change to
+// that page; the buffer is pinned so that such a change fails here rather than on the wire.
 func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
@@ -3431,8 +3431,8 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 // both emitters (#146).
 //
 // Why it is worth pinning rather than deleting the guards: what reaches the template is this
-// server's statement about whether the response has a state, and an operator-supplied template is
-// free to read it any way it likes, including the two ways above. A guard removed as "dead" would
+// server's statement about whether the response has a state, and a template is free to read it any
+// way it likes, including the two ways above. A guard removed as "dead" would
 // send state="" to every such template for a request that carried no state at all.
 func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 	// Renders the bind map's key set rather than any one value, which is the whole point: it is the
@@ -3445,9 +3445,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 			state string
 			want  string
 		}{
-			{name: "a state the client sent", state: "abc123", want: `[code][redirectURI][state]`},
-			{name: "a whitespace-only state", state: "   ", want: `[code][redirectURI][state]`},
-			{name: "no state at all", state: "", want: `[code][redirectURI]`},
+			{name: "a state the client sent", state: "abc123", want: `[code][iss][redirectURI][state]`},
+			{name: "a whitespace-only state", state: "   ", want: `[code][iss][redirectURI][state]`},
+			{name: "no state at all", state: "", want: `[code][iss][redirectURI]`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
@@ -3473,9 +3473,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 			state string
 			want  string
 		}{
-			{name: "a state the client sent", state: "abc123", want: `[error][error_description][redirectURI][state]`},
-			{name: "a whitespace-only state", state: "   ", want: `[error][error_description][redirectURI][state]`},
-			{name: "no state at all", state: "", want: `[error][error_description][redirectURI]`},
+			{name: "a state the client sent", state: "abc123", want: `[error][error_description][iss][redirectURI][state]`},
+			{name: "a whitespace-only state", state: "   ", want: `[error][error_description][iss][redirectURI][state]`},
+			{name: "no state at all", state: "", want: `[error][error_description][iss][redirectURI]`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
@@ -3661,7 +3661,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Assertions - code should be issued successfully
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", rr.Header().Get("Location"))
 
 		// Verify all expectations
 		pageRenderer.AssertExpectations(t)
@@ -4086,7 +4086,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Assertions - code should be issued successfully
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
+		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", rr.Header().Get("Location"))
 
 		// Verify all other expectations
 		pageRenderer.AssertExpectations(t)
@@ -5239,7 +5239,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 // The code arm writes its form_post through the template FS the route table gave the client-error
 // responder, the one the error responses of the same ceremony are written through, so a code and an
-// error to the same client render the same operator-supplied form_post.html.
+// error to the same client render the same form_post.html.
 func TestHandleIssueGet_ACodeInFormPostRendersFromTheRespondersTemplates(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)

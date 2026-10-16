@@ -38,10 +38,10 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
    ```http
    HTTP/1.1 302 Found
-   Location: https://app.example.com/callback#access_token=eyJhbGciOiJSUzI1NiIs...&token_type=Bearer&expires_in=300&id_token=eyJhbGciOiJSUzI1NiIs...&scope=openid+email&state=af0ifjsldkj
+   Location: https://app.example.com/callback#access_token=eyJhbGciOiJSUzI1NiIs...&token_type=Bearer&expires_in=300&id_token=eyJhbGciOiJSUzI1NiIs...&scope=openid+email&state=af0ifjsldkj&iss=https%3A%2F%2Fauth.example.com
    ```
 
-6. Check that `state` is the one you kept. Check the ID token as [a web app does](/guides/add-sign-in-to-a-web-app/#what-the-id-token-says), `nonce` included, and check its `at_hash` against the access token. Then replace the address in the browser's history with one that has no `#` part, so the tokens don't stay there.
+6. Check that `state` is the one you kept, and that `iss` is the auth server's issuer. Check the ID token as [a web app does](/guides/add-sign-in-to-a-web-app/#what-the-id-token-says), `nonce` included, and check its `at_hash` against the access token. Then replace the address in the browser's history with one that has no `#` part, so the tokens don't stay there.
 
 </Steps>
 
@@ -71,10 +71,11 @@ The browser comes back to your redirect URI with these parameters after the `#`:
 | `id_token` | `response_type` has `id_token` |
 | `scope` | The scopes granted, which can be fewer than your app asked for |
 | `state` | When your app sent one, unchanged |
+| `iss` | Always: the auth server's issuer, as the [discovery document](/reference/endpoints/discovery-and-jwks/) names it |
 
 There's **never a refresh token**: [RFC 6749 section 4.2.2](https://www.rfc-editor.org/rfc/rfc6749.html#section-4.2.2) forbids one, so `offline_access` is dropped from the scope, as [OpenID Connect Core 1.0 section 11](https://openid.net/specs/openid-connect-core-1_0.html#OfflineAccess) asks. When the access token expires, send the browser back to the auth server. A user whose [session](/concepts/sessions/) is still valid isn't asked for their password again.
 
-With `response_mode=form_post`, the same parameters are posted to your redirect URI by a page that sends a form on its own. `response_mode=query` is refused with `invalid_request`, since tokens never travel in the query. Errors come back the same way as tokens, after the `#` or posted: `error`, `error_description`, and `state` when your app sent one.
+With `response_mode=form_post`, the same parameters are posted to your redirect URI by a page that sends a form on its own. `response_mode=query` is refused with `invalid_request`, since tokens never travel in the query. Errors come back the same way as tokens, after the `#` or posted: `error`, `error_description`, `state` when your app sent one, and `iss`.
 
 ## What the auth server checks
 

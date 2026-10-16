@@ -9,8 +9,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientIdIsMissing(t *testing.T) {
@@ -89,7 +92,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", errorMsg)
 }
 
-func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthorizationCodeFlow(t *testing.T) {
+// #573 item 3 turned this refusal around: a client whose code flow is off is no longer answered
+// on the page but at its redirect URI, so the request that reaches the page answers only the
+// missing redirect_uri, and the code-flow message is gone from the page entirely. The delivery
+// to the client is pinned beside the other deferrals, in authorize_deferred_error_test.go.
+func TestAuthorize_ValidateClientAndRedirectURI_TheCodeFlowIsNoLongerAPageAnswer(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -119,7 +126,9 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthoriza
 	}
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", errorMsg)
+	assert.Equal(t, "The redirect_uri parameter is missing.", errorMsg)
+	assert.NotContains(t, errorMsg, "authorization code flow",
+		"the code flow refusal must not be rendered on the page anymore (#573)")
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.T) {
@@ -287,4 +296,76 @@ func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *t
 	errorMsg := doc.Find("p#errorMsg").Text()
 	assert.Equal(t, "Parâmetro client_id inválido. O cliente não existe.", errorMsg,
 		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
+}
+
+// TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode pins the
+// other half of the RFC 9700 section 2.6 fix: the http rule is a save gate, not an authorize
+// gate. A redirect URI stored before the rule keeps working, which is what keeps an upgrade
+// from locking out an integration that already runs over plain http - including, in the worst
+// case, the admin console's own client, whose redirect URIs bootstrap seeds from
+// GOIABADA_ADMINCONSOLE_BASEURL. So the whole ceremony runs and the code arrives at the stored
+// URI: a refusal page, an error page or a deferred error would each stop it short of /auth/issue
+// (#575).
+func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPStillReceivesTheCode(t *testing.T) {
+	client := &record.Client{
+		ClientIdentifier:         "test-client-" + fake.LetterN(8),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		DefaultAcrLevel:          record.AcrLevel1,
+	}
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
+	stored := "http://app.example.com/callback"
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored}))
+
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
+
+	requestState := fake.LetterN(8)
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(stored) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
+		"&scope=openid" +
+		"&state=" + requestState +
+		"&nonce=" + fake.LetterN(8)
+
+	httpClient := createHttpClient(t)
+	resp, err := httpClient.Get(destUrl)
+	require.NoError(t, err)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	redirectLocation := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	redirectLocation = assertRedirect(t, resp, "/auth/issue")
+	resp = loadPage(t, httpClient, redirectLocation)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	location, err := url.Parse(resp.Header.Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, stored, location.Scheme+"://"+location.Host+location.Path,
+		"the code goes to the stored http redirect URI; the rule is a save gate only")
+	_, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, requestState, stateVal)
 }

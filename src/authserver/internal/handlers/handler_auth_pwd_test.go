@@ -1068,7 +1068,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Equal(t, http.StatusSeeOther, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
@@ -1320,7 +1320,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// (#564).
 		for i := 0; i < tightBudget*4; i++ {
 			authContext.AuthState = ceremony.AuthStateLevel1Password
-			assert.Equal(t, http.StatusFound, post(handler, password),
+			assert.Equal(t, http.StatusSeeOther, post(handler, password),
 				"sign-in %d should succeed", i+1)
 		}
 	})

@@ -1641,7 +1641,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	resp = postConsent(t, httpClient, consentUrl, resp, []int{}) // Cancel consent
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	redirectLocationUrl, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -1772,7 +1772,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	redirectLocationUrl, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -1911,7 +1911,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	redirectLocationUrl, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -2042,7 +2042,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	redirectLocationUrl, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
@@ -2181,7 +2181,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = postConsent(t, httpClient, redirectLocation, resp, []int{}) // Cancel consent
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
 	redirectLocationUrl, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {

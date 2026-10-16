@@ -116,6 +116,8 @@ To change the layout of a page, or an email's body, you give a server its own co
 A directory replaces the built-in set **whole**, so it must hold every file of that set, not only the ones you change. When you upgrade Goiabada, copy the new release's files again and redo your changes on them.
 </Aside>
 
+One auth server template is never read from the directory: `form_post.html`, the page that posts an authorization response to a client's redirect URI when the client asks for `response_mode=form_post`. It's how the response travels, not a page anyone reads, since it sends itself at once, so the auth server always uses its own. You don't need to copy it, and a copy in the directory is ignored.
+
 ## Regenerate the CSS
 
 The pages are styled with [Tailwind CSS](https://tailwindcss.com/), and `main.css` holds only the classes the templates used when it was generated. A class you add to a template does nothing until you regenerate it.
@@ -163,7 +165,7 @@ The names of countries and phone country codes, and the country in each time zon
 
 ## Email bodies
 
-An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). The auth server uses it for a recipient whose language is exactly that tag, `es` here, and the English template for everyone else.
+An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `es` serves a recipient reading `es-MX`, and `pt-BR` one reading `pt`. With copies for two regions, the closer one can win over the plain language, so `es-419` beats `es` for `es-MX`. A recipient with no copy in their language gets the English template.
 
 ## Templates and static files
 

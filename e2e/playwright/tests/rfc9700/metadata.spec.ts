@@ -1,7 +1,8 @@
 // RFC 9700 section 2.6: authorization servers are RECOMMENDED to publish OAuth Authorization Server
 // Metadata (RFC 8414), so that clients configure themselves from it rather than by hand, which is
 // where misconfigured endpoints and missing security features come from. Goiabada publishes OpenID
-// Connect Discovery's document; these check that it is right, and look for RFC 8414's. Dynamic
+// Connect Discovery's document at both its address and RFC 8414's; these check that it is right and
+// that the two addresses serve it alike. Dynamic
 // registration choosing no client_id (4.15.1) is in client-registration.system.ts. Asymmetric client
 // authentication (2.5) is not implemented, and not tested.
 import type { APIRequestContext } from "@playwright/test";
@@ -19,15 +20,26 @@ async function discovery(request: APIRequestContext) {
 }
 
 test("the RFC 8414 metadata is published at /.well-known/oauth-authorization-server (section 2.6 RECOMMENDED)", async ({ request }) => {
-  // #576 item 1: not published today. Remove this line once it is.
-  test.fail();
+  const address = `${env.authUrl}/.well-known/oauth-authorization-server`;
   const oidc = await discovery(request);
-  const response = await request.get(`${env.authUrl}/.well-known/oauth-authorization-server`, { failOnStatusCode: false });
+  const response = await request.get(address, { failOnStatusCode: false });
   expect(response.status()).toBe(200);
-  const metadata = await response.json();
-  for (const field of ["issuer", "authorization_endpoint", "token_endpoint", "jwks_uri", "code_challenge_methods_supported", "response_types_supported"]) {
-    expect(metadata[field], field).toEqual(oidc[field]);
-  }
+  // The whole document is the OpenID Connect one, so the two addresses cannot disagree.
+  expect(await response.json()).toEqual(oidc);
+
+  await test.step("HEAD answers as GET does", async () => {
+    const head = await request.head(address, { failOnStatusCode: false });
+    expect(head.status()).toBe(200);
+    expect(head.headers()["content-type"]).toBe(response.headers()["content-type"]);
+  });
+
+  await test.step("a script on another origin may read it", async () => {
+    // A browser-based client, an MCP client among them, fetches the metadata cross-origin.
+    const origin = "https://metadata-reader.example";
+    const crossOrigin = await request.get(address, { headers: { Origin: origin }, failOnStatusCode: false });
+    expect(crossOrigin.status()).toBe(200);
+    expect(crossOrigin.headers()["access-control-allow-origin"]).toBe(origin);
+  });
 });
 
 test("the discovery document matches the server: its issuer, its endpoints, and the response modes it lists (section 2.6)", async ({
