@@ -555,7 +555,6 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `CheckOwnership` | kernel | — |
 | `core/internal/refgraph` | `DocRow` | own-package | — |
 | `core/internal/refgraph` | `ExemptByBuildConstraint` | kernel | — |
-| `core/internal/refgraph` | `FindSourceRoot` | kernel | — |
 | `core/internal/refgraph` | `Flatten` | kernel | — |
 | `core/internal/refgraph` | `ImportGraph` | kernel | — |
 | `core/internal/refgraph` | `JustificationBothApps` | kernel | — |
@@ -641,6 +640,8 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
+| `core/sourceroot` | `FindSourceRoot` | kernel | — |
+| `core/sourceroot` | `ModuleDirs` | kernel | — |
 | `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
 | `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
 | `core/timezones` | `Zone` | contract | The row type both halves of the table share. |

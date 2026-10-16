@@ -117,6 +117,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/phonecountries` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
+| `core/sourceroot` | kernel | — |
 | `core/timezones` | kernel | — |
 
 Notes on rows that are not self-evident:
@@ -131,9 +132,15 @@ Notes on rows that are not self-evident:
 - `core/internal` is kernel because it holds `refgraph`, the reference-graph reader behind the
   tree-wide guards and `ownershipdump`: the census left `core/testutil`, now `core/guard`, so that
   the tool stops linking `testing` and testify, and Go's internal rule keeps it from anything
-  outside core (#431). The four module directories the graph resolves against are declared there
-  once (#442).
+  outside core (#431). The four module directories the graph resolves against are declared once,
+  in `core/sourceroot` since #480: Go's internal rule kept them, while they lived here, from the
+  one consumer outside core (#442).
   It also holds `pinnedfetch`, the pinned download the reference-data generators share (#432).
+- `core/sourceroot` is kernel because it is the one declaration of the four module directories and
+  of the ascent that finds the root from them. The tree-wide guards read it through
+  `guard.SourceRoot`, `ownershipdump` and the auth server's `schemadump` root their walks with it,
+  and it is an exported leaf rather than part of `refgraph` because Go's internal rule kept the
+  auth server from reading it there (#480).
 - `core/guard` is kernel because it is test support compiled into no binary, and it holds the
   tree-wide guards and nothing else: it was `core/testutil` until #442, when its one helper that was
   no guard, `SkipWithoutIPv6Loopback`, left for `core/hostport/hostporttest`. It is still held to

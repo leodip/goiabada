@@ -1,4 +1,4 @@
-package refgraph
+package sourceroot
 
 import (
 	"os"
