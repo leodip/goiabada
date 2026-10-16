@@ -115,6 +115,43 @@ func Walk(c *http.Client, urls []string) {
 }
 `
 
+// forLoopSource is loopSource's counted retry loop: the assignment on line 9 is the for
+// statement's body, and its next iteration runs it after the defer on line 13.
+const forLoopSource = `package forloop
+
+import "net/http"
+
+func Walk(c *http.Client, url string, limit int) {
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < limit; attempt++ {
+		resp, err = c.Get(url)
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+	}
+}
+`
+
+// cleanupLocalSource declares its response inside the deferred literal, which closes the one
+// response it made and captures nothing: the declaration on line 7 is the literal's own, not a
+// reassignment of a variable it closes over.
+const cleanupLocalSource = `package cleanuplocal
+
+import "net/http"
+
+func Walk(c *http.Client, url string) {
+	defer func() {
+		resp, err := c.Get(url)
+		if err != nil {
+			return
+		}
+		_ = resp.Body.Close()
+	}()
+}
+`
+
 // loopDefineSource is the clean twin of loopSource: the `:=` inside the body declares a new
 // variable on each iteration, so each closure reads its own.
 const loopDefineSource = `package loopdefine
@@ -226,6 +263,8 @@ func staleCloseTree(t *testing.T) string {
 	writeGoFile(t, root, "integration/direct_test.go", directSource)
 	writeGoFile(t, root, "integration/shadow_test.go", shadowSource)
 	writeGoFile(t, root, "integration/loop_test.go", loopSource)
+	writeGoFile(t, root, "integration/for_loop_test.go", forLoopSource)
+	writeGoFile(t, root, "integration/cleanup_local_test.go", cleanupLocalSource)
 	writeGoFile(t, root, "integration/loop_define_test.go", loopDefineSource)
 	writeGoFile(t, root, "integration/range_assign_test.go", rangeAssignSource)
 	writeGoFile(t, root, "integration/closure_test.go", closureSource)
@@ -245,21 +284,23 @@ func TestStaleClose_TheRuleTable(t *testing.T) {
 	stale, files, err := findStaleDeferredBodyCloses(root)
 	require.NoError(t, err)
 
-	assert.Equal(t, 10, files, "the ten parseable fixtures, and not the broken one")
+	assert.Equal(t, 12, files, "the twelve parseable fixtures, and not the broken one")
 	assert.Equal(t, []staleClose{
 		{file: "integration/closure_test.go", line: 14, variable: "resp", reassignedAt: 16},
 		{file: "integration/closure_unit_test.go", line: 15, variable: "resp", reassignedAt: 16},
+		{file: "integration/for_loop_test.go", line: 13, variable: "resp", reassignedAt: 9},
 		{file: "integration/loop_test.go", line: 13, variable: "resp", reassignedAt: 9},
 		{file: "integration/range_assign_test.go", line: 10, variable: "resp", reassignedAt: 11},
 		{file: "integration/stale_chain_test.go", line: 10, variable: "resp", reassignedAt: 11},
 		{file: "integration/stale_chain_test.go", line: 12, variable: "resp", reassignedAt: 13},
 	}, stale, "each stale defer once, and not the defer after the last reassignment, the per-iteration "+
-		"`:=`, or the callback's defer the enclosing function reassigns after")
+		"`:=`, the callback's defer the enclosing function reassigns after, or the cleanup's own response")
 }
 
 // TestStaleClose_ACleanTreeReportsNothing is the other direction, and it is what keeps the case
 // above from passing for the wrong reason: a tree of the fixed, the direct, the shadow, the
-// per-iteration `:=` and the callback-unit shapes reaches files and reports nothing.
+// per-iteration `:=`, the callback-unit and the cleanup-local shapes reaches files and reports
+// nothing.
 func TestStaleClose_ACleanTreeReportsNothing(t *testing.T) {
 	root := t.TempDir()
 	writeGoFile(t, root, "integration/fixed_test.go", fixedSource)
@@ -267,11 +308,12 @@ func TestStaleClose_ACleanTreeReportsNothing(t *testing.T) {
 	writeGoFile(t, root, "integration/shadow_test.go", shadowSource)
 	writeGoFile(t, root, "integration/loop_define_test.go", loopDefineSource)
 	writeGoFile(t, root, "integration/closure_then_outer_test.go", closureThenOuterSource)
+	writeGoFile(t, root, "integration/cleanup_local_test.go", cleanupLocalSource)
 
 	stale, files, err := findStaleDeferredBodyCloses(root)
 	require.NoError(t, err)
 
-	assert.Equal(t, 5, files)
+	assert.Equal(t, 6, files)
 	assert.Empty(t, stale)
 
 	report := Run(func(r Reporter) { assertNoStaleDeferredBodyCloses(r, root) })

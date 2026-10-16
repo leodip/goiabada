@@ -296,19 +296,11 @@ func identIsVar(id *ast.Ident) bool {
 }
 
 // closedBodyVariable returns the response variable a deferred func literal closes over, when its
-// body calls `variable.Body.Close()` on a variable declared outside the literal. A literal
-// that takes the response as its own parameter -- the fixed shape -- closes over its parameter
-// and reports nothing.
+// body calls `variable.Body.Close()` on a variable declared outside the literal. A variable
+// declared within the literal's source range closes over nothing and reports nothing: its own
+// parameter -- the fixed shape -- and a response the literal itself requests, such as a cleanup
+// that makes a call and closes what it got.
 func closedBodyVariable(fl *ast.FuncLit) *ast.Ident {
-	params := map[any]bool{}
-	for _, field := range fl.Type.Params.List {
-		for _, name := range field.Names {
-			if identObject(name) != nil {
-				params[identObject(name)] = true
-			}
-		}
-	}
-
 	var found *ast.Ident
 	ast.Inspect(fl.Body, func(n ast.Node) bool {
 		if found != nil {
@@ -330,7 +322,7 @@ func closedBodyVariable(fl *ast.FuncLit) *ast.Ident {
 		if !ok || identObject(id) == nil {
 			return true
 		}
-		if params[identObject(id)] || !identIsVar(id) {
+		if declared := identObject(id).Pos(); (declared >= fl.Pos() && declared < fl.End()) || !identIsVar(id) {
 			return true
 		}
 		found = id
