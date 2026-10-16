@@ -1490,15 +1490,10 @@ func sortedKeys[V any](m map[string]V) []string {
 // in core/api declares, so those are held to the same standard as the rest rather than skipped.
 // Exact: the schema's array must equal this set, so both a deletion and an addition fail.
 //
-// One is left. The four picture and logo answers were here as map[string]interface{} literals
-// until #441 gave each a type in core/api/pictures.go, whose omitempty tags are now what this
-// test reads.
-var untypedResponseRequired = map[string][]string{
-	// database/sql.NullTime as encoding/json writes it. No tags and no MarshalJSON, so both
-	// exported fields are always present; when Valid is false, Time is the zero instant rather
-	// than absent.
-	"NullTime": {"Time", "Valid"},
-}
+// Empty since #475, which also holds it exact below in the shape schemasWithNoAPIStruct and
+// publishedRequestEnums already hold their exemptions. NullTime was the last entry: f9d27d14
+// deleted its schema from openapi.yaml, and the entry left with this check.
+var untypedResponseRequired = map[string][]string{}
 
 func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
 	doc := specDocument(t)
@@ -1571,6 +1566,22 @@ func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
 					"absent", schema, wire, source)
 			}
 		}
+	}
+
+	// The map is exact, in the shape unrecordedRequestEnums keeps publishedRequestEnums: an
+	// entry that has stopped being a gap fails here rather than sitting on as a stale
+	// allowance. A schema no response reaches, or one a core/api type now pairs with, makes
+	// the entry dead either way, because the loop above consults the map before the pairing.
+	unreached, paired := staleUntypedResponseRequired(untypedResponseRequired, responseOnly,
+		structs, schemaStructNames)
+	for _, schema := range unreached {
+		t.Errorf("untypedResponseRequired holds %s, which no response reaches; delete the entry",
+			schema)
+	}
+	for _, schema := range paired {
+		t.Errorf("untypedResponseRequired holds %s, which a core/api type now pairs with; "+
+			"delete the entry so the omitempty tags this test reads are what holds the schema",
+			schema)
 	}
 }
 
@@ -2160,6 +2171,92 @@ func TestUnrecordedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing
 			map[string]string{"CreateUserRequest.setPasswordType": "why"})
 		if len(unrecorded) != 0 || len(stale) != 0 {
 			t.Errorf("unrecorded = %v, stale = %v, want neither", unrecorded, stale)
+		}
+	})
+}
+
+// staleUntypedResponseRequired is the decision behind that check, as a pure function so its
+// boundary can be driven directly, in the shape unrecordedRequestEnums above already uses. It
+// returns the entries naming a schema no response reaches, and the entries a core/api type now
+// pairs with, directly or through schemaStructNames: either way the hand-written set has
+// stopped being what the test reads, so the entry goes. Both halves come back sorted, because
+// a map range would reorder the failures between runs.
+func staleUntypedResponseRequired(entries map[string][]string, responseOnly map[string]bool,
+	structs map[string]map[string]goField, aliases map[string]string) (unreached, paired []string) {
+
+	for _, schema := range sortedKeys(entries) {
+		if !responseOnly[schema] {
+			unreached = append(unreached, schema)
+			continue
+		}
+		structName, aliased := aliases[schema]
+		if !aliased {
+			structName = schema
+		}
+		if _, pairs := structs[structName]; pairs {
+			paired = append(paired, schema)
+		}
+	}
+	return unreached, paired
+}
+
+// The two failures the decision exists to report, driven at the boundary: an entry naming a
+// schema no response reaches, and an entry a core/api type has come to pair with, directly or
+// through schemaStructNames. Left standing, either one keeps the hand-written set answering for
+// a schema the test no longer reads it for, which is the regression the map exists to prevent.
+// The empty map is what the document holds today, and it passes.
+func TestStaleUntypedResponseRequired_ReportsDeadEntries(t *testing.T) {
+	responseOnly := map[string]bool{"UserResponse": true, "NullTime": true}
+	structs := map[string]map[string]goField{
+		"UserResponse":      {"Subject": {}},
+		"WebOriginResponse": {"Value": {}},
+	}
+	aliases := map[string]string{"WebOrigin": "WebOriginResponse"}
+
+	t.Run("an empty map passes", func(t *testing.T) {
+		unreached, paired := staleUntypedResponseRequired(nil, responseOnly, structs, aliases)
+		if len(unreached) != 0 || len(paired) != 0 {
+			t.Errorf("unreached = %v, paired = %v, want neither", unreached, paired)
+		}
+	})
+
+	t.Run("an entry naming a schema no response reaches is reported", func(t *testing.T) {
+		unreached, paired := staleUntypedResponseRequired(
+			map[string][]string{"Vanished": {"Time"}}, responseOnly, structs, aliases)
+		if len(unreached) != 1 || unreached[0] != "Vanished" {
+			t.Errorf("unreached = %v, want [Vanished]", unreached)
+		}
+		if len(paired) != 0 {
+			t.Errorf("paired = %v, want none: no type pairs with a schema that is not reached", paired)
+		}
+	})
+
+	t.Run("an entry a type of its own name pairs with is reported", func(t *testing.T) {
+		unreached, paired := staleUntypedResponseRequired(
+			map[string][]string{"UserResponse": {"subject"}}, responseOnly, structs, aliases)
+		if len(unreached) != 0 {
+			t.Errorf("unreached = %v, want none: a response reaches the schema", unreached)
+		}
+		if len(paired) != 1 || paired[0] != "UserResponse" {
+			t.Errorf("paired = %v, want [UserResponse]", paired)
+		}
+	})
+
+	t.Run("an entry an aliased type pairs with is reported", func(t *testing.T) {
+		aliasedOnly := map[string]bool{"WebOrigin": true}
+		_, paired := staleUntypedResponseRequired(
+			map[string][]string{"WebOrigin": {"value"}}, aliasedOnly, structs, aliases)
+		if len(paired) != 1 || paired[0] != "WebOrigin" {
+			t.Errorf("paired = %v, want [WebOrigin]: schemaStructNames pairs it with WebOriginResponse",
+				paired)
+		}
+	})
+
+	t.Run("an entry a response reaches and no type pairs with is kept", func(t *testing.T) {
+		unreached, paired := staleUntypedResponseRequired(
+			map[string][]string{"NullTime": {"Time", "Valid"}}, responseOnly, structs, aliases)
+		if len(unreached) != 0 || len(paired) != 0 {
+			t.Errorf("unreached = %v, paired = %v, want neither: the entry is still read", unreached, paired)
 		}
 	})
 }
