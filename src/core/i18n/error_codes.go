@@ -125,6 +125,7 @@ const (
 	ErrCodeResourceIdentifierRequired          = "handler.resource.identifier_required"
 	ErrCodeResourceDescriptionTooLong          = "handler.resource.description_too_long" // Args: {"max": int}
 	ErrCodeResourceIdentifierInUse             = "handler.resource.identifier_in_use"
+	ErrCodeResourceIdentifierNamesClient       = "handler.resource.identifier_names_client"
 	ErrCodeResourceSystemLevelIdentifierFixed  = "handler.resource.system_level_identifier_fixed"
 	ErrCodeResourceSystemLevelDeleteNotAllowed = "handler.resource.system_level_delete_not_allowed"
 
@@ -165,6 +166,7 @@ const (
 	// bound is handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodeClientDisplayNameTooLong            = "handler.client.display_name_too_long" // Args: {"max": int}
 	ErrCodeClientIdentifierInUse               = "handler.client.identifier_in_use"
+	ErrCodeClientIdentifierNamesResource       = "handler.client.identifier_names_resource"
 	ErrCodeClientSystemLevelDeleteNotAllowed   = "handler.client.system_level_delete_not_allowed"
 	ErrCodeClientSystemLevelIdentifierFixed    = "handler.client.system_level_identifier_fixed"
 	ErrCodeClientSelfRegisteredIdentifierFixed = "handler.client.self_registered_identifier_fixed"

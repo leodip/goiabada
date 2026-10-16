@@ -400,3 +400,35 @@ func TestAPIClientCreate_BothDescriptionAndDisplayName(t *testing.T) {
 	assert.Equal(t, "My App", client["displayName"])
 	assert.Equal(t, true, client["showDisplayName"])
 }
+
+// A client identifier may not name a resource either, for the same reason a resource identifier
+// may not name a client: the string would live in both namespaces, making the two token
+// audiences indistinguishable to anything resolving aud through the client table (#151, found
+// during #109). The cleanup looks the row up rather than trusting the refusal, so a red run of
+// this test on a tree that lacks the check leaves no client row in the shared database.
+func TestAPIClientCreate_ClashingWithAResourceIdentifier(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	identifier := "clash-resource-" + strings.ToLower(fake.LetterN(8))
+	existing := createTestResource(t, identifier, "Holds the identifier")
+	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.Id) }()
+	defer func() {
+		if stored, err := database.GetClientByClientIdentifier(context.Background(), nil, identifier); err == nil && stored != nil {
+			_ = database.DeleteClient(context.Background(), nil, stored.Id)
+		}
+	}()
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
+	resp := makeAPIRequest(t, "POST", url, accessToken, api.CreateClientRequest{
+		ClientIdentifier:         identifier,
+		Description:              "Named like the resource",
+		AuthorizationCodeEnabled: true,
+		ClientCredentialsEnabled: false,
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "The client identifier is already in use by a resource.", errResp.ErrorDescription)
+}

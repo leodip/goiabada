@@ -1525,6 +1525,7 @@
 "handler.resource.identifier_required" = "O identificador do recurso é obrigatório"
 "handler.resource.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres"
 "handler.resource.identifier_in_use" = "O identificador do recurso já está em uso"
+"handler.resource.identifier_names_client" = "O identificador do recurso já está em uso por um cliente"
 "handler.resource.system_level_identifier_fixed" = "O identificador de um recurso em nível de sistema não pode ser alterado."
 "handler.resource.system_level_delete_not_allowed" = "Tentativa de excluir um recurso em nível de sistema"
 
@@ -1555,6 +1556,7 @@
 
 "handler.client.display_name_too_long" = "O nome de exibição não pode ter mais que {{.max}} caracteres."
 "handler.client.identifier_in_use" = "O identificador do cliente já está em uso."
+"handler.client.identifier_names_resource" = "O identificador do cliente já está em uso por um recurso."
 "handler.client.system_level_delete_not_allowed" = "Tentativa de excluir um cliente em nível de sistema"
 "handler.client.system_level_identifier_fixed" = "O identificador de um cliente em nível de sistema não pode ser alterado."
 "handler.client.self_registered_identifier_fixed" = "O identificador de um cliente autorregistrado não pode ser alterado."

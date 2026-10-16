@@ -20,11 +20,13 @@ import (
 	"github.com/leodip/goiabada/core/inputvalidation"
 )
 
-// resourcesDatabase is what the resource endpoints need: the resource row.
+// resourcesDatabase is what the resource endpoints need: the resource row, and the client row
+// an identifier may not name (#151).
 type resourcesDatabase interface {
 	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
 	GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
@@ -98,6 +100,20 @@ func HandleResourceCreatePost(
 		}
 		if existing != nil {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// A resource identifier may not name a client either. The two namespaces are separate
+		// tables with separate uniqueness checks, and a string held by both makes an access
+		// token's aud resolvable as a client, which is how a session-bound access token passed
+		// every ID-token-hint check in #109's logout (#151).
+		clashingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, createReq.ResourceIdentifier)
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error checking client by resource identifier"), "resource_identifier", createReq.ResourceIdentifier)
+			return
+		}
+		if clashingClient != nil {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierNamesClient, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
@@ -237,6 +253,22 @@ func HandleResourceUpdatePut(
 		if resource.IsSystemLevelResource() && trimmedResourceIdentifier != resource.ResourceIdentifier {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
+		}
+
+		// A new identifier may not name a client either (#151). The check fires only when the
+		// request actually changes the identifier, so a row that already holds a collision,
+		// from before this check existed, keeps its other edits: renaming either side is a
+		// breaking change for the integrations using it.
+		if trimmedResourceIdentifier != resource.ResourceIdentifier {
+			clashingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, trimmedResourceIdentifier)
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "database error checking client by resource identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.Id)
+				return
+			}
+			if clashingClient != nil {
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierNamesClient, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
 		}
 
 		resource.ResourceIdentifier = trimmedResourceIdentifier

@@ -1613,6 +1613,7 @@
 "handler.resource.identifier_required" = "Resource identifier is required"
 "handler.resource.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters"
 "handler.resource.identifier_in_use" = "The resource identifier is already in use"
+"handler.resource.identifier_names_client" = "The resource identifier is already in use by a client"
 "handler.resource.system_level_identifier_fixed" = "The identifier of a system-level resource cannot be changed."
 "handler.resource.system_level_delete_not_allowed" = "Trying to delete a system level resource"
 
@@ -1643,6 +1644,7 @@
 
 "handler.client.display_name_too_long" = "The display name cannot exceed a maximum length of {{.max}} characters."
 "handler.client.identifier_in_use" = "The client identifier is already in use."
+"handler.client.identifier_names_resource" = "The client identifier is already in use by a resource."
 "handler.client.system_level_delete_not_allowed" = "Trying to delete a system level client"
 "handler.client.system_level_identifier_fixed" = "The identifier of a system-level client cannot be changed."
 "handler.client.self_registered_identifier_fixed" = "The identifier of a self-registered client cannot be changed."

@@ -26,7 +26,8 @@ import (
 )
 
 // clientsDatabase is what the client endpoints need: the client row, its redirect URIs and web
-// origins, and the transaction that changes them together.
+// origins, the resource row an identifier may not name (#151), and the transaction that changes
+// them together.
 //
 // It embeds the revocation port because making a confidential client public revokes the grants it
 // held while it still had to authenticate, and what the administrative policy reads to judge whether
@@ -47,6 +48,7 @@ type clientsDatabase interface {
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
 	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
@@ -388,6 +390,20 @@ func HandleClientCreatePost(
 			return
 		}
 
+		// A client identifier may not name a resource either. The two namespaces are separate
+		// tables with separate uniqueness checks, and a string held by both makes an access
+		// token's aud resolvable as a client, which is how a session-bound access token passed
+		// every ID-token-hint check in #109's logout (#151).
+		clashingResource, err := database.GetResourceByResourceIdentifier(r.Context(), nil, req.ClientIdentifier)
+		if err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error checking resource by client identifier"), "client_identifier", req.ClientIdentifier)
+			return
+		}
+		if clashingResource != nil {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Generate and encrypt client secret
 		clientSecret := securerandom.String(60)
 		clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -560,6 +576,19 @@ func HandleClientUpdatePut(
 			}
 			if existingClient != nil && existingClient.Id != client.Id {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+
+			// The identifier may not name a resource either (#151). Sitting inside the
+			// only-when-changed guard above keeps a row that already holds a collision, from
+			// before this check existed, editable everywhere else on this form.
+			clashingResource, err := database.GetResourceByResourceIdentifier(r.Context(), nil, updateReq.ClientIdentifier)
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "database error checking resource by client identifier for update"), "client_identifier", updateReq.ClientIdentifier, "client_id", client.Id)
+				return
+			}
+			if clashingResource != nil {
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		}
