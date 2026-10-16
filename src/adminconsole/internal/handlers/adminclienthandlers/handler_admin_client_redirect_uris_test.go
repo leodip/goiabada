@@ -47,8 +47,13 @@ func (s *stubApiClient) GetSettingsGeneral(_ context.Context, accessToken string
 // stubHttpHelper captures the bind instead of rendering it. The template is proved separately,
 // in renderintegration, from a bind the test hands it; that case cannot see whether this handler
 // built the bind correctly, which is what these cases are for.
+//
+// It embeds no interface and defines every HttpHelper method itself, so a writer missing from
+// the stub is a compile error, and a method added to HttpHelper is one too, until this stub
+// says what it does (#476). The two JSON writers no case here drives through the stub fail
+// the test instead: the handlers' JSON paths are proved with the real render.New, so a call
+// reaching this stub means a case strayed onto a writer it never meant to exercise.
 type stubHttpHelper struct {
-	HttpHelper
 	bind map[string]interface{}
 	err  error
 }
@@ -66,6 +71,39 @@ func (s *stubHttpHelper) InternalServerError(w http.ResponseWriter, r *http.Requ
 
 func (s *stubHttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func (*stubHttpHelper) JSONError(http.ResponseWriter, *http.Request, error) {
+	panic("unexpected call to JSONError")
+}
+
+func (*stubHttpHelper) EncodeJSON(http.ResponseWriter, *http.Request, interface{}) {
+	panic("unexpected call to EncodeJSON")
+}
+
+// The unexpected writers say which writer was reached, not just that a pointer was nil: that is
+// the message a case that strays onto a JSON path reads, and what stops a copy of this stub
+// growing an answer no test here asked for (#476).
+func TestStubHttpHelper_FailsTheTestOnAWriterItDoesNotServe(t *testing.T) {
+	writers := []struct {
+		name string
+		call func(s *stubHttpHelper, w http.ResponseWriter, r *http.Request)
+	}{
+		{"JSONError", func(s *stubHttpHelper, w http.ResponseWriter, r *http.Request) {
+			s.JSONError(w, r, nil)
+		}},
+		{"EncodeJSON", func(s *stubHttpHelper, w http.ResponseWriter, r *http.Request) {
+			s.EncodeJSON(w, r, nil)
+		}},
+	}
+	for _, writer := range writers {
+		t.Run(writer.name, func(t *testing.T) {
+			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings")
+			assert.PanicsWithValue(t, "unexpected call to "+writer.name, func() {
+				writer.call(&stubHttpHelper{}, httptest.NewRecorder(), req)
+			})
+		})
+	}
 }
 
 // The auth server refuses a redirect URI with a 400 whose description names the offending
