@@ -29,7 +29,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	authBase := s.cfg.AuthServer.GetEffectiveBaseURL()
 
 	// Initialize all the service dependencies
-	apiClient := apiclient.NewAuthServerClient(authBase, s.upstream)
+	apiClient := apiclient.NewAuthServerClient(authBase, s.rootCAs, s.upstream)
 
 	// The HTTP client and the token client are main's, the same pair the session token source
 	// was built on, so the sign-in's exchange, the refresh and the client-credentials grant are one

@@ -186,7 +186,7 @@ func tokenClientFor(authServerURL string) *oauthclient.TokenClient {
 		AdminConsole: config.AdminConsoleConfig{OAuthClientSecret: "the-secret"},
 		AuthServer:   config.AuthServerConfig{BaseURL: authServerURL},
 	}
-	return newTokenClient(cfg, oauthclient.NewAuthServerHTTPClient(), upstreammetrics.Register(metrics.NewRegistry()))
+	return newTokenClient(cfg, oauthclient.NewAuthServerHTTPClient(nil), upstreammetrics.Register(metrics.NewRegistry()))
 }
 
 func TestAuthServerRetryDelay_DoublesFromOneSecondToTen(t *testing.T) {

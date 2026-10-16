@@ -91,7 +91,7 @@ func (s manageAccountAuthServer) client(t *testing.T) *apiclient.AuthServerClien
 		}
 	}))
 	t.Cleanup(server.Close)
-	return apiclient.NewAuthServerClient(server.URL, nil)
+	return apiclient.NewAuthServerClient(server.URL, nil, nil)
 }
 
 // accountHandlersOutsideTheTable are the account handlers accountHandlerCases leaves out: the

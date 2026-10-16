@@ -10,6 +10,8 @@ package sessionbackend
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -76,10 +78,23 @@ type httpBackend struct {
 //
 // Every attempt is recorded by upstream under the sessions target, a retry as a call of its own
 // (#400 decision 6).
-func New(baseURL string, tokens TokenSource, upstream *upstreammetrics.Recorder) sessionstore.Backend {
+//
+// rootCAs is the pool the client verifies the auth server's certificate against, nil for the
+// system roots alone; main hands it the pool it built, so an https internal URL a private CA
+// signed verifies once the operator names the CA through GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE
+// (#525).
+func New(baseURL string, tokens TokenSource, rootCAs *x509.CertPool, upstream *upstreammetrics.Recorder) sessionstore.Backend {
+	// The transport is the default one carrying the configured roots, so the file's authorities
+	// are trusted beside the system roots rather than in their place (#525).
+	client := &http.Client{Timeout: httpBackendTimeout}
+	if rootCAs != nil {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
+		client.Transport = transport
+	}
 	return &httpBackend{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
-		client:  upstream.Client(upstreammetrics.Sessions, &http.Client{Timeout: httpBackendTimeout}),
+		client:  upstream.Client(upstreammetrics.Sessions, client),
 		tokens:  tokens,
 	}
 }

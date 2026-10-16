@@ -76,7 +76,7 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	// decision 2).
 	chimiddleware.RequestID(
 		i18n.Locale(nil)(
-			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()))(next),
+			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()))(next),
 		),
 	).ServeHTTP(recorder, req)
 

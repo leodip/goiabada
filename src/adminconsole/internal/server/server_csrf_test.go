@@ -41,7 +41,7 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 		s := &Server{
 			router:        chi.NewRouter(),
 			sessionStore:  newTestSessionStore(),
-			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
+			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},
 			metrics:       metrics.NewRegistry(),
 		}
@@ -201,7 +201,7 @@ func csrfProbe(t *testing.T, path string, headers map[string]string) *httptest.R
 	s := &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
-		settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{},
 		metrics:       metrics.NewRegistry(),
 	}

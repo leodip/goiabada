@@ -327,7 +327,7 @@ func TestRefresh_WritesNoRecord(t *testing.T) {
 // the connection and never answers and a handler held open for as long as the
 // browser waits (#338).
 func TestNewAuthServerHTTPClient_CarriesTheConfiguredTimeout(t *testing.T) {
-	client := NewAuthServerHTTPClient()
+	client := NewAuthServerHTTPClient(nil)
 
 	require.NotNil(t, client)
 	assert.Equal(t, TokenExchangeTimeout, client.Timeout,
