@@ -125,6 +125,9 @@
 # Wording kept byte for byte from the error_description this condition used to redirect, so an
 # integrator meets the same sentence now that it is answered on a page instead (#213).
 "auth_error.unsupported_response_mode.message" = "Invalid response_mode parameter. Supported values are: query, fragment, form_post."
+# form_post with a redirect URI no form can post to, answered on the page for the reason the line above is (#121).
+"auth_error.form_post_unreachable.code.message" = "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive. Use response_mode=query or response_mode=fragment instead."
+"auth_error.form_post_unreachable.implicit.message" = "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive. Use response_mode=fragment instead."
 # The two below are answered on the page because the request cannot say where a redirect would go (#228).
 "auth_error.malformed_request.message" = "The authorization request could not be read: one of its parameters is not correctly encoded."
 "auth_error.repeated_parameter.message" = "The {{.parameter}} parameter was included more than once."

@@ -119,6 +119,8 @@
 "auth_error.rate_limited.message" = "Chegaram muitas solicitações deste navegador, ou para esta conta, em pouco tempo. Aguarde alguns minutos e tente novamente."
 "auth_error.unable_to_authorize.title" = "Não foi possível autorizar"
 "auth_error.unsupported_response_mode.message" = "Parâmetro response_mode inválido. Os valores aceitos são: query, fragment, form_post."
+"auth_error.form_post_unreachable.code.message" = "response_mode=form_post envia a resposta à URI de redirecionamento como um formulário, que nenhum esquema além de http ou https pode receber. Use response_mode=query ou response_mode=fragment."
+"auth_error.form_post_unreachable.implicit.message" = "response_mode=form_post envia a resposta à URI de redirecionamento como um formulário, que nenhum esquema além de http ou https pode receber. Use response_mode=fragment."
 "auth_error.malformed_request.message" = "Não foi possível ler a solicitação de autorização: um de seus parâmetros não está codificado corretamente."
 "auth_error.repeated_parameter.message" = "O parâmetro {{.parameter}} foi enviado mais de uma vez."
 "auth_error.request_handle_unusable.message" = "Este link de login não é mais válido. Ele pode ter expirado, já ter sido usado ou ter sido alterado. Volte ao aplicativo em que você estava entrando e comece novamente."
