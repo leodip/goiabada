@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/gob"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -272,4 +274,80 @@ func TestHandleUnauthorizedGet_Answers403(t *testing.T) {
 		handlertest.Request(http.MethodGet, "/unauthorized"))
 
 	assert.Equal(t, http.StatusForbidden, handlertest.Bind(t, httpHelper)["_httpStatus"])
+}
+
+// #411: the state change on this route refuses a navigation the browser reports as beginning on
+// another site, the same evidence the origin check reads first on the unsafe methods. Both of
+// this route's callers navigate from this console's own pages, which report same-origin, so only
+// another site's navigation is refused.
+func TestHandleSessionEndedGet_RefusesANavigationTheBrowserReportsCrossSite(t *testing.T) {
+	testCases := []struct {
+		name string
+		site string
+	}{
+		{"cross-site", "cross-site"},
+		{"a sibling subdomain, which the origin check also refuses for a POST", "same-site"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			store := newMemoryStore(t)
+			cookies := seedSession(t, store, signedInValues())
+
+			req := withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies)
+			req.Header.Set("Sec-Fetch-Site", testCase.site)
+
+			w := httptest.NewRecorder()
+			HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusForbidden, w.Code,
+				"the same status the origin check answers a cross-site POST with")
+			assert.Contains(t, w.Body.String(), i18n.T(context.Background(), "error.csrf_refused"),
+				"the same sentence, from the same catalog entry")
+
+			sess := readSession(t, store, cookies)
+			assert.Contains(t, sess.Values, sessionkeys.JWT,
+				"the stored tokens survive: the navigation signed nobody out")
+			assert.Equal(t, "kept", sess.Values["somethingElse"])
+			_, noticed := sess.TakeFlash(flashSessionEnded)
+			assert.False(t, noticed, "no notice, since nothing happened")
+		})
+	}
+}
+
+// The navigations this console itself initiates are all allowed through: the API-error helpers'
+// 302 and the page scripts' window.location both begin on this origin, the address bar reports
+// none, and a browser predating fetch metadata reports nothing at all.
+func TestHandleSessionEndedGet_StillSignsOutTheNavigationsThisConsoleInitiates(t *testing.T) {
+	testCases := []struct {
+		name string
+		site string
+	}{
+		{"a browser reporting same-origin", "same-origin"},
+		{"the address bar, which reports none", "none"},
+		{"a browser predating fetch metadata, which reports nothing", ""},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			store := newMemoryStore(t)
+			cookies := seedSession(t, store, signedInValues())
+
+			req := withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies)
+			if testCase.site != "" {
+				req.Header.Set("Sec-Fetch-Site", testCase.site)
+			}
+
+			w := httptest.NewRecorder()
+			HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusFound, w.Code)
+			assert.Equal(t, "/", w.Header().Get("Location"))
+
+			sess := readSession(t, store, cookies)
+			assert.NotContains(t, sess.Values, sessionkeys.JWT)
+			_, noticed := sess.TakeFlash(flashSessionEnded)
+			assert.True(t, noticed, "the notice was saved for the home page's request")
+		})
+	}
 }

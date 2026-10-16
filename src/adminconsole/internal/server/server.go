@@ -512,9 +512,11 @@ func (s *Server) initMiddleware() chi.Router {
 // Safe methods are untouched, because http.CrossOriginProtection.Check only applies to unsafe ones,
 // and a 403 tells a cross-origin prober less about this deployment's route table than the 404 did.
 //
-// /auth/logout is likewise absent. This server mounts GET /auth/logout only, and GET is a safe
-// method the origin check never applies to, so the auth server's conditional entry for it would
-// exempt nothing here.
+// /auth/logout is likewise absent. The console's own sign-out answers a POST since #411, which
+// the origin check guards like every other unsafe method here, and nothing about it is
+// cross-origin by protocol design; its GET renders the confirmation page and changes nothing. The
+// auth server's conditional entry is for its RP-initiated logout, a GET another origin navigates
+// to by OIDC design, and would exempt nothing here.
 func csrfPolicy() httpmw.CSRFPolicy {
 	return httpmw.CSRFPolicy{
 		// Matched EXACTLY, so a future sibling route is NOT silently exempted: it keeps full CSRF

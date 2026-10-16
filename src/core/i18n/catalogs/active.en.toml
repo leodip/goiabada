@@ -228,6 +228,12 @@
 "adminconsole.menu.logout" = "Sign out"
 "adminconsole.menu.version_label" = "version:"
 
+# --- Sign-out confirmation page (#411) ---------------------------------------
+
+"adminconsole.logout_confirm.heading" = "Sign out?"
+"adminconsole.logout_confirm.message" = "This signs you out of the admin console and of your sign-in session on the auth server."
+"adminconsole.logout_confirm.cancel" = "Cancel"
+
 # --- Adminconsole account-side drawer ---------------------------------------
 
 "adminconsole.account_menu.profile" = "Profile"

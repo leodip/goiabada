@@ -1,0 +1,27 @@
+{{define "title"}}{{ .appName }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+
+<!-- The sign-out confirmation (#411). Every navigation to /auth/logout arrives here: the menu's
+     link, the redirect the general settings save issues after an issuer change, and the sessions
+     pages' script. The page writes nothing and calls nothing; its form is the only way on, and it
+     posts, so the origin check guards the sign-out. No JavaScript is needed to take it: the button
+     below is a plain submit. -->
+
+<main>
+    <div class="flex items-center justify-center h-screen p-8">
+        <div class="w-full max-w-md text-center">
+            <h1 class="text-2xl font-semibold mb-2">{{ T $.ctx "adminconsole.logout_confirm.heading" }}</h1>
+            <p class="text-sm opacity-70 mb-6">{{ T $.ctx "adminconsole.logout_confirm.message" }}</p>
+            <div class="flex items-center justify-center gap-3">
+                <a href="/" class="btn">{{ T $.ctx "adminconsole.logout_confirm.cancel" }}</a>
+                <form method="post" action="/auth/logout">
+                    <button type="submit" class="btn btn-primary">{{ T $.ctx "adminconsole.menu.logout" }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+
+{{end}}
