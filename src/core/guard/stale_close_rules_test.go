@@ -7,8 +7,11 @@ package guard
 // statement of the same function assigns, the fixed shape that hands the closure its own value,
 // the direct defer that binds its receiver when it runs, and the shadow -- a redeclaration of
 // the same name in a nested block, which declares a new variable the closure never reads and is
-// the one finding of difference between this walk and the scan in #591. A file that does not
-// parse is excluded from the walk, as it is for every other guard.
+// the one finding of difference between this walk and the scan in #591. Beside them, the three
+// other ways a statement reaches the variable after the defer has run -- the next iteration of a
+// loop around it, a range clause assigning with `=`, and a nested closure -- and the two units a
+// function literal makes. A file that does not parse is excluded from the walk, as it is for
+// every other guard.
 
 import (
 	"testing"
@@ -92,7 +95,129 @@ func Walk(c *http.Client, url string, n int) {
 }
 `
 
-// staleCloseTree writes the four shapes together, plus one file that does not parse.
+// loopSource registers a closure on every iteration over a variable declared outside the loop.
+// The assignment on line 9 comes before the defer on line 13 in the source, but the next
+// iteration runs it after, so every response but the last is left unclosed.
+const loopSource = `package loop
+
+import "net/http"
+
+func Walk(c *http.Client, urls []string) {
+	var resp *http.Response
+	var err error
+	for _, u := range urls {
+		resp, err = c.Get(u)
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+	}
+}
+`
+
+// loopDefineSource is the clean twin of loopSource: the `:=` inside the body declares a new
+// variable on each iteration, so each closure reads its own.
+const loopDefineSource = `package loopdefine
+
+import "net/http"
+
+func Walk(c *http.Client, urls []string) {
+	for _, u := range urls {
+		resp, err := c.Get(u)
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+	}
+}
+`
+
+// rangeAssignSource reassigns the variable through a range clause with `=`, on line 11, after the
+// defer on line 10: a range clause is an assignment no *ast.AssignStmt spells.
+const rangeAssignSource = `package rangeassign
+
+import "net/http"
+
+func Walk(c *http.Client, url string, resps []*http.Response) {
+	resp, err := c.Get(url)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	for _, resp = range resps {
+	}
+}
+`
+
+// closureSource reassigns the outer variable inside a subtest's callback, on line 16, which runs
+// before the test returns and so before the defer on line 14 does.
+const closureSource = `package closure
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestWalk(t *testing.T) {
+	c := &http.Client{}
+	resp, err := c.Get("a")
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	t.Run("next", func(t *testing.T) {
+		resp, err = c.Get("b")
+	})
+}
+`
+
+// closureUnitSource holds the stale chain inside a subtest's callback, a function unit of its
+// own: the defer on line 15 is staled by the assignment on line 16, and is reported once, from
+// the callback's unit and not again from the enclosing function's.
+const closureUnitSource = `package closureunit
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestWalk(t *testing.T) {
+	c := &http.Client{}
+	t.Run("chain", func(t *testing.T) {
+		resp, err := c.Get("a")
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+		resp = loadPage(c, "b")
+	})
+}
+`
+
+// closureThenOuterSource defers inside a subtest's callback, which runs when the callback
+// returns, before the enclosing function reassigns the variable after it: the callback's unit
+// borrows no statement of the enclosing one.
+const closureThenOuterSource = `package closurethenouter
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestWalk(t *testing.T) {
+	c := &http.Client{}
+	resp, err := c.Get("a")
+	if err != nil {
+		return
+	}
+	t.Run("close", func(t *testing.T) {
+		defer func() { _ = resp.Body.Close() }()
+	})
+	resp = loadPage(c, "b")
+}
+`
+
+// staleCloseTree writes every shape together, plus one file that does not parse.
 func staleCloseTree(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -100,6 +225,12 @@ func staleCloseTree(t *testing.T) string {
 	writeGoFile(t, root, "integration/fixed_test.go", fixedSource)
 	writeGoFile(t, root, "integration/direct_test.go", directSource)
 	writeGoFile(t, root, "integration/shadow_test.go", shadowSource)
+	writeGoFile(t, root, "integration/loop_test.go", loopSource)
+	writeGoFile(t, root, "integration/loop_define_test.go", loopDefineSource)
+	writeGoFile(t, root, "integration/range_assign_test.go", rangeAssignSource)
+	writeGoFile(t, root, "integration/closure_test.go", closureSource)
+	writeGoFile(t, root, "integration/closure_unit_test.go", closureUnitSource)
+	writeGoFile(t, root, "integration/closure_then_outer_test.go", closureThenOuterSource)
 	writeGoFile(t, root, "integration/broken.go", unparseableSource)
 	return root
 }
@@ -114,35 +245,33 @@ func TestStaleClose_TheRuleTable(t *testing.T) {
 	stale, files, err := findStaleDeferredBodyCloses(root)
 	require.NoError(t, err)
 
-	assert.Equal(t, 4, files, "the four parseable fixtures, and not the broken one")
-	require.Len(t, stale, 2, "the two defers before a reassignment, and not the one after the last")
-	assert.Equal(t, staleClose{
-		file:         "integration/stale_chain_test.go",
-		line:         10,
-		variable:     "resp",
-		reassignedAt: 11,
-	}, stale[0])
-	assert.Equal(t, staleClose{
-		file:         "integration/stale_chain_test.go",
-		line:         12,
-		variable:     "resp",
-		reassignedAt: 13,
-	}, stale[1])
+	assert.Equal(t, 10, files, "the ten parseable fixtures, and not the broken one")
+	assert.Equal(t, []staleClose{
+		{file: "integration/closure_test.go", line: 14, variable: "resp", reassignedAt: 16},
+		{file: "integration/closure_unit_test.go", line: 15, variable: "resp", reassignedAt: 16},
+		{file: "integration/loop_test.go", line: 13, variable: "resp", reassignedAt: 9},
+		{file: "integration/range_assign_test.go", line: 10, variable: "resp", reassignedAt: 11},
+		{file: "integration/stale_chain_test.go", line: 10, variable: "resp", reassignedAt: 11},
+		{file: "integration/stale_chain_test.go", line: 12, variable: "resp", reassignedAt: 13},
+	}, stale, "each stale defer once, and not the defer after the last reassignment, the per-iteration "+
+		"`:=`, or the callback's defer the enclosing function reassigns after")
 }
 
 // TestStaleClose_ACleanTreeReportsNothing is the other direction, and it is what keeps the case
-// above from passing for the wrong reason: a tree of the fixed, the direct and the shadow shapes
-// reaches files and reports nothing.
+// above from passing for the wrong reason: a tree of the fixed, the direct, the shadow, the
+// per-iteration `:=` and the callback-unit shapes reaches files and reports nothing.
 func TestStaleClose_ACleanTreeReportsNothing(t *testing.T) {
 	root := t.TempDir()
 	writeGoFile(t, root, "integration/fixed_test.go", fixedSource)
 	writeGoFile(t, root, "integration/direct_test.go", directSource)
 	writeGoFile(t, root, "integration/shadow_test.go", shadowSource)
+	writeGoFile(t, root, "integration/loop_define_test.go", loopDefineSource)
+	writeGoFile(t, root, "integration/closure_then_outer_test.go", closureThenOuterSource)
 
 	stale, files, err := findStaleDeferredBodyCloses(root)
 	require.NoError(t, err)
 
-	assert.Equal(t, 3, files)
+	assert.Equal(t, 5, files)
 	assert.Empty(t, stale)
 
 	report := Run(func(r Reporter) { assertNoStaleDeferredBodyCloses(r, root) })

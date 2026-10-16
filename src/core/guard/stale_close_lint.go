@@ -75,7 +75,7 @@ func assertNoStaleDeferredBodyCloses(r Reporter, root string) {
 			strconv.Itoa(f.reassignedAt)+", so this defer closes only the last response")
 	}
 
-	r.Errorf("%d deferred close(s) read a variable a later statement reassigns:\n\t%s\n\n"+
+	r.Errorf("%d deferred close(s) read a variable reassigned after the defer is registered:\n\t%s\n\n"+
 		"A defer hands the closure the variable, not the value, so every response before the "+
 		"last is left unclosed and the last is closed once per defer. Hand each closure its own "+
 		"value, the shape the review of #582 fixed its one instance of in bfbaedd8:\n"+
@@ -84,7 +84,7 @@ func assertNoStaleDeferredBodyCloses(r Reporter, root string) {
 		len(stale), strings.Join(lines, "\n\t"))
 }
 
-// staleClose is one deferred close that reads a variable a later statement reassigns.
+// staleClose is one deferred close that reads a variable reassigned after the defer is registered.
 type staleClose struct {
 	// file is relative to the root the walk started from, forward slashes.
 	file string
@@ -92,18 +92,21 @@ type staleClose struct {
 	line int
 	// variable is the name of the response variable the closure reads.
 	variable string
-	// reassignedAt is the line of the first assignment to that variable after the defer.
+	// reassignedAt is the line of the first assignment that stales the defer: one after it, or one
+	// anywhere in a loop around it that the variable is declared outside.
 	reassignedAt int
 }
 
 // findStaleDeferredBodyCloses walks every Go file under root and reports each defer statement
-// whose call is a func literal closing `x.Body` of a variable that a later statement of
-// the same function assigns. It returns the number of files it reached a verdict on, so the
+// whose call is a func literal closing `x.Body` of a variable that the same function assigns
+// after the defer has run: a later statement, a nested closure, or the next iteration of a loop
+// around it (see staleDefersInUnit). It returns the number of files it reached a verdict on, so the
 // reporting half can tell "nothing to report" from "nothing was read".
 //
 // A function unit is a FuncDecl or a FuncLit of its own: a defer inside a nested closure runs
 // when that closure returns, and what stales it is a reassignment after it inside that closure,
-// so the units are analyzed separately and neither borrows the statements of the other. A
+// so a defer is weighed against its own unit and the closures that unit holds, never against the
+// unit around it. A
 // reassignment reaches the variable through the same object the closure reads -- parser
 // resolution, not a name match -- so a shadowing `:=` in a nested block does not count.
 func findStaleDeferredBodyCloses(root string) ([]staleClose, int, error) {
@@ -175,47 +178,90 @@ func staleDefersInFile(fset *token.FileSet, file *ast.File, path, root string) [
 }
 
 // staleDefersInUnit reports the stale deferred closes of one function unit, a FuncDecl or a
-// FuncLit. Nested FuncLits are their own units and are skipped here in both directions.
+// FuncLit. A defer in a nested FuncLit belongs to that literal's own unit and is skipped here, but
+// an assignment in one is not: a nested closure that reassigns the variable after the defer, such
+// as a subtest's callback, runs before the unit returns. Such a closure may never run, and a
+// finding there costs only the value-capturing shape, which is correct either way.
+//
+// A defer is stale when an assignment to the variable it closes comes after it in the source, or
+// sits anywhere in a loop around it that the variable is declared outside: the next iteration runs
+// that assignment after the defer. A `:=` in the loop body declares a new variable on each
+// iteration, so a closure over it is clean. A range clause with `=` assigns its key and value as
+// an assignment statement does.
 func staleDefersInUnit(fset *token.FileSet, body *ast.BlockStmt, rel string) []staleClose {
 	type deferred struct {
 		stmt     *ast.DeferStmt
 		variable *ast.Ident
+		loops    []ast.Stmt
 	}
 	var defers []deferred
-	var assigns []*ast.AssignStmt
+	var assigned []*ast.Ident
 
 	ast.Inspect(body, func(n ast.Node) bool {
+		switch s := n.(type) {
+		case *ast.AssignStmt:
+			for _, lhs := range s.Lhs {
+				if id, ok := lhs.(*ast.Ident); ok {
+					assigned = append(assigned, id)
+				}
+			}
+		case *ast.RangeStmt:
+			if s.Tok == token.ASSIGN {
+				for _, e := range []ast.Expr{s.Key, s.Value} {
+					if id, ok := e.(*ast.Ident); ok {
+						assigned = append(assigned, id)
+					}
+				}
+			}
+		}
+		return true
+	})
+
+	var enclosing []ast.Node
+	ast.Inspect(body, func(n ast.Node) bool {
+		if n == nil {
+			enclosing = enclosing[:len(enclosing)-1]
+			return true
+		}
 		if _, ok := n.(*ast.FuncLit); ok {
 			return false
 		}
-		switch s := n.(type) {
-		case *ast.DeferStmt:
+		if s, ok := n.(*ast.DeferStmt); ok {
 			if call, ok := s.Call.Fun.(*ast.FuncLit); ok {
 				if v := closedBodyVariable(call); v != nil {
-					defers = append(defers, deferred{s, v})
+					var loops []ast.Stmt
+					for _, e := range enclosing {
+						switch l := e.(type) {
+						case *ast.ForStmt, *ast.RangeStmt:
+							loops = append(loops, l.(ast.Stmt))
+						}
+					}
+					defers = append(defers, deferred{s, v, loops})
 				}
 			}
-		case *ast.AssignStmt:
-			assigns = append(assigns, s)
 		}
+		enclosing = append(enclosing, n)
 		return true
 	})
 
 	var stale []staleClose
 	for _, d := range defers {
+		obj := identObject(d.variable)
 		reassignedAt := 0
-		for _, a := range assigns {
-			if a.Pos() <= d.stmt.Pos() {
+		for _, id := range assigned {
+			if identObject(id) != obj {
 				continue
 			}
-			if reassignedAt != 0 && fset.Position(a.Pos()).Line >= reassignedAt {
-				break
-			}
-			for _, lhs := range a.Lhs {
-				if id, ok := lhs.(*ast.Ident); ok && identObject(id) == identObject(d.variable) && identObject(id) != nil {
-					reassignedAt = fset.Position(a.Pos()).Line
-					break
+			stales := id.Pos() > d.stmt.Pos()
+			for _, l := range d.loops {
+				declaredOutside := obj.Pos() < l.Pos() || obj.Pos() >= l.End()
+				if declaredOutside && id.Pos() >= l.Pos() && id.Pos() < l.End() {
+					stales = true
 				}
+			}
+			if stales {
+				reassignedAt = fset.Position(id.Pos()).Line
+				break
 			}
 		}
 		if reassignedAt != 0 {
@@ -234,9 +280,11 @@ func staleDefersInUnit(fset *token.FileSet, body *ast.BlockStmt, rel string) []s
 // deprecated (SA1019) because full identifier resolution needs type information, and this guard
 // is built on exactly the resolution the parser gives without loading packages: same-file
 // identity through the scope chain, which is what tells a reassignment of the variable a closure
-// reads from a redeclaration of its name in a nested block, the distinction #591 turns on. The
-// deprecated API is the only stdlib resolver that works on a parsed file alone, and it is named
-// here and nowhere else in this package.
+// reads from a redeclaration of its name in a nested block, the distinction #591 turns on. It
+// needs no importer and no type-check, and same-file scope resolution is exact for the
+// function-local variables this rule reads. The go/types route the package's other resolving
+// guards take would work too, at the cost of a type-check per directory. This is the one place in
+// the package that names the deprecated API.
 func identObject(id *ast.Ident) *ast.Object { //nolint:staticcheck // SA1019: the parser-level object is the identity this rule resolves by
 	return id.Obj
 }

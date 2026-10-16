@@ -506,8 +506,9 @@ driven from a rule test: the finder directly, the reporting half through `guard.
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
 does. Every guard follows this: those in `core/guard`, the newest
 `AssertNoStaleDeferredBodyCloses`, which refuses a deferred func-literal close of a response
-body reading a variable a later statement of the same function reassigns, so only the last
-response is closed (#591), and before it
+body reading a variable the same function reassigns after the defer is registered, in a later
+statement, a nested closure or the next iteration of a loop, so only the last response is closed
+(#591), and before it
 `AssertNoGuardInTestsReachedFrom`, which refuses a test importing `core/guard`, directly or
 through first-party production code, in any package a module reaches, called over the setup
 wizard because `go mod tidy` reads those tests and would put chi and TOML in its `go.sum` (#500),
