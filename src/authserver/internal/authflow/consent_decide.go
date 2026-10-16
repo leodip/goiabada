@@ -67,14 +67,14 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *record.User
 	return scopeInfoArr
 }
 
-// ConsentScreenOwed answers whether GET /auth/consent renders the screen rather than going straight
+// consentScreenOwed answers whether GET /auth/consent renders the screen rather than going straight
 // on to issuance. It is shown when:
 //   - not every requested scope is already consented, OR
 //   - offline_access is requested (a refresh token grant is always re-confirmed), OR
 //   - prompt=consent was explicitly requested (force consent UI).
 //
 // Exported for the Clients concept page's consent table test in internal/handlers.
-func ConsentScreenOwed(scopes []ScopeInfo, scope string, promptConsent bool) bool {
+func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent bool) bool {
 	fullyConsented := true
 	for _, scopeInfo := range scopes {
 		fullyConsented = fullyConsented && scopeInfo.AlreadyConsented

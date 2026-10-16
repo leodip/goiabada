@@ -44,7 +44,7 @@ type Level2SelectionResult struct {
 //     answers nil for a user deleted mid-ceremony, #242 decision 5) is returned as an error, and
 //     nothing is saved;
 //  2. captures the user's OTP configuration generation on the auth context;
-//  3. decides the arm from the target level and the user's authenticator (DecideLevel2Arm), an
+//  3. decides the arm from the target level and the user's authenticator (decideLevel2Arm), an
 //     error for a target that never reaches this step;
 //  4. saves the ceremony in the arm's state.
 //
@@ -76,7 +76,7 @@ func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 	otpConfigGeneration := user.OtpConfigGeneration
 	authContext.OtpConfigGeneration = &otpConfigGeneration
 
-	nextState, nextStep, err := DecideLevel2Arm(authContext.GetTargetAcrLevel(client.DefaultAcrLevel), user.OTPEnabled)
+	nextState, nextStep, err := decideLevel2Arm(authContext.GetTargetAcrLevel(client.DefaultAcrLevel), user.OTPEnabled)
 	if err != nil {
 		return Level2SelectionResult{}, err
 	}
@@ -88,7 +88,7 @@ func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 	}, nil
 }
 
-// DecideLevel2Arm is /auth/level2's choice of second factor, from the ceremony's target and whether
+// decideLevel2Arm is /auth/level2's choice of second factor, from the ceremony's target and whether
 // the user has an authenticator: the state the ceremony moves to and the route it goes to. OTP is
 // the one second factor.
 //
@@ -100,7 +100,7 @@ func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 //
 // Exported for the sign-in table on the docs' acr-and-amr page, which handlers' concept_docs_test.go
 // holds to this function.
-func DecideLevel2Arm(target record.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
+func decideLevel2Arm(target record.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
 	switch target {
 	case record.AcrLevel2Optional:
 		if userHasOTP {

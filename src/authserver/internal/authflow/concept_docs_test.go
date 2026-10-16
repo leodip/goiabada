@@ -1,12 +1,17 @@
-package handlers
+package authflow
 
 // The concept pages on how strongly a user signs in, held to the code that decides it (#522).
 //
 // Two tables there are the answers an integrator writes code against: what a silent request
 // (prompt=none) is refused with, in the order the auth server asks, and which acr and amr a sign-in
-// with no session ends with for each level. Both are decided in code, by authflow.DecideSilentAuthentication
-// and by the step-up rule and authflow.DecideLevel2Arm, so each table is held to those in both
+// with no session ends with for each level. Both are decided in code, by decideSilentAuthentication
+// and by the step-up rule and decideLevel2Arm, so each table is held to those in both
 // directions: a row the code does not answer fails, and so does an answer the table leaves out.
+//
+// The guard lives here rather than beside the handlers because it drives this package's decisions
+// and needs no HTTP harness: it reads the site through core/docsreader, so the decisions its tables
+// are held to stay unexported (#584). It shares the silent world and the drive with the decision's
+// own table in silent_authentication_decide_test.go, which is why they are no longer copied here.
 //
 // It reads files and nothing else.
 
@@ -18,12 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
-	"github.com/stretchr/testify/require"
 )
 
 // The pages, relative to the repository root.
@@ -40,7 +43,7 @@ var (
 	signInLevelsSection = conceptSection{acrAndAmrPage, "## A sign-in with no session"}
 )
 
-// silentRefusalWorlds is one prompt=none request per refusal, in the order authflow.DecideSilentAuthentication
+// silentRefusalWorlds is one prompt=none request per refusal, in the order decideSilentAuthentication
 // asks. Each world passes every check before its own and fails its own and every one after it, so
 // the answer is its own check's only while that check is asked before all the later ones: a check
 // moved earlier answers in a world before its own, and the table's order stops matching. The last
@@ -101,89 +104,7 @@ func silentRefusalWorlds() []silentWorld {
 		authenticatorChanged, noScope, noConsent, partialConsent, passes}
 }
 
-// silentWorld is what authflow.SilentAuthentication would load for a prompt=none request, answered
-// from the row, so the docs tests below read authflow.DecideSilentAuthentication's answers with no
-// HTTP harness and no mocks. authflow's silent_authentication_decide_test.go drives the same
-// decision from its own copy, for the decision's table.
-type silentWorld struct {
-	noSession          bool
-	valid              bool
-	maxAgeRequested    bool
-	validWithoutMaxAge bool
-	disabled           bool
-	subject            string
-	hint               string
-	target             record.AcrLevel
-	sessionAcr         record.AcrLevel
-	sessionOtpGen      int64
-	userOtpGen         int64
-	otpEnabled         bool
-	effectiveScope     string
-	consentRequired    bool
-	clientIdentifier   string
-	consentScope       *string // nil for no consent row
-}
-
-// driveSilentAuthentication runs authflow.DecideSilentAuthentication as authflow.SilentAuthentication
-// does, loading each fact it asks for from the world, and answers the answer and the facts in the
-// order asked for.
-func driveSilentAuthentication(t *testing.T, world silentWorld) (authflow.SilentAuthenticationAnswer, []authflow.SilentFact) {
-	t.Helper()
-
-	facts := authflow.SilentAuthenticationFacts{
-		MaxAgeRequested:  world.maxAgeRequested,
-		HintSubject:      world.hint,
-		Target:           world.target,
-		ConsentRequired:  world.consentRequired,
-		ClientIdentifier: world.clientIdentifier,
-	}
-	var asked []authflow.SilentFact
-	for {
-		answer, need := authflow.DecideSilentAuthentication(facts)
-		if need == authflow.SilentFactNone {
-			return answer, asked
-		}
-		require.NotContains(t, asked, need, "each fact is loaded once")
-		asked = append(asked, need)
-
-		switch need {
-		case authflow.SilentFactSession:
-			facts.SessionLoaded = true
-			if !world.noSession {
-				facts.Session = &record.UserSession{
-					UserId:              7,
-					AcrLevel:            world.sessionAcr,
-					OtpConfigGeneration: world.sessionOtpGen,
-					User: record.User{
-						Id:                  7,
-						Subject:             world.subject,
-						Enabled:             !world.disabled,
-						OTPEnabled:          world.otpEnabled,
-						OtpConfigGeneration: world.userOtpGen,
-					},
-				}
-			}
-		case authflow.SilentFactValidity:
-			valid := world.valid
-			facts.SessionValid = &valid
-		case authflow.SilentFactValidityWithoutMaxAge:
-			valid := world.validWithoutMaxAge
-			facts.SessionValidWithoutMaxAge = &valid
-		case authflow.SilentFactEffectiveScope:
-			scope := world.effectiveScope
-			facts.EffectiveScope = &scope
-		case authflow.SilentFactConsent:
-			facts.ConsentLoaded = true
-			if world.consentScope != nil {
-				facts.Consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
-			}
-		default:
-			require.FailNow(t, "an unknown fact", "%v", need)
-		}
-	}
-}
-
-// silentRefusals is what authflow.DecideSilentAuthentication answers in each of silentRefusalWorlds, up to
+// silentRefusals is what decideSilentAuthentication answers in each of silentRefusalWorlds, up to
 // the first that is not a refusal.
 func silentRefusals(t *testing.T) []silentRefusal {
 	t.Helper()
@@ -203,7 +124,7 @@ type silentRefusal struct{ code, description string }
 
 // The silent checks table on prompt says what prompt=none is refused with and in which order, and an
 // app reading error and error_description decides from it what to show the user next. Its rows are
-// authflow.DecideSilentAuthentication's refusals, one each, in the order it asks.
+// decideSilentAuthentication's refusals, one each, in the order it asks.
 func TestConceptDocs_TheSilentChecksAreTheCodesRefusalsInOrder(t *testing.T) {
 	assertSilentChecksTable(t, filepath.Dir(guard.SourceRoot(t)), silentChecksSection, silentRefusals(t))
 }
@@ -219,7 +140,7 @@ type signInLevel struct {
 // signInLevels is, for every level and both answers to "has the user an authenticator", what a
 // sign-in with no session ends with: the acr is the target, as SetAcrLevel writes it with no
 // session, and the amr is pwd, with otp when the step-up rule sends the ceremony to level 2 and
-// authflow.DecideLevel2Arm asks for a code there.
+// decideLevel2Arm asks for a code there.
 func signInLevels(t *testing.T) []signInLevel {
 	t.Helper()
 	var levels []signInLevel
@@ -235,7 +156,7 @@ func signInLevels(t *testing.T) []signInLevel {
 				t.Fatalf("the step-up rule for %s: %v", level, err)
 			}
 			if stepUp != ceremony.StepUpNone {
-				state, _, err := authflow.DecideLevel2Arm(level, userHasOTP)
+				state, _, err := decideLevel2Arm(level, userHasOTP)
 				if err != nil {
 					t.Fatalf("level 2 for %s: %v", level, err)
 				}

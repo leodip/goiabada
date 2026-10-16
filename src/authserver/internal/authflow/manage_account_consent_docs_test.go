@@ -1,4 +1,4 @@
-package handlers
+package authflow
 
 // The pages that say when the consent screen is owed for authserver:manage-account, held to the code
 // that owes it (#509).
@@ -10,6 +10,9 @@ package handlers
 // reading either page and finding only Consent required and offline_access there would not expect
 // the screen, or the refusal, that the code gives them.
 //
+// The guard drives decideSilentAuthentication and reads the site through core/docsreader, so it
+// lives here with the decision and needs no HTTP harness (#584).
+//
 // It reads files and nothing else.
 
 import (
@@ -20,6 +23,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -30,7 +34,7 @@ func TestConceptDocs_TheConsentSectionSaysWhoIsAskedForManageAccount(t *testing.
 		[]string{"`" + consentManageAccountScope + "`", "admin console's own client"})
 }
 
-// manageAccountSilentRefusals is what authflow.DecideSilentAuthentication answers a prompt=none request from a
+// manageAccountSilentRefusals is what decideSilentAuthentication answers a prompt=none request from a
 // client with Consent required off, other than the admin console's, whose scope holds
 // authserver:manage-account: with no stored consent, and with one leaving manage-account out. It
 // fails when the code answers either with no refusal, or refuses the admin console's client, since
@@ -52,7 +56,7 @@ func manageAccountSilentRefusals(t *testing.T) []silentRefusal {
 		world.consentScope = consentScope
 		answer, _ := driveSilentAuthentication(t, world)
 		if answer.ErrorCode == "" {
-			t.Fatalf("authflow.DecideSilentAuthentication refuses nothing for %+v", world)
+			t.Fatalf("decideSilentAuthentication refuses nothing for %+v", world)
 		}
 		refusals = append(refusals, silentRefusal{answer.ErrorCode, answer.ErrorDescription})
 	}
@@ -60,7 +64,7 @@ func manageAccountSilentRefusals(t *testing.T) []silentRefusal {
 	world.consentScope = nil
 	world.clientIdentifier = builtin.AdminConsoleClientIdentifier
 	if answer, _ := driveSilentAuthentication(t, world); answer.ErrorCode != "" {
-		t.Fatalf("authflow.DecideSilentAuthentication refuses the admin console's client with %s %q",
+		t.Fatalf("decideSilentAuthentication refuses the admin console's client with %s %q",
 			answer.ErrorCode, answer.ErrorDescription)
 	}
 	return refusals
@@ -154,6 +158,23 @@ func assertSilentChecksName(r guard.Reporter, root string, section conceptSectio
 		}
 		if !found {
 			r.Errorf("%s: %s has no row for %s %q", section.page, section.heading, refusal.code, refusal.description)
+		}
+	}
+}
+
+// assertSectionSays is the reporting half of the quote checks: one failure per text the section does
+// not hold verbatim; a stop for a section not found. The handlers' endpoint guard keeps its own copy
+// beside the pages it holds, since test files cannot cross packages (#584).
+func assertSectionSays(r guard.Reporter, root string, section conceptSection, texts []string) {
+	r.Helper()
+	text, err := docsreader.Section(root, section.page, section.heading)
+	if err != nil {
+		r.Fatalf("%v", err)
+		return
+	}
+	for _, want := range texts {
+		if !strings.Contains(text, want) {
+			r.Errorf("%s: %s does not say %q", section.page, section.heading, want)
 		}
 	}
 }

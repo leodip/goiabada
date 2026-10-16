@@ -29,8 +29,10 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -50,6 +52,60 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/guard"
 )
+
+// conceptSection is one section of a page: the page, and its heading line as written. The docs
+// guards that drive authflow's decisions took their tables to that package (#584); the endpoint,
+// guide, legacy-flow and security guards that stay here share the section and the fixture writer
+// below.
+type conceptSection struct{ page, heading string }
+
+// writeConceptFixture writes content at name under root, so a fixture test can hold a guard to a
+// tree that fails.
+func writeConceptFixture(t *testing.T, root, name, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("creating %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
+	}
+}
+
+// conceptTableColumns is the named columns of the first Markdown table in a section, row by row, each
+// cell with the backticks and double quotes around it removed. The guards that drive authflow's
+// decisions read through their own copy of it in that package (#584).
+func conceptTableColumns(root string, section conceptSection, headers ...string) ([][]string, error) {
+	text, err := docsreader.Section(root, section.page, section.heading)
+	if err != nil {
+		return nil, err
+	}
+	tables := docsreader.Tables(text)
+	if len(tables) == 0 {
+		return nil, fmt.Errorf("%s: %s has no table", section.page, section.heading)
+	}
+	var indexes []int
+	for _, header := range headers {
+		index := slices.Index(tables[0].Header, header)
+		if index < 0 {
+			return nil, fmt.Errorf("%s: %s's table has no column headed %s", section.page, section.heading, header)
+		}
+		indexes = append(indexes, index)
+	}
+	var columns [][]string
+	for _, row := range tables[0].Rows {
+		var cells []string
+		for _, index := range indexes {
+			cell := ""
+			if index < len(row) {
+				cell = strings.Trim(row[index], "`\"")
+			}
+			cells = append(cells, cell)
+		}
+		columns = append(columns, cells)
+	}
+	return columns, nil
+}
 
 // The pages, relative to the repository root.
 const (

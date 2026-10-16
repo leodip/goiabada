@@ -230,37 +230,37 @@ func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim o
 	return beforeBindingBind
 }
 
-// AfterBindingFact is a fact DecideAfterBinding needs and has not been given. Completion loads it
+// afterBindingFact is a fact decideAfterBinding needs and has not been given. Completion loads it
 // and asks again.
-type AfterBindingFact int
+type afterBindingFact int
 
 const (
-	// AfterBindingFactNone means the answer is decided.
-	AfterBindingFactNone AfterBindingFact = iota
-	// AfterBindingFactEffectiveScope is the ceremony's scope narrowed to what the user holds, as
+	// afterBindingFactNone means the answer is decided.
+	afterBindingFactNone afterBindingFact = iota
+	// afterBindingFactEffectiveScope is the ceremony's scope narrowed to what the user holds, as
 	// AuthContext.SetScope stores it.
-	AfterBindingFactEffectiveScope
-	// AfterBindingFactConsent is the user's stored consent to the client, or none.
-	AfterBindingFactConsent
+	afterBindingFactEffectiveScope
+	// afterBindingFactConsent is the user's stored consent to the client, or none.
+	afterBindingFactConsent
 )
 
-// AfterBindingAnswer is where a ceremony bound to a session goes next.
-type AfterBindingAnswer int
+// afterBindingAnswer is where a ceremony bound to a session goes next.
+type afterBindingAnswer int
 
 const (
 	// AfterBindingUndecided is returned beside a fact still to load.
-	AfterBindingUndecided AfterBindingAnswer = iota
+	AfterBindingUndecided afterBindingAnswer = iota
 	// AfterBindingNoScope answers access_denied for a user holding none of the requested scopes.
 	AfterBindingNoScope
-	// AfterBindingConsent goes on to the consent screen.
-	AfterBindingConsent
-	// AfterBindingIssue goes on to issuance.
-	AfterBindingIssue
+	// afterBindingConsent goes on to the consent screen.
+	afterBindingConsent
+	// afterBindingIssue goes on to issuance.
+	afterBindingIssue
 )
 
-// AfterBindingFacts is what DecideAfterBinding decides from. EffectiveScope is nil until it has been
+// afterBindingFacts is what decideAfterBinding decides from. EffectiveScope is nil until it has been
 // loaded.
-type AfterBindingFacts struct {
+type afterBindingFacts struct {
 	// PromptConsent is the prompt's consent token.
 	PromptConsent bool
 	// ConsentRequired is the client's ConsentRequired.
@@ -273,7 +273,7 @@ type AfterBindingFacts struct {
 	Consent       *record.UserConsent
 }
 
-// DecideAfterBinding decides where a ceremony goes once it is bound to a session, or names the next
+// decideAfterBinding decides where a ceremony goes once it is bound to a session, or names the next
 // fact it needs to decide that. The user is enabled by now, since decideBeforeBinding refused a
 // disabled one, so the scope is filtered only for a user who may be issued something. In order of
 // precedence:
@@ -289,23 +289,23 @@ type AfterBindingFacts struct {
 //
 // The consent table on the Clients concept page is held to this, with the consent step's own rule,
 // by the handlers package's consent docs test.
-func DecideAfterBinding(f AfterBindingFacts) (AfterBindingAnswer, AfterBindingFact) {
+func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFact) {
 	if f.EffectiveScope == nil {
-		return AfterBindingUndecided, AfterBindingFactEffectiveScope
+		return AfterBindingUndecided, afterBindingFactEffectiveScope
 	}
 	if len(*f.EffectiveScope) == 0 {
-		return AfterBindingNoScope, AfterBindingFactNone
+		return AfterBindingNoScope, afterBindingFactNone
 	}
 	if f.PromptConsent || f.ConsentRequired || oidc.HasOfflineAccessScope(*f.EffectiveScope) {
-		return AfterBindingConsent, AfterBindingFactNone
+		return afterBindingConsent, afterBindingFactNone
 	}
 	if owed := userconsent.AlwaysOwed(f.ClientIdentifier, *f.EffectiveScope); len(owed) > 0 {
 		if !f.ConsentLoaded {
-			return AfterBindingUndecided, AfterBindingFactConsent
+			return AfterBindingUndecided, afterBindingFactConsent
 		}
 		if !userconsent.Covers(f.Consent, owed) {
-			return AfterBindingConsent, AfterBindingFactNone
+			return afterBindingConsent, afterBindingFactNone
 		}
 	}
-	return AfterBindingIssue, AfterBindingFactNone
+	return afterBindingIssue, afterBindingFactNone
 }

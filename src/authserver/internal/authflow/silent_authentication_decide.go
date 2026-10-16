@@ -9,29 +9,29 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 )
 
-// SilentFact is a fact DecideSilentAuthentication needs and has not been given. SilentAuthentication
+// silentFact is a fact decideSilentAuthentication needs and has not been given. SilentAuthentication
 // loads it and asks again.
-type SilentFact int
+type silentFact int
 
 const (
-	// SilentFactNone means the answer is decided.
-	SilentFactNone SilentFact = iota
-	// SilentFactSession is the browser's session with its user, or none.
-	SilentFactSession
-	// SilentFactValidity is whether the session is valid with the request's max_age applied.
-	SilentFactValidity
-	// SilentFactValidityWithoutMaxAge is whether it would be valid without max_age.
-	SilentFactValidityWithoutMaxAge
-	// SilentFactEffectiveScope is the requested scope narrowed to what the user holds.
-	SilentFactEffectiveScope
-	// SilentFactConsent is the user's consent to this client, or none.
-	SilentFactConsent
+	// silentFactNone means the answer is decided.
+	silentFactNone silentFact = iota
+	// silentFactSession is the browser's session with its user, or none.
+	silentFactSession
+	// silentFactValidity is whether the session is valid with the request's max_age applied.
+	silentFactValidity
+	// silentFactValidityWithoutMaxAge is whether it would be valid without max_age.
+	silentFactValidityWithoutMaxAge
+	// silentFactEffectiveScope is the requested scope narrowed to what the user holds.
+	silentFactEffectiveScope
+	// silentFactConsent is the user's consent to this client, or none.
+	silentFactConsent
 )
 
-// SilentAuthenticationFacts is what DecideSilentAuthentication decides from. The first five are
+// silentAuthenticationFacts is what decideSilentAuthentication decides from. The first five are
 // known from the ceremony and its client; every other fact is unknown until SilentAuthentication
 // has loaded it, a nil pointer or a false loaded flag.
-type SilentAuthenticationFacts struct {
+type silentAuthenticationFacts struct {
 	MaxAgeRequested bool
 	HintSubject     string
 	Target          record.AcrLevel
@@ -52,16 +52,16 @@ type SilentAuthenticationFacts struct {
 	Consent       *record.UserConsent
 }
 
-// SilentAuthenticationAnswer is DecideSilentAuthentication's answer: an error for the client, or an
+// silentAuthenticationAnswer is decideSilentAuthentication's answer: an error for the client, or an
 // empty ErrorCode to proceed.
-type SilentAuthenticationAnswer struct {
+type silentAuthenticationAnswer struct {
 	ErrorCode        string
 	ErrorDescription string
 	// UserDisabled says the refusal is for a disabled account, which is audited.
 	UserDisabled bool
 }
 
-// DecideSilentAuthentication decides whether a prompt=none request can be answered silently, or
+// decideSilentAuthentication decides whether a prompt=none request can be answered silently, or
 // names the next fact it needs to decide that. The checks run in a fixed order and the first that
 // fails is the answer, so each fact is asked for only once every check before it has passed:
 //
@@ -84,25 +84,25 @@ type SilentAuthenticationAnswer struct {
 //
 // The refusals, their order and their descriptions are the silent checks table on the docs' prompt
 // page, which handlers' concept_docs_test.go holds to this function.
-func DecideSilentAuthentication(f SilentAuthenticationFacts) (SilentAuthenticationAnswer, SilentFact) {
-	refuse := func(code, description string) (SilentAuthenticationAnswer, SilentFact) {
-		return SilentAuthenticationAnswer{ErrorCode: code, ErrorDescription: description}, SilentFactNone
+func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticationAnswer, silentFact) {
+	refuse := func(code, description string) (silentAuthenticationAnswer, silentFact) {
+		return silentAuthenticationAnswer{ErrorCode: code, ErrorDescription: description}, silentFactNone
 	}
 
 	if !f.SessionLoaded {
-		return SilentAuthenticationAnswer{}, SilentFactSession
+		return silentAuthenticationAnswer{}, silentFactSession
 	}
 	if f.Session == nil {
 		return refuse(oidc.ErrorLoginRequired, "User authentication is required")
 	}
 
 	if f.SessionValid == nil {
-		return SilentAuthenticationAnswer{}, SilentFactValidity
+		return silentAuthenticationAnswer{}, silentFactValidity
 	}
 	if !*f.SessionValid {
 		if f.MaxAgeRequested {
 			if f.SessionValidWithoutMaxAge == nil {
-				return SilentAuthenticationAnswer{}, SilentFactValidityWithoutMaxAge
+				return silentAuthenticationAnswer{}, silentFactValidityWithoutMaxAge
 			}
 			if *f.SessionValidWithoutMaxAge {
 				return refuse(oidc.ErrorLoginRequired, "Session age exceeds max_age")
@@ -113,11 +113,11 @@ func DecideSilentAuthentication(f SilentAuthenticationFacts) (SilentAuthenticati
 
 	user := &f.Session.User
 	if !user.Enabled {
-		return SilentAuthenticationAnswer{
+		return silentAuthenticationAnswer{
 			ErrorCode:        "access_denied",
 			ErrorDescription: "The user account is disabled",
 			UserDisabled:     true,
-		}, SilentFactNone
+		}, silentFactNone
 	}
 
 	if f.HintSubject != "" && user.Subject != f.HintSubject {
@@ -129,7 +129,7 @@ func DecideSilentAuthentication(f SilentAuthenticationFacts) (SilentAuthenticati
 	}
 
 	if f.EffectiveScope == nil {
-		return SilentAuthenticationAnswer{}, SilentFactEffectiveScope
+		return silentAuthenticationAnswer{}, silentFactEffectiveScope
 	}
 	if len(strings.TrimSpace(*f.EffectiveScope)) == 0 {
 		return refuse("access_denied", "The user is not authorized to access any of the requested scopes")
@@ -144,7 +144,7 @@ func DecideSilentAuthentication(f SilentAuthenticationFacts) (SilentAuthenticati
 	}
 	if len(mustCover) > 0 {
 		if !f.ConsentLoaded {
-			return SilentAuthenticationAnswer{}, SilentFactConsent
+			return silentAuthenticationAnswer{}, silentFactConsent
 		}
 		if f.Consent == nil {
 			return refuse(oidc.ErrorConsentRequired, "User consent is required")
@@ -154,10 +154,10 @@ func DecideSilentAuthentication(f SilentAuthenticationFacts) (SilentAuthenticati
 		}
 	}
 
-	return SilentAuthenticationAnswer{}, SilentFactNone
+	return silentAuthenticationAnswer{}, silentFactNone
 }
 
-// silentStepUpRefusal is DecideSilentAuthentication's answer to the step-up a session still owes a
+// silentStepUpRefusal is decideSilentAuthentication's answer to the step-up a session still owes a
 // prompt=none request: none passes, each reason ceremony.StepUp names is refused with its own
 // description, and a value it does not name is refused too, so a reason added to StepUp later fails
 // closed here, rather than letting the silent flow issue a code its target was not met for, until
