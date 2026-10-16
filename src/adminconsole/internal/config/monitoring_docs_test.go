@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -72,7 +73,7 @@ func TestMonitoringDocs_AMissingSectionStops(t *testing.T) {
 func assertDocsNameOnlyReadVariables(r guard.Reporter, root string, sections []docSection, read map[string]bool) {
 	r.Helper()
 	for _, s := range sections {
-		text, err := docSectionText(root, s)
+		text, err := docsreader.Section(root, s.page, s.heading)
 		if err != nil {
 			r.Fatalf("%v", err)
 			return

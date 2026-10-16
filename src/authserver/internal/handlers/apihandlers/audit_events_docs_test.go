@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
@@ -168,11 +169,11 @@ func assertAuditEventCatalog(r guard.Reporter, root string, section docSection, 
 // time, or gives it no meaning, and then one per event in events with no row. It returns an error,
 // and no findings, for a section not found or holding no table.
 func auditEventCatalogFindings(root string, section docSection, events []string) ([]string, error) {
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		return nil, err
 	}
-	rows := docEveryTableRows(text)
+	rows := docsreader.Rows(text)
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("%s: %s holds no table of the audit events", section.page, section.heading)
 	}
@@ -209,31 +210,4 @@ func auditEventCatalogFindings(root string, section docSection, events []string)
 		}
 	}
 	return findings, nil
-}
-
-// docEveryTableRows is the body rows of every Markdown table in text, in order, each trimmed cell
-// in order: each table's header row and the delimiter row under it are left out.
-func docEveryTableRows(text string) [][]string {
-	var rows [][]string
-	inTable := false
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			inTable = false
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		for i := range cells {
-			cells[i] = strings.TrimSpace(cells[i])
-		}
-		if !inTable {
-			inTable = true // a table's header row
-			continue
-		}
-		if strings.Trim(strings.Join(cells, ""), "-: ") == "" {
-			continue // the delimiter row
-		}
-		rows = append(rows, cells)
-	}
-	return rows
 }

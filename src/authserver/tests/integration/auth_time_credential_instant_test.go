@@ -141,22 +141,22 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The credential's window. Bracketing the POST rather than reading the clock once is what
 	// makes the assertions exact without depending on how long the hash took.
 	pwdBefore := time.Now().UTC()
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, email, password)
 	pwdAfter := time.Now().UTC()
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 
@@ -166,11 +166,11 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 	resumedAt := time.Now().UTC()
 
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -327,7 +327,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 		authTime := ageSession(longAgo, 5*time.Minute)
 
 		resp, codeVerifier := silentAuthorize()
-		defer func() { _ = resp.Body.Close() }()
+		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 		redirectLocation := assertRedirect(t, resp, "/auth/issue")
 		resp = loadPage(t, httpClient, redirectLocation)
 		defer func() { _ = resp.Body.Close() }()

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/httpmw"
 )
@@ -133,12 +134,12 @@ func assertCSRFExemptionTable(r guard.Reporter, root string, section docSection,
 		r.Fatalf("no path to hold %s: %s to: the policy exempts nothing", section.page, section.heading)
 		return
 	}
-	text, err := docSectionText(root, section)
+	text, err := docsreader.Section(root, section.page, section.heading)
 	if err != nil {
 		r.Fatalf("%v", err)
 		return
 	}
-	rows := docTableRows(text)
+	rows := docsreader.Rows(text)
 	if len(rows) == 0 {
 		r.Fatalf("%s: %s has no table", section.page, section.heading)
 		return

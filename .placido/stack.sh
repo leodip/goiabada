@@ -103,8 +103,14 @@ case "${1:-}" in
     up)
         compose up -d --wait --wait-timeout "$WAIT"
         wait_for_databases
-        # The devcontainer must mount this worktree, not another checkout.
+        # The devcontainer must mount this worktree, not another checkout. Docker Desktop
+        # on WSL can report the mount by its own proxy instead, named after the SHA-256
+        # of the host path compose gave it.
         mounted=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "'"$REPO_IN_CONTAINER"'"}}{{.Source}}{{end}}{{end}}' "$CONTAINER")
+        if [[ "$mounted" == /run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/*/* \
+              && "${mounted##*/}" == "$(realpath -s "$WT" | tr -d '\n' | sha256sum | cut -d' ' -f1)" ]]; then
+            mounted="$WT"
+        fi
         [[ "$(cd "$mounted" 2>/dev/null && pwd -P)" == "$(cd "$WT" && pwd -P)" ]] \
             || die "$CONTAINER mounts $mounted, not $WT."
         echo "stack $NAME is up"
