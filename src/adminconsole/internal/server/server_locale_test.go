@@ -37,7 +37,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 		s := &Server{
 			router:        chi.NewRouter(),
 			sessionStore:  newTestSessionStore(),
-			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
+			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},
 			metrics:       metrics.NewRegistry(),
 		}

@@ -117,7 +117,7 @@ func TestClient_RecordsItsCallsUnderTheSettingsTarget(t *testing.T) {
 	defer server.Close()
 
 	reg := metrics.NewRegistry()
-	client := NewClient(server.URL, upstreammetrics.Register(reg))
+	client := NewClient(server.URL, nil, upstreammetrics.Register(reg))
 
 	_, err := client.GetPublicSettings(context.Background())
 	require.NoError(t, err)

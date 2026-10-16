@@ -2,6 +2,8 @@ package oauthclient
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,8 +28,19 @@ import (
 // deadline, but the JWKS fetch deliberately keeps the request's own context -- it is an
 // idempotent read -- and a browser context carries no deadline. So the timeout here is what
 // bounds it (#338).
-func NewAuthServerHTTPClient() *http.Client {
-	return &http.Client{Timeout: TokenExchangeTimeout}
+//
+// rootCAs is the pool the client verifies the auth server's certificate against, nil for the
+// system roots alone; main hands the pool GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE named appended
+// to the system roots, so an https internal URL a private CA signed verifies once the operator
+// names the CA, and no call this process makes replaces the roots the process already had (#525).
+func NewAuthServerHTTPClient(rootCAs *x509.CertPool) *http.Client {
+	client := &http.Client{Timeout: TokenExchangeTimeout}
+	if rootCAs != nil {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
+		client.Transport = transport
+	}
+	return client
 }
 
 // TokenEndpointURL is the auth server's token endpoint under baseURL. The base URL comes from
@@ -55,7 +68,7 @@ type TokenClient struct {
 // fetch sharing it is not labelled as a grant (#400 decision 6).
 func NewTokenClient(tokenURL, clientID, clientSecret string, httpClient *http.Client, upstream *upstreammetrics.Recorder) *TokenClient {
 	if httpClient == nil {
-		httpClient = NewAuthServerHTTPClient()
+		httpClient = NewAuthServerHTTPClient(nil)
 	}
 	return &TokenClient{
 		tokenURL:     tokenURL,

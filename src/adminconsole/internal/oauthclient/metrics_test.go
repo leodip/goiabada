@@ -32,7 +32,7 @@ func TestTokenClientAndJWKSFetch_SharingAClientRecordUnderTheirOwnTargets(t *tes
 
 	reg := metrics.NewRegistry()
 	upstream := upstreammetrics.Register(reg)
-	shared := NewAuthServerHTTPClient()
+	shared := NewAuthServerHTTPClient(nil)
 	tokenClient := NewTokenClient(TokenEndpointURL(server.URL), "ci", "cs", shared, upstream)
 	parser := NewJWKSTokenParser(server.URL, shared, upstream, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))

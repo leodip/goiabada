@@ -45,14 +45,17 @@ const (
 	httpsChildTestName = "TestInternalBaseURL_HTTPS_TrustsWhatTheSystemRootsTrust"
 )
 
-// An https internal URL is a configuration the console supports with no setting of its own (#505):
-// its clients send through Go's default transport, which verifies the auth server's certificate
-// against the system roots, and on Linux SSL_CERT_FILE and SSL_CERT_DIR replace those roots. The
-// parent serves two auth servers over TLS, one under a CA the child's SSL_CERT_FILE names and one
-// under a CA it does not, and runs the child with only that CA trusted: the system roots load once
-// per process, so the child is a fresh one. The child makes the calls with the clients main and
-// the routes compose, through the internal URL; the first server must see every call arrive, and
-// the second none, since the console refuses its certificate before sending a byte of a request.
+// An https internal URL while GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE is unset is the trust the
+// console had before it could name a CA (#505): its clients send through Go's default transport,
+// which verifies the auth server's certificate against the system roots, and on Linux
+// SSL_CERT_FILE and SSL_CERT_DIR replace those roots. The setting of its own appends a CA beside
+// those roots instead, and internal_ca_test.go holds that half (#525); this is what remains when
+// no CA is named. The parent serves two auth servers over TLS, one under a CA the child's
+// SSL_CERT_FILE names and one under a CA it does not, and runs the child with only that CA
+// trusted: the system roots load once per process, so the child is a fresh one. The child makes
+// the calls with the clients main and the routes compose, through the internal URL; the first
+// server must see every call arrive, and the second none, since the console refuses its
+// certificate before sending a byte of a request.
 func TestInternalBaseURL_HTTPS_ReachesATrustedAuthServerAndRefusesAnUntrustedOne(t *testing.T) {
 	switch runtime.GOOS {
 	case "darwin", "ios", "windows", "android", "plan9":
@@ -113,9 +116,9 @@ func TestInternalBaseURL_HTTPS_TrustsWhatTheSystemRootsTrust(t *testing.T) {
 		upstream := upstreammetrics.Register(metrics.NewRegistry())
 		authBase := cfg.AuthServer.GetEffectiveBaseURL()
 
-		_, tokenErr := newTokenClient(cfg, oauthclient.NewAuthServerHTTPClient(), upstream).ClientCredentials(context.Background(), "authserver:manage")
-		_, settingsErr := publicsettings.NewClient(authBase, upstream).GetPublicSettings(context.Background())
-		_, adminErr := apiclient.NewAuthServerClient(authBase, upstream).GetSettingsGeneral(context.Background(), "an-access-token")
+		_, tokenErr := newTokenClient(cfg, oauthclient.NewAuthServerHTTPClient(nil), upstream).ClientCredentials(context.Background(), "authserver:manage")
+		_, settingsErr := publicsettings.NewClient(authBase, nil, upstream).GetPublicSettings(context.Background())
+		_, adminErr := apiclient.NewAuthServerClient(authBase, nil, upstream).GetSettingsGeneral(context.Background(), "an-access-token")
 		return []error{tokenErr, settingsErr, adminErr}
 	}
 
@@ -142,6 +145,8 @@ func newTLSAuthServer(t *testing.T, leaf tls.Certificate, requests *atomic.Int32
 			_, _ = w.Write([]byte(`{"appName":"Goiabada","uiTheme":"","smtpEnabled":false,"issuer":"https://auth.example.test"}`))
 		case "/api/v1/admin/settings/general":
 			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"https://auth.example.test"}`))
+		case "/api/v1/sessions/create":
+			_, _ = w.Write([]byte(`{"expiresAt":"2026-10-16T12:00:00Z"}`))
 		default:
 			http.NotFound(w, r)
 		}
