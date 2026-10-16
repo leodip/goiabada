@@ -105,6 +105,18 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 			http.StatusBadRequest)
 	}
 
+	// A client whose default ACR level is level 2 (mandatory) asks every sign-in for a second
+	// factor, and a password is all this grant ever checks, so the client's floor cannot be
+	// met: refuse rather than issue a level-1 token below it. After the password is verified,
+	// as the refusal above is, so the account's rate-limit charge answers a real guess (#533).
+	if client.DefaultAcrLevel == record.AcrLevel2Mandatory {
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			"Resource owner password credentials grant is not available for a client whose "+
+				"default ACR level is urn:goiabada:level2_mandatory. "+
+				"Please use the authorization code flow instead.",
+			http.StatusBadRequest)
+	}
+
 	// Validate scopes - follow authorization code flow pattern
 	// Note: consent_required is BYPASSED for ROPC (user providing credentials = implicit consent)
 	err = val.database.UserLoadPermissions(ctx, nil, user)
