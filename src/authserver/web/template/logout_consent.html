@@ -10,9 +10,9 @@
             return false;
         }
 
-        // No history to go back to: leave the link's own href in charge, which re-renders
-        // this page rather than sending the End-User anywhere. It is also what a browser
-        // without JavaScript does with the control, there being no script to prevent.
+        // No history to go back to: leave the link's own href in charge, which leads to the
+        // page saying the End-User is still signed in and can close it. It is also what a
+        // browser without JavaScript does with the control, there being no script to prevent.
     }
 </script>
 
@@ -56,14 +56,15 @@
         {{end}}
 
         <!-- The declining control is a link rather than a button, because a button with no type
-             attribute is a submit control by HTML's missing-value default and only the inline
-             script above could stop it submitting: with JavaScript unavailable, clicking No
+             attribute is a submit control by HTML's missing-value default and only the click
+             handler above could stop it submitting: with JavaScript unavailable, clicking No
              answered Yes and tore the session down (#152). A link cannot submit the form, and its
-             href is a destination that needs no script: this form's action path, which drops the
-             query string the page was served with and re-renders the question, still signed in.
-             That is also the answer to the no-history case NoBtnClick falls back to above. -->
+             href is a destination that needs no script: the declined page, which says the End-User
+             is still signed in and can close it, carrying ui_locales and nothing else, since a
+             decline is not a logout and hands the RP nothing. That is also the answer to the
+             no-history case NoBtnClick falls back to above. -->
         <div class="grid grid-cols-2 gap-3">
-            <a class="w-full mt-2 btn btn-secondary" href="{{.formAction}}" onclick="return NoBtnClick(this, event);">{{ T $.ctx "common.button.no" }}</a>
+            <a class="w-full mt-2 btn btn-secondary" href="{{.declineHref}}" onclick="return NoBtnClick(this, event);">{{ T $.ctx "common.button.no" }}</a>
             <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "common.button.yes" }}</button>
         </div>
 
