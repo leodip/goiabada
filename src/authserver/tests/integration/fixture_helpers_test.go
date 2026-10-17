@@ -162,26 +162,26 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -271,30 +271,30 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -395,41 +395,41 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/otp")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -576,30 +576,30 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -732,30 +732,30 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
