@@ -256,7 +256,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 
 	err := createChallengelessCode000039(t, h, client, user, nil)
 	if isSQLite000039() {
-		require.ErrorContainsf(t, err, "code_challenge",
+		require.ErrorContainsf(t, err, "NOT NULL constraint failed: codes.code_challenge",
 			"at %06d SQLite still holds codes.code_challenge NOT NULL: the refusal must name the column, and only that failure is the defect", pred)
 	} else {
 		require.NoErrorf(t, err, "the other three engines have accepted a NULL challenge since their own 000007 (%s)", dbType())
@@ -288,7 +288,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 		assert.True(t, afterDown.CodeChallengeMethod.Valid, "the down converts the method column too")
 		assert.Empty(t, afterDown.CodeChallengeMethod.String, "the down writes an empty string")
 
-		require.ErrorContainsf(t, createChallengelessCode000039(t, h, client, user, nil), "code_challenge",
+		require.ErrorContainsf(t, createChallengelessCode000039(t, h, client, user, nil), "NOT NULL constraint failed: codes.code_challenge",
 			"after the down SQLite must refuse a NULL challenge again: the constraint is back, and the refusal must name the column it refused")
 	} else {
 		require.NoError(t, createChallengelessCode000039(t, h, client, user, nil),
@@ -379,7 +379,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 func seedClient000039(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
 	identifier := "c-" + fake.UUID()[:8]
-	return &record.Client{Id: seedClient000035(t, h, identifier), ClientIdentifier: identifier}
+	return &record.Client{Id: seedClient(t, h, identifier), ClientIdentifier: identifier}
 }
 
 func seedUser000039(t *testing.T, h *isolatedDB) *record.User {

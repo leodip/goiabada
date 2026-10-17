@@ -14,22 +14,23 @@ import (
 // The SQL seeds the per-migration tests share (#510). The repository's CRUD writes every column
 // the current Go record declares, so it only fits the schema at head: the next migration that adds
 // a column to users, groups, resources, permissions, one of the three grant tables, user_consents,
-// user_session_clients or web_origins would break every test that seeds one of those tables below
-// head, on every engine, for a reason unrelated to the migration under test. #499 hit exactly that
-// for clients (seedClient000035); these are the rest of the tables the migration tests seed.
+// user_session_clients, web_origins or clients would break every test that seeds one of those
+// tables below head, on every engine, for a reason unrelated to the migration under test. #499 hit
+// exactly that for clients; seedClient, which it wrote for that, lives here beside the rest.
 //
 // Each helper names only the columns every version it is used at carries, so a column a later
-// migration adds is simply absent from the statement. String values are engine-neutral literals,
-// as in seedClient000035 and the h.SQL.Exec seeds of 000046 and 000055; users is the one table
-// bound through sqlbuilder instead, because 000048 and 000059 seed a real OTP ciphertext, the one
-// value no literal can carry. A write that is what its test tests -- 000039's codes, 000046's
-// user_sessions, 000055's duplicate refusals -- keeps the ORM, with a comment saying so where it
-// stands.
+// migration adds is simply absent from the statement. Identifiers and descriptions the tests write
+// are plain ASCII with no quote or backslash, inlined as engine-neutral literals, as in the
+// h.SQL.Exec seeds of 000046 and 000055. Free text a fixture controls is bound through sqlbuilder
+// instead: users, for 000048's and 000059's OTP ciphertext, which no literal can carry, and
+// web_origins, whose fixtures carry a backslash, which MySQL's default sql_mode reads as an escape
+// inside a literal. A write that is what its test tests -- 000039's codes, 000046's user_sessions,
+// 000055's duplicate refusals -- keeps the ORM, with a comment saying so where it stands.
 
 // userSeed is the users row a migration test needs: the NOT NULL columns every version from the
 // oldest seed onwards carries, plus the OTP pair only 000048's and 000059's fixtures hold a value
-// for. Empty fields get the same generated values seedUser000039 handed the ORM, so two seeds in
-// one database stay distinct on every unique key.
+// for. Empty fields are generated, the username and email derived from the subject, so two seeds
+// in one database stay distinct on every unique key.
 type userSeed struct {
 	Enabled             bool
 	Subject             string
@@ -123,11 +124,50 @@ func seedGroup(t *testing.T, h *isolatedDB, identifier, description string) int6
 
 	falseLit, _ := boolLiterals000031()
 	_, err := h.SQL.Exec(fmt.Sprintf(
-		"INSERT INTO groups (group_identifier, description, include_in_id_token, include_in_access_token) VALUES ('%s', '%s', %s, %s)",
-		identifier, description, falseLit, falseLit))
+		"INSERT INTO %s (group_identifier, description, include_in_id_token, include_in_access_token) VALUES ('%s', '%s', %s, %s)",
+		groupsTable(), identifier, description, falseLit, falseLit))
 	require.NoError(t, err, "seed group %s", identifier)
 
-	return seedIdByIdentifier(t, h, "groups", "group_identifier", identifier)
+	return seedIdByIdentifier(t, h, groupsTable(), "group_identifier", identifier)
+}
+
+// groupsTable is the groups table's name quoted per engine, because MySQL 8.0.2 made GROUPS a
+// reserved word, so the bare name parses on three engines and fails on the fourth.
+func groupsTable() string {
+	switch dbType() {
+	case data.MySQL:
+		return "`groups`"
+	case data.MSSQL:
+		return "[groups]"
+	default: // sqlite, postgres
+		return `"groups"`
+	}
+}
+
+// seedClient inserts a client with client_credentials_enabled off and reads its id back by an
+// exact match on its identifier, which 000040 relies on to seed a case-variant pair. Every NOT
+// NULL column without a default is named, so the insert does not depend on per-engine defaults
+// agreeing.
+func seedClient(t *testing.T, h *isolatedDB, identifier string) int64 {
+	t.Helper()
+
+	falseLit, trueLit := boolLiterals000031()
+
+	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO clients
+		(client_identifier, enabled, consent_required, is_public, authorization_code_enabled,
+		 client_credentials_enabled, token_expiration_in_seconds,
+		 refresh_token_offline_idle_timeout_in_seconds, refresh_token_offline_max_lifetime_in_seconds,
+		 include_open_id_connect_claims_in_access_token, default_acr_level)
+		VALUES ('%s', %s, %s, %s, %s, %s, 300, 2592000, 5184000,
+		        'default', 'urn:goiabada:level2_optional')`,
+		identifier, trueLit, falseLit, falseLit, trueLit, falseLit))
+	require.NoErrorf(t, err, "seed the %s client", identifier)
+
+	var id int64
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
+		`SELECT id FROM clients WHERE client_identifier = '%s'`, identifier)).Scan(&id),
+		"read back the seeded client id")
+	return id
 }
 
 // seedResource writes a resources row and reads its id back by its identifier.
@@ -141,8 +181,7 @@ func seedResource(t *testing.T, h *isolatedDB, identifier, description string) i
 	return seedIdByIdentifier(t, h, "resources", "resource_identifier", identifier)
 }
 
-// seedPermission writes a permissions row, shaped as seedPermission000035 is because that is the
-// insert #499 already moved off the ORM, and reads its id back by identifier and resource.
+// seedPermission writes a permissions row and reads its id back by identifier and resource.
 func seedPermission(t *testing.T, h *isolatedDB, resourceId int64, identifier, description string) int64 {
 	t.Helper()
 
@@ -210,20 +249,26 @@ func seedUserSessionClient(t *testing.T, h *isolatedDB, sessionId, clientId int6
 	return seedMaxId(t, h, "user_session_clients", fmt.Sprintf("user_session_id = %d AND client_id = %d", sessionId, clientId))
 }
 
-// seedWebOrigin writes the origin verbatim and answers its id. The insert stores what it is
-// given either way -- raw SQL no more than the data layer, which is why 000034's backfill
-// fixtures could move onto it: the validation this migration exists to backfill has only ever
-// lived in the API handler.
+// seedWebOrigin writes the origin verbatim and answers its id. Both statements bind the origin
+// rather than inline it, because 000034's fixtures carry a backslash, which MySQL's default
+// sql_mode reads as an escape inside a literal: inlined, MySQL stored a different origin than the
+// fixture names. Bound, the row holds what the data layer's own write would -- the validation
+// 000034 exists to backfill has only ever lived in the API handler.
 func seedWebOrigin(t *testing.T, h *isolatedDB, clientId int64, origin string) int64 {
 	t.Helper()
 
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		"INSERT INTO web_origins (origin, client_id) VALUES ('%s', %d)", origin, clientId))
+	insert := sqlbuilder.NewInsertBuilder()
+	insert.InsertInto("web_origins").Cols("origin", "client_id").Values(origin, clientId)
+	q, args := insert.BuildWithFlavor(seedFlavor())
+	_, err := h.SQL.ExecContext(context.Background(), q, args...)
 	require.NoError(t, err, "seed web origin %s", origin)
 
+	lookup := sqlbuilder.NewSelectBuilder()
+	lookup.Select("id").From("web_origins").Where(
+		lookup.Equal("origin", origin), lookup.Equal("client_id", clientId))
+	q, args = lookup.BuildWithFlavor(seedFlavor())
 	var id int64
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT id FROM web_origins WHERE origin = '%s' AND client_id = %d", origin, clientId)).Scan(&id),
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&id),
 		"read back the seeded web origin id")
 	return id
 }

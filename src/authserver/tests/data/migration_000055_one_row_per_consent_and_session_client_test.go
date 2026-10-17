@@ -147,7 +147,7 @@ type seeded000055 struct {
 // or 000055, and the record already names clients.administrative_scopes_allowed, which 000060 adds.
 func seedClient000055(t *testing.T, h *isolatedDB) int64 {
 	t.Helper()
-	return seedClient000035(t, h, "mig55_client_"+fake.LetterN(8))
+	return seedClient(t, h, "mig55_client_"+fake.LetterN(8))
 }
 
 func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
@@ -185,10 +185,7 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 
 	// A pair nothing duplicated keeps every column it had.
 	s.untouched = consentRow000055{seedConsent000055(t, h, s.userB, s.client3, "openid profile", middle000055), "openid profile"}
-	stored, err := h.DB.GetConsentByUserIdAndClientId(context.Background(), nil, s.userB, s.client3)
-	require.NoError(t, err)
-	require.NotNil(t, stored)
-	s.untouchedGrantedAt = stored.GrantedAt
+	s.untouchedGrantedAt = consentGrantedAt000055(t, h, s.userB, s.client3)
 
 	// Associations: three rows for (S1, C1), one for (S1, C2), two for (S2, C1). The same client in
 	// two sessions is two pairs, not a duplicate.
@@ -244,6 +241,20 @@ func consentRows000055(t *testing.T, h *isolatedDB, userId, clientId int64) []co
 	return found
 }
 
+// consentGrantedAt000055 reads the granted_at of a pair that holds one row. In SQL rather than
+// through GetConsentByUserIdAndClientId, as consentRows000055 is: the read runs below head, and the
+// ORM's SELECT names every column the record declares, so the next column any migration adds to
+// user_consents would fail it for a reason this migration does not own (#510).
+func consentGrantedAt000055(t *testing.T, h *isolatedDB, userId, clientId int64) sql.NullTime {
+	t.Helper()
+
+	var grantedAt sql.NullTime
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
+		"SELECT granted_at FROM user_consents WHERE user_id = %d AND client_id = %d", userId, clientId)).Scan(&grantedAt),
+		"read the pair's granted_at")
+	return grantedAt
+}
+
 func sessionClientIds000055(t *testing.T, h *isolatedDB, sessionId, clientId int64) []int64 {
 	t.Helper()
 
@@ -291,18 +302,16 @@ func (s *seeded000055) assertSwept(t *testing.T, h *isolatedDB, when string) {
 
 	// The scope a user removed stays removed: the surviving row is the narrower one, which is what
 	// every reader that consults the consent (a refresh that needs one, the silent sign-in) goes by.
-	narrowed, err := h.DB.GetConsentByUserIdAndClientId(context.Background(), nil, s.userA, s.client1)
-	require.NoError(t, err)
-	require.NotNil(t, narrowed)
+	narrowedRows := consentRows000055(t, h, s.userA, s.client1)
+	require.Len(t, narrowedRows, 1)
+	narrowed := &record.UserConsent{Scope: narrowedRows[0].scope}
 	assert.Truef(t, narrowed.HasScope("openid"), "the scope the user kept is still consented %s", when)
 	assert.Falsef(t, narrowed.HasScope("profile"), "the scope the user removed is not handed back %s", when)
 	assert.Falsef(t, narrowed.HasScope("email"), "nor the other one %s", when)
 
-	untouched, err := h.DB.GetConsentByUserIdAndClientId(context.Background(), nil, s.userB, s.client3)
-	require.NoError(t, err)
-	require.NotNil(t, untouched)
-	assert.Truef(t, s.untouchedGrantedAt.Time.Equal(untouched.GrantedAt.Time),
-		"an untouched consent keeps its granted_at %s: %v and was %v", when, untouched.GrantedAt.Time, s.untouchedGrantedAt.Time)
+	untouched := consentGrantedAt000055(t, h, s.userB, s.client3)
+	assert.Truef(t, s.untouchedGrantedAt.Time.Equal(untouched.Time),
+		"an untouched consent keeps its granted_at %s: %v and was %v", when, untouched.Time, s.untouchedGrantedAt.Time)
 
 	assert.Equalf(t, []int64{s.session1Client1Kept}, sessionClientIds000055(t, h, s.session1, s.client1),
 		"three associations for a pair keep the lowest id %s", when)

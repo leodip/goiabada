@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
@@ -103,7 +104,10 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		dbType())
 
 	// 2. The row survives with its seed readable. Through the ORM, which is what every production
-	// read of a seed goes through.
+	// read of a seed goes through, and so at head: the ORM's SELECT names every column the record
+	// declares, so a read at 000048 would fail on the next column any migration adds to users, for
+	// a reason this migration does not own (#510). The dropped column stays dropped on the way.
+	require.NoErrorf(t, h.Migrator.Up(context.Background()), "migrate to head on %s", dbType())
 	got, err := h.DB.GetUserById(context.Background(), nil, user.Id)
 	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.Id, dbType())
 	require.NotNilf(t, got, "users.id=%d is gone; this migration deletes no rows", user.Id)
@@ -134,11 +138,13 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		"000048's down must not invent a default on %s", dbType())
 
 	// The shape only. The values are not restored and the file says so: the plaintext seeds are
-	// recorded nowhere else, so the re-added column reads NULL or empty for every row.
-	rolledBack, err := h.DB.GetUserById(context.Background(), nil, user.Id)
-	require.NoError(t, err)
-	require.NotNil(t, rolledBack)
-	stillDecrypts, err := dataCipher.Decrypt(rolledBack.OTPSecretEncrypted)
+	// recorded nowhere else, so the re-added column reads NULL or empty for every row. Read in SQL,
+	// since the database is at 000047, below head, where the ORM's read is not this test's to make.
+	var rolledBack []byte
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
+		"SELECT otp_secret_encrypted FROM users WHERE id = %d", user.Id)).Scan(&rolledBack),
+		"read the encrypted seed back after the roll back")
+	stillDecrypts, err := dataCipher.Decrypt(rolledBack)
 	require.NoErrorf(t, err, "the encrypted seed is untouched by the roll back on %s", dbType())
 	assert.Equal(t, seed, stillDecrypts,
 		"a down migration that restores a shape must not disturb the column that actually carries the seed")

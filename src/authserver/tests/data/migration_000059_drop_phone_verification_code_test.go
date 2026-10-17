@@ -120,7 +120,11 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 	assert.Equalf(t, wantAfterDrop, afterDrop,
 		"000059 must drop the two phone verification columns and touch nothing else of users on %s", dbType())
 
-	// 2. The user survives, its seed included.
+	// 2. The user survives, its seed included. Read through the ORM at head: its SELECT names
+	// every column the record declares, so a read at 000059 would fail on the next column any
+	// migration adds to users, for a reason this migration does not own (#510). The two dropped
+	// columns stay dropped on the way.
+	require.NoErrorf(t, h.Migrator.Up(ctx), "migrate to head on %s", dbType())
 	got, err := h.DB.GetUserById(ctx, nil, user.Id)
 	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.Id, dbType())
 	require.NotNilf(t, got, "users.id=%d is gone on %s; this migration deletes no rows", user.Id, dbType())
@@ -144,10 +148,11 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 			"000059's down restores the shape, never the values: users.%s reads NULL on %s", col, dbType())
 	}
 
-	rolledBack, err := h.DB.GetUserById(ctx, nil, user.Id)
-	require.NoErrorf(t, err, "read users.id=%d back after the roll back on %s", user.Id, dbType())
-	require.NotNilf(t, rolledBack, "the roll back must keep users.id=%d on %s", user.Id, dbType())
-	assert.Equal(t, user.Email, rolledBack.Email)
+	// In SQL: the database is at 000058, below head, where the ORM's read is not this test's to make.
+	var rolledBackEmail string
+	require.NoErrorf(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf("SELECT email FROM users WHERE id = %d", user.Id)).Scan(&rolledBackEmail),
+		"the roll back must keep users.id=%d on %s", user.Id, dbType())
+	assert.Equal(t, user.Email, rolledBackEmail)
 
 	// 4. Forward again, which is what an operator who rolled back and retried does.
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, dropPhoneVerificationCode000059),

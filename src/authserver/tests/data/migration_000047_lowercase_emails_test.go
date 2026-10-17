@@ -246,7 +246,10 @@ func seedUserEmail000047(t *testing.T, h *isolatedDB, n int, raw string) int64 {
 }
 
 // storedEmail000047 reads one address back through the ORM, which is what a credential path would
-// read, so a difference here is a difference a sign-in would meet.
+// read, so a difference here is a difference a sign-in would meet. The ORM read is the subject, so
+// it stays the ORM's below head, unlike the seed (#510): it reads what the migration under test
+// left, at that migration's version, and a column a later migration adds to users fails here,
+// loudly, at the read this test is about.
 func storedEmail000047(t *testing.T, h *isolatedDB, id int64) string {
 	t.Helper()
 	user, err := h.DB.GetUserById(context.Background(), nil, id)

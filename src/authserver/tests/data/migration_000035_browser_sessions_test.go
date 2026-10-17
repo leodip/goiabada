@@ -81,7 +81,7 @@ func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 
 	// The end state 000035 produces, already present before it runs.
 	permissionId := seedBrowserSessionsPermission000035(t, h, resourceId)
-	seedBrowserSessionsGrant000035(t, h, clientId, permissionId)
+	seedClientPermission(t, h, clientId, permissionId)
 
 	require.Equal(t, 1, countBrowserSessionsPermission000035(t, h), "fixture: one permission")
 	require.Equal(t, 1, countBrowserSessionsGrant000035(t, h), "fixture: one grant")
@@ -126,12 +126,12 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
 	resourceId, clientId := seedInstallation000035(t, h)
 
-	managePermissionId := seedPermission000035(t, h, resourceId, "manage",
+	managePermissionId := seedPermission(t, h, resourceId, "manage",
 		"Manage the authorization server")
-	seedBrowserSessionsGrant000035(t, h, clientId, managePermissionId)
+	seedClientPermission(t, h, clientId, managePermissionId)
 
-	otherClientId := seedClient000035(t, h, "some-other-client")
-	seedBrowserSessionsGrant000035(t, h, otherClientId, managePermissionId)
+	otherClientId := seedClient(t, h, "some-other-client")
+	seedClientPermission(t, h, otherClientId, managePermissionId)
 
 	require.Equal(t, 1, countGrantsForClient000035(t, h, "admin-console-client"),
 		"fixture: the admin console client starts holding the wide grant and nothing else")
@@ -199,19 +199,19 @@ func TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal(t *t
 
 	// A second permission on the same resource that nothing in the migration names, held by
 	// the same three principals. Nothing may touch it.
-	manageId := seedPermission000035(t, h, resourceId, "manage", "Manage the authorization server")
+	manageId := seedPermission(t, h, resourceId, "manage", "Manage the authorization server")
 
-	otherClientId := seedClient000035(t, h, "some-other-client")
-	seedBrowserSessionsGrant000035(t, h, otherClientId, browserSessionsId)
-	seedBrowserSessionsGrant000035(t, h, otherClientId, manageId)
+	otherClientId := seedClient(t, h, "some-other-client")
+	seedClientPermission(t, h, otherClientId, browserSessionsId)
+	seedClientPermission(t, h, otherClientId, manageId)
 
-	userId := seedUser000035(t, h, "mig35-holder")
-	seedUserGrant000035(t, h, userId, browserSessionsId)
-	seedUserGrant000035(t, h, userId, manageId)
+	userId := seedUser(t, h, userSeed{Enabled: true, Username: "mig35-holder"})
+	seedUserPermission(t, h, userId, browserSessionsId)
+	seedUserPermission(t, h, userId, manageId)
 
-	groupId := seedGroup000035(t, h, "mig35-holders")
-	seedGroupGrant000035(t, h, groupId, browserSessionsId)
-	seedGroupGrant000035(t, h, groupId, manageId)
+	groupId := seedGroup(t, h, "mig35-holders", "")
+	seedGroupPermission(t, h, groupId, browserSessionsId)
+	seedGroupPermission(t, h, groupId, manageId)
 
 	require.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "browser-sessions"),
 		"fixture: another client holds the administrator's browser-sessions permission")
@@ -295,7 +295,7 @@ func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId i
 		`SELECT id FROM resources WHERE resource_identifier = 'authserver'`).Scan(&resourceId),
 		"read back the seeded resource id")
 
-	clientId = seedClient000035(t, h, "admin-console-client")
+	clientId = seedClient(t, h, "admin-console-client")
 
 	require.False(t, clientCredentialsEnabled000035(t, h),
 		"the fixture must start with client_credentials_enabled off, or the migration's UPDATE "+
@@ -304,57 +304,10 @@ func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId i
 	return resourceId, clientId
 }
 
-// seedClient000035 inserts a client with client_credentials_enabled off. Every NOT NULL
-// column without a default is named, so the insert does not depend on per-engine defaults
-// agreeing.
-func seedClient000035(t *testing.T, h *isolatedDB, identifier string) int64 {
-	t.Helper()
-
-	falseLit, trueLit := boolLiterals000031()
-
-	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO clients
-		(client_identifier, enabled, consent_required, is_public, authorization_code_enabled,
-		 client_credentials_enabled, token_expiration_in_seconds,
-		 refresh_token_offline_idle_timeout_in_seconds, refresh_token_offline_max_lifetime_in_seconds,
-		 include_open_id_connect_claims_in_access_token, default_acr_level)
-		VALUES ('%s', %s, %s, %s, %s, %s, 300, 2592000, 5184000,
-		        'default', 'urn:goiabada:level2_optional')`,
-		identifier, trueLit, falseLit, falseLit, trueLit, falseLit))
-	require.NoErrorf(t, err, "seed the %s client", identifier)
-
-	var id int64
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		`SELECT id FROM clients WHERE client_identifier = '%s'`, identifier)).Scan(&id),
-		"read back the seeded client id")
-	return id
-}
-
 func seedBrowserSessionsPermission000035(t *testing.T, h *isolatedDB, resourceId int64) int64 {
 	t.Helper()
-	return seedPermission000035(t, h, resourceId, "browser-sessions",
+	return seedPermission(t, h, resourceId, "browser-sessions",
 		"Read and write admin console browser sessions")
-}
-
-func seedPermission000035(t *testing.T, h *isolatedDB, resourceId int64, identifier, description string) int64 {
-	t.Helper()
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		`INSERT INTO permissions (permission_identifier, description, resource_id)
-		 VALUES ('%s', '%s', %d)`, identifier, description, resourceId))
-	require.NoErrorf(t, err, "seed the %s permission", identifier)
-
-	var id int64
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		`SELECT id FROM permissions WHERE permission_identifier = '%s' AND resource_id = %d`,
-		identifier, resourceId)).Scan(&id), "read back the seeded permission id")
-	return id
-}
-
-func seedBrowserSessionsGrant000035(t *testing.T, h *isolatedDB, clientId, permissionId int64) {
-	t.Helper()
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		`INSERT INTO clients_permissions (client_id, permission_id) VALUES (%d, %d)`,
-		clientId, permissionId))
-	require.NoError(t, err, "seed the client permission grant")
 }
 
 func countBrowserSessionsPermission000035(t *testing.T, h *isolatedDB) int {
@@ -461,77 +414,6 @@ func tableExists000035(t *testing.T, h *isolatedDB, table string) bool {
 	var n int
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&n), "table catalog lookup: %s", table)
 	return n > 0
-}
-
-// seedUser000035 inserts one user. Every NOT NULL column without a default is named, so
-// the insert does not depend on per-engine defaults agreeing. Only one user is seeded, so
-// a NULL email would be safe even on SQL Server, where a unique index treats two NULLs as
-// equal; it is set anyway so the row does not depend on that staying true.
-func seedUser000035(t *testing.T, h *isolatedDB, name string) int64 {
-	t.Helper()
-
-	falseLit, trueLit := boolLiterals000031()
-	subject := "00000000-0000-4000-8000-000000000035"
-
-	_, err := h.SQL.Exec(fmt.Sprintf(`INSERT INTO users
-		(enabled, subject, username, email, email_verified, phone_number_verified,
-		 password_hash, otp_enabled)
-		VALUES (%s, '%s', '%s', '%s@test.local', %s, %s, 'x', %s)`,
-		trueLit, subject, name, name, falseLit, falseLit, falseLit))
-	require.NoError(t, err, "seed a user")
-
-	var id int64
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT id FROM users WHERE subject = '%s'", subject)).Scan(&id),
-		"read back the seeded user id")
-	return id
-}
-
-// seedGroup000035 inserts one group. The table name is quoted per engine because MySQL
-// 8.0.2 made GROUPS a reserved word, so the bare name parses on three engines and fails on
-// the fourth.
-func seedGroup000035(t *testing.T, h *isolatedDB, identifier string) int64 {
-	t.Helper()
-
-	falseLit, _ := boolLiterals000031()
-
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		`INSERT INTO %s (group_identifier, include_in_id_token, include_in_access_token)
-		 VALUES ('%s', %s, %s)`, groupsTable000035(), identifier, falseLit, falseLit))
-	require.NoError(t, err, "seed a group")
-
-	var id int64
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT id FROM %s WHERE group_identifier = '%s'", groupsTable000035(), identifier)).Scan(&id),
-		"read back the seeded group id")
-	return id
-}
-
-func groupsTable000035() string {
-	switch dbType() {
-	case data.MySQL:
-		return "`groups`"
-	case data.MSSQL:
-		return "[groups]"
-	default: // sqlite, postgres
-		return `"groups"`
-	}
-}
-
-func seedUserGrant000035(t *testing.T, h *isolatedDB, userId, permissionId int64) {
-	t.Helper()
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		`INSERT INTO users_permissions (user_id, permission_id) VALUES (%d, %d)`,
-		userId, permissionId))
-	require.NoError(t, err, "seed the user permission grant")
-}
-
-func seedGroupGrant000035(t *testing.T, h *isolatedDB, groupId, permissionId int64) {
-	t.Helper()
-	_, err := h.SQL.Exec(fmt.Sprintf(
-		`INSERT INTO groups_permissions (group_id, permission_id) VALUES (%d, %d)`,
-		groupId, permissionId))
-	require.NoError(t, err, "seed the group permission grant")
 }
 
 // countUserGrant000035 and countGroupGrant000035 count grants of one permission on the

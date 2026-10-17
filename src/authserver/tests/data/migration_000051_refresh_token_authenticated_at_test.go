@@ -67,7 +67,7 @@ func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string 
 	t.Helper()
 	random := fake.LetterN(6)
 
-	clientId := seedClient000035(t, h, "mig51_client_"+random)
+	clientId := seedClient(t, h, "mig51_client_"+random)
 	userId := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random})
 
 	falseLit, _ := boolLiterals000031()

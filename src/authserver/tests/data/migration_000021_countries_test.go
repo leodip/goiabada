@@ -286,7 +286,10 @@ func assertMigration000021(t *testing.T, h *isolatedDB, fixtures []migFixture, i
 	for _, f := range fixtures {
 		// Every row must remain loadable via GetUserById (commondb scans the
 		// plain-string columns, which cannot hold SQL NULL) -- this proves the
-		// NULL normalization worked.
+		// NULL normalization worked. The ORM read is the subject, so it stays
+		// the ORM's below head, unlike the seed (#510): the forced marker this
+		// test starts from cannot reach head, and a column a later migration
+		// adds to users fails here, loudly, at the read this test is about.
 		u, err := h.DB.GetUserById(context.Background(), nil, ids[f.label])
 		require.NoErrorf(t, err, "%s [%s]: GetUserById", f.label, phase)
 		require.NotNilf(t, u, "%s [%s]: user nil", f.label, phase)
