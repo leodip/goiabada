@@ -30,6 +30,9 @@ func TestMain(m *testing.M) {
 		// main does not return: it exits with the code run answers.
 		main()
 	}
+	if path := os.Getenv(runHeldMigrateMarker); path != "" {
+		os.Exit(runHeldMigrateChild(path))
+	}
 	os.Exit(m.Run())
 }
 
