@@ -276,11 +276,12 @@ func TestHandleUnauthorizedGet_Answers403(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, handlertest.Bind(t, httpHelper)["_httpStatus"])
 }
 
-// #411: the state change on this route refuses a navigation the browser reports as beginning on
-// another site, the same evidence the origin check reads first on the unsafe methods. Both of
-// this route's callers navigate from this console's own pages, which report same-origin, so only
-// another site's navigation is refused.
-func TestHandleSessionEndedGet_RefusesANavigationTheBrowserReportsCrossSite(t *testing.T) {
+// #411: the state change on this route clears nothing for a navigation the browser reports as
+// beginning on another site, the same evidence the origin check reads first on the unsafe
+// methods. It is sent home rather than refused: the API-error helpers' 302 carries the initiator
+// of the navigation it answers, so an administrator who followed another site's link to a console
+// page whose token had ended arrives here cross-site, and a 403 would dead-end them on every try.
+func TestHandleSessionEndedGet_SendsANavigationTheBrowserReportsCrossSiteHomeAndClearsNothing(t *testing.T) {
 	testCases := []struct {
 		name string
 		site string
@@ -292,6 +293,7 @@ func TestHandleSessionEndedGet_RefusesANavigationTheBrowserReportsCrossSite(t *t
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			store := newMemoryStore(t)
+			logs := logtest.CaptureSlog(t)
 			cookies := seedSession(t, store, signedInValues())
 
 			req := withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies)
@@ -300,17 +302,28 @@ func TestHandleSessionEndedGet_RefusesANavigationTheBrowserReportsCrossSite(t *t
 			w := httptest.NewRecorder()
 			HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w, req)
 
-			assert.Equal(t, http.StatusForbidden, w.Code,
-				"the same status the origin check answers a cross-site POST with")
-			assert.Contains(t, w.Body.String(), i18n.T(context.Background(), "error.csrf_refused"),
-				"the same sentence, from the same catalog entry")
+			assert.Equal(t, http.StatusFound, w.Code, "sent on, not dead-ended on a 403")
+			assert.Equal(t, "/", w.Header().Get("Location"),
+				"the home page, which calls no admin API, so nothing can loop")
+			assert.NotContains(t, w.Body.String(), i18n.T(context.Background(), "error.csrf_refused"),
+				"not the origin check's refusal")
+			assert.Empty(t, w.Result().Cookies(), "nothing is written to the session")
 
 			sess := readSession(t, store, cookies)
 			assert.Contains(t, sess.Values, sessionkeys.JWT,
 				"the stored tokens survive: the navigation signed nobody out")
+			assert.Contains(t, sess.Values, sessionkeys.JWTExpiresAt)
 			assert.Equal(t, "kept", sess.Values["somethingElse"])
 			_, noticed := sess.TakeFlash(flashSessionEnded)
 			assert.False(t, noticed, "no notice, since nothing happened")
+
+			records := logs.Records()
+			require.Len(t, records, 1)
+			assert.Equal(t, slog.LevelWarn, records[0].Level, "a refused request")
+			assert.Equal(t, "a navigation from another site reached the session-ended route, sending it home without signing out",
+				records[0].Message)
+			assert.Equal(t, testCase.site, records[0].Attrs["sec_fetch_site"],
+				"which evidence decided it, as the origin check records its own refusals")
 		})
 	}
 }

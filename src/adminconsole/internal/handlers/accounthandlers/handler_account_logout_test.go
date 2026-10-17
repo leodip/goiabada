@@ -162,15 +162,33 @@ func TestHandleLogoutConfirmGet_RendersTheConfirmationAndSignsNobodyOut(t *testi
 	assert.Empty(t, rec.Header().Get("Location"), "nothing may navigate the browser away")
 }
 
+// Without both the verified ID token and the access token string there is nothing to sign out,
+// so the visitor is not asked to confirm it: the same two arms the POST's own test covers.
 func TestHandleLogoutConfirmGet_SendsAVisitorWithoutTokensHome(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
-	handlertest.RefuseInternalServerError(t, httpHelper)
+	testCases := []struct {
+		name string
+		req  *http.Request
+	}{
+		{"no tokens at all",
+			handlertest.Request(http.MethodGet, "/auth/logout")},
+		{"an access token and no ID token",
+			handlertest.Request(http.MethodGet, "/auth/logout", handlertest.WithAccessToken())},
+		{"an ID token and no access token",
+			handlertest.Request(http.MethodGet, "/auth/logout",
+				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "the.id.token"}}))},
+	}
 
-	rec := httptest.NewRecorder()
-	HandleLogoutConfirmGet(httpHelper, consoleBaseURL).ServeHTTP(rec,
-		handlertest.Request(http.MethodGet, "/auth/logout"))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
 
-	assert.Equal(t, http.StatusFound, rec.Code)
-	assert.Equal(t, consoleBaseURL, rec.Header().Get("Location"),
-		"home is the base URL the handler was built with, as the sign-out's own unauthenticated arm")
+			rec := httptest.NewRecorder()
+			HandleLogoutConfirmGet(httpHelper, consoleBaseURL).ServeHTTP(rec, tc.req)
+
+			assert.Equal(t, http.StatusFound, rec.Code)
+			assert.Equal(t, consoleBaseURL, rec.Header().Get("Location"),
+				"home is the base URL the handler was built with, as the sign-out's own unauthenticated arm")
+		})
+	}
 }

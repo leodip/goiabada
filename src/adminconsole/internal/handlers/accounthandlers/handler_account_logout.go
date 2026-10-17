@@ -19,8 +19,10 @@ type accountLogoutAPI interface {
 }
 
 // HandleLogoutConfirmGet renders the page that asks the administrator to confirm signing out,
-// and is the GET every navigation to /auth/logout arrives at: the menu's link, the redirect the
-// general settings save issues after an issuer change (#473), and the sessions pages' script.
+// and is the GET a navigation to /auth/logout arrives at, which the menu's link is. The redirect
+// the general settings save issues after an issuer change (#473) arrives here too, but with its
+// tokens already cleared, so it takes the no-token arm below and is sent home, as before #411.
+// The sessions pages post the sign-out directly once their own modal has confirmed it.
 //
 // It writes nothing and signs nobody out — the handler is not even handed a session store, so
 // the confirmation cannot destroy anything — and it calls no API. A state-changing GET on this

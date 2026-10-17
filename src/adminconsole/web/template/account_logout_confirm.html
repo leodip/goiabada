@@ -3,10 +3,11 @@
 
 {{define "body"}}
 
-<!-- The sign-out confirmation (#411). Every navigation to /auth/logout arrives here: the menu's
-     link, the redirect the general settings save issues after an issuer change, and the sessions
-     pages' script. The page writes nothing and calls nothing; its form is the only way on, and it
-     posts, so the origin check guards the sign-out. No JavaScript is needed to take it: the button
+<!-- The sign-out confirmation (#411). The menu's link arrives here. The redirect the general
+     settings save issues after an issuer change arrives with its tokens already cleared and is
+     sent home before this page renders, and the sessions pages post the sign-out directly once
+     their own modal has confirmed it. The page writes nothing and calls nothing; its form posts,
+     so the origin check guards the sign-out. No JavaScript is needed to take it: the button
      below is a plain submit. -->
 
 <main>

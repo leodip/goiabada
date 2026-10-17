@@ -7,7 +7,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -26,11 +26,20 @@ const flashSessionEnded = "sessionEnded"
 // helpers answer an admin API 401 with a 302 here, and the page scripts follow with
 // window.location, and neither can arrive as a POST. A GET that changes state is the exposure
 // #411 closed on /auth/logout, so the state change here is guarded instead: a navigation the
-// browser itself reports as beginning on another site is refused, which is the same evidence the
-// origin check reads first on the unsafe methods beside it (httpmw.CSRF). A browser predating
+// browser itself reports as beginning on another site clears nothing, which is the same evidence
+// the origin check reads first on the unsafe methods beside it (httpmw.CSRF). A browser predating
 // fetch metadata sends no Sec-Fetch-Site at all and is allowed through, the posture those POSTs
 // keep; and a top-level navigation is the only cross-site shape that carries this console's Lax
 // session cookie to a GET anyway (#408).
+//
+// Such a navigation is sent home with the session untouched rather than refused, because the
+// 302 here does not always begin on this console: fetch metadata reports every hop of a
+// navigation with its initiator, so an administrator whose auth server session ended and who
+// follows a link to a console page from another site, or from the auth server's own pages, which
+// are usually the same site, arrives here reported cross-site or same-site. A 403 would dead-end
+// that administrator on every try. The home page calls no admin API, so nothing loops, and the
+// next console page they open meets the same 401 from this origin and is signed out then, with
+// the notice.
 func HandleSessionEndedGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -38,10 +47,11 @@ func HandleSessionEndedGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if crossSiteNavigation(r) {
-			// The same status and sentence httpmw.CSRF answers a cross-site POST with, from the
-			// same catalog entry, so one refusal vocabulary covers both halves of #411. The
-			// session is left exactly as the navigation found it: alive, tokens and all.
-			http.Error(w, i18n.T(r.Context(), "error.csrf_refused"), http.StatusForbidden)
+			// Warn: a refused request. The session is left exactly as the navigation found it:
+			// alive, tokens and all, and nothing is written to it.
+			slog.WarnContext(r.Context(), "a navigation from another site reached the session-ended route, sending it home without signing out",
+				"sec_fetch_site", logging.FieldForLog(r.Header.Get("Sec-Fetch-Site")))
+			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 
