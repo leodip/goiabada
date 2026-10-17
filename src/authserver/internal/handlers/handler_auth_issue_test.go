@@ -22,7 +22,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -5289,4 +5291,270 @@ func TestHandleIssueGet_ACodeInFormPostRendersFromTheRespondersTemplates(t *test
 		rr.Body.String())
 	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 	pageRenderer.AssertNotCalled(t, "InternalServerError", rr, req, mock.Anything)
+}
+
+// TestHandleIssueGet_WarnsWhenAResponseGoesToAStoredPlainHTTPRedirectURI owns the record #590
+// asks for on the two arms of /auth/issue that answer a client, the code and the implicit
+// tokens, which are the only emissions this handler makes to a redirect URI. A plain-http URI
+// off the loopback interface that was stored before intake began refusing the shape still
+// receives responses by design, so every case here asserts the delivery too: the record is
+// additive, never a refusal, and a test that passed while the response stopped going out would
+// be worth nothing. The loopback and https rows are the predicate's boundary: neither may warn,
+// the first because RFC 8252 section 7.3 native and MCP clients redirect to http on 127.0.0.1,
+// ::1 and localhost by design, the second because TLS is what RFC 9700 section 2.6 asks for.
+func TestHandleIssueGet_WarnsWhenAResponseGoesToAStoredPlainHTTPRedirectURI(t *testing.T) {
+
+	// One wiring for both arms, built the way TestHandleIssueGet_AnswersEachIssuanceOutcome builds
+	// the code arm and TestHandleIssueGet_ImplicitFlow builds the tokens arm, so the gate above
+	// the dispatch is a pass and the emission under test is the only thing left. The client's
+	// registrations hold whatever URI the case carries, exactly as a stored row would.
+	type warnFixture struct {
+		handler             http.HandlerFunc
+		authContext         *ceremony.AuthContext
+		rr                  *httptest.ResponseRecorder
+		req                 *http.Request
+		codeIssuer          *handlersmocks.CodeIssuer
+		implicitTokenIssuer *handlersmocks.ImplicitTokenIssuer
+		database            *datamocks.Database
+		auditLogger         *handlersmocks.AuditLogger
+		ceremonyStore       *handlersmocks.CeremonyStore
+		pageRenderer        *handlersmocks.PageRenderer
+		userSessionManager  *handlersmocks.UserSessionManager
+		permissionChecker   *handlersmocks.PermissionChecker
+	}
+	newFixture := func(t *testing.T, responseType, responseMode, redirectURI string) *warnFixture {
+		f := &warnFixture{
+			codeIssuer:          handlersmocks.NewCodeIssuer(t),
+			implicitTokenIssuer: handlersmocks.NewImplicitTokenIssuer(t),
+			database:            datamocks.NewDatabase(t),
+			auditLogger:         handlersmocks.NewAuditLogger(t),
+			ceremonyStore:       handlersmocks.NewCeremonyStore(t),
+			pageRenderer:        handlersmocks.NewPageRenderer(t),
+			userSessionManager:  handlersmocks.NewUserSessionManager(t),
+			permissionChecker:   handlersmocks.NewPermissionChecker(t),
+		}
+		f.handler = buildIssueGet(issueGetDeps{
+			pageRenderer:        f.pageRenderer,
+			ceremonyStore:       f.ceremonyStore,
+			templateFS:          fstest.MapFS{},
+			codeIssuer:          f.codeIssuer,
+			implicitTokenIssuer: f.implicitTokenIssuer,
+			database:            f.database,
+			auditLogger:         f.auditLogger,
+			userSessionManager:  f.userSessionManager,
+			permissionChecker:   f.permissionChecker,
+		})
+
+		// The wiring the code cases of TestHandleIssueGet use: a request carrying the
+		// session's settings and its identifier, so the ceremony the store returns is the
+		// only thing left to vary. armIssueGate is deliberately NOT called here, because its
+		// contract is LAST in a case, after the rows that case armed for itself: testify
+		// answers a call with the first registered expectation that matches, so a row armed
+		// here would win over the case's own and serve the wrong user or client.
+		f.req = requestWithSessionIdentifier(t, liveSessionIdentifier)
+		f.rr = httptest.NewRecorder()
+
+		// The code arm's ceremony, as the Successfully-issues-a-code case carries it, and the
+		// tokens arm's, as TestHandleIssueGet_ImplicitFlow carries it. No AcrLevel and no
+		// AuthStateGeneration anywhere, because the user rows these cases stub carry none
+		// either, and a ceremony that named a generation the stubbed user does not hold
+		// would be restarted at level 1 instead of answered.
+		f.authContext = &ceremony.AuthContext{
+			CeremonyId:   testCeremonyId,
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
+			ClientId:     "test-client",
+			UserId:       123,
+			ResponseMode: responseMode,
+			ResponseType: responseType,
+			RedirectURI:  redirectURI,
+			Scope:        "openid",
+			State:        "test-state",
+			Nonce:        "test-nonce",
+		}
+		if responseType == "token" {
+			f.authContext.AuthenticatedAt = &testIssueAuthTime
+			f.authContext.AuthMethods = "pwd"
+		}
+
+		f.ceremonyStore.On("GetAuthContext", f.req).Return(f.authContext, nil)
+		stubLiveSession(f.database, 123)
+		return f
+	}
+
+	// armCodeIssuer stubs the code arm's issuer and audit, the code returning the very URI the
+	// ceremony carries, which is the value an emission would have gone out to.
+	armCodeIssuer := func(f *warnFixture, redirectURI string) {
+		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+			return reflect.DeepEqual(input, newCreateCodeInput(f.authContext, liveSessionIdentifier))
+		})).Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: redirectURI, State: "test-state"}, nil).Once()
+		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+	}
+
+	t.Run("the code arm delivers the response and writes one warn record", func(t *testing.T) {
+		const storedURI = "http://app.example.com/callback"
+		f := newFixture(t, "code", "query", storedURI)
+		armCodeIssuer(f, storedURI)
+		armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+		logs := logtest.CaptureSlog(t)
+		f.handler.ServeHTTP(f.rr, f.req)
+
+		// The delivery is the property that must not change: a stored row keeps receiving
+		// responses by design, and this record is the one line that says what that costs.
+		assert.Equal(t, http.StatusFound, f.rr.Code)
+		assert.Equal(t, storedURI+"?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", f.rr.Header().Get("Location"))
+
+		warning, ok := warningSaying(t, logs, "uses plain http off the loopback interface")
+		if !ok {
+			return
+		}
+		assert.Equal(t, "issueAuthCode", warning.Attrs["site"])
+		assert.Equal(t, "test-client", warning.Attrs["client_identifier"])
+		assert.Equal(t, storedURI, warning.Attrs["redirect_uri"])
+		assertOrdinaryClientRemedy(t, warning)
+	})
+
+	t.Run("the implicit arm delivers the tokens and writes one warn record", func(t *testing.T) {
+		const storedURI = "http://app.example.com/callback"
+		f := newFixture(t, "token", "fragment", storedURI)
+
+		f.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
+				AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
+		f.database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
+			Return(&record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
+		f.implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything,
+			mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+				return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid" &&
+					input.SessionIdentifier == liveSessionIdentifier
+			}), true, false).
+			Return(&issuance.ImplicitGrantResponse{AccessToken: "access-token-123", TokenType: "Bearer",
+				ExpiresIn: 3600, Scope: "openid"}, nil)
+		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil)
+		armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+		logs := logtest.CaptureSlog(t)
+		f.handler.ServeHTTP(f.rr, f.req)
+
+		assert.Equal(t, http.StatusFound, f.rr.Code)
+		assert.Equal(t, storedURI+"#access_token=access-token-123&token_type=Bearer&expires_in=3600&scope=openid&state=test-state&iss=https%3A%2F%2Fissuer.example",
+			f.rr.Header().Get("Location"))
+
+		warning, ok := warningSaying(t, logs, "uses plain http off the loopback interface")
+		if !ok {
+			return
+		}
+		assert.Equal(t, "issueImplicitTokens", warning.Attrs["site"])
+		assert.Equal(t, "test-client", warning.Attrs["client_identifier"])
+		assert.Equal(t, storedURI, warning.Attrs["redirect_uri"])
+		assertOrdinaryClientRemedy(t, warning)
+	})
+
+	// The admin console's own client is the case #590 calls the worst: its redirect URIs are
+	// seeded from GOIABADA_ADMINCONSOLE_BASEURL with no intake check, and the console keeps
+	// sending what that variable says. The ordinary remedy, remove the http URI, would delete the
+	// console's own callback, which intake then refuses to add back, so every administrator would
+	// be locked out. Its remedy has to say the console moves to https first.
+	t.Run("the admin console's client gets a remedy that moves the console to https first", func(t *testing.T) {
+		const storedURI = "http://console.example.com/auth/callback"
+		f := newFixture(t, "code", "query", storedURI)
+		f.authContext.ClientId = builtin.AdminConsoleClientIdentifier
+		armCodeIssuer(f, storedURI)
+		armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+		logs := logtest.CaptureSlog(t)
+		f.handler.ServeHTTP(f.rr, f.req)
+
+		assert.Equal(t, http.StatusFound, f.rr.Code)
+		assert.Equal(t, storedURI+"?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", f.rr.Header().Get("Location"))
+
+		warning, ok := warningSaying(t, logs, "uses plain http off the loopback interface")
+		if !ok {
+			return
+		}
+		assert.Equal(t, builtin.AdminConsoleClientIdentifier, warning.Attrs["client_identifier"])
+		assert.Equal(t, storedURI, warning.Attrs["redirect_uri"])
+		remedy, _ := warning.Attrs["remedy"].(string)
+		assert.Contains(t, remedy, "admin console's own client")
+		assert.Contains(t, remedy, "GOIABADA_ADMINCONSOLE_BASEURL")
+		assert.Contains(t, remedy, "/auth/callback")
+		assert.Contains(t, remedy, "only then remove the http URIs")
+	})
+
+	// The short ASCII URIs above are ones logging.FieldForLog returns unchanged, so they would pass
+	// with the URI written raw. A stored URI may be up to record.RedirectURIMaxBytes, past
+	// logging.MaxLoggedField, and may carry non-ASCII text: the record must hold the bounded,
+	// escaped rendering, while the response still goes to the whole stored URI.
+	for name, storedURI := range map[string]string{
+		"a stored URI longer than a logged field is bounded in the record": "http://app.example.com/" + strings.Repeat("a", 2000),
+		"a stored URI with non-ASCII text is escaped in the record":        "http://app.example.com/ação",
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.LessOrEqual(t, len(storedURI), record.RedirectURIMaxBytes)
+			require.NotEqual(t, storedURI, logging.FieldForLog(storedURI), "the fixture must be one FieldForLog changes")
+
+			f := newFixture(t, "code", "query", storedURI)
+			armCodeIssuer(f, storedURI)
+			armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+			logs := logtest.CaptureSlog(t)
+			f.handler.ServeHTTP(f.rr, f.req)
+
+			assert.Equal(t, http.StatusFound, f.rr.Code)
+			location, err := url.Parse(f.rr.Header().Get("Location"))
+			require.NoError(t, err)
+			location.RawQuery = ""
+			want, err := url.Parse(storedURI)
+			require.NoError(t, err)
+			assert.Equal(t, want.String(), location.String())
+
+			warning, ok := warningSaying(t, logs, "uses plain http off the loopback interface")
+			if !ok {
+				return
+			}
+			assert.Equal(t, logging.FieldForLog(storedURI), warning.Attrs["redirect_uri"])
+		})
+	}
+
+	t.Run("a loopback http redirect URI delivers with no warn record", func(t *testing.T) {
+		const storedURI = "http://127.0.0.1:9090/callback"
+		f := newFixture(t, "code", "query", storedURI)
+		armCodeIssuer(f, storedURI)
+		armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+		logs := logtest.CaptureSlog(t)
+		f.handler.ServeHTTP(f.rr, f.req)
+
+		assert.Equal(t, http.StatusFound, f.rr.Code)
+		assert.Equal(t, storedURI+"?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", f.rr.Header().Get("Location"))
+		noRecordSays(t, logs, "plain http off the loopback")
+	})
+
+	t.Run("an https redirect URI delivers with no warn record", func(t *testing.T) {
+		const storedURI = "https://app.example.com/callback"
+		f := newFixture(t, "code", "query", storedURI)
+		armCodeIssuer(f, storedURI)
+		armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
+
+		logs := logtest.CaptureSlog(t)
+		f.handler.ServeHTTP(f.rr, f.req)
+
+		assert.Equal(t, http.StatusFound, f.rr.Code)
+		assert.Equal(t, storedURI+"?code=test-code&state=test-state&iss=https%3A%2F%2Fissuer.example", f.rr.Header().Get("Location"))
+		noRecordSays(t, logs, "plain http off the loopback")
+	})
+}
+
+// assertOrdinaryClientRemedy holds the remedy an ordinary client's warn record carries to the order
+// that keeps the client working, the https URI added before the http one is removed, and to saying
+// nothing about the admin console, whose remedy is its own.
+func assertOrdinaryClientRemedy(t *testing.T, warning logtest.CapturedRecord) {
+	t.Helper()
+	remedy, _ := warning.Attrs["remedy"].(string)
+	assert.Contains(t, remedy, "add the https redirect URI the client will send")
+	assert.Contains(t, remedy, "only then remove the http one")
+	assert.NotContains(t, remedy, "GOIABADA_ADMINCONSOLE_BASEURL")
+	assert.NotContains(t, remedy, "stored before")
 }

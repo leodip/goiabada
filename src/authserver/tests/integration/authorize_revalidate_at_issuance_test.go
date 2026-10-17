@@ -206,13 +206,13 @@ func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	require.NoError(t, err)
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The consent submission itself succeeds: it reads no session row, so the expiry is
 	// invisible to it. That is what makes the next hop the load-bearing one.
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, parked.httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1")
 	assert.NotContains(t, redirectLocation, "code=",
@@ -246,7 +246,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
 
@@ -311,7 +311,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
 
@@ -323,7 +323,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 	require.NoError(t, err)
 
 	resp = loadPage(t, parked.httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode,
 		"the refusal is rendered, not redirected")
@@ -445,7 +445,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 	// Every box, the revoked one included: the page was built before the revocation and the
 	// browser has no way to know.
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, parked.httpClient, redirectLocation)

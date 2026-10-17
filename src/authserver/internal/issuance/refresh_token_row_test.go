@@ -3,6 +3,7 @@ package issuance
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -473,4 +474,24 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 			mockDB.AssertExpectations(t)
 		})
 	}
+}
+
+// TestGetRefreshTokenMaxLifetime_SessionRowGone holds the gone row's error to what a 500 on the
+// rotation path needs to be traced: the named condition the code exchange refuses on, the
+// session identifier, and the origin's stack under %+v (#530).
+func TestGetRefreshTokenMaxLifetime_SessionRowGone(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
+
+	sessionIdentifier := "swept-session-123"
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
+
+	_, err := tokenIssuer.getRefreshTokenMaxLifetime(context.Background(), nil, TokenTypeRefresh, time.Now().UTC(),
+		&record.Settings{UserSessionMaxLifetimeInSeconds: 43200}, &record.Client{}, sessionIdentifier)
+
+	require.ErrorIs(t, err, errSessionRowGone)
+	assert.Contains(t, err.Error(), sessionIdentifier)
+	assert.Contains(t, fmt.Sprintf("%+v", err), "getRefreshTokenMaxLifetime", "the error should carry its origin's stack")
+
+	mockDB.AssertExpectations(t)
 }
