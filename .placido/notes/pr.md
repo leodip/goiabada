@@ -36,6 +36,11 @@
   `src/authserver/web/openapi.yaml`; user-facing text needs both catalogs,
   `src/core/i18n/catalogs/active.en.toml` and `active.pt-BR.toml`.
 - **Do not run** `e2e` or the scripts under `e2e/`: they rebuild a shared environment.
+- **Nothing on this machine outside the commands.** The devcontainer has no Node.js,
+  and `implement.md`'s advice to build the docs site on the host is for the owner's
+  own changes. For a contributor's pull request, install nothing and build nothing
+  here: read a docs change by eye, check its links against the pages, and leave the
+  site's build to CI's Docs job.
 - **The comment and the squash message:** the history's squash subjects are a sentence
   in the imperative ending with the pull request's number, such as
   `Refuse the password grant for a mandatory level 2 client (#602)`; the body says

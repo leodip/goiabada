@@ -142,6 +142,9 @@ type AuthorizePageRefusal struct {
 	// ClientRefusal is the validator's refusal of the client_id or redirect_uri, for
 	// AuthorizePageRefusalClientOrRedirectURI, localized when the page is rendered.
 	ClientRefusal *i18n.LocalizedError
+	// ImplicitFlow is whether the request asks for tokens rather than a code, for
+	// AuthorizePageRefusalFormPostUnreachable, so the page names the modes that request may use.
+	ImplicitFlow bool
 }
 
 // AuthorizePageRefusalReason is why a request is answered on the refusal page.
@@ -159,6 +162,9 @@ const (
 	// AuthorizePageRefusalUnsupportedResponseMode is a response_mode this server cannot encode an
 	// answer in (OIDC Core 1.0 section 3.1.2.6).
 	AuthorizePageRefusalUnsupportedResponseMode
+	// AuthorizePageRefusalFormPostUnreachable is response_mode=form_post with a redirect URI whose
+	// scheme is neither http nor https, which no form can post to (#121).
+	AuthorizePageRefusalFormPostUnreachable
 )
 
 // AuthorizeArrival is what HandleAuthorizeGet reads off the HTTP request beside its parameters.
@@ -558,6 +564,23 @@ func refuseUnaddressableAuthorizeRequest(ctx context.Context, validator authoriz
 	// refuses by redirect, in the fragment (#231).
 	if !protocolvalidation.IsSupportedResponseMode(params.Get("response_mode")) {
 		return &AuthorizePageRefusal{Reason: AuthorizePageRefusalUnsupportedResponseMode}, nil
+	}
+
+	// response_mode=form_post answers through an HTML form whose action is the redirect URI, and
+	// html/template's URL filter, the one guard standing between a stored javascript: redirect URI
+	// and a live form action, rewrites every scheme outside http, https and mailto to "#ZgotmplZ"
+	// rather than let the form target it. A private-use scheme such as myapp:// (RFC 8252 section
+	// 7.1) therefore got a form that posted the code back to this server, and any error answered in
+	// that mode goes the same way, so the request is refused here, for the reason the unsupported
+	// mode above is: the server cannot deliver a response in the mode asked for. The template's
+	// allowlist stays as it is (#121). The redirect URI was checked above to be registered and
+	// absolute, and the parse lower-cases its scheme.
+	if params.Get("response_mode") == "form_post" {
+		redirectURI, err := url.Parse(params.Get("redirect_uri"))
+		if err != nil || (redirectURI.Scheme != "http" && redirectURI.Scheme != "https") {
+			return &AuthorizePageRefusal{Reason: AuthorizePageRefusalFormPostUnreachable,
+				ImplicitFlow: protocolvalidation.ParseResponseType(params.Get("response_type")).IsImplicitFlow()}, nil
+		}
 	}
 
 	return nil, nil

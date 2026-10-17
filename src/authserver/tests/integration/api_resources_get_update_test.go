@@ -123,6 +123,55 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, "Updated desc", stored.Description)
 }
 
+// A rename onto a client's identifier is refused for the same reason the create is: the string
+// would live in both namespaces (#151). An unchanged identifier that already names a client is a
+// row from before the check existed; the test below holds that it stays editable.
+func TestAPIResourceUpdatePut_OntoAClientIdentifier(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := createTestClientUnique(t, true)
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	res := createTestResource(t, "api-test-clash-res-"+fake.LetterN(6), "desc")
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
+		ResourceIdentifier: client.ClientIdentifier,
+		Description:        "Rename onto the client's identifier",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "The resource identifier is already in use by a client", errResp.ErrorDescription)
+}
+
+// A row that already holds a collision, from before the check existed, keeps its other edits:
+// renaming either side is a breaking change for the integrations using it, so the check fires
+// only on an identifier the request actually changes (#151). The fixture is written straight to
+// the database, because the handler now refuses to create the collision this row is.
+func TestAPIResourceUpdatePut_UnchangedIdentifierNamingAClient(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := createTestClientUnique(t, true)
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	res := createTestResource(t, client.ClientIdentifier, "desc")
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
+		ResourceIdentifier: client.ClientIdentifier, // unchanged, though it names the client above
+		Description:        "Still editable",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	var updResp api.UpdateResourceResponse
+	_ = json.NewDecoder(resp.Body).Decode(&updResp)
+	assert.Equal(t, "Still editable", updResp.Resource.Description)
+}
+
 func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	res := createTestResource(t, "api-test-update-val-"+fake.LetterN(6), "desc")

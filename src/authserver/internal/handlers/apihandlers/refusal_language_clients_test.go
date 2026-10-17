@@ -110,6 +110,17 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			portuguese: "O identificador do cliente já está em uso.",
 		},
 		{
+			name: "create naming a resource's identifier",
+			serve: create(`{"clientIdentifier":"a-client"}`, func(database *datamocks.Database) {
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "a-client").Return(nil, nil).Once()
+				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "a-client").Return(&record.Resource{Id: 4, ResourceIdentifier: "a-client"}, nil).Once()
+			}),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "The client identifier is already in use by a resource.",
+			portuguese: "O identificador do cliente já está em uso por um recurso.",
+		},
+		{
 			name:       "update with no identifier",
 			serve:      update(stored(), `{"clientIdentifier":""}`, nil),
 			status:     http.StatusBadRequest,
@@ -151,6 +162,17 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			code:       "VALIDATION_ERROR",
 			english:    "The client identifier is already in use.",
 			portuguese: "O identificador do cliente já está em uso.",
+		},
+		{
+			name: "update onto a resource's identifier",
+			serve: update(stored(), `{"clientIdentifier":"named-like-a-resource"}`, func(database *datamocks.Database) {
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-resource").Return(nil, nil).Once()
+				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-resource").Return(&record.Resource{Id: 9, ResourceIdentifier: "named-like-a-resource"}, nil).Once()
+			}),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "The client identifier is already in use by a resource.",
+			portuguese: "O identificador do cliente já está em uso por um recurso.",
 		},
 		{
 			name: "a default ACR level with the authorization code flow off",

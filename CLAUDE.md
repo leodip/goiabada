@@ -56,7 +56,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/accounthandlers/` - Pages reached without a session: self-registration and its activation link, forgot password and its reset link (#435)
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
-- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Every ceremony route has one: `/auth/authorize` (`Authorization` on the GET, which creates the ceremony and routes it with `decideAuthorizeRoute`, after `ResolveParked` swaps in a parked request; `AuthorizationParking` on the POST), `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal, `PasswordSubmission` on the POST), `/auth/otp` (`OTPPrompt` on the GET, `OTPSubmission` on the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST), `/auth/issue` (`Issuance`) and a `prompt=none` request at `/auth/authorize` (`SilentAuthentication`, with `DecideSilentAuthentication`, which `Authorization` hands it to). The handlers keep what reads the request and writes the response: `/auth/authorize`'s parameter parse, its settings read and its `ui_locales` swap of the request's localizer among them (#580)
+- `internal/authflow/` - The ceremony steps' operations, one per step: its loads, the decision it applies, its database and browser-session writes, and a typed result its handler answers from. It cannot reach HTTP (`import_lint_test.go` refuses `net/http`, chi, `internal/handlers`, `internal/middleware` and `internal/reqctx`): what the request carries arrives as plain values, every browser-session write goes through a port the handler satisfies with a per-request adapter (`handlers.browserSession`), and the handler writes the response after the operation returns. Every ceremony route has one: `/auth/authorize` (`Authorization` on the GET, which creates the ceremony and routes it with `decideAuthorizeRoute`, after `ResolveParked` swaps in a parked request; `AuthorizationParking` on the POST), `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`), `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal, `PasswordSubmission` on the POST), `/auth/otp` (`OTPPrompt` on the GET, `OTPSubmission` on the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET, `ConsentSubmission` on the POST), `/auth/issue` (`Issuance`) and a `prompt=none` request at `/auth/authorize` (`SilentAuthentication`, with `decideSilentAuthentication`, which `Authorization` hands it to). The handlers keep what reads the request and writes the response: `/auth/authorize`'s parameter parse, its settings read and its `ui_locales` swap of the request's localizer among them (#580)
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image uploads, themes
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/reqctx/` - The five request-scoped values (settings, session identifier, bearer token, validated token, and the credential reservation a failures-only rate-limit tier holds), each written by one middleware and read through a typed accessor; services take theirs as parameters, and the context-value guard holds every module file to them with no exemption (#433, #439)
@@ -275,6 +275,16 @@ Core 3.1.2.6, since the server cannot encode a response in a mode it does not im
 one definition, `protocolvalidation.IsSupportedResponseMode`, shared by `authflow.Authorization` and
 `ValidateRequest`.
 
+A second response_mode rule, form_post's own, is answered on the same page for the same reason: the
+redirect URI's scheme must be http or https, because the mode answers through an HTML form whose
+action is the URI and `html/template`'s URL filter — the one guard standing between a stored
+`javascript:` redirect URI and a live form action — rewrites every scheme outside http, https and
+mailto to `#ZgotmplZ`, and a form cannot post to mailto either, so a private-use scheme (RFC 8252
+7.1) used to get a form that posted the code to this server, and an error in that mode would go the
+same way. `refuseUnaddressableAuthorizeRequest` refuses it after the unsupported mode, as
+`AuthorizePageRefusalFormPostUnreachable`, its page naming `fragment` alone for an implicit request
+(#121).
+
 ### Key Logic in Level1Completed
 `authflow/level1_completion.go:Level1Completion.Run`, answered by `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
 - If a deferred error is parked → answer the client and stop (see above)
@@ -287,7 +297,7 @@ one definition, `protocolvalidation.IsSupportedResponseMode`, shared by `authflo
 - Otherwise → auth completed
 
 ### Key Logic in Level2
-`authflow/level2_selection.go:Level2Selection.Run`, its arm decided by `DecideLevel2Arm`:
+`authflow/level2_selection.go:Level2Selection.Run`, its arm decided by `decideLevel2Arm`:
 - If `level2_optional` + `user.OTPEnabled` → `/auth/otp`, the OTP form
 - If `level2_optional` + no OTP → skip to auth completed
 - If `level2_mandatory` → `/auth/otp`, the OTP form (user enrolls if needed)
@@ -505,6 +515,10 @@ exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Bot
 driven from a rule test: the finder directly, the reporting half through `guard.Run`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
 does. Every guard follows this: those in `core/guard`, the newest
+`AssertNoStaleDeferredBodyCloses`, which refuses a deferred func-literal close of a response
+body reading a variable the same function reassigns after the defer is registered, in a later
+statement, a nested closure or the next iteration of a loop, so only the last response is closed
+(#591), and before it
 `AssertNoGuardInTestsReachedFrom`, which refuses a test importing `core/guard`, directly or
 through first-party production code, in any package a module reaches, called over the setup
 wizard because `go mod tidy` reads those tests and would put chi and TOML in its `go.sum` (#500),

@@ -119,6 +119,35 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	assert.Equal(t, "The resource identifier is already in use", errResp.ErrorDescription)
 }
 
+// A resource identifier may not name a client either. The two namespaces are separate tables
+// with separate uniqueness checks, and a string held by both makes an access token's aud
+// resolvable as a client, which is how a session-bound access token passed every ID-token-hint
+// check in #109's logout (#151). The cleanup looks the row up rather than trusting the refusal,
+// so a tree that lacks the check, a red run of this test, leaves no row in the shared database.
+func TestAPIResourcesCreate_ClashingWithAClientIdentifier(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := createTestClientUnique(t, true)
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() {
+		if stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, client.ClientIdentifier); err == nil && stored != nil {
+			_ = database.DeleteResource(context.Background(), nil, stored.Id)
+		}
+	}()
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
+	resp := makeAPIRequest(t, "POST", url, accessToken, api.CreateResourceRequest{
+		ResourceIdentifier: client.ClientIdentifier,
+		Description:        "Named like the client",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	_ = json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Equal(t, "The resource identifier is already in use by a client", errResp.ErrorDescription)
+}
+
 func TestAPIResourcesCreate_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
