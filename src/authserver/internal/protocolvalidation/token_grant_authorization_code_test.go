@@ -1782,6 +1782,10 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 // has gone is the ordinary state of an older grant and MUST still redeem. That is exactly why
 // this cannot be complete, and the residual is documented in concepts/sessions.mdx.
 //
+// The validator's acceptance is not the last word: issuance refuses a session-bound grant whose
+// row is gone with invalid_grant, as a revoked code is refused, and redeems an offline_access
+// one, whose tokens carry no sid (#530).
+//
 // A fourth case is covered without a row here: a code with no session identifier performs no
 // lookup at all. Every other authorization_code test in this file leaves SessionIdentifier
 // empty and mocks no lookup, and the database mock is strict, so a lookup on the empty path
