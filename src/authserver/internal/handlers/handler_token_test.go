@@ -1792,6 +1792,12 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 				"The client is not authorized to use the resource owner password credentials grant type.",
 				http.StatusBadRequest)},
+		// Answered before the account is looked up, so a right password is not a failed guess (#533).
+		{"unauthorized_client, the client's default ACR level is level 2 (mandatory)",
+			oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
+				"Resource owner password credentials grant is not available for a client whose "+
+					"default ACR level is urn:goiabada:level2_mandatory. Please use the authorization code flow instead.",
+				http.StatusBadRequest)},
 		{"invalid_request, a parameter is missing",
 			oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				"Missing required password parameter.", http.StatusBadRequest)},

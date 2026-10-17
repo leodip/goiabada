@@ -87,7 +87,7 @@ A user who still has their authenticator can turn it off themselves, with their 
 ## What a code can't protect
 
 - **A silent request** (`prompt=none`) can't show the code page. When a code is due, it gets `interaction_required`. See [prompt](/concepts/prompt/#the-silent-checks).
-- **The password grant** ([ROPC](/legacy-flows/ropc/)) can't ask for a code, so it refuses every user who has an authenticator.
+- **The password grant** ([ROPC](/legacy-flows/ropc/)) can't ask for a code, so it refuses every user who has an authenticator. At a level 3 client it refuses everyone. See [who can't use it](/legacy-flows/ropc/#who-cant-use-it).
 - **The client credentials flow** has no user, so nothing asks for a code.
 
 ## Next steps
