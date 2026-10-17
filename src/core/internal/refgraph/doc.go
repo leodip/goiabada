@@ -1,7 +1,8 @@
-// Package refgraph reads the source tree as a reference graph: where the source root is, which
-// package imports which, which files a production build excludes, the markdown tables
-// ARCHITECTURE.md and OWNERSHIP.md hold as data, and the census of every exported core symbol with
-// what names it.
+// Package refgraph reads the source tree as a reference graph: which package imports which,
+// which files a production build excludes, the markdown tables ARCHITECTURE.md and OWNERSHIP.md
+// hold as data, and the census of every exported core symbol with what names it. The source
+// root itself is core/sourceroot's, the one declaration the tree-wide guards, cmd/ownershipdump
+// and the auth server's schemadump share (#480).
 //
 // It is the half of the tree-wide guards that is not a test. core/guard keeps every Assert* and
 // reporting half and reads the tree through this package, and cmd/ownershipdump writes

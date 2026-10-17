@@ -1,8 +1,6 @@
 package apihandlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -42,9 +40,9 @@ func HandleSettingsGeneralGet() http.HandlerFunc {
 	}
 }
 
-// settingsGeneralDatabase is what the general settings endpoint needs: the settings write.
+// settingsGeneralDatabase is what the general settings endpoint needs: the settings save.
 type settingsGeneralDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	settingsSaveDatabase
 }
 
 // HandleSettingsGeneralPut - PUT /api/v1/admin/settings/general. baseURL is the auth server's
@@ -108,23 +106,25 @@ func HandleSettingsGeneralPut(
 			return
 		}
 
-		// Apply updates
-		currentSettings.AppName = strings.TrimSpace(req.AppName)
-		currentSettings.Issuer = issuer
-		currentSettings.SelfRegistrationEnabled = req.SelfRegistrationEnabled
-		// Stored as sent, whether or not self-registration is on. It does nothing while
-		// self-registration is off, since the registration page is then a 404, so keeping it
-		// costs nothing, and clearing it did: an administrator who turned self-registration off
-		// and on again got it back without email verification, which makes which addresses
-		// have an account discoverable, with nothing on the page saying it had changed.
-		currentSettings.SelfRegistrationRequiresEmailVerification = req.SelfRegistrationRequiresEmailVerification
-		currentSettings.DynamicClientRegistrationEnabled = req.DynamicClientRegistrationEnabled
-		currentSettings.PasswordPolicy = passwordPolicy
-		currentSettings.PKCERequired = req.PKCERequired
-		currentSettings.ImplicitFlowEnabled = req.ImplicitFlowEnabled
-		currentSettings.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
-
-		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
+		// Apply updates, onto the row as stored when the save runs (#407)
+		appName := strings.TrimSpace(req.AppName)
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+			stored.AppName = appName
+			stored.Issuer = issuer
+			stored.SelfRegistrationEnabled = req.SelfRegistrationEnabled
+			// Stored as sent, whether or not self-registration is on. It does nothing while
+			// self-registration is off, since the registration page is then a 404, so keeping it
+			// costs nothing, and clearing it did: an administrator who turned self-registration off
+			// and on again got it back without email verification, which makes which addresses
+			// have an account discoverable, with nothing on the page saying it had changed.
+			stored.SelfRegistrationRequiresEmailVerification = req.SelfRegistrationRequiresEmailVerification
+			stored.DynamicClientRegistrationEnabled = req.DynamicClientRegistrationEnabled
+			stored.PasswordPolicy = passwordPolicy
+			stored.PKCERequired = req.PKCERequired
+			stored.ImplicitFlowEnabled = req.ImplicitFlowEnabled
+			stored.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
+		})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -135,15 +135,15 @@ func HandleSettingsGeneralPut(
 		})
 
 		resp := api.SettingsGeneralResponse{
-			AppName:                 currentSettings.AppName,
-			Issuer:                  currentSettings.Issuer,
-			SelfRegistrationEnabled: currentSettings.SelfRegistrationEnabled,
-			SelfRegistrationRequiresEmailVerification: currentSettings.SelfRegistrationRequiresEmailVerification,
-			DynamicClientRegistrationEnabled:          currentSettings.DynamicClientRegistrationEnabled,
-			PasswordPolicy:                            currentSettings.PasswordPolicy.String(),
-			PKCERequired:                              currentSettings.PKCERequired,
-			ImplicitFlowEnabled:                       currentSettings.ImplicitFlowEnabled,
-			ResourceOwnerPasswordCredentialsEnabled:   currentSettings.ResourceOwnerPasswordCredentialsEnabled,
+			AppName:                 saved.AppName,
+			Issuer:                  saved.Issuer,
+			SelfRegistrationEnabled: saved.SelfRegistrationEnabled,
+			SelfRegistrationRequiresEmailVerification: saved.SelfRegistrationRequiresEmailVerification,
+			DynamicClientRegistrationEnabled:          saved.DynamicClientRegistrationEnabled,
+			PasswordPolicy:                            saved.PasswordPolicy.String(),
+			PKCERequired:                              saved.PKCERequired,
+			ImplicitFlowEnabled:                       saved.ImplicitFlowEnabled,
+			ResourceOwnerPasswordCredentialsEnabled:   saved.ResourceOwnerPasswordCredentialsEnabled,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)

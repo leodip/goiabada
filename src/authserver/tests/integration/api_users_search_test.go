@@ -248,7 +248,7 @@ func TestAPIUsersSearch_SizeLimit(t *testing.T) {
 	// Test: Maximum allowed size (200)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 

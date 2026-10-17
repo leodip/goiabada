@@ -240,17 +240,17 @@ func accountHandlerCases() []accountHandlerCase {
 			},
 		},
 		{
-			name: "HandleLogoutGet",
+			name: "HandleLogoutPost",
 			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
 				// Every row takes a real store, and this one needs it even when the API refuses:
 				// it clears the console's own session before it asks the auth server to end the
 				// upstream one.
-				return HandleLogoutGet(h, newFlashTestStore(), c, consoleBaseURL)
+				return HandleLogoutPost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			// The logout page reads the verified ID token beside the bearer string, and takes its
 			// unauthenticated arm without both of them.
 			request: func() *http.Request {
-				return handlertest.Request(http.MethodGet, "/account/logout",
+				return handlertest.Request(http.MethodPost, "/account/logout",
 					handlertest.WithJwtInfo(oauthclient.JwtInfo{
 						TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
 						IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},

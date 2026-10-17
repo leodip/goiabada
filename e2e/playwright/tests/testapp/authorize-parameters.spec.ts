@@ -3,7 +3,7 @@
 // two-factor authentication).
 import { expect, test } from "../../lib/fixtures";
 import { freshTotp } from "../../lib/totp";
-import { expectResult, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
+import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 
 const second = () => new Promise((resolve) => setTimeout(resolve, 1_100));
 
@@ -62,6 +62,33 @@ test("an id_token_hint naming the signed-in user signs in silently; naming someo
   expect((await signInToWebApp(app, testapp.web, alice, { id_token_hint: "yes" })).askedForPassword).toBe(true);
   await expectResult(app, "Signed in");
   expect((await shownClaims(app, "ID token claims")).email).toBe(alice.email);
+  await context.close();
+});
+
+test("a sign-in by someone other than the id_token_hint's user is refused with no consent screen, and ends the session the browser held", async ({ browser, users }) => {
+  const alice = await users.create();
+  const bob = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, alice);
+  await expectResult(app, "Signed in");
+
+  // With prompt=login the hint naming Alice asks for a password over her session, and Bob enters his.
+  const visited: string[] = [];
+  app.on("framenavigated", (frame) => {
+    if (frame === app.mainFrame()) visited.push(new URL(frame.url()).pathname);
+  });
+  expect((await signInToWebApp(app, testapp.web, bob, { id_token_hint: "yes", prompt: "login" })).askedForPassword).toBe(true);
+  await expectResult(app, "Sign-in failed");
+  const refusal = await resultBody(app);
+  expect(refusal.error).toBe("login_required");
+  expect(refusal.error_description).toBe("The authenticated user does not match the id_token_hint");
+  expect(visited).not.toContain("/auth/consent");
+
+  // The browser changed hands, so Alice's session is gone and Bob was given none: the second site
+  // asks for a password rather than signing anyone in as Alice.
+  expect((await signInToWebApp(app, testapp.web2, bob)).askedForPassword).toBe(true);
+  await expectResult(app, "Signed in");
+  expect((await shownClaims(app, "ID token claims")).email).toBe(bob.email);
   await context.close();
 });
 

@@ -367,11 +367,24 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 func assertNextRequestAuthenticatesAsUserB(t *testing.T, b *crossUserBrowser, expectedSessionIdentifier string) {
 	t.Helper()
 
+	codeVal := signInWithTheBrowsersSession(t, b)
+	code := loadCodeFromDatabase(t, codeVal)
+	assert.Equal(t, b.userB.Id, code.UserId,
+		"the browser must now authenticate as the user who took it over")
+	assert.Equal(t, expectedSessionIdentifier, code.SessionIdentifier,
+		"and on the session that ceremony created")
+}
+
+// signInWithTheBrowsersSession sends an ordinary authorization request on the fixture's browser,
+// requires it to reuse the session the browser holds, and returns the code it ends with.
+func signInWithTheBrowsersSession(t *testing.T, b *crossUserBrowser) string {
+	t.Helper()
+
 	resp, err := b.jar.Get(crossUserAuthorizeUrl(b, ""))
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	// Straight to level1completed means a session was reused, and the assertions below say whose.
+	// Straight to level1completed means a session was reused, and the caller's assertions say whose.
 	loc := assertRedirect(t, resp, "/auth/level1completed")
 
 	// The hops after this one depend on the ACR the ceremony left on B's session against the
@@ -391,11 +404,7 @@ func assertNextRequestAuthenticatesAsUserB(t *testing.T, b *crossUserBrowser, ex
 	}
 
 	codeVal, _ := getCodeAndStateFromUrl(t, resp)
-	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, b.userB.Id, code.UserId,
-		"the browser must now authenticate as the user who took it over")
-	assert.Equal(t, expectedSessionIdentifier, code.SessionIdentifier,
-		"and on the session that ceremony created")
+	return codeVal
 }
 
 // TestCrossUser_PromptLogin_BindsToTheAuthenticatingUsersSession covers the first entry path, and it
@@ -419,9 +428,10 @@ func TestCrossUser_PromptLogin_BindsToTheAuthenticatingUsersSession(t *testing.T
 // TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr covers the second entry
 // path, and it is the shape that minted a cross-bound code.
 //
-// An id_token_hint naming a third party is refused at /auth/issue, where the hint's subject is
-// compared with the authenticated user. A hint naming B is the ordinary use of the parameter, a
-// relying party saying who should sign in, so nothing refuses it and a code really is issued.
+// An id_token_hint naming a third party is refused before the ceremony binds a session, at
+// /auth/completed, which leaves /auth/issue's comparison as the last line (#535). A hint naming B
+// is the ordinary use of the parameter, a relying party saying who should sign in, so nothing
+// refuses it and a code really is issued.
 //
 // Its own assertion is decision 3, the ACR. The ceremony asks for level1 while A's session holds
 // level2_optional, and the ACR used to be the maximum taken against whatever session the browser
@@ -485,4 +495,98 @@ func TestCrossUser_ExpiredForeignSession_BindsToTheAuthenticatingUsersSession(t 
 		b.userB.Email, b.passwordB, false, "")
 
 	assertCeremonyBoundToUserB(t, b, codeVal)
+}
+
+// TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSession covers the
+// handover a hint refuses. The client's hint names a third user, and B signs in over A's session:
+// /auth/completed answers login_required before it binds anything (#535), so B gets no session, but
+// the browser has changed hands all the same, so A's session is ended as any handover ends it, with
+// its refresh token revoked and the handover audited (#133). The browser then holds no session, and
+// the next ordinary request asks whoever is there for a password rather than signing them in as A.
+func TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSession(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, adminClient := createAdminClientWithToken(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+
+	b := createCrossUserBrowser(t, record.AcrLevel1, record.AcrLevel1)
+
+	// A grant of A's bound to A's session on this browser, which the handover has to revoke.
+	tokensA := redeemCrossUserCode(t, b, b.jar, signInWithTheBrowsersSession(t, b))
+	refreshTokenA, ok := tokensA["refresh_token"].(string)
+	require.True(t, ok, "expected a refresh_token for A, got %v", tokensA)
+	require.Equal(t, b.sessionA.SessionIdentifier, decodeJWTPayload(t, refreshTokenA)["sid"])
+
+	// The hint's ID token belongs to a user of its own, who never signs in on this browser.
+	hintTokens, hintCode, _, _ := userTokenResponseWithScope(t, "openid", nil)
+	idToken, ok := hintTokens["id_token"].(string)
+	require.True(t, ok, "the hint flow should have issued an id_token: %v", hintTokens)
+	require.NotEqual(t, b.userA.Id, hintCode.User.Id)
+	require.NotEqual(t, b.userB.Id, hintCode.User.Id)
+
+	authorizeUrl := crossUserAuthorizeUrl(b, "&id_token_hint="+url.QueryEscape(idToken))
+	parsedAuthorizeUrl, err := url.Parse(authorizeUrl)
+	require.NoError(t, err)
+	state := parsedAuthorizeUrl.Query().Get("state")
+
+	resp, err := b.jar.Get(authorizeUrl)
+	require.NoError(t, err)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+	loc := assertRedirect(t, resp, "/auth/level1")
+	resp = loadPage(t, b.jar, loc)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+	loc = assertRedirect(t, resp, "/auth/pwd")
+	resp = loadPage(t, b.jar, loc)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+	resp = authenticateWithPassword(t, b.jar, loc, resp, b.userB.Email, b.passwordB)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+	loc = assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, b.jar, loc)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+	loc = assertRedirect(t, resp, "/auth/completed")
+
+	req, err := http.NewRequest(http.MethodGet, loc, nil)
+	require.NoError(t, err)
+	requestId := "completed-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestId)
+	resp, err = b.jar.Do(req)
+	require.NoError(t, err)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+
+	destination, params := clientAnswer(t, resp, "code")
+	assert.Equal(t, b.redirectUri.URI, destination)
+	assert.Equal(t, "login_required", params.Get("error"))
+	assert.Equal(t, "The authenticated user does not match the id_token_hint", params.Get("error_description"))
+	assert.Equal(t, state, params.Get("state"))
+	assert.Empty(t, params.Get("code"))
+
+	// A's session is ended, with the grant it handed out on this browser.
+	survivingA, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, b.sessionA.SessionIdentifier)
+	require.NoError(t, err)
+	assert.Nil(t, survivingA, "the previous user's session must be terminated, not left behind")
+	refreshRowA, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshTokenA))
+	require.NoError(t, err)
+	require.NotNil(t, refreshRowA)
+	assert.True(t, refreshRowA.Revoked, "the previous user's refresh token from this browser is revoked")
+
+	// B's refused sign-in starts nothing.
+	sessionsB, err := database.GetUserSessionsByUserId(context.Background(), nil, b.userB.Id)
+	require.NoError(t, err)
+	assert.Empty(t, sessionsB, "the refused sign-in leaves no session for the user who signed in")
+	assert.Empty(t, auditRows(t, adminToken, "started_new_user_session", requestId),
+		"no session start is recorded")
+
+	replaced := auditRows(t, adminToken, "cross_user_session_replaced", requestId)
+	if assert.Len(t, replaced, 1, "the handover is recorded once") {
+		assert.EqualValues(t, b.userB.Id, replaced[0]["user_id"])
+		assert.EqualValues(t, b.userA.Id, replaced[0]["previous_user_id"])
+		assert.Equal(t, b.sessionA.SessionIdentifier, replaced[0]["previous_session_identifier"])
+	}
+	assert.Len(t, auditRows(t, adminToken, "terminated_user_session", requestId), 1)
+	assert.Len(t, auditRows(t, adminToken, "deleted_user_session", requestId), 1)
+
+	// The browser holds no session now, so whoever is at it is asked for a password.
+	resp, err = b.jar.Get(crossUserAuthorizeUrl(b, ""))
+	require.NoError(t, err)
+	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
+	assertRedirect(t, resp, "/auth/level1")
 }

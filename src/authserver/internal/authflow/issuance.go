@@ -259,7 +259,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 
 	case issuanceRefuseHintMismatch:
 		return answerClient(browser, authContext, client, oidc.ErrorLoginRequired,
-			"The authenticated user does not match the id_token_hint"), nil
+			hintMismatchDescription), nil
 
 	case issuanceRefuseUnusableSession:
 		return o.refuseUnusableSession(ctx, browser, answer.sessionShape, authContext, client, ambientSession,

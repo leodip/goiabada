@@ -20,7 +20,7 @@
 //     records level 1 on the ceremony when it is right and the account enabled.
 //   - Level1Completion, GET /auth/level1completed: delivers an authorization error parked by
 //     /auth/authorize, or decides whether level 2 is owed (ceremony.StepUpOwed).
-//   - Level2Selection, GET /auth/level2: chooses the level 2 method (DecideLevel2Arm) and captures
+//   - Level2Selection, GET /auth/level2: chooses the level 2 method (decideLevel2Arm) and captures
 //     the user's OTP configuration generation.
 //   - OTPPrompt, GET /auth/otp: chooses the code form or the enrolment form, and keeps, or mints,
 //     the ceremony's enrolment key; the handler renders the form.
@@ -29,8 +29,8 @@
 //     the ceremony, or ends a sign-in whose enrolment can no longer be stored.
 //   - Completion, GET /auth/completed: decides on the user (decideBeforeBinding), binds the ceremony
 //     to a user session by reusing the browser's or creating one, or restarts it at level 1
-//     (decideCompletion), then sends it to consent or to issuance (DecideAfterBinding).
-//   - ConsentPrompt, GET /auth/consent: shows the consent screen (ConsentScreenOwed), handing its
+//     (decideCompletion), then sends it to consent or to issuance (decideAfterBinding).
+//   - ConsentPrompt, GET /auth/consent: shows the consent screen (consentScreenOwed), handing its
 //     data to the handler to render, or moves a ceremony whose scope is already consented on to
 //     issuance.
 //   - ConsentSubmission, POST /auth/consent: reads the user's answer from the submitted body, weighs
@@ -38,7 +38,7 @@
 //     records the consent (userconsent.Record) or refuses with access_denied.
 //   - SilentAuthentication, GET /auth/authorize with prompt=none, once Authorization has accepted
 //     it: decides whether the browser's session answers it without showing anything
-//     (DecideSilentAuthentication), and either refuses it for the client or adopts the session,
+//     (decideSilentAuthentication), and either refuses it for the client or adopts the session,
 //     bumps it and sends the ceremony straight to /auth/issue.
 //   - Issuance, GET /auth/issue: checks again what may have changed since /auth/authorize
 //     (decideIssuance), restarts a ceremony whose session can no longer carry a grant, and issues an

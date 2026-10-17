@@ -87,26 +87,26 @@ func (f *consentFixture) reachConsentScreen(t *testing.T, extraQuery string) (br
 
 	resp, err := browser.Get(destUrl)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, browser, location)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, browser, location)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, browser, location, resp, f.user.Email, f.password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, browser, location)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, browser, location)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location = assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, browser, location)

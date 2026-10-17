@@ -97,7 +97,12 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Auth routes
 	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
 		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient))
-		r.Get("/logout", accounthandlers.HandleLogoutGet(httpHelper, s.sessionStore, apiClient, baseURL))
+		// The confirmation page is the GET the menu's link arrives at; the issuer-change redirect
+		// arrives with its tokens already cleared and is sent home. The POST answers the page,
+		// and the sessions pages' script submits it directly, and it is the only one of the two
+		// that can end a session, which is what brings it under the origin check (#411).
+		r.Get("/logout", accounthandlers.HandleLogoutConfirmGet(httpHelper, baseURL))
+		r.Post("/logout", accounthandlers.HandleLogoutPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/session-ended", handlers.HandleSessionEndedGet(httpHelper, s.sessionStore))
 	})
 

@@ -46,8 +46,9 @@
 
                         if(result.Success) {
                             if(result.IsCurrentSession) {
-                                // Redirect to logout endpoint for proper logout flow
-                                window.location.href = "/auth/logout";
+                                // The modal above has confirmed it, so the sign-out is posted
+                                // rather than asked again by the confirmation page (#411).
+                                submitSignOut();
                             } else {
                                 window.location.href = "/account/sessions";
                             }

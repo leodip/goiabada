@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/core/sourceroot"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -304,7 +305,9 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 // consumers actually run: the generator from src/authserver and the per-engine assertion from
 // src/authserver/tests/data.
 func TestGoldenPath(t *testing.T) {
-	root, err := SourceRoot()
+	cwd, err := os.Getwd()
+	require.NoError(t, err, "getting the working directory")
+	root, err := sourceroot.FindSourceRoot(cwd)
 	require.NoError(t, err, "the test's own working directory is inside the repository")
 
 	for _, d := range []data.Dialect{data.SQLite, data.MySQL, data.Postgres, data.MSSQL} {

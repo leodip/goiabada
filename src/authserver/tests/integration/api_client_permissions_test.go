@@ -62,7 +62,7 @@ func TestAPIClientPermissions_Get_Errors(t *testing.T) {
 	// Invalid format id
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)

@@ -73,7 +73,7 @@ type ConsentPromptResult struct {
 //  1. Loads the user, the client and the user's stored consent to the client; a failed read, or a
 //     user or client not found, is returned as an error, and nothing is saved.
 //  2. Builds the screen's rows from the ceremony's scope and the stored consent, and decides whether
-//     the screen is owed (ConsentScreenOwed).
+//     the screen is owed (consentScreenOwed).
 //  3. Owed: reads the client block (getClientDisplayInfo) and returns the screen. Not owed: saves
 //     the ceremony in ready_to_issue_code and returns /auth/issue.
 func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
@@ -102,7 +102,7 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 
 	scopes := buildScopeInfoArray(ctx, authContext.Scope, consent)
 
-	if ConsentScreenOwed(scopes, authContext.Scope, authContext.HasPromptValue("consent")) {
+	if consentScreenOwed(scopes, authContext.Scope, authContext.HasPromptValue("consent")) {
 		displayInfo := getClientDisplayInfo(ctx, o.database, client)
 		clientName, clientNameUnverified := ConsentClientName(client)
 

@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -34,7 +33,6 @@ import (
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -187,7 +185,7 @@ func TestAdministrativeScopesDocs_NameWhatTheAllowanceRestsOn(t *testing.T) {
 func TestAdministrativeScopesDocs_TheClientsPageNamesTheSwitchAndTheRefusal(t *testing.T) {
 	label := i18n.T(context.Background(), "adminconsole.admin_clients.settings.field.administrative_scopes_allowed")
 
-	assertSectionText(t, filepath.Dir(guard.SourceRoot(t)), allowanceClientsSection,
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), allowanceClientsSection.page, allowanceClientsSection.heading,
 		[]string{"**" + label + "**", "`invalid_scope`", "`invalid_grant`"}, nil)
 }
 
@@ -199,8 +197,9 @@ func TestAdministrativeScopesDocs_TheEndpointPagesQuoteTheRefusal(t *testing.T) 
 	refusal := protocolvalidation.AdministrativeScopeRefusal([]string{"authserver:manage"}).Description()
 	root := filepath.Dir(guard.SourceRoot(t))
 
-	assertSectionText(t, root, authorizeSection, []string{"`invalid_scope`", refusal}, nil)
-	assertSectionText(t, root, tokenSection,
+	guard.AssertSectionSays(t, root, authorizeSection.page, authorizeSection.heading,
+		[]string{"`invalid_scope`", refusal}, nil)
+	guard.AssertSectionSays(t, root, tokenSection.page, tokenSection.heading,
 		[]string{"`invalid_scope`", "`invalid_grant`", refusal, "Scope 'authserver:manage' is not recognized. " + refusal}, nil)
 }
 
@@ -211,80 +210,9 @@ func TestAdministrativeScopesDocs_TheEndpointPagesQuoteTheRefusal(t *testing.T) 
 func TestAdministrativeScopesDocs_TheAccountAPISetupUsesAUserToken(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 
-	assertSectionText(t, root, accountAPISetupSection,
+	guard.AssertSectionSays(t, root, accountAPISetupSection.page, accountAPISetupSection.heading,
 		[]string{"response_type=code", "authserver:manage-account", "grant_type=authorization_code"},
 		[]string{"grant_type=client_credentials"})
-	assertSectionText(t, root, clientCredentialsSetup, nil, []string{"manage-account"})
-}
-
-func TestAdministrativeScopesDocs_ASectionMissingOrHoldingTextFails(t *testing.T) {
-	root := t.TempDir()
-	writeDocFixture(t, root, "site/api.mdx", "### Account API\n\n"+
-		"```bash\ncurl -d grant_type=client_credentials -d scope=authserver:manage-account\n```\n\n"+
-		"### Next\n\nresponse_type=code\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionText(r, root, docSection{"site/api.mdx", "### Account API"},
-			[]string{"authserver:manage-account", "response_type=code"}, []string{"grant_type=client_credentials"})
-	})
-
-	if report.Stopped {
-		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
-	}
-	want := []string{
-		`site/api.mdx: ### Account API does not say "response_type=code"`,
-		`site/api.mdx: ### Account API says "grant_type=client_credentials"`,
-	}
-	if !slices.Equal(report.Errors, want) {
-		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
-	}
-}
-
-func TestAdministrativeScopesDocs_ASectionSayingWhatItShouldPasses(t *testing.T) {
-	root := t.TempDir()
-	writeDocFixture(t, root, "site/api.mdx", "### Account API\n\n"+
-		"response_type=code&scope=authserver:manage-account\n\n### Next\n\ngrant_type=client_credentials\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionText(r, root, docSection{"site/api.mdx", "### Account API"},
-			[]string{"authserver:manage-account", "response_type=code"}, []string{"grant_type=client_credentials"})
-	})
-
-	if report.Stopped || len(report.Errors) > 0 {
-		t.Errorf("a section saying what it should failed: %+v", report)
-	}
-}
-
-func TestAdministrativeScopesDocs_AMissingSectionStopsTheTextCheck(t *testing.T) {
-	root := t.TempDir()
-	writeDocFixture(t, root, "site/api.mdx", "### Account API setup\n\nresponse_type=code\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionText(r, root, docSection{"site/api.mdx", "### Account API"}, []string{"response_type=code"}, nil)
-	})
-
-	if !report.Stopped || !strings.Contains(report.Fatal, "### Account API") {
-		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
-	}
-}
-
-// assertSectionText is the reporting half of the text checks: one failure per text in present the
-// section does not hold verbatim, and per text in absent it does; a stop for a section not found.
-func assertSectionText(r guard.Reporter, root string, section docSection, present, absent []string) {
-	r.Helper()
-	text, err := docsreader.Section(root, section.page, section.heading)
-	if err != nil {
-		r.Fatalf("%v", err)
-		return
-	}
-	for _, want := range present {
-		if !strings.Contains(text, want) {
-			r.Errorf("%s: %s does not say %q", section.page, section.heading, want)
-		}
-	}
-	for _, refused := range absent {
-		if strings.Contains(text, refused) {
-			r.Errorf("%s: %s says %q", section.page, section.heading, refused)
-		}
-	}
+	guard.AssertSectionSays(t, root, clientCredentialsSetup.page, clientCredentialsSetup.heading,
+		nil, []string{"manage-account"})
 }
