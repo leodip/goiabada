@@ -128,26 +128,26 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	consentUrl := assertRedirect(t, resp, "/auth/consent")
 	consentPageA := loadPage(t, httpClient, consentUrl)
@@ -162,15 +162,15 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	consentUrlB := assertRedirect(t, resp, "/auth/consent")
 	consentPageB := loadPage(t, httpClient, consentUrlB)
@@ -183,7 +183,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	// The user, still looking at A's screen, submits it. Two boxes ticked, which under the defect
 	// would have granted client B the scopes at those positions.
 	resp = postConsent(t, httpClient, consentUrl, consentPageA, []int{0, 1})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode,
 		"a consent form from a replaced ceremony must be refused")
@@ -205,7 +205,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	// And the ceremony that is actually current is untouched: B's own screen still completes, in
 	// its own tab, with exactly the scopes ticked on it.
 	resp = postConsent(t, httpClient, consentUrlB, consentPageB, []int{0, 1})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -257,11 +257,11 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	pwdUrlA := assertRedirect(t, resp, "/auth/pwd")
 	pwdPageA := loadPage(t, httpClient, pwdUrlA)
@@ -276,11 +276,11 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	pwdUrlB := assertRedirect(t, resp, "/auth/pwd")
 	pwdPageB := loadPage(t, httpClient, pwdUrlB)
@@ -292,7 +292,7 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	// The user, still looking at A's screen, signs in there.
 	resp = authenticateWithPassword(t, httpClient, pwdUrlA, pwdPageA, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assertCeremonyMismatchPage(t, resp, "a login form")
 	assertNothingWasCompleted(t, user.Id)
@@ -300,15 +300,15 @@ func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	// And the ceremony that is actually current is untouched: B's own screen still signs in, in its
 	// own tab, and receives a code for B's request.
 	resp = authenticateWithPassword(t, httpClient, pwdUrlB, pwdPageB, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -398,7 +398,7 @@ func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	// The user, still looking at A's prompt, enters the code there.
 	resp := authenticateWithOtp(t, httpClient, otpUrlA, otpPageA, otpCode)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assertCeremonyMismatchPage(t, resp, "an OTP prompt")
 	assertNothingWasCompleted(t, user.Id)
@@ -406,11 +406,11 @@ func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	// The same code, on the prompt the user is actually on. It still works, so the refusal took
 	// nothing away from the live ceremony.
 	resp = authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, otpCode)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)

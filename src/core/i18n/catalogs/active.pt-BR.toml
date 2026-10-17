@@ -99,6 +99,12 @@
 "logout_consent.title" = "Sair"
 "logout_consent.confirm" = "Tem certeza de que deseja sair?"
 
+# --- Sessão mantida (auth/logout/declined) -----------------------------------
+
+"logout_declined.page_title" = "Sessão mantida"
+"logout_declined.title" = "Sessão mantida"
+"logout_declined.message" = "Você continua conectado. Pode fechar esta página."
+
 # --- Sessão encerrada (auth/logout) ------------------------------------------
 
 "logged_out.page_title" = "Sessão encerrada"

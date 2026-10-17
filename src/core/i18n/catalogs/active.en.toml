@@ -101,6 +101,12 @@
 "logout_consent.title" = "Sign out"
 "logout_consent.confirm" = "Are you sure you want to sign out?"
 
+# --- Logout declined (auth/logout/declined) ----------------------------------
+
+"logout_declined.page_title" = "Still signed in"
+"logout_declined.title" = "Still signed in"
+"logout_declined.message" = "You are still signed in. You can close this page."
+
 # --- Logged out (auth/logout) -----------------------------------------------
 
 "logged_out.page_title" = "Signed out"

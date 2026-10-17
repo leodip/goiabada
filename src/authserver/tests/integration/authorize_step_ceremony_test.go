@@ -43,7 +43,7 @@ func walkToPasswordPage(t *testing.T, httpClient *http.Client, client *record.Cl
 
 	resp, err := httpClient.Get(authorizeUrlFor(client, redirectUri, "openid profile", state))
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	level1Location := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, level1Location)
@@ -87,15 +87,15 @@ func TestAuthorize_APageOfAReplacedSignInIsRefusedAtItsNextStep(t *testing.T) {
 
 	// B's sign-in was not disturbed by any of it: its own screen signs in and receives its code.
 	resp := authenticateWithPassword(t, httpClient, pwdUrlB, pwdPageB, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location := assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, location)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, location)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, location)
