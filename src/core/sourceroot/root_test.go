@@ -1,4 +1,4 @@
-package refgraph
+package sourceroot
 
 import (
 	"os"
@@ -69,4 +69,24 @@ func TestSourceRoot_EachOfTheFourModulesIsRequired(t *testing.T) {
 			require.Error(t, err, "a tree without %s was taken for the source root", missing)
 		})
 	}
+}
+
+// TestModuleDirs_EachCallIsItsOwnCopy is why the list is a function rather than an exported slice:
+// a caller that overwrites or appends to what it was handed cannot change which directories the
+// next caller resolves imports against, or which ones FindSourceRoot requires (#480).
+func TestModuleDirs_EachCallIsItsOwnCopy(t *testing.T) {
+	first := ModuleDirs()
+	require.Len(t, first, 4)
+	first[0] = "overwritten"
+	_ = append(first[:1], "appended")
+
+	assert.Equal(t, []string{"core", "authserver", "adminconsole", "cmd/goiabada-setup"}, ModuleDirs())
+
+	root := t.TempDir()
+	for _, m := range []string{"core", "authserver", "adminconsole", "cmd/goiabada-setup"} {
+		writeGoMod(t, root, filepath.FromSlash(m))
+	}
+	found, err := FindSourceRoot(root)
+	require.NoError(t, err)
+	assert.Equal(t, root, found)
 }

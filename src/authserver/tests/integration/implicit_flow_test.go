@@ -131,27 +131,27 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Follow redirects through auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -201,27 +201,27 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Follow auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -276,27 +276,27 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Follow auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -381,27 +381,27 @@ func TestImplicitFlow_ClientOverride_Enabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Should proceed with auth flow (client override enabled)
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -579,27 +579,27 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -723,36 +723,36 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Should redirect to consent page (because resource permissions require consent)
 	redirectLocation = assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Get consent page and submit consent for all scopes (openid, profile, resource:permission)
 	resp = postConsent(t, httpClient, redirectLocation, resp, []int{0, 1, 2})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -789,27 +789,27 @@ func TestImplicitFlow_AtHashValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -875,27 +875,27 @@ func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -942,27 +942,27 @@ func TestImplicitFlow_StatePreservation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			// Complete auth flow
 			redirectLocation := assertRedirect(t, resp, "/auth/level1")
 			resp = loadPage(t, httpClient, redirectLocation)
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 			resp = loadPage(t, httpClient, redirectLocation)
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 			resp = loadPage(t, httpClient, redirectLocation)
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			redirectLocation = assertRedirect(t, resp, "/auth/completed")
 			resp = loadPage(t, httpClient, redirectLocation)
-			defer func() { _ = resp.Body.Close() }()
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 			redirectLocation = assertRedirect(t, resp, "/auth/issue")
 			resp = loadPage(t, httpClient, redirectLocation)
@@ -993,27 +993,27 @@ func TestImplicitFlow_EmptyState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -1049,27 +1049,27 @@ func TestImplicitFlow_NonceInIdToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -1111,27 +1111,27 @@ func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -1198,27 +1198,27 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Complete auth flow
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)

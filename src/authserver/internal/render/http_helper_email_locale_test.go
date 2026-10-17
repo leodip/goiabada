@@ -19,8 +19,9 @@ import (
 // i18n.WithLocale(ctx, true, user.Locale, "en") (forgot password, the
 // existing-account registration notice, the email change, email verification
 // and the admin's user creation). The two other registration senders attach the
-// page's first tag alone, which renderEmailFirstTagOnly reproduces. The layout
-// prints the content block, so the body asserts which copy was chosen.
+// page's matched catalog then English, i18n.WithLocale(ctx, true,
+// i18n.CatalogTag(ctx), "en"), the same shape (#607). The layout prints the
+// content block, so the body asserts which copy was chosen.
 func renderEmail(t *testing.T, templateFS fstest.MapFS, locale string) (string, error) {
 	t.Helper()
 	if locale == "" {
@@ -29,9 +30,10 @@ func renderEmail(t *testing.T, templateFS fstest.MapFS, locale string) (string, 
 	return renderEmailWithTags(t, templateFS, locale, "en")
 }
 
-// renderEmailFirstTagOnly attaches the locale alone, with no English fallback,
-// the way the registration confirmation and activation senders attach the
-// page's first tag.
+// renderEmailFirstTagOnly attaches the locale alone, with no English fallback.
+// No production sender attaches that shape since #607, when the registration
+// confirmation and activation senders gained the fallback; it is the renderer's
+// coverage for a caller attaching a lone tag.
 func renderEmailFirstTagOnly(t *testing.T, templateFS fstest.MapFS, locale string) (string, error) {
 	t.Helper()
 	return renderEmailWithTags(t, templateFS, locale)

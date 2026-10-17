@@ -64,7 +64,7 @@ type SilentAuthenticationResult struct {
 
 // Run, in order:
 //
-//  1. Decides from the ceremony and its client (DecideSilentAuthentication), loading each fact it
+//  1. Decides from the ceremony and its client (decideSilentAuthentication), loading each fact it
 //     asks for, once: the browser's user session by sessionIdentifier with its user, its validity
 //     with and without max_age, the scope narrowed to what the user holds, and the user's consent to
 //     the client. A failed read is returned as an error, never taken for "no session" or "no
@@ -91,7 +91,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 
 	idleTimeout, maxLifetime := settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds
 	requestedMaxAge := authContext.RequestedMaxAge()
-	facts := SilentAuthenticationFacts{
+	facts := silentAuthenticationFacts{
 		MaxAgeRequested:  requestedMaxAge != nil,
 		HintSubject:      authContext.IdTokenHintSub,
 		Target:           authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
@@ -99,10 +99,10 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 		ClientIdentifier: client.ClientIdentifier,
 	}
 
-	answer, need := DecideSilentAuthentication(facts)
-	for need != SilentFactNone {
+	answer, need := decideSilentAuthentication(facts)
+	for need != silentFactNone {
 		switch need {
-		case SilentFactSession:
+		case silentFactSession:
 			userSession, err := o.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
 			if err != nil {
 				return SilentAuthenticationResult{}, err
@@ -116,15 +116,15 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 			facts.SessionLoaded = true
 			facts.Session = userSession
 
-		case SilentFactValidity:
+		case silentFactValidity:
 			valid := o.sessions.HasValidUserSession(facts.Session, idleTimeout, maxLifetime, requestedMaxAge)
 			facts.SessionValid = &valid
 
-		case SilentFactValidityWithoutMaxAge:
+		case silentFactValidityWithoutMaxAge:
 			valid := o.sessions.HasValidUserSession(facts.Session, idleTimeout, maxLifetime, nil)
 			facts.SessionValidWithoutMaxAge = &valid
 
-		case SilentFactEffectiveScope:
+		case silentFactEffectiveScope:
 			effectiveScope, err := o.scopes.FilterOutScopesWhereUserIsNotAuthorized(ctx, authContext.Scope,
 				&facts.Session.User)
 			if err != nil {
@@ -132,7 +132,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 			}
 			facts.EffectiveScope = &effectiveScope
 
-		case SilentFactConsent:
+		case silentFactConsent:
 			consent, err := o.database.GetConsentByUserIdAndClientId(ctx, nil, facts.Session.User.Id, client.Id)
 			if err != nil {
 				return SilentAuthenticationResult{}, err
@@ -140,7 +140,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 			facts.ConsentLoaded = true
 			facts.Consent = consent
 		}
-		answer, need = DecideSilentAuthentication(facts)
+		answer, need = decideSilentAuthentication(facts)
 	}
 
 	if answer.ErrorCode != "" {

@@ -19,7 +19,7 @@ import (
 // userDisabledDescription is the error_description of the access_denied a ceremony is answered with
 // when its user turns out to be disabled. Three steps answer with it, each at the moment it is
 // cheapest to ask: the session shortcut at /auth/authorize, /auth/completed once the credential is
-// accepted (Completion), and /auth/issue before anything is minted (#197). DecideSilentAuthentication
+// accepted (Completion), and /auth/issue before anything is minted (#197). decideSilentAuthentication
 // answers the same condition with its own description, which the silent checks table on the docs'
 // prompt page holds.
 const userDisabledDescription = "The user account is disabled."
@@ -158,7 +158,7 @@ type CompletionResult struct {
 //     session cannot be stored (StartNewUserSession refuses a zero instant, migration 000062 ended
 //     every older session), and an auth_time is never invented for it (#580 decision 5).
 //  7. Sets the ceremony's ACR against the bound session (AuthContext.SetAcrLevel).
-//  8. Decides where the bound ceremony goes (DecideAfterBinding), loading what it asks for: the scope
+//  8. Decides where the bound ceremony goes (decideAfterBinding), loading what it asks for: the scope
 //     narrowed to what the user holds, which replaces the ceremony's, and the stored consent. A user
 //     holding none of the scopes is answered access_denied after the clear; otherwise the ceremony is
 //     saved towards /auth/consent or /auth/issue.
@@ -288,15 +288,15 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		return CompletionResult{}, err
 	}
 
-	facts := AfterBindingFacts{
+	facts := afterBindingFacts{
 		PromptConsent:    authContext.HasPromptValue("consent"),
 		ConsentRequired:  client.ConsentRequired,
 		ClientIdentifier: client.ClientIdentifier,
 	}
-	answer, need := DecideAfterBinding(facts)
-	for need != AfterBindingFactNone {
+	answer, need := decideAfterBinding(facts)
+	for need != afterBindingFactNone {
 		switch need {
-		case AfterBindingFactEffectiveScope:
+		case afterBindingFactEffectiveScope:
 			effectiveScope, filterErr := o.scopes.FilterOutScopesWhereUserIsNotAuthorized(ctx, authContext.Scope, user)
 			if filterErr != nil {
 				return CompletionResult{}, filterErr
@@ -304,7 +304,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			authContext.SetScope(effectiveScope)
 			scope := authContext.Scope
 			facts.EffectiveScope = &scope
-		case AfterBindingFactConsent:
+		case afterBindingFactConsent:
 			consent, consentErr := o.database.GetConsentByUserIdAndClientId(ctx, nil, user.Id, client.Id)
 			if consentErr != nil {
 				return CompletionResult{}, consentErr
@@ -312,17 +312,17 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			facts.ConsentLoaded = true
 			facts.Consent = consent
 		}
-		answer, need = DecideAfterBinding(facts)
+		answer, need = decideAfterBinding(facts)
 	}
 
 	switch answer {
-	case AfterBindingNoScope:
+	case afterBindingNoScope:
 		return CompletionResult{
 			ClientError: &ClientError{Client: client, Code: "access_denied",
 				Description: "The user is not authorized to access any of the requested scopes"},
 			ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
 		}, nil
-	case AfterBindingConsent:
+	case afterBindingConsent:
 		authContext.AuthState = ceremony.AuthStateRequiresConsent
 		return CompletionResult{NextStep: "/auth/consent", SaveErr: browser.SaveAuthContext(authContext)}, nil
 	default:

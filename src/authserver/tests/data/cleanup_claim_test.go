@@ -2,10 +2,12 @@ package datatests
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -15,7 +17,11 @@ import (
 // against every supported engine, which is the point: the claim is a conditional
 // UPDATE rather than an engine-specific advisory lock.
 
-// setLastCleanupAt puts settings row 1 into a known state.
+// setLastCleanupAt puts settings row 1 into a known state. last_cleanup_at is
+// dont-update (#407), so no settings write can arrange it any more, and
+// arranging it through TryClaimCleanupRun would make the setup depend on the
+// very conditional these tests are about to exercise. The column is therefore
+// written directly, as the one-column UPDATE the claim itself is.
 func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 	t.Helper()
 
@@ -39,14 +45,20 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 		}
 	}
 
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("settings")
 	if at == nil {
-		settings.LastCleanupAt.Valid = false
+		settings.LastCleanupAt = sql.NullTime{}
+		ub.Set("last_cleanup_at = NULL")
 	} else {
-		settings.LastCleanupAt.Time = *at
-		settings.LastCleanupAt.Valid = true
+		settings.LastCleanupAt = sql.NullTime{Time: *at, Valid: true}
+		ub.Set(ub.Assign("last_cleanup_at", *at))
 	}
-	if err := database.UpdateSettings(context.Background(), nil, settings); err != nil {
-		t.Fatalf("Failed to update settings: %v", err)
+	ub.Where(ub.Equal("id", 1))
+	engine := engineOf(t)
+	query, args := ub.BuildWithFlavor(engine.Flavor)
+	if _, execErr := engine.ExecSQL(context.Background(), nil, query, args...); execErr != nil {
+		t.Fatalf("Failed to set last_cleanup_at: %v", execErr)
 	}
 	return settings
 }
@@ -158,6 +170,131 @@ func TestTryClaimCleanupRun_ClaimBlocksTheNextInterval(t *testing.T) {
 	}
 	if claimed {
 		t.Error("Expected the follow-up poll to lose the claim")
+	}
+}
+
+// A settings save must not release the claim (#407's acceptance case). Every settings
+// PUT writes the whole row back from the request-start snapshot, so before
+// last_cleanup_at was dont-update a save landing inside the interval wrote the
+// pre-claim timestamp back over the claim, and a second instance could claim a
+// sweep already running.
+func TestTryClaimCleanupRun_ASettingsSaveDoesNotReleaseTheClaim(t *testing.T) {
+	longAgo := time.Now().UTC().Add(-24 * time.Hour).Truncate(time.Second)
+	setLastCleanupAt(t, &longAgo)
+
+	// The snapshot a settings PUT's middleware loads at request start, read before
+	// the claim is taken.
+	snapshot, err := database.GetSettingsById(context.Background(), nil, 1)
+	if err != nil {
+		t.Fatalf("Failed to read settings: %v", err)
+	}
+	if snapshot == nil {
+		t.Skip("settings row 1 does not exist in this database; the claim targets id = 1")
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
+	if err != nil {
+		t.Fatalf("TryClaimCleanupRun failed: %v", err)
+	}
+	if !claimed {
+		t.Fatal("Expected the claim to succeed")
+	}
+
+	// The save lands with its own section changed and the stale snapshot behind
+	// it, which is the shape the settings handlers write.
+	snapshot.TokenExpirationInSeconds++
+	if updateErr := database.UpdateSettings(context.Background(), nil, snapshot); updateErr != nil {
+		t.Fatalf("Failed to update settings: %v", updateErr)
+	}
+
+	// The save itself must still have landed.
+	saved, err := database.GetSettingsById(context.Background(), nil, 1)
+	if err != nil {
+		t.Fatalf("Failed to re-read settings: %v", err)
+	}
+	if saved.TokenExpirationInSeconds != snapshot.TokenExpirationInSeconds {
+		t.Errorf("Expected the settings save to land, TokenExpirationInSeconds %d",
+			saved.TokenExpirationInSeconds)
+	}
+
+	// The claim holds: the row still names the claim time, and a poll a minute
+	// later, inside the interval, loses exactly as it did before the save.
+	if !saved.LastCleanupAt.Valid || !saved.LastCleanupAt.Time.Equal(now) {
+		t.Errorf("Expected last_cleanup_at to hold the claim at %v, got %v",
+			now, saved.LastCleanupAt)
+	}
+	later := now.Add(time.Minute)
+	claimedAgain, err := database.TryClaimCleanupRun(context.Background(), nil, later, later.Add(-12*time.Hour))
+	if err != nil {
+		t.Fatalf("TryClaimCleanupRun failed after the save: %v", err)
+	}
+	if claimedAgain {
+		t.Error("Expected the claim to still hold the interval after a settings save")
+	}
+}
+
+// A claim made while a settings section's save holds the row waits for that save and lands once it
+// commits, with the save's change kept beside it (#407). The save's transaction holds the settings
+// row and nothing else, so the claim, autocommitted, waits for that one transaction and cannot be
+// part of a deadlock with it. On SQLite the pool has one connection, so the claim waits for the
+// connection rather than the row; what it then finds is the same.
+func TestTryClaimCleanupRun_AClaimWaitsForASectionSaveHoldingTheRowAndLandsAfterIt(t *testing.T) {
+	longAgo := time.Now().UTC().Add(-24 * time.Hour).Truncate(time.Second)
+	settings := setLastCleanupAt(t, &longAgo)
+
+	// The save, of the token settings, holding the row uncommitted.
+	save := beginTx(t)
+	if err := saveSettingsSectionUnderTheLock(context.Background(), save, settings.Id, func(stored *record.Settings) {
+		stored.TokenExpirationInSeconds = settings.TokenExpirationInSeconds + 7
+	}); err != nil {
+		t.Fatalf("The save under the lock failed: %v", err)
+	}
+
+	type outcome struct {
+		claimed bool
+		err     error
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	done := make(chan outcome, 1)
+	go func() {
+		claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
+		done <- outcome{claimed: claimed, err: err}
+	}()
+
+	select {
+	case o := <-done:
+		t.Fatalf("The claim returned (claimed %v, err %v) while a save held the row uncommitted: it must wait for "+
+			"that save", o.claimed, o.err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	if err := database.CommitTransaction(context.Background(), save); err != nil {
+		t.Fatalf("Committing the save failed: %v", err)
+	}
+
+	select {
+	case o := <-done:
+		if o.err != nil {
+			t.Fatalf("The claim failed after the save committed: %v", o.err)
+		}
+		if !o.claimed {
+			t.Fatal("Expected the claim to land once the save committed: the save must leave last_cleanup_at as it found it")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("The claim never returned after the save committed")
+	}
+
+	stored, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	if err != nil {
+		t.Fatalf("Failed to re-read settings: %v", err)
+	}
+	if !stored.LastCleanupAt.Valid || !stored.LastCleanupAt.Time.Equal(now) {
+		t.Errorf("Expected last_cleanup_at to hold the claim at %v, got %v", now, stored.LastCleanupAt)
+	}
+	if stored.TokenExpirationInSeconds != settings.TokenExpirationInSeconds+7 {
+		t.Errorf("Expected the save to be kept beside the claim, TokenExpirationInSeconds %d",
+			stored.TokenExpirationInSeconds)
 	}
 }
 

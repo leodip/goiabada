@@ -4588,6 +4588,51 @@ func TestAnswerAuthorizePageRefusal_AnUnknownReasonIsA500(t *testing.T) {
 		mock.Anything)
 }
 
+// response_mode=form_post to a redirect URI no form can post to is answered 400 on the page, never
+// by redirect, since the answer would go to the same unreachable form (#121). The page names the
+// modes the request may use: an implicit request may not use the query (#231), so its page names the
+// fragment alone. The mocks are strict and nothing past the address check has an expectation, so a
+// request let through to the client load fails the case.
+func TestHandleAuthorizeGet_FormPostToAPrivateUseSchemeIsAnsweredOnThePage(t *testing.T) {
+	for responseType, key := range map[string]string{
+		"code":           "auth_error.form_post_unreachable.code.message",
+		"token":          "auth_error.form_post_unreachable.implicit.message",
+		"id_token token": "auth_error.form_post_unreachable.implicit.message",
+	} {
+		t.Run(responseType, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+			handler := buildAuthorizeGet(authorizeGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      handlersmocks.NewCeremonyStore(t),
+				userSessionManager: handlersmocks.NewUserSessionManager(t),
+				database:           datamocks.NewDatabase(t),
+				authorizeValidator: authorizeValidator,
+				auditLogger:        handlersmocks.NewAuditLogger(t),
+				permissionChecker:  handlersmocks.NewPermissionChecker(t),
+				tokenParser:        handlersmocks.NewTokenParser(t),
+			})
+
+			query := url.Values{
+				"client_id": {"test-client"}, "redirect_uri": {"myapp://callback"}, "response_type": {responseType},
+				"scope": {"openid"}, "nonce": {"n"}, "response_mode": {"form_post"},
+			}
+			req := httptest.NewRequest(http.MethodGet, "/authorize?"+query.Encode(), nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
+			rr := httptest.NewRecorder()
+
+			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil).Once()
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.MatchedBy(func(data map[string]interface{}) bool {
+				return data["error"] == i18n.T(req.Context(), key) && data["_httpStatus"] == http.StatusBadRequest
+			})).Return(nil).Once()
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Empty(t, rr.Result().Header.Get("Location"))
+		})
+	}
+}
+
 // A refusal page that cannot be rendered is the 500 page carrying the render's failure.
 func TestRenderAuthorizeRefusal_ARenderFailureIsA500(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)

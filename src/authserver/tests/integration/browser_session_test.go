@@ -158,15 +158,15 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	httpClient := createHttpClient(t)
 
 	resp := beginAuthorize(t, httpClient, client, redirectUri)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// What the browser carries into the password POST, and what a planting attacker holds
 	// a copy of.
@@ -174,7 +174,7 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	plantedId := decodeSessionIdentifier(t, plantedCookie)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	verifiedLocation := assertRedirect(t, resp, "/auth/level1completed")
 
@@ -226,7 +226,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	resp := beginAuthorize(t, httpClient, level1Client, level1RedirectUri)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	completeLevel1(t, httpClient, resp, user.Email, password)
 
 	level1Cookie := requireSessionCookie(t, httpClient)
@@ -236,22 +236,22 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	level2Client, level2RedirectUri := newClientAndRedirectUri(t, record.AcrLevel2Mandatory)
 
 	resp = beginAuthorize(t, httpClient, level2Client, level2RedirectUri)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The browser arrives with a valid session, so /auth/authorize skips the password entry
 	// entirely and goes straight to /auth/level1completed, which is where the step-up to
 	// level 2 is decided.
 	redirectLocation := assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/otp")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Nothing has rotated since the level 1 ceremony ended, so this is still the
 	// identifier the browser was reachable by at level 1.
@@ -260,7 +260,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	otpCode, err := totp.GenerateCode(otpKey.Secret(), time.Now())
 	require.NoError(t, err)
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 
@@ -299,15 +299,15 @@ func TestBrowserSession_LogoutLeavesNoUsableSession(t *testing.T) {
 	// OP ask when no id_token_hint was supplied. The confirming POST is the logout, and it
 	// carries no fields: this browser asked for nothing to be redirected to.
 	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+logoutPath)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	resp = confirmLogout(t, httpClient)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	resp = beginAuthorize(t, httpClient, client, redirectUri)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -407,7 +407,7 @@ func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
 	replay.Jar.SetCookies(baseURL, []*http.Cookie{cookie})
 
 	resp := beginAuthorize(t, replay, client, redirectUri)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, replay, redirectLocation)
@@ -482,18 +482,18 @@ func completeLevel1(t *testing.T, httpClient *http.Client, authorizeResp *http.R
 
 	redirectLocation := assertRedirect(t, authorizeResp, "/auth/level1")
 	resp := loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)

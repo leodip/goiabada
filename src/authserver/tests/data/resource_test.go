@@ -296,3 +296,45 @@ func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
 		}
 	}
 }
+
+// TestGetIdentifiersSharedByClientsAndResources pins the read behind the startup warning of
+// #151: it answers an identifier both a client and a resource hold, and nothing for a client
+// alone, a pair differing only by case, or a pair differing only by a trailing space, which SQL
+// Server's padding joins and the data layer discards (commondb.engineFoldedTheMatch). The shared
+// database holds other tests' rows, so only the identifiers this test wrote are compared.
+func TestGetIdentifiersSharedByClientsAndResources(t *testing.T) {
+	prefix := "shared_" + strings.ToLower(fake.LetterN(6)) + "_"
+	shared := prefix + "both"
+
+	clients := []string{shared, prefix + "client_only", prefix + "Cased", prefix + "padded"}
+	resources := []string{shared, prefix + "resource_only", prefix + "cased", prefix + "padded "}
+	for _, identifier := range clients {
+		client := &record.Client{ClientIdentifier: identifier, Description: "Test Client"}
+		if err := database.CreateClient(context.Background(), nil, client); err != nil {
+			t.Fatalf("Failed to create the client %q: %v", identifier, err)
+		}
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	}
+	for _, identifier := range resources {
+		resource := &record.Resource{ResourceIdentifier: identifier, Description: "Test Resource"}
+		if err := database.CreateResource(context.Background(), nil, resource); err != nil {
+			t.Fatalf("Failed to create the resource %q: %v", identifier, err)
+		}
+		t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
+	}
+
+	identifiers, err := database.GetIdentifiersSharedByClientsAndResources(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var ours []string
+	for _, identifier := range identifiers {
+		if strings.HasPrefix(identifier, prefix) {
+			ours = append(ours, identifier)
+		}
+	}
+	if len(ours) != 1 || ours[0] != shared {
+		t.Errorf("expected exactly %q among this test's identifiers, got %q", shared, ours)
+	}
+}

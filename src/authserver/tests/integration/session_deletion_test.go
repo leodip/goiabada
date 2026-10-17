@@ -82,26 +82,26 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	resp, err := httpClient.Get(destUrl)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
@@ -144,34 +144,34 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 
 	resp2, err := httpClient.Get(destUrl2)
 	require.NoError(t, err)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// Should redirect to /auth/level1 (starting the auth flow)
 	redirectLocation2 := assertRedirect(t, resp2, "/auth/level1")
 	resp2 = loadPage(t, httpClient, redirectLocation2)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// Should redirect to /auth/pwd (password page)
 	redirectLocation2 = assertRedirect(t, resp2, "/auth/pwd")
 	resp2 = loadPage(t, httpClient, redirectLocation2)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// Step 6: Submit credentials
 
 	resp2 = authenticateWithPassword(t, httpClient, redirectLocation2, resp2, user.Email, password)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// Step 7: CRITICAL TEST - After the fix, login should succeed
 	// Before the fix, this would redirect back to /auth/pwd (silent failure)
 	// After the fix, this should redirect to /auth/level1completed
 	redirectLocation2 = assertRedirect(t, resp2, "/auth/level1completed")
 	resp2 = loadPage(t, httpClient, redirectLocation2)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// Continue the flow to verify it completes successfully
 	redirectLocation2 = assertRedirect(t, resp2, "/auth/completed")
 	resp2 = loadPage(t, httpClient, redirectLocation2)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation2 = assertRedirect(t, resp2, "/auth/issue")
 	resp2 = loadPage(t, httpClient, redirectLocation2)
@@ -257,29 +257,29 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 
 	resp, err := httpClient.Get(destUrl)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// A password IS entered here, unlike the OTP case below. That is what makes this ceremony
 	// legitimate up to the consent screen and what makes /auth/issue the only hop that can
 	// refuse it.
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Consent, not /auth/issue: the ceremony now waits for a person.
 	consentUrl := assertRedirect(t, resp, "/auth/consent")
@@ -302,14 +302,14 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	// consent page this ceremony rendered. Deleting the session row does not disturb it: the
 	// binding is carried by the auth context, not by the session (#79).
 	resp = postConsent(t, httpClient, consentUrl, consentPage, []int{0, 1, 2})
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The consent submission itself succeeds, and asserting that is deliberate: it reads no
 	// session row, so the termination is invisible to it. This is what makes the next hop the
 	// load-bearing one rather than an incidental one.
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The liveness check. Before #129 stage 6 this redirected to the client with a usable code
 	// bound to a session that no longer existed.
@@ -390,20 +390,20 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 
 	resp, err := httpClient.Get(destUrl)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Straight to level1completed: the session covers level 1, no password is asked for.
 	redirectLocation := assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level2")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/otp")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The session is ended while the ceremony waits on the OTP form. Deleting the row is
 	// what the gate keys on, and it is how this file's other test ends a session too; that
@@ -417,14 +417,14 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 		t.Fatal(err)
 	}
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The OTP itself is accepted: the handler reads no session row, so it cannot see the
 	// termination. Asserting this rather than a failure here is deliberate, because it is
 	// what makes the next hop the load-bearing one.
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The gate. Before #129 this went to /auth/issue with a recreated session behind it.
 	redirectLocation = assertRedirect(t, resp, "/auth/level1")
@@ -477,7 +477,7 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 
 	resp, err := httpClient.Get(destUrl)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// authflow.SilentAuthentication accepted the session and handed off. Asserting that rather than an
 	// error here is deliberate: it is what puts the whole window in the next hop.
@@ -490,7 +490,7 @@ func TestSessionEndedBeforeIssue_PromptNoneGetsLoginRequired(t *testing.T) {
 	require.NoError(t, err)
 
 	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// Back to the client with an error, rather than on to a password form.
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
