@@ -73,21 +73,25 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 			col, dbType())
 	}
 
-	// Seeded through the data layer, which names neither column any more, and then the two
-	// columns filled with SQL, the way a row from before v0.7 can still hold them.
+	// Seeded through the shared SQL seed, which names neither phone verification column any
+	// more, and then the two columns filled with SQL, the way a row from before v0.7 can still
+	// hold them. The seed is SQL rather than the ORM because the record follows the head schema
+	// and the next column any migration adds to users would break the seeding at 000058
+	// (#510); otp_secret_encrypted is bound as bytes, the one value no engine-neutral literal
+	// can carry.
 	const seed = "JBSWY3DPEHPK3PXP"
 	encryptedSeed, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
-	user := &record.User{
+	email := "mig59-" + fake.UUID() + "@example.com"
+	user := &record.User{Id: seedUser(t, h, userSeed{
 		Enabled:            true,
 		Subject:            fake.UUID(),
 		Username:           "mig59user",
-		Email:              "mig59-" + fake.UUID() + "@example.com",
+		Email:              email,
 		PasswordHash:       "a-stored-password-hash",
 		OTPEnabled:         true,
 		OTPSecretEncrypted: encryptedSeed,
-	}
-	require.NoErrorf(t, h.DB.CreateUser(ctx, nil, user), "seed a user at 000058 on %s", dbType())
+	}), Email: email}
 
 	_, err = h.SQL.Exec(fmt.Sprintf(
 		`UPDATE users SET phone_number_verification_code_encrypted = %s, phone_number_verification_code_issued_at = %s WHERE id = %d`,

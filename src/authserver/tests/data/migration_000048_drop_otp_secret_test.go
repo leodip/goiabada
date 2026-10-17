@@ -57,8 +57,11 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	// property 3 would compare the statement with itself. Measured: the comparison passed with the
 	// down declaring BLOB instead of TEXT.
 	//
-	// Migrating up is also enough to seed through the ORM. record.User carries no OTPSecret field
-	// since #98, and every column it does carry exists at 000047.
+	// The user is seeded through the shared SQL seed rather than the ORM: the record follows the
+	// head schema, so the next column any migration adds to users would break the seeding at
+	// 000047 for a reason this migration does not own (#510). otp_secret_encrypted is bound as
+	// bytes, the one value no engine-neutral literal can carry; record.User carries no
+	// OTPSecret field since #98.
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOtpSecret000048),
 		"migrate an empty database up to 000047 on %s", dbType())
 
@@ -73,7 +76,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	encrypted, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
 
-	user := &record.User{
+	user := &record.User{Id: seedUser(t, h, userSeed{
 		Enabled:            true,
 		Subject:            "00000000-0000-0000-0000-000000048001",
 		Username:           "mig48user",
@@ -81,8 +84,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		PasswordHash:       "not-a-real-hash",
 		OTPEnabled:         true,
 		OTPSecretEncrypted: encrypted,
-	}
-	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, user), "seed a user at 000047 on %s", dbType())
+	})}
 
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOtpSecret000048), "apply 000048 on %s", dbType())
 

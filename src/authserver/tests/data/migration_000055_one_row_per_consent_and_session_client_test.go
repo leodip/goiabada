@@ -154,8 +154,8 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 	t.Helper()
 
 	s := &seeded000055{
-		userA:   createTestUserOn(t, h.DB).Id,
-		userB:   createTestUserOn(t, h.DB).Id,
+		userA:   seedUser(t, h, userSeed{}),
+		userB:   seedUser(t, h, userSeed{}),
 		client1: seedClient000055(t, h),
 		client2: seedClient000055(t, h),
 		client3: seedClient000055(t, h),
@@ -209,25 +209,19 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 func seedConsent000055(t *testing.T, h *isolatedDB, userId, clientId int64, scope, updatedAt string) int64 {
 	t.Helper()
 
-	consent := &record.UserConsent{
-		UserId: userId, ClientId: clientId, Scope: scope,
-		GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
-	}
-	require.NoError(t, h.DB.CreateUserConsent(context.Background(), nil, consent), "seed a consent while no key refuses a second")
+	id := seedUserConsent(t, h, userId, clientId, scope)
 	_, err := h.SQL.ExecContext(context.Background(), fmt.Sprintf(
-		"UPDATE user_consents SET updated_at = %s WHERE id = %d", updatedAt, consent.Id))
+		"UPDATE user_consents SET updated_at = %s WHERE id = %d", updatedAt, id))
 	require.NoError(t, err, "set the consent's updated_at")
-	return consent.Id
+	return id
 }
 
 func seedSessionClient000055(t *testing.T, h *isolatedDB, sessionId, clientId int64) int64 {
 	t.Helper()
 
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	association := &record.UserSessionClient{UserSessionId: sessionId, ClientId: clientId, Started: now, LastAccessed: now}
-	require.NoError(t, h.DB.CreateUserSessionClient(context.Background(), nil, association),
-		"seed an association while no key refuses a second")
-	return association.Id
+	// Seeded through the shared SQL seed for the same reason as the consent above, and every
+	// other row this test writes below head (#510).
+	return seedUserSessionClient(t, h, sessionId, clientId)
 }
 
 // consentRows000055 reads the pair's rows straight from the table, ordered by id, so what is

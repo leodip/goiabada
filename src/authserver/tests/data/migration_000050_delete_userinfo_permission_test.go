@@ -51,31 +51,42 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, before), "migrate an empty database up to %d on %s", before, dbType())
 
 	f := &userinfoFixture000050{h: h}
-	f.resource = &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
-	require.NoError(t, h.DB.CreateResource(ctx, nil, f.resource))
-	f.userinfo = &record.Permission{PermissionIdentifier: "userinfo", Description: userinfoDescription000050, ResourceId: f.resource.Id}
-	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.userinfo))
-	f.control = &record.Permission{PermissionIdentifier: "mig50-control", Description: "Control", ResourceId: f.resource.Id}
-	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.control))
+	// Seeded through the shared SQL seeds rather than the ORM: the database is one version
+	// below 000050, the records follow the head schema, and the next column any migration
+	// adds to one of these tables would break the seeding for a reason this migration does
+	// not own (#510).
+	f.resource = &record.Resource{
+		Id:                 seedResource(t, h, builtin.AuthServerResourceIdentifier, "Authorization server (system-level)"),
+		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
+	}
+	f.userinfo = &record.Permission{
+		Id:                   seedPermission(t, h, f.resource.Id, "userinfo", userinfoDescription000050),
+		PermissionIdentifier: "userinfo",
+	}
+	f.control = &record.Permission{
+		Id:                   seedPermission(t, h, f.resource.Id, "mig50-control", "Control"),
+		PermissionIdentifier: "mig50-control",
+	}
 
-	f.user = &record.User{
+	f.user = &record.User{Id: seedUser(t, h, userSeed{
 		Enabled:      true,
 		Subject:      "00000000-0000-0000-0000-000000050001",
 		Username:     "mig50user",
 		Email:        "mig50@example.com",
 		PasswordHash: "not-a-real-hash",
+	})}
+	f.group = &record.Group{
+		Id:              seedGroup(t, h, "mig50-group", "Migration 000050 test group"),
+		GroupIdentifier: "mig50-group",
 	}
-	require.NoError(t, h.DB.CreateUser(ctx, nil, f.user))
-	f.group = &record.Group{GroupIdentifier: "mig50-group", Description: "Migration 000050 test group"}
-	require.NoError(t, h.DB.CreateGroup(ctx, nil, f.group))
 	// In SQL rather than through the ORM, whose record names clients columns later migrations add,
 	// administrative_scopes_allowed (000060) among them.
 	f.client = &record.Client{Id: seedClient000035(t, h, "mig50-client"), ClientIdentifier: "mig50-client"}
 
 	for _, permission := range []*record.Permission{f.userinfo, f.control} {
-		require.NoError(t, h.DB.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: f.user.Id, PermissionId: permission.Id}))
-		require.NoError(t, h.DB.CreateGroupPermission(ctx, nil, &record.GroupPermission{GroupId: f.group.Id, PermissionId: permission.Id}))
-		require.NoError(t, h.DB.CreateClientPermission(ctx, nil, &record.ClientPermission{ClientId: f.client.Id, PermissionId: permission.Id}))
+		seedUserPermission(t, h, f.user.Id, permission.Id)
+		seedGroupPermission(t, h, f.group.Id, permission.Id)
+		seedClientPermission(t, h, f.client.Id, permission.Id)
 	}
 
 	userHolds, groupHolds, clientHolds := f.held(t)
