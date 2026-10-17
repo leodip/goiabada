@@ -40,6 +40,65 @@ test("signing out with no ID token asks first, then ends the session", async ({ 
   await context.close();
 });
 
+// Declining on the confirmation page (#152). No is a link to the "still signed in" page, which the
+// page's script turns into a step back when there is somewhere to go back to. Each case checks the
+// session survived by signing in again without being asked for the password.
+test("declining the sign-out goes back to the app, and the session survives", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user);
+  await expectResult(app, "Signed in");
+
+  await app.getByRole("button", { name: "Sign out with no id_token_hint" }).click();
+  await expect(app.getByRole("heading", { name: "Sign out", exact: true })).toBeVisible();
+  await app.getByRole("link", { name: "No", exact: true }).click();
+  await app.waitForURL(testapp.web.url);
+
+  expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(false);
+  await context.close();
+});
+
+test("declining the sign-out with nowhere to go back to says the user is still signed in, in their language", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user);
+  await expectResult(app, "Signed in");
+
+  // A fresh tab whose first entry is the confirmation page, as when an app opens sign-out in a new tab.
+  const tab = await context.newPage();
+  await tab.goto(`${env.authUrl}/auth/logout?ui_locales=pt-BR`);
+  expect(await tab.evaluate(() => history.length)).toBe(1);
+  await tab.getByRole("link", { name: "Não", exact: true }).click();
+  await tab.waitForURL((url) => url.pathname === "/auth/logout/declined");
+  expect(new URL(tab.url()).searchParams.get("ui_locales")).toBe("pt-BR");
+  await expect(tab.getByRole("heading", { name: "Sessão mantida" })).toBeVisible();
+  await expect(tab.getByText("Você continua conectado. Pode fechar esta página.")).toBeVisible();
+  await tab.close();
+
+  expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(false);
+  await context.close();
+});
+
+test("declining the sign-out without JavaScript says the user is still signed in, and the session survives", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user);
+  await expectResult(app, "Signed in");
+
+  // The same browser's cookies, in a context that runs no script, so nothing can stop No submitting.
+  const noScript = await browser.newContext({ storageState: await context.storageState(), javaScriptEnabled: false });
+  const page = await noScript.newPage();
+  await page.goto(`${env.authUrl}/auth/logout`);
+  await page.getByRole("link", { name: "No", exact: true }).click();
+  await page.waitForURL((url) => url.pathname === "/auth/logout/declined");
+  await expect(page.getByRole("heading", { name: "Still signed in" })).toBeVisible();
+  await expect(page.getByText("You are still signed in. You can close this page.")).toBeVisible();
+  await noScript.close();
+
+  expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(false);
+  await context.close();
+});
+
 test("forgetting only the app's session leaves the auth server's: signing in again asks for nothing", async ({ browser, users }) => {
   const user = await users.create();
   const { context, page: app } = await userBrowser(browser);
