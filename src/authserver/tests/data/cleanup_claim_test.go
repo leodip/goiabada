@@ -234,6 +234,70 @@ func TestTryClaimCleanupRun_ASettingsSaveDoesNotReleaseTheClaim(t *testing.T) {
 	}
 }
 
+// A claim made while a settings section's save holds the row waits for that save and lands once it
+// commits, with the save's change kept beside it (#407). The save's transaction holds the settings
+// row and nothing else, so the claim, autocommitted, waits for that one transaction and cannot be
+// part of a deadlock with it. On SQLite the pool has one connection, so the claim waits for the
+// connection rather than the row; what it then finds is the same.
+func TestTryClaimCleanupRun_AClaimWaitsForASectionSaveHoldingTheRowAndLandsAfterIt(t *testing.T) {
+	longAgo := time.Now().UTC().Add(-24 * time.Hour).Truncate(time.Second)
+	settings := setLastCleanupAt(t, &longAgo)
+
+	// The save, of the token settings, holding the row uncommitted.
+	save := beginTx(t)
+	if err := saveSettingsSectionUnderTheLock(context.Background(), save, settings.Id, func(stored *record.Settings) {
+		stored.TokenExpirationInSeconds = settings.TokenExpirationInSeconds + 7
+	}); err != nil {
+		t.Fatalf("The save under the lock failed: %v", err)
+	}
+
+	type outcome struct {
+		claimed bool
+		err     error
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	done := make(chan outcome, 1)
+	go func() {
+		claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
+		done <- outcome{claimed: claimed, err: err}
+	}()
+
+	select {
+	case o := <-done:
+		t.Fatalf("The claim returned (claimed %v, err %v) while a save held the row uncommitted: it must wait for "+
+			"that save", o.claimed, o.err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	if err := database.CommitTransaction(context.Background(), save); err != nil {
+		t.Fatalf("Committing the save failed: %v", err)
+	}
+
+	select {
+	case o := <-done:
+		if o.err != nil {
+			t.Fatalf("The claim failed after the save committed: %v", o.err)
+		}
+		if !o.claimed {
+			t.Fatal("Expected the claim to land once the save committed: the save must leave last_cleanup_at as it found it")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("The claim never returned after the save committed")
+	}
+
+	stored, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	if err != nil {
+		t.Fatalf("Failed to re-read settings: %v", err)
+	}
+	if !stored.LastCleanupAt.Valid || !stored.LastCleanupAt.Time.Equal(now) {
+		t.Errorf("Expected last_cleanup_at to hold the claim at %v, got %v", now, stored.LastCleanupAt)
+	}
+	if stored.TokenExpirationInSeconds != settings.TokenExpirationInSeconds+7 {
+		t.Errorf("Expected the save to be kept beside the claim, TokenExpirationInSeconds %d",
+			stored.TokenExpirationInSeconds)
+	}
+}
+
 // The sequential test above proves the predicate is right: once a claim lands,
 // later claims see the fresh timestamp and lose. It cannot prove mutual exclusion,
 // because nothing ever overlaps, so no row lock is contended and the database

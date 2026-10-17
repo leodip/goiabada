@@ -437,3 +437,155 @@ func TestSettingsSectionSaves_ConcurrentSavesOfDifferentSectionsAllSurvive(t *te
 		assert.Equal(t, 12, row.AuditLogRetentionDays, "round %d: the audit log save was lost", round)
 	}
 }
+
+// settingsSectionReplaced is what each section that records the values it replaced logs of them,
+// computed from the row the save wrote onto. The other sections log only their new values.
+var settingsSectionReplaced = map[string]func(stored record.Settings) map[string]interface{}{
+	"sessions": func(stored record.Settings) map[string]interface{} {
+		return map[string]interface{}{"old": sessionsSettingsAuditValues(&stored)}
+	},
+	"tokens": func(stored record.Settings) map[string]interface{} {
+		return map[string]interface{}{"old": map[string]interface{}{
+			"token_expiration_in_seconds":                    stored.TokenExpirationInSeconds,
+			"refresh_token_offline_idle_timeout_in_seconds":  stored.RefreshTokenOfflineIdleTimeoutInSeconds,
+			"refresh_token_offline_max_lifetime_in_seconds":  stored.RefreshTokenOfflineMaxLifetimeInSeconds,
+			"include_open_id_connect_claims_in_access_token": stored.IncludeOpenIDConnectClaimsInAccessToken,
+			"include_open_id_connect_claims_in_id_token":     stored.IncludeOpenIDConnectClaimsInIdToken,
+		}}
+	},
+	"ui theme": func(stored record.Settings) map[string]interface{} {
+		return map[string]interface{}{"old_ui_theme": stored.UITheme}
+	},
+}
+
+// The values a save records as replaced are the row's as read under its lock, which is what it
+// wrote over, not the copy its request loaded: a save of the same section committed meanwhile
+// changed them, and recording the request's copy would name values the row no longer held (#407).
+func TestSettingsSectionSaves_TheAuditRecordsTheValuesTheSaveReplaced(t *testing.T) {
+	for _, save := range settingsSectionSaves() {
+		replaced, records := settingsSectionReplaced[save.name]
+		if !records {
+			continue
+		}
+		t.Run(save.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			logged := recordLoggedEvents(auditLogger)
+			datamocks.ExpectRunInTransaction(database, settingsSaveTx)
+			database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).Return(nil).Once()
+			database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+				RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+					stored := settingsSavedMeanwhile()
+					return &stored, nil
+				}).Once()
+			database.EXPECT().UpdateSettings(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Once()
+
+			rr := serveSectionSave(save, database, auditLogger, save.body(t), settingsAsTheRequestLoadedThem())
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.Len(t, *logged, 1)
+			details := (*logged)[0].details
+			for key, want := range replaced(settingsSavedMeanwhile()) {
+				assert.Equal(t, want, details[key], "the %s save recorded %s from the copy its request loaded", save.name, key)
+			}
+		})
+	}
+}
+
+// The engine reruns a transaction's body when it aborts it as a deadlock victim, so a save's apply
+// runs once per attempt, each on that attempt's own read. What the save writes and what it records
+// is the committed attempt's: its write carries the other sections as that attempt read them, and
+// the values it records as replaced are that attempt's, not the aborted one's (#407).
+func TestSettingsSectionSaves_ARerunBodyWritesAndRecordsTheCommittedAttempt(t *testing.T) {
+	for _, save := range settingsSectionSaves() {
+		t.Run(save.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			logged := recordLoggedEvents(auditLogger)
+			datamocks.ExpectRunInTransactionRerun(database, settingsSaveTx)
+			database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).Return(nil).Times(2)
+			// The aborted attempt reads the row as the request loaded it; the committed one reads it
+			// after saves of every section committed between the two.
+			reads := 0
+			database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+				RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+					reads++
+					stored := settingsAsTheRequestLoadedThem()
+					if reads > 1 {
+						stored = settingsSavedMeanwhile()
+					}
+					return &stored, nil
+				}).Times(2)
+			var writes []record.Settings
+			database.EXPECT().UpdateSettings(mock.Anything, settingsSaveTx, mock.Anything).
+				Run(func(_ context.Context, _ *sql.Tx, settings *record.Settings) { writes = append(writes, *settings) }).
+				Return(nil).Times(2)
+
+			rr := serveSectionSave(save, database, auditLogger, save.body(t), settingsAsTheRequestLoadedThem())
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.Len(t, writes, 2)
+			owns := map[string]bool{}
+			for _, column := range save.owns {
+				owns[column] = true
+			}
+			meanwhile := settingsSavedMeanwhile()
+			cv, mv := reflect.ValueOf(writes[1]), reflect.ValueOf(meanwhile)
+			for i := 0; i < cv.NumField(); i++ {
+				name := cv.Type().Field(i).Name
+				if owns[name] {
+					continue
+				}
+				assert.Equal(t, mv.Field(i).Interface(), cv.Field(i).Interface(),
+					"the committed attempt of the %s save wrote %s from the aborted attempt's read", save.name, name)
+			}
+			require.Len(t, *logged, 1, "one record, for the committed attempt")
+			if replaced, records := settingsSectionReplaced[save.name]; records {
+				details := (*logged)[0].details
+				for key, want := range replaced(meanwhile) {
+					assert.Equal(t, want, details[key], "the %s save recorded %s from the aborted attempt", save.name, key)
+				}
+			}
+		})
+	}
+}
+
+// settingsSaveStore is a settingsSaveDatabase whose read answers row, nil for a row that is not
+// there, and which counts the writes it is asked for.
+type settingsSaveStore struct {
+	row    *record.Settings
+	writes int
+}
+
+func (s *settingsSaveStore) RunInTransaction(_ context.Context, fn func(tx *sql.Tx) error) error {
+	return fn(settingsSaveTx)
+}
+
+func (s *settingsSaveStore) AcquireSettingsRow(context.Context, *sql.Tx, int64) error { return nil }
+
+func (s *settingsSaveStore) GetSettingsById(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+	if s.row == nil {
+		return nil, nil
+	}
+	stored := *s.row
+	return &stored, nil
+}
+
+func (s *settingsSaveStore) UpdateSettings(context.Context, *sql.Tx, *record.Settings) error {
+	s.writes++
+	return nil
+}
+
+// A settings row that is gone by the time the save reads it under its lock is an error, and
+// nothing is applied or written: the lock holds no row, and writing would update none.
+func TestSaveSettingsSection_ARowThatIsGoneWritesNothing(t *testing.T) {
+	store := &settingsSaveStore{}
+	applied := false
+
+	saved, err := saveSettingsSection(context.Background(), store, 1, func(*record.Settings) { applied = true })
+
+	require.Error(t, err)
+	assert.Nil(t, saved)
+	assert.False(t, applied, "the section was applied to a row that is not there")
+	assert.Zero(t, store.writes, "a save wrote a row that is not there")
+}
