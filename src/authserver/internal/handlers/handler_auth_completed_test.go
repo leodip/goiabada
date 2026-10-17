@@ -3363,6 +3363,16 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 			level1Completed:    true,
 			endsForeignSession: true,
 		},
+		{
+			// The user's own session, not reusable (max_age, say), takes the create arm with a session
+			// in hand, which a refusal leaves as it is: only another user's session is ended (#133).
+			// The identifier lets a wrong termination reach the strict database mock.
+			name: "create arm with the user's own session no longer reusable",
+			session: &record.UserSession{Id: 9, UserId: 1, SessionIdentifier: "test-session", AcrLevel: record.AcrLevel1,
+				AuthMethods: "pwd"},
+			valid:           false,
+			level1Completed: true,
+		},
 	}
 
 	users := []struct {
@@ -3530,16 +3540,21 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 
 // A sign-in refused for the id_token_hint over another user's session ends that session only while
 // the browser session still holds the ceremony, as the create arm does (#579 decision 4): a ceremony
-// the browser replaced meanwhile ends nothing and answers the "no longer active" page. A termination
-// that fails is a 500 with the ceremony left in place, the fail-closed direction the create arm
-// takes. Neither answers the client, clears the ceremony or starts a session.
+// the browser replaced meanwhile ends nothing and answers the "no longer active" page, and a
+// confirmation the store cannot answer ends nothing and is a 500. A termination that fails is a 500
+// with the ceremony left in place, the fail-closed direction the create arm takes. None answers the
+// client, clears the ceremony or starts a session.
 func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHoldsTheCeremony(t *testing.T) {
-	for _, replaced := range []bool{true, false} {
-		name := "a termination that fails"
-		if replaced {
-			name = "a ceremony the browser session no longer holds"
-		}
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// confirmErr is what ConfirmCeremony answers; the termination is attempted only after nil.
+		confirmErr error
+	}{
+		{name: "a ceremony the browser session no longer holds", confirmErr: ceremony.ErrCeremonyReplaced},
+		{name: "a confirmation the store cannot answer", confirmErr: errors.New("the session store is unreachable")},
+		{name: "a termination that fails"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			userSessionManager := handlersmocks.NewUserSessionManager(t)
@@ -3596,10 +3611,18 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 				Return(&record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: 7}, nil)
 
-			if replaced {
-				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(ceremony.ErrCeremonyReplaced).Once()
+			switch {
+			case errors.Is(tc.confirmErr, ceremony.ErrCeremonyReplaced):
+				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(tc.confirmErr).Once()
 				expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
-			} else {
+			case tc.confirmErr != nil:
+				// No transaction is expected, so a termination attempted anyway fails on the strict
+				// database mock.
+				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(tc.confirmErr).Once()
+				pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+					return errors.Is(err, tc.confirmErr)
+				})).Return().Once()
+			default:
 				expectCeremonyConfirmed(ceremonyStore, rr, req)
 				failure := errors.New("the database is unreachable")
 				datamocks.ExpectRunInTransactionRefused(database, failure)
