@@ -56,6 +56,12 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	// below 000050, the records follow the head schema, and the next column any migration
 	// adds to one of these tables would break the seeding for a reason this migration does
 	// not own (#510).
+	// A permission on another resource, written first and granted to nobody, so the fixture's
+	// permission ids run ahead of the link tables' own ids: a grant read that returned a link
+	// row's id where its permission_id belongs then disagrees with every assertion below.
+	unrelated := seedResource(t, h, "mig50-unrelated", "Migration 000050 unrelated resource")
+	seedPermission(t, h, unrelated, "mig50-unrelated", "Unrelated")
+
 	f.resource = &record.Resource{
 		Id:                 seedResource(t, h, builtin.AuthServerResourceIdentifier, "Authorization server (system-level)"),
 		ResourceIdentifier: builtin.AuthServerResourceIdentifier,

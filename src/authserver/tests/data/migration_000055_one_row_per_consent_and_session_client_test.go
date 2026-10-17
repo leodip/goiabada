@@ -131,13 +131,12 @@ type seeded000055 struct {
 	session1, session2        int64
 
 	// The consent that must survive in each pair, which is the whole of decision 28's claim.
-	narrowedAfterward  consentRow000055 // (A,1): the LOWER id, saved later with the narrower scope
-	equalTimes         consentRow000055 // (A,2): two rows saved at one instant, the higher id
-	nullOnTheHigherId  consentRow000055 // (B,1): the lower id, against a NULL updated_at
-	bothNull           consentRow000055 // (B,2): nothing but the id to order by, the higher
-	middleOfThree      consentRow000055 // (A,3): neither the highest id nor the lowest, but the latest save
-	untouched          consentRow000055 // (B,3): a pair nothing duplicated
-	untouchedGrantedAt sql.NullTime
+	narrowedAfterward consentRow000055 // (A,1): the LOWER id, saved later with the narrower scope
+	equalTimes        consentRow000055 // (A,2): two rows saved at one instant, the higher id
+	nullOnTheHigherId consentRow000055 // (B,1): the lower id, against a NULL updated_at
+	bothNull          consentRow000055 // (B,2): nothing but the id to order by, the higher
+	middleOfThree     consentRow000055 // (A,3): neither the highest id nor the lowest, but the latest save
+	untouched         consentRow000055 // (B,3): a pair nothing duplicated
 
 	// The association that must survive in each pair: the lowest id.
 	session1Client1Kept, session1Client2Only, session2Client1Kept int64
@@ -185,7 +184,12 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 
 	// A pair nothing duplicated keeps every column it had.
 	s.untouched = consentRow000055{seedConsent000055(t, h, s.userB, s.client3, "openid profile", middle000055), "openid profile"}
-	s.untouchedGrantedAt = consentGrantedAt000055(t, h, s.userB, s.client3)
+	// Its granted_at a fixed instant no other column of the row holds, so a reader that read the
+	// wrong column could not agree with it.
+	_, err := h.SQL.ExecContext(context.Background(), fmt.Sprintf(
+		"UPDATE user_consents SET granted_at = %s WHERE id = %d", untouchedGrantedAtLiteral000055, s.untouched.id))
+	require.NoError(t, err, "set the untouched consent's granted_at")
+	assertUntouchedGrantedAt000055(t, h, s, "the fixture: as written")
 
 	// Associations: three rows for (S1, C1), one for (S1, C2), two for (S2, C1). The same client in
 	// two sessions is two pairs, not a duplicate.
@@ -239,6 +243,21 @@ func consentRows000055(t *testing.T, h *isolatedDB, userId, clientId int64) []co
 	}
 	require.NoError(t, rows.Err())
 	return found
+}
+
+// untouchedGrantedAtLiteral000055 is the untouched consent's granted_at as the fixture writes it,
+// and untouchedGrantedAt000055 the same instant as it must read back, written down apart from any
+// read so the assertion does not compare the reader with itself.
+const untouchedGrantedAtLiteral000055 = "'2025-06-15 12:34:56'"
+
+var untouchedGrantedAt000055 = time.Date(2025, 6, 15, 12, 34, 56, 0, time.UTC)
+
+func assertUntouchedGrantedAt000055(t *testing.T, h *isolatedDB, s *seeded000055, msg string) {
+	t.Helper()
+
+	got := consentGrantedAt000055(t, h, s.userB, s.client3)
+	require.Truef(t, got.Valid, "%s: granted_at reads NULL", msg)
+	assert.Truef(t, untouchedGrantedAt000055.Equal(got.Time), "%s: want %v, got %v", msg, untouchedGrantedAt000055, got.Time)
 }
 
 // consentGrantedAt000055 reads the granted_at of a pair that holds one row. In SQL rather than
@@ -309,9 +328,7 @@ func (s *seeded000055) assertSwept(t *testing.T, h *isolatedDB, when string) {
 	assert.Falsef(t, narrowed.HasScope("profile"), "the scope the user removed is not handed back %s", when)
 	assert.Falsef(t, narrowed.HasScope("email"), "nor the other one %s", when)
 
-	untouched := consentGrantedAt000055(t, h, s.userB, s.client3)
-	assert.Truef(t, s.untouchedGrantedAt.Time.Equal(untouched.Time),
-		"an untouched consent keeps its granted_at %s: %v and was %v", when, untouched.Time, s.untouchedGrantedAt.Time)
+	assertUntouchedGrantedAt000055(t, h, s, "an untouched consent keeps its granted_at "+when)
 
 	assert.Equalf(t, []int64{s.session1Client1Kept}, sessionClientIds000055(t, h, s.session1, s.client1),
 		"three associations for a pair keep the lowest id %s", when)
