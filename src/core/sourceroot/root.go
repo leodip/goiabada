@@ -35,8 +35,9 @@ func ModuleDirs() []string {
 
 // FindSourceRoot returns the directory holding the four go.mod files, ascending
 // from dir. It is where every tree-wide guard roots its walk, through
-// guard.SourceRoot, and where cmd/ownershipdump roots its own, which is a
-// command rather than a test and still has to start in the same place.
+// guard.SourceRoot, and where cmd/ownershipdump and the auth server's schemadump
+// root their own, which are commands rather than tests and still have to start
+// in the same place.
 //
 // A wrong root is not a loud failure: it walks a directory that exists and holds
 // nothing, and the guard passes. That is why its failure is an error rather than
