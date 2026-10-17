@@ -87,12 +87,28 @@ probe() {
     esac
 }
 
+# A server that exited will never answer: say why at once, not after the wait. MySQL
+# and SQL Server each take a share of the kernel's async I/O contexts, a limit for the
+# whole machine (Docker Desktop's engine shares WSL's kernel), which several stacks up
+# at once can run out of.
+exited() {
+    docker logs --tail 15 "$2" 2>&1 | sed 's/^/  /' >&2
+    if grep -q -i -e 'aio-max-nr' -e 'io_setup() failed' <(docker logs "$2" 2>&1); then  # no pipe: grep -q would break it
+        die "$1 exited: the kernel ran out of async I/O contexts ($(cat /proc/sys/fs/aio-nr 2>/dev/null || echo '?')" \
+            "in use of $(cat /proc/sys/fs/aio-max-nr 2>/dev/null || echo '?')). Raise the limit, once and for good:" \
+            "echo 'fs.aio-max-nr = 1048576' | sudo tee /etc/sysctl.d/60-aio-max-nr.conf && sudo sysctl --system"
+    fi
+    die "$1 exited with code $(docker inspect -f '{{.State.ExitCode}}' "$2" 2>/dev/null); its last lines are above"
+}
+
 wait_for_databases() {
-    local engine deadline started
+    local engine container deadline started
     for engine in mysql postgres mssql; do
+        container="$NAME-$engine-server-1"
         started=$(date +%s); deadline=$(( started + WAIT ))
         until probe "$engine"; do
-            [[ $(date +%s) -lt $deadline ]] || die "$engine did not answer within ${WAIT}s; see: docker logs $NAME-$engine-server-1"
+            [[ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null)" == true ]] || exited "$engine" "$container"
+            [[ $(date +%s) -lt $deadline ]] || die "$engine did not answer within ${WAIT}s; see: docker logs $container"
             sleep 2
         done
         echo "$engine ready after $(( $(date +%s) - started ))s"
