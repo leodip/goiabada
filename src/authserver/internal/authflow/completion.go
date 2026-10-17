@@ -122,8 +122,9 @@ type CompletionResult struct {
 	// holds the ceremony. The handler redirects to NextStep only when it is nil.
 	SaveErr error
 
-	// ClientError is the access_denied the client is owed, for a disabled user or for a user holding
-	// none of the requested scopes. The ceremony ends with it: it was cleared.
+	// ClientError is the error the client is owed: login_required for a user who is not the
+	// id_token_hint's, access_denied for a disabled user or for a user holding none of the requested
+	// scopes. The ceremony ends with it: it was cleared.
 	ClientError *ClientError
 	// ClearErr is the clear's failure: ceremony.ErrCeremonyReplaced, which answers the "no longer
 	// active" page and nothing to the client, or any other, which answers the client server_error in
@@ -148,7 +149,10 @@ type CompletionResult struct {
 //  3. Unless it restarts, loads the ceremony's user and decides on it before anything is bound
 //     (decideBeforeBinding): a missing user is an error, a user who is not the id_token_hint's is
 //     answered login_required, a disabled one is audited and answered access_denied, each refusal
-//     after the ceremony is cleared, and a moved generation or a removed authenticator restarts.
+//     after the ceremony is cleared, and a moved generation or a removed authenticator restarts. A
+//     user who is not the hint's, on a create arm arriving with another user's session, first ends
+//     that session as the create arm would (ConfirmCeremony, terminateForeignSession), and starts
+//     none (#133).
 //  4. A restart (restart route 1) discards the attempt (AuthContext.Restart) and saves the ceremony
 //     towards /auth/level1.
 //  5. Binds: the reuse arm (bindReusedSession) or the create arm (bindNewSession). The write asking
@@ -216,6 +220,21 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		case beforeBindingUserMissing:
 			return CompletionResult{}, errs.New("user not found")
 		case beforeBindingHintMismatch:
+			// The sign-in is refused, but the browser has still changed hands: the session it
+			// arrived with, when it is another user's, is ended as the create arm would end it,
+			// and no session is started for this user (#133, #535).
+			if create, creates := plan.(createSessionPlan); creates && create.terminatesForeignSession() {
+				err = browser.ConfirmCeremony(authContext.CeremonyId)
+				if err == nil {
+					err = o.terminateForeignSession(ctx, authContext, client, userSession)
+				}
+				switch {
+				case errors.Is(err, ceremony.ErrCeremonyReplaced):
+					return CompletionResult{Replaced: true}, nil
+				case err != nil:
+					return CompletionResult{}, err
+				}
+			}
 			return CompletionResult{
 				ClientError: &ClientError{Client: client, Code: oidc.ErrorLoginRequired,
 					Description: hintMismatchDescription},
@@ -458,30 +477,9 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	// never reach this one. Both sweeps key on the session identifier, so the previous user's other
 	// devices are untouched (#133).
 	if plan.terminatesForeignSession() {
-		terminationResult, err := revocation.TerminateUserSessionTx(ctx, o.database, userSession)
-		if err != nil {
+		if err := o.terminateForeignSession(ctx, authContext, client, userSession); err != nil {
 			return nil, err
 		}
-
-		// The handover comes first, as the reason for the other two, and attests the ending, not a
-		// replacement: started_new_user_session attests that, so its absence after this event shows a
-		// handover that did not complete (#133). No event names logged_in_user: the only identity in
-		// scope is the cookie's, which is still the user being terminated, and the actor is this
-		// event's user_id.
-		o.auditLogger.Log(ctx, audit.EventCrossUserSessionReplaced, map[string]interface{}{
-			"user_id":                     authContext.UserId,
-			"previous_user_id":            userSession.UserId,
-			"previous_session_identifier": userSession.SessionIdentifier,
-			"client_id":                   client.Id,
-		})
-		// deleted_user_session beside terminated_user_session, the pair every caller of
-		// TerminateUserSessionTx writes (#129 decision 9).
-		o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": userSession.Id,
-			"logged_in_user":  "",
-			"reason":          audit.DeletedUserSessionReplacedByOtherUser,
-		})
-		revocation.LogTerminatedUserSession(ctx, o.auditLogger, userSession, "", terminationResult)
 	}
 
 	// The browser's own session, when it is this user's, is the one this sign-in replaces. Nothing it
@@ -530,6 +528,41 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 		"client_id": client.Id,
 	})
 	return newSession, nil
+}
+
+// terminateForeignSession ends userSession, another user's that the browser arrived with, with its
+// codes and refresh tokens (revocation.TerminateUserSessionTx), then audits the handover, the deletion
+// and the termination, in that order and after the commit. The create arm calls it before it starts
+// the new session, and a sign-in refused for the id_token_hint calls it in place of the create arm,
+// since that browser changed hands too (#133, #535).
+func (o *Completion) terminateForeignSession(ctx context.Context, authContext *ceremony.AuthContext,
+	client *record.Client, userSession *record.UserSession) error {
+
+	terminationResult, err := revocation.TerminateUserSessionTx(ctx, o.database, userSession)
+	if err != nil {
+		return err
+	}
+
+	// The handover comes first, as the reason for the other two, and attests the ending, not a
+	// replacement: started_new_user_session attests that, so its absence after this event shows a
+	// handover that did not complete (#133). No event names logged_in_user: the only identity in
+	// scope is the cookie's, which is still the user being terminated, and the actor is this
+	// event's user_id.
+	o.auditLogger.Log(ctx, audit.EventCrossUserSessionReplaced, map[string]interface{}{
+		"user_id":                     authContext.UserId,
+		"previous_user_id":            userSession.UserId,
+		"previous_session_identifier": userSession.SessionIdentifier,
+		"client_id":                   client.Id,
+	})
+	// deleted_user_session beside terminated_user_session, the pair every caller of
+	// TerminateUserSessionTx writes (#129 decision 9).
+	o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
+		"user_session_id": userSession.Id,
+		"logged_in_user":  "",
+		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
+	})
+	revocation.LogTerminatedUserSession(ctx, o.auditLogger, userSession, "", terminationResult)
+	return nil
 }
 
 // otpClaimOf is the ceremony's claim to a one-time code: whether its methods name one, and the

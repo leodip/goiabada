@@ -3324,10 +3324,13 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 }
 
 // /auth/completed decides on the user before either arm binds a session (#522 decision 6). A
-// disabled user is answered access_denied and a user whose authentication generation has moved on
-// since the ceremony authenticated is restarted at level 1, and on every arm nothing is written
-// first: no rotation, no bump, no termination of a foreign session, no new session and no audit
-// record of one. Each strict mock fails the case on any write it was not told to expect.
+// disabled user is answered access_denied, a user who is not the id_token_hint's login_required
+// (#535), and a user whose authentication generation has moved on since the ceremony authenticated
+// is restarted at level 1, and on every arm nothing is written first: no rotation, no bump, no new
+// session and no audit record of one. Nor is a foreign session terminated, except for the hint's
+// refusal, where the browser changed hands all the same and the other user's session is ended as
+// the create arm would end it (#133). Each strict mock fails the case on any write it was not told
+// to expect.
 func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 	const ceremonyGeneration = int64(7)
 	// claimGeneration is the otp_config_generation of the authenticator a ceremony's code came from.
@@ -3340,6 +3343,8 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 		valid   bool
 		// level1Completed is set on the arms that create, which the create gate requires.
 		level1Completed bool
+		// endsForeignSession is set on the arm whose session is another user's.
+		endsForeignSession bool
 	}{
 		{
 			name:    "reuse arm",
@@ -3351,10 +3356,12 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 			level1Completed: true,
 		},
 		{
-			name:            "create arm with another user's session to end",
-			session:         &record.UserSession{Id: 9, UserId: 2, AcrLevel: record.AcrLevel1, AuthMethods: "pwd"},
-			valid:           true,
-			level1Completed: true,
+			name: "create arm with another user's session to end",
+			session: &record.UserSession{Id: 9, UserId: 2, SessionIdentifier: "test-session", AcrLevel: record.AcrLevel1,
+				AuthMethods: "pwd"},
+			valid:              true,
+			level1Completed:    true,
+			endsForeignSession: true,
 		},
 	}
 
@@ -3363,6 +3370,10 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 		user *record.User
 		// methods is the ceremony's, "pwd" when empty.
 		methods string
+		// hint is the id_token_hint's subject, none when empty; clearErr is what clearing the
+		// ceremony answers.
+		hint     string
+		clearErr error
 	}{
 		{name: "a disabled user", user: &record.User{Id: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration}},
 		{name: "a disabled user whose generation also moved on",
@@ -3377,6 +3388,17 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 			user: &record.User{Id: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration, OTPEnabled: true,
 				OtpConfigGeneration: claimGeneration + 2}, methods: "pwd otp"},
 		{name: "a missing user"},
+		{name: "a user who is not the id_token_hint's",
+			user: &record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
+			hint: "the-hint"},
+		// A clear the store fails answers server_error in place of login_required, and one finding
+		// the ceremony replaced the "no longer active" page, with nothing to the client (#141, #579).
+		{name: "a user who is not the id_token_hint's, and a failing clear",
+			user: &record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
+			hint: "the-hint", clearErr: errors.New("the session store is unreachable")},
+		{name: "a user who is not the id_token_hint's, and a clear finding the ceremony replaced",
+			user: &record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
+			hint: "the-hint", clearErr: ceremony.ErrCeremonyReplaced},
 	}
 
 	for _, arm := range arms {
@@ -3422,6 +3444,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					PasswordVerifiedAt:  &authenticatedAt,
 					Level1AuthCompleted: arm.level1Completed,
 					OtpClaimGeneration:  func() *int64 { g := claimGeneration; return &g }(),
+					IdTokenHintSub:      u.hint,
 				}
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -3437,6 +3460,16 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 				switch {
 				case u.user == nil:
 					pageRenderer.On("InternalServerError", rr, req, mock.Anything).Return().Once()
+				case u.hint != "":
+					if arm.endsForeignSession {
+						expectForeignSessionEnded(ceremonyStore, database, auditLogger, rr, req, arm.session)
+					}
+					ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(u.clearErr).Once()
+					if errors.Is(u.clearErr, ceremony.ErrCeremonyReplaced) {
+						expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
+					} else {
+						stubRegisteredRedirectURI(database, "https://example.com/callback")
+					}
 				case !u.user.Enabled:
 					stubRegisteredRedirectURI(database, "https://example.com/callback")
 					auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
@@ -3455,6 +3488,22 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 
 				switch {
 				case u.user == nil:
+				case errors.Is(u.clearErr, ceremony.ErrCeremonyReplaced):
+					assert.Empty(t, rr.Header().Get("Location"))
+				case u.hint != "":
+					assert.Equal(t, http.StatusFound, rr.Code)
+					location, err := rr.Result().Location()
+					require.NoError(t, err)
+					assert.Equal(t, "https://example.com/callback", location.Scheme+"://"+location.Host+location.Path)
+					if u.clearErr != nil {
+						assert.Equal(t, "server_error", location.Query().Get("error"))
+						assert.Equal(t, "Internal server error", location.Query().Get("error_description"))
+					} else {
+						assert.Equal(t, "login_required", location.Query().Get("error"))
+						assert.Equal(t, "The authenticated user does not match the id_token_hint",
+							location.Query().Get("error_description"))
+					}
+					assert.Equal(t, "some-state", location.Query().Get("state"))
 				case !u.user.Enabled:
 					assert.Equal(t, http.StatusFound, rr.Code)
 					location, err := rr.Result().Location()
@@ -3477,6 +3526,142 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 			})
 		}
 	}
+}
+
+// A sign-in refused for the id_token_hint over another user's session ends that session only while
+// the browser session still holds the ceremony, as the create arm does (#579 decision 4): a ceremony
+// the browser replaced meanwhile ends nothing and answers the "no longer active" page. A termination
+// that fails is a 500 with the ceremony left in place, the fail-closed direction the create arm
+// takes. Neither answers the client, clears the ceremony or starts a session.
+func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHoldsTheCeremony(t *testing.T) {
+	for _, replaced := range []bool{true, false} {
+		name := "a termination that fails"
+		if replaced {
+			name = "a ceremony the browser session no longer holds"
+		}
+		t.Run(name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			userSessionManager := handlersmocks.NewUserSessionManager(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			permissionChecker := handlersmocks.NewPermissionChecker(t)
+
+			handler := buildAuthCompletedGet(authCompletedGetDeps{
+				pageRenderer:       pageRenderer,
+				ceremonyStore:      ceremonyStore,
+				userSessionManager: userSessionManager,
+				database:           database,
+				templateFS:         fstest.MapFS{},
+				auditLogger:        auditLogger,
+				permissionChecker:  permissionChecker,
+			})
+
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req = withSessionSettings(req)
+			sessionIdentifier := "test-session"
+			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
+			rr := httptest.NewRecorder()
+
+			at := time.Now().UTC().Add(-time.Minute)
+			authContext := &ceremony.AuthContext{
+				CeremonyId:          testCeremonyId,
+				AuthState:           ceremony.AuthStateAuthenticationCompleted,
+				ClientId:            "test-client",
+				UserId:              1,
+				RequestedScope:      "openid",
+				Scope:               "openid",
+				ResponseMode:        "query",
+				RedirectURI:         "https://example.com/callback",
+				State:               "some-state",
+				AuthMethods:         "pwd",
+				AuthStateGeneration: 7,
+				AuthenticatedAt:     &at,
+				PasswordVerifiedAt:  &at,
+				Level1AuthCompleted: true,
+				IdTokenHintSub:      "the-hint",
+			}
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+			foreignSession := &record.UserSession{Id: 9, UserId: 2, SessionIdentifier: sessionIdentifier,
+				AcrLevel: record.AcrLevel1, AuthMethods: "pwd"}
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
+				Return(foreignSession, nil)
+			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, foreignSession).Return(nil)
+			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1,
+				AuthorizationCodeEnabled: true}
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+			userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
+				mock.AnythingOfType("*int64")).Return(true)
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: 7}, nil)
+
+			if replaced {
+				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(ceremony.ErrCeremonyReplaced).Once()
+				expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
+			} else {
+				expectCeremonyConfirmed(ceremonyStore, rr, req)
+				failure := errors.New("the database is unreachable")
+				datamocks.ExpectRunInTransactionRefused(database, failure)
+				pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
+					return errors.Is(err, failure)
+				})).Return().Once()
+			}
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Empty(t, rr.Header().Get("Location"))
+			database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			pageRenderer.AssertExpectations(t)
+			ceremonyStore.AssertExpectations(t)
+			userSessionManager.AssertExpectations(t)
+			database.AssertExpectations(t)
+		})
+	}
+}
+
+// expectForeignSessionEnded arms /auth/completed to end the session the browser arrived with,
+// another user's, as the create arm ends it: the ceremony confirmed first, then the session deleted
+// with its codes and its one refresh token revoked in one transaction, then the handover, the
+// deletion and the termination audited (#133, #579 decision 4).
+func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, database *datamocks.Database,
+	auditLogger *handlersmocks.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request,
+	foreignSession *record.UserSession) {
+
+	expectCeremonyConfirmed(ceremonyStore, rr, req)
+
+	tx := &sql.Tx{}
+	datamocks.ExpectRunInTransaction(database, tx)
+	database.On("DeleteUserSession", mock.Anything, tx, foreignSession.Id).Return(nil).Once()
+	database.On("RevokeCodesBySessionIdentifier", mock.Anything, tx, foreignSession.SessionIdentifier).
+		Return(int64(1), nil).Once()
+	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, foreignSession.SessionIdentifier).
+		Return([]*record.RefreshToken{{Id: 11, RefreshTokenJti: "rt-of-the-previous-user"}}, nil).Once()
+	database.On("UpdateRefreshToken", mock.Anything, tx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
+		return rt.RefreshTokenJti == "rt-of-the-previous-user" && rt.Revoked
+	})).Return(nil).Once()
+
+	auditLogger.On("Log", mock.Anything, audit.EventCrossUserSessionReplaced, map[string]interface{}{
+		"user_id":                     int64(1),
+		"previous_user_id":            foreignSession.UserId,
+		"previous_session_identifier": foreignSession.SessionIdentifier,
+		"client_id":                   int64(1),
+	}).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
+		"user_session_id": foreignSession.Id,
+		"logged_in_user":  "",
+		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
+	}).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventTerminatedUserSession, map[string]interface{}{
+		"user_id":                    foreignSession.UserId,
+		"user_session_id":            foreignSession.Id,
+		"session_identifier":         foreignSession.SessionIdentifier,
+		"logged_in_user":             "",
+		"revoked_code_count":         int64(1),
+		"revoked_refresh_token_jtis": []string{"rt-of-the-previous-user"},
+	}).Return().Once()
 }
 
 // signedInAs is what /auth/completed hands the session manager for a sign-in by userId that entered

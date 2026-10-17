@@ -168,6 +168,8 @@ func TestDecideBeforeBinding(t *testing.T) {
 		{name: "an enabled user at the ceremony's generation is bound",
 			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
 		{name: "a missing user", user: nil, want: beforeBindingUserMissing},
+		{name: "a user with a subject is bound when the request carried no hint",
+			user: &record.User{Subject: "s", Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
 		{name: "the hint's user is bound",
 			user:        &record.User{Subject: "the-hint", Enabled: true, AuthStateGeneration: 7},
 			hintSubject: "the-hint", want: beforeBindingBind},
