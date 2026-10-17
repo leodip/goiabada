@@ -408,6 +408,14 @@ type Database interface {
 	// given and never outside one: the first seed's settings row (#424 decision 14).
 	CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	// AcquireSettingsRow takes the settings row inside the caller's transaction and holds it until
+	// that transaction ends, as AcquireClientRow does a client's. Each settings section's save
+	// takes it, reads the row again on the transaction and writes its own section onto what it
+	// read, so a save of another section committed meanwhile is not written back over (#407).
+	//
+	// A transaction is required: without one the statement autocommits and the row is released
+	// before the read even runs.
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	// TryClaimCleanupRun atomically claims the next background cleanup run via a
 	// conditional update on settings.last_cleanup_at, and reports whether this

@@ -1,8 +1,6 @@
 package apihandlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -33,9 +31,9 @@ func HandleSettingsUIThemeGet() http.HandlerFunc {
 	}
 }
 
-// settingsUIThemeDatabase is what the UI theme settings endpoint needs: the settings write.
+// settingsUIThemeDatabase is what the UI theme settings endpoint needs: the settings save.
 type settingsUIThemeDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	settingsSaveDatabase
 }
 
 // HandleSettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
@@ -71,10 +69,13 @@ func HandleSettingsUIThemePut(
 			}
 		}
 
-		oldTheme := currentSettings.UITheme
-		currentSettings.UITheme = desired
-
-		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
+		// The old theme is the stored row's, read under the save's lock, which is what it replaced.
+		var oldTheme string
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+			oldTheme = stored.UITheme
+			stored.UITheme = desired
+		})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -83,11 +84,11 @@ func HandleSettingsUIThemePut(
 		auditLogger.Log(r.Context(), audit.EventUpdatedUIThemeSettings, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
 			"old_ui_theme":   oldTheme,
-			"new_ui_theme":   currentSettings.UITheme,
+			"new_ui_theme":   saved.UITheme,
 		})
 
 		resp := api.SettingsUIThemeResponse{
-			UITheme:         currentSettings.UITheme,
+			UITheme:         saved.UITheme,
 			AvailableThemes: uithemes.Get(),
 		}
 

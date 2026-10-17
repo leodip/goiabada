@@ -3,7 +3,6 @@ package apihandlers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -248,7 +247,8 @@ func serveEmailSave(t *testing.T, settings *record.Settings, body string) (*http
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	var written *record.Settings
-	database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).
+	allowSettingsSave(database)
+	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 		Run(func(args mock.Arguments) {
 			saved := *args.Get(2).(*record.Settings)
 			saved.SMTPPasswordEncrypted = bytes.Clone(saved.SMTPPasswordEncrypted)
