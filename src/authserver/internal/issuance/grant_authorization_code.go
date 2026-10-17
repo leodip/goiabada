@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -123,11 +124,15 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
 	if err != nil {
 		if errors.Is(err, errSessionRowGone) {
-			// A code whose session row has gone still redeems (the validator's contract:
-			// the ordinary state of an older grant), so the grant answers with the access
-			// and ID tokens alone. No refresh token is bound to a row that no longer
-			// exists (#530).
-			return &tokenResponse, nil
+			// The code's session has ended since it was issued (a sign-out, a newer sign-in
+			// from the same device, the sweep), so the grant is refused as a revoked code is.
+			// Its access and ID tokens carry a sid naming a session the server no longer
+			// holds, which /userinfo and the APIs refuse at once. The code is spent, as with
+			// any failed mint after the claim (#530).
+			slog.DebugContext(ctx, "code's session is gone, rejecting the redemption",
+				"grant_type", oidc.GrantTypeAuthorizationCode.String(),
+				"code_id", code.Id)
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest)
 		}
 		return nil, err
 	}

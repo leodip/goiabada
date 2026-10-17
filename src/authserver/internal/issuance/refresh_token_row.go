@@ -158,11 +158,11 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType TokenType, now 
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-// errSessionRowGone names the swept-session condition behind a session-bound refresh token:
-// the row its max lifetime is computed from is gone, which is the ordinary state of an older
-// grant whose session idled out or reached its maximum lifetime. It is named rather than
-// failed over inline, because the initial code exchange answers it by minting the grant's
-// other tokens and no refresh token (#530).
+// errSessionRowGone names the ended-session condition behind a session-bound refresh token:
+// the row its max lifetime is computed from is gone, swept once the session idled out or
+// reached its maximum lifetime, or deleted by a sign-out or a newer sign-in from the same
+// device. It is named rather than failed over inline, because the initial code exchange
+// refuses it with invalid_grant, as a revoked code is refused (#530).
 var errSessionRowGone = errors.New("the user session backing a session-bound refresh token is gone")
 
 // getRefreshTokenMaxLifetime is the instant a grant's refresh tokens stop being redeemable. A
@@ -188,8 +188,8 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 			// The session backing this Refresh token no longer exists: swept once it idled
 			// out or reached its maximum lifetime, or torn down by a sign-out or a newer
 			// sign-in from the same device. Named for the caller to answer: the initial
-			// code exchange mints no refresh token (#530).
-			return 0, errSessionRowGone
+			// code exchange refuses the code (#530).
+			return 0, errs.Wrapf(errSessionRowGone, "user session %q", sessionIdentifier)
 		}
 		maxLifetime := userSession.Started.Add(
 			time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds)).Unix()
