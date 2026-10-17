@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -280,4 +281,35 @@ func TestGetRouteVerbs_TheGuardIsFatalOnAWalkThatReachedNothing(t *testing.T) {
 
 	require.True(t, report.Stopped, "a walk that read no GET must be fatal rather than a pass")
 	assert.Contains(t, report.Fatal, "found no GET registration in")
+}
+
+// Every verb the guard promises to refuse, spelled here rather than read from mutatingVerbs, so a
+// verb dropped or misspelled there fails this table. Each registration is tried both directly on a
+// router and chained through root.With(...), the shape the console's base routes are mounted with.
+func TestGetRouteVerbs_TheGuardRefusesEveryPromisedVerbInEitherRegistrationShape(t *testing.T) {
+	promised := []string{
+		"Add", "Clear", "Create", "Delete", "Disable", "Edit", "Enable", "Generate", "Logout",
+		"Remove", "Reset", "Revoke", "Rotate", "Save", "Send", "Set", "Update",
+	}
+	shapes := map[string]string{
+		"direct":  `r.Get("/thing", somehandlers.Handle%sThingPost(httpHelper))`,
+		"chained": `root.With(baseAuth...).Get("/thing", somehandlers.Handle%sThingPost(httpHelper))`,
+	}
+
+	for _, verb := range promised {
+		for shape, registration := range shapes {
+			t.Run(verb+" "+shape, func(t *testing.T) {
+				routeTable := getRouteFixture(t, "\n\t"+fmt.Sprintf(registration, verb)+"\n")
+
+				report := guard.Run(func(r guard.Reporter) {
+					assertNoStateChangingGets(r, routeTable, nil)
+				})
+
+				require.Len(t, report.Errors, 1, "GET answered by Handle%sThingPost passed the guard: %s", verb, report.Text())
+				assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+				assert.Contains(t, report.Errors[0], "routes.go:5: GET /thing is answered by somehandlers.Handle"+verb+"ThingPost")
+				assert.Contains(t, report.Errors[0], "("+verb+")")
+			})
+		}
+	}
 }
