@@ -222,6 +222,47 @@ func TestTables_ARowNoDelimiterFollowsIsData(t *testing.T) {
 	}
 }
 
+// TestTableColumns_PicksTheNamedColumnsInTheAskedOrder: each row's cells come back in the order the
+// headers are asked for, not the order the table writes them, as Tables read them.
+func TestTableColumns_PicksTheNamedColumnsInTheAskedOrder(t *testing.T) {
+	table := Tables("| A | `B` | C |\n|---|---|---|\n| a1 | `b1` | c1 |\n| a2 | `b2` | c2 |\n")[0]
+	columns, err := table.Columns("C", "A", "`B`")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"c1", "a1", "`b1`"}, {"c2", "a2", "`b2`"}}
+	if !slices.EqualFunc(columns, want, slices.Equal[[]string]) {
+		t.Errorf("columns %q, want %q", columns, want)
+	}
+}
+
+// TestTableColumns_AShortRowHasEmptyCells: a row that stops before a named column has an empty
+// cell there rather than being dropped or shifting the cells after it.
+func TestTableColumns_AShortRowHasEmptyCells(t *testing.T) {
+	table := Tables("| A | B | C |\n|---|---|---|\n| a1 |\n| a2 | b2 | c2 |\n")[0]
+	columns, err := table.Columns("A", "C")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"a1", ""}, {"a2", "c2"}}
+	if !slices.EqualFunc(columns, want, slices.Equal[[]string]) {
+		t.Errorf("columns %q, want %q", columns, want)
+	}
+}
+
+// TestTableColumns_AMissingHeaderIsAnErrorNamingIt: a header the table does not carry is an error
+// naming the first one missing, and no columns come back.
+func TestTableColumns_AMissingHeaderIsAnErrorNamingIt(t *testing.T) {
+	table := Tables("| A | B |\n|---|---|\n| a | b |\n")[0]
+	columns, err := table.Columns("A", "Missing", "Absent")
+	if err == nil || err.Error() != "the table has no column headed Missing" {
+		t.Errorf("a missing header: %v", err)
+	}
+	if columns != nil {
+		t.Errorf("a missing header still read %q", columns)
+	}
+}
+
 // TestRows_FlattensEveryTablesDataRows: the pages that list one row per variable read every table
 // in a section as one list of rows.
 func TestRows_FlattensEveryTablesDataRows(t *testing.T) {

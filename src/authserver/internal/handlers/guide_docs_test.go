@@ -104,9 +104,10 @@ func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 	if step != ceremony.StepUpNone {
 		t.Fatalf("a level 3 session owes %v at level 3, so the guide's sentence no longer holds", step)
 	}
-	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), alreadySignedInSection, []string{
-		"A user whose session already reached the client's level isn't asked for anything: the session is reused",
-	})
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), alreadySignedInSection.page, alreadySignedInSection.heading,
+		[]string{
+			"A user whose session already reached the client's level isn't asked for anything: the session is reused",
+		}, nil)
 }
 
 // Require two-factor authentication says that a user whose authenticator an administrator turned off
@@ -128,9 +129,10 @@ func TestGuideDocs_ALostAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	if step == ceremony.StepUpNone {
 		t.Fatal("a level 3 session of a user with no authenticator owes nothing at level 3, so the guide's sentence no longer holds")
 	}
-	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), lostAuthenticatorSection, []string{
-		"At level 3, the user sets up a new authenticator at their next sign-in.",
-	})
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), lostAuthenticatorSection.page, lostAuthenticatorSection.heading,
+		[]string{
+			"At level 3, the user sets up a new authenticator at their next sign-in.",
+		}, nil)
 }
 
 // Require two-factor authentication promises a code at a sign-in that starts a session, and at a
@@ -172,13 +174,13 @@ func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
 	}
 
 	root := filepath.Dir(guard.SourceRoot(t))
-	assertSectionSays(t, root, requireACodeSection, []string{
+	guard.AssertSectionSays(t, root, requireACodeSection.page, requireACodeSection.heading, []string{
 		"From then on, a sign-in that starts a new session asks for your password and then a code.",
 		"A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave.",
-	})
-	assertSectionSays(t, root, alreadySignedInSection, []string{
+	}, nil)
+	guard.AssertSectionSays(t, root, alreadySignedInSection.page, alreadySignedInSection.heading, []string{
 		"`prompt=login` doesn't reuse the session: the user signs in again with their password and a code, whatever their session already gave",
-	})
+	}, nil)
 	page, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(twoFactorGuide)))
 	if err != nil {
 		t.Fatalf("%v", err)
