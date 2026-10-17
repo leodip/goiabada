@@ -27,7 +27,9 @@ import (
 // twice ends with the row it found at the first call.
 //
 // last_cleanup_at is left as the cleanup finds it: the background worker claims its runs through
-// that column (Database.TryClaimCleanupRun), so it is the server's, not the test's, to write.
+// that column (Database.TryClaimCleanupRun), so it is the server's, not the test's, to write, and
+// UpdateSettings never writes it (it is dont-update, #407), so writing the snapshot back cannot
+// move a claim made meanwhile.
 func restoreSettings(t *testing.T) *record.Settings {
 	t.Helper()
 
@@ -39,13 +41,7 @@ func restoreSettings(t *testing.T) *record.Settings {
 	snapshot.SMTPPasswordEncrypted = bytes.Clone(found.SMTPPasswordEncrypted)
 
 	t.Cleanup(func() {
-		current, err := database.GetSettingsById(context.Background(), nil, 1)
-		if !assert.NoError(t, err, "unable to read the settings row to restore it") || current == nil {
-			return
-		}
-		restored := snapshot
-		restored.LastCleanupAt = current.LastCleanupAt
-		assert.NoError(t, database.UpdateSettings(context.Background(), nil, &restored),
+		assert.NoError(t, database.UpdateSettings(context.Background(), nil, &snapshot),
 			"unable to restore the settings row")
 	})
 
@@ -65,7 +61,8 @@ func changeSettings(t *testing.T, edit func(settings *record.Settings)) *record.
 
 // settingsColumnsNoTestOwns are the fields settingsChanges skips: the key, the two timestamps the
 // seeder and UpdateSettings write, the column the background worker claims its runs through, and
-// the legacy key column UpdateSettings never writes (it is dont-update).
+// the legacy key column. Two of them UpdateSettings never writes, being dont-update: last_cleanup_at,
+// which TryClaimCleanupRun alone writes (#407), and the legacy key column.
 var settingsColumnsNoTestOwns = map[string]bool{
 	"Id":                     true,
 	"CreatedAt":              true,

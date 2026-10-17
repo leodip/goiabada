@@ -10,6 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
+	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -217,17 +222,43 @@ func TestChangeSettings_TwoCallsEndWithTheRowTheFirstFound(t *testing.T) {
 	assert.Empty(t, settingsChanges(before, readSettingsRow(t)))
 }
 
+// setLastCleanupAt writes the settings row's last_cleanup_at directly, as the one-column UPDATE the
+// worker's claim is: UpdateSettings never writes the column (it is dont-update, #407).
+func setLastCleanupAt(t *testing.T, at sql.NullTime) {
+	t.Helper()
+
+	var engine *commondb.Database
+	switch d := database.(type) {
+	case *sqlitedb.Database:
+		engine = d.Database
+	case *mysqldb.Database:
+		engine = d.Database
+	case *postgresdb.Database:
+		engine = d.Database
+	case *mssqldb.Database:
+		engine = d.Database
+	default:
+		t.Fatalf("no engine for database type %T", database)
+	}
+
+	update := engine.Flavor.NewUpdateBuilder()
+	update.Update("settings")
+	if at.Valid {
+		update.Set(update.Assign("last_cleanup_at", at.Time))
+	} else {
+		update.Set("last_cleanup_at = NULL")
+	}
+	update.Where(update.Equal("id", 1))
+	query, args := update.Build()
+	_, err := engine.ExecSQL(context.Background(), nil, query, args...)
+	require.NoError(t, err, "unable to set last_cleanup_at")
+}
+
 // A claim the background worker makes while a test holds the row survives that test's restore:
 // last_cleanup_at is the worker's schedule, and writing the snapshot's value back would move it.
 func TestRestoreSettings_KeepsACleanupClaimMadeMeanwhile(t *testing.T) {
 	original := readSettingsRow(t).LastCleanupAt
-	t.Cleanup(func() {
-		current, err := database.GetSettingsById(context.Background(), nil, 1)
-		if assert.NoError(t, err) {
-			current.LastCleanupAt = original
-			assert.NoError(t, database.UpdateSettings(context.Background(), nil, current))
-		}
-	})
+	t.Cleanup(func() { setLastCleanupAt(t, original) })
 
 	claimedAt := time.Now().UTC().Truncate(time.Second)
 	t.Run("the worker claims a run", func(t *testing.T) {

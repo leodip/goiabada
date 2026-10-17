@@ -5,7 +5,10 @@ import (
 )
 
 type Settings struct {
-	Id                                        int64          `db:"id" fieldtag:"pk"`
+	Id int64 `db:"id" fieldtag:"pk"`
+	// CreatedAt is when the row was inserted. It is tagged dont-update so UpdateSettings never
+	// writes it (#407): the insert writes it once, and a save written from any copy of the row,
+	// a zero one included, must not move it.
 	CreatedAt                                 sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt                                 sql.NullTime   `db:"updated_at"`
 	AppName                                   string         `db:"app_name"`
@@ -90,7 +93,15 @@ type Settings struct {
 	// Database.TryClaimCleanupRun), so exactly one instance runs the cleanup per
 	// interval no matter how many are deployed, and the schedule follows wall
 	// clock rather than a single process's uptime.
-	LastCleanupAt sql.NullTime `db:"last_cleanup_at"`
+	//
+	// It is tagged dont-update so UpdateSettings never writes it (#407): the
+	// column is coordination state, not settings data, and a settings save
+	// writes the whole row back from the request-start snapshot, which would
+	// reset a live claim and let a second instance claim a sweep already
+	// running. The one writer, TryClaimCleanupRun, assigns the column directly
+	// and is unaffected by the tag, the same reasoning AESEncryptionKeyLegacy
+	// carries above.
+	LastCleanupAt sql.NullTime `db:"last_cleanup_at" fieldtag:"dont-update"`
 }
 
 // IsSelfRegistrationAvailable says whether a visitor may register: self-registration on, and either

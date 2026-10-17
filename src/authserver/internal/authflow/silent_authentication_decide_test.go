@@ -12,7 +12,7 @@ import (
 )
 
 // silentWorld is what SilentAuthentication would load for a prompt=none request, answered from the
-// row, so a DecideSilentAuthentication case needs no HTTP harness and no mocks.
+// row, so a decideSilentAuthentication case needs no HTTP harness and no mocks.
 type silentWorld struct {
 	noSession          bool
 	valid              bool
@@ -32,30 +32,30 @@ type silentWorld struct {
 	consentScope       *string // nil for no consent row
 }
 
-// driveSilentAuthentication runs DecideSilentAuthentication as SilentAuthentication.Run does,
+// driveSilentAuthentication runs decideSilentAuthentication as SilentAuthentication.Run does,
 // loading each fact it asks for from the world, and answers the answer and the facts in the order
 // asked for.
-func driveSilentAuthentication(t *testing.T, world silentWorld) (SilentAuthenticationAnswer, []SilentFact) {
+func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthenticationAnswer, []silentFact) {
 	t.Helper()
 
-	facts := SilentAuthenticationFacts{
+	facts := silentAuthenticationFacts{
 		MaxAgeRequested:  world.maxAgeRequested,
 		HintSubject:      world.hint,
 		Target:           world.target,
 		ConsentRequired:  world.consentRequired,
 		ClientIdentifier: world.clientIdentifier,
 	}
-	var asked []SilentFact
+	var asked []silentFact
 	for {
-		answer, need := DecideSilentAuthentication(facts)
-		if need == SilentFactNone {
+		answer, need := decideSilentAuthentication(facts)
+		if need == silentFactNone {
 			return answer, asked
 		}
 		require.NotContains(t, asked, need, "each fact is loaded once")
 		asked = append(asked, need)
 
 		switch need {
-		case SilentFactSession:
+		case silentFactSession:
 			facts.SessionLoaded = true
 			if !world.noSession {
 				facts.Session = &record.UserSession{
@@ -71,16 +71,16 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (SilentAuthentic
 					},
 				}
 			}
-		case SilentFactValidity:
+		case silentFactValidity:
 			valid := world.valid
 			facts.SessionValid = &valid
-		case SilentFactValidityWithoutMaxAge:
+		case silentFactValidityWithoutMaxAge:
 			valid := world.validWithoutMaxAge
 			facts.SessionValidWithoutMaxAge = &valid
-		case SilentFactEffectiveScope:
+		case silentFactEffectiveScope:
 			scope := world.effectiveScope
 			facts.EffectiveScope = &scope
-		case SilentFactConsent:
+		case silentFactConsent:
 			facts.ConsentLoaded = true
 			if world.consentScope != nil {
 				facts.Consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
@@ -97,11 +97,11 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (SilentAuthentic
 // seam 1).
 func TestDecideSilentAuthentication(t *testing.T) {
 	const (
-		session       = SilentFactSession
-		validity      = SilentFactValidity
-		withoutMaxAge = SilentFactValidityWithoutMaxAge
-		scope         = SilentFactEffectiveScope
-		consent       = SilentFactConsent
+		session       = silentFactSession
+		validity      = silentFactValidity
+		withoutMaxAge = silentFactValidityWithoutMaxAge
+		scope         = silentFactEffectiveScope
+		consent       = silentFactConsent
 	)
 	scopes := func(s string) *string { return &s }
 
@@ -125,21 +125,21 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		wantCode         string
 		wantDescription  string
 		wantUserDisabled bool
-		wantReads        []SilentFact
+		wantReads        []silentFact
 	}{
 		{
 			name:            "no session",
 			world:           with(func(w *silentWorld) { w.noSession = true }),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "User authentication is required",
-			wantReads:       []SilentFact{session},
+			wantReads:       []silentFact{session},
 		},
 		{
 			name:            "an expired session with no max_age is not asked about max_age",
 			world:           with(func(w *silentWorld) { w.valid = false; w.validWithoutMaxAge = true }),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "User session has expired",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name: "a session valid but for max_age says so",
@@ -150,7 +150,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "Session age exceeds max_age",
-			wantReads:       []SilentFact{session, validity, withoutMaxAge},
+			wantReads:       []silentFact{session, validity, withoutMaxAge},
 		},
 		{
 			name: "a session expired with max_age as well is expired",
@@ -161,14 +161,14 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "User session has expired",
-			wantReads:       []SilentFact{session, validity, withoutMaxAge},
+			wantReads:       []silentFact{session, validity, withoutMaxAge},
 		},
 		{
 			name: "a valid session with max_age asks nothing more about it",
 			world: with(func(w *silentWorld) {
 				w.maxAgeRequested = true
 			}),
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			name:             "a disabled user, audited",
@@ -176,7 +176,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			wantCode:         "access_denied",
 			wantDescription:  "The user account is disabled",
 			wantUserDisabled: true,
-			wantReads:        []SilentFact{session, validity},
+			wantReads:        []silentFact{session, validity},
 		},
 		{
 			name:             "a disabled user is asked before the hint",
@@ -184,40 +184,40 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			wantCode:         "access_denied",
 			wantDescription:  "The user account is disabled",
 			wantUserDisabled: true,
-			wantReads:        []SilentFact{session, validity},
+			wantReads:        []silentFact{session, validity},
 		},
 		{
 			name:            "a hint naming another user",
 			world:           with(func(w *silentWorld) { w.hint = "sub-2" }),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "The current session user does not match the id_token_hint",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name:      "a hint naming the session's user passes",
 			world:     with(func(w *silentWorld) { w.hint = "sub-1" }),
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			name:            "a hint mismatch is asked before the step-up rule",
 			world:           with(func(w *silentWorld) { w.hint = "sub-2"; w.target = record.AcrLevel2Mandatory }),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "The current session user does not match the id_token_hint",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name:            "a target above the session's level",
 			world:           with(func(w *silentWorld) { w.target = record.AcrLevel2Optional; w.otpEnabled = true }),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Higher authentication level required",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name:            "an unknown session level is insufficient",
 			world:           with(func(w *silentWorld) { w.sessionAcr = "urn:goiabada:pwd" }),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Higher authentication level required",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name: "a mandatory target with no authenticator, before the changed configuration",
@@ -228,7 +228,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Additional authentication setup required",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name: "the authenticator changed since the session answered level 2",
@@ -240,7 +240,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Authentication configuration has changed",
-			wantReads:       []SilentFact{session, validity},
+			wantReads:       []silentFact{session, validity},
 		},
 		{
 			// The level 2 question is not asked of a level 1 target.
@@ -249,7 +249,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.sessionAcr = record.AcrLevel2Optional
 				w.sessionOtpGen, w.userOtpGen = 2, 3
 			}),
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			name: "a mandatory target satisfied by an enrolled session passes",
@@ -258,26 +258,26 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.sessionAcr = record.AcrLevel2Mandatory
 				w.otpEnabled = true
 			}),
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			name:            "no requested scope the user holds",
 			world:           with(func(w *silentWorld) { w.effectiveScope = "  " }),
 			wantCode:        "access_denied",
 			wantDescription: "The user is not authorized to access any of the requested scopes",
-			wantReads:       []SilentFact{session, validity, scope},
+			wantReads:       []silentFact{session, validity, scope},
 		},
 		{
 			name:      "no consent asked for when the client does not require it and offline_access is absent",
 			world:     passing,
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			name:            "a client requiring consent with none given",
 			world:           with(func(w *silentWorld) { w.consentRequired = true }),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "User consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "a consent missing one scope",
@@ -287,7 +287,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "Additional consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "a consent covering every scope passes",
@@ -295,7 +295,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.consentRequired = true
 				w.consentScope = scopes("openid profile email")
 			}),
-			wantReads: []SilentFact{session, validity, scope, consent},
+			wantReads: []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "offline_access asks for consent on a client that does not require it",
@@ -305,7 +305,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "Additional consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "offline_access covered by the consent passes",
@@ -313,7 +313,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.effectiveScope = "openid offline_access"
 				w.consentScope = scopes("openid offline_access")
 			}),
-			wantReads: []SilentFact{session, validity, scope, consent},
+			wantReads: []silentFact{session, validity, scope, consent},
 		},
 		{
 			// The scope is read through oidc.SplitScope like every other reader of one (#244): a
@@ -325,7 +325,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.effectiveScope = "openid res:read all"
 				w.consentScope = scopes("openid res:read all")
 			}),
-			wantReads: []SilentFact{session, validity, scope, consent},
+			wantReads: []silentFact{session, validity, scope, consent},
 		},
 		// authserver:manage-account needs a stored consent covering it from every client but the
 		// admin console's, whatever its Consent required says, with today's sentences (#509
@@ -338,7 +338,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "User consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "manage-account from a consent-off client with a stored consent leaving it out",
@@ -349,7 +349,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "Additional consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			// A consent-off client is asked about manage-account and nothing else.
@@ -359,7 +359,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.effectiveScope = "openid profile authserver:manage-account"
 				w.consentScope = scopes("openid authserver:manage-account")
 			}),
-			wantReads: []SilentFact{session, validity, scope, consent},
+			wantReads: []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "manage-account from the admin console's client passes with no consent read",
@@ -367,7 +367,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.clientIdentifier = "admin-console-client"
 				w.effectiveScope = "authserver:manage authserver:manage-account email openid profile"
 			}),
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			name: "manage-account filtered out of the effective scope is owed nothing",
@@ -375,7 +375,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 				w.clientIdentifier = "crafted-link-client"
 				w.effectiveScope = "openid"
 			}),
-			wantReads: []SilentFact{session, validity, scope},
+			wantReads: []silentFact{session, validity, scope},
 		},
 		{
 			// A client requiring consent still needs every scope covered, manage-account included.
@@ -388,7 +388,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "Additional consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 		{
 			name: "a tab still separates two scopes of an effective scope",
@@ -399,7 +399,7 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			}),
 			wantCode:        oidc.ErrorConsentRequired,
 			wantDescription: "Additional consent is required",
-			wantReads:       []SilentFact{session, validity, scope, consent},
+			wantReads:       []silentFact{session, validity, scope, consent},
 		},
 	}
 

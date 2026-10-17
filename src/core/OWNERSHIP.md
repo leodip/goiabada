@@ -254,8 +254,8 @@ command itself and fails on a tree it changed.
 | `core/countries` | `Country` | kernel | — |
 | `core/docsreader` | `Row` | kernel | — |
 | `core/docsreader` | `Rows` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
-| `core/docsreader` | `Section` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's pages through it. |
-| `core/docsreader` | `SectionText` | test-support | Test support: compiled into no binary, and the docs tests of every module read already-read pages through it. |
+| `core/docsreader` | `Section` | kernel | — |
+| `core/docsreader` | `SectionText` | own-package | — |
 | `core/docsreader` | `Table` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
 | `core/docsreader` | `Tables` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
 | `core/errs` | `Errorf` | kernel | — |
@@ -286,8 +286,10 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertNoHTMLSinks` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoParentImport` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoStaleDeferredBodyCloses` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertRequestPathContext` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertSectionSays` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
@@ -364,6 +366,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeClientDefaultAcrNotApplicable` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientDisplayNameTooLong` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientIdentifierInUse` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeClientIdentifierNamesResource` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientIdentifierRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeClientPermissionsClientCredentialsDisabled` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientRedirectURIEmpty` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -466,6 +469,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeProfileZoneInfoInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeResourceDescriptionTooLong` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeResourceIdentifierInUse` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
+| `core/i18n` | `ErrCodeResourceIdentifierNamesClient` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeResourceIdentifierRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeResourceSystemLevelDeleteNotAllowed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeResourceSystemLevelIdentifierFixed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -555,7 +559,6 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `CheckOwnership` | kernel | — |
 | `core/internal/refgraph` | `DocRow` | own-package | — |
 | `core/internal/refgraph` | `ExemptByBuildConstraint` | kernel | — |
-| `core/internal/refgraph` | `FindSourceRoot` | kernel | — |
 | `core/internal/refgraph` | `Flatten` | kernel | — |
 | `core/internal/refgraph` | `ImportGraph` | kernel | — |
 | `core/internal/refgraph` | `JustificationBothApps` | kernel | — |
@@ -641,6 +644,8 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
+| `core/sourceroot` | `FindSourceRoot` | kernel | — |
+| `core/sourceroot` | `ModuleDirs` | kernel | — |
 | `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
 | `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
 | `core/timezones` | `Zone` | contract | The row type both halves of the table share. |

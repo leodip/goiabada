@@ -158,6 +158,7 @@ failures are one key per cause, each a whole sentence.
 | `handler.resource.identifier_required` | (none) | Resource identifier is required |
 | `handler.resource.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
 | `handler.resource.identifier_in_use` | (none) | The resource identifier is already in use |
+| `handler.resource.identifier_names_client` | (none) | The resource identifier is already in use by a client |
 | `handler.resource.system_level_identifier_fixed` | (none) | The identifier of a system-level resource cannot be changed. |
 | `handler.resource.system_level_delete_not_allowed` | (none) | Trying to delete a system level resource |
 | `handler.permission.duplicate_ids` | (none) | Duplicate permission IDs in request are not allowed |
@@ -184,6 +185,7 @@ failures are one key per cause, each a whole sentence.
 | `handler.email_verification.account_changed` | (none) | The account was changed by another request while the code was being sent. Nothing was sent: try again. |
 | `handler.client.display_name_too_long` | `max` (int) | The display name cannot exceed a maximum length of {{.max}} characters. |
 | `handler.client.identifier_in_use` | (none) | The client identifier is already in use. |
+| `handler.client.identifier_names_resource` | (none) | The client identifier is already in use by a resource. |
 | `handler.client.system_level_delete_not_allowed` | (none) | Trying to delete a system level client |
 | `handler.client.system_level_identifier_fixed` | (none) | The identifier of a system-level client cannot be changed. |
 | `handler.client.self_registered_identifier_fixed` | (none) | The identifier of a self-registered client cannot be changed. |

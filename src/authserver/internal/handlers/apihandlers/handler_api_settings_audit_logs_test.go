@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"testing"
@@ -23,7 +22,8 @@ func TestSettingsAuditLogsPut_AFailedSaveRecordsNothing(t *testing.T) {
 	logtest.CaptureSlog(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).
+	expectSettingsSave(database)
+	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 		Return(errors.New("the database refused the save")).Once()
 	save := settingsCeilingSaves[2]
 
@@ -41,7 +41,8 @@ func TestSettingsAuditLogsPut_SwitchingLoggingOffIsRecordedUnderTheOldSwitches(t
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	var steps []string
 	var saved record.Settings
-	database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).
+	expectSettingsSave(database)
+	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 		Run(func(args mock.Arguments) {
 			steps = append(steps, "save")
 			saved = *args.Get(2).(*record.Settings)

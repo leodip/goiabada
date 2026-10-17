@@ -106,7 +106,7 @@ func TestAuthorizePost_PromptNoneFromASignedInBrowserIssuesSilently(t *testing.T
 	_ = resp.Body.Close()
 
 	resp = loadPage(t, browser, handleURL)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	issueLocation := assertRedirect(t, resp, "/auth/issue")
 
 	resp = loadPage(t, browser, issueLocation)

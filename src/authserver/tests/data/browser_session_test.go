@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -63,6 +64,25 @@ func rawSQLHandle(t *testing.T) *sql.DB {
 		return d.DB
 	}
 	t.Fatalf("no raw handle for database type %T", database)
+	return nil
+}
+
+// engineOf is the commondb.Database the engine under test embeds, so an arrange that writes a
+// column no data-layer method writes builds it with that engine's own flavor and runs it through
+// that engine's exec.
+func engineOf(t *testing.T) *commondb.Database {
+	t.Helper()
+	switch d := database.(type) {
+	case *sqlitedb.Database:
+		return d.Database
+	case *mysqldb.Database:
+		return d.Database
+	case *postgresdb.Database:
+		return d.Database
+	case *mssqldb.Database:
+		return d.Database
+	}
+	t.Fatalf("no engine for database type %T", database)
 	return nil
 }
 
