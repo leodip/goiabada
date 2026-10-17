@@ -142,7 +142,7 @@ func newTLSAuthServer(t *testing.T, leaf tls.Certificate, requests *atomic.Int32
 // reaches it, for a test that asks which of the console's clients arrived.
 func newRecordingTLSAuthServer(t *testing.T, leaf tls.Certificate, record func(path string)) *httptest.Server {
 	t.Helper()
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return newTLSServer(t, leaf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		record(r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
@@ -158,6 +158,12 @@ func newRecordingTLSAuthServer(t *testing.T, leaf tls.Certificate, record func(p
 			http.NotFound(w, r)
 		}
 	}))
+}
+
+// newTLSServer serves handler over TLS with leaf, at an address the leaf names.
+func newTLSServer(t *testing.T, leaf tls.Certificate, handler http.Handler) *httptest.Server {
+	t.Helper()
+	server := httptest.NewUnstartedServer(handler)
 	// The refused handshakes are the point of the test; the server's log of them is noise.
 	server.Config.ErrorLog = log.New(io.Discard, "", 0)
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{leaf}, MinVersion: tls.VersionTLS12}

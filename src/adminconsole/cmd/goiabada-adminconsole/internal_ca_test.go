@@ -12,19 +12,26 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"encoding/gob"
+	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,10 +39,17 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionbackend"
+	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // TestInternalBaseURL_HTTPS_TrustsAPrivateCATheConsoleNames is the issue as a test: the console
@@ -257,5 +271,169 @@ func TestMain_HandsTheInternalRootsToEveryClientItBuilds(t *testing.T) {
 	} {
 		assert.Positivef(t, arrived[path], "%s never reached the peer at %s, so it was not handed the internal roots; arrived: %v\n%s",
 			client, path, arrived, dumpRecords(records))
+	}
+}
+
+// TestMain_HandsTheInternalRootsToTheServer is the last of main's hand-offs: the pool it gives
+// NewServer, which the route table builds the admin API client from. Only a signed-in page calls
+// the admin API, so the auth server here keeps the console's browser sessions for real, in memory,
+// and the test seals a signed-in administrator's session into it under the child's own session
+// keys, as the console would have after a sign-in. The child then serves /account/sessions to that
+// session: the JWT middleware verifies the session's ID token against the JWKS it fetches, and the
+// page asks the admin API for the account's sessions. Both must reach the auth server, which only
+// the CA GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE names signed, and the page must render. A main
+// handing NewServer nil leaves the admin API client on the system roots alone: the page answers
+// 500 and the admin API request never arrives.
+func TestMain_HandsTheInternalRootsToTheServer(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
+	defer cancel()
+
+	ca, caKey := newTestCA(t, "the CA only the setting names")
+	caFile := filepath.Join(t.TempDir(), "internal-ca.pem")
+	require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Raw}), 0o600))
+
+	signing, _ := oauthclienttest.Keys(t)
+	sessions := sessiontest.NewMemoryBackend()
+	var mu sync.Mutex
+	arrived := map[string]int{}
+	peer := newTLSServer(t, newTestLeaf(t, ca, caKey), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		arrived[r.URL.Path]++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/auth/token":
+			_, _ = w.Write([]byte(`{"access_token":"a-session-token","token_type":"Bearer","expires_in":3600}`))
+		case "/api/public/settings":
+			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"` + oauthclienttest.Issuer + `"}`))
+		case "/certs":
+			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
+				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
+		case "/api/v1/account/sessions":
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			serveSessionEndpoint(t, sessions, w, r)
+		}
+	}))
+
+	// The session a sign-in leaves: a signed ID token for the console's client and a token set
+	// granting the account scope, sealed under the keys the child is started with.
+	authenticationKey, err := hex.DecodeString(strings.Repeat("b1", 64))
+	require.NoError(t, err)
+	encryptionKey, err := hex.DecodeString(strings.Repeat("b2", 32))
+	require.NoError(t, err)
+	store, err := newSessionStore(sessions, false, sessionstore.KeyPair{
+		AuthenticationKey: authenticationKey, EncryptionKey: encryptionKey}, nil)
+	require.NoError(t, err)
+	claims := oauthclienttest.ValidClaims()
+	claims["aud"] = builtin.AdminConsoleClientIdentifier
+	gob.Register(oauth.TokenResponse{})
+	seed := httptest.NewRequest(http.MethodGet, "/", nil)
+	session, err := store.Get(seed, builtin.AdminConsoleSessionName)
+	require.NoError(t, err)
+	session.Values[sessionkeys.JWT] = oauth.TokenResponse{
+		AccessToken: "an-access-token",
+		IdToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
+		TokenType:   "Bearer",
+		Scope:       "openid authserver:manage-account",
+	}
+	session.Values[sessionkeys.JWTExpiresAt] = time.Now().Add(time.Hour).Unix()
+	saved := httptest.NewRecorder()
+	require.NoError(t, store.Save(seed, saved, session))
+
+	ports := freePorts(t, 2)
+	httpPort := ports[0]
+	child := startMetricsChild(t, ctx, "https://auth.example.test", httpPort, ports[1], "",
+		"GOIABADA_AUTHSERVER_INTERNALBASEURL="+peer.URL,
+		"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE="+caFile)
+
+	// A child whose token grant was refused never listens, so its exit ends the wait at once.
+	up, upCancel := context.WithCancel(ctx)
+	defer upCancel()
+	go func() {
+		select {
+		case <-child.done:
+		case <-up.Done():
+		}
+		upCancel()
+	}()
+	consoleURL := "http://127.0.0.1:" + strconv.Itoa(httpPort)
+	status, _, body := getWhenUp(t, up, consoleURL+"/health")
+	require.Equal(t, http.StatusOK, status, "the console answers: %s", body)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, consoleURL+"/account/sessions", nil)
+	require.NoError(t, err)
+	for _, cookie := range saved.Result().Cookies() {
+		req.AddCookie(cookie)
+	}
+	noRedirects := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := noRedirects.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	require.NoError(t, child.cmd.Process.Signal(syscall.SIGTERM))
+	code, records := child.wait(t, ctx)
+	require.Equalf(t, 0, code, "a drained stop exits 0\n%s", dumpRecords(records))
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Positivef(t, arrived["/certs"], "the JWKS fetch never reached the peer; arrived: %v\n%s", arrived, dumpRecords(records))
+	assert.Positivef(t, arrived["/api/v1/account/sessions"],
+		"the admin API client never reached the peer, so main did not hand NewServer the internal roots; arrived: %v\n%s",
+		arrived, dumpRecords(records))
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "the signed-in page renders from the admin API's answer")
+}
+
+// serveSessionEndpoint answers the auth server's browser-session endpoint, /api/v1/sessions/<op>,
+// over backend, with the statuses the console's session backend reads: 404 for a session that is
+// gone, 204 for a delete.
+func serveSessionEndpoint(t *testing.T, backend sessionstore.Backend, w http.ResponseWriter, r *http.Request) {
+	operation, found := strings.CutPrefix(r.URL.Path, "/api/v1/sessions/")
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+	var request api.SessionWriteRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var (
+		answer any
+		err    error
+	)
+	switch operation {
+	case "load":
+		var record *sessionstore.Record
+		if record, err = backend.Load(r.Context(), request.Id); err == nil {
+			answer = api.SessionLoadResponse{Data: string(record.Data), LastAccessed: record.LastAccessed, ExpiresAt: record.ExpiresAt}
+		}
+	case "create", "update", "touch":
+		var expiresAt time.Time
+		switch operation {
+		case "create":
+			expiresAt, err = backend.Create(r.Context(), request.Id, []byte(request.Data), request.Authenticated)
+		case "update":
+			expiresAt, err = backend.Update(r.Context(), request.Id, []byte(request.Data), request.Authenticated)
+		default:
+			expiresAt, err = backend.Touch(r.Context(), request.Id, request.Authenticated)
+		}
+		answer = api.SessionWriteResponse{ExpiresAt: expiresAt}
+	case "delete":
+		if err = backend.Delete(r.Context(), request.Id); err == nil {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	switch {
+	case errors.Is(err, sessionstore.ErrNotFound):
+		http.NotFound(w, r)
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	default:
+		assert.NoError(t, json.NewEncoder(w).Encode(answer))
 	}
 }
