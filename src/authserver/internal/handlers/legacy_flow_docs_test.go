@@ -99,8 +99,8 @@ type passwordRefusal struct {
 	ropcOff bool
 	// public makes the client public; the others are confidential, with clientSecret as its secret.
 	public bool
-	// level2Mandatory sets the client's default ACR level to urn:goiabada:level2_mandatory,
-	// a floor the password grant cannot meet.
+	// level2Mandatory turns the client's authorization code flow on and sets its default ACR
+	// level to urn:goiabada:level2_mandatory, a floor the password grant cannot meet.
 	level2Mandatory bool
 	form            url.Values
 	// user is the account the username names, or nil for none.
@@ -171,6 +171,7 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		client := &record.Client{Id: 7, ClientIdentifier: "legacy-app", Enabled: true, IsPublic: refusal.public,
 			ResourceOwnerPasswordCredentialsEnabled: &on}
 		if refusal.level2Mandatory {
+			client.AuthorizationCodeEnabled = true
 			client.DefaultAcrLevel = record.AcrLevel2Mandatory
 		}
 		if !refusal.public {

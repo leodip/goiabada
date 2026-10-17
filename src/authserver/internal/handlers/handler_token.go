@@ -292,13 +292,13 @@ func auditTokenRefusal(r *http.Request, database revocation.Database, auditLogge
 	//
 	// invalid_grant is the whole of the predicate, and it is narrower than it looks.
 	// The validator's other password-grant failures are unauthorized_client (the
-	// grant is switched off), invalid_request (a missing username or password) and
+	// grant is switched off, or the client's default ACR level is one it cannot
+	// meet), invalid_request (a missing username or password) and
 	// invalid_client (client authentication), none of which compared a credential
 	// against an account, so charging them would let a caller spend an account's
 	// budget without guessing and would fill the audit log with rows naming a
 	// username nothing checked. What invalid_grant does cover is a wrong password,
-	// an unknown user, a disabled user, a 2FA-blocked user and a client whose
-	// default ACR level is level 2 (mandatory), which is exactly the
+	// an unknown user, a disabled user and a 2FA-blocked user, which is exactly the
 	// set EventROPCAuthFailed is documented to mean.
 	//
 	// The checks that run before the grant is looked at read no credential either, and none

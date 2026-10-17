@@ -163,6 +163,8 @@ New clients start at `urn:goiabada:level2_optional`. The field shows only while 
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
 
+The [password grant](/legacy-flows/ropc/#who-cant-use-it) can't ask for a one-time code, so at `urn:goiabada:level2_mandatory` it is refused for every user. With **Authorization code with PKCE** off, the level doesn't apply, and neither does that refusal.
+
 ## Administrative scopes
 
 Six permissions on the `authserver` resource let whoever holds them administer Goiabada: `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a user's behalf acts at the Admin API with that user's authority. So **only a client allowed to request the administrative scopes may get one**:

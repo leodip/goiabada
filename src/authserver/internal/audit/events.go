@@ -75,8 +75,7 @@ const (
 	// refresh arm checks the token's owner before it compares scopes.
 	EventTokenScopeDenied = "token_scope_denied"
 	// EventROPCAuthFailed is logged when ROPC authentication fails.
-	// This includes invalid credentials, disabled users, 2FA-blocked users, and a client
-	// whose default ACR level is level 2 (mandatory), which the grant cannot meet.
+	// This includes invalid credentials, disabled users, and 2FA-blocked users.
 	EventROPCAuthFailed = "ropc_auth_failed"
 	// EventAuthCodeReuseDetected is logged when an authorization code is replayed
 	// at the token endpoint by an authenticated requester (correct client_id,

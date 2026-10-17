@@ -500,6 +500,48 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	assert.Contains(t, data["error_description"], "authorization code flow")
 }
 
+// TestROPC_ClientAcrLevel2MandatoryRefused pins the refusal of a client whose default ACR level is
+// level 2 (mandatory), read back from the database, while its authorization code flow is on: the
+// right password gets unauthorized_client and no token. With the code flow off, the level is not
+// applicable and the same client gets its grant (#533).
+func TestROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
+
+	password := fake.Password(12)
+	client := createROPCClient(t, "", true)
+	user := createROPCUser(t, password)
+
+	client.AuthorizationCodeEnabled = true
+	client.DefaultAcrLevel = record.AcrLevel2Mandatory
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
+
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHttpClient(t)
+
+	formData := url.Values{
+		"grant_type": {"password"},
+		"client_id":  {client.ClientIdentifier},
+		"username":   {user.Email},
+		"password":   {password},
+		"scope":      {"openid"},
+	}
+
+	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.Equal(t, "unauthorized_client", data["error"])
+	assert.Equal(t, "Resource owner password credentials grant is not available for a client whose "+
+		"default ACR level is urn:goiabada:level2_mandatory. Please use the authorization code flow instead.",
+		data["error_description"])
+	assert.NotContains(t, data, "access_token")
+
+	client.AuthorizationCodeEnabled = false
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
+
+	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+
+	assert.NotEmpty(t, data["access_token"], "with the code flow off the level is not applicable: %v", data)
+}
+
 // TestROPC_WithResourcePermissions tests ROPC with resource permissions
 func TestROPC_WithResourcePermissions(t *testing.T) {
 	// Enable ROPC globally
