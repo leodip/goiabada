@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/pem"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -117,6 +120,74 @@ func TestMain_RefusesAMalformedVariable(t *testing.T) {
 	require.Equal(t, 2, code, "stderr: %s", stderr)
 	assert.Equal(t, `malformed configuration: GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS is "94x4", not an integer; `+
 		`GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS is "yes", not a boolean (true or false)`+"\n", stderr)
+}
+
+// TestMain_RefusesAnInternalCAFileItCannotUse is #525's refusal at the process: an internal CA file
+// that is not there, or that holds no certificate, stops main with one line on stderr and exit 2,
+// the channel and code of every other malformed setting, before anything is logged; and beside a
+// malformed port, the same line names both. So does a file whose authorities have no system roots
+// to join, because the roots SSL_CERT_FILE names cannot be read.
+//
+// The exit code is what a main reading the file after the load cannot fake: it would log the
+// refusal through the installed handler and exit 1, and beside the malformed port it would name
+// the port alone.
+func TestMain_RefusesAnInternalCAFileItCannotUse(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "absent.pem")
+	notPEM := filepath.Join(dir, "not-a-certificate.pem")
+	require.NoError(t, os.WriteFile(notPEM, []byte("this is not a certificate\n"), 0o600))
+	const setting = "GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (--adminconsole-internal-ca-file) is "
+
+	cases := []struct {
+		name string
+		env  []string
+		want string
+	}{
+		{"a file that is not there", []string{"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=" + missing},
+			setting + `"` + missing + `", which cannot be read: no such file or directory`},
+		{"a file holding no certificate", []string{"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=" + notPEM},
+			setting + `"` + notPEM + `", which holds no PEM certificate`},
+		{"beside a malformed port", []string{
+			"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=94x4",
+			"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=" + missing,
+		}, `GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS is "94x4", not an integer; ` +
+			setting + `"` + missing + `", which cannot be read: no such file or directory`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			code, stderr := runMainProcess(t, append(tc.env,
+				// Neither listener, so a child that got past the refusal stops rather than serves.
+				"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+			))
+
+			require.Equal(t, 2, code, "stderr: %s", stderr)
+			assert.Equal(t, "malformed configuration: "+tc.want+"\n", stderr)
+		})
+	}
+
+	t.Run("system roots that do not load", func(t *testing.T) {
+		if runtime.GOOS != "linux" {
+			t.Skipf("SSL_CERT_FILE and SSL_CERT_DIR are the system roots' sources on linux, not on %s", runtime.GOOS)
+		}
+		// A directory where the roots' file should be is an error the loader keeps, unlike a file
+		// that is not there, and the empty directory holds no root to rescue it.
+		rootsFile := t.TempDir()
+		rootsDir := t.TempDir()
+		ca, _ := newTestCA(t, "the CA the setting names")
+		caFile := filepath.Join(dir, "internal-ca.pem")
+		require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Raw}), 0o600))
+
+		code, stderr := runMainProcess(t, []string{
+			"SSL_CERT_FILE=" + rootsFile,
+			"SSL_CERT_DIR=" + rootsDir,
+			"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=" + caFile,
+			"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+		})
+
+		require.Equal(t, 2, code, "stderr: %s", stderr)
+		assert.Equal(t, "malformed configuration: "+setting+`"`+caFile+`", whose authorities join the system roots, which do not load: `+
+			strconv.Quote("read "+rootsFile+": is a directory")+"\n", stderr)
+	})
 }
 
 // TestMain_RefusesAMalformedPreviousSessionKey is the wiring between the session-key rule

@@ -7,9 +7,9 @@
 // database: everything it reads and writes goes through the auth server's admin and account APIs,
 // and its browser sessions are stored on the auth server as ciphertext under the console's own
 // session keys, which the auth server holds no key for (#266). A configuration it cannot use stops
-// it before it serves anything: a malformed number or boolean, or a TZ that names no zone, with one
-// line on stderr and exit 2; missing session keys, a missing client secret, a malformed trusted
-// proxy list, an internal CA file that cannot be read or holds no certificate, or a client secret
+// it before it serves anything: a malformed number or boolean, an internal CA file that cannot be
+// read or holds no certificate, or a TZ that names no zone, with one line on stderr and exit 2;
+// missing session keys, a missing client secret, a malformed trusted proxy list or a client secret
 // the auth server refuses with one record and exit 1. It waits for the auth server to issue its
 // token before it listens (#542).
 package main
@@ -70,8 +70,8 @@ func run() int {
 	// the handler cannot read has to stop the server rather than be silently
 	// replaced by a default (#320).
 	//
-	// A numeric or boolean variable that does not parse stops the server here, all of them named
-	// at once. It goes to stderr as one line and exits 2, which is what a bad flag already gets
+	// A numeric or boolean variable that does not parse, or an internal CA file Load cannot build a
+	// pool from (#525), stops the server here, all of them named at once. It goes to stderr as one line and exits 2, which is what a bad flag already gets
 	// from flag.CommandLine, because no log handler exists yet to write it through (#434).
 	//
 	// It is loaded once, here, and handed on: the server and every handler receive the values
@@ -98,14 +98,10 @@ func run() int {
 
 	// The root pool every call this process makes to the auth server verifies the peer's
 	// certificate against: the system roots, plus the CA file the configuration names when
-	// there is one. It is read once, here, so an internal URL a private CA signed verifies from
-	// the first call rather than the first page an administrator happens to open, and a file
-	// that cannot be read stops the console before it serves anything (#525).
-	internalRoots, rootsErr := cfg.AdminConsole.InternalRoots()
-	if rootsErr != nil {
-		slog.Error("the internal CA file cannot be read, so the admin console cannot start", "error", rootsErr)
-		return 1
-	}
+	// there is one. Load read it once, refusing above a file it cannot build a pool from, so an
+	// internal URL a private CA signed verifies from the first call rather than the first page an
+	// administrator happens to open (#525).
+	internalRoots := cfg.AdminConsole.InternalRoots
 
 	slog.Info("admin console started")
 	slog.Info("build information",

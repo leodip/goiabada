@@ -171,8 +171,10 @@ var configVariables = []configVar{
 		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
 		read: func(c *Config) any { return c.AdminConsole.I18nOverridesDir },
 	},
+	// Load reads the file the setting names, and refuses one it cannot (#525), so both values
+	// are real files: certificates and nothing else.
 	strVar("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", "adminconsole-internal-ca-file", "",
-		"/env/internal-ca.pem", "/flag/internal-ca.pem",
+		"testdata/internal-ca-env.pem", "testdata/internal-ca-flag.pem",
 		func(c *Config) any { return c.AdminConsole.InternalCAFile }),
 
 	// Auth server: the two endpoints this process talks to. The other 22 GOIABADA_AUTHSERVER_*

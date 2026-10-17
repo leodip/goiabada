@@ -57,6 +57,11 @@ type AdminConsoleConfig struct {
 	// can sign that URL without the process's own roots being replaced. Empty, its calls verify
 	// against the system roots alone (#525).
 	InternalCAFile string
+	// InternalRoots is the pool Load read InternalCAFile into: the system roots with the file's
+	// authorities appended, which every client main and the route table build verifies the auth
+	// server's certificate against. nil while InternalCAFile is unset, which is the system roots
+	// alone (#525).
+	InternalRoots *x509.CertPool
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -79,45 +84,6 @@ func (c *AdminConsoleConfig) TrustedProxyRanges() ([]*net.IPNet, error) {
 		return nil, errs.Wrap(err, "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES (--adminconsole-trusted-proxies)")
 	}
 	return ranges, nil
-}
-
-// InternalRoots answers the root pool the console verifies the auth server's certificate against
-// on every call it makes over the wire: the system roots alone while InternalCAFile is unset, and
-// that file's authorities appended to the system roots once it is. Appended rather than in their
-// place, because SSL_CERT_FILE and SSL_CERT_DIR are the way to replace the roots wholesale, and
-// an operator naming one CA has asked to trust it beside the roots the process already had, not
-// to stop trusting them (#525).
-//
-// main calls this once, at start, and hands the pool to every client it builds, so the file is
-// read once and a refusal stops the console before it serves anything: a file that cannot be
-// read, or that holds no PEM certificate, is the same refusal the auth server's database CA file
-// answers, under this process's own variable names (#502), rather than a certificate failure on
-// the first page an administrator opens.
-func (c *AdminConsoleConfig) InternalRoots() (*x509.CertPool, error) {
-	if c.InternalCAFile == "" {
-		return nil, nil
-	}
-
-	const setting = "GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (--adminconsole-internal-ca-file) is "
-	file := strconv.Quote(c.InternalCAFile)
-	pemBytes, err := os.ReadFile(c.InternalCAFile)
-	if err != nil {
-		// The cause alone: the path is quoted above, and the error repeats it unquoted.
-		reason := err.Error()
-		var pathErr *os.PathError
-		if errors.As(err, &pathErr) {
-			reason = pathErr.Err.Error()
-		}
-		return nil, errs.Errorf("%s%s, which cannot be read: %s", setting, file, reason)
-	}
-	roots, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, errs.Wrap(err, setting+file)
-	}
-	if !roots.AppendCertsFromPEM(pemBytes) {
-		return nil, errs.Errorf("%s%s, which holds no PEM certificate", setting, file)
-	}
-	return roots, nil
 }
 
 // isHTTPSURL reports whether a URL uses the https scheme (case-insensitive).
@@ -160,7 +126,8 @@ type Config struct {
 // configuration at request time (#441).
 //
 // It answers a whole configuration or an error: the parse's, or one naming every numeric or
-// boolean variable that is set and does not parse. A flag given for the same setting does not
+// boolean variable that is set and does not parse, and the internal CA file when it cannot be read
+// or holds no certificate (#525). A flag given for the same setting does not
 // rescue the variable: the value the operator wrote is wrong whichever of the two wins (#434).
 func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	var malformed malformedValues
@@ -236,6 +203,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	// (comma-separated) overrides the environment value.
 	c.AdminConsole.TrustedProxies = splitCSV(adminConsoleTrustedProxies)
 
+	// After the parse, because the flag can name the file too.
+	readInternalRoots(&c.AdminConsole, &malformed)
+
 	// Warn about removed settings still present in the environment so a
 	// deployment relying on them notices they are now ignored. The Secure cookie
 	// flag is derived from an https base URL (see IsCookieSecure).
@@ -266,12 +236,61 @@ func getEnv(key string, defaultVal string) string {
 	return strings.TrimSpace(defaultVal)
 }
 
-// malformedValues collects every numeric or boolean variable Load could not parse, so one
-// refusal names them all rather than costing the operator a restart per typo (#434).
+// malformedValues collects every numeric or boolean variable Load could not parse, and the internal
+// CA file when it cannot build a pool from it (#525), so one refusal names them all rather than
+// costing the operator a restart per typo (#434).
 type malformedValues []string
 
 func (m *malformedValues) add(key, value, want string) {
 	*m = append(*m, key+" is "+strconv.Quote(value)+", not "+want)
+}
+
+// addLine records a refusal that is not a value out of its form, written whole by the caller,
+// who quotes any value in it.
+func (m *malformedValues) addLine(refusal string) {
+	*m = append(*m, refusal)
+}
+
+// readInternalRoots reads the internal CA file into c.InternalRoots, which is how the file is read
+// once, at start, and refuses one it cannot build a pool from, as the auth server's database CA
+// file is refused (#502): one that cannot be read, and one holding no PEM certificate. Each is a
+// malformed value, so the console stops with one stderr line and exit 2, naming it beside every
+// other malformed value rather than on the next start (#525).
+//
+// The file's authorities are appended to the system roots rather than put in their place, which is
+// the difference from the auth server's database CA file: SSL_CERT_FILE and SSL_CERT_DIR are the
+// way to replace the roots wholesale, and an operator naming one CA has asked to trust it beside
+// the roots the process already had, not to stop trusting them.
+func readInternalRoots(c *AdminConsoleConfig, malformed *malformedValues) {
+	c.InternalRoots = nil
+	if c.InternalCAFile == "" {
+		return
+	}
+
+	const setting = "GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (--adminconsole-internal-ca-file) is "
+	file := strconv.Quote(c.InternalCAFile)
+	pemBytes, err := os.ReadFile(c.InternalCAFile)
+	if err != nil {
+		// The cause alone: the path is quoted above, and the error repeats it unquoted.
+		reason := err.Error()
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			reason = pathErr.Err.Error()
+		}
+		malformed.addLine(setting + file + ", which cannot be read: " + reason)
+		return
+	}
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		// Quoted, because the error names a path from SSL_CERT_FILE or SSL_CERT_DIR, unquoted.
+		malformed.addLine(setting + file + ", whose authorities join the system roots, which do not load: " + strconv.Quote(err.Error()))
+		return
+	}
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		malformed.addLine(setting + file + ", which holds no PEM certificate")
+		return
+	}
+	c.InternalRoots = roots
 }
 
 // err is the refusal: one line, whatever the values hold, because main writes it to stderr

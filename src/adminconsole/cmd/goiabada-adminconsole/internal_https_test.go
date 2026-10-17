@@ -135,8 +135,15 @@ func TestInternalBaseURL_HTTPS_TrustsWhatTheSystemRootsTrust(t *testing.T) {
 // every request that reaches it.
 func newTLSAuthServer(t *testing.T, leaf tls.Certificate, requests *atomic.Int32) *httptest.Server {
 	t.Helper()
+	return newRecordingTLSAuthServer(t, leaf, func(string) { requests.Add(1) })
+}
+
+// newRecordingTLSAuthServer is newTLSAuthServer handing record the path of every request that
+// reaches it, for a test that asks which of the console's clients arrived.
+func newRecordingTLSAuthServer(t *testing.T, leaf tls.Certificate, record func(path string)) *httptest.Server {
+	t.Helper()
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
+		record(r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/auth/token":

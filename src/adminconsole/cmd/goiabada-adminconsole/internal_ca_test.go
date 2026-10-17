@@ -15,11 +15,15 @@ import (
 	"encoding/pem"
 	"flag"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,8 +43,10 @@ import (
 // the peer the CA signed. No SSL_CERT_FILE or SSL_CERT_DIR is set, so nothing but the setting
 // can have made the certificate verify. The clients are the ones main and the routes compose,
 // against a configuration Load read, so the test covers the setting from its variable to the
-// wire: the token client, the session backend (its token grant and its write, which is why the
-// peer sees five requests), the public settings client and the admin API client.
+// wire: the token client, the session backend, the public settings client and the admin API
+// client. The session backend is handed a token rather than a token source over the token client,
+// so its write is its own transport's request, in the refusal as much as the reach: over the token
+// client, the refused token grant would stop it before its own transport dialled.
 func TestInternalBaseURL_HTTPS_TrustsAPrivateCATheConsoleNames(t *testing.T) {
 	ca, caKey := newTestCA(t, "the named internal CA")
 	var requests atomic.Int32
@@ -59,10 +65,8 @@ func TestInternalBaseURL_HTTPS_TrustsAPrivateCATheConsoleNames(t *testing.T) {
 		fs.SetOutput(io.Discard)
 		cfg, loadErr := config.Load(fs, nil)
 		require.NoError(t, loadErr, "the load must accept a CA file it can read")
-		roots, rootsErr := cfg.AdminConsole.InternalRoots()
-		require.NoError(t, rootsErr)
-		require.NotNil(t, roots, "a CA file the load accepted must answer a pool")
-		return cfg, roots
+		require.NotNil(t, cfg.AdminConsole.InternalRoots, "a CA file the load accepted must answer a pool")
+		return cfg, cfg.AdminConsole.InternalRoots
 	}
 
 	// call makes the four calls the console's page load makes, with the clients main and the
@@ -72,9 +76,8 @@ func TestInternalBaseURL_HTTPS_TrustsAPrivateCATheConsoleNames(t *testing.T) {
 		authBase := cfg.AuthServer.GetEffectiveBaseURL()
 
 		tokenClient := newTokenClient(cfg, oauthclient.NewAuthServerHTTPClient(roots), upstream)
-		tokenSource := oauthclient.NewSessionTokenSource(tokenClient)
 		_, tokenErr := tokenClient.ClientCredentials(context.Background(), "authserver:manage")
-		_, sessionErr := sessionbackend.New(authBase, tokenSource, roots, upstream).
+		_, sessionErr := sessionbackend.New(authBase, staticTokens{}, roots, upstream).
 			Create(context.Background(), "a-session", []byte("ciphertext"), false)
 		_, settingsErr := publicsettings.NewClient(authBase, roots, upstream).GetPublicSettings(context.Background())
 		_, adminErr := apiclient.NewAuthServerClient(authBase, roots, upstream).
@@ -88,9 +91,9 @@ func TestInternalBaseURL_HTTPS_TrustsAPrivateCATheConsoleNames(t *testing.T) {
 		for i, err := range call(cfg, roots) {
 			require.NoError(t, err, "call %d to the private-CA auth server answered %v, want the console to reach it once it names the CA", i, err)
 		}
-		// Five: the token grant above, the session backend's own token grant and its write,
-		// the public settings read and the admin API read.
-		assert.Equal(t, int32(5), requests.Load(), "the peer whose CA the console names saw these calls")
+		// Four: the token grant, the session backend's write, the public settings read and the
+		// admin API read.
+		assert.Equal(t, int32(4), requests.Load(), "the peer whose CA the console names saw these calls")
 	})
 
 	t.Run("a CA the console was not told of", func(t *testing.T) {
@@ -107,6 +110,13 @@ func TestInternalBaseURL_HTTPS_TrustsAPrivateCATheConsoleNames(t *testing.T) {
 		assert.Equal(t, int32(0), untrustedRequests.Load(), "the peer whose certificate the console refuses saw these calls")
 	})
 }
+
+// staticTokens is a session token source that always has a token, so the session backend's
+// request is its own transport's from the first byte.
+type staticTokens struct{}
+
+func (staticTokens) Token(context.Context) (string, error) { return "a-session-token", nil }
+func (staticTokens) Invalidate()                           {}
 
 // The environment the parent hands the child half of the append test: the marker that makes the
 // test the child, and the two servers' URLs.
@@ -179,8 +189,7 @@ func TestInternalCAFile_KeepsTheSystemRootsBesideTheNamedCA(t *testing.T) {
 	fs.SetOutput(io.Discard)
 	cfg, loadErr := config.Load(fs, nil)
 	require.NoError(t, loadErr)
-	roots, rootsErr := cfg.AdminConsole.InternalRoots()
-	require.NoError(t, rootsErr)
+	roots := cfg.AdminConsole.InternalRoots
 	require.NotNil(t, roots)
 
 	client := oauthclient.NewAuthServerHTTPClient(roots)
@@ -191,5 +200,62 @@ func TestInternalCAFile_KeepsTheSystemRootsBesideTheNamedCA(t *testing.T) {
 		resp, err := client.Get(os.Getenv(url))
 		require.NoError(t, err, "the request to the server %s must verify, so the named CA joined the system roots beside them rather than in their place", name)
 		_ = resp.Body.Close()
+	}
+}
+
+// TestMain_HandsTheInternalRootsToEveryClientItBuilds is the wiring between the pool Load reads
+// and the clients main composes, at the process: the internal URL is served under a private CA
+// that only GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE names, with no SSL_CERT_FILE in the child's
+// environment. main's own token grant must reach it, or the console never listens; and a page
+// that reads the settings and saves a session, the sign-in redirect, must reach the settings
+// endpoint and the session endpoint. A main handing any of the three clients nil instead of the
+// pool sends that request under the system roots alone, and the peer never sees it.
+func TestMain_HandsTheInternalRootsToEveryClientItBuilds(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
+	defer cancel()
+
+	ca, caKey := newTestCA(t, "the CA only the setting names")
+	caFile := filepath.Join(t.TempDir(), "internal-ca.pem")
+	require.NoError(t, os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Raw}), 0o600))
+	var mu sync.Mutex
+	arrived := map[string]int{}
+	peer := newRecordingTLSAuthServer(t, newTestLeaf(t, ca, caKey), func(path string) {
+		mu.Lock()
+		defer mu.Unlock()
+		arrived[path]++
+	})
+
+	ports := freePorts(t, 2)
+	httpPort := ports[0]
+	child := startMetricsChild(t, ctx, "https://auth.example.test", httpPort, ports[1], "",
+		"GOIABADA_AUTHSERVER_INTERNALBASEURL="+peer.URL,
+		"GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE="+caFile)
+
+	// A child whose token grant was refused never listens, so its exit ends the wait at once.
+	up, upCancel := context.WithCancel(ctx)
+	defer upCancel()
+	go func() {
+		select {
+		case <-child.done:
+		case <-up.Done():
+		}
+		upCancel()
+	}()
+	status, _, body := getWhenUp(t, up, "http://127.0.0.1:"+strconv.Itoa(httpPort)+"/admin/users")
+	assert.Equal(t, http.StatusFound, status, "the sign-in redirect: %s", body)
+
+	require.NoError(t, child.cmd.Process.Signal(syscall.SIGTERM))
+	code, records := child.wait(t, ctx)
+	require.Equalf(t, 0, code, "a drained stop exits 0\n%s", dumpRecords(records))
+
+	mu.Lock()
+	defer mu.Unlock()
+	for path, client := range map[string]string{
+		"/auth/token":             "the token client, over main's HTTP client",
+		"/api/public/settings":    "the public settings client",
+		"/api/v1/sessions/create": "the session backend",
+	} {
+		assert.Positivef(t, arrived[path], "%s never reached the peer at %s, so it was not handed the internal roots; arrived: %v\n%s",
+			client, path, arrived, dumpRecords(records))
 	}
 }
