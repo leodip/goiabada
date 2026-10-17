@@ -7,12 +7,23 @@
 // keeps the code out of the address, and 4.17 governs in-browser responses, which this server does
 // not offer.
 import type { Request, Response } from "@playwright/test";
-import { clientUrl } from "../../lib/admin-console";
+import { addRedirectUri, clientUrl, setImplicitGrant } from "../../lib/admin-console";
 import { signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { codeToken } from "../../lib/oauth";
-import { authorizeEndpoint, codeRequest, emptyBrowser, expectRefusedOnPage, followAuthorize, getAuthorize, tokenEndpoint } from "../../lib/rfc6749";
+import {
+  authorizeEndpoint,
+  codeRequest,
+  emptyBrowser,
+  expectRefusedOnPage,
+  followAuthorize,
+  getAuthorize,
+  readAnswer,
+  responseParams,
+  type RawAnswer,
+  tokenEndpoint,
+} from "../../lib/rfc6749";
 import { browserSignInClient } from "../../lib/test-clients";
 import { freshTotp } from "../../lib/totp";
 
@@ -166,5 +177,78 @@ test("form_post is offered, and posts the response to the redirect URI; an in-br
   const inBrowser = await getAuthorize(signIn.context.request, codeRequest(client.identifier, { response_mode: "web_message" }).params);
   expect(inBrowser.status).toBe(400);
   expectRefusedOnPage(inBrowser, /Invalid response_mode parameter/);
+  await signIn.context.close();
+});
+
+// form_post answers through a form whose action is the redirect URI, which no form can post to when
+// its scheme is a custom one: html/template rewrote it to #ZgotmplZ, so the code, or an error, was
+// posted back to the auth server and never reached the app. The request is refused on the page with
+// no error parameters, as an unsupported mode is (OIDC Core 1.0 section 3.1.2.6), whether or not the
+// browser is signed in, and the page names the modes the request may use instead (#121).
+test("form_post to a custom-scheme redirect URI is refused on the page, signed in or not (#121, OIDC Core 3.1.2.6)", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  const customUris = ["myapp://callback", "com.example.app:/oauth2redirect/example-provider"];
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  await setImplicitGrant(page, client.id, "on");
+  for (const uri of customUris) await addRedirectUri(page, client.id, uri);
+
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
+  const signedOut = await emptyBrowser(browser);
+
+  const codeAdvice = "Use response_mode=query or response_mode=fragment instead.";
+  const implicitAdvice = "Use response_mode=fragment instead.";
+  const requests = customUris.flatMap((uri) => [
+    { name: `code to ${uri}`, advice: codeAdvice, params: codeRequest(client.identifier, { response_mode: "form_post", redirect_uri: uri }).params },
+    {
+      name: `token to ${uri}`,
+      advice: implicitAdvice,
+      params: codeRequest(client.identifier, {
+        response_mode: "form_post",
+        redirect_uri: uri,
+        response_type: "token",
+        code_challenge: undefined,
+        code_challenge_method: undefined,
+      }).params,
+    },
+  ]);
+
+  const expectRefusal = (answer: RawAnswer, advice: string, label: string) => {
+    expect(answer.status, label).toBe(400);
+    expectRefusedOnPage(answer, advice);
+    expect(answer.text, `${label}: no form to post anything anywhere`).not.toContain("<form");
+    expect(answer.text, label).not.toContain("ZgotmplZ");
+  };
+  for (const [state, context] of [
+    ["signed in", signIn.context],
+    ["signed out", signedOut],
+  ] as const) {
+    for (const { name, advice, params } of requests) {
+      expectRefusal(await getAuthorize(context.request, params), advice, `GET ${name}, ${state}`);
+      const posted = await context.request.post(authorizeEndpoint, { form: params, failOnStatusCode: false, maxRedirects: 0 });
+      expectRefusal(await readAnswer(posted), advice, `POST ${name}, ${state}`);
+    }
+  }
+
+  // In the browser itself: the page stays on the authorization endpoint and says why.
+  const tab = await signedOut.newPage();
+  const shown = await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(requests[0].params)}`);
+  expect(shown?.status()).toBe(400);
+  await expect(tab.getByRole("heading", { name: "Unable to authorize" })).toBeVisible();
+  await expect(tab.locator("#errorMsg")).toContainText(codeAdvice);
+  expect(new URL(tab.url()).pathname).toBe("/auth/authorize");
+
+  // The control: the query reaches a custom scheme, so only form_post is refused there.
+  const viaQuery = codeRequest(client.identifier, { response_mode: "query", redirect_uri: customUris[0] }).params;
+  const { redirect } = await followAuthorize(signIn.context.request, viaQuery);
+  expect(redirect?.protocol, "redirected to the app's custom scheme").toBe("myapp:");
+  expect(responseParams(redirect!).get("code")).toBeTruthy();
+  expect(responseParams(redirect!).get("state")).toBe(viaQuery.state);
+
+  await signedOut.close();
   await signIn.context.close();
 });

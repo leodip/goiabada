@@ -31,6 +31,7 @@ The auth server couldn't tell where to send an error, so it shows it to the user
 - a missing, unknown or disabled `client_id`;
 - a missing, malformed or unregistered `redirect_uri`, as [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/) explains;
 - a `response_mode` other than `query`, `fragment` or `form_post`: "Invalid response_mode parameter. Supported values are: query, fragment, form_post.";
+- `response_mode=form_post` with a redirect URI that isn't `http` or `https`, such as `myapp://callback`: "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive." A form can't post to a custom scheme, so ask for `query` or `fragment`, or `fragment` alone in the implicit flow;
 - `client_id`, `redirect_uri`, `response_type` or `response_mode` sent twice, or a request that isn't correctly encoded;
 - **"This sign-in link is no longer valid."**: your app sent a POST to `/auth/authorize`, and the browser came back to its one-time link after it expired or was used.
 
