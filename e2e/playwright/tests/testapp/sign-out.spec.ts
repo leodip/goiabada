@@ -64,9 +64,13 @@ test("declining the sign-out with nowhere to go back to says the user is still s
   await signInToWebApp(app, testapp.web, user);
   await expectResult(app, "Signed in");
 
-  // A fresh tab whose first entry is the confirmation page, as when an app opens sign-out in a new tab.
-  const tab = await context.newPage();
-  await tab.goto(`${env.authUrl}/auth/logout?ui_locales=pt-BR`);
+  // The app opens sign-out in a new tab, whose first entry is the confirmation page. A page opened with
+  // context.newPage() would not do: it starts on about:blank, which leaves a step back.
+  const [tab] = await Promise.all([
+    context.waitForEvent("page"),
+    app.evaluate((url) => { window.open(url); }, `${env.authUrl}/auth/logout?ui_locales=pt-BR`),
+  ]);
+  await tab.waitForLoadState();
   expect(await tab.evaluate(() => history.length)).toBe(1);
   await tab.getByRole("link", { name: "Não", exact: true }).click();
   await tab.waitForURL((url) => url.pathname === "/auth/logout/declined");
