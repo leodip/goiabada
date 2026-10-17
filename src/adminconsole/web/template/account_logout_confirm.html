@@ -1,0 +1,28 @@
+{{define "title"}}{{ .appName }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+
+<!-- The sign-out confirmation (#411). The menu's link arrives here. The redirect the general
+     settings save issues after an issuer change arrives with its tokens already cleared and is
+     sent home before this page renders, and the sessions pages post the sign-out directly once
+     their own modal has confirmed it. The page writes nothing and calls nothing; its form posts,
+     so the origin check guards the sign-out. No JavaScript is needed to take it: the button
+     below is a plain submit. -->
+
+<main>
+    <div class="flex items-center justify-center h-screen p-8">
+        <div class="w-full max-w-md text-center">
+            <h1 class="text-2xl font-semibold mb-2">{{ T $.ctx "adminconsole.logout_confirm.heading" }}</h1>
+            <p class="text-sm opacity-70 mb-6">{{ T $.ctx "adminconsole.logout_confirm.message" }}</p>
+            <div class="flex items-center justify-center gap-3">
+                <a href="/" class="btn">{{ T $.ctx "adminconsole.logout_confirm.cancel" }}</a>
+                <form method="post" action="/auth/logout">
+                    <button type="submit" class="btn btn-primary">{{ T $.ctx "adminconsole.menu.logout" }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+
+{{end}}

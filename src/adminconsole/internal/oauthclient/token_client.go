@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -140,8 +141,6 @@ func (c *TokenClient) ExchangeCode(ctx context.Context, code, redirectURI, codeV
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
 	form.Set("redirect_uri", redirectURI)
-	form.Set("client_id", c.clientID)
-	form.Set("client_secret", c.clientSecret)
 	form.Set("code_verifier", codeVerifier)
 
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), TokenExchangeTimeout)
@@ -162,8 +161,6 @@ func (c *TokenClient) Refresh(ctx context.Context, refreshToken string) (*oauth.
 	form := url.Values{}
 	form.Set("grant_type", "refresh_token")
 	form.Set("refresh_token", refreshToken)
-	form.Set("client_id", c.clientID)
-	form.Set("client_secret", c.clientSecret)
 
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), TokenExchangeTimeout)
 	defer cancel()
@@ -200,8 +197,6 @@ func (c *TokenClient) Refresh(ctx context.Context, refreshToken string) (*oauth.
 func (c *TokenClient) ClientCredentials(ctx context.Context, scope string) (*oauth.TokenResponse, error) {
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
-	form.Set("client_id", c.clientID)
-	form.Set("client_secret", c.clientSecret)
 	form.Set("scope", scope)
 
 	ctx, cancel := context.WithTimeout(ctx, TokenExchangeTimeout)
@@ -251,13 +246,30 @@ func (c *TokenClient) clientCredentialsRemedy(code, scope string) string {
 	return remedy
 }
 
-// post sends one grant's form to the token endpoint and decodes the answer.
+// basicAuthorization is the Authorization header every grant authenticates with: RFC 6749
+// section 2.3.1's HTTP Basic scheme, the identifier and the secret percent-encoded, joined
+// by one colon and base64'd. The encoding is url.PathEscape because it is the exact inverse
+// of what the auth server's Basic parser undoes, which un-escapes each half with
+// url.PathUnescape (percentDecoded, in its handler_token.go): a '+' leaves as itself and
+// reads back as one, a space leaves as %20 rather than the '+' of form-encoding, which the
+// parser keeps, a '%' leaves as %25, and a ':' leaves as itself, safe because the parser
+// splits at the first colon and the identifier before it never holds one. No credential
+// rides the body: client_secret_post is the scheme section 2.3.1 keeps for clients that
+// cannot use Basic, and this client can (#474).
+func (c *TokenClient) basicAuthorization() string {
+	credentials := url.PathEscape(c.clientID) + ":" + url.PathEscape(c.clientSecret)
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(credentials))
+}
+
+// post sends one grant's form to the token endpoint and decodes the answer. The client's
+// own credentials are not in the form: every grant authenticates through the header above.
 func (c *TokenClient) post(ctx context.Context, form url.Values) (*oauth.TokenResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, errs.Wrap(err, "error creating request")
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", c.basicAuthorization())
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

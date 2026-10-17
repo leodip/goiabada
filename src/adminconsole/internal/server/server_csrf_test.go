@@ -129,6 +129,9 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 		// cookie-authenticated form, which is exactly what CSRF defends.
 		{"POST /admin/clients is refused", "/admin/clients", true, http.StatusForbidden},
 		{"POST /account/profile is refused", "/account/profile", true, http.StatusForbidden},
+		// The console's sign-out, a POST since #411 so that the origin check guards it: exempting it
+		// would let any site's form sign the administrator out of the console and of SSO.
+		{"POST /auth/logout is refused", "/auth/logout", true, http.StatusForbidden},
 
 		// A sibling of the exempt route inherits nothing, because ExactPaths is matched exactly.
 		{"POST /auth/callback-extra is refused", "/auth/callback-extra", true, http.StatusForbidden},
@@ -213,6 +216,7 @@ func csrfProbe(t *testing.T, path string, headers map[string]string) *httptest.R
 		"/auth/callback-extra",
 		"/admin/clients",
 		"/account/profile",
+		"/auth/logout",
 	} {
 		s.router.Post(mounted, ok)
 	}

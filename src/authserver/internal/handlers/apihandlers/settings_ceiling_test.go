@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -230,7 +229,8 @@ func TestSettingsCeiling_AManageTokenChangesTheReservedSettings(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).Return(nil).Once()
+			expectSettingsSave(database)
+			database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).Return(nil).Once()
 			records := recordLoggedEvents(auditLogger)
 
 			rr := serveSettingsSave(c.save, database, auditLogger, c.body(t), "authserver:manage")
@@ -248,7 +248,8 @@ func TestSettingsCeiling_AManageTokenChangesTheReservedSettings(t *testing.T) {
 func TestSettingsCeiling_ManageSettingsKeepsTheOtherSettings(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).Return(nil).Once()
+	expectSettingsSave(database)
+	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).Return(nil).Once()
 	records := recordLoggedEvents(auditLogger)
 
 	body := `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":86400,"maxUserSessionsPerUser":20}`

@@ -22,7 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
-// authflow.DecideSilentAuthentication's steps 5 to 7 through the handler: each answer the step-up
+// authflow.decideSilentAuthentication's steps 5 to 7 through the handler: each answer the step-up
 // rule gives reaches its own description, and the rule's two answers keep step 6 between them. Which
 // answer a session gets is ceremony.StepUpOwed's table; this is the thin seam showing prompt=none
 // consults it and in what order (#437 seam 4).
@@ -143,7 +143,7 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 // Every read and write prompt=none makes, failing. Each answers 500 and nothing else: the client is
 // not answered, because a read that failed is no answer, and taking it for "no session" or "no
 // consent" would tell a signed-in user's client login_required or consent_required for a database
-// fault. Which reads a request makes is authflow.DecideSilentAuthentication's table; this is that
+// fault. Which reads a request makes is authflow.decideSilentAuthentication's table; this is that
 // each load stops on its fault (#437 seam 4).
 func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 	fault := errors.New("the database is unavailable")
@@ -277,7 +277,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 // prompt=none from a consent-off client asking for authserver:manage-account through the handler:
 // an ordinary client's request reads the user's consent to that client and, with none stored, is
 // answered consent_required, and the admin console's client reads no consent and goes on to issue.
-// Which answer each fact gets is authflow.DecideSilentAuthentication's table; this is that the
+// Which answer each fact gets is authflow.decideSilentAuthentication's table; this is that the
 // handler hands it the client and loads the consent it asks for (#509 decisions 2 and 3).
 func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 	const scope = "openid authserver:manage-account"

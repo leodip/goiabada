@@ -1,4 +1,10 @@
-package refgraph
+// Package sourceroot holds the one declaration of the four module directories that identify the
+// repository's source root, and the ascent that finds that directory. Every tree-wide guard
+// roots its walk here, through guard.SourceRoot, cmd/ownershipdump roots its own here, and the
+// auth server's schemadump finds the root its golden files live under here. The declaration
+// lived in core/internal/refgraph until #480: Go's internal rule kept the auth server from
+// reading it there, which is how the same four directories came to be declared twice.
+package sourceroot
 
 import (
 	"os"
@@ -11,16 +17,27 @@ import (
 // moduleDirs are the four go.mod directories the Lint job loops over, relative
 // to the source root, slash-separated and in the order a reader expects them.
 // This is their one declaration: FindSourceRoot requires all four to be present,
-// which is what identifies that directory while ascending, and BuildImportGraph
-// resolves import paths against the module each one declares. A module added to
+// which is what identifies that directory while ascending, and refgraph's import
+// graph resolves import paths against the module each one declares. A module added to
 // the repository without being added here is a failure to find the root rather
 // than a walk that quietly skips it.
 var moduleDirs = []string{"core", "authserver", "adminconsole", "cmd/goiabada-setup"}
 
+// ModuleDirs returns the module directories of the one declaration above, relative
+// to the source root, slash-separated and in the order a reader expects them, as
+// a fresh copy on every call. refgraph reads the list through this rather than
+// naming the directories again.
+func ModuleDirs() []string {
+	out := make([]string, len(moduleDirs))
+	copy(out, moduleDirs)
+	return out
+}
+
 // FindSourceRoot returns the directory holding the four go.mod files, ascending
 // from dir. It is where every tree-wide guard roots its walk, through
-// guard.SourceRoot, and where cmd/ownershipdump roots its own, which is a
-// command rather than a test and still has to start in the same place.
+// guard.SourceRoot, and where cmd/ownershipdump and the auth server's schemadump
+// root their own, which are commands rather than tests and still have to start
+// in the same place.
 //
 // A wrong root is not a loud failure: it walks a directory that exists and holds
 // nothing, and the guard passes. That is why its failure is an error rather than

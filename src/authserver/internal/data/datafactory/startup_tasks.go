@@ -27,9 +27,22 @@ type keyRotationStore interface {
 	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
 }
 
+// sharedIdentifierReader is what the startup warning reads: the identifiers a client and a
+// resource both hold (#151).
+type sharedIdentifierReader interface {
+	GetIdentifiersSharedByClientsAndResources(ctx context.Context, tx *sql.Tx) ([]string, error)
+}
+
+// startupDataStore is what runStartupDataTasks takes: both tasks' ports.
+type startupDataStore interface {
+	keyRotationStore
+	sharedIdentifierReader
+}
+
 // runStartupDataTasks is everything that has to happen to the stored data after the migration
-// chain and before either application serves a request. One thing is left: the optional
-// env-to-env key rotation. The email lowercase pass went in #351, which made it migration 000047
+// chain and before either application serves a request. Two things are left: the optional
+// env-to-env key rotation, and the warning about a client and a resource sharing an identifier.
+// The email lowercase pass went in #351, which made it migration 000047
 // and a pre-flight that runs BEFORE the chain rather than after it; the one-shot move of the data
 // key out of the database and the TOTP secret encryption pass (#82) went in #359, which deleted
 // both 1.5.x conversions and set the policy that an upgrade must pass through 1.6.x (#262).
@@ -38,7 +51,7 @@ type keyRotationStore interface {
 // the legacy key column is the conversion's, not rotation's, and startup_tasks_test.go asserts
 // GetSettingsById is never called.
 //
-// THE REMAINING TASK IS FAIL-CLOSED, and that is the property this function exists to make
+// THE ROTATION IS FAIL-CLOSED, and that is the property this function exists to make
 // testable rather than merely true. It returns an error that must stop startup, because it leaves
 // the data half-converted when it fails: secrets re-keyed under a key the running process does not
 // hold are a set of clients and accounts that silently cannot be used. NewDatabase builds a real
@@ -47,7 +60,10 @@ type keyRotationStore interface {
 //
 // The keys are parameters rather than config reads for the same reason. The caller has already
 // validated envKey as 32 bytes; previousKey is optional and is acted on only at that length.
-func runStartupDataTasks(ctx context.Context, database keyRotationStore, envKey []byte, previousKey []byte) error {
+//
+// The warning is not fail-closed: it changes nothing, and a failed read of it is logged and the
+// start goes on. A start asked to stop by the time the rotation ends does not read it.
+func runStartupDataTasks(ctx context.Context, database startupDataStore, envKey []byte, previousKey []byte) error {
 	// A start asked to stop does not begin the rotation, and one that has begun runs to its end
 	// whatever the stop: the re-key is one transaction, and a rotation cut short would only have to
 	// begin again at the next start (#390 decision 9).
@@ -61,7 +77,28 @@ func runStartupDataTasks(ctx context.Context, database keyRotationStore, envKey 
 	if rotated {
 		slog.InfoContext(ctx, "rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
 	}
+	if ctx.Err() == nil {
+		warnOfSharedIdentifiers(ctx, database)
+	}
 	return nil
+}
+
+// warnOfSharedIdentifiers logs one Warn record for every identifier a client and a resource both
+// hold. The admin API refuses a new such pair (#151), but not one stored before that check, nor
+// one two overlapping writes, one per table, landed past it, and renaming either side is a
+// breaking change for the integrations using it, so the start names each pair for the operator
+// rather than refusing it or renaming anything.
+func warnOfSharedIdentifiers(ctx context.Context, database sharedIdentifierReader) {
+	identifiers, err := database.GetIdentifiersSharedByClientsAndResources(ctx, nil)
+	if err != nil {
+		slog.WarnContext(ctx, "unable to check for identifiers shared by a client and a resource", "error", err)
+		return
+	}
+	for _, identifier := range identifiers {
+		slog.WarnContext(ctx, "a client and a resource share an identifier",
+			"client_identifier", identifier,
+			"resource_identifier", identifier)
+	}
 }
 
 // rotateDataKeyIfNeeded checks the data key against the stored data and is the env-to-env rotation

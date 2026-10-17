@@ -158,7 +158,7 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The POST is parked and answered with a 303 to a GET, which refuses the request parameter
 	// (#246); the parked request keeps `request` so the GET sees it.

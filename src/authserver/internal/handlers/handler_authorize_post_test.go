@@ -215,6 +215,22 @@ func TestHandleAuthorizePost_ARequestTheGetWouldRefuseOnThePageWritesNoRow(t *te
 		rr := e.post("", validAuthorizeQuery+"&response_mode=web_message")
 		assert.Empty(t, rr.Header().Get("Location"))
 	})
+
+	// A form cannot post to a private-use scheme, so neither the code nor an error reaches it in
+	// form_post (#121). The page names the modes the request's flow may use instead.
+	for responseType, key := range map[string]string{
+		"code":  "auth_error.form_post_unreachable.code.message",
+		"token": "auth_error.form_post_unreachable.implicit.message",
+	} {
+		t.Run("response_mode=form_post to a private-use scheme, response_type="+responseType, func(t *testing.T) {
+			e := newAuthorizePostEndpoint(t)
+			e.passesTheGate()
+			e.expectsPage(i18n.T(ctx, key), http.StatusBadRequest)
+			rr := e.post("", "client_id=test-client&redirect_uri="+url.QueryEscape("myapp://callback")+
+				"&response_type="+responseType+"&scope=openid&response_mode=form_post")
+			assert.Empty(t, rr.Header().Get("Location"))
+		})
+	}
 }
 
 func TestHandleAuthorizePost_AFailedInsertIsA500AndNoRedirect(t *testing.T) {

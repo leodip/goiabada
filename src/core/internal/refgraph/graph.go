@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/sourceroot"
 )
 
 // ImportGraph is the tree as the compiler sees it: one entry per package directory holding at least
@@ -35,7 +36,7 @@ func BuildImportGraph(root string) (*ImportGraph, error) {
 		Modules: map[string]string{},
 	}
 
-	for _, dir := range moduleDirs {
+	for _, dir := range sourceroot.ModuleDirs() {
 		path, err := ModulePath(filepath.Join(root, filepath.FromSlash(dir), "go.mod"))
 		if err != nil {
 			return nil, err

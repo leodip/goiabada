@@ -1,29 +1,21 @@
 package server
 
 import (
-	"encoding/gob"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
-	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
-	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/metrics"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The metrics listener and the HTTP metrics on the main router (#400 decisions 3 and 6), the auth
@@ -177,50 +169,12 @@ func TestRegisterRoutes_CountsTheRequestsTheMainRouterAnswers(t *testing.T) {
 // the JWT middleware verifies the stored ID token against the JWKS it fetches, and the page asks
 // the admin API for the account's sessions, which this auth server refuses 503.
 func TestInitRoutes_TheJWKSFetchAndTheAdminAPIRecordOnTheServersRegistry(t *testing.T) {
-	signing, _ := oauthclienttest.Keys(t)
-	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/api/public/settings":
-			_, _ = w.Write([]byte(`{"appName":"Goiabada Test","issuer":"` + oauthclienttest.Issuer + `"}`))
-		case "/certs":
-			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
-				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
-		default:
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}
-	}))
-	t.Cleanup(authServer.Close)
-
-	cfg := &config.Config{
-		AdminConsole: config.AdminConsoleConfig{BaseURL: "https://console.example.test"},
-		AuthServer:   config.AuthServerConfig{BaseURL: authServer.URL},
-	}
-	registry := metrics.NewRegistry()
-	upstream := upstreammetrics.Register(registry)
-	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, upstream), publicsettings.DefaultTTL, registry)
-	store := newTestSessionStore()
-	s := NewServer(chi.NewRouter(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(nil), nil, nil, registry, upstream)
-	s.registerRoutes()
-
-	claims := oauthclienttest.ValidClaims()
-	claims["aud"] = builtin.AdminConsoleClientIdentifier
-	gob.Register(oauth.TokenResponse{})
-	seed := httptest.NewRequest(http.MethodGet, "/", nil)
-	sess, err := store.Get(seed, builtin.AdminConsoleSessionName)
-	require.NoError(t, err)
-	sess.Values[sessionkeys.JWT] = oauth.TokenResponse{
-		AccessToken: "an-access-token",
-		IdToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
-		TokenType:   "Bearer",
-		Scope:       "openid authserver:manage-account",
-	}
-	sess.Values[sessionkeys.JWTExpiresAt] = time.Now().Add(time.Hour).Unix()
-	saved := httptest.NewRecorder()
-	require.NoError(t, store.Save(seed, saved, sess))
+	s, cookies := newSignedInConsole(t, "openid authserver:manage-account", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/account/sessions", nil)
-	for _, cookie := range saved.Result().Cookies() {
+	for _, cookie := range cookies {
 		req.AddCookie(cookie)
 	}
 	s.router.ServeHTTP(httptest.NewRecorder(), req)

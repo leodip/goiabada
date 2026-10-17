@@ -104,8 +104,9 @@ func TestMigrationLock_AStopWhileQueuedAtThePreCreateEndsTheWait(t *testing.T) {
 // TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchanged is decision 10 at
 // the process: the real `goiabada-authserver migrate to` against a database with no version table
 // whose migration lock another session holds, interrupted with SIGINT once its pre-create is queued.
-// It prints the stop, says the database is unchanged and exits 1, as every other stop of the
-// subcommand does; it used to report a failure to prepare the runner, with a stack trace.
+// It acknowledges the signal, then prints the stop, says the database is unchanged and exits 1, as
+// every other stop of the subcommand does; it used to report a failure to prepare the runner, with
+// a stack trace. The acknowledgement is written before the wait is cancelled, so it comes first (#487).
 //
 // The binary is built from this tree, since the subcommand's entry point is package main and no
 // other seam reaches the classification of its preparation step against a real lock.
@@ -156,8 +157,9 @@ func TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchan
 	require.ErrorAsf(t, err, &exitErr, "migrate must exit non-zero on a stop: %v\nstdout: %s\nstderr: %s",
 		err, stdout.String(), stderr.String())
 	assert.Equalf(t, 1, exitErr.ExitCode(), "the target was not reached, so the stop exits 1\nstderr: %s", stderr.String())
-	assert.Equalf(t, "stopped by a signal before any migration ran: the database is unchanged\n", stdout.String(),
-		"the stop is printed as a stop\nstderr: %s", stderr.String())
+	assert.Equalf(t, "stopping: no further migration will start, and one already running finishes first\n"+
+		"stopped by a signal before any migration ran: the database is unchanged\n", stdout.String(),
+		"the signal is acknowledged, then the stop is printed as a stop\nstderr: %s", stderr.String())
 	assert.NotContains(t, stderr.String(), "unable to prepare the migration runner", "a stop is not a failure to prepare the runner")
 	assert.False(t, versionTableExists(t, h), "the database is unchanged")
 

@@ -1,8 +1,6 @@
 package apihandlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net"
@@ -46,9 +44,9 @@ func HandleSettingsEmailGet() http.HandlerFunc {
 	}
 }
 
-// settingsEmailDatabase is what the email settings endpoint needs: the settings write.
+// settingsEmailDatabase is what the email settings endpoint needs: the settings save.
 type settingsEmailDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	settingsSaveDatabase
 }
 
 // HandleSettingsEmailPut - PUT /api/v1/admin/settings/email
@@ -78,16 +76,17 @@ func HandleSettingsEmailPut(
 				return
 			}
 
-			currentSettings.SMTPEnabled = false
-			currentSettings.SMTPHost = ""
-			currentSettings.SMTPPort = 0
-			currentSettings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
-			currentSettings.SMTPUsername = ""
-			currentSettings.SMTPPasswordEncrypted = nil
-			currentSettings.SMTPFromName = ""
-			currentSettings.SMTPFromEmail = ""
-
-			if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
+			saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+				stored.SMTPEnabled = false
+				stored.SMTPHost = ""
+				stored.SMTPPort = 0
+				stored.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
+				stored.SMTPUsername = ""
+				stored.SMTPPasswordEncrypted = nil
+				stored.SMTPFromName = ""
+				stored.SMTPFromEmail = ""
+			})
+			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
 			}
@@ -96,17 +95,7 @@ func HandleSettingsEmailPut(
 				"logged_in_user": callerSubject(r),
 			})
 
-			resp := api.SettingsEmailResponse{
-				SMTPEnabled:     currentSettings.SMTPEnabled,
-				SMTPHost:        currentSettings.SMTPHost,
-				SMTPPort:        currentSettings.SMTPPort,
-				SMTPUsername:    currentSettings.SMTPUsername,
-				SMTPEncryption:  currentSettings.SMTPEncryption,
-				SMTPFromName:    currentSettings.SMTPFromName,
-				SMTPFromEmail:   currentSettings.SMTPFromEmail,
-				HasSMTPPassword: len(currentSettings.SMTPPasswordEncrypted) > 0,
-			}
-			writeJSON(w, r, http.StatusOK, resp)
+			writeJSON(w, r, http.StatusOK, settingsEmailResponse(saved))
 			return
 		}
 
@@ -221,29 +210,39 @@ func HandleSettingsEmailPut(
 			_ = conn.Close()
 		}
 
-		// Apply updates
-		currentSettings.SMTPEnabled = true
-		currentSettings.SMTPHost = smtpHost
-		currentSettings.SMTPPort = req.SMTPPort
-		currentSettings.SMTPEncryption = smtpEncryption.String()
-		currentSettings.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
-
+		// The password written is decided here, against the row the host check above read: a kept
+		// password is that row's, the one the check found entered for this host. Keeping the
+		// password the save reads under its lock instead would let a save of another host and
+		// password, committed meanwhile, have its password sent to this save's host (#410
+		// decision 2). Two saves of the email settings are still last-writer-wins between them.
+		smtpPasswordEncrypted := currentSettings.SMTPPasswordEncrypted
 		switch {
 		case req.ClearSMTPPassword:
-			currentSettings.SMTPPasswordEncrypted = nil
+			smtpPasswordEncrypted = nil
 		case len(req.SMTPPassword) > 0:
-			encrypted, err := dataCipher.Encrypt(req.SMTPPassword)
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			encrypted, encryptErr := dataCipher.Encrypt(req.SMTPPassword)
+			if encryptErr != nil {
+				writeInternalServerError(w, r, encryptErr)
 				return
 			}
-			currentSettings.SMTPPasswordEncrypted = encrypted
+			smtpPasswordEncrypted = encrypted
 		}
 
-		currentSettings.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
-		currentSettings.SMTPFromEmail = strings.ToLower(req.SMTPFromEmail)
-
-		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
+		// Apply updates, onto the row as stored when the save runs (#407)
+		smtpUsername := strings.TrimSpace(req.SMTPUsername)
+		smtpFromName := strings.TrimSpace(req.SMTPFromName)
+		smtpFromEmail := strings.ToLower(req.SMTPFromEmail)
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+			stored.SMTPEnabled = true
+			stored.SMTPHost = smtpHost
+			stored.SMTPPort = req.SMTPPort
+			stored.SMTPEncryption = smtpEncryption.String()
+			stored.SMTPUsername = smtpUsername
+			stored.SMTPPasswordEncrypted = smtpPasswordEncrypted
+			stored.SMTPFromName = smtpFromName
+			stored.SMTPFromEmail = smtpFromEmail
+		})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -252,17 +251,22 @@ func HandleSettingsEmailPut(
 			"logged_in_user": callerSubject(r),
 		})
 
-		resp := api.SettingsEmailResponse{
-			SMTPEnabled:     currentSettings.SMTPEnabled,
-			SMTPHost:        currentSettings.SMTPHost,
-			SMTPPort:        currentSettings.SMTPPort,
-			SMTPUsername:    currentSettings.SMTPUsername,
-			SMTPEncryption:  currentSettings.SMTPEncryption,
-			SMTPFromName:    currentSettings.SMTPFromName,
-			SMTPFromEmail:   currentSettings.SMTPFromEmail,
-			HasSMTPPassword: len(currentSettings.SMTPPasswordEncrypted) > 0,
-		}
-		writeJSON(w, r, http.StatusOK, resp)
+		writeJSON(w, r, http.StatusOK, settingsEmailResponse(saved))
+	}
+}
+
+// settingsEmailResponse is the email settings as the API answers them, the password only as
+// whether one is stored.
+func settingsEmailResponse(settings *record.Settings) api.SettingsEmailResponse {
+	return api.SettingsEmailResponse{
+		SMTPEnabled:     settings.SMTPEnabled,
+		SMTPHost:        settings.SMTPHost,
+		SMTPPort:        settings.SMTPPort,
+		SMTPUsername:    settings.SMTPUsername,
+		SMTPEncryption:  settings.SMTPEncryption,
+		SMTPFromName:    settings.SMTPFromName,
+		SMTPFromEmail:   settings.SMTPFromEmail,
+		HasSMTPPassword: len(settings.SMTPPasswordEncrypted) > 0,
 	}
 }
 

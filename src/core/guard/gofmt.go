@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/internal/refgraph"
+	"github.com/leodip/goiabada/core/sourceroot"
 )
 
 // AssertGofmted holds every Go file in the repository to gofmt's canonical
@@ -115,7 +115,7 @@ func findUnformatted(root string) ([]string, int, error) {
 // Ascending rather than accepting a relative path keeps each caller from having
 // to encode how deep its own package sits. That matters because a wrong root is
 // not a loud failure: it walks a directory that exists and holds nothing, and
-// the guard passes. The ascent itself is refgraph.FindSourceRoot, which
+// the guard passes. The ascent itself is sourceroot.FindSourceRoot, which
 // cmd/ownershipdump roots its walk with too.
 func SourceRoot(t *testing.T) string {
 	t.Helper()
@@ -124,7 +124,7 @@ func SourceRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("getting the working directory: %v", err)
 	}
-	root, err := refgraph.FindSourceRoot(dir)
+	root, err := sourceroot.FindSourceRoot(dir)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

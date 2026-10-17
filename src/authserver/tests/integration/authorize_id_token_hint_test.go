@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"io"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -18,12 +19,13 @@ import (
 // id_token_hint Persistence Tests
 // =============================================================================
 
-// TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance verifies that:
-// 1. id_token_hint is stored in AuthContext from the authorize endpoint
-// 2. The hint persists through the entire authentication state machine
-// 3. The issuance endpoint detects user mismatch and returns error=login_required
-// 4. State parameter is preserved in the error response
-func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
+// TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding verifies that:
+//  1. id_token_hint is stored in AuthContext from the authorize endpoint
+//  2. The hint persists through the entire authentication state machine
+//  3. /auth/completed answers a sign-in by another user with error=login_required before a session
+//     is bound (#535), so the mismatched sign-in leaves nothing behind
+//  4. State parameter is preserved in the error response
+func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	// =========================================================================
 	// Step 1: Create User A and User B
 	// =========================================================================
@@ -204,12 +206,8 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	// =========================================================================
-	// Step 6: At /auth/issue, expect error=login_required due to mismatch
+	// Step 6: /auth/completed answers login_required before a session is bound
 	// =========================================================================
-	issueUrl := assertRedirect(t, respB, "/auth/issue")
-	respB = loadPage(t, httpClientB, issueUrl)
-	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
-
 	// Should redirect back to client with error
 	assert.Equal(t, 302, respB.StatusCode, "Expected redirect to client callback")
 
@@ -231,11 +229,9 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// =========================================================================
 	// Step 7: The refusal ended the ceremony, so it cannot be replayed
 	// =========================================================================
-	// This is the one refusal that left the browser holding a ready_to_issue_code context, the
-	// state that mints codes, with only the id_token_hint comparison between a replay and a code.
-	// The clear now reaches the browser, so replaying /auth/issue on the same jar has no context
+	// The clear reaches the browser, so replaying /auth/completed on the same jar has no context
 	// to resume and lands on the account profile instead of refusing a second time (#141).
-	respB = loadPage(t, httpClientB, issueUrl)
+	respB = loadPage(t, httpClientB, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
 	assert.Equal(t, 302, respB.StatusCode)
@@ -309,26 +305,26 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 
 	resp, err := httpClient1.Get(destUrl1)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient1, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient1, redirectLocation)
@@ -382,26 +378,26 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	resp2, err := httpClient2.Get(destUrl2)
 	require.NoError(t, err)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/pwd")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	resp2 = authenticateWithPassword(t, httpClient2, redirectLocation, resp2, user.Email, password)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1completed")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/completed")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// =========================================================================
 	// Step 6: Should succeed and issue code (user matches hint)
@@ -435,9 +431,9 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	assert.Equal(t, user.Subject, newIdClaims["sub"])
 }
 
-// TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance verifies that
+// TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding verifies that
 // id_token_hint works even without prompt=login parameter.
-func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
+func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	// Create two users
 	passwordA := fake.Password(10)
 	passwordHashedA, err := passwordhash.Hash(passwordA)
@@ -508,26 +504,26 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	respA, err := httpClientA.Get(destUrlA)
 	require.NoError(t, err)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation := assertRedirect(t, respA, "/auth/level1")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/pwd")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	respA = authenticateWithPassword(t, httpClientA, redirectLocation, respA, userA.Email, passwordA)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/level1completed")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/completed")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/issue")
 	respA = loadPage(t, httpClientA, redirectLocation)
@@ -570,32 +566,29 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// User B authenticates
 	respB, err := httpClientB.Get(destUrlB)
 	require.NoError(t, err)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/pwd")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	respB = authenticateWithPassword(t, httpClientB, redirectLocation, respB, userB.Email, passwordB)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
-	redirectLocation = assertRedirect(t, respB, "/auth/issue")
-	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
-
-	// Should get error=login_required even without prompt parameter
+	// Should get error=login_required even without prompt parameter, answered by /auth/completed
+	// before anything is bound
 	errorCode, errorDescription, state := getErrorFromUrl(t, respB)
 	assert.Equal(t, "login_required", errorCode,
 		"Should return login_required error when user differs from id_token_hint, even without prompt parameter")

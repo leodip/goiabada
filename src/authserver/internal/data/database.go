@@ -17,7 +17,7 @@ import (
 //   - datafactory, which builds one and returns it; its own two readers, the email case pre-flight
 //     and the startup task, take ports like everything else (#438 decision 8);
 //   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
-//   - tests/data, which exercises all 224 of these methods on every engine, and is the tier that
+//   - tests/data, which exercises all 225 of these methods on every engine, and is the tier that
 //     proves each one works there;
 //   - this declaration itself, which is the compiler's check that the four engine adapters still
 //     implement a complete set -- worth more since #416 replaced their explicit delegations with
@@ -340,6 +340,11 @@ type Database interface {
 	GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error)
+	// GetIdentifiersSharedByClientsAndResources answers every string that is both a client's
+	// identifier and a resource's, compared exactly, in order. The admin API refuses a new one
+	// (#151), so what it answers was stored before that check, or by two overlapping writes, one
+	// per table, which the check cannot see; the startup warning reads it.
+	GetIdentifiersSharedByClientsAndResources(ctx context.Context, tx *sql.Tx) ([]string, error)
 	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
 
 	CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
@@ -403,6 +408,14 @@ type Database interface {
 	// given and never outside one: the first seed's settings row (#424 decision 14).
 	CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	// AcquireSettingsRow takes the settings row inside the caller's transaction and holds it until
+	// that transaction ends, as AcquireClientRow does a client's. Each settings section's save
+	// takes it, reads the row again on the transaction and writes its own section onto what it
+	// read, so a save of another section committed meanwhile is not written back over (#407).
+	//
+	// A transaction is required: without one the statement autocommits and the row is released
+	// before the read even runs.
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	// TryClaimCleanupRun atomically claims the next background cleanup run via a
 	// conditional update on settings.last_cleanup_at, and reports whether this
