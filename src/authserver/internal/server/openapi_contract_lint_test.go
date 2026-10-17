@@ -1572,14 +1572,25 @@ func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
 	// entry that has stopped being a gap fails here rather than sitting on as a stale
 	// allowance. A schema no response reaches, or one a core/api type now pairs with, makes
 	// the entry dead either way, because the loop above consults the map before the pairing.
-	unreached, paired := staleUntypedResponseRequired(untypedResponseRequired, responseOnly,
-		structs, schemaStructNames)
+	reportStaleUntypedResponseRequired(t, untypedResponseRequired, responseOnly, structs,
+		schemaStructNames)
+}
+
+// reportStaleUntypedResponseRequired is the reporting half of that check: one failure per entry
+// staleUntypedResponseRequired finds dead. It takes a guard.Reporter so its rule test can drive
+// it through guard.Run against the real document, since the map is empty and the run above
+// reports nothing.
+func reportStaleUntypedResponseRequired(r guard.Reporter, entries map[string][]string,
+	responseOnly map[string]bool, structs map[string]map[string]goField, aliases map[string]string) {
+
+	r.Helper()
+	unreached, paired := staleUntypedResponseRequired(entries, responseOnly, structs, aliases)
 	for _, schema := range unreached {
-		t.Errorf("untypedResponseRequired holds %s, which no response reaches; delete the entry",
+		r.Errorf("untypedResponseRequired holds %s, which no response reaches; delete the entry",
 			schema)
 	}
 	for _, schema := range paired {
-		t.Errorf("untypedResponseRequired holds %s, which a core/api type now pairs with; "+
+		r.Errorf("untypedResponseRequired holds %s, which a core/api type now pairs with; "+
 			"delete the entry so the omitempty tags this test reads are what holds the schema",
 			schema)
 	}
@@ -2221,13 +2232,16 @@ func TestStaleUntypedResponseRequired_ReportsDeadEntries(t *testing.T) {
 	})
 
 	t.Run("an entry naming a schema no response reaches is reported", func(t *testing.T) {
+		// A type of the schema's name, so the pairing would report it too if the decision
+		// went on to look for one.
+		withVanished := map[string]map[string]goField{"Vanished": {"Time": {}}}
 		unreached, paired := staleUntypedResponseRequired(
-			map[string][]string{"Vanished": {"Time"}}, responseOnly, structs, aliases)
+			map[string][]string{"Vanished": {"Time"}}, responseOnly, withVanished, aliases)
 		if len(unreached) != 1 || unreached[0] != "Vanished" {
 			t.Errorf("unreached = %v, want [Vanished]", unreached)
 		}
 		if len(paired) != 0 {
-			t.Errorf("paired = %v, want none: no type pairs with a schema that is not reached", paired)
+			t.Errorf("paired = %v, want none: an unreached entry is reported once, as unreached", paired)
 		}
 	})
 
@@ -2257,6 +2271,48 @@ func TestStaleUntypedResponseRequired_ReportsDeadEntries(t *testing.T) {
 			map[string][]string{"NullTime": {"Time", "Valid"}}, responseOnly, structs, aliases)
 		if len(unreached) != 0 || len(paired) != 0 {
 			t.Errorf("unreached = %v, paired = %v, want neither: the entry is still read", unreached, paired)
+		}
+	})
+}
+
+// The reporting half, driven through guard.Run over the real document as the main test builds
+// it, because the map is empty and that test's run reports nothing: a call site that stopped
+// turning a dead entry into a failure would otherwise stay green until an entry was added. The
+// two seeds are real: NullTime's schema left openapi.yaml with f9d27d14, and WebOrigin pairs
+// with api.WebOriginResponse through schemaStructNames.
+func TestReportStaleUntypedResponseRequired_FailsEachDeadEntryOfTheRealDocument(t *testing.T) {
+	doc := specDocument(t)
+	responseOnly, _, _ := schemaReachability(t, doc)
+	structs := structFields(t, filepath.Join("..", "..", "..", "core", "api"), 100)
+
+	report := func(entries map[string][]string) guard.Report {
+		return guard.Run(func(r guard.Reporter) {
+			reportStaleUntypedResponseRequired(r, entries, responseOnly, structs, schemaStructNames)
+		})
+	}
+
+	t.Run("an empty map records nothing", func(t *testing.T) {
+		if got := report(map[string][]string{}); got.Failed() {
+			t.Errorf("an empty map failed: %+v", got)
+		}
+	})
+
+	t.Run("an entry naming a schema no response reaches is one failure", func(t *testing.T) {
+		got := report(map[string][]string{"NullTime": {"Time", "Valid"}})
+		want := []string{"untypedResponseRequired holds NullTime, which no response reaches; " +
+			"delete the entry"}
+		if got.Stopped || !slices.Equal(got.Errors, want) {
+			t.Errorf("failures\n%q\nwant\n%q (stopped: %v)", got.Errors, want, got.Stopped)
+		}
+	})
+
+	t.Run("an entry a core/api type pairs with is one failure", func(t *testing.T) {
+		got := report(map[string][]string{"WebOrigin": {"id", "createdAt", "origin", "clientId"}})
+		want := []string{"untypedResponseRequired holds WebOrigin, which a core/api type now " +
+			"pairs with; delete the entry so the omitempty tags this test reads are what holds " +
+			"the schema"}
+		if got.Stopped || !slices.Equal(got.Errors, want) {
+			t.Errorf("failures\n%q\nwant\n%q (stopped: %v)", got.Errors, want, got.Stopped)
 		}
 	})
 }
