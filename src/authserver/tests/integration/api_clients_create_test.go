@@ -136,7 +136,7 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 
 	first := api.CreateClientRequest{ClientIdentifier: ident, Description: "first"}
 	resp := makeAPIRequest(t, "POST", url, accessToken, first)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	// Try again with same identifier

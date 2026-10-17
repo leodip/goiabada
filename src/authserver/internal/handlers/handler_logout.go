@@ -61,6 +61,11 @@ func HandleLogoutGet(
 // from r.URL.Path would silently start posting somewhere else the day anything rewrites the path.
 const logoutFormPath = "/auth/logout"
 
+// logoutDeclinedPath is where the consent page's declining control leads when there is no history
+// to go back to, or no script to go back with. It duplicates the route registered in
+// internal/server/routes.go for the same reason logoutFormPath does (#152).
+const logoutDeclinedPath = "/auth/logout/declined"
+
 // refineLogoutLocale honours a ui_locales the RP sent, which the global locale middleware cannot
 // see for itself. resolveLocale in core/i18n reads r.URL.Query() only, above a comment explaining
 // that it must not call ParseForm because that would consume the request body, so it works for a
@@ -101,6 +106,7 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer Pa
 
 	bind := map[string]interface{}{
 		"formAction":            logoutFormPath,
+		"declineHref":           logoutDeclineHref(r),
 		"postLogoutRedirectUri": render.QueryOrFormValue(r, "post_logout_redirect_uri"),
 		"clientId":              clientId,
 		"state":                 state,
@@ -111,6 +117,31 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer Pa
 	err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/logout_consent.html", bind)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
+	}
+}
+
+// logoutDeclineHref is the declining control's destination: the declined page, carrying the
+// End-User's language and nothing else. A decline is not a logout, so it hands the RP nothing:
+// no post_logout_redirect_uri, client_id or state, and never the id_token_hint (RP-Initiated
+// Logout 1.0 sections 2 and 3, #152).
+func logoutDeclineHref(r *http.Request) string {
+	if uiLocales := render.QueryOrFormValue(r, "ui_locales"); len(uiLocales) > 0 {
+		return logoutDeclinedPath + "?" + url.Values{"ui_locales": {uiLocales}}.Encode()
+	}
+	return logoutDeclinedPath
+}
+
+// HandleLogoutDeclinedGet renders the page an End-User lands on after declining to sign out with
+// no history to go back to, or with no script to go back with: they are still signed in and can
+// close the page. It reads no session and writes nothing, and the only parameter it honours is
+// ui_locales, so the page is in the language the RP asked for (#152).
+func HandleLogoutDeclinedGet(pageRenderer PageRenderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r = refineLogoutLocale(r)
+		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/logout_declined.html", map[string]interface{}{})
+		if err != nil {
+			pageRenderer.InternalServerError(w, r, err)
+		}
 	}
 }
 

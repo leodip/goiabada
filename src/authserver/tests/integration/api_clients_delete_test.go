@@ -89,7 +89,7 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	// Not found
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/9999999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 
 	// Invalid id format
