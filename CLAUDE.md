@@ -278,11 +278,12 @@ one definition, `protocolvalidation.IsSupportedResponseMode`, shared by `authflo
 A second response_mode rule, form_post's own, is answered on the same page for the same reason: the
 redirect URI's scheme must be http or https, because the mode answers through an HTML form whose
 action is the URI and `html/template`'s URL filter — the one guard standing between a stored
-`javascript:` redirect URI and a live form action — rewrites every other scheme to `#ZgotmplZ`, so
-a private-use scheme (RFC 8252 7.1) used to get a form that posted the code to this server, and an
-error in that mode would go the same way. `refuseUnaddressableAuthorizeRequest` refuses it after the
-unsupported mode, as `AuthorizePageRefusalFormPostUnreachable`, its page naming `fragment` alone for
-an implicit request (#121).
+`javascript:` redirect URI and a live form action — rewrites every scheme outside http, https and
+mailto to `#ZgotmplZ`, and a form cannot post to mailto either, so a private-use scheme (RFC 8252
+7.1) used to get a form that posted the code to this server, and an error in that mode would go the
+same way. `refuseUnaddressableAuthorizeRequest` refuses it after the unsupported mode, as
+`AuthorizePageRefusalFormPostUnreachable`, its page naming `fragment` alone for an implicit request
+(#121).
 
 ### Key Logic in Level1Completed
 `authflow/level1_completion.go:Level1Completion.Run`, answered by `handler_auth_level1.go:HandleAuthLevel1CompletedGet`:
