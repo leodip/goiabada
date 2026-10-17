@@ -5,9 +5,10 @@ import (
 	"bytes"
 	"context"
 	"database/sql/driver"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -26,10 +27,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 )
 
-// #390 decision 10: `migrate to` follows the start's rule on SIGINT and SIGTERM. A wait is
-// cancelled, a running file finishes and no new one starts; the command prints where it stopped,
-// the version reached and how many files were applied and remained, and exits 1, because the
-// target the operator asked for was not reached. Ctrl-C used to end it mid-file, with the shell's
+// #390 decision 10: `migrate to` follows the start's rule on SIGINT and SIGTERM, and since #487 on
+// SIGHUP and SIGQUIT too. A wait is cancelled, a running file finishes and no new one starts; the
+// command prints where it stopped, the version reached and how many files were applied and
+// remained, and exits 1, because the target the operator asked for was not reached. Ctrl-C used to end it mid-file, with the shell's
 // 130 and a dirty, possibly partly applied file.
 
 // blockingFunction is the SQL function a test migration file calls to hold the runner inside it.
@@ -54,6 +55,19 @@ type fileHold struct {
 // connections opened after it.
 func holdTheFile(t *testing.T) *fileHold {
 	t.Helper()
+	h := armTheHold()
+	t.Cleanup(func() {
+		h.let()
+		blockingMu.Lock()
+		blocking = nil
+		blockingMu.Unlock()
+	})
+	return h
+}
+
+// armTheHold is holdTheFile for a process with no test to clean up after: the child that
+// runHeldMigrateChild runs.
+func armTheHold() *fileHold {
 	registerBlockingFunction.Do(func() {
 		sqlite.MustRegisterScalarFunction(blockingFunction, 0,
 			func(*sqlite.FunctionContext, []driver.Value) (driver.Value, error) {
@@ -72,12 +86,6 @@ func holdTheFile(t *testing.T) *fileHold {
 	blockingMu.Lock()
 	blocking = h
 	blockingMu.Unlock()
-	t.Cleanup(func() {
-		h.let()
-		blockingMu.Lock()
-		blocking = nil
-		blockingMu.Unlock()
-	})
 	return h
 }
 
@@ -87,12 +95,24 @@ func (h *fileHold) let() { h.once.Do(func() { close(h.release) }) }
 // whose second holds the runner inside it until the case releases it.
 func newHeldMigrator(t *testing.T) (*sqlitedb.Database, *migrator.Migrator) {
 	t.Helper()
-	db, err := sqlitedb.New(context.Background(), "file:"+filepath.Join(t.TempDir(), "held.db"), false)
+	db, m, err := openHeldMigrator(filepath.Join(t.TempDir(), "held.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
+	return db, m
+}
+
+// openHeldMigrator is newHeldMigrator over the file at path, for the child runHeldMigrateChild
+// runs and for the case that reads what that child left there.
+func openHeldMigrator(path string) (*sqlitedb.Database, *migrator.Migrator, error) {
+	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
+	if err != nil {
+		return nil, nil, err
+	}
 	// The engine's own migrator is built first for what it creates on the way, schema_migrations.
-	_, err = db.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
+	if _, err = db.NewMigrator(context.Background(), nil); err != nil {
+		_ = db.DB.Close()
+		return nil, nil, err
+	}
 
 	files := fstest.MapFS{
 		"migrations/000001_first.up.sql":    {Data: []byte("CREATE TABLE t1 (id INTEGER);")},
@@ -103,8 +123,11 @@ func newHeldMigrator(t *testing.T) (*sqlitedb.Database, *migrator.Migrator) {
 		"migrations/000003_third.down.sql":  {Data: []byte("DROP TABLE t3;")},
 	}
 	m, err := migrator.New(db.DB, files, "migrations", migrator.SQLite())
-	require.NoError(t, err)
-	return db, m
+	if err != nil {
+		_ = db.DB.Close()
+		return nil, nil, err
+	}
+	return db, m, nil
 }
 
 func TestMigrateTo_AStopWhileAFileRunsFinishesThatFileAndExits1(t *testing.T) {
@@ -177,6 +200,13 @@ func (w *lockedWriter) String() string {
 	return w.buf.String()
 }
 
+// The two lines `migrate to` answers a stop signal with (#487). Both hold whether the signal caught
+// a file running or ended a wait before any did.
+const (
+	stopAcknowledgement = "stopping: no further migration will start, and one already running finishes first"
+	stopReminder        = "still stopping: a migration already running finishes first, and a further Ctrl-C changes nothing"
+)
+
 // TestAnswerEachSignal_TheFirstIsAcknowledgedAndEveryFurtherOneReminded is what a Ctrl-C, and a
 // Ctrl-C pressed again, meet on screen (#487): the first is acknowledged with the stop rule it
 // sets in motion, and every further one, which changes nothing, is told so.
@@ -185,7 +215,7 @@ func TestAnswerEachSignal_TheFirstIsAcknowledgedAndEveryFurtherOneReminded(t *te
 	done := make(chan struct{})
 	defer close(done)
 	var out lockedWriter
-	go answerEachSignal(further, done, &out)
+	go answerEachSignal(further, done, &out, func() {})
 
 	further <- syscall.SIGINT
 	further <- syscall.SIGINT
@@ -197,83 +227,240 @@ func TestAnswerEachSignal_TheFirstIsAcknowledgedAndEveryFurtherOneReminded(t *te
 
 	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
 	require.Len(t, lines, 3, out.String())
-	assert.Equal(t, "stopping: the running migration will finish, then no further migration starts", lines[0],
-		"the first is the acknowledgement")
-	assert.Equal(t, "still stopping: the running migration finishes first, and a further Ctrl-C changes nothing", lines[1],
-		"the second is reminded that it changes nothing")
-	assert.Equal(t, "still stopping: the running migration finishes first, and a further Ctrl-C changes nothing", lines[2],
-		"and so is every one after it")
+	assert.Equal(t, stopAcknowledgement, lines[0], "the first is the acknowledgement")
+	assert.Equal(t, stopReminder, lines[1], "the second is reminded that it changes nothing")
+	assert.Equal(t, stopReminder, lines[2], "and so is every one after it")
 }
 
-// TestMigrateTo_ACtrlCIsAnsweredWhileTheFileItCatchesRunningStillRuns is #487 at the held file:
-// the acknowledgement is printed the moment the signal arrives, while the migration file it
-// catches running is still running, which reportStop cannot say, being written only once the file
-// has ended. A second Ctrl-C meets the reminder, and the command's answer, the schema it leaves
-// and its exit code stay what they were.
-func TestMigrateTo_ACtrlCIsAnsweredWhileTheFileItCatchesRunningStillRuns(t *testing.T) {
-	hold := holdTheFile(t)
-	db, m := newHeldMigrator(t)
+// stopWitness records, at each line written to it, whether the stop had already been made.
+type stopWitness struct {
+	ctx     context.Context
+	mu      sync.Mutex
+	stopped []bool
+}
 
-	// The command's own wiring, as runMigrateCommand installs it for `migrate to` (#390 decision
-	// 10, #487): the signals NotifyContext catches are the signals that are answered.
-	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stopListeningForSignals()
-	var out lockedWriter
-	stopAnsweringSignals := answerSignals(&out)
+func (w *stopWitness) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.stopped = append(w.stopped, w.ctx.Err() != nil)
+	return len(p), nil
+}
+
+func (w *stopWitness) writes() []bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return append([]bool(nil), w.stopped...)
+}
+
+// TestAnswerEachSignal_TheAcknowledgementIsWrittenBeforeTheStopIsMade is what keeps the
+// acknowledgement ahead of reportStop's line: the command answers the stop only once its context
+// has ended, and the goroutine that writes the acknowledgement ends it, after the write. Were the
+// two independent receivers of the signal, the command could report, return and stop answering
+// before the acknowledgement was written, printing it after the report or not at all.
+func TestAnswerEachSignal_TheAcknowledgementIsWrittenBeforeTheStopIsMade(t *testing.T) {
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	further := make(chan os.Signal, 2)
+	done := make(chan struct{})
+	defer close(done)
+	out := &stopWitness{ctx: ctx}
+	go answerEachSignal(further, done, out, stop)
+
+	further <- syscall.SIGINT
+	select {
+	case <-ctx.Done():
+	case <-time.After(10 * time.Second):
+		t.Fatal("the first signal never made the stop")
+	}
+	further <- syscall.SIGINT
+	require.Eventually(t, func() bool { return len(out.writes()) == 2 },
+		10*time.Second, 10*time.Millisecond, "both signals are answered")
+
+	assert.Equal(t, []bool{false, true}, out.writes(),
+		"the acknowledgement is written before the stop is made, and the reminder after it")
+}
+
+// TestMigrateTo_EveryStopSignalIsAnsweredWhileTheFileItCatchesRunningStillRuns is #487 at the held
+// file, for each signal `migrate to` follows the stop rule on: Ctrl-C's SIGINT, SIGTERM, the SIGHUP
+// of a closed terminal or a lost SSH session, and Ctrl-\'s SIGQUIT. The acknowledgement is printed
+// the moment the signal arrives, while the migration file it catches running is still running,
+// which reportStop cannot say, being written only once the file has ended. A second signal meets
+// the reminder, and the command's answer, the schema it leaves and its exit code stay what they
+// were. The signals are real, sent to this process, so the registration is what is tested: a
+// signal left out of it ends the process at once, mid-file, and the case with it.
+func TestMigrateTo_EveryStopSignalIsAnsweredWhileTheFileItCatchesRunningStillRuns(t *testing.T) {
+	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT} {
+		t.Run(sig.String(), func(t *testing.T) {
+			hold := holdTheFile(t)
+			db, m := newHeldMigrator(t)
+
+			// The command's own wiring, as runMigrateCommand installs it for `migrate to` (#390
+			// decision 10, #487).
+			var out lockedWriter
+			ctx, stopAnsweringSignals := answerSignals(context.Background(), &out)
+			defer stopAnsweringSignals()
+
+			done := make(chan int, 1)
+			go func() { done <- runMigrate(ctx, []string{"to", "3"}, db, m, 0, &out) }()
+
+			select {
+			case <-hold.entered:
+			case code := <-done:
+				t.Fatalf("migrate returned %d before reaching the held migration file\n%s", code, out.String())
+			case <-time.After(30 * time.Second):
+				t.Fatal("the runner never reached the held migration file")
+			}
+
+			// The signal, and the signal again, what an operator presses while nothing answers.
+			// The second is sent once the first has been answered, because the kernel coalesces
+			// two identical signals still pending: one delivered is one taken. Both land while the
+			// file is held, which is what makes what follows provable: the runner cannot have
+			// moved, so what was printed was printed while the file ran.
+			require.NoError(t, syscall.Kill(syscall.Getpid(), sig))
+			require.Eventually(t, func() bool {
+				return strings.Contains(out.String(), stopAcknowledgement)
+			}, 10*time.Second, 10*time.Millisecond, "the first signal is answered while the file runs")
+			require.NoError(t, syscall.Kill(syscall.Getpid(), sig))
+			require.Eventually(t, func() bool {
+				return strings.Count(out.String(), "\n") == 5
+			}, 10*time.Second, 10*time.Millisecond, "the second signal is answered while the file runs")
+
+			assert.Contains(t, out.String(), "migrations to run, in order: 000001, 000002, 000003\n"+
+				stopAcknowledgement+"\n"+stopReminder+"\n",
+				"the two answers, and nothing else, follow the plan")
+			assert.NotContains(t, out.String(), "stopped by a signal",
+				"the report is written only once the file has ended, so the answers preceded it: they were printed while it ran")
+
+			hold.let()
+
+			var code int
+			select {
+			case code = <-done:
+			case <-time.After(30 * time.Second):
+				t.Fatal("migrate did not return after the held file was released")
+			}
+			require.Equal(t, 1, code, out.String())
+			assert.Equal(t, "current schema version: none (never migrated)\n"+
+				"target schema version: 000003\n"+
+				"migrations to run, in order: 000001, 000002, 000003\n"+
+				stopAcknowledgement+"\n"+
+				stopReminder+"\n"+
+				"stopped by a signal: the database is at schema version 000002, clean, with 2 migrations applied and 1 remaining; run the same command again to carry on\n",
+				out.String(), "the answers precede the report, and the report stays what it was")
+
+			version, dirty, err := m.Version(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, 2, version, "the file running when the signals arrived ran to its end")
+			assert.False(t, dirty, "and the schema is left clean")
+		})
+	}
+}
+
+// runHeldMigrateMarker, set in a child's environment to a database path, makes this test binary
+// run runHeldMigrateChild over that path instead of the tests.
+const runHeldMigrateMarker = "GOIABADA_TEST_RUN_HELD_MIGRATE"
+
+// The lines runHeldMigrateChild writes to stderr, so its parent can tell where it is with stdout
+// gone.
+const (
+	heldFileEntered = "held: the file is running"
+	heldStopMade    = "held: the stop is made"
+)
+
+// runHeldMigrateChild is the child of TestMigrateTo_AStopWhoseReaderIsGoneStillFinishesTheFile:
+// `migrate to 3` over the held migrations at path, its signals wired as runMigrateCommand wires
+// them, writing to the process's own stdout. The held file is released when stdin closes.
+func runHeldMigrateChild(path string) int {
+	hold := armTheHold()
+	go func() {
+		<-hold.entered
+		_, _ = fmt.Fprintln(os.Stderr, heldFileEntered)
+	}()
+	go func() {
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		hold.let()
+	}()
+
+	db, m, err := openHeldMigrator(path)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		return 3
+	}
+	defer func() { _ = db.DB.Close() }()
+
+	ctx, stopAnsweringSignals := answerSignals(context.Background(), os.Stdout)
 	defer stopAnsweringSignals()
+	context.AfterFunc(ctx, func() { _, _ = fmt.Fprintln(os.Stderr, heldStopMade) })
+	return runMigrate(ctx, []string{"to", "3"}, db, m, 0, os.Stdout)
+}
 
-	done := make(chan int, 1)
-	go func() { done <- runMigrate(ctx, []string{"to", "3"}, db, m, 0, &out) }()
+// TestMigrateTo_AStopWhoseReaderIsGoneStillFinishesTheFile is the stop rule with nobody left
+// reading stdout, as in `migrate to N | tee log`, whose tee the Ctrl-C reaching the whole process
+// group ends. The acknowledgement is then written into a pipe with no reader, while a file runs,
+// and Go's default for that write ends the process at once, mid-file, leaving the schema dirty.
+// The command ignores the broken pipe instead: the write fails, the file runs to its end, and the
+// command exits 1 with the schema clean, as it does with a reader.
+func TestMigrateTo_AStopWhoseReaderIsGoneStillFinishesTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "held.db")
 
-	select {
-	case <-hold.entered:
-	case code := <-done:
-		t.Fatalf("migrate returned %d before reaching the held migration file\n%s", code, out.String())
-	case <-time.After(30 * time.Second):
-		t.Fatal("the runner never reached the held migration file")
+	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0])
+	cmd.Env = []string{runHeldMigrateMarker + "=" + path}
+	stdin, err := cmd.StdinPipe()
+	require.NoError(t, err)
+	stdout, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	stderr, err := cmd.StderrPipe()
+	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
+
+	var said strings.Builder
+	lines := bufio.NewScanner(stderr)
+	reached := func(want string) bool {
+		for lines.Scan() {
+			said.WriteString(lines.Text() + "\n")
+			if lines.Text() == want {
+				return true
+			}
+		}
+		return false
+	}
+	// A child that ended early is reported with how it ended.
+	ended := func(where string) {
+		for lines.Scan() {
+			said.WriteString(lines.Text() + "\n")
+		}
+		t.Fatalf("the child ended %s: %v\nstderr: %s", where, cmd.Wait(), said.String())
 	}
 
-	// Ctrl-C, and Ctrl-C again, what an operator at a terminal presses while nothing answers.
-	// The second is sent once the first has been answered, because the kernel coalesces two
-	// identical signals still pending: one delivered is one taken. Both land while the file is
-	// held, which is what makes what follows provable: the runner cannot have moved, so what was
-	// printed was printed while the file ran.
-	require.NoError(t, syscall.Kill(syscall.Getpid(), syscall.SIGINT))
-	require.Eventually(t, func() bool {
-		return strings.Contains(out.String(), "stopping: the running migration will finish")
-	}, 10*time.Second, 10*time.Millisecond, "the first Ctrl-C is answered while the file runs")
-	require.NoError(t, syscall.Kill(syscall.Getpid(), syscall.SIGINT))
-	require.Eventually(t, func() bool {
-		return strings.Count(out.String(), "\n") == 5
-	}, 10*time.Second, 10*time.Millisecond, "the second Ctrl-C is answered while the file runs")
-
-	assert.Contains(t, out.String(), "migrations to run, in order: 000001, 000002, 000003\n"+
-		"stopping: the running migration will finish, then no further migration starts\n"+
-		"still stopping: the running migration finishes first, and a further Ctrl-C changes nothing\n",
-		"the two answers, and nothing else, follow the plan")
-	assert.NotContains(t, out.String(), "stopped by a signal",
-		"the report is written only once the file has ended, so the answers preceded it: they were printed while it ran")
-
-	hold.let()
-
-	var code int
-	select {
-	case code = <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatal("migrate did not return after the held file was released")
+	if !reached(heldFileEntered) {
+		ended("before reaching the held file")
 	}
-	require.Equal(t, 1, code, out.String())
-	assert.Equal(t, "current schema version: none (never migrated)\n"+
-		"target schema version: 000003\n"+
-		"migrations to run, in order: 000001, 000002, 000003\n"+
-		"stopping: the running migration will finish, then no further migration starts\n"+
-		"still stopping: the running migration finishes first, and a further Ctrl-C changes nothing\n"+
-		"stopped by a signal: the database is at schema version 000002, clean, with 2 migrations applied and 1 remaining; run the same command again to carry on\n",
-		out.String(), "the answers precede the report, and the report stays what it was")
+	// The reader is gone, then the stop arrives while the file is held.
+	require.NoError(t, stdout.Close())
+	require.NoError(t, cmd.Process.Signal(syscall.SIGINT))
+	if !reached(heldStopMade) {
+		ended("while answering the stop, mid-file")
+	}
+	require.NoError(t, stdin.Close())
+	for lines.Scan() {
+		said.WriteString(lines.Text() + "\n")
+	}
 
+	err = cmd.Wait()
+	require.NoErrorf(t, ctx.Err(), "the child did not exit within %s\nstderr: %s", mainProcessBound, said.String())
+	var exitErr *exec.ExitError
+	require.ErrorAsf(t, err, &exitErr, "a stop short of the target is not success: %v\nstderr: %s", err, said.String())
+	require.Equalf(t, 1, exitErr.ExitCode(), "a stop handled, not a broken pipe that killed the process: %v\nstderr: %s",
+		err, said.String())
+
+	db, m, err := openHeldMigrator(path)
+	require.NoError(t, err)
+	defer func() { _ = db.DB.Close() }()
 	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, 2, version, "the file running when the signals arrived ran to its end")
+	assert.Equal(t, 2, version, "the file running when the stop arrived ran to its end")
 	assert.False(t, dirty, "and the schema is left clean")
 }
 
@@ -348,7 +535,7 @@ func TestMain_MigrateStopsCleanlyOnSIGINT(t *testing.T) {
 	// #487: the Ctrl-C is answered as it arrives, so the acknowledgement precedes the report,
 	// which is written only once the interrupted step has ended. An operator watching the
 	// terminal sees the command take the signal before the running file has finished.
-	ack := "stopping: the running migration will finish, then no further migration starts"
+	ack := stopAcknowledgement
 	require.Containsf(t, printed.String(), ack, "the first Ctrl-C is acknowledged at once\n%s", printed.String())
 	assert.Lessf(t, strings.Index(printed.String(), ack), strings.Index(printed.String(), match[0]),
 		"the acknowledgement is printed when the signal arrives, not once the file it waits for ends\n%s", printed.String())
