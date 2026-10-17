@@ -393,7 +393,9 @@ func HandleClientCreatePost(
 		// A client identifier may not name a resource either. The two namespaces are separate
 		// tables with separate uniqueness checks, and a string held by both makes an access
 		// token's aud resolvable as a client, which is how a session-bound access token passed
-		// every ID-token-hint check in #109's logout (#151).
+		// every ID-token-hint check in #109's logout (#151). Under concurrency the check is
+		// advisory: no index spans the two tables, so this create and a resource create naming
+		// the same string, overlapping, can both commit; the startup warning reports such a pair.
 		clashingResource, err := database.GetResourceByResourceIdentifier(r.Context(), nil, req.ClientIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error checking resource by client identifier"), "client_identifier", req.ClientIdentifier)
