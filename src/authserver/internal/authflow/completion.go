@@ -301,7 +301,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 	}
 
 	switch answer {
-	case AfterBindingNoScope:
+	case afterBindingNoScope:
 		return CompletionResult{
 			ClientError: &ClientError{Client: client, Code: "access_denied",
 				Description: "The user is not authorized to access any of the requested scopes"},

@@ -254,8 +254,8 @@ command itself and fails on a tree it changed.
 | `core/countries` | `Country` | kernel | — |
 | `core/docsreader` | `Row` | kernel | — |
 | `core/docsreader` | `Rows` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
-| `core/docsreader` | `Section` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's pages through it. |
-| `core/docsreader` | `SectionText` | test-support | Test support: compiled into no binary, and the docs tests of every module read already-read pages through it. |
+| `core/docsreader` | `Section` | kernel | — |
+| `core/docsreader` | `SectionText` | own-package | — |
 | `core/docsreader` | `Table` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
 | `core/docsreader` | `Tables` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
 | `core/errs` | `Errorf` | kernel | — |
@@ -289,6 +289,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertNoStaleDeferredBodyCloses` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertRequestPathContext` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertSectionSays` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |

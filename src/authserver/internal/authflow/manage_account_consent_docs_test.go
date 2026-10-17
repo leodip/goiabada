@@ -23,15 +23,14 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
 // The Clients page's consent section names the scope the table's column is about, and the one client
 // its Yes leaves out, which no row can show.
 func TestConceptDocs_TheConsentSectionSaysWhoIsAskedForManageAccount(t *testing.T) {
-	assertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), consentScreenSection,
-		[]string{"`" + consentManageAccountScope + "`", "admin console's own client"})
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), consentScreenSection.page, consentScreenSection.heading,
+		[]string{"`" + consentManageAccountScope + "`", "admin console's own client"}, nil)
 }
 
 // manageAccountSilentRefusals is what decideSilentAuthentication answers a prompt=none request from a
@@ -158,23 +157,6 @@ func assertSilentChecksName(r guard.Reporter, root string, section conceptSectio
 		}
 		if !found {
 			r.Errorf("%s: %s has no row for %s %q", section.page, section.heading, refusal.code, refusal.description)
-		}
-	}
-}
-
-// assertSectionSays is the reporting half of the quote checks: one failure per text the section does
-// not hold verbatim; a stop for a section not found. The handlers' endpoint guard keeps its own copy
-// beside the pages it holds, since test files cannot cross packages (#584).
-func assertSectionSays(r guard.Reporter, root string, section conceptSection, texts []string) {
-	r.Helper()
-	text, err := docsreader.Section(root, section.page, section.heading)
-	if err != nil {
-		r.Fatalf("%v", err)
-		return
-	}
-	for _, want := range texts {
-		if !strings.Contains(text, want) {
-			r.Errorf("%s: %s does not say %q", section.page, section.heading, want)
 		}
 	}
 }

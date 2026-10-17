@@ -98,8 +98,8 @@ func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 //   - Any other target never reaches this step, since /auth/level1completed sends only a target
 //     above level 1 here, and is answered with an error.
 //
-// Exported for the sign-in table on the docs' acr-and-amr page, which handlers' concept_docs_test.go
-// holds to this function.
+// The sign-in table on the docs' acr-and-amr page is held to this function by this package's
+// concept_docs_test.go.
 func decideLevel2Arm(target record.AcrLevel, userHasOTP bool) (ceremony.AuthState, string, error) {
 	switch target {
 	case record.AcrLevel2Optional:

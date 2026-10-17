@@ -72,8 +72,6 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *record.User
 //   - not every requested scope is already consented, OR
 //   - offline_access is requested (a refresh token grant is always re-confirmed), OR
 //   - prompt=consent was explicitly requested (force consent UI).
-//
-// Exported for the Clients concept page's consent table test in internal/handlers.
 func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent bool) bool {
 	fullyConsented := true
 	for _, scopeInfo := range scopes {

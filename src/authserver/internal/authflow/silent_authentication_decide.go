@@ -83,7 +83,7 @@ type silentAuthenticationAnswer struct {
 //     client is not the admin console's (userconsent.AlwaysOwed, #509 decision 3).
 //
 // The refusals, their order and their descriptions are the silent checks table on the docs' prompt
-// page, which handlers' concept_docs_test.go holds to this function.
+// page, which this package's concept_docs_test.go holds to this function.
 func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticationAnswer, silentFact) {
 	refuse := func(code, description string) (silentAuthenticationAnswer, silentFact) {
 		return silentAuthenticationAnswer{ErrorCode: code, ErrorDescription: description}, silentFactNone

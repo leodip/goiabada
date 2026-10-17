@@ -84,25 +84,14 @@ func conceptTableColumns(root string, section conceptSection, headers ...string)
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("%s: %s has no table", section.page, section.heading)
 	}
-	var indexes []int
-	for _, header := range headers {
-		index := slices.Index(tables[0].Header, header)
-		if index < 0 {
-			return nil, fmt.Errorf("%s: %s's table has no column headed %s", section.page, section.heading, header)
-		}
-		indexes = append(indexes, index)
+	columns, err := tables[0].Columns(headers...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s: %w", section.page, section.heading, err)
 	}
-	var columns [][]string
-	for _, row := range tables[0].Rows {
-		var cells []string
-		for _, index := range indexes {
-			cell := ""
-			if index < len(row) {
-				cell = strings.Trim(row[index], "`\"")
-			}
-			cells = append(cells, cell)
+	for _, cells := range columns {
+		for i, cell := range cells {
+			cells[i] = strings.Trim(cell, "`\"")
 		}
-		columns = append(columns, cells)
 	}
 	return columns, nil
 }
@@ -303,71 +292,10 @@ func profilePictureCacheControl(t *testing.T) string {
 func TestEndpointDocs_TheImageSectionsQuoteTheirCacheControl(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 
-	assertSectionSays(t, root, clientLogoSection, []string{"`Cache-Control: " + clientLogoCacheControl(t) + "`"})
-	assertSectionSays(t, root, profilePictureSection, []string{"`Cache-Control: " + profilePictureCacheControl(t) + "`"})
-}
-
-func TestEndpointDocs_ASectionNotQuotingTheHeaderFails(t *testing.T) {
-	root := t.TempDir()
-	writeConceptFixture(t, root, "site/images.mdx", "## The client logo\n\n`Cache-Control: no-store`\n\n"+
-		"## Next\n\n`Cache-Control: public, max-age=300`\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionSays(r, root, conceptSection{"site/images.mdx", "## The client logo"},
-			[]string{"`Cache-Control: public, max-age=300`"})
-	})
-
-	if report.Stopped {
-		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
-	}
-	want := []string{"site/images.mdx: ## The client logo does not say \"`Cache-Control: public, max-age=300`\""}
-	if !slices.Equal(report.Errors, want) {
-		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
-	}
-}
-
-func TestEndpointDocs_ASectionQuotingTheHeaderPasses(t *testing.T) {
-	root := t.TempDir()
-	writeConceptFixture(t, root, "site/images.mdx", "## The client logo\n\nIt carries `Cache-Control: public, max-age=300`.\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionSays(r, root, conceptSection{"site/images.mdx", "## The client logo"},
-			[]string{"`Cache-Control: public, max-age=300`"})
-	})
-
-	if report.Stopped || len(report.Errors) > 0 {
-		t.Errorf("a section quoting the header was refused: %+v", report)
-	}
-}
-
-func TestEndpointDocs_AMissingImageSectionStops(t *testing.T) {
-	root := t.TempDir()
-	writeConceptFixture(t, root, "site/images.mdx", "## Client logo\n\n`Cache-Control: public, max-age=300`\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionSays(r, root, conceptSection{"site/images.mdx", "## The client logo"},
-			[]string{"`Cache-Control: public, max-age=300`"})
-	})
-
-	if !report.Stopped || !strings.Contains(report.Fatal, "## The client logo") {
-		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
-	}
-}
-
-// assertSectionSays is the reporting half of the quote checks: one failure per text the section does
-// not hold verbatim; a stop for a section not found.
-func assertSectionSays(r guard.Reporter, root string, section conceptSection, texts []string) {
-	r.Helper()
-	text, err := docsreader.Section(root, section.page, section.heading)
-	if err != nil {
-		r.Fatalf("%v", err)
-		return
-	}
-	for _, want := range texts {
-		if !strings.Contains(text, want) {
-			r.Errorf("%s: %s does not say %q", section.page, section.heading, want)
-		}
-	}
+	guard.AssertSectionSays(t, root, clientLogoSection.page, clientLogoSection.heading,
+		[]string{"`Cache-Control: " + clientLogoCacheControl(t) + "`"}, nil)
+	guard.AssertSectionSays(t, root, profilePictureSection.page, profilePictureSection.heading,
+		[]string{"`Cache-Control: " + profilePictureCacheControl(t) + "`"}, nil)
 }
 
 // The procedure on UserInfo has a client check the answer's sub against the ID token's before it reads
@@ -376,11 +304,11 @@ func assertSectionSays(r guard.Reporter, root string, section conceptSection, te
 func TestEndpointDocs_TheUserInfoProcedureChecksTheSubjectFirst(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 	check := "**Check `sub` before you use any claim.** It must be exactly the `sub` of the ID token you validated at sign-in."
-	assertSectionSays(t, root, readClaimsSection, []string{
+	guard.AssertSectionSays(t, root, readClaimsSection.page, readClaimsSection.heading, []string{
 		check,
 		"discard the whole answer and use none of its claims",
 		"[OpenID Connect Core section 5.3.2](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse)",
-	})
+	}, nil)
 
 	text, err := docsreader.Section(root, readClaimsSection.page, readClaimsSection.heading)
 	if err != nil {

@@ -50,7 +50,7 @@ func manageAccountScope(t *testing.T) string {
 // user's approval on the consent screen, once, the admin console's own client excepted. It no longer
 // says any client that signs a user in can ask for it.
 func TestManageAccountDocs_TheScopesPageSaysWhoGetsIt(t *testing.T) {
-	assertSectionText(t, filepath.Dir(guard.SourceRoot(t)), accountScopeSection,
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), accountScopeSection.page, accountScopeSection.heading,
 		[]string{"`" + manageAccountScope(t) + "`", "consent screen", "admin console's own client", "**Consent required**"},
 		[]string{"any client that signs a user in can ask for it"})
 }
@@ -59,7 +59,7 @@ func TestManageAccountDocs_TheScopesPageSaysWhoGetsIt(t *testing.T) {
 // prompt=none request are answered while the user has not consented, which is what an application
 // that called the Account API before this rule meets first.
 func TestManageAccountDocs_TheAccountAPISetupSaysTheUserConsentsOnce(t *testing.T) {
-	assertSectionText(t, filepath.Dir(guard.SourceRoot(t)), accountAPISetupSection,
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), accountAPISetupSection.page, accountAPISetupSection.heading,
 		[]string{"consent screen", "once", "`invalid_grant`", "`" + oidc.ErrorConsentRequired + "`", "prompt=none"},
 		[]string{"needs no permission of its own to ask for it."})
 }
@@ -68,7 +68,7 @@ func TestManageAccountDocs_TheAccountAPISetupSaysTheUserConsentsOnce(t *testing.
 // API with the user's token, the Admin API with the client's own token through client credentials,
 // holding authserver:manage-users, and the admin console's Account pages.
 func TestManageAccountDocs_TheAuthenticationPageNamesTheThreeWays(t *testing.T) {
-	assertSectionText(t, filepath.Dir(guard.SourceRoot(t)), accountChangeWaysSection,
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), accountChangeWaysSection.page, accountChangeWaysSection.heading,
 		[]string{
 			"`" + manageAccountScope(t) + "`",
 			"`" + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageUsersPermissionIdentifier + "`",
@@ -81,7 +81,7 @@ func TestManageAccountDocs_TheAuthenticationPageNamesTheThreeWays(t *testing.T) 
 // Consent required alone, and sends the reader to the consent section, where the manage-account
 // condition is.
 func TestManageAccountDocs_TheAdministrativeScopesSectionLeavesConsentToItsSection(t *testing.T) {
-	assertSectionText(t, filepath.Dir(guard.SourceRoot(t)), allowanceClientsSection,
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), allowanceClientsSection.page, allowanceClientsSection.heading,
 		[]string{"(#consent-required)", "`" + manageAccountScope(t) + "`"},
 		[]string{"the consent screen still follows **Consent required**"})
 }

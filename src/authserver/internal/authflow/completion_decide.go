@@ -248,10 +248,10 @@ const (
 type afterBindingAnswer int
 
 const (
-	// AfterBindingUndecided is returned beside a fact still to load.
-	AfterBindingUndecided afterBindingAnswer = iota
-	// AfterBindingNoScope answers access_denied for a user holding none of the requested scopes.
-	AfterBindingNoScope
+	// afterBindingUndecided is returned beside a fact still to load.
+	afterBindingUndecided afterBindingAnswer = iota
+	// afterBindingNoScope answers access_denied for a user holding none of the requested scopes.
+	afterBindingNoScope
 	// afterBindingConsent goes on to the consent screen.
 	afterBindingConsent
 	// afterBindingIssue goes on to issuance.
@@ -288,20 +288,20 @@ type afterBindingFacts struct {
 //   - otherwise the ceremony goes on to issuance.
 //
 // The consent table on the Clients concept page is held to this, with the consent step's own rule,
-// by the handlers package's consent docs test.
+// by this package's consent_docs_test.go.
 func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFact) {
 	if f.EffectiveScope == nil {
-		return AfterBindingUndecided, afterBindingFactEffectiveScope
+		return afterBindingUndecided, afterBindingFactEffectiveScope
 	}
 	if len(*f.EffectiveScope) == 0 {
-		return AfterBindingNoScope, afterBindingFactNone
+		return afterBindingNoScope, afterBindingFactNone
 	}
 	if f.PromptConsent || f.ConsentRequired || oidc.HasOfflineAccessScope(*f.EffectiveScope) {
 		return afterBindingConsent, afterBindingFactNone
 	}
 	if owed := userconsent.AlwaysOwed(f.ClientIdentifier, *f.EffectiveScope); len(owed) > 0 {
 		if !f.ConsentLoaded {
-			return AfterBindingUndecided, afterBindingFactConsent
+			return afterBindingUndecided, afterBindingFactConsent
 		}
 		if !userconsent.Covers(f.Consent, owed) {
 			return afterBindingConsent, afterBindingFactNone

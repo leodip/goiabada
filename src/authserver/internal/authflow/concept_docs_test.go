@@ -453,25 +453,14 @@ func conceptTableColumns(root string, section conceptSection, headers ...string)
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("%s: %s has no table", section.page, section.heading)
 	}
-	var indexes []int
-	for _, header := range headers {
-		index := slices.Index(tables[0].Header, header)
-		if index < 0 {
-			return nil, fmt.Errorf("%s: %s's table has no column headed %s", section.page, section.heading, header)
-		}
-		indexes = append(indexes, index)
+	columns, err := tables[0].Columns(headers...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s: %w", section.page, section.heading, err)
 	}
-	var columns [][]string
-	for _, row := range tables[0].Rows {
-		var cells []string
-		for _, index := range indexes {
-			cell := ""
-			if index < len(row) {
-				cell = strings.Trim(row[index], "`\"")
-			}
-			cells = append(cells, cell)
+	for _, cells := range columns {
+		for i, cell := range cells {
+			cells[i] = strings.Trim(cell, "`\"")
 		}
-		columns = append(columns, cells)
 	}
 	return columns, nil
 }

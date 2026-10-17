@@ -238,7 +238,7 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 	for {
 		answer, need := decideAfterBinding(facts)
 		if need == afterBindingFactNone {
-			require.NotEqual(t, AfterBindingUndecided, answer, "a decided ceremony has an answer")
+			require.NotEqual(t, afterBindingUndecided, answer, "a decided ceremony has an answer")
 			return answer, asked
 		}
 		require.NotContains(t, asked, need, "each fact is loaded once")
@@ -276,13 +276,13 @@ func TestDecideAfterBinding(t *testing.T) {
 		{
 			name:       "a user holding none of the scopes is refused",
 			world:      afterBindingWorld{effectiveScope: ""},
-			wantAnswer: AfterBindingNoScope,
+			wantAnswer: afterBindingNoScope,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "no scope is refused before prompt=consent is honoured",
 			world:      afterBindingWorld{promptConsent: true, effectiveScope: ""},
-			wantAnswer: AfterBindingNoScope,
+			wantAnswer: afterBindingNoScope,
 			wantReads:  []afterBindingFact{scope},
 		},
 		{
@@ -363,7 +363,7 @@ func TestDecideAfterBinding(t *testing.T) {
 		{
 			name:       "no scope is refused before manage-account is asked about",
 			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: ""},
-			wantAnswer: AfterBindingNoScope,
+			wantAnswer: afterBindingNoScope,
 			wantReads:  []afterBindingFact{scope},
 		},
 	}
