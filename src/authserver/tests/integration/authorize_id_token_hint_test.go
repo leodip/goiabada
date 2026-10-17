@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"io"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -309,26 +310,26 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 
 	resp, err := httpClient1.Get(destUrl1)
 	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/pwd")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	resp = authenticateWithPassword(t, httpClient1, redirectLocation, resp, user.Email, password)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient1, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient1, redirectLocation)
@@ -382,26 +383,26 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	resp2, err := httpClient2.Get(destUrl2)
 	require.NoError(t, err)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/pwd")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	resp2 = authenticateWithPassword(t, httpClient2, redirectLocation, resp2, user.Email, password)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/level1completed")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	redirectLocation = assertRedirect(t, resp2, "/auth/completed")
 	resp2 = loadPage(t, httpClient2, redirectLocation)
-	defer func() { _ = resp2.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
 	// =========================================================================
 	// Step 6: Should succeed and issue code (user matches hint)
@@ -508,26 +509,26 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 
 	respA, err := httpClientA.Get(destUrlA)
 	require.NoError(t, err)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation := assertRedirect(t, respA, "/auth/level1")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/pwd")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	respA = authenticateWithPassword(t, httpClientA, redirectLocation, respA, userA.Email, passwordA)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/level1completed")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/completed")
 	respA = loadPage(t, httpClientA, redirectLocation)
-	defer func() { _ = respA.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
 	redirectLocation = assertRedirect(t, respA, "/auth/issue")
 	respA = loadPage(t, httpClientA, redirectLocation)
@@ -570,26 +571,26 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// User B authenticates
 	respB, err := httpClientB.Get(destUrlB)
 	require.NoError(t, err)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/pwd")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	respB = authenticateWithPassword(t, httpClientB, redirectLocation, respB, userB.Email, passwordB)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/level1completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/completed")
 	respB = loadPage(t, httpClientB, redirectLocation)
-	defer func() { _ = respB.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
 	redirectLocation = assertRedirect(t, respB, "/auth/issue")
 	respB = loadPage(t, httpClientB, redirectLocation)

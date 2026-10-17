@@ -3,6 +3,7 @@ package issuance
 import (
 	"context"
 	"database/sql"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
+	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -398,6 +401,122 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	require.NoError(t, err)
+
+	mockDB.AssertExpectations(t)
+}
+
+// sessionRowMintFixture is a session-bound code (no offline_access) taught every read the mint
+// makes before its refresh token, for the tests of what that refresh token's session read
+// answers. The session read and the insert are left to each test.
+func sessionRowMintFixture(t *testing.T) (*TokenIssuer, *datamocks.Database, *record.Settings, *record.Code) {
+	t.Helper()
+	mockDB := datamocks.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
+
+	settings := &record.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInAccessToken: false,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+
+	now := time.Now().UTC()
+	privateKeyBytes := getTestPrivateKey(t)
+
+	code := &record.Code{
+		Id:                2,
+		ClientId:          2,
+		UserId:            2,
+		Scope:             "openid",
+		Nonce:             "swept-nonce",
+		AuthenticatedAt:   now.Add(-120 * time.Second),
+		SessionIdentifier: "test-session-123",
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthMethods:       "pwd",
+	}
+	client := &record.Client{
+		Id:               2,
+		ClientIdentifier: "minimal-client",
+	}
+	user := &record.User{
+		Id:      2,
+		Subject: fake.UUID(),
+		Email:   "swept@example.com",
+	}
+
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+	code.Client = *client
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
+	code.User = *user
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
+	}, nil)
+
+	return tokenIssuer, mockDB, settings, code
+}
+
+// TestMintAuthorizationCodeTokens_SessionRowGone pins #530 at the unit tier. A session-bound
+// code whose session row is gone (a sign-out, a newer sign-in from the same device, the sweep)
+// is refused as a revoked code is, with invalid_grant "Code is invalid.": its access and ID
+// tokens would carry a sid naming a session the server no longer holds, and /userinfo and the
+// APIs refuse such a token at once. The strict mock holds the rest: CreateRefreshToken is never
+// taught, so an insert would fail the test.
+func TestMintAuthorizationCodeTokens_SessionRowGone(t *testing.T) {
+	tokenIssuer, mockDB, settings, code := sessionRowMintFixture(t)
+
+	// The swept row: the lookup finds nothing, which is not an error.
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, code.SessionIdentifier).Return(nil, nil)
+
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+
+	require.ErrorIs(t, err, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest))
+	assert.Nil(t, response, "a grant whose session row is gone answers no tokens")
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestMintAuthorizationCodeTokens_SessionReadFails holds the refusal above to the gone row alone:
+// a failure reading the session is a fault, answered as one, not refused as an invalid code.
+func TestMintAuthorizationCodeTokens_SessionReadFails(t *testing.T) {
+	tokenIssuer, mockDB, settings, code := sessionRowMintFixture(t)
+
+	failure := errs.New("connection refused")
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, code.SessionIdentifier).Return(nil, failure)
+
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest))
+	assert.Nil(t, response)
+
+	mockDB.AssertExpectations(t)
+}
+
+// TestMintAuthorizationCodeTokens_RefreshTokenInsertFails is the same for the insert after a live
+// session's read: a failed CreateRefreshToken is a fault, not an invalid code.
+func TestMintAuthorizationCodeTokens_RefreshTokenInsertFails(t *testing.T) {
+	tokenIssuer, mockDB, settings, code := sessionRowMintFixture(t)
+
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, code.SessionIdentifier).Return(&record.UserSession{
+		SessionIdentifier: code.SessionIdentifier,
+		Started:           time.Now().UTC().Add(-5 * time.Minute),
+	}, nil)
+	failure := errs.New("connection refused")
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(failure)
+
+	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), settings, code)
+
+	require.ErrorIs(t, err, failure)
+	require.NotErrorIs(t, err, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest))
+	assert.Nil(t, response)
 
 	mockDB.AssertExpectations(t)
 }
