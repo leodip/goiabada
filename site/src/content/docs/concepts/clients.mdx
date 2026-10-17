@@ -47,6 +47,8 @@ A client identifier you enter is 3 to 38 characters long. (A self-registered cli
 
 It's case-sensitive: `my-app` and `My-App` are two different clients, and a request whose `client_id` differs only in case finds no client.
 
+It can't be a resource's identifier either, since an ID token's `aud` is the client identifier and an access token's names resources. [Resources and permissions](/concepts/resources-and-permissions/#identifiers) says what happens to a client and a resource that already share one.
+
 ## Settings a new client starts with
 
 A client you create in the admin console starts:
