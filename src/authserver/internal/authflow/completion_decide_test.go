@@ -154,18 +154,38 @@ func TestDecideCompletion(t *testing.T) {
 
 // What /auth/completed does with the ceremony's user before an arm binds a session (#522 decision
 // 6). The ceremony authenticated at generation 7, and names no one-time code unless claimsOTP says,
-// from the authenticator at otp_config_generation claimGeneration.
+// from the authenticator at otp_config_generation claimGeneration. It carries no id_token_hint
+// unless hintSubject says one.
 func TestDecideBeforeBinding(t *testing.T) {
 	testCases := []struct {
 		name            string
 		user            *record.User
 		claimsOTP       bool
 		claimGeneration int64
+		hintSubject     string
 		want            beforeBindingAnswer
 	}{
 		{name: "an enabled user at the ceremony's generation is bound",
 			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
 		{name: "a missing user", user: nil, want: beforeBindingUserMissing},
+		{name: "a user with a subject is bound when the request carried no hint",
+			user: &record.User{Subject: "s", Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
+		{name: "the hint's user is bound",
+			user:        &record.User{Subject: "the-hint", Enabled: true, AuthStateGeneration: 7},
+			hintSubject: "the-hint", want: beforeBindingBind},
+		{name: "a user who is not the hint's is refused",
+			user:        &record.User{Subject: "someone-else", Enabled: true, AuthStateGeneration: 7},
+			hintSubject: "the-hint", want: beforeBindingHintMismatch},
+		{
+			// The answer /auth/issue gives the same ceremony, and its order: the client is owed
+			// login_required, not access_denied about an account the hint never named (#535).
+			name:        "a hint mismatch is refused before a disabled user is answered",
+			user:        &record.User{Subject: "someone-else", Enabled: false, AuthStateGeneration: 7},
+			hintSubject: "the-hint", want: beforeBindingHintMismatch,
+		},
+		{name: "a hint mismatch is refused before the generation is compared",
+			user:        &record.User{Subject: "someone-else", Enabled: true, AuthStateGeneration: 8},
+			hintSubject: "the-hint", want: beforeBindingHintMismatch},
 		{name: "a disabled user is refused",
 			user: &record.User{Enabled: false, AuthStateGeneration: 7}, want: beforeBindingUserDisabled},
 		{
@@ -210,7 +230,7 @@ func TestDecideBeforeBinding(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			claim := otpcredential.OTPClaim{Claimed: tc.claimsOTP, Generation: &tc.claimGeneration}
-			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, claim))
+			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, claim, tc.hintSubject))
 		})
 	}
 }
