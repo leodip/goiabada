@@ -35,7 +35,17 @@
   `site/src/content/docs/`; Admin and Account API facts live in
   `src/authserver/web/openapi.yaml`; user-facing text needs both catalogs,
   `src/core/i18n/catalogs/active.en.toml` and `active.pt-BR.toml`.
+- **Browser tests:** the Playwright suite under `e2e/playwright/tests/` runs against one
+  shared environment on a VPS, and placido runs it whole as the last gate, after the
+  review. Check whether the change needs a spec added or updated there: anything a
+  browser sees, such as sign-in, consent, logout, a redirect or `form_post` answer, an
+  error page, or the admin and account consoles. A missing one is a finding, naming
+  the spec file and what it should show. The fixer writes it following
+  `e2e/README.md`; `e2e/` runs on this machine, so the owner approves the change
+  before anything runs it.
 - **Do not run** `e2e` or the scripts under `e2e/`: they rebuild a shared environment.
+  Do not type-check the specs on the host either (it needs `npm ci`, which installs
+  the pull request's packages): the last gate compiles and runs them.
 - **Nothing on this machine outside the commands.** The devcontainer has no Node.js,
   and `implement.md`'s advice to build the docs site on the host is for the owner's
   own changes. For a contributor's pull request, install nothing and build nothing
