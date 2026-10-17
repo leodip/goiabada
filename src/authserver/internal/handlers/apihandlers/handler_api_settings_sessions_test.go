@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -109,7 +108,8 @@ func TestSettingsSessionsPut_SavesACapAtEitherEndOfTheRange(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			var saved record.Settings
-			database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).
+			expectSettingsSave(database)
+			database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 				Run(func(args mock.Arguments) { saved = *args.Get(2).(*record.Settings) }).
 				Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedSessionsSettings, mock.Anything).Return().Once()
@@ -137,7 +137,8 @@ func TestSettingsSessionsPut_TheEventRecordsTheCallerAndEachValueBeforeAndAfter(
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	var saved record.Settings
-	database.On("UpdateSettings", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.Settings")).
+	expectSettingsSave(database)
+	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 		Run(func(args mock.Arguments) { saved = *args.Get(2).(*record.Settings) }).
 		Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedSessionsSettings, map[string]interface{}{

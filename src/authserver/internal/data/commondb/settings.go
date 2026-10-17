@@ -124,6 +124,53 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 	return nil
 }
 
+// AcquireSettingsRow takes the settings row and holds it for the rest of the caller's transaction,
+// the way AcquireClientRow holds a client's: one unconditional UPDATE of the row's updated_at, which
+// the caller's UpdateSettings overwrites moments later with its own (#407).
+//
+// WHAT IT BUYS. UpdateSettings writes every mutable column, and each settings section's save
+// changes only its own. A save that writes the row its request started with carries every other
+// section's columns from that copy, so a save of another section committed meanwhile is written
+// back over, and one section's change is lost without an error. A save of the email or audit-log
+// settings, reserved to authserver:manage, can be undone that way by a manage-settings save that
+// loaded the row before it (#402). The section saves therefore take this row first, read it again
+// on the transaction, apply their own section to what they read and write that: the read happens
+// under this transaction's lock, so no other save can commit between it and the write. A bare
+// re-read does not hold, for the reason AcquireClientRow gives: under MVCC it returns the last
+// committed version without waiting for a writer in flight.
+//
+// The transaction holding it touches no table but settings, so it holds one row and cannot be part
+// of a deadlock cycle. TryClaimCleanupRun writes the same row, autocommitted, and waits at most for
+// one save.
+//
+// A row that is not there affects no rows and is not reported here, as AcquireClientRow does not
+// report a missing client: the read that follows decides whether it exists.
+//
+// The transaction is required. Without one the statement autocommits and releases the row before
+// the caller's read runs, which is the whole of what this buys.
+func (d *Database) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error {
+
+	if tx == nil {
+		return errs.New("acquiring the settings row requires a transaction: an autocommitted statement releases the row before the caller can read it")
+	}
+
+	if settingsId == 0 {
+		return errs.New("can't acquire a settings row with an id of 0")
+	}
+
+	acquire := sqlbuilder.NewUpdateBuilder()
+	acquire.Update("settings")
+	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
+	acquire.Where(acquire.Equal("id", settingsId))
+
+	query, args := acquire.BuildWithFlavor(d.Flavor)
+	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+		return errs.Wrap(err, "unable to acquire the settings row")
+	}
+
+	return nil
+}
+
 func (d *Database) getSettingsCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	settingsStruct *sqlbuilder.Struct) (*record.Settings, error) {
 

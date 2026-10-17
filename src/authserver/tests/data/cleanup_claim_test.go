@@ -17,31 +17,6 @@ import (
 // against every supported engine, which is the point: the claim is a conditional
 // UPDATE rather than an engine-specific advisory lock.
 
-// engineExecer is the exec the data layer's own writers go through. Every
-// database the factory builds embeds commondb.Database, so whichever of the
-// four engines this run targets carries the method.
-type engineExecer interface {
-	ExecSQL(ctx context.Context, tx *sql.Tx, query string, args ...any) (sql.Result, error)
-}
-
-// flavorOf mirrors the builder flavor each engine's New builds its statements
-// with (sqlitedb, mysqldb, postgresdb and mssqldb each pass one to
-// commondb.New), so a direct statement renders the placeholders its engine
-// reads.
-func flavorOf(dialect data.Dialect) sqlbuilder.Flavor {
-	switch dialect {
-	case data.SQLite:
-		return sqlbuilder.SQLite
-	case data.MySQL:
-		return sqlbuilder.MySQL
-	case data.Postgres:
-		return sqlbuilder.PostgreSQL
-	case data.MSSQL:
-		return sqlbuilder.SQLServer
-	}
-	panic("unknown dialect: " + string(dialect))
-}
-
 // setLastCleanupAt puts settings row 1 into a known state. last_cleanup_at is
 // dont-update (#407), so no settings write can arrange it any more, and
 // arranging it through TryClaimCleanupRun would make the setup depend on the
@@ -80,23 +55,12 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 		ub.Set(ub.Assign("last_cleanup_at", *at))
 	}
 	ub.Where(ub.Equal("id", 1))
-	query, args := ub.BuildWithFlavor(flavorOf(dbType()))
-	if err := execLastCleanupAt(t, query, args...); err != nil {
-		t.Fatalf("Failed to set last_cleanup_at: %v", err)
+	engine := engineOf(t)
+	query, args := ub.BuildWithFlavor(engine.Flavor)
+	if _, execErr := engine.ExecSQL(context.Background(), nil, query, args...); execErr != nil {
+		t.Fatalf("Failed to set last_cleanup_at: %v", execErr)
 	}
 	return settings
-}
-
-// execLastCleanupAt runs one of setLastCleanupAt's statements through the engine
-// exec, so the arrange reaches the column no settings write can.
-func execLastCleanupAt(t *testing.T, query string, args ...any) error {
-	t.Helper()
-	exec, ok := database.(engineExecer)
-	if !ok {
-		t.Fatal("the database does not expose the engine exec this arrange needs")
-	}
-	_, err := exec.ExecSQL(context.Background(), nil, query, args...)
-	return err
 }
 
 func TestTryClaimCleanupRun_ClaimableWhenNeverRun(t *testing.T) {
@@ -239,9 +203,9 @@ func TestTryClaimCleanupRun_ASettingsSaveDoesNotReleaseTheClaim(t *testing.T) {
 
 	// The save lands with its own section changed and the stale snapshot behind
 	// it, which is the shape the settings handlers write.
-	snapshot.TokenExpirationInSeconds = snapshot.TokenExpirationInSeconds + 1
-	if err := database.UpdateSettings(context.Background(), nil, snapshot); err != nil {
-		t.Fatalf("Failed to update settings: %v", err)
+	snapshot.TokenExpirationInSeconds++
+	if updateErr := database.UpdateSettings(context.Background(), nil, snapshot); updateErr != nil {
+		t.Fatalf("Failed to update settings: %v", updateErr)
 	}
 
 	// The save itself must still have landed.

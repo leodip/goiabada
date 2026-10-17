@@ -5,7 +5,10 @@ import (
 )
 
 type Settings struct {
-	Id                                        int64          `db:"id" fieldtag:"pk"`
+	Id int64 `db:"id" fieldtag:"pk"`
+	// CreatedAt is when the row was inserted. It is tagged dont-update so UpdateSettings never
+	// writes it (#407): the insert writes it once, and a save written from any copy of the row,
+	// a zero one included, must not move it.
 	CreatedAt                                 sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt                                 sql.NullTime   `db:"updated_at"`
 	AppName                                   string         `db:"app_name"`
