@@ -99,6 +99,12 @@
 "logout_consent.title" = "Sair"
 "logout_consent.confirm" = "Tem certeza de que deseja sair?"
 
+# --- Sessão mantida (auth/logout/declined) -----------------------------------
+
+"logout_declined.page_title" = "Sessão mantida"
+"logout_declined.title" = "Sessão mantida"
+"logout_declined.message" = "Você continua conectado. Pode fechar esta página."
+
 # --- Sessão encerrada (auth/logout) ------------------------------------------
 
 "logged_out.page_title" = "Sessão encerrada"
@@ -803,7 +809,7 @@
 "adminconsole.admin_clients.oauth2_flows.implicit_warning" = "Atenção: o fluxo implicit está depreciado no OAuth 2.1 e tem vulnerabilidades de segurança conhecidas. Tokens são expostos em URLs e no histórico do navegador, e refresh tokens não podem ser emitidos. Use o fluxo authorization code com PKCE sempre que possível."
 "adminconsole.admin_clients.oauth2_flows.ropc_label" = "Resource Owner Password Credentials (ROPC)"
 "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" = "RFC 6749 Seção 4.3 - O grant resource owner password credentials permite que clientes obtenham tokens usando diretamente o nome de usuário e a senha. Este fluxo está depreciado no OAuth 2.1 por questões de segurança."
-"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Atenção: o fluxo Resource Owner Password Credentials está depreciado no OAuth 2.1 e tem questões de segurança conhecidas. As credenciais do usuário ficam expostas diretamente ao aplicativo cliente, contornando a tela de login do servidor de autorização. Este fluxo não suporta usuários com autenticação de dois fatores habilitada. Use o fluxo authorization code com PKCE sempre que possível."
+"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Atenção: o fluxo Resource Owner Password Credentials está depreciado no OAuth 2.1 e tem questões de segurança conhecidas. As credenciais do usuário ficam expostas diretamente ao aplicativo cliente, contornando a tela de login do servidor de autorização. Este fluxo não suporta usuários com autenticação de dois fatores habilitada, e um cliente cujo nível ACR padrão é ACR nível 3 (OTP obrigatório) tem o grant recusado enquanto o fluxo authorization code estiver ativo, pois o grant não pode pedir o código de uso único. Use o fluxo authorization code com PKCE sempre que possível."
 "adminconsole.admin_clients.oauth2_flows.saved_successfully" = "Fluxos OAuth2 do cliente salvos com sucesso"
 
 # === Adminconsole — usuários admin ===========================================
@@ -1525,6 +1531,7 @@
 "handler.resource.identifier_required" = "O identificador do recurso é obrigatório"
 "handler.resource.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres"
 "handler.resource.identifier_in_use" = "O identificador do recurso já está em uso"
+"handler.resource.identifier_names_client" = "O identificador do recurso já está em uso por um cliente"
 "handler.resource.system_level_identifier_fixed" = "O identificador de um recurso em nível de sistema não pode ser alterado."
 "handler.resource.system_level_delete_not_allowed" = "Tentativa de excluir um recurso em nível de sistema"
 
@@ -1555,6 +1562,7 @@
 
 "handler.client.display_name_too_long" = "O nome de exibição não pode ter mais que {{.max}} caracteres."
 "handler.client.identifier_in_use" = "O identificador do cliente já está em uso."
+"handler.client.identifier_names_resource" = "O identificador do cliente já está em uso por um recurso."
 "handler.client.system_level_delete_not_allowed" = "Tentativa de excluir um cliente em nível de sistema"
 "handler.client.system_level_identifier_fixed" = "O identificador de um cliente em nível de sistema não pode ser alterado."
 "handler.client.self_registered_identifier_fixed" = "O identificador de um cliente autorregistrado não pode ser alterado."

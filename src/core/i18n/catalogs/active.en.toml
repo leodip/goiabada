@@ -101,6 +101,12 @@
 "logout_consent.title" = "Sign out"
 "logout_consent.confirm" = "Are you sure you want to sign out?"
 
+# --- Logout declined (auth/logout/declined) ----------------------------------
+
+"logout_declined.page_title" = "Still signed in"
+"logout_declined.title" = "Still signed in"
+"logout_declined.message" = "You are still signed in. You can close this page."
+
 # --- Logged out (auth/logout) -----------------------------------------------
 
 "logged_out.page_title" = "Signed out"
@@ -855,7 +861,7 @@
 "adminconsole.admin_clients.oauth2_flows.implicit_warning" = "Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are exposed in URLs and browser history, and no refresh tokens can be issued. Use the authorization code flow with PKCE instead whenever possible."
 "adminconsole.admin_clients.oauth2_flows.ropc_label" = "Resource Owner Password Credentials (ROPC)"
 "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" = "RFC 6749 Section 4.3 - The resource owner password credentials grant allows clients to obtain tokens using the user's username and password directly. This flow is deprecated in OAuth 2.1 due to security concerns."
-"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns. User credentials are exposed directly to the client application, bypassing the auth server's sign-in UI. This flow does not support users with two-factor authentication enabled. Use the authorization code flow with PKCE instead whenever possible."
+"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns. User credentials are exposed directly to the client application, bypassing the auth server's sign-in UI. This flow does not support users with two-factor authentication enabled, and a client whose default ACR level is ACR level 3 (mandatory OTP) is refused the grant while its authorization code flow is on, since the grant cannot ask for the one-time code. Use the authorization code flow with PKCE instead whenever possible."
 "adminconsole.admin_clients.oauth2_flows.saved_successfully" = "Client OAuth2 flows saved successfully"
 
 # --- Admin users (list, create, delete, details) -----------------------------
@@ -1613,6 +1619,7 @@
 "handler.resource.identifier_required" = "Resource identifier is required"
 "handler.resource.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters"
 "handler.resource.identifier_in_use" = "The resource identifier is already in use"
+"handler.resource.identifier_names_client" = "The resource identifier is already in use by a client"
 "handler.resource.system_level_identifier_fixed" = "The identifier of a system-level resource cannot be changed."
 "handler.resource.system_level_delete_not_allowed" = "Trying to delete a system level resource"
 
@@ -1643,6 +1650,7 @@
 
 "handler.client.display_name_too_long" = "The display name cannot exceed a maximum length of {{.max}} characters."
 "handler.client.identifier_in_use" = "The client identifier is already in use."
+"handler.client.identifier_names_resource" = "The client identifier is already in use by a resource."
 "handler.client.system_level_delete_not_allowed" = "Trying to delete a system level client"
 "handler.client.system_level_identifier_fixed" = "The identifier of a system-level client cannot be changed."
 "handler.client.self_registered_identifier_fixed" = "The identifier of a self-registered client cannot be changed."

@@ -72,7 +72,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	// First get all clients to find one to test with
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	var getResponse api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResponse)

@@ -99,15 +99,19 @@ type passwordRefusal struct {
 	ropcOff bool
 	// public makes the client public; the others are confidential, with clientSecret as its secret.
 	public bool
-	form   url.Values
+	// level2Mandatory turns the client's authorization code flow on and sets its default ACR
+	// level to urn:goiabada:level2_mandatory, a floor the password grant cannot meet.
+	level2Mandatory bool
+	form            url.Values
 	// user is the account the username names, or nil for none.
 	user *record.User
 }
 
 // passwordRefusals is every branch on which the password grant answers an error after the client
 // is found: the flow off, a missing username, a wrong client secret, an unknown account, a wrong
-// password, a disabled account, an account with two-factor authentication, a scope the user does
-// not hold, and an administrative scope the client may not request.
+// password, a disabled account, an account with two-factor authentication, a client whose
+// default ACR level is level 2 (mandatory), a scope the user does not hold, and an
+// administrative scope the client may not request.
 func passwordRefusals(t *testing.T) []passwordRefusal {
 	t.Helper()
 	hash, err := passwordhash.Hash("the-password")
@@ -144,6 +148,7 @@ func passwordRefusals(t *testing.T) []passwordRefusal {
 		{name: "a wrong password", form: form(func(v url.Values) { v.Set("password", "wrong") }), user: user(nil)},
 		{name: "a disabled account", form: form(nil), user: user(func(u *record.User) { u.Enabled = false })},
 		{name: "two-factor authentication", form: form(nil), user: user(func(u *record.User) { u.OTPEnabled = true })},
+		{name: "a client whose default ACR level is level 2 (mandatory)", level2Mandatory: true, form: form(nil), user: user(nil)},
 		{name: "a scope the user does not hold", form: form(func(v url.Values) { v.Set("scope", "openid product-api:write") }),
 			user: user(nil)},
 		{name: "an administrative scope", form: form(func(v url.Values) { v.Set("scope", "openid authserver:manage") }),
@@ -165,6 +170,10 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		on := !refusal.ropcOff
 		client := &record.Client{Id: 7, ClientIdentifier: "legacy-app", Enabled: true, IsPublic: refusal.public,
 			ResourceOwnerPasswordCredentialsEnabled: &on}
+		if refusal.level2Mandatory {
+			client.AuthorizationCodeEnabled = true
+			client.DefaultAcrLevel = record.AcrLevel2Mandatory
+		}
 		if !refusal.public {
 			client.ClientSecretEncrypted = secret
 		}
