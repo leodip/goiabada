@@ -221,6 +221,12 @@
 "adminconsole.menu.logout" = "Sair"
 "adminconsole.menu.version_label" = "versão:"
 
+# --- Página de confirmação de saída (#411) ------------------------------------
+
+"adminconsole.logout_confirm.heading" = "Sair?"
+"adminconsole.logout_confirm.message" = "Isso encerra sua sessão no console administrativo e também no servidor de autenticação."
+"adminconsole.logout_confirm.cancel" = "Cancelar"
+
 # --- Drawer do lado da conta ------------------------------------------------
 
 "adminconsole.account_menu.profile" = "Perfil"

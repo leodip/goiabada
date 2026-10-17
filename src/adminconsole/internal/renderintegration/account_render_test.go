@@ -1,6 +1,7 @@
 package renderintegration
 
 import (
+	"context"
 	"html"
 	"regexp"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/countries"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/phonecountries"
 	"github.com/leodip/goiabada/core/timezones"
@@ -727,4 +729,29 @@ func TestRender_AccountLogoutFormPost(t *testing.T) {
 	assert.Contains(t, out, `document.getElementById("logoutForm").submit()`,
 		"the form submits itself; without the hook the visitor sits on a blank page")
 	assert.Contains(t, out, "<noscript>", "a browser without JavaScript still needs a way through")
+}
+
+// The sign-out confirmation (#411), through the real template and layout: the GET renders this
+// page and changes nothing, so its form is what signs out, and only as a POST, which the origin
+// check guards. A form that sent GET would land on this page again and nobody could sign out.
+// The layout loads its own scripts, so this asserts what the page's own markup offers, which needs
+// none of them: a plain submit and a plain link.
+func TestRender_AccountLogoutConfirm(t *testing.T) {
+	for _, locale := range []string{"en", "pt-BR"} {
+		t.Run(locale, func(t *testing.T) {
+			out := renderPage(t, "/layouts/no_menu_layout.html", "/account_logout_confirm.html", nil, nil, locale, true)
+			ctx := i18n.WithLocale(context.Background(), true, locale)
+
+			assert.Equal(t, 1, strings.Count(out, "<form "), "exactly one form")
+			assert.Contains(t, out, `<form method="post" action="/auth/logout">`,
+				"the sign-out is the POST the origin check guards")
+			assert.Regexp(t, `(?s)<form method="post" action="/auth/logout">\s*<button type="submit"[^>]*>`+
+				regexp.QuoteMeta(html.EscapeString(i18n.T(ctx, "adminconsole.menu.logout")))+`</button>\s*</form>`, out,
+				"a plain submit inside the form, which needs no JavaScript")
+			assert.Regexp(t, `<a href="/"[^>]*>`+regexp.QuoteMeta(html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.cancel")))+`</a>`, out,
+				"Cancel goes home and changes nothing")
+			assert.Contains(t, out, html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.heading")))
+			assert.Contains(t, out, html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.message")))
+		})
+	}
 }
