@@ -128,6 +128,92 @@ func tlsRoots(certificates string) *x509.CertPool {
 	return roots
 }
 
+// carriesClientCertificate reports whether the mode presents a client certificate pair to the
+// database: the three modes that always ask for TLS, require, verify-ca and verify-full. The auth
+// server refuses the pair beside disable and prefer, which may send none (#546).
+func carriesClientCertificate(mode string) bool {
+	return mode == "require" || checksCertificate(mode)
+}
+
+// checksHostName reports whether the mode checks the certificate's host name: verify-full alone.
+// The auth server refuses a host name override beside any other mode (#546).
+func checksHostName(mode string) bool {
+	return mode == "verify-full"
+}
+
+// cannotBeRead is os.ReadFile's error with the path stripped out of it, the path being quoted
+// beside it in the refusal: the cause alone, as the auth server takes it (#546).
+func cannotBeRead(err error) string {
+	reason := err.Error()
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		reason = pathErr.Err.Error()
+	}
+	return reason
+}
+
+// clientCertificate is the pair the operator named, as the wizard carries it: the two absolute
+// paths, which native binaries write into the env file and the summary prints, and the two files'
+// contents, as PEM, which the Kubernetes Secret is written from. The pair is not parsed here: the
+// connection check parses it again, as the auth server's load does (#546).
+type clientCertificate struct {
+	certFile string
+	keyFile  string
+	certPEM  string
+	keyPEM   string
+}
+
+// readClientCertificate reads the certificate and key files as the auth server reads
+// GOIABADA_DB_TLS_CLIENT_CERT_FILE and GOIABADA_DB_TLS_CLIENT_KEY_FILE, and refuses a pair as the
+// server would, in the server's own words: one file named without the other, either that cannot
+// be read, and two that do not pair (#546). It returns both paths made absolute, since the auth
+// server starts from wherever its service runs.
+func readClientCertificate(certPath, keyPath string) (clientCertificate, error) {
+	if certPath == "" || keyPath == "" {
+		half, other := "GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file)",
+			"GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file)"
+		named := certPath
+		if named == "" {
+			half, other = other, half
+			named = keyPath
+		}
+		return clientCertificate{}, errs.Errorf("%s is %s without %s: name both or neither",
+			half, strconv.Quote(named), other)
+	}
+	certFile, err := filepath.Abs(certPath)
+	if err != nil {
+		return clientCertificate{}, errs.Wrapf(err, "unable to resolve the client certificate %s", strconv.Quote(certPath))
+	}
+	keyFile, err := filepath.Abs(keyPath)
+	if err != nil {
+		return clientCertificate{}, errs.Wrapf(err, "unable to resolve the client key %s", strconv.Quote(keyPath))
+	}
+	if err = checkWritable(certFile); err != nil {
+		return clientCertificate{}, errs.Wrapf(err, "the client certificate %s cannot be written to the configuration",
+			strconv.Quote(certFile))
+	}
+	if err = checkWritable(keyFile); err != nil {
+		return clientCertificate{}, errs.Wrapf(err, "the client key %s cannot be written to the configuration",
+			strconv.Quote(keyFile))
+	}
+	certPEM, err := os.ReadFile(certFile) //nolint:gosec // G304: the operator names the certificate their database reads
+	if err != nil {
+		return clientCertificate{}, errs.Errorf("GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is %s, which cannot be read: %s",
+			strconv.Quote(certFile), cannotBeRead(err))
+	}
+	keyPEM, err := os.ReadFile(keyFile) //nolint:gosec // G304: the operator names the key their database reads
+	if err != nil {
+		return clientCertificate{}, errs.Errorf("GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is %s, which cannot be read: %s",
+			strconv.Quote(keyFile), cannotBeRead(err))
+	}
+	if _, err := tls.X509KeyPair(certPEM, keyPEM); err != nil {
+		return clientCertificate{}, errs.Errorf("GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is %s and "+
+			"GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is %s, which do not pair: %s",
+			strconv.Quote(certFile), strconv.Quote(keyFile), err.Error())
+	}
+	return clientCertificate{certFile: certFile, keyFile: keyFile, certPEM: string(certPEM), keyPEM: string(keyPEM)}, nil
+}
+
 // verifyChainOnly is the auth server's data.VerifyChainOnly, which this module may not import
 // (ARCHITECTURE.md rule 3): verify-ca's check for a driver that has none of its own. The server's
 // certificate chain must lead to roots, nil meaning the system's roots, and the host name is not

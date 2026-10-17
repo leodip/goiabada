@@ -49,6 +49,13 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 		if config.DBTLSCAFile != "" {
 			writeEnvVariable(&sb, "GOIABADA_DB_TLS_CA_FILE", config.DBTLSCAFile)
 		}
+		if config.DBTLSClientCertFile != "" {
+			writeEnvVariable(&sb, "GOIABADA_DB_TLS_CLIENT_CERT_FILE", config.DBTLSClientCertFile)
+			writeEnvVariable(&sb, "GOIABADA_DB_TLS_CLIENT_KEY_FILE", config.DBTLSClientKeyFile)
+		}
+		if config.DBTLSServerName != "" {
+			writeEnvVariable(&sb, "GOIABADA_DB_TLS_SERVER_NAME", config.DBTLSServerName)
+		}
 	}
 	sb.WriteString("\n")
 

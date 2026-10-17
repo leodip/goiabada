@@ -146,6 +146,9 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--db-password-file` | Reads the database password from a file, or from standard input with `-`. |
 | `--db-tls-mode` | Kubernetes and native: how the auth server protects its database connection: `disable`, `prefer`, `require`, `verify-ca` or `verify-full`. Default: `prefer`. |
 | `--db-tls-ca-file` | Kubernetes and native, with `--db-tls-mode` `verify-ca` or `verify-full`: the PEM file of the authorities your database's certificate is checked against. Default: the system's roots. |
+| `--db-tls-client-cert-file` | Kubernetes and native, with `--db-tls-mode` `require`, `verify-ca` or `verify-full`: the PEM file of the client certificate the connection presents to the database, with `--db-tls-client-key-file` beside it. Not for SQL Server. Default: none. |
+| `--db-tls-client-key-file` | Kubernetes and native: the PEM file of the client certificate's private key, beside `--db-tls-client-cert-file`. Default: none. |
+| `--db-tls-server-name` | Kubernetes and native, with `--db-tls-mode` `verify-full`: the host name the database's certificate is checked against, when the address you dial is not the name certified. Default: the host dialed. |
 | `--skip-db-test` | Skips the database connection test. Without it, a failed test warns and the files are still written. |
 | `--gateway-traffic-policy` | Kubernetes: `cluster` or `local`. Default: `cluster`. |
 | `--network-policy` | Kubernetes: admits only Envoy and the admin console to the servers, with NetworkPolicies. |

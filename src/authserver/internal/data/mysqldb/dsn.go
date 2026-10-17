@@ -71,6 +71,10 @@ func driverConfig(cfg *DatabaseConfig) (*mysqldriver.Config, error) {
 //
 // Only preferred sets the driver's fallback to plain text; with any other TLS the driver refuses a
 // server offering none.
+//
+// The client certificate pair, when the configuration carries one, is presented over the TLS of
+// every mode that builds a configuration here: require's is built here rather than taken as the
+// driver's skip-verify string, which cannot carry one (#546).
 func applyTLS(c *mysqldriver.Config, cfg *DatabaseConfig) error {
 	mode := cfg.TLSMode.OrPrefer()
 	switch mode {
@@ -85,10 +89,20 @@ func applyTLS(c *mysqldriver.Config, cfg *DatabaseConfig) error {
 		// next one asks for TLS again, as pgx's does.
 		_ = c.Apply(mysqldriver.BeforeConnect(func(context.Context, *mysqldriver.Config) error { return nil }))
 	case data.TLSRequire:
-		c.TLSConfig = "skip-verify"
+		if cfg.TLSClientCertificate == nil {
+			c.TLSConfig = "skip-verify"
+			return nil
+		}
+		// The driver's skip-verify string carries no certificate; the builder's own configuration
+		// carries the pair and checks nothing, as require does (#546).
+		c.TLS = &tls.Config{
+			ServerName:         serverName(cfg),
+			InsecureSkipVerify: true, //nolint:gosec // G402: require checks no certificate, by design
+			MinVersion:         tls.VersionTLS12,
+		}
 	case data.TLSVerifyCA:
 		c.TLS = &tls.Config{
-			ServerName: hostport.Unbracket(cfg.Host),
+			ServerName: serverName(cfg),
 			RootCAs:    cfg.TLSRoots,
 			MinVersion: tls.VersionTLS12,
 			// The library's check compares the host too; VerifyChainOnly replaces it, on every
@@ -98,7 +112,7 @@ func applyTLS(c *mysqldriver.Config, cfg *DatabaseConfig) error {
 		}
 	case data.TLSVerifyFull:
 		c.TLS = &tls.Config{
-			ServerName: hostport.Unbracket(cfg.Host),
+			ServerName: serverName(cfg),
 			RootCAs:    cfg.TLSRoots,
 			MinVersion: tls.VersionTLS12,
 		}
@@ -107,5 +121,18 @@ func applyTLS(c *mysqldriver.Config, cfg *DatabaseConfig) error {
 		// reaches this, and it must not connect as prefer under another name.
 		return errs.Errorf("GOIABADA_DB_TLS_MODE %q is not one of the five modes", mode)
 	}
+	if cfg.TLSClientCertificate != nil && c.TLS != nil {
+		c.TLS.Certificates = []tls.Certificate{*cfg.TLSClientCertificate}
+	}
 	return nil
+}
+
+// serverName is who the TLS configuration the builder writes names: the host name the operator
+// gave GOIABADA_DB_TLS_SERVER_NAME or, with none, the host dialed. Only verify-full checks the
+// name; the load refuses the override beside any other mode (#546).
+func serverName(cfg *DatabaseConfig) string {
+	if cfg.TLSServerName != "" {
+		return cfg.TLSServerName
+	}
+	return hostport.Unbracket(cfg.Host)
 }

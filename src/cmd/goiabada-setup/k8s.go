@@ -75,6 +75,14 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		fmt.Fprintf(&sb, "  # The %s ConfigMap below, mounted into the auth server's pods.\n", dbCAConfigMap)
 		fmt.Fprintf(&sb, "  GOIABADA_DB_TLS_CA_FILE: %s\n", yamlQuote(dbCAFileInPod))
 	}
+	if config.DBTLSClientCert != "" {
+		fmt.Fprintf(&sb, "  # The %s Secret in the Secrets file, mounted into the auth server's pods.\n", dbClientTLSSecret)
+		fmt.Fprintf(&sb, "  GOIABADA_DB_TLS_CLIENT_CERT_FILE: %s\n", yamlQuote(dbClientCertFileInPod))
+		fmt.Fprintf(&sb, "  GOIABADA_DB_TLS_CLIENT_KEY_FILE: %s\n", yamlQuote(dbClientKeyFileInPod))
+	}
+	if config.DBTLSServerName != "" {
+		fmt.Fprintf(&sb, "  GOIABADA_DB_TLS_SERVER_NAME: %s\n", yamlQuote(config.DBTLSServerName))
+	}
 	sb.WriteString("\n")
 
 	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
@@ -134,10 +142,17 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		previousKeyRef{"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", goiabadaSecrets, "auth-session-enc-key-previous"},
 		previousKeyRef{"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", encryptionKeySecret, "aes-encryption-key-previous"},
 	)
-	if config.DBTLSCA != "" {
+	if config.DBTLSCA != "" || config.DBTLSClientCert != "" {
 		sb.WriteString("        volumeMounts:\n")
+	}
+	if config.DBTLSCA != "" {
 		fmt.Fprintf(&sb, "        - name: %s\n", dbCAConfigMap)
 		fmt.Fprintf(&sb, "          mountPath: %s\n", dbCAMountDir)
+		sb.WriteString("          readOnly: true\n")
+	}
+	if config.DBTLSClientCert != "" {
+		fmt.Fprintf(&sb, "        - name: %s\n", dbClientTLSSecret)
+		fmt.Fprintf(&sb, "          mountPath: %s\n", dbClientTLSMountDir)
 		sb.WriteString("          readOnly: true\n")
 	}
 	writeProbes(&sb, 9090,
@@ -154,11 +169,18 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		"with them. Cloud cores are often slower than the one measured, and the 100m request is all",
 		"the scheduler guarantees on a busy node. For a higher sign-in peak, raise the limit or add",
 		"replicas.")
-	if config.DBTLSCA != "" {
+	if config.DBTLSCA != "" || config.DBTLSClientCert != "" {
 		sb.WriteString("      volumes:\n")
+	}
+	if config.DBTLSCA != "" {
 		fmt.Fprintf(&sb, "      - name: %s\n", dbCAConfigMap)
 		sb.WriteString("        configMap:\n")
 		fmt.Fprintf(&sb, "          name: %s\n", dbCAConfigMap)
+	}
+	if config.DBTLSClientCert != "" {
+		fmt.Fprintf(&sb, "      - name: %s\n", dbClientTLSSecret)
+		sb.WriteString("        secret:\n")
+		fmt.Fprintf(&sb, "          secretName: %s\n", dbClientTLSSecret)
 	}
 	sb.WriteString("\n")
 	writeDisruptionBudget(&sb, ns, "goiabada-authserver")
@@ -413,6 +435,19 @@ func generateKubernetesSecrets(config *Config, paths outputPaths) string {
 	fmt.Fprintf(&sb, "  oauth-client-secret: %s\n", base64Encode(config.OAuthClientSecret))
 	sb.WriteString("\n")
 
+	if config.DBTLSClientCert != "" {
+		sb.WriteString("---\n")
+		sb.WriteString("# The client certificate the auth server presents to the database, with its private\n")
+		sb.WriteString("# key. The certificate is no secret, but it is mounted beside its key, which is, so one\n")
+		sb.WriteString("# volume serves both files the server reads. To change the pair, edit this Secret, or\n")
+		sb.WriteString("# run the wizard again, and restart the auth server:\n")
+		fmt.Fprintf(&sb, "#   kubectl rollout restart -n %s deployment/goiabada-authserver\n", ns)
+		writeSecretHead(&sb, ns, dbClientTLSSecret)
+		fmt.Fprintf(&sb, "  %s: %s\n", dbClientCertFileName, base64Encode(config.DBTLSClientCert))
+		fmt.Fprintf(&sb, "  %s: %s\n", dbClientKeyFileName, base64Encode(config.DBTLSClientKey))
+		sb.WriteString("\n")
+	}
+
 	sb.WriteString("---\n")
 	for _, line := range aesKeyComment() {
 		fmt.Fprintf(&sb, "# %s\n", line)
@@ -434,6 +469,19 @@ const (
 	dbCAMountDir  = "/etc/goiabada/db-ca"
 	dbCAFileName  = "ca.pem"
 	dbCAFileInPod = dbCAMountDir + "/" + dbCAFileName
+)
+
+// The client certificate pair the auth server presents to the database, on Kubernetes: a Secret of
+// its own, since the private key beside the certificate is a secret, mounted read-only into the
+// auth server's pods at a fixed path its ConfigMap names. The certificate is no secret, but it
+// travels with its key so one volume serves both files the server reads (#546).
+const (
+	dbClientTLSSecret     = "goiabada-db-client-tls" //nolint:gosec // G101: the Secret's name, not its value
+	dbClientTLSMountDir   = "/etc/goiabada/db-client-tls"
+	dbClientCertFileName  = "client-cert.pem"
+	dbClientKeyFileName   = "client-key.pem"
+	dbClientCertFileInPod = dbClientTLSMountDir + "/" + dbClientCertFileName
+	dbClientKeyFileInPod  = dbClientTLSMountDir + "/" + dbClientKeyFileName
 )
 
 // writeDatabaseCA writes the ConfigMap holding the certificates of the CA file the operator named,

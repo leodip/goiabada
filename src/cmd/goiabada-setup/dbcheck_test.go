@@ -39,6 +39,10 @@ type connectionStringCase struct {
 	MySQLMaintenance *mysqlFields `json:"mysqlMaintenance"`
 	// TLSMode is GOIABADA_DB_TLS_MODE, empty for a case that leaves it unset, which is prefer.
 	TLSMode string `json:"tlsMode"`
+	// ServerName is GOIABADA_DB_TLS_SERVER_NAME, empty for a case that leaves the host dialed:
+	// the override reaches the TLS configurations the strings are opened from, and SQL Server's
+	// string alone, in its hostNameInCertificate parameter (#546).
+	ServerName string `json:"serverName"`
 }
 
 // mysqlFields is a MySQL configuration as the case file pins it: the fields the connection is
@@ -94,7 +98,18 @@ func build(t *testing.T, which string, connection func(dbTarget) (dbConnection, 
 }
 
 func (c connectionStringCase) target() dbTarget {
-	return dbTarget{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password, Name: c.Database, TLSMode: c.TLSMode}
+	return dbTarget{Host: c.Host, Port: c.Port, Username: c.Username, Password: c.Password, Name: c.Database, TLSMode: c.TLSMode,
+		TLSServerName: c.ServerName}
+}
+
+// certificateHostName is who the case's verifying configuration names: the host name the operator
+// gave GOIABADA_DB_TLS_SERVER_NAME or, with none, the host dialed, which the wizard's serverName
+// writes and go-mssqldb's hostNameInCertificate carries (#546).
+func (c connectionStringCase) certificateHostName() string {
+	if c.ServerName != "" {
+		return c.ServerName
+	}
+	return strings.Trim(c.Host, "[]")
 }
 
 func readConnectionStringCases(t *testing.T) []connectionStringCase {
@@ -269,7 +284,9 @@ func checkPostgresTLS(t *testing.T, which string, c connectionStringCase, parsed
 // decision 2 defines it: whether the login or the whole session is encrypted, with no plain-text
 // fallback outside prefer, and whether the certificate and the host are checked. The two verifying
 // modes are one string: what makes verify-ca check the chain alone, and either of them trust the CA
-// file, is added to the configuration the string is parsed into, which no string can carry.
+// file, is added to the configuration the string is parsed into, which no string can carry. The
+// host the certificate is checked against is the case's own, hostNameInCertificate's override or
+// the host dialed (#546).
 func checkMssqlTLS(t *testing.T, which string, c connectionStringCase, parsed msdsn.Config) {
 	t.Helper()
 	mode := c.TLSMode
@@ -289,7 +306,7 @@ func checkMssqlTLS(t *testing.T, which string, c connectionStringCase, parsed ms
 		got = "an encryption no mode names"
 	case tlsConfig.InsecureSkipVerify:
 		got = "require"
-	case tlsConfig.ServerName == strings.Trim(c.Host, "[]") && (mode == "verify-ca" || mode == "verify-full"):
+	case tlsConfig.ServerName == c.certificateHostName() && (mode == "verify-ca" || mode == "verify-full"):
 		got = mode
 	default:
 		got = "a certificate check naming no host"
@@ -305,7 +322,8 @@ func checkMssqlTLS(t *testing.T, which string, c connectionStringCase, parsed ms
 // checkMysqlTLS holds the TLS go-sql-driver/mysql connects with under a case's configuration to
 // the case's mode, as #502 decision 2 defines it: whether the connection is encrypted, whether
 // plain text follows when the server offers no TLS, and whether the certificate and the host are
-// checked.
+// checked. The host the certificate is checked against is the case's own, the override or the
+// host dialed (#546).
 func checkMysqlTLS(t *testing.T, which string, c connectionStringCase, parsed *mysqldriver.Config) {
 	t.Helper()
 	mode := c.TLSMode
@@ -325,7 +343,7 @@ func checkMysqlTLS(t *testing.T, which string, c connectionStringCase, parsed *m
 		got = "require"
 	case tlsConfig.InsecureSkipVerify:
 		got = "verify-ca"
-	case tlsConfig.ServerName == strings.Trim(c.Host, "[]"):
+	case tlsConfig.ServerName == c.certificateHostName():
 		got = "verify-full"
 	default:
 		got = "a certificate check naming no host"

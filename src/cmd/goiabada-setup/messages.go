@@ -73,6 +73,13 @@ func printSummary(out *console, config *Config) {
 			out.println("  DB CA file:       none, the system's roots")
 		}
 	}
+	if config.DBTLSClientCertFile != "" {
+		out.printf("  DB client cert:   %s\n", config.DBTLSClientCertFile)
+		out.printf("  DB client key:    %s\n", config.DBTLSClientKeyFile)
+	}
+	if config.DBTLSServerName != "" {
+		out.printf("  DB TLS host name: %s\n", config.DBTLSServerName)
+	}
 	out.println()
 	out.printf("%s%s==========================================================%s\n", out.bold, out.cyan, out.reset)
 }

@@ -190,3 +190,50 @@ func cleanLibpqEnvironment(t *testing.T) {
 	}
 	t.Setenv("HOME", t.TempDir())
 }
+
+// TestConnConfig_PresentsTheClientPairAndChecksTheNamedHost: the pair the configuration carries is
+// presented by the connection, and the host name override replaces the host dialled in what
+// verify-full checks, on the application database's connection and the maintenance one alike — pgx
+// reading neither from a URL, which blanks sslcert and sslkey and names no host to check against
+// (#546).
+func TestConnConfig_PresentsTheClientPairAndChecksTheNamedHost(t *testing.T) {
+	cleanLibpqEnvironment(t)
+	ours := tlstest.NewAuthority(t, "ours")
+	pair := ours.IssueClient(t, "goiabada")
+	const override = "db-1.internal.example"
+	forDialled := ours.Issue(t, tlsTestHost)
+	forOverride := ours.Issue(t, override)
+
+	for _, tt := range []struct {
+		name  string
+		mode  data.TLSMode
+		roots *x509.CertPool
+	}{
+		{"require, which checks nothing", data.TLSRequire, nil},
+		{"verify-ca, which checks the chain", data.TLSVerifyCA, ours.Pool()},
+		{"verify-full, which checks the chain and the name", data.TLSVerifyFull, ours.Pool()},
+	} {
+		for _, conn := range []struct {
+			which string
+			build func(*DatabaseConfig) (*pgx.ConnConfig, error)
+		}{{"ConnConfig", ConnConfig}, {"MaintenanceConnConfig", MaintenanceConnConfig}} {
+			t.Run(tt.name+"/"+conn.which, func(t *testing.T) {
+				cfg := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: tlsTestHost, Port: 5432, Name: "goiabada",
+					TLSMode: tt.mode, TLSRoots: tt.roots, TLSClientCertificate: &pair, TLSServerName: override}
+				parsed, err := conn.build(cfg)
+				require.NoError(t, err)
+				require.NotNil(t, parsed.TLSConfig, "the connection is TLS")
+
+				assert.Equal(t, []tls.Certificate{pair}, parsed.TLSConfig.Certificates, "the connection presents the pair")
+				assert.Equal(t, override, parsed.TLSConfig.ServerName, "the host check names the override")
+
+				if tt.mode == data.TLSVerifyFull {
+					require.NoError(t, tlstest.Handshake(t, parsed.TLSConfig, forOverride),
+						"a certificate naming the override is accepted")
+					require.Error(t, tlstest.Handshake(t, parsed.TLSConfig, forDialled),
+						"a certificate naming the host dialled is refused")
+				}
+			})
+		}
+	}
+}

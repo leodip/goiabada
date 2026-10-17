@@ -29,6 +29,7 @@ import (
 // 1 at the connection instead: the code and the exact line are what fail.
 func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "absent.pem")
+	clientCert, clientKey := writeTestClientPair(t)
 	postgres := []string{
 		"GOIABADA_DB_TYPE=postgres",
 		"GOIABADA_DB_HOST=127.0.0.1",
@@ -75,6 +76,29 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 			want: "malformed configuration: PGSSLROOTCERT is set, which the auth server no longer reads: " +
 				"unset it and set GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) instead\n",
 		},
+		{
+			name: "a client certificate without its key, at the server",
+			env:  []string{"GOIABADA_DB_TLS_MODE=verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE=" + clientCert},
+			want: `malformed configuration: GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "` + clientCert +
+				`" without GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file): name both or neither` + "\n",
+		},
+		{
+			name: "a client certificate beside a mode that may send no TLS",
+			env:  []string{"GOIABADA_DB_TLS_CLIENT_CERT_FILE=" + clientCert, "GOIABADA_DB_TLS_CLIENT_KEY_FILE=" + clientKey},
+			want: `malformed configuration: GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "` + clientCert +
+				`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is unset, so prefer, which may send no TLS: only require, verify-ca and verify-full carry a client certificate` + "\n",
+		},
+		{
+			name: "a host name beside a mode that checks none, at the server",
+			env:  []string{"GOIABADA_DB_TLS_MODE=require", "GOIABADA_DB_TLS_SERVER_NAME=db-1.internal.example"},
+			want: `malformed configuration: GOIABADA_DB_TLS_SERVER_NAME (--db-tls-server-name) is "db-1.internal.example" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no host name: only verify-full checks the certificate's host name` + "\n",
+		},
+		{
+			name: "PGSSLCERT, which the client certificate setting replaces",
+			env:  []string{"PGSSLCERT=" + clientCert},
+			want: "malformed configuration: PGSSLCERT is set, which the auth server no longer reads: " +
+				"unset it and set GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) instead\n",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -96,6 +120,32 @@ func TestMain_RefusesTheConnectionsTLSSettingsBeforeOpeningAnything(t *testing.T
 		// migrate prints its usage after the refusal, as for every flag it refuses.
 		assert.Equal(t, `malformed configuration: --db-tls-mode is "strict", not one of disable, prefer, require, verify-ca, verify-full`+
 			"\n\n"+migrateUsage+"\n", stderr)
+	})
+
+	t.Run("a client certificate on SQL Server, whose driver takes none", func(t *testing.T) {
+		decoy := filepath.Join(t.TempDir(), "d.db")
+		env := []string{"GOIABADA_DB_TYPE=mssql", "GOIABADA_DB_HOST=127.0.0.1", "GOIABADA_DB_PORT=1",
+			"GOIABADA_DB_CREATE=false", "GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+			"GOIABADA_DB_TLS_MODE=verify-full",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE=" + clientCert, "GOIABADA_DB_TLS_CLIENT_KEY_FILE=" + clientKey}
+
+		code, stderr := runMainProcessWith(t, decoy, env)
+
+		require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+		assert.Equal(t, `malformed configuration: GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "`+clientCert+
+			`" while GOIABADA_DB_TYPE (--db-type) is mssql, whose driver takes no client certificate`+"\n", stderr)
+	})
+
+	t.Run("the pair, the override and verify-full reach the dial together", func(t *testing.T) {
+		decoy := filepath.Join(t.TempDir(), "d.db")
+
+		code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...),
+			"GOIABADA_DB_TLS_MODE=verify-full",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE="+clientCert, "GOIABADA_DB_TLS_CLIENT_KEY_FILE="+clientKey,
+			"GOIABADA_DB_TLS_SERVER_NAME=db-1.internal.example"))
+
+		require.Equal(t, migrateExitError, code, "stderr: %s", stderr)
+		assert.Contains(t, stderr, "(tls mode verify-full)", "the load passed and the engine was reached: %s", stderr)
 	})
 }
 
@@ -184,4 +234,29 @@ func writeTestAuthority(t *testing.T) string {
 	path := filepath.Join(t.TempDir(), "ca.pem")
 	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
 	return path
+}
+
+// writeTestClientPair writes a client certificate and its key to files of the test's and answers
+// their paths (#546).
+func writeTestClientPair(t *testing.T) (string, string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "main test client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	require.NoError(t, err)
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	require.NoError(t, err)
+	certPath := filepath.Join(t.TempDir(), "client.pem")
+	require.NoError(t, os.WriteFile(certPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600))
+	keyPath := filepath.Join(t.TempDir(), "client.key")
+	require.NoError(t, os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), 0o600))
+	return certPath, keyPath
 }

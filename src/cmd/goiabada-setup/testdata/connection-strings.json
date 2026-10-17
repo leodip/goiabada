@@ -793,6 +793,77 @@
       "tlsMode": "verify-full",
       "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&encrypt=true",
       "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=true"
+    },
+    {
+      "name": "tls mode verify-full with a host name override",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "serverName": "db.internal.example.com",
+      "tlsMode": "verify-full",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada?sslmode=verify-full&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres?sslmode=verify-full&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
+    },
+    {
+      "name": "tls mode verify-full with a host name override",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "serverName": "db.internal.example.com",
+      "tlsMode": "verify-full",
+      "mysql": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "goiabada",
+        "multiStatements": true,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "db.internal.example.com",
+          "insecureSkipVerify": false,
+          "verifyConnection": false
+        }
+      },
+      "mysqlMaintenance": {
+        "user": "goiabada",
+        "passwd": "pw",
+        "net": "tcp",
+        "addr": "db.example.com:3306",
+        "dbName": "",
+        "multiStatements": false,
+        "parseTime": true,
+        "loc": "UTC",
+        "charset": "utf8mb4",
+        "tlsConfig": "",
+        "tls": {
+          "serverName": "db.internal.example.com",
+          "insecureSkipVerify": false,
+          "verifyConnection": false
+        }
+      }
+    },
+    {
+      "name": "tls mode verify-full with a host name override",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "serverName": "db.internal.example.com",
+      "tlsMode": "verify-full",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada&hostNameInCertificate=db.internal.example.com&encrypt=true",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&hostNameInCertificate=db.internal.example.com&encrypt=true"
     }
   ]
 }

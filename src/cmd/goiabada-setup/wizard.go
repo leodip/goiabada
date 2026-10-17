@@ -802,7 +802,10 @@ func (w *wizard) databaseConnectionFromPrompts(defaultHost string) error {
 // databaseTLSFromPrompts asks how the auth server protects its connection to the database, from a
 // menu of the five modes offering the one answered before, prefer the first time, as the auth
 // server does unset; then, for verify-ca and verify-full alone, the CA file, blank for the system's
-// roots, asked again while the auth server would refuse it (#502 decision 7).
+// roots; then the client certificate pair, for the three modes that carry one and an engine whose
+// driver reads it; then, for verify-full alone, the host name the certificate is checked against,
+// blank for the host dialed. What the auth server would refuse is asked again, as its refusals
+// say (#502 decision 7, #546).
 func (w *wizard) databaseTLSFromPrompts() error {
 	c := w.config
 	w.out.println()
@@ -825,25 +828,102 @@ func (w *wizard) databaseTLSFromPrompts() error {
 	}
 	index, _ := strconv.Atoi(choice)
 	c.DBTLSMode, c.DBTLSCAFile, c.DBTLSCA = tlsModes[index-1].name, "", ""
+	c.DBTLSClientCertFile, c.DBTLSClientKeyFile, c.DBTLSClientCert, c.DBTLSClientKey, c.DBTLSServerName = "", "", "", "", ""
 	if !checksCertificate(c.DBTLSMode) {
 		w.warnUncheckedTLS()
+		if !carriesClientCertificate(c.DBTLSMode) {
+			return nil
+		}
+	}
+	if checksCertificate(c.DBTLSMode) {
+		_, err = w.validated("CA file the database's certificate chains to (PEM), blank for the system's roots", "", "CA file",
+			func(path string) error {
+				if path == "" {
+					return nil
+				}
+				absolute, certificates, refused := readCAFile(path)
+				c.DBTLSCAFile, c.DBTLSCA = absolute, certificates
+				return refused
+			})
+		if err != nil {
+			return err
+		}
+	}
+	if c.Engine.takesClientCertificate {
+		if err = w.clientCertificateFromPrompts(); err != nil {
+			return err
+		}
+	}
+	if checksHostName(c.DBTLSMode) {
+		_, err = w.validated("Host name verify-full checks the certificate against when the address dialed is not the name certified, blank for the host dialed", "", "host name",
+			func(name string) error {
+				if refused := checkWritable(name); refused != nil {
+					return errs.Wrapf(refused, "the host name cannot be written to the configuration")
+				}
+				c.DBTLSServerName = name
+				return nil
+			})
+	}
+	return err
+}
+
+// clientCertificateFromPrompts asks for the pair the connection presents to the database, the
+// certificate first and the key beside it, both or neither: a blank key returns to the certificate,
+// since half a pair is refused, and a pair the auth server would refuse is asked again, as its
+// refusals say (#546).
+func (w *wizard) clientCertificateFromPrompts() error {
+	c := w.config
+	for {
+		cert, err := w.validated("Client certificate the auth server presents to the database (PEM), blank for none", c.DBTLSClientCertFile, "client certificate",
+			func(path string) error {
+				if path == "" {
+					c.DBTLSClientCertFile, c.DBTLSClientKeyFile, c.DBTLSClientCert, c.DBTLSClientKey = "", "", "", ""
+					return nil
+				}
+				_, refused := os.ReadFile(path) //nolint:gosec // G304: the operator names the certificate their database reads
+				if refused != nil {
+					return errs.Errorf("the client certificate %s cannot be read: %s", strconv.Quote(path), cannotBeRead(refused))
+				}
+				if err := checkWritable(path); err != nil {
+					return errs.Wrapf(err, "the client certificate %s cannot be written to the configuration", strconv.Quote(path))
+				}
+				c.DBTLSClientCertFile = path
+				return nil
+			})
+		if err != nil {
+			return err
+		}
+		if cert == "" {
+			return nil
+		}
+		key, err := w.validated("Client certificate's private key (PEM), blank to name the certificate again", "", "client key",
+			func(path string) error {
+				if path == "" {
+					return nil
+				}
+				pair, refused := readClientCertificate(c.DBTLSClientCertFile, path)
+				if refused != nil {
+					return refused
+				}
+				c.DBTLSClientCertFile, c.DBTLSClientKeyFile, c.DBTLSClientCert, c.DBTLSClientKey = pair.certFile, pair.keyFile, pair.certPEM, pair.keyPEM
+				return nil
+			})
+		if err != nil {
+			return err
+		}
+		if key == "" {
+			continue
+		}
+		w.out.info("Database client certificate: %s and %s", c.DBTLSClientCertFile, c.DBTLSClientKeyFile)
 		return nil
 	}
-	_, err = w.validated("CA file the database's certificate chains to (PEM), blank for the system's roots", "", "CA file",
-		func(path string) error {
-			if path == "" {
-				return nil
-			}
-			absolute, certificates, refused := readCAFile(path)
-			c.DBTLSCAFile, c.DBTLSCA = absolute, certificates
-			return refused
-		})
-	return err
 }
 
 // databaseTLSFromFlags is databaseTLSFromPrompts answered by --db-tls-mode, prefer when left out,
 // and --db-tls-ca-file, refused as the auth server refuses GOIABADA_DB_TLS_CA_FILE: beside a mode
-// that checks no certificate, unreadable, or holding no PEM certificate (#502 decisions 4 and 7).
+// that checks no certificate, unreadable, or holding no PEM certificate; and by
+// --db-tls-client-cert-file, --db-tls-client-key-file and --db-tls-server-name, refused as the
+// server refuses that pair and that override (#502 decisions 4 and 7, #546).
 func (w *wizard) databaseTLSFromFlags() error {
 	c := w.config
 	mode := w.flags.DBTLSMode
@@ -855,27 +935,88 @@ func (w *wizard) databaseTLSFromFlags() error {
 	}
 	c.DBTLSMode = mode
 	w.out.info("Database TLS mode: %s", mode)
-	if !checksCertificate(mode) {
-		if w.flags.DBTLSCAFile != "" {
+	switch {
+	case w.flags.DBTLSCAFile != "" && !checksCertificate(mode):
+		described := mode
+		if w.flags.DBTLSMode == "" {
+			described = "left out, so " + mode
+		}
+		return errs.Errorf("--db-tls-ca-file is set while --db-tls-mode is %s, which checks no certificate: only verify-ca and verify-full read a CA file", described)
+	case w.flags.DBTLSCAFile == "":
+		w.out.info("Database CA: the system's roots")
+	default:
+		absolute, certificates, err := readCAFile(w.flags.DBTLSCAFile)
+		if err != nil {
+			return errs.Wrap(err, "invalid --db-tls-ca-file")
+		}
+		c.DBTLSCAFile, c.DBTLSCA = absolute, certificates
+		w.out.info("Database CA file: %s", absolute)
+	}
+	if err := w.clientCertificateFromFlags(); err != nil {
+		return err
+	}
+	if w.flags.DBTLSServerName != "" {
+		if !checksHostName(mode) {
 			described := mode
 			if w.flags.DBTLSMode == "" {
 				described = "left out, so " + mode
 			}
-			return errs.Errorf("--db-tls-ca-file is set while --db-tls-mode is %s, which checks no certificate: only verify-ca and verify-full read a CA file", described)
+			return errs.Errorf("--db-tls-server-name is set while --db-tls-mode is %s, which checks no host name: only verify-full checks the certificate's host name", described)
 		}
+		c.DBTLSServerName = w.flags.DBTLSServerName
+		w.out.info("Database certificate host name: %s", w.flags.DBTLSServerName)
+	}
+	if !checksCertificate(mode) {
 		w.warnUncheckedTLS()
+	}
+	return nil
+}
+
+// clientCertificateFromFlags is the client certificate pair answered by --db-tls-client-cert-file
+// and --db-tls-client-key-file, refused as the auth server refuses the pair: half of one, one on
+// SQL Server, whose driver takes none, one beside a mode that may send no TLS, and one the wizard
+// cannot read. SQLite reads no pair, as the auth server reads none beside it (#546).
+func (w *wizard) clientCertificateFromFlags() error {
+	c := w.config
+	if !c.Engine.hasServer {
 		return nil
 	}
-	if w.flags.DBTLSCAFile == "" {
-		w.out.info("Database CA: the system's roots")
+	if w.flags.DBTLSClientCertFile == "" && w.flags.DBTLSClientKeyFile == "" {
 		return nil
 	}
-	absolute, certificates, err := readCAFile(w.flags.DBTLSCAFile)
+	if w.flags.DBTLSClientCertFile == "" || w.flags.DBTLSClientKeyFile == "" {
+		half, other := "--db-tls-client-cert-file", "--db-tls-client-key-file"
+		named := w.flags.DBTLSClientCertFile
+		if named == "" {
+			half, other = other, half
+			named = w.flags.DBTLSClientKeyFile
+		}
+		return errs.Errorf("%s is %s without %s: name both or neither", half, strconv.Quote(named), other)
+	}
+	if !c.Engine.takesClientCertificate {
+		return errs.Errorf("--db-tls-client-cert-file is set while --db is %s, whose driver takes no client certificate", c.Engine.name)
+	}
+	mode := w.flags.DBTLSMode
+	if mode == "" {
+		mode = defaultTLSMode
+	}
+	if !carriesClientCertificate(mode) {
+		described := mode
+		if w.flags.DBTLSMode == "" {
+			described = "left out, so " + mode
+		}
+		sends := "sends no TLS"
+		if mode == "prefer" {
+			sends = "may send no TLS"
+		}
+		return errs.Errorf("--db-tls-client-cert-file is set while --db-tls-mode is %s, which %s: only require, verify-ca and verify-full carry a client certificate", described, sends)
+	}
+	pair, err := readClientCertificate(w.flags.DBTLSClientCertFile, w.flags.DBTLSClientKeyFile)
 	if err != nil {
-		return errs.Wrap(err, "invalid --db-tls-ca-file")
+		return errs.Wrap(err, "invalid --db-tls-client-cert-file and --db-tls-client-key-file")
 	}
-	c.DBTLSCAFile, c.DBTLSCA = absolute, certificates
-	w.out.info("Database CA file: %s", absolute)
+	c.DBTLSClientCertFile, c.DBTLSClientKeyFile, c.DBTLSClientCert, c.DBTLSClientKey = pair.certFile, pair.keyFile, pair.certPEM, pair.keyPEM
+	w.out.info("Database client certificate: %s and %s", pair.certFile, pair.keyFile)
 	return nil
 }
 

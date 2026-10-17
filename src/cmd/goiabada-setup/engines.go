@@ -23,6 +23,9 @@ type engine struct {
 	// kubernetes says whether the Kubernetes manifests may use it: a pod's filesystem is not
 	// where an auth server's only copy of its data can live.
 	kubernetes bool
+	// takesClientCertificate says whether the engine's driver accepts a client certificate pair:
+	// go-mssqldb takes none, so the wizard offers none and refuses the pair beside it (#546).
+	takesClientCertificate bool
 
 	image string
 	// imageComment is the comment written above the database service's image, saying why its tag
@@ -71,7 +74,9 @@ var engines = []*engine{
 		label:      "MySQL",
 		hasServer:  true,
 		kubernetes: true,
-		image:      "mysql:26",
+		// The pair is offered where a driver reads it; go-mssqldb takes none (#546).
+		takesClientCertificate: true,
+		image:                  "mysql:26",
 		imageComment: []string{
 			"A major, the one latest named when this file's generator was released. A major upgrade",
 			"is a dump and restore, not a tag edit: MySQL upgrades a data directory in place only",
@@ -99,7 +104,9 @@ var engines = []*engine{
 		label:      "PostgreSQL",
 		hasServer:  true,
 		kubernetes: true,
-		image:      "postgres:18",
+		// The pair is offered where a driver reads it; go-mssqldb takes none (#546).
+		takesClientCertificate: true,
+		image:                  "postgres:18",
 		imageComment: []string{
 			"A major, the one latest named when this file's generator was released. A major upgrade",
 			"is a dump and restore or pg_upgrade, not a tag edit: PostgreSQL does not start on a",
