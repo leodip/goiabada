@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/sourceroot"
 )
 
 // The golden file is the checked record of what one engine's migration chain builds, and the
@@ -497,49 +498,20 @@ func firstError(errs ...error) error {
 // generator runs from src/authserver and the per-engine assertion from
 // src/authserver/tests/data. A wrong root is not a loud failure, it names a file that is
 // simply absent, so the ascent identifies the root by requiring every module to be under it.
-// core/guard.sourceRoot does the same walk for the gofmt guard; it is not shared because
-// that one takes a *testing.T and fails a test, and this one has to answer a command.
+// The ascent is sourceroot.FindSourceRoot, the one declaration the tree-wide guards and
+// cmd/ownershipdump root their walks with: this package reads it rather than declaring the
+// four module directories again (#480).
 func GoldenPath(d data.Dialect) (string, error) {
 	if !valid(d) {
 		return "", errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
-	root, err := SourceRoot()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", errs.Errorf("schemadump: getting the working directory: %w", err)
+	}
+	root, err := sourceroot.FindSourceRoot(cwd)
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(root, "authserver", "internal", "data", string(d)+"db", "schema.golden"), nil
-}
-
-// sourceRootModules are the four go.mod directories that identify the source root, the same
-// four the Lint job loops over. Requiring all of them means a module added to the repository
-// without being added here is a failure to find the root rather than a walk that lands
-// somewhere plausible.
-var sourceRootModules = []string{"core", "authserver", "adminconsole", filepath.Join("cmd", "goiabada-setup")}
-
-// SourceRoot is the directory holding every Go module in the repository.
-func SourceRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", errs.Errorf("schemadump: getting the working directory: %w", err)
-	}
-	for {
-		if holdsEveryModule(dir) {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", errs.Errorf("schemadump: no directory above the working directory holds all of %s",
-				strings.Join(sourceRootModules, ", "))
-		}
-		dir = parent
-	}
-}
-
-func holdsEveryModule(dir string) bool {
-	for _, m := range sourceRootModules {
-		if _, err := os.Stat(filepath.Join(dir, m, "go.mod")); err != nil {
-			return false
-		}
-	}
-	return true
 }

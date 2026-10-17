@@ -20,6 +20,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
+	"github.com/leodip/goiabada/core/sourceroot"
 	"github.com/stretchr/testify/require"
 )
 
@@ -104,7 +105,9 @@ func TestMigrationCutoffs_AreTight(t *testing.T) {
 func committedMigrationTree(t *testing.T) migrationTree {
 	t.Helper()
 
-	root, err := schemadump.SourceRoot()
+	cwd, err := os.Getwd()
+	require.NoError(t, err, "getting the working directory")
+	root, err := sourceroot.FindSourceRoot(cwd)
 	require.NoError(t, err, "find the source root the way schemadump.GoldenPath does")
 
 	dirs, err := filepath.Glob(filepath.Join(root, "authserver", "internal", "data", "*db", "migrations"))

@@ -624,6 +624,180 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	assert.Equal(t, 400, customErr.HTTPStatus())
 }
 
+// A client whose default ACR level is level 2 (mandatory) is refused before the account is
+// looked up, as unauthorized_client: the answer depends on the client alone, so the mock fails
+// if GetUserByEmail is called, and a right password and a wrong one get the same answer, which
+// the token handler neither charges to the account's budget nor audits as a guess (#533).
+func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		password string
+	}{
+		{"the right password", "correctpassword"},
+		{"a wrong password", "wrongpassword"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := datamocks.NewDatabase(t)
+			mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+			mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
+
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+
+			settings := &record.Settings{
+				ResourceOwnerPasswordCredentialsEnabled: true,
+			}
+			ctx := context.Background()
+
+			ropcEnabled := true
+			client := &record.Client{
+				Id:                                      1,
+				ClientIdentifier:                        "ropc-client",
+				Enabled:                                 true,
+				IsPublic:                                true,
+				AuthorizationCodeEnabled:                true,
+				ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+				DefaultAcrLevel:                         record.AcrLevel2Mandatory,
+			}
+
+			input := &ValidateTokenRequestInput{
+				GrantType: "password",
+				ClientId:  "ropc-client",
+				Username:  "user@example.com",
+				Password:  tc.password,
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+
+			result, err := validator.ValidateTokenRequest(ctx, settings, input)
+
+			assert.Nil(t, result)
+			require.Error(t, err)
+			var customErr *oauth.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "unauthorized_client", customErr.Code())
+			assert.Equal(t, "Resource owner password credentials grant is not available for a client whose "+
+				"default ACR level is urn:goiabada:level2_mandatory. Please use the authorization code flow instead.",
+				customErr.Description())
+			assert.Equal(t, 400, customErr.HTTPStatus())
+		})
+	}
+}
+
+// With the authorization code flow off, a client's default ACR level is not applicable: the
+// admin console hides it and the Admin API refuses to change it, so a level 2 (mandatory) value
+// stored while the flow was on does not refuse the password grant (#533).
+func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillValidates(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+
+	settings := &record.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.Background()
+
+	passwordHash, _ := passwordhash.Hash("correctpassword")
+	user := &record.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &record.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		AuthorizationCodeEnabled:                false,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+		DefaultAcrLevel:                         record.AcrLevel2Mandatory,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
+
+	require.NoError(t, err)
+	assert.Equal(t, client, grantAs[*PasswordGrant](t, result).Client)
+	assert.Equal(t, user, grantAs[*PasswordGrant](t, result).User)
+	assert.Equal(t, "openid", grantAs[*PasswordGrant](t, result).Scope)
+}
+
+// The floor a password can meet: a level 2 optional client asks a second factor only of users
+// who have one, and the two-factor refusal already answers those, so this client still gets its
+// password-only grants. Refusing it too would turn the grant off for every client left at its
+// default, since the admin console, the Admin API and the seed create clients at level 2
+// optional (#533).
+func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+
+	settings := &record.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.Background()
+
+	passwordHash, _ := passwordhash.Hash("correctpassword")
+	user := &record.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: passwordHash,
+		Enabled:      true,
+		OTPEnabled:   false,
+	}
+
+	ropcEnabled := true
+	client := &record.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		AuthorizationCodeEnabled:                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+		DefaultAcrLevel:                         record.AcrLevel2Optional,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "correctpassword",
+		Scope:     "openid",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
+
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, client, grantAs[*PasswordGrant](t, result).Client)
+	assert.Equal(t, user, grantAs[*PasswordGrant](t, result).User)
+	assert.Equal(t, "openid", grantAs[*PasswordGrant](t, result).Scope)
+}
+
 func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)

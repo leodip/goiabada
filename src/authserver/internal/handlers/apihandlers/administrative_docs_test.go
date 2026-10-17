@@ -190,58 +190,8 @@ func TestAdministrativeDocs_TheConsoleLockoutRecoveryRequestsManage(t *testing.T
 // the language the page is written in (#559). It moved there from Users and groups, which now links
 // to it (#522).
 func TestAdministrativeDocs_TheLastAdministratorSectionQuotesTheRefusal(t *testing.T) {
-	assertSectionQuotes(t, filepath.Dir(guard.SourceRoot(t)),
-		docSection{apiAdministratorsPage, "## The last administrator"},
-		i18n.NewLocalizedError(i18n.ErrCodeLastAdministrator, nil).EnglishFallback())
-}
-
-func TestAdministrativeDocs_ASectionNotQuotingTheSentenceFails(t *testing.T) {
-	root := t.TempDir()
-	writeDocFixture(t, root, "site/admins.mdx", "## The last administrator\n\n"+
-		"The console says \"Grant it to someone first.\"\n\n"+
-		"## Next\n\nThis change would leave nobody. Grant it first.\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "## The last administrator"},
-			"This change would leave nobody. Grant it first.")
-	})
-
-	if report.Stopped {
-		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
-	}
-	want := []string{`site/admins.mdx: ## The last administrator does not quote "This change would leave nobody. Grant it first."`}
-	if !slices.Equal(report.Errors, want) {
-		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
-	}
-}
-
-func TestAdministrativeDocs_ASectionQuotingTheSentencePasses(t *testing.T) {
-	root := t.TempDir()
-	writeDocFixture(t, root, "site/admins.mdx", "## The last administrator\n\n"+
-		"The console shows \"This change would leave nobody. Grant it first.\"\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "## The last administrator"},
-			"This change would leave nobody. Grant it first.")
-	})
-
-	if report.Stopped || len(report.Errors) > 0 {
-		t.Errorf("a section quoting the sentence was refused: %+v", report)
-	}
-}
-
-func TestAdministrativeDocs_AQuoteCheckWithoutItsSectionStops(t *testing.T) {
-	root := t.TempDir()
-	writeDocFixture(t, root, "site/admins.mdx", "## The final administrator\n\nThis change would leave nobody.\n")
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertSectionQuotes(r, root, docSection{"site/admins.mdx", "## The last administrator"},
-			"This change would leave nobody.")
-	})
-
-	if !report.Stopped || !strings.Contains(report.Fatal, "## The last administrator") {
-		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
-	}
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), apiAdministratorsPage, "## The last administrator",
+		[]string{i18n.NewLocalizedError(i18n.ErrCodeLastAdministrator, nil).EnglishFallback()}, nil)
 }
 
 func TestAdministrativeDocs_ARecoveryRequestingAGranularScopeFails(t *testing.T) {
@@ -478,20 +428,6 @@ func assertScopeRequests(r guard.Reporter, root string, section docSection, want
 		if match[1] != want {
 			r.Errorf("%s: %s requests scope=%s, want %s", section.page, section.heading, match[1], want)
 		}
-	}
-}
-
-// assertSectionQuotes is the reporting half of a quoted sentence's check: one failure when the
-// section does not hold want word for word; a stop for a section not found.
-func assertSectionQuotes(r guard.Reporter, root string, section docSection, want string) {
-	r.Helper()
-	text, err := docsreader.Section(root, section.page, section.heading)
-	if err != nil {
-		r.Fatalf("%v", err)
-		return
-	}
-	if !strings.Contains(text, want) {
-		r.Errorf("%s: %s does not quote %q", section.page, section.heading, want)
 	}
 }
 

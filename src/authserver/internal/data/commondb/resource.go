@@ -200,6 +200,43 @@ func (d *Database) GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Re
 	return resources, nil
 }
 
+// GetIdentifiersSharedByClientsAndResources joins the two tables on their identifiers and keeps
+// only the rows whose two strings are the same string, because the engine may have folded a pair
+// that is not; see engineFoldedTheMatch. A pair the engine does not join is not one either: both
+// columns carry the same case- and accent-sensitive collation on every engine.
+func (d *Database) GetIdentifiersSharedByClientsAndResources(ctx context.Context, tx *sql.Tx) ([]string, error) {
+	selectBuilder := sqlbuilder.NewSelectBuilder()
+	selectBuilder.Select("clients.client_identifier", "resources.resource_identifier").
+		From("clients").
+		JoinWithOption(sqlbuilder.InnerJoin, "resources", "clients.client_identifier = resources.resource_identifier").
+		OrderBy("clients.client_identifier")
+
+	sql, args := selectBuilder.BuildWithFlavor(d.Flavor)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var identifiers []string
+	for rows.Next() {
+		var clientIdentifier, resourceIdentifier string
+		if err := rows.Scan(&clientIdentifier, &resourceIdentifier); err != nil {
+			return nil, errs.Wrap(err, "unable to scan shared identifier")
+		}
+		if engineFoldedTheMatch(resourceIdentifier, clientIdentifier) {
+			continue
+		}
+		identifiers = append(identifiers, clientIdentifier)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, errs.Wrap(err, "unable to read query results")
+	}
+
+	return identifiers, nil
+}
+
 func (d *Database) DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(record.Resource)).

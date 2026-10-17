@@ -109,14 +109,18 @@ func runMigrateCommand(inv migrateInvocation, stdout, stderr io.Writer) int {
 	// below takes a context rather than opening one where it lands (#386).
 	ctx := context.Background()
 
-	// `migrate to` owns SIGINT and SIGTERM, so Ctrl-C stops it the way a shutdown signal stops a
+	// `migrate to` owns the stop signals, so Ctrl-C stops it the way a shutdown signal stops a
 	// starting server rather than ending it mid-file: a wait (connecting, or for the migration
 	// lock) is cancelled, a running file finishes, and no new one starts (#390 decision 10).
 	// `migrate version` only reads, so a signal simply ends it, as it always has.
+	//
+	// The signals are answered as they arrive, so a Ctrl-C that was taken is not mistaken for
+	// one that was ignored while the file it catches running finishes, and a second, which the
+	// rule leaves changing nothing, says so itself (#487).
 	if len(inv.positional) > 0 && inv.positional[0] == "to" {
-		var stopListeningForSignals context.CancelFunc
-		ctx, stopListeningForSignals = signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-		defer stopListeningForSignals()
+		var stopAnsweringSignals func()
+		ctx, stopAnsweringSignals = answerSignals(ctx, stdout)
+		defer stopAnsweringSignals()
 	}
 
 	database, err := datafactory.OpenDatabase(ctx, &inv.database, false)
@@ -456,6 +460,70 @@ func reportStop(out io.Writer, err error) {
 	// and that unlock failure is the line this prints.
 	if err != error(stopped) { //nolint:errorlint // the bare stop was printed above; anything joined onto it is printed here
 		outf(out, "%s\n", err)
+	}
+}
+
+// migrateStopSignals are the signals `migrate to` follows the stop rule on (#390 decision 10):
+// Ctrl-C's SIGINT, SIGTERM, SIGHUP, which closing the terminal or losing an SSH session sends, and
+// Ctrl-\'s SIGQUIT. Go's default for the last two ends the process at once, mid-file, which is
+// what the rule exists to prevent (#487). Only SIGKILL, which no process can catch, ends the
+// command sooner.
+var migrateStopSignals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT}
+
+// answerSignals answers ctx, which the first of migrateStopSignals to arrive ends, and
+// stopAnswering, which hands the signals back once the command is done. Each signal is answered
+// on out as it arrives (#487). The stop rule already holds: the signal ends a wait, the file it
+// catches running finishes, no new one starts, and reportStop prints where it stopped once that
+// has happened, which a file that takes minutes leaves looking like an ignored Ctrl-C, and a
+// second, which the rule leaves doing nothing, like a command that no longer responds. The first
+// line is written the moment the signal arrives, before the file it waits for ends, and every
+// further one with what it changes, which is nothing: ending the process mid-file would leave the
+// schema dirty.
+//
+// The goroutine that writes the acknowledgement is the one that ends ctx, and only after the
+// write, as the start's watchStartup writes its record before it ends the startup context: every
+// step that answers the stop does so after the acknowledgement, so reportStop's line follows it
+// and the acknowledgement is never left unwritten behind a command that has returned.
+//
+// A broken pipe is ignored while the command runs. The acknowledgement is written while a file
+// runs, and once the reader of stdout is gone, as `tee` is after the Ctrl-C that reached its
+// whole process group, Go's default for that write is to end the process at once, mid-file. With
+// SIGPIPE ignored the write fails instead, which outf discards.
+func answerSignals(parent context.Context, out io.Writer) (ctx context.Context, stopAnswering func()) {
+	ctx, stop := context.WithCancel(parent)
+	signal.Ignore(syscall.SIGPIPE)
+	// Two slots, so a Ctrl-C pressed twice in a burst is taken twice rather than arriving over a
+	// buffer the answering goroutine has not emptied yet.
+	further := make(chan os.Signal, 2)
+	signal.Notify(further, migrateStopSignals...)
+	done := make(chan struct{})
+	go answerEachSignal(further, done, out, stop)
+	return ctx, func() {
+		signal.Stop(further)
+		signal.Reset(syscall.SIGPIPE)
+		close(done)
+		stop()
+	}
+}
+
+// answerEachSignal writes one line per signal read from further until done closes: the first the
+// acknowledgement, after which it calls stop, and every one after it the reminder, which is all a
+// further signal changes.
+func answerEachSignal(further <-chan os.Signal, done <-chan struct{}, out io.Writer, stop func()) {
+	n := 0
+	for {
+		select {
+		case <-further:
+			n++
+			if n == 1 {
+				outf(out, "stopping: no further migration will start, and one already running finishes first\n")
+				stop()
+				continue
+			}
+			outf(out, "still stopping: a migration already running finishes first, and a further Ctrl-C changes nothing\n")
+		case <-done:
+			return
+		}
 	}
 }
 

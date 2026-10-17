@@ -32,7 +32,7 @@ func TestDecideLevel2Arm(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			state, path, err := DecideLevel2Arm(tc.target, tc.userHasOTP)
+			state, path, err := decideLevel2Arm(tc.target, tc.userHasOTP)
 
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)

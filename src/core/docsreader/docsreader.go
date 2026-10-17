@@ -12,6 +12,7 @@ package docsreader
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -75,6 +76,34 @@ func Section(root, page, heading string) (string, error) {
 type Table struct {
 	Header []string
 	Rows   [][]string
+}
+
+// Columns returns the cells of every data row in the named columns, in the order headers names
+// them, each cell as Tables read it. A row shorter than the header has an empty cell for each column
+// it does not reach. A header the table does not carry is an error naming the first one, so a check
+// reading a renamed column cannot pass as one that read it.
+func (t Table) Columns(headers ...string) ([][]string, error) {
+	indexes := make([]int, 0, len(headers))
+	for _, header := range headers {
+		index := slices.Index(t.Header, header)
+		if index < 0 {
+			return nil, errs.Errorf("the table has no column headed %s", header)
+		}
+		indexes = append(indexes, index)
+	}
+	columns := make([][]string, 0, len(t.Rows))
+	for _, row := range t.Rows {
+		cells := make([]string, 0, len(indexes))
+		for _, index := range indexes {
+			cell := ""
+			if index < len(row) {
+				cell = row[index]
+			}
+			cells = append(cells, cell)
+		}
+		columns = append(columns, cells)
+	}
+	return columns, nil
 }
 
 // Tables returns every table in text, in the order the page reads them. Fenced code holds no

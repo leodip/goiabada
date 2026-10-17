@@ -461,7 +461,8 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 //   - Script. A handler registered from /static/utils.js, the one script this server serves, can
 //     cancel the submit event. The sets below refuse an inline handler on the form and on the
 //     affirmative control, and refuse a <script> inside the form, which is the part the template
-//     declares; the rest needs a JavaScript engine.
+//     declares; the declining link's onclick is the one inline handler permitted, because with
+//     script unavailable the link still goes somewhere (#152); the rest needs a JavaScript engine.
 //   - An ancestor attribute outside consentHidingAttrs, which is a denylist for the reason recorded
 //     on it, so its tail is open by construction where every other set here is closed.
 //
@@ -470,12 +471,14 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 var (
 	consentFormAttrs   = map[string]bool{"action": true, "method": true, "class": true}
 	consentInputAttrs  = map[string]bool{"type": true, "name": true, "value": true, "class": true}
-	consentButtonAttrs = map[string]bool{"type": true, "name": true, "value": true, "class": true, "onclick": true}
+	consentButtonAttrs = map[string]bool{"type": true, "name": true, "value": true, "class": true}
 	consentLayoutAttrs = map[string]bool{"class": true}
+	consentAnchorAttrs = map[string]bool{"class": true, "href": true, "onclick": true}
 
 	consentFormTags = map[string]map[string]bool{
 		"input":  consentInputAttrs,
 		"button": consentButtonAttrs,
+		"a":      consentAnchorAttrs,
 		"div":    consentLayoutAttrs,
 		"p":      consentLayoutAttrs,
 	}
@@ -550,8 +553,8 @@ var (
 	consentMetaEquivs = map[string]bool{"x-ua-compatible": true, "content-security-policy": true}
 )
 
-// consentLabels is what the two answer buttons must read in one locale, which is what ties each
-// button to the answer it gives. Without it the affirmative control is identified structurally, by
+// consentLabels is what the two answer controls must read in one locale, which is what ties each
+// control to the answer it gives. Without it the affirmative control is identified structurally, by
 // being the one with no cancelling script, and swapping the two translation references leaves the
 // page submitting on visible No and cancelling on visible Yes with every case still green.
 type consentLabels struct{ yes, no string }
@@ -784,21 +787,23 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	// reports in Sec-Fetch-Site and httpmw.CSRF enforces, and no hidden field carries that.
 	// The loop above still pins the form's shape, which is what the rest of this helper needs.
 
-	// Which button gives which answer, read the way the End-User reads it. Identifying the affirmative
-	// control structurally is not enough on its own: swap the two translation references and the
-	// unscripted submit button is the one labelled No, so visible No logs the user out, visible Yes
-	// cancels, and every case below still passes.
+	// Which control gives which answer, read the way the End-User reads it. The affirmative control is
+	// the form's one button and the declining control is a link, and identifying either structurally
+	// is not enough on its own: swap the two translation references and the unscripted submit button
+	// is the one labelled No, so visible No logs the user out, visible Yes cancels, and every case
+	// below still passes.
 	buttons := formSel.Find("button")
-	require.Equal(t, 2, buttons.Length(),
-		"the consent form asks one question and carries one button per answer")
+	require.Equal(t, 1, buttons.Length(),
+		"the consent form's one button is its affirmative answer; the declining answer is a link (#152)")
+	require.Equal(t, 1, formSel.Find("a").Length(), "the declining control is the form's one link")
 	affirmative := buttons.FilterFunction(func(_ int, button *goquery.Selection) bool {
 		return strings.TrimSpace(button.Text()) == labels.yes
 	})
-	declining := buttons.FilterFunction(func(_ int, button *goquery.Selection) bool {
-		return strings.TrimSpace(button.Text()) == labels.no
+	declining := formSel.Find("a").FilterFunction(func(_ int, anchor *goquery.Selection) bool {
+		return strings.TrimSpace(anchor.Text()) == labels.no
 	})
 	require.Equal(t, 1, affirmative.Length(), "exactly one button must read %q", labels.yes)
-	require.Equal(t, 1, declining.Length(), "exactly one button must read %q", labels.no)
+	require.Equal(t, 1, declining.Length(), "exactly one link must read %q", labels.no)
 
 	// The affirmative control must be one a browser would submit with, or the page is unusable however
 	// correct the handler is: no cancelling handler of its own, and a type that submits, which a button
@@ -810,13 +815,18 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	require.True(t, strings.EqualFold("submit", affirmative.AttrOr("type", "submit")),
 		"the affirmative control must be able to submit the form, got type=%q", affirmative.AttrOr("type", ""))
 
-	// And the declining control must not be able to submit it. Today an inline handler calls
-	// preventDefault(), since a button with no type attribute is a submit control; an explicit
-	// type="button" would do the same without script, and either satisfies this.
-	require.True(t,
-		!strings.EqualFold("submit", declining.AttrOr("type", "submit")) || declining.AttrOr("onclick", "") != "",
-		`the button labelled %q must not submit the form: give it type="button" or keep its cancelling handler`,
-		labels.no)
+	// And the declining control must neither be able to submit the form nor need script to go
+	// somewhere. A link cannot submit a form, so it is its element that carries the first half, and
+	// the href that carries the second: with JavaScript unavailable the button this control used to
+	// be was a submit control by HTML's missing-value default, and clicking No was answering Yes
+	// (#152). The destination is the declined page, which says the End-User is still signed in, so a
+	// decline with no history to go back to — and no script to go back with — leaves them signed in
+	// and told so. It carries the End-User's language and nothing else of the request: a decline is
+	// not a logout, so it hands the RP nothing (RP-Initiated Logout 1.0 sections 2 and 3).
+	href, hasHref := declining.Attr("href")
+	require.True(t, hasHref,
+		"the link labelled %q needs a destination that works without script (#152)", labels.no)
+	assertDeclineHref(t, href, uiLocales)
 
 	// A named submitter is itself a successful control, so a browser would send it too.
 	if name, hasName := affirmative.Attr("name"); hasName {
@@ -843,6 +853,27 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 	resp, err = httpClient.Do(req)
 	require.NoError(t, err)
 	return resp
+}
+
+// assertDeclineHref holds the consent page's declining control to its destination: the declined
+// page's path, with a query holding ui_locales when the request asked for one and nothing else.
+// Whatever else the request carried, a hint, a post-logout target, a client or a state, a decline
+// must not hand on, because it is not a logout and nothing about it may reach the RP (#152).
+func assertDeclineHref(t *testing.T, href, uiLocales string) {
+	t.Helper()
+
+	destination, err := url.Parse(href)
+	require.NoError(t, err)
+	require.Equal(t, "/auth/logout/declined", destination.Path,
+		"the declining control leads to the declined page, not back to the question and not to the answer")
+	require.Empty(t, destination.Host, "the declined page is this server's own")
+
+	want := url.Values{}
+	if len(uiLocales) > 0 {
+		want.Set("ui_locales", uiLocales)
+	}
+	require.Equal(t, want, destination.Query(),
+		"the declining control carries the End-User's language and nothing else of the request")
 }
 
 // signedOutTexts is what the terminal page must render in one locale. It is a struct rather than a
@@ -1061,6 +1092,145 @@ func TestLogout_Hintless_UILocalesSurvivesTheConsentForm(t *testing.T) {
 	// Every reference on the page, in pt-BR: the whole template has to follow the locale the consent
 	// page was read in, not only the line this case used to check.
 	assertSignedOutPage(t, resp, signedOutPortuguese, false)
+}
+
+// TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript is #152, end to end. The consent
+// page's declining control used to be a button with no type attribute, which HTML's missing-value
+// default makes a submit control, so the only thing standing between clicking No and answering Yes
+// was the control's inline preventDefault; with JavaScript unavailable the click POSTed the consent
+// form, and a hintless same-origin POST that passes the origin check is confirmation, so declining
+// tore the whole session down (#109 decision 13, #155).
+//
+// This case follows the control the way a browser without any script follows it: by resolving and
+// GETting its href. What lands is asserted whole: the declined page in the End-User's language, not
+// the consent question again and not the signed-out page, and the End-User's session row surviving
+// the click that declined to end it. The request carries every parameter the endpoint reads, so the
+// href is held to carrying the language and nothing else, with no hint and with one it rejects.
+func TestLogout_Hintless_TheDecliningControlDeclinesWithoutScript(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		hint string
+	}{
+		{"no hint", ""},
+		{"a rejected hint", "not.a.token"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			grant := createOfflineGrant(t)
+
+			query := url.Values{
+				"ui_locales":               {"pt-BR"},
+				"state":                    {"s"},
+				"post_logout_redirect_uri": {grant.redirectURI},
+				"client_id":                {grant.client.ClientIdentifier},
+			}
+			if len(tc.hint) > 0 {
+				query.Set("id_token_hint", tc.hint)
+			}
+
+			resp, err := grant.httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/logout?" + query.Encode())
+			require.NoError(t, err)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+			require.Equal(t, http.StatusOK, resp.StatusCode,
+				"a request with no confirmable id_token_hint must render the consent page, which the spec makes a MUST")
+
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(bodyString(t, resp)))
+			require.NoError(t, err)
+
+			declining := doc.Find("form a").FilterFunction(func(_ int, anchor *goquery.Selection) bool {
+				return strings.TrimSpace(anchor.Text()) == consentLabelsByLocale["pt-BR"].no
+			})
+			require.Equal(t, 1, declining.Length(),
+				"the consent page's declining control is a link, which cannot submit the form (#152)")
+			href, ok := declining.Attr("href")
+			require.True(t, ok, "the declining control needs a destination that works without script (#152)")
+			assertDeclineHref(t, href, "pt-BR")
+
+			// A browser resolves the href against the page's own URL, and so does this.
+			base, err := url.Parse(appConfig.AuthServer.BaseURL + "/auth/logout")
+			require.NoError(t, err)
+			destination, err := base.Parse(href)
+			require.NoError(t, err)
+
+			followed, err := grant.httpClient.Get(destination.String())
+			require.NoError(t, err)
+			defer func(r *http.Response) { _ = r.Body.Close() }(followed)
+
+			require.Equal(t, http.StatusOK, followed.StatusCode,
+				"the declining control's destination must render a page, not redirect or fail")
+			assertDeclinedPage(t, followed, declinedPortuguese)
+
+			// What the decline must never touch: the session row the sign-in ceremony left.
+			after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
+			require.NoError(t, err)
+			require.NotNil(t, after,
+				"#152: following the declining control without script tore the End-User's session down")
+		})
+	}
+}
+
+// TestLogout_DeclinedPage_RendersInTheRequestedLanguage is the declined page on its own, reached
+// with no session at all: it reads none, so it renders the same for anyone, in the language
+// ui_locales asks for, and asks nothing (#152).
+func TestLogout_DeclinedPage_RendersInTheRequestedLanguage(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		uiLocales string
+		texts     declinedTexts
+	}{
+		{"default locale", "", declinedEnglish},
+		{"pt-BR", "pt-BR", declinedPortuguese},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			target := appConfig.AuthServer.BaseURL + "/auth/logout/declined"
+			if len(tc.uiLocales) > 0 {
+				target += "?" + url.Values{"ui_locales": {tc.uiLocales}}.Encode()
+			}
+			resp, err := createHttpClient(t).Get(target)
+			require.NoError(t, err)
+			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			assertDeclinedPage(t, resp, tc.texts)
+		})
+	}
+}
+
+// declinedTexts is what the declined page must render in one locale, each field a separate
+// translation reference in logout_declined.html, for the reason signedOutTexts gives.
+type declinedTexts struct {
+	pageTitle string
+	heading   string
+	message   string
+}
+
+var (
+	declinedEnglish = declinedTexts{
+		pageTitle: "Still signed in",
+		heading:   "Still signed in",
+		message:   "You are still signed in. You can close this page.",
+	}
+	declinedPortuguese = declinedTexts{
+		pageTitle: "Sessão mantida",
+		heading:   "Sessão mantida",
+		message:   "Você continua conectado. Pode fechar esta página.",
+	}
+)
+
+// assertDeclinedPage reads the declined page through its rendered markup: its three translation
+// references, and that it asks nothing, since a form or a button there would put the question, or
+// worse its answer, back in front of an End-User who has just declined it.
+func assertDeclinedPage(t *testing.T, resp *http.Response, texts declinedTexts) {
+	t.Helper()
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(bodyString(t, resp)))
+	require.NoError(t, err)
+
+	assert.Contains(t, doc.Find("title").Text(), texts.pageTitle, "the browser tab title")
+	require.Equal(t, 1, doc.Find("h2").Length(), "the page has one heading, which the next line names")
+	assert.Equal(t, texts.heading, strings.TrimSpace(doc.Find("h2").Text()), "the page heading")
+	assert.Contains(t, doc.Text(), texts.message, "the page says the End-User is still signed in")
+	assert.Equal(t, 0, doc.Find("form").Length(), "the declined page asks nothing, so it carries no form")
+	assert.Equal(t, 0, doc.Find("main button").Length(), "the declined page asks nothing, so it carries no button")
 }
 
 // The cases below drive POST /auth/logout the way a relying party's own page would: from a foreign

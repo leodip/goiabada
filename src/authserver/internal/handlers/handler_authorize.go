@@ -152,6 +152,13 @@ func answerAuthorizePageRefusal(pageRenderer PageRenderer, w http.ResponseWriter
 	case authflow.AuthorizePageRefusalUnsupportedResponseMode:
 		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), "auth_error.unsupported_response_mode.message"),
 			http.StatusBadRequest)
+	case authflow.AuthorizePageRefusalFormPostUnreachable:
+		// An implicit request may not use the query (#231), so its page names the fragment alone.
+		message := "auth_error.form_post_unreachable.code.message"
+		if refusal.ImplicitFlow {
+			message = "auth_error.form_post_unreachable.implicit.message"
+		}
+		renderAuthorizeRefusal(pageRenderer, w, r, i18n.T(r.Context(), message), http.StatusBadRequest)
 	default:
 		pageRenderer.InternalServerError(w, r, errs.Errorf("authorization request refused for an unknown reason (%v)", refusal.Reason))
 	}

@@ -183,6 +183,69 @@ func (_c *Database_AcquireManagePermissionRow_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
+// AcquireSettingsRow provides a mock function for the type Database
+func (_mock *Database) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error {
+	ret := _mock.Called(ctx, tx, settingsId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AcquireSettingsRow")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, settingsId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_AcquireSettingsRow_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AcquireSettingsRow'
+type Database_AcquireSettingsRow_Call struct {
+	*mock.Call
+}
+
+// AcquireSettingsRow is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - settingsId int64
+func (_e *Database_Expecter) AcquireSettingsRow(ctx any, tx any, settingsId any) *Database_AcquireSettingsRow_Call {
+	return &Database_AcquireSettingsRow_Call{Call: _e.mock.On("AcquireSettingsRow", ctx, tx, settingsId)}
+}
+
+func (_c *Database_AcquireSettingsRow_Call) Run(run func(ctx context.Context, tx *sql.Tx, settingsId int64)) *Database_AcquireSettingsRow_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_AcquireSettingsRow_Call) Return(err error) *Database_AcquireSettingsRow_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_AcquireSettingsRow_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, settingsId int64) error) *Database_AcquireSettingsRow_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AcquireUserRow provides a mock function for the type Database
 func (_mock *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error {
 	ret := _mock.Called(ctx, tx, userId)
@@ -7585,6 +7648,74 @@ func (_c *Database_GetGroupsByIds_Call) Return(groups []record.Group, err error)
 }
 
 func (_c *Database_GetGroupsByIds_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error)) *Database_GetGroupsByIds_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetIdentifiersSharedByClientsAndResources provides a mock function for the type Database
+func (_mock *Database) GetIdentifiersSharedByClientsAndResources(ctx context.Context, tx *sql.Tx) ([]string, error) {
+	ret := _mock.Called(ctx, tx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIdentifiersSharedByClientsAndResources")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) ([]string, error)); ok {
+		return returnFunc(ctx, tx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) []string); ok {
+		r0 = returnFunc(ctx, tx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx) error); ok {
+		r1 = returnFunc(ctx, tx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetIdentifiersSharedByClientsAndResources_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIdentifiersSharedByClientsAndResources'
+type Database_GetIdentifiersSharedByClientsAndResources_Call struct {
+	*mock.Call
+}
+
+// GetIdentifiersSharedByClientsAndResources is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+func (_e *Database_Expecter) GetIdentifiersSharedByClientsAndResources(ctx any, tx any) *Database_GetIdentifiersSharedByClientsAndResources_Call {
+	return &Database_GetIdentifiersSharedByClientsAndResources_Call{Call: _e.mock.On("GetIdentifiersSharedByClientsAndResources", ctx, tx)}
+}
+
+func (_c *Database_GetIdentifiersSharedByClientsAndResources_Call) Run(run func(ctx context.Context, tx *sql.Tx)) *Database_GetIdentifiersSharedByClientsAndResources_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetIdentifiersSharedByClientsAndResources_Call) Return(strings []string, err error) *Database_GetIdentifiersSharedByClientsAndResources_Call {
+	_c.Call.Return(strings, err)
+	return _c
+}
+
+func (_c *Database_GetIdentifiersSharedByClientsAndResources_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) ([]string, error)) *Database_GetIdentifiersSharedByClientsAndResources_Call {
 	_c.Call.Return(run)
 	return _c
 }

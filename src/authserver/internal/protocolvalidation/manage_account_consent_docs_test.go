@@ -68,20 +68,19 @@ func TestManageAccountRefreshDocs_ThePagesGiveTheRefusals(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 	scope := "`" + refreshManageAccountScope + "`"
 
-	assertRefreshSectionSays(t, root, refreshGrantSection, append([]string{scope}, refusals...))
-	assertRefreshSectionSays(t, root, refreshChecksSection, []string{scope, "admin console"})
+	guard.AssertSectionSays(t, root, refreshGrantSection.page, refreshGrantSection.heading,
+		append([]string{scope}, refusals...), nil)
+	guard.AssertSectionSays(t, root, refreshChecksSection.page, refreshChecksSection.heading,
+		[]string{scope, "admin console"}, nil)
 	assertRefreshReasonRows(t, root, refreshReasonsSection, refusals, scope)
 }
 
 func TestManageAccountRefreshDocs_APageMissingAnAnswerFails(t *testing.T) {
 	root := t.TempDir()
-	writeRefreshDocFixture(t, root, "site/token.mdx", "## Refresh\n\nThe user withdrew their consent.\n\n## Next\n\n`authserver:manage-account`\n")
 	writeRefreshDocFixture(t, root, "site/revoked.mdx", "## Other reasons\n\n| `error_description` | Why |\n|---|---|\n"+
 		"| \"No consent.\" | The user withdrew their consent. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRefreshSectionSays(r, root, refreshDocSection{"site/token.mdx", "## Refresh"},
-			[]string{"`authserver:manage-account`", "No consent."})
 		assertRefreshReasonRows(r, root, refreshDocSection{"site/revoked.mdx", "## Other reasons"},
 			[]string{"No consent.", "Not consented."}, "`authserver:manage-account`")
 	})
@@ -90,8 +89,6 @@ func TestManageAccountRefreshDocs_APageMissingAnAnswerFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/token.mdx: ## Refresh does not say \"`authserver:manage-account`\"",
-		"site/token.mdx: ## Refresh does not say \"No consent.\"",
 		"site/revoked.mdx: ## Other reasons row 1, \"No consent.\", does not name `authserver:manage-account` in its Why",
 		"site/revoked.mdx: ## Other reasons has no row for \"Not consented.\"",
 	}
@@ -102,19 +99,16 @@ func TestManageAccountRefreshDocs_APageMissingAnAnswerFails(t *testing.T) {
 
 func TestManageAccountRefreshDocs_APageGivingTheAnswersPasses(t *testing.T) {
 	root := t.TempDir()
-	writeRefreshDocFixture(t, root, "site/token.mdx", "## Refresh\n\n`authserver:manage-account`: \"No consent.\"\n")
 	writeRefreshDocFixture(t, root, "site/revoked.mdx", "## Other reasons\n\n| `error_description` | Why |\n|---|---|\n"+
 		"| \"No consent.\" | Checked for `authserver:manage-account` too. |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRefreshSectionSays(r, root, refreshDocSection{"site/token.mdx", "## Refresh"},
-			[]string{"`authserver:manage-account`", "No consent."})
 		assertRefreshReasonRows(r, root, refreshDocSection{"site/revoked.mdx", "## Other reasons"},
 			[]string{"No consent."}, "`authserver:manage-account`")
 	})
 
 	if report.Stopped || len(report.Errors) > 0 {
-		t.Errorf("pages giving the answers were refused: %+v", report)
+		t.Errorf("a page giving the answers was refused: %+v", report)
 	}
 }
 
@@ -147,22 +141,6 @@ func TestManageAccountRefreshDocs_AMissingSectionStops(t *testing.T) {
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "## Other reasons") {
 		t.Errorf("a page without the section did not stop the check naming it: %+v", report)
-	}
-}
-
-// assertRefreshSectionSays is the reporting half of the text check: one failure per text the section
-// does not hold verbatim; a stop for a section not found.
-func assertRefreshSectionSays(r guard.Reporter, root string, section refreshDocSection, texts []string) {
-	r.Helper()
-	text, err := docsreader.Section(root, section.page, section.heading)
-	if err != nil {
-		r.Fatalf("%v", err)
-		return
-	}
-	for _, want := range texts {
-		if !strings.Contains(text, want) {
-			r.Errorf("%s: %s does not say %q", section.page, section.heading, want)
-		}
 	}
 }
 
