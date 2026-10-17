@@ -106,6 +106,18 @@ func TestStubHttpHelper_FailsTheTestOnAWriterItDoesNotServe(t *testing.T) {
 	}
 }
 
+// An embedded interface would compile and pass every case here while promoting any method the
+// stub does not define from a nil interface, so a writer missing from the stub, or one added to
+// HttpHelper later, would be a nil-pointer panic at test time again rather than a compile error.
+func TestStubHttpHelper_EmbedsNoInterface(t *testing.T) {
+	stubType := reflect.TypeOf(stubHttpHelper{})
+	for i := 0; i < stubType.NumField(); i++ {
+		field := stubType.Field(i)
+		assert.False(t, field.Anonymous && field.Type.Kind() == reflect.Interface,
+			"stubHttpHelper embeds the interface %s; define its methods instead (#476)", field.Name)
+	}
+}
+
 // The auth server refuses a redirect URI with a 400 whose description names the offending
 // value. The administrator has to be able to read that sentence: it is the only thing that
 // says which of their URIs was rejected and why, and the page's own new URL() check accepts
