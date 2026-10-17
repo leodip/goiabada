@@ -2,12 +2,14 @@ package datafactory
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +35,8 @@ var startRecordsBesideTheSchema = map[string]bool{
 // starts are real ones on SQLite: a first start, a start at head, and a start stopped while it
 // migrates. SQLite never waits for the lock, so that record is the start's progress writing it.
 func TestUpgradePage_TheSchemaRecordsAreWhatAStartWrites(t *testing.T) {
-	rows := upgradeRecordsTable(t, troubleshootingPage(t, upgradePage))
+	rows, err := upgradeRecordsTable(troubleshootingPage(t, upgradePage))
+	require.NoError(t, err)
 	written := schemaRecordsAStartWrites(t)
 
 	for _, message := range sortedMessages(written) {
@@ -49,6 +52,31 @@ func TestUpgradePage_TheSchemaRecordsAreWhatAStartWrites(t *testing.T) {
 			t.Errorf("%s: ## How migrations run has a row for %q, which no start writes", upgradePage, message)
 		}
 	}
+}
+
+// A record two rows name is refused, so a later table cannot hide an earlier row that is wrong.
+func TestUpgradeRecordsTable_ARecordTwoRowsNameIsRefused(t *testing.T) {
+	const header = "| Record | When | Attributes |\n|---|---|---|\n"
+	page := "## How migrations run\n\n" + header + "| `database migrated` | A start migrated. | `wrong` |\n\n" +
+		header + "| `database migrated` | A start migrated. | `from`, `to` |\n"
+
+	_, err := upgradeRecordsTable(page)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `two rows for "database migrated"`)
+}
+
+// A row missing a cell is refused rather than skipped, so a complete copy in a later table cannot
+// stand in for it.
+func TestUpgradeRecordsTable_ARowMissingACellIsRefused(t *testing.T) {
+	const header = "| Record | When | Attributes |\n|---|---|---|\n"
+	page := "## How migrations run\n\n" + header + "| `database migrated` | A start migrated. |\n\n" +
+		header + "| `database migrated` | A start migrated. | `from`, `to` |\n"
+
+	_, err := upgradeRecordsTable(page)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "a row of 2 cells under a header of 3")
 }
 
 // schemaRecordsAStartWrites is each record the starts wrote about the schema, with the sorted
@@ -85,45 +113,49 @@ func schemaRecordsAStartWrites(t *testing.T) map[string][]string {
 	return written
 }
 
-// upgradeRecordsTable reads the table headed | Record | When | Attributes | under ## How
-// migrations run: each row's record, and the attributes its last cell names, sorted, none being
-// an empty list.
-func upgradeRecordsTable(t *testing.T, page string) map[string][]string {
-	t.Helper()
-	_, section, found := strings.Cut(page, "\n## How migrations run\n")
-	require.Truef(t, found, "%s has no section headed ## How migrations run", upgradePage)
-	if next := strings.Index(section, "\n## "); next >= 0 {
-		section = section[:next]
+// upgradeRecordsTable reads every table headed | Record | When | Attributes | under ## How
+// migrations run: each row's record, and the attributes its Attributes column names, sorted, none
+// being an empty list. A record two rows name is an error, whichever tables they are in, because
+// the check would hold only one of them to what a start writes, and so is a row whose cells are
+// not its header's, which could not be read.
+func upgradeRecordsTable(page string) (map[string][]string, error) {
+	section, found := docsreader.SectionText(page, "## How migrations run")
+	if !found {
+		return nil, fmt.Errorf("%s has no section headed ## How migrations run", upgradePage)
 	}
 	rows := map[string][]string{}
-	inTable := false
-	for _, line := range strings.Split(section, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "| Record | When | Attributes |") {
-			inTable = true
+	holdsTable := false
+	for _, table := range docsreader.Tables(section) {
+		if len(table.Header) < 3 || table.Header[0] != "Record" || table.Header[1] != "When" || table.Header[2] != "Attributes" {
 			continue
 		}
-		if !inTable {
-			continue
-		}
-		if !strings.HasPrefix(line, "|") {
-			break
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		if len(cells) != 3 || strings.HasPrefix(strings.TrimSpace(cells[0]), "---") {
-			continue
-		}
-		attrs := []string{}
-		if cell := strings.TrimSpace(cells[2]); cell != "none" {
-			for _, name := range strings.Split(cell, ",") {
-				attrs = append(attrs, strings.Trim(strings.TrimSpace(name), "`"))
+		holdsTable = true
+		for _, cells := range table.Rows {
+			if len(cells) != len(table.Header) {
+				return nil, fmt.Errorf("%s: ## How migrations run has a row of %d cells under a header of %d: %q",
+					upgradePage, len(cells), len(table.Header), cells)
 			}
+			attrs := []string{}
+			if cell := cells[2]; cell != "none" {
+				for _, name := range strings.Split(cell, ",") {
+					attrs = append(attrs, strings.Trim(strings.TrimSpace(name), "`"))
+				}
+			}
+			sort.Strings(attrs)
+			record := strings.Trim(cells[0], "`")
+			if _, twice := rows[record]; twice {
+				return nil, fmt.Errorf("%s: ## How migrations run has two rows for %q; one row per record", upgradePage, record)
+			}
+			rows[record] = attrs
 		}
-		sort.Strings(attrs)
-		rows[strings.Trim(strings.TrimSpace(cells[0]), "`")] = attrs
 	}
-	require.NotEmptyf(t, rows, "%s: ## How migrations run holds no table headed | Record | When | Attributes |", upgradePage)
-	return rows
+	if !holdsTable {
+		return nil, fmt.Errorf("%s: ## How migrations run holds no table headed | Record | When | Attributes |", upgradePage)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("%s: the table under ## How migrations run headed | Record | When | Attributes | holds no row", upgradePage)
+	}
+	return rows, nil
 }
 
 func sortedMessages(records map[string][]string) []string {

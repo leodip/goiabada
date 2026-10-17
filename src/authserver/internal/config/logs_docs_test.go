@@ -9,15 +9,20 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
 
 // The header of the Logs page's table of the records worth knowing by name.
 const logRecordsHeader = "| Record (`msg`) | Level | What it says |"
+
+// The cells of the records table's header row, the way the reader reads them.
+var logRecordHeaderCells = docsreader.Tables(logRecordsHeader + "\n|---|---|---|")[0].Header
 
 // Every record the Logs page names is one a server writes, at the level the page gives it. An
 // operator searches the log for these messages and alerts on their level, so a record renamed or
@@ -112,32 +117,23 @@ func logRecordRows(path string) ([]logRecordRow, error) {
 		return nil, err
 	}
 	var rows []logRecordRow
-	inTable, found := false, false
-	for _, line := range strings.Split(string(content), "\n") {
-		line = strings.TrimSpace(line)
-		if line == logRecordsHeader {
-			inTable, found = true, true
+	for _, table := range docsreader.Tables(string(content)) {
+		if !slices.Equal(table.Header, logRecordHeaderCells) {
 			continue
 		}
-		if !inTable || strings.HasPrefix(line, "|---") {
-			continue
+		for _, cells := range table.Rows {
+			if len(cells) < 2 {
+				return nil, fmt.Errorf("a row of the records table has %d cells: | %s |", len(cells), strings.Join(cells, " | "))
+			}
+			msg := logRecordCell.FindStringSubmatch(cells[0])
+			level := logRecordCell.FindStringSubmatch(cells[1])
+			if msg == nil || level == nil {
+				return nil, fmt.Errorf("a row of the records table names no message or level as a code span: | %s |", strings.Join(cells, " | "))
+			}
+			rows = append(rows, logRecordRow{msg[1], level[1]})
 		}
-		if !strings.HasPrefix(line, "|") {
-			inTable = false
-			continue
-		}
-		cells := strings.Split(strings.Trim(line, "|"), "|")
-		if len(cells) < 2 {
-			return nil, fmt.Errorf("a row of the records table has %d cells: %s", len(cells), line)
-		}
-		msg := logRecordCell.FindStringSubmatch(strings.TrimSpace(cells[0]))
-		level := logRecordCell.FindStringSubmatch(strings.TrimSpace(cells[1]))
-		if msg == nil || level == nil {
-			return nil, fmt.Errorf("a row of the records table names no message or level as a code span: %s", line)
-		}
-		rows = append(rows, logRecordRow{msg[1], level[1]})
 	}
-	if !found || len(rows) == 0 {
+	if len(rows) == 0 {
 		return nil, fmt.Errorf("no table headed %q with a row in it, so this check read nothing", logRecordsHeader)
 	}
 	return rows, nil

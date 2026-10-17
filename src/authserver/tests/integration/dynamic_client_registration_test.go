@@ -914,39 +914,39 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 
 	page, err := httpClient.Get(authorizeURL)
 	require.NoError(t, err)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	location := assertRedirect(t, page, "/auth/level1")
 	page = loadPage(t, httpClient, location)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	location = assertRedirect(t, page, "/auth/pwd")
 	page = loadPage(t, httpClient, location)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	page = authenticateWithPassword(t, httpClient, location, page, user.Email, password)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	location = assertRedirect(t, page, "/auth/level1completed")
 	page = loadPage(t, httpClient, location)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	// A self-registered client is registered at level2_optional and this user has no OTP, so
 	// level 2 falls straight through.
 	location = assertRedirect(t, page, "/auth/level2")
 	page = loadPage(t, httpClient, location)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	location = assertRedirect(t, page, "/auth/completed")
 	page = loadPage(t, httpClient, location)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	location = assertRedirect(t, page, "/auth/consent")
 	page = loadPage(t, httpClient, location)
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	page = postConsent(t, httpClient, location, page, []int{0, 1})
-	defer func() { _ = page.Body.Close() }()
+	defer func(r *http.Response) { _ = r.Body.Close() }(page)
 
 	location = assertRedirect(t, page, "/auth/issue")
 	page = loadPage(t, httpClient, location)
