@@ -2,6 +2,7 @@ package oauthclient
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -42,10 +43,11 @@ import (
 
 // recordedRequest is what the fake token endpoint saw.
 type recordedRequest struct {
-	method      string
-	path        string
-	contentType string
-	form        url.Values
+	method        string
+	path          string
+	contentType   string
+	authorization string
+	form          url.Values
 }
 
 // requestRecorder guards it. The handler runs on the server's own goroutine and
@@ -82,10 +84,11 @@ func newTokenEndpoint(t *testing.T, status int, body string) (string, *requestRe
 		assert.NoError(t, err)
 
 		recorder.put(recordedRequest{
-			method:      r.Method,
-			path:        r.URL.Path,
-			contentType: r.Header.Get("Content-Type"),
-			form:        form,
+			method:        r.Method,
+			path:          r.URL.Path,
+			contentType:   r.Header.Get("Content-Type"),
+			authorization: r.Header.Get("Authorization"),
+			form:          form,
 		})
 
 		w.WriteHeader(status)
@@ -163,24 +166,24 @@ func TestExchangeCode_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	assert.Equal(t, "application/x-www-form-urlencoded", seen.contentType)
 
 	// Every value differs from every other, so a transposed pair fails here
-	// rather than passing on a shared fixture string. The client id and the secret
-	// come from construction and the other three from the call.
+	// rather than passing on a shared fixture string. No credential rides the
+	// form: the grant authenticates as Basic, which the case below holds for
+	// every grant (#474).
 	assert.Equal(t, "authorization_code", seen.form.Get("grant_type"))
 	assert.Equal(t, "the-code", seen.form.Get("code"))
 	assert.Equal(t, "https://console.example.com/auth/callback", seen.form.Get("redirect_uri"))
-	assert.Equal(t, "the-client-id", seen.form.Get("client_id"))
-	assert.Equal(t, "the-client-secret", seen.form.Get("client_secret"))
 	assert.Equal(t, "the-code-verifier", seen.form.Get("code_verifier"))
 
-	// Exactly those six: a parameter added without a test is what this catches.
+	// Exactly those four: a parameter added without a test is what this catches.
 	assert.ElementsMatch(t, []string{
-		"grant_type", "code", "redirect_uri", "client_id", "client_secret", "code_verifier",
+		"grant_type", "code", "redirect_uri", "code_verifier",
 	}, formKeys(seen.form))
 }
 
-// The refresh grant's form is RFC 6749 section 6's, with the client authenticated in
-// the body as every grant of this client does (#441 decision 7). It is the form the
-// middleware posted before #441, parameter for parameter.
+// The refresh grant's form is RFC 6749 section 6's, with no client credentials in it:
+// every grant of this client authenticates as Basic (#474). It is the form the
+// middleware posted before #441 less client_id and client_secret, which ride the
+// Authorization header since #474.
 func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
 
@@ -195,18 +198,17 @@ func TestRefresh_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 
 	assert.Equal(t, "refresh_token", seen.form.Get("grant_type"))
 	assert.Equal(t, "the-refresh-token", seen.form.Get("refresh_token"))
-	assert.Equal(t, "the-client-id", seen.form.Get("client_id"))
-	assert.Equal(t, "the-client-secret", seen.form.Get("client_secret"))
 
-	// Exactly those four: no scope, so the grant is the one originally granted.
+	// Exactly those two: no scope, so the grant is the one originally granted.
 	assert.ElementsMatch(t, []string{
-		"grant_type", "refresh_token", "client_id", "client_secret",
+		"grant_type", "refresh_token",
 	}, formKeys(seen.form))
 }
 
 // The client-credentials grant's form is RFC 6749 section 4.4.2's, with the scope the
-// caller asks for and the client authenticated in the body (#441 decision 7). It is the
-// form SessionTokenSource posted before #441, parameter for parameter.
+// caller asks for and no client credentials in it: every grant of this client
+// authenticates as Basic (#474). It is the form SessionTokenSource posted before #441
+// less client_id and client_secret, which ride the Authorization header since #474.
 func TestClientCredentials_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{"access_token":"at"}`)
 
@@ -220,13 +222,69 @@ func TestClientCredentials_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	assert.Equal(t, "application/x-www-form-urlencoded", seen.contentType)
 
 	assert.Equal(t, "client_credentials", seen.form.Get("grant_type"))
-	assert.Equal(t, "the-client-id", seen.form.Get("client_id"))
-	assert.Equal(t, "the-client-secret", seen.form.Get("client_secret"))
 	assert.Equal(t, "the-resource:the-permission", seen.form.Get("scope"))
 
 	assert.ElementsMatch(t, []string{
-		"grant_type", "client_id", "client_secret", "scope",
+		"grant_type", "scope",
 	}, formKeys(seen.form))
+}
+
+// Every grant of this client authenticates as HTTP Basic, which RFC 6749 section 2.3.1
+// prefers, and no credential rides the body: client_secret_post is the scheme that
+// section keeps for clients that cannot use Basic, and this one can (#474).
+func TestTokenClient_AuthenticatesAsBasicOnEveryGrant(t *testing.T) {
+	for _, g := range grants {
+		t.Run(g.name, func(t *testing.T) {
+			tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
+
+			_, err := g.sendAgainst(tokenURL)
+			require.NoError(t, err)
+
+			seen := recorder.snapshot()
+			assert.Equal(t,
+				"Basic "+base64.StdEncoding.EncodeToString([]byte("ci:cs")),
+				seen.authorization, "the credentials the client was built with, Basic-encoded")
+
+			keys := formKeys(seen.form)
+			assert.NotContains(t, keys, "client_id", "no credential rides the body (#474)")
+			assert.NotContains(t, keys, "client_secret", "no credential rides the body (#474)")
+		})
+	}
+}
+
+// A secret the encoding changes still reads back as the one the client was built with.
+// The bootstrap seed stores an operator-chosen console secret with no charset check
+// (#474), so it may hold a '+', a '%', a space or a ':', and the auth server's Basic
+// parser un-escapes each half of the header with url.PathUnescape (percentDecoded, in
+// its handler_token.go). The decode below is that parser's -- split on the first
+// colon, then un-escape each half -- so the pair here is the one the endpoint accepts.
+func TestTokenClient_EncodesTheSecretTheServerDecodes(t *testing.T) {
+	// The characters the encoding and the parser disagree over, then "~~~", which
+	// url.PathEscape leaves alone and which puts a '+' in the header's Base64, the one
+	// place the standard alphabet the parser decodes and the URL-safe one differ.
+	const secret = "a%25b+c d:e~~~"
+
+	tokenURL, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
+	_, err := NewTokenClient(tokenURL, "the-client-id", secret, nil, nil).
+		ClientCredentials(context.Background(), "s")
+	require.NoError(t, err)
+
+	seen := recorder.snapshot()
+	require.True(t, strings.HasPrefix(seen.authorization, "Basic "), "a Basic header, not another scheme")
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(seen.authorization, "Basic "))
+	require.NoError(t, err)
+
+	encodedId, encodedSecret, ok := strings.Cut(string(decoded), ":")
+	require.True(t, ok, "the identifier and the secret, joined by one colon")
+
+	assert.Equal(t, "the-client-id", encodedId, "an identifier the encoding does not change")
+	unescapedSecret, err := url.PathUnescape(encodedSecret)
+	require.NoError(t, err)
+	assert.Equal(t, secret, unescapedSecret, "the secret reads back through the server's own decode")
+
+	// Sent raw, this secret would not read back: its '%25' would decode to '%'. The
+	// escape is what keeps the stored value the one the parser returns.
+	assert.NotEqual(t, secret, encodedSecret, "the characters the parser would lose are escaped")
 }
 
 // -----------------------------------------------------------------------------
