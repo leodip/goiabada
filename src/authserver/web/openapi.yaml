@@ -2791,7 +2791,7 @@ paths:
     get:
       tags: [Settings]
       summary: Get UI theme
-      description: Get current UI theme and available themes
+      description: Get the current UI theme and the themes it can be set to
       operationId: getSettingsUITheme
       responses:
         '200':
@@ -6077,10 +6077,14 @@ components:
       properties:
         uiTheme:
           type: string
+          enum: ['', light, dark]
+          description: The theme of the sign-in pages and the admin console. Empty is the automatic theme, light or dark as each visitor's device prefers.
         availableThemes:
           type: array
+          description: The themes uiTheme can be set to besides the automatic one, which is the empty value.
           items:
             type: string
+            enum: [light, dark]
       required:
         - uiTheme
         - availableThemes
@@ -6090,6 +6094,8 @@ components:
       properties:
         uiTheme:
           type: string
+          enum: ['', light, dark]
+          description: Empty for the automatic theme, which follows each visitor's device, or one of availableThemes. Surrounding spaces are ignored.
 
     SettingsTokensResponse:
       type: object

@@ -1866,6 +1866,10 @@ var publishedRequestEnums = map[string]string{
 		"handler_api_clients.go parses the trimmed value through record.ThreeStateSettingFromString " +
 		"and refuses anything outside [on, off, default] with 400 before writing. Covered by " +
 		"TestAPIClientTokensPut_ValidationErrors' invalid_three_state_id case. Published in #562",
+	"UpdateSettingsUIThemeRequest.uiTheme": "enforced: handler_api_settings_ui_theme.go trims the " +
+		"value and refuses anything but the empty value and uithemes.Get() with 400 before saving. " +
+		"Covered by TestAPISettingsUIThemePut_ValidationErrors. Published in #617, when the themes " +
+		"became three",
 }
 
 // A closed enum on a request property is a promise that the server refuses everything outside it,
