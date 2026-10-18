@@ -22,7 +22,7 @@ const (
 
 // uiThemes000065 is every value the settings could hold before 000065, with the theme it becomes:
 // the 32 daisyUI themes the admin API accepted, by the color-scheme each declared in the stylesheet
-// they were drawn from, the empty value, which drew the pages dark, and a value no list offered,
+// they were drawn from, the empty value, which drew the pages dark, and values no list offered,
 // which daisyUI drew in its default light theme.
 var uiThemes000065 = []struct{ stored, want string }{
 	{"dark", "dark"}, {"synthwave", "dark"}, {"halloween", "dark"}, {"forest", "dark"},
@@ -36,6 +36,11 @@ var uiThemes000065 = []struct{ stored, want string }{
 	{"lemonade", "light"}, {"winter", "light"}, {"nord", "light"},
 	{"", "dark"},
 	{"not-a-theme", "light"},
+	// Compared exactly on every engine: a value differing from a dark theme's name by case, by a
+	// trailing space or by an ignorable character is one no list offered.
+	{"Dark", "light"},
+	{"dark ", "light"},
+	{"da\u00adrk", "light"},
 }
 
 // TestMigration000065_UIThemeLightOrDark exercises the backfill that maps a stored daisyUI theme to
@@ -47,7 +52,8 @@ var uiThemes000065 = []struct{ stored, want string }{
 //
 //  1. Each of the 32 daisyUI themes becomes "dark" when daisyUI drew it dark and "light" otherwise.
 //  2. The empty value becomes "dark", the look it had: until 000065 it drew the pages dark.
-//  3. Any other value becomes "light".
+//  3. Any other value becomes "light", compared exactly: one differing from a dark theme's name only
+//     by case, a trailing space or a character a linguistic collation ignores included.
 //  4. The down migration changes nothing, and 000065 applies again after it.
 //  5. A later start, which has nothing to migrate, leaves the values as they are, an empty value
 //     written after 000065 included: that one is the automatic theme, and is not mapped to dark.
