@@ -31,10 +31,46 @@ import (
 // binary, and "latest" is the right image tag for someone running the wizard
 // from a checkout: it resolves to the current release rather than to whichever
 // version happened to be hardcoded when the file was last edited.
+//
+// The digests are what a release build gets: the release workflow pushes the
+// images before it links the wizard, then stamps the manifest digests it read
+// from buildx's metadata, so every deployment the wizard writes names the
+// image content itself, not only the mutable tag under which it was pushed.
+// A source build, or a test, stamps none, and the image reference stays the
+// tag alone.
 var (
-	version  = "dev"
-	imageTag = "latest"
+	version            = "dev"
+	imageTag           = "latest"
+	authserverDigest   = ""
+	adminconsoleDigest = ""
 )
+
+// imageRef returns the reference a generated deployment points at one of the
+// two published images with: its tag, and the digest the release build
+// stamped when it knows one, so a re-push under the same tag cannot change
+// what a node pulls next. Without a digest, the reference is the tag alone,
+// which is what a source build and a test should see.
+func imageRef(name string) string {
+	ref := "leodip/goiabada:" + name + "-" + imageTag
+	if digest := digestFor(name); digest != "" {
+		return ref + "@" + digest
+	}
+
+	return ref
+}
+
+// digestFor returns the manifest digest the release build stamped for one of
+// the two published images, or the empty string when it stamped none.
+func digestFor(name string) string {
+	switch name {
+	case "authserver":
+		return authserverDigest
+	case "adminconsole":
+		return adminconsoleDigest
+	}
+
+	return ""
+}
 
 // main is the wizard's one exit. Everything under it returns an error instead, so a failure deep
 // in a prompt or a step is reported, and its exit code chosen, here and nowhere else (#430).

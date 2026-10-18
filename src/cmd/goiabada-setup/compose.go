@@ -97,7 +97,7 @@ func generateAuthServerService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-authserver:\n")
-	fmt.Fprintf(&sb, "    image: leodip/goiabada:authserver-%s\n", imageTag)
+	fmt.Fprintf(&sb, "    image: %s\n", imageRef("authserver"))
 	sb.WriteString("    restart: unless-stopped\n")
 	writeStopGracePeriod(&sb,
 		"Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after",
@@ -197,7 +197,7 @@ func generateAdminConsoleService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-adminconsole:\n")
-	fmt.Fprintf(&sb, "    image: leodip/goiabada:adminconsole-%s\n", imageTag)
+	fmt.Fprintf(&sb, "    image: %s\n", imageRef("adminconsole"))
 	sb.WriteString("    restart: unless-stopped\n")
 	writeStopGracePeriod(&sb,
 		"The auth server's value: this service stops within its 15s drain, and a grace",

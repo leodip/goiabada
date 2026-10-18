@@ -7,10 +7,14 @@
 set -euo pipefail
 
 VERSION="${GOIABADA_VERSION:-dev}"
+AUTHSERVER_DIGEST="${GOIABADA_AUTHSERVER_DIGEST:-}"
+ADMINCONSOLE_DIGEST="${GOIABADA_ADMINCONSOLE_DIGEST:-}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
+        --authserver-digest) AUTHSERVER_DIGEST="${2:?--authserver-digest needs a value}"; shift 2 ;;
+        --adminconsole-digest) ADMINCONSOLE_DIGEST="${2:?--adminconsole-digest needs a value}"; shift 2 ;;
         # Turns a future typo into a failure rather than a silently ignored
         # argument.
         *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -35,6 +39,12 @@ build_platform() {
     # that shipped in this release. Both derive from one tag, so they cannot
     # disagree.
     #
+    # The digests name the image content itself. A release run passes the
+    # manifest digests the images job read from buildx's metadata, so every
+    # deployment the wizard writes pins tag@digest and a re-push under the tag
+    # cannot change what a node pulls next. A local run stamps none, and the
+    # wizard writes the tag alone.
+    #
     # -w drops the DWARF debug data, as the servers' release builds do (#331).
     # It is -w and not -s -w, which this script passed until then: -s drops
     # the symbol table too, which is what `govulncheck -mode=binary` matches at
@@ -57,7 +67,7 @@ build_platform() {
     # build_platform calls below stop matching the guard's release targets
     # (#463).
     GOOS=$os GOARCH=$arch go build -v -tags=production \
-        -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
+        -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION} -X main.authserverDigest=${AUTHSERVER_DIGEST} -X main.adminconsoleDigest=${ADMINCONSOLE_DIGEST}" \
         -o "${BUILD_DIR}/goiabada-setup-${os}-${arch}${extension}" \
         .
 }

@@ -12,6 +12,35 @@ import (
 // Every generated Compose file gives both servers 60 seconds to stop, where Compose's default of 10
 // cut the auth server's 50-second stop short: one value for both, since a grace period is a
 // ceiling and the admin console exits once its own drain is done (#390 decision 4).
+// A release build stamps the manifest digests of the images it shipped beside the wizard, so both
+// services the Compose file runs name the content itself: tag@digest, and a re-push under the tag
+// cannot change what a pull fetches. A source build keeps the tag alone.
+func TestComposeFile_PinsTheStampedDigest(t *testing.T) {
+	checked := 0
+	for _, testCase := range goldenCases() {
+		if testCase.deployment != deploymentLocal && testCase.deployment != deploymentProduction {
+			continue
+		}
+		t.Run(testCase.name, func(t *testing.T) {
+			withImageTag(t, "1.5.0")
+			withImageDigests(t, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
+
+			content := descriptionOf(testCase.config())
+			doc := only[map[string]any](t, toAny(yamlDocuments(t, content)), "the Compose file's documents")
+			if got := at[string](t, doc, "services", "goiabada-authserver", "image"); got != "leodip/goiabada:authserver-1.5.0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" {
+				t.Errorf("goiabada-authserver runs %q", got)
+			}
+			if got := at[string](t, doc, "services", "goiabada-adminconsole", "image"); got != "leodip/goiabada:adminconsole-1.5.0@sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210" {
+				t.Errorf("goiabada-adminconsole runs %q", got)
+			}
+		})
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no golden case is a Compose file, so this checked nothing")
+	}
+}
+
 func TestComposeFile_GivesEachServerTimeToStop(t *testing.T) {
 	checked := 0
 	for _, testCase := range goldenCases() {

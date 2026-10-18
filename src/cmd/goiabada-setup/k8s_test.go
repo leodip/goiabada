@@ -734,6 +734,17 @@ func withImageTag(t *testing.T, tag string) {
 	t.Cleanup(func() { imageTag = previous })
 }
 
+// withImageDigests runs the test with the manifest digests a release build stamps, putting the
+// source build's empty ones back afterwards.
+func withImageDigests(t *testing.T, authserver, adminconsole string) {
+	t.Helper()
+	previousAuthserver, previousAdminconsole := authserverDigest, adminconsoleDigest
+	authserverDigest, adminconsoleDigest = authserver, adminconsole
+	t.Cleanup(func() {
+		authserverDigest, adminconsoleDigest = previousAuthserver, previousAdminconsole
+	})
+}
+
 // A version tag names one build, so a node pulls it once; a source build's latest moves, so a node
 // pulls it at every start, or it would run whichever latest it happened to cache (#396 decision 10).
 func TestKubernetesManifest_PullPolicyFollowsTheTag(t *testing.T) {
@@ -756,6 +767,25 @@ func TestKubernetesManifest_PullPolicyFollowsTheTag(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A release build stamps the manifest digests of the images it shipped beside the wizard, and
+// every image the manifest then runs names the content itself: tag@digest, so a re-push under the
+// tag cannot change what a node pulls next. A source build, and every test that stamps none, keeps
+// the tag alone.
+func TestKubernetesManifest_PinsTheStampedDigest(t *testing.T) {
+	withImageTag(t, "1.5.0")
+	withImageDigests(t, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
+
+	docs := kubernetesDocuments(t, kubernetesConfig())
+	for _, w := range workloads {
+		podSpec := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "spec")
+		container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), w.deployment+"'s containers")
+		want := "leodip/goiabada:" + w.container + "-1.5.0@" + digestFor(w.container)
+		if got := at[string](t, container, "image"); got != want {
+			t.Errorf("%s runs %q, want %q", w.deployment, got, want)
+		}
 	}
 }
 

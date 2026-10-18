@@ -601,13 +601,17 @@ func writeTopologySpread(sb *strings.Builder, name string) {
 // tag, with the pull policy that tag needs and the container's securityContext.
 func writeContainerHead(sb *strings.Builder, name string) {
 	fmt.Fprintf(sb, "      - name: %s\n", name)
-	fmt.Fprintf(sb, "        image: leodip/goiabada:%s-%s\n", name, imageTag)
+	fmt.Fprintf(sb, "        image: %s\n", imageRef(name))
 	if imageTag == "latest" {
 		sb.WriteString("        # latest is a moving tag: each start pulls whatever release it names then, so pods can\n")
 		sb.WriteString("        # run different releases. Replace it with a release version to pin the image.\n")
 		sb.WriteString("        imagePullPolicy: Always\n")
 	} else {
 		sb.WriteString("        # A version tag names one build, so a node pulls it once.\n")
+		if digest := digestFor(name); digest != "" {
+			sb.WriteString("        # The digest pins the image content itself: a re-push under the tag\n")
+			sb.WriteString("        # cannot change what a node pulls.\n")
+		}
 		sb.WriteString("        imagePullPolicy: IfNotPresent\n")
 	}
 	sb.WriteString("        # Everything the restricted Pod Security Standard requires, and a read-only root besides.\n")

@@ -116,7 +116,11 @@ jobs:
     name: Binaries
     # Depends on both, though Checks implies Verify transitively. Naming both
     # makes the intent explicit and survives someone editing Checks.
-    needs: [verify, checks, versions]
+    #
+    # It also depends on Images: the wizard this job cross-compiles is what
+    # pins the pushed images by digest in the manifests it writes, so the
+    # digests must exist before the wizard is linked.
+    needs: [verify, checks, versions, images]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -131,7 +135,10 @@ jobs:
 
       - name: Cross-compile the setup tool
         working-directory: src/cmd/goiabada-setup
-        run: ./build-binaries.sh --version "${{ needs.verify.outputs.version }}"
+        run: >
+          ./build-binaries.sh --version "${{ needs.verify.outputs.version }}"
+          --authserver-digest "${{ needs.images.outputs.authserver-digest }}"
+          --adminconsole-digest "${{ needs.images.outputs.adminconsole-digest }}"
 
       # One staging directory feeding the checksums, the attestation and the
       # release upload, so all three describe an identical set.
@@ -193,6 +200,9 @@ jobs:
     name: Images
     needs: [verify, checks, versions]
     runs-on: ubuntu-latest
+    outputs:
+      authserver-digest: ${{ steps.digests.outputs.authserver }}
+      adminconsole-digest: ${{ steps.digests.outputs.adminconsole }}
     # The push credentials, DOCKER_USERNAME and DOCKER_PASSWORD, exist only in this environment,
     # which admits main and v* tags alone, and GitHub exposes environment secrets only to jobs
     # that declare it. The Check workflow pulls with a separate read-only token.
