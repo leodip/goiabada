@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"flag"
 	"log/slog"
@@ -585,8 +586,8 @@ func readDatabaseTLSRoots(c *DatabaseConfig, malformed *malformedValues) {
 // readDatabaseTLSClientCertificate reads the certificate and key files into
 // c.TLSClientCertificate, which is how the pair is read once, at start, and refuses one the
 // connection cannot present (#546): half a pair, one on SQL Server, whose driver takes no client
-// certificate, one beside a mode that may send no TLS, a half that cannot be read, and two halves
-// that do not pair. SQLite has no connection to carry one, and reads no file. Neither does a mode
+// certificate, one beside a mode that may send no TLS, a half that cannot be read, a key encrypted
+// with a passphrase, and two halves that do not pair. SQLite has no connection to carry one, and reads no file. Neither does a mode
 // that is itself malformed, which is refused already.
 func readDatabaseTLSClientCertificate(c *DatabaseConfig, malformed *malformedValues) {
 	c.TLSClientCertificate = nil
@@ -643,6 +644,11 @@ func readDatabaseTLSClientCertificate(c *DatabaseConfig, malformed *malformedVal
 			strconv.Quote(c.TLSClientKeyFile) + ", which cannot be read: " + cannotBeRead(err))
 		return
 	}
+	if keyIsEncrypted(keyPEM) {
+		malformed.addLine("GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is " +
+			strconv.Quote(c.TLSClientKeyFile) + ", which is encrypted with a passphrase the auth server cannot read: write a copy without one")
+		return
+	}
 	pair, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
 		malformed.addLine(certSetting + strconv.Quote(c.TLSClientCertFile) +
@@ -651,6 +657,22 @@ func readDatabaseTLSClientCertificate(c *DatabaseConfig, malformed *malformedVal
 		return
 	}
 	c.TLSClientCertificate = &pair
+}
+
+// keyIsEncrypted reports whether a key file holds an encrypted private key: PKCS #8's ENCRYPTED
+// PRIVATE KEY block, or a legacy block whose Proc-Type header says ENCRYPTED. tls.X509KeyPair
+// refuses either only as a key it cannot parse, which never names the passphrase the operator
+// has to remove.
+func keyIsEncrypted(keyPEM []byte) bool {
+	for rest := keyPEM; ; {
+		var block *pem.Block
+		if block, rest = pem.Decode(rest); block == nil {
+			return false
+		}
+		if block.Type == "ENCRYPTED PRIVATE KEY" || strings.Contains(block.Headers["Proc-Type"], "ENCRYPTED") {
+			return true
+		}
+	}
 }
 
 // refuseTheServerNameTheModeCannotCheck refuses a host name override beside any mode but

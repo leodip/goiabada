@@ -490,6 +490,14 @@ func TestLoad_RefusesAClientPairItCannotUse(t *testing.T) {
 	certFile, keyFile, _ := writeTestClientPair(t)
 	_, otherKey, _ := writeTestClientPair(t)
 	missing := filepath.Join(t.TempDir(), "absent.pem")
+	writeEncryptedKey := func(block *pem.Block) string {
+		path := filepath.Join(t.TempDir(), "encrypted-key.pem")
+		require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(block), 0o600))
+		return path
+	}
+	encryptedKey := writeEncryptedKey(&pem.Block{Type: "ENCRYPTED PRIVATE KEY", Bytes: []byte("ciphertext")})
+	legacyEncryptedKey := writeEncryptedKey(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: []byte("ciphertext"),
+		Headers: map[string]string{"Proc-Type": "4,ENCRYPTED", "DEK-Info": "AES-256-CBC,00112233445566778899AABBCCDDEEFF"}})
 
 	const certSetting = "GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "
 	const keySetting = "GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is "
@@ -532,6 +540,12 @@ func TestLoad_RefusesAClientPairItCannotUse(t *testing.T) {
 			env: map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": otherKey},
 			refusal: certSetting + strconv.Quote(certFile) + " and GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is " +
 				strconv.Quote(otherKey) + ", which do not pair: tls: private key does not match public key"},
+		{name: "a key encrypted as PKCS #8",
+			env:     map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": encryptedKey},
+			refusal: keySetting + strconv.Quote(encryptedKey) + ", which is encrypted with a passphrase the auth server cannot read: write a copy without one"},
+		{name: "a key encrypted the legacy way, under a Proc-Type header",
+			env:     map[string]string{"GOIABADA_DB_TLS_MODE": "verify-full", "GOIABADA_DB_TLS_CLIENT_CERT_FILE": certFile, "GOIABADA_DB_TLS_CLIENT_KEY_FILE": legacyEncryptedKey},
+			refusal: keySetting + strconv.Quote(legacyEncryptedKey) + ", which is encrypted with a passphrase the auth server cannot read: write a copy without one"},
 	}
 	for _, engine := range []string{"mysql", "postgres"} {
 		for _, tt := range tests {

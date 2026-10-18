@@ -30,8 +30,6 @@ The auth server reads the CA file only at start, so restart it after you change 
 
 A CA file the auth server can't use stops it before it connects, with a `malformed configuration:` line naming `GOIABADA_DB_TLS_CA_FILE`. That happens when the file can't be read, holds no certificate, or is set with `disable`, `prefer` or `require`, which read none.
 
-A client certificate or host name the auth server can't use stops it the same way, with a line naming the setting: a certificate without its key or a key without its certificate, a file that can't be read, two files that don't pair, a certificate with `disable` or `prefer` or on SQL Server, and `GOIABADA_DB_TLS_SERVER_NAME` with any mode but `verify-full`. The auth server reads the two files only at start too. On Kubernetes, they're in [the `goiabada-db-client-tls` Secret](/deploy/kubernetes/security/#present-a-client-certificate).
-
 ## Check the certificate dates
 
 After `x509: certificate has expired or is not yet valid`, the `error` gives the auth server's time and the certificate's date: `current time ... is after ...` for a certificate that has expired, `is before ...` for one that doesn't start yet.

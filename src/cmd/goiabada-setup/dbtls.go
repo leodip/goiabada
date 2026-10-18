@@ -175,7 +175,7 @@ type clientCertificate struct {
 // readClientCertificate reads the certificate and key files as the auth server reads
 // GOIABADA_DB_TLS_CLIENT_CERT_FILE and GOIABADA_DB_TLS_CLIENT_KEY_FILE, and refuses a pair as the
 // server would, in the server's own words: one file named without the other, either that cannot
-// be read, and two that do not pair (#546). It returns both paths made absolute, since the auth
+// be read, a key encrypted with a passphrase, and two that do not pair (#546). It returns both paths made absolute, since the auth
 // server starts from wherever its service runs.
 func readClientCertificate(certPath, keyPath string) (clientCertificate, error) {
 	if certPath == "" || keyPath == "" {
@@ -215,12 +215,32 @@ func readClientCertificate(certPath, keyPath string) (clientCertificate, error) 
 		return clientCertificate{}, errs.Errorf("GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is %s, which cannot be read: %s",
 			strconv.Quote(keyFile), cannotBeRead(err))
 	}
+	if keyIsEncrypted(keyPEM) {
+		return clientCertificate{}, errs.Errorf("GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is %s, "+
+			"which is encrypted with a passphrase the auth server cannot read: write a copy without one", strconv.Quote(keyFile))
+	}
 	if _, err := tls.X509KeyPair(certPEM, keyPEM); err != nil {
 		return clientCertificate{}, errs.Errorf("GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is %s and "+
 			"GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is %s, which do not pair: %s",
 			strconv.Quote(certFile), strconv.Quote(keyFile), err.Error())
 	}
 	return clientCertificate{certFile: certFile, keyFile: keyFile, certPEM: string(certPEM), keyPEM: string(keyPEM)}, nil
+}
+
+// keyIsEncrypted is the auth server's check of the same name, which this module may not import
+// (ARCHITECTURE.md rule 3): an encrypted private key, PKCS #8's ENCRYPTED PRIVATE KEY block or a
+// legacy block whose Proc-Type header says ENCRYPTED, which tls.X509KeyPair refuses only as a key
+// it cannot parse.
+func keyIsEncrypted(keyPEM []byte) bool {
+	for rest := keyPEM; ; {
+		var block *pem.Block
+		if block, rest = pem.Decode(rest); block == nil {
+			return false
+		}
+		if block.Type == "ENCRYPTED PRIVATE KEY" || strings.Contains(block.Headers["Proc-Type"], "ENCRYPTED") {
+			return true
+		}
+	}
 }
 
 // verifyChainOnly is the auth server's data.VerifyChainOnly, which this module may not import

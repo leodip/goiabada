@@ -349,6 +349,34 @@ func testClientPair(t *testing.T) (cert, key string) {
 	return string(certFile), string(keyFile)
 }
 
+// An encrypted key is refused in the auth server's words, which name the passphrase, where
+// tls.X509KeyPair alone says only that it cannot parse the key.
+func TestReadClientCertificate_RefusesAnEncryptedKey(t *testing.T) {
+	cert, _ := testClientPair(t)
+	certPath := filepath.Join(t.TempDir(), "cert.pem")
+	if err := os.WriteFile(certPath, []byte(cert), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, block := range map[string]*pem.Block{
+		"PKCS #8": {Type: "ENCRYPTED PRIVATE KEY", Bytes: []byte("ciphertext")},
+		"legacy, under a Proc-Type header": {Type: "RSA PRIVATE KEY", Bytes: []byte("ciphertext"),
+			Headers: map[string]string{"Proc-Type": "4,ENCRYPTED", "DEK-Info": "AES-256-CBC,00112233445566778899AABBCCDDEEFF"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			keyPath := filepath.Join(t.TempDir(), "key.pem")
+			if err := os.WriteFile(keyPath, pem.EncodeToMemory(block), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := readClientCertificate(certPath, keyPath)
+			want := `GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is "` + keyPath +
+				`", which is encrypted with a passphrase the auth server cannot read: write a copy without one`
+			if err == nil || err.Error() != want {
+				t.Errorf("got %v, want %q", err, want)
+			}
+		})
+	}
+}
+
 // The pair and the host name override are asked after the CA file, for verify-full, and reach the
 // configuration as the generated files write them: the two paths made absolute, the two files'
 // contents, and the name. The key beside a certificate the wizard cannot pair is asked again
