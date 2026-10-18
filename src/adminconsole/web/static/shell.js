@@ -52,10 +52,13 @@ function setUpSidebar() {
       setOpen(false, true);
     }
   });
+  // Crossing the width either way forgets the panel's state, so the sidebar settles where the new
+  // width puts it without sliding.
   wide.addEventListener("change", function () {
-    if (wide.matches && sidebar.dataset.open === "true") {
+    if (sidebar.dataset.open === "true") {
       setOpen(false, false);
     }
+    delete sidebar.dataset.open;
   });
 }
 

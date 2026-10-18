@@ -112,7 +112,7 @@ func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 		"/admin_settings_sessions.html", mock.Anything).
 		Run(func(args mock.Arguments) { bind = args.Get(4).(map[string]interface{}) }).
 		Return(nil).Once()
-	refusal := "User session - max sessions per user must be between 0 and 1000."
+	refusal := "The maximum sessions per user must be between 0 and 1000."
 	apiClient := &sessionsAPI{updateErr: apiStatus(http.StatusBadRequest, refusal)}
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/sessions",

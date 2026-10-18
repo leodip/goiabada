@@ -237,13 +237,13 @@ failures are one key per cause, each a whole sentence.
 | `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
 | `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
 | `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
-| `handler.settings_sessions.idle_timeout_not_positive` | (none) | User session - idle timeout in seconds must be greater than zero. |
-| `handler.settings_sessions.max_lifetime_not_positive` | (none) | User session - max lifetime in seconds must be greater than zero. |
-| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | User session - idle timeout in seconds cannot be greater than {{.max}}. |
-| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | User session - max lifetime in seconds cannot be greater than {{.max}}. |
-| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | User session - the idle timeout cannot be greater than the max lifetime. |
-| `handler.settings_sessions.max_sessions_per_user_required` | (none) | User session - max sessions per user is required. |
-| `handler.settings_sessions.max_sessions_per_user_out_of_range` | `max` (int) | User session - max sessions per user must be between 0 and {{.max}}. |
+| `handler.settings_sessions.idle_timeout_not_positive` | (none) | The idle timeout must be greater than zero. |
+| `handler.settings_sessions.max_lifetime_not_positive` | (none) | The maximum lifetime must be greater than zero. |
+| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout cannot be more than {{.max}} seconds. |
+| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | The maximum lifetime cannot be more than {{.max}} seconds. |
+| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | The idle timeout cannot be longer than the maximum lifetime. |
+| `handler.settings_sessions.max_sessions_per_user_required` | (none) | Enter the maximum sessions per user. |
+| `handler.settings_sessions.max_sessions_per_user_out_of_range` | `max` (int) | The maximum sessions per user must be between 0 and {{.max}}. |
 | `handler.settings_tokens.token_expiration_not_positive` | (none) | Token expiration in seconds must be greater than zero. |
 | `handler.settings_tokens.token_expiration_too_large` | `max` (int) | Token expiration in seconds cannot be greater than {{.max}}. |
 | `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | Refresh token offline - idle timeout in seconds must be greater than zero. |

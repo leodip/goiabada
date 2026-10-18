@@ -545,6 +545,11 @@
     margin-top: 0.125rem;
   }
 
+  .notice > :not(svg) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .notice-danger {
     background-color: var(--color-danger-soft);
     color: var(--color-danger-ink);
@@ -604,7 +609,10 @@
 
   /* Tables. A table wider than its place scrolls inside .table-scroll, never the page. */
 
+  /* Positioned, so the visually hidden text in its cells is placed within it and scrolls with
+     the table, rather than widening the page from where the table overflows. */
   .table-scroll {
+    position: relative;
     overflow-x: auto;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
@@ -662,6 +670,74 @@
     overflow-wrap: anywhere;
   }
 
+  /* A list table that stacks on narrow screens: each row becomes a card, its first cell the
+     card's title and every other cell a line labelled with its column's name, from the cell's
+     data-label. The labels are text a screen reader reads too, so a cell keeps its meaning where
+     a browser stops treating the restyled table as a table, as Safari can; explicit table roles
+     would avoid that, but HTML forbids them on a table's rows and cells. */
+  @media (max-width: 39.99rem) {
+    .data-table-stack,
+    .data-table-stack tbody,
+    .data-table-stack tr,
+    .data-table-stack td {
+      display: block;
+    }
+
+    .data-table-stack thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .data-table-stack tr {
+      padding: 0.875rem 1rem;
+      border-top: 1px solid var(--color-line);
+    }
+
+    .data-table-stack tbody tr:first-child {
+      border-top: 0;
+    }
+
+    .data-table-stack td {
+      padding: 0.125rem 0;
+      border-top: 0;
+    }
+
+    .data-table-stack td:first-child {
+      padding-bottom: 0.375rem;
+      font-weight: 600;
+    }
+
+    .data-table-stack td[data-label]::before {
+      content: attr(data-label) ": ";
+      color: var(--color-ink-muted);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .data-table-stack .cell-actions {
+      padding-top: 0.5rem;
+      text-align: start;
+    }
+
+    .data-table-stack .cell-mono {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table-stack .cell-secondary {
+      display: inline;
+    }
+
+    .data-table-stack .cell-secondary::before {
+      content: " · ";
+    }
+  }
+
   .cell-secondary {
     display: block;
     color: var(--color-ink-muted);
@@ -669,18 +745,21 @@
 
   /* Tabs: links between the sections of one record. The bar scrolls sideways on narrow screens. */
 
+  /* The bar's baseline is an inset shadow rather than a border, so the current tab's underline
+     sits on it without overflowing the bar, which would give the sideways-scrolling bar a
+     vertical scrollbar too. */
   .tab-bar {
     display: flex;
     gap: 0.25rem;
     margin-bottom: 1.5rem;
     overflow-x: auto;
-    border-bottom: 1px solid var(--color-line);
+    overflow-y: hidden;
+    box-shadow: inset 0 -1px 0 var(--color-line);
     scrollbar-width: thin;
   }
 
   .tab-item {
     flex: none;
-    margin-bottom: -1px;
     padding: 0.625rem 0.875rem;
     border-bottom: 2px solid transparent;
     color: var(--color-ink-muted);
@@ -933,6 +1012,11 @@
     background-color: var(--color-surface);
     transform: translateX(-100%);
     visibility: hidden;
+  }
+
+  /* The panel slides only while the menu button opens or closes it, never when the window crosses
+     the width where the sidebar becomes a panel. */
+  .app-sidebar[data-open] {
     transition:
       transform 0.2s,
       visibility 0.2s;
@@ -958,6 +1042,8 @@
     flex-direction: column;
   }
 
+  /* The header and the sidebar's head are one height, so their lower borders meet where the
+     sidebar's border crosses them. */
   .app-header {
     position: sticky;
     top: 0;
@@ -965,7 +1051,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    min-height: 3.5rem;
+    min-height: 4rem;
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--color-line);
     background-color: var(--color-surface);
@@ -1006,7 +1092,6 @@
       width: 17rem;
       transform: none;
       visibility: visible;
-      transition: none;
     }
 
     .app-sidebar[data-open="true"] {
@@ -1041,10 +1126,11 @@
 
   .sidebar-head {
     display: flex;
+    flex: none;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    min-height: 3.5rem;
+    min-height: 4rem;
     padding: 0.5rem 0.75rem 0.5rem 1.25rem;
     border-bottom: 1px solid var(--color-line);
   }
@@ -1285,6 +1371,7 @@
 
   .theme-swatch-auto > span {
     flex: 1;
+    background-repeat: no-repeat;
   }
 
   /* Windows high-contrast mode, and any other forced palette: draw with the system's colors where
@@ -1310,9 +1397,28 @@
     }
 
     .option-card:has(input:checked),
-    .nav-link[aria-current="page"],
     .pager-item[aria-current="page"] {
       border-color: Highlight;
+    }
+
+    /* A forced palette paints the transparent left border every link keeps for the current
+       page's marker, so the marker is drawn on the current link alone. */
+    .nav-link {
+      border-left-style: none;
+      padding-left: calc(0.75rem + 3px);
+    }
+
+    .nav-link[aria-current="page"] {
+      border-left-style: solid;
+      border-left-color: Highlight;
+      padding-left: 0.75rem;
+    }
+
+    /* A theme's picture shows the theme's own colors, which is all it is for. */
+    .theme-swatch,
+    .theme-swatch-light,
+    .theme-swatch-dark {
+      forced-color-adjust: none;
     }
 
     .tab-item[aria-current="page"] {

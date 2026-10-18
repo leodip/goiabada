@@ -27,7 +27,7 @@
 
 {{ if .pageResult.Users }}
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
-  <table class="data-table" id="usersTable">
+  <table class="data-table data-table-stack" id="usersTable">
     <thead>
       <tr>
         <th scope="col">{{ T $.ctx "adminconsole.admin_users.list.col_email" }}</th>
@@ -39,11 +39,11 @@
     <tbody>
       {{ range .pageResult.Users }}
       <tr>
-        <td class="whitespace-nowrap">
+        <td class="cell-wrap sm:whitespace-nowrap">
           <a class="text-link" href="/admin/users/{{ .Id }}/details?page={{ $page }}{{ if $query }}&query={{ $query }}{{ end }}">{{ .Email }}</a>
           {{ if not .Enabled }}<span class="tag tag-caution ml-1">{{ T $.ctx "adminconsole.admin_users.list.disabled_tag" }}</span>{{ end }}
         </td>
-        <td class="cell-wrap min-w-40">
+        <td class="cell-wrap sm:min-w-40" data-label="{{ T $.ctx "adminconsole.admin_users.list.col_name" }}">
           {{ if or .GivenName .MiddleName .FamilyName }}
           {{ .GivenName }} {{ .MiddleName }} {{ .FamilyName }}
           {{ else }}
@@ -51,7 +51,7 @@
           {{ end }}
           {{ if .Username }}<span class="cell-secondary">{{ .Username }}</span>{{ end }}
         </td>
-        <td class="cell-mono">{{ .Subject }}</td>
+        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_users.list.col_subject" }}">{{ .Subject }}</td>
         <td class="cell-actions">
           <a class="text-link text-link-danger" href="/admin/users/{{ .Id }}/delete?page={{ $page }}{{ if $query }}&query={{ $query }}{{ end }}">{{ T $.ctx "adminconsole.admin_users.list.action_delete" }}<span class="sr-only"> {{ .Email }}</span></a>
         </td>

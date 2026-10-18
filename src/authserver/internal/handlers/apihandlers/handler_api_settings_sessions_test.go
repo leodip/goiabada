@@ -66,22 +66,22 @@ func TestSettingsSessionsPut_RefusesAMissingOrOutOfRangeCap(t *testing.T) {
 		{
 			name:    "absent",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200}`,
-			message: "User session - max sessions per user is required.",
+			message: "Enter the maximum sessions per user.",
 		},
 		{
 			name:    "null",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null}`,
-			message: "User session - max sessions per user is required.",
+			message: "Enter the maximum sessions per user.",
 		},
 		{
 			name:    "below 0",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1}`,
-			message: "User session - max sessions per user must be between 0 and 1000.",
+			message: "The maximum sessions per user must be between 0 and 1000.",
 		},
 		{
 			name:    "above 1000",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001}`,
-			message: "User session - max sessions per user must be between 0 and 1000.",
+			message: "The maximum sessions per user must be between 0 and 1000.",
 		},
 	}
 

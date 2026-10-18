@@ -3302,9 +3302,6 @@
   .min-w-0 {
     min-width: 0px;
   }
-  .min-w-40 {
-    min-width: calc(var(--spacing) * 40);
-  }
   .flex-1 {
     flex: 1;
   }
@@ -3840,6 +3837,14 @@
       text-decoration-line: underline;
     }
   }
+  @media (width >= 40rem) {
+    .sm\:min-w-40 {
+      min-width: calc(var(--spacing) * 40);
+    }
+    .sm\:whitespace-nowrap {
+      white-space: nowrap;
+    }
+  }
   @media (width >= 48rem) {
     .md\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4295,6 +4300,10 @@
     height: 1.25rem;
     margin-top: 0.125rem;
   }
+  .notice > :not(svg) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   .notice-danger {
     background-color: var(--color-danger-soft);
     color: var(--color-danger-ink);
@@ -4342,6 +4351,7 @@
     color: var(--color-note-ink);
   }
   .table-scroll {
+    position: relative;
     overflow-x: auto;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-panel);
@@ -4392,6 +4402,55 @@
   .cell-wrap {
     overflow-wrap: anywhere;
   }
+  @media (max-width: 39.99rem) {
+    .data-table-stack, .data-table-stack tbody, .data-table-stack tr, .data-table-stack td {
+      display: block;
+    }
+    .data-table-stack thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .data-table-stack tr {
+      padding: 0.875rem 1rem;
+      border-top: 1px solid var(--color-line);
+    }
+    .data-table-stack tbody tr:first-child {
+      border-top: 0;
+    }
+    .data-table-stack td {
+      padding: 0.125rem 0;
+      border-top: 0;
+    }
+    .data-table-stack td:first-child {
+      padding-bottom: 0.375rem;
+      font-weight: 600;
+    }
+    .data-table-stack td[data-label]::before {
+      content: attr(data-label) ": ";
+      color: var(--color-ink-muted);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .data-table-stack .cell-actions {
+      padding-top: 0.5rem;
+      text-align: start;
+    }
+    .data-table-stack .cell-mono {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .data-table-stack .cell-secondary {
+      display: inline;
+    }
+    .data-table-stack .cell-secondary::before {
+      content: " · ";
+    }
+  }
   .cell-secondary {
     display: block;
     color: var(--color-ink-muted);
@@ -4401,12 +4460,12 @@
     gap: 0.25rem;
     margin-bottom: 1.5rem;
     overflow-x: auto;
-    border-bottom: 1px solid var(--color-line);
+    overflow-y: hidden;
+    box-shadow: inset 0 -1px 0 var(--color-line);
     scrollbar-width: thin;
   }
   .tab-item {
     flex: none;
-    margin-bottom: -1px;
     padding: 0.625rem 0.875rem;
     border-bottom: 2px solid transparent;
     color: var(--color-ink-muted);
@@ -4612,6 +4671,8 @@
     background-color: var(--color-surface);
     transform: translateX(-100%);
     visibility: hidden;
+  }
+  .app-sidebar[data-open] {
     transition: transform 0.2s, visibility 0.2s;
   }
   .app-sidebar[data-open="true"] {
@@ -4638,7 +4699,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    min-height: 3.5rem;
+    min-height: 4rem;
     padding: 0.5rem 1rem;
     border-bottom: 1px solid var(--color-line);
     background-color: var(--color-surface);
@@ -4673,7 +4734,6 @@
       width: 17rem;
       transform: none;
       visibility: visible;
-      transition: none;
     }
     .app-sidebar[data-open="true"] {
       box-shadow: none;
@@ -4699,10 +4759,11 @@
   }
   .sidebar-head {
     display: flex;
+    flex: none;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    min-height: 3.5rem;
+    min-height: 4rem;
     padding: 0.5rem 0.75rem 0.5rem 1.25rem;
     border-bottom: 1px solid var(--color-line);
   }
@@ -4900,6 +4961,7 @@
   }
   .theme-swatch-auto > span {
     flex: 1;
+    background-repeat: no-repeat;
   }
   @media (forced-colors: active) {
     .switch {
@@ -4916,8 +4978,20 @@
     .switch:checked::before {
       background-color: HighlightText;
     }
-    .option-card:has(input:checked), .nav-link[aria-current="page"], .pager-item[aria-current="page"] {
+    .option-card:has(input:checked), .pager-item[aria-current="page"] {
       border-color: Highlight;
+    }
+    .nav-link {
+      border-left-style: none;
+      padding-left: calc(0.75rem + 3px);
+    }
+    .nav-link[aria-current="page"] {
+      border-left-style: solid;
+      border-left-color: Highlight;
+      padding-left: 0.75rem;
+    }
+    .theme-swatch, .theme-swatch-light, .theme-swatch-dark {
+      forced-color-adjust: none;
     }
     .tab-item[aria-current="page"] {
       border-bottom-color: Highlight;

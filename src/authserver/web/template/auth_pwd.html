@@ -22,13 +22,11 @@
   </div>
 
   <div class="field">
-    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <label class="field-label" for="password">{{ T $.ctx "auth.pwd.password_label" }}</label>
-      {{ if .smtpEnabled }}
-      <a class="text-link text-sm" href="/forgot-password">{{ T $.ctx "auth.pwd.forgot_password" }}</a>
-      {{ end }}
-    </div>
+    <label class="field-label" for="password">{{ T $.ctx "auth.pwd.password_label" }}</label>
     <input class="control" id="password" type="password" name="password" autocomplete="current-password">
+    {{ if .smtpEnabled }}
+    <p class="text-right text-sm"><a class="text-link" href="/forgot-password">{{ T $.ctx "auth.pwd.forgot_password" }}</a></p>
+    {{ end }}
   </div>
 
   <button class="button button-primary button-block" type="submit">{{ T $.ctx "auth.pwd.button" }}</button>
