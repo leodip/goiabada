@@ -33,7 +33,7 @@ Most OpenID Connect libraries do every step below once you give them the discove
    Host: app.example.com
    ```
 
-   Check that `state` is the one you kept. If it isn't, stop: the request didn't come from your app. Check too that `iss` is the auth server's issuer, the `issuer` in its [discovery document](/reference/endpoints/discovery-and-jwks/). If the browser brings `error` and `error_description` instead of `code`, the sign-in was refused, and the description says why.
+   Check that `state` is the one you kept. If it isn't, stop: the request didn't come from your app. Check too that `iss` is the auth server's issuer, the `issuer` in its [discovery document](/reference/endpoints/discovery-and-jwks/), and stop if it isn't. If the browser brings `error` and `error_description` instead of `code`, the sign-in was refused, and the description says why.
 
 5. From your server, redeem the code at the token endpoint within 60 seconds, with your client secret and the code verifier:
 

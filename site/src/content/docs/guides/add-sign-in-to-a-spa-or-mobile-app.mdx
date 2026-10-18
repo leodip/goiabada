@@ -34,7 +34,7 @@ It's the same trip as [a web app's](/guides/add-sign-in-to-a-web-app/): the brow
    Host: auth.example.com
    ```
 
-6. The user signs in, and the browser comes back to your redirect URI with `code` and `state`. Check that `state` is the one you kept, then redeem the code within 60 seconds. A public client sends its `client_id` and no secret:
+6. The user signs in, and the browser comes back to your redirect URI with `code`, `state` and `iss`. Check that `state` is the one you kept and that `iss` is the auth server's issuer, then redeem the code within 60 seconds. A public client sends its `client_id` and no secret:
 
    ```bash
    curl -X POST https://auth.example.com/auth/token \

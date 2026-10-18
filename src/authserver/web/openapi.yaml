@@ -5939,13 +5939,11 @@ components:
           type: string
           maxLength: 60
           description: >-
-            The issuer, at most 60 characters, with no < or >. It must be an https URL with no
-            query, fragment or user info (a trailing ? or # counts as one), or exactly the auth
-            server's base URL (GOIABADA_AUTHSERVER_BASEURL) whatever its scheme, as RFC 8414
-            section 2, RFC 9207 section 2 and OpenID Connect Discovery 1.0 section 3 require.
-            Anything else is refused with 400 VALIDATION_ERROR. The rule applies only when the
-            value differs from the stored issuer, so a stored issuer it refuses can be sent back
-            unchanged while the other general settings are saved.
+            The issuer: an https URL with no query, fragment or user info, or exactly the auth
+            server's base URL (GOIABADA_AUTHSERVER_BASEURL), whatever its scheme. A changed issuer
+            outside that rule is refused with 400 VALIDATION_ERROR. Any issuer longer than 60
+            characters is refused with 400 VALIDATION_ERROR too, and one holding < or > with 400
+            validator.settings.issuer_angle_brackets.
         selfRegistrationEnabled:
           type: boolean
         selfRegistrationRequiresEmailVerification:

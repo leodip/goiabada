@@ -82,14 +82,14 @@ When the person who signs in is a **different** user, the browser has changed ha
 | What | What happens |
 |---|---|
 | The previous user's session | Ended, as if someone had ended it: deleted, with its refresh tokens and unredeemed authorization codes revoked |
-| The new user | Gets a session of their own, never the one that was there |
+| The new user | Never gets the session that was there |
 | The previous user's other devices | Untouched. Only what this browser's session handed out is revoked |
 
 The grants that session held were reachable from this browser, and the browser is now someone else's. An offline refresh token from it would otherwise keep working in the background indefinitely.
 
 Nothing carries over. If the client asks for a one-time code, the new user is asked for one, however the previous user signed in, and the `acr` and `amr` in their tokens describe only what they did.
 
-Each handover leaves a `cross_user_session_replaced` entry in the audit log, naming both users and the session that was ended, beside the `terminated_user_session` and `deleted_user_session` entries for that session and the `started_new_user_session` entry for the new one. It's the entry that tells a browser changing hands apart from an administrator ending a session.
+Each handover leaves a `cross_user_session_replaced` entry in the audit log, naming both users and the session that was ended, beside the `terminated_user_session` and `deleted_user_session` entries for that session and the `started_new_user_session` entry for the new one, when one starts. It's the entry that tells a browser changing hands apart from an administrator ending a session.
 
 <Aside>
 When the **same** user signs in again, none of this applies. Their session is reused while it's still valid. When it isn't, they get a new session, and nothing is revoked.

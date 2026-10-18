@@ -121,7 +121,7 @@ An origin is a scheme, a host and an optional port, with nothing after the host:
 
 **Web origins are permitted server-wide.** A browser's CORS check doesn't say which client is calling, so an origin registered on any client is accepted for every client. The **Web origins** tab lists every origin permitted server-wide, and the client each was registered for.
 
-`/.well-known/openid-configuration` and `/certs` accept every origin, with nothing to register.
+The [discovery document](/reference/endpoints/discovery-and-jwks/#where-the-document-is), at both its addresses, and `/certs` accept every origin, with nothing to register.
 
 ## Consent required
 

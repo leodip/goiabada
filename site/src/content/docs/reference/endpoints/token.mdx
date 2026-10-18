@@ -231,14 +231,14 @@ Pragma: no-cache
 | `invalid_request` | 400 | A parameter is missing, repeated or not allowed for this client |
 | `invalid_client` | 401 | The client couldn't be authenticated, with `WWW-Authenticate: Basic realm="goiabada"` |
 | `invalid_grant` | 400 | The code, refresh token or user's credentials can't be used |
-| `unauthorized_client` | 400 | The grant is off for this client |
+| `unauthorized_client` | 400 | The grant is off for this client, or this client can't use it |
 | `unsupported_grant_type` | 400 | `grant_type` isn't one of the four: "Unsupported grant_type." |
 | `invalid_scope` | 400 | A scope is malformed, unknown, or more than the client or user may have |
 | `server_error` | 500 | Something failed on the server. The description ends with a request id to find it in the logs |
 
 `error_description` is English, with no character outside the ones RFC 6749 allows in it, and at most 512 bytes.
 
-With rate limiting on, the password grant is limited per IP address and per account, and a request over the limit is answered `429 Too Many Requests` with a `Retry-After` header. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/). The other grants aren't limited.
+The password grant is limited per account, 100 wrong passwords an hour, whether or not rate limiting is on. With rate limiting on, it's also limited per IP address. A request over a limit is answered `429 Too Many Requests` with a `Retry-After` header. See [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/). The other grants aren't limited.
 
 ## Calling it from a browser
 
