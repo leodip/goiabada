@@ -17,8 +17,14 @@ import (
 // syntax error fails here rather than in a visitor's browser, and syntax newer than ES2020 is
 // refused, the cap: logical assignment and numeric separators (ES2021), class fields, private
 // names, static blocks, top-level await and the regular expression d flag (ES2022), a hashbang
-// (ES2023), the v flag (ES2024) and inline modifiers (ES2025). A classic script cannot import or
-// export, so module syntax is refused too.
+// (ES2023), the v flag (ES2024) and inline modifiers (ES2025). A classic script cannot import,
+// export, read import.meta or use for await outside an async function, so those are refused too.
+//
+// The parser accepts some scripts a browser refuses when it compiles them, the early errors of the
+// language, and the walk refuses the ones a slip of the hand writes: an assignment or an increment
+// whose target is not a variable, a property or a destructuring pattern, and a regular expression
+// with an unknown or repeated flag, an unbalanced group or character class, an unknown group
+// syntax, or a quantifier with nothing to repeat.
 //
 // The pages load these files as they are written: there is no build step that could translate one
 // down, so the cap is the language the files are written in.
@@ -119,6 +125,9 @@ func (v *syntaxCap) Enter(n js.INode) js.IVisitor {
 			}
 		}
 	case *js.BinaryExpr:
+		if assignmentOps[n.Op] && !assignmentTarget(n.X, n.Op == js.EqToken) {
+			v.add("%s assigns to %s, which is not a variable, a property or a destructuring pattern", n.Op.String(), n.X.String())
+		}
 		switch n.Op {
 		case js.AndEqToken, js.OrEqToken, js.NullishEqToken:
 			v.add("the logical assignment %s is ES2021", n.Op.String())
@@ -134,9 +143,22 @@ func (v *syntaxCap) Enter(n js.INode) js.IVisitor {
 	case *js.LiteralExpr:
 		v.literal(n)
 	case *js.UnaryExpr:
-		if n.Op == js.AwaitToken && !v.async {
-			v.add("await outside an async function is top-level await, ES2022, and a module's alone")
+		switch n.Op {
+		case js.AwaitToken:
+			if !v.async {
+				v.add("await outside an async function is top-level await, ES2022, and a module's alone")
+			}
+		case js.PreIncrToken, js.PreDecrToken, js.PostIncrToken, js.PostDecrToken:
+			if !simpleTarget(n.X) {
+				v.add("%s changes %s, which is not a variable or a property", n.Op.String(), n.X.String())
+			}
 		}
+	case *js.ForOfStmt:
+		if n.Await && !v.async {
+			v.add("for await outside an async function is a syntax error in a script")
+		}
+	case *js.ImportMetaExpr:
+		v.add("import.meta is module syntax, which a classic script cannot use")
 	case *js.ImportStmt:
 		v.add("import is module syntax, which a classic script cannot use")
 	case *js.ExportStmt:
@@ -159,12 +181,120 @@ func privateName(e js.IExpr) (string, bool) {
 	return "", false
 }
 
+// assignmentOps are the operators that assign to their left operand.
+var assignmentOps = map[js.TokenType]bool{
+	js.EqToken: true, js.AddEqToken: true, js.SubEqToken: true, js.MulEqToken: true, js.DivEqToken: true,
+	js.ModEqToken: true, js.ExpEqToken: true, js.LtLtEqToken: true, js.GtGtEqToken: true,
+	js.GtGtGtEqToken: true, js.BitAndEqToken: true, js.BitOrEqToken: true, js.BitXorEqToken: true,
+	js.AndEqToken: true, js.OrEqToken: true, js.NullishEqToken: true,
+}
+
+// simpleTarget reports whether e is a variable or a property, what an increment or a compound
+// assignment may change. An optional chain is neither.
+func simpleTarget(e js.IExpr) bool {
+	switch e := e.(type) {
+	case *js.Var:
+		return true
+	case *js.DotExpr:
+		return !e.Optional
+	case *js.IndexExpr:
+		return !e.Optional
+	case *js.GroupExpr:
+		return simpleTarget(e.X)
+	}
+	return false
+}
+
+// assignmentTarget reports whether e may stand left of an assignment: a simple target, or for a
+// plain = a destructuring pattern.
+func assignmentTarget(e js.IExpr, plain bool) bool {
+	switch e.(type) {
+	case *js.ArrayExpr, *js.ObjectExpr:
+		return plain
+	}
+	return simpleTarget(e)
+}
+
+// regexpGroupStart matches what may follow "(?" in a group: a non-capturing group, a lookahead or a
+// lookbehind, or a named group. An inline modifier is matched apart, as syntax past the cap.
+var regexpGroupStart = regexp.MustCompile(`^(?::|=|!|<=|<!|<[A-Za-z_$][\w$]*>)`)
+
+// regexpProblem returns why a browser refuses a regular expression's pattern, or "": an unbalanced
+// group or character class, an unknown group syntax, or a quantifier with nothing to repeat.
+func regexpProblem(pattern string) string {
+	depth := 0
+	canRepeat := false
+	for i := 0; i < len(pattern); i++ {
+		switch c := pattern[i]; c {
+		case '\\':
+			i++
+			canRepeat = true
+		case '[':
+			end := i + 1
+			for ; end < len(pattern) && pattern[end] != ']'; end++ {
+				if pattern[end] == '\\' {
+					end++
+				}
+			}
+			if end >= len(pattern) {
+				return "a character class is not closed"
+			}
+			i = end
+			canRepeat = true
+		case '(':
+			depth++
+			if strings.HasPrefix(pattern[i+1:], "?") {
+				if m := regexpModifier.FindString(pattern[i:]); m != "" && strings.HasPrefix(pattern[i:], m) {
+					i += len(m) - 1
+				} else if m := regexpGroupStart.FindString(pattern[i+2:]); m != "" {
+					i += 1 + len(m)
+				} else {
+					return "a group starts with an unknown (? syntax"
+				}
+			}
+			canRepeat = false
+		case ')':
+			depth--
+			if depth < 0 {
+				return "a group is closed that was never opened"
+			}
+			canRepeat = true
+		case '|':
+			canRepeat = false
+		case '*', '+', '?':
+			if !canRepeat {
+				return "a quantifier has nothing to repeat"
+			}
+			if i+1 < len(pattern) && pattern[i+1] == '?' {
+				i++
+			}
+			canRepeat = false
+		default:
+			canRepeat = true
+		}
+	}
+	if depth > 0 {
+		return "a group is not closed"
+	}
+	return ""
+}
+
 func (v *syntaxCap) literal(n *js.LiteralExpr) {
 	data := string(n.Data)
 	switch {
 	case n.TokenType == js.RegExpToken:
 		end := strings.LastIndexByte(data, '/')
 		pattern, flags := data[1:end], data[end+1:]
+		for i, f := range flags {
+			if !strings.ContainsRune("dgimsuyv", f) {
+				v.add("the regular expression %s has the unknown flag %c", data, f)
+			} else if strings.ContainsRune(flags[:i], f) {
+				v.add("the regular expression %s has the flag %c twice", data, f)
+			}
+		}
+		if problem := regexpProblem(pattern); problem != "" {
+			v.add("the regular expression %s is refused by a browser: %s", data, problem)
+		}
 		if strings.ContainsRune(flags, 'd') {
 			v.add("the regular expression flag d, in %s, is ES2022", data)
 		}

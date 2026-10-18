@@ -17,6 +17,15 @@ import (
 // template's parse tree, so every branch of every {{if}}, {{with}} and {{range}} is checked, and an
 // action stands for the text, attribute or value it renders.
 //
+// Each template file is checked on its own, and each page again as the renderer assembles it: with
+// every layout under layouts/ that finds all the templates it calls in the page, and with every
+// partial under partials/, a {{template}} call resolved where it is made. A partial is therefore held
+// to the place each page puts it, and the rules about a whole page, its one <h1> and the ids its
+// references name, are held to the page as it is served. Every fact is kept per branch: an attribute
+// or a name present in one branch alone is not taken as present in the other, a label shown in one
+// branch labels no control outside it, and two <h1> or two ids in branches that never render together
+// do not collide.
+//
 // Markup:
 //   - every element is closed explicitly and in order, a void element never is, and none is closed
 //     by a trailing slash outside SVG;
@@ -26,18 +35,19 @@ import (
 //   - none of the nesting a browser repairs silently: a block element in a <p>, a form in a form, a
 //     link or button in a link or button, a list item outside a list, stray content in a table;
 //   - no executable script: an inline <script> is a JSON data block, <script type="application/json">,
-//     whose body is valid JSON with each action read as a value, or loads a file with src and has no
-//     body; no on... attribute and no javascript: URL.
+//     whose body is valid JSON in every branch with each action read as a value, or loads a file with
+//     src and has no body; no <script> inside SVG; no on... attribute and no javascript: URL.
 //
 // Accessibility:
-//   - every form control has a label: a <label for> naming its id, a <label> around it, or
-//     aria-label or aria-labelledby;
+//   - every form control has a label: a <label for> naming its id wherever it renders, a <label>
+//     around it, or aria-label or aria-labelledby;
 //   - every <img> has alt, every <svg> is hidden from assistive technology or named, and every link
-//     and button has a name: text, an action, or aria-label or aria-labelledby;
-//   - at most one <h1> per file, heading levels never skip on the way down, <html> has lang, and no
-//     tabindex is positive;
-//   - every id that for, aria-labelledby or aria-describedby names is declared in the same file, and
-//     an id written without an action is neither repeated inside {{range}} nor declared twice.
+//     and button has a name in every branch: text, an action, or aria-label or aria-labelledby;
+//   - a page has one <h1> on every branch, heading levels never skip on the way down, <html> has
+//     lang, and no tabindex is positive;
+//   - every id that for, aria-labelledby or aria-describedby names is declared wherever the reference
+//     renders, and an id written without an action is neither repeated inside {{range}} nor declared
+//     twice where both can render.
 //
 // outOfScope names the files no rule reads, a path or a directory ending in "/": the email
 // templates, which are not pages. pending names the pages not yet brought under the rules, which
@@ -53,28 +63,38 @@ func AssertWellFormedTemplates(t *testing.T, fsys fs.FS, root string, outOfScope
 func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, outOfScope, pending []string) {
 	r.Helper()
 
-	seen := map[string]bool{}
+	files := map[string]string{}
+	n, err := walkHTMLTemplates(fsys, root, func(path, content string) {
+		files[path] = content
+	})
+	if err != nil {
+		r.Fatalf("walking templates under %s: %v", root, err)
+	}
+	if n == 0 {
+		r.Fatalf("walked no .html files under %s; this guard is checking nothing", root)
+	}
+
+	set := newTemplateSet(root, files, outOfScope)
 	checked := 0
-	walkOrFail(r, fsys, root, func(path, content string) {
+	for _, path := range set.order {
 		rel := strings.TrimPrefix(path, root+"/")
-		seen[rel] = true
 		if matchesTemplateList(rel, outOfScope) {
-			return
+			continue
 		}
-		found := findMarkupProblems(path, content)
+		found := set.problems(path)
 		if listsTemplate(rel, pending) {
 			if len(found) == 0 {
 				r.Errorf("%s: listed as pending, and already meets every rule; remove it from the list", path)
 			}
-			return
+			continue
 		}
 		checked++
 		for _, f := range found {
 			r.Errorf("%s: %s", f.path, f.detail)
 		}
-	})
+	}
 	for _, entry := range append(append([]string{}, outOfScope...), pending...) {
-		if !strings.HasSuffix(entry, "/") && !seen[entry] {
+		if _, ok := files[root+"/"+entry]; !strings.HasSuffix(entry, "/") && !ok {
 			r.Errorf("%s/%s: listed, and no such template exists; remove it from the list", root, entry)
 		}
 	}
@@ -101,36 +121,218 @@ func listsTemplate(rel string, list []string) bool {
 	return false
 }
 
-// findMarkupProblems returns one finding per rule a template breaks, each naming its line.
+// findMarkupProblems checks one template file on its own, as a rule test reads it: the file's rules,
+// without the rules about a whole page.
 func findMarkupProblems(path, content string) []templateFinding {
-	tree := parse.New(path)
-	tree.Mode = parse.SkipFuncCheck | parse.ParseComments
-	set := map[string]*parse.Tree{}
-	if _, err := tree.Parse(content, "", "", set); err != nil {
-		return []templateFinding{{path: path, detail: "does not parse: " + err.Error()}}
+	set := newTemplateSet("", map[string]string{path: content}, nil)
+	f := set.files[path]
+	if f.err != nil {
+		return []templateFinding{{path: path, detail: "does not parse: " + f.err.Error()}}
 	}
+	return renderMarkupFindings(set.fileProblems(f))
+}
 
-	c := &markupChecker{lines: newlineOffsets(content), staticIDs: map[string]int{}}
-	names := make([]string, 0, len(set))
-	for name := range set {
+type templateKind int
+
+const (
+	pageTemplate templateKind = iota
+	layoutTemplate
+	partialTemplate
+)
+
+// templateFile is one parsed template file: its trees, the file's own and one per {{define}}, and
+// where each line of it starts.
+type templateFile struct {
+	path  string
+	lines []int
+	trees map[string]*parse.Tree
+	err   error
+	kind  templateKind
+}
+
+type templateSet struct {
+	files map[string]*templateFile
+	order []string
+}
+
+func newTemplateSet(root string, contents map[string]string, outOfScope []string) *templateSet {
+	set := &templateSet{files: map[string]*templateFile{}}
+	for path, content := range contents {
+		rel := strings.TrimPrefix(path, root+"/")
+		f := &templateFile{path: path, lines: newlineOffsets(content), trees: map[string]*parse.Tree{}}
+		switch {
+		case strings.HasPrefix(rel, "layouts/"):
+			f.kind = layoutTemplate
+		case strings.HasPrefix(rel, "partials/"):
+			f.kind = partialTemplate
+		}
+		if matchesTemplateList(rel, outOfScope) {
+			continue
+		}
+		tree := parse.New(path)
+		tree.Mode = parse.SkipFuncCheck | parse.ParseComments
+		if _, err := tree.Parse(content, "", "", f.trees); err != nil {
+			f.err = err
+		}
+		set.files[path] = f
+		set.order = append(set.order, path)
+	}
+	sort.Strings(set.order)
+	return set
+}
+
+// problems returns one finding per rule the file breaks: read on its own, and for a page read as
+// served, in each layout that can render it.
+func (set *templateSet) problems(path string) []templateFinding {
+	f := set.files[path]
+	if f.err != nil {
+		return []templateFinding{{path: path, detail: "does not parse: " + f.err.Error()}}
+	}
+	found := set.fileProblems(f)
+	if f.kind == pageTemplate {
+		found = append(found, set.pageProblems(f)...)
+	}
+	return renderMarkupFindings(found)
+}
+
+// fileProblems reads each of a file's trees on its own, a call to a template the file defines
+// resolved where it is made.
+func (set *templateSet) fileProblems(f *templateFile) []markupFinding {
+	var found []markupFinding
+	names := make([]string, 0, len(f.trees))
+	for name := range f.trees {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		t := set[name]
-		if t.Root == nil {
+		tree := f.trees[name]
+		if tree.Root == nil {
 			continue
 		}
-		s := &markupState{}
-		c.walkList(s, t.Root)
-		c.finishTree(s)
+		w := newMarkupWalk(set, f.trees, false)
+		w.walkTree(tree)
+		found = append(found, w.found...)
 	}
-	c.finishFile()
+	return found
+}
 
-	sort.SliceStable(c.found, func(i, j int) bool { return c.found[i].line < c.found[j].line })
-	out := make([]templateFinding, 0, len(c.found))
-	for _, f := range c.found {
-		out = append(out, templateFinding{path: path, detail: fmt.Sprintf("line %d: %s", f.line, f.message)})
+// pageProblems reads a page as served: inside each layout that finds every template it calls in
+// the page and the partials, as the renderer parses them, the layout first, then the page, then
+// the partials. A page that is a whole document of its own is read alone.
+func (set *templateSet) pageProblems(page *templateFile) []markupFinding {
+	var found []markupFinding
+	rendered := false
+	for _, path := range set.order {
+		layout := set.files[path]
+		if layout.kind != layoutTemplate || layout.err != nil {
+			continue
+		}
+		trees := set.composed(layout, page)
+		root := layout.trees[layout.path]
+		if root == nil || !resolvesEveryCall(root, trees, map[string]bool{}) {
+			continue
+		}
+		rendered = true
+		w := newMarkupWalk(set, trees, true)
+		w.pageFile = page.path
+		w.page = layout.path
+		w.walkTree(root)
+		found = append(found, w.found...)
+	}
+	if rendered {
+		return found
+	}
+	top := page.trees[page.path]
+	if top == nil || parse.IsEmptyTree(top.Root) {
+		return []markupFinding{{file: page.path, line: 1, message: "no layout under layouts/ finds every template it calls in this page"}}
+	}
+	trees := set.composed(nil, page)
+	w := newMarkupWalk(set, trees, true)
+	w.pageFile = page.path
+	w.walkTree(top)
+	return w.found
+}
+
+func (set *templateSet) composed(layout, page *templateFile) map[string]*parse.Tree {
+	trees := map[string]*parse.Tree{}
+	// A later definition replaces an earlier one, as the renderer parses them, except that an empty
+	// one never replaces a template already defined.
+	add := func(f *templateFile) {
+		for name, tree := range f.trees {
+			if tree.Root == nil {
+				continue
+			}
+			if _, defined := trees[name]; defined && parse.IsEmptyTree(tree.Root) {
+				continue
+			}
+			trees[name] = tree
+		}
+	}
+	if layout != nil {
+		add(layout)
+	}
+	add(page)
+	for _, path := range set.order {
+		if f := set.files[path]; f.kind == partialTemplate && f.err == nil {
+			add(f)
+		}
+	}
+	return trees
+}
+
+// resolvesEveryCall reports whether every {{template}} call reachable from tree names a template in
+// trees.
+func resolvesEveryCall(tree *parse.Tree, trees map[string]*parse.Tree, seen map[string]bool) bool {
+	ok := true
+	var visit func(parse.Node)
+	visit = func(node parse.Node) {
+		switch n := node.(type) {
+		case *parse.ListNode:
+			if n != nil {
+				for _, c := range n.Nodes {
+					visit(c)
+				}
+			}
+		case *parse.IfNode:
+			visit(n.List)
+			visit(n.ElseList)
+		case *parse.WithNode:
+			visit(n.List)
+			visit(n.ElseList)
+		case *parse.RangeNode:
+			visit(n.List)
+			visit(n.ElseList)
+		case *parse.TemplateNode:
+			called, found := trees[n.Name]
+			if !found {
+				ok = false
+				return
+			}
+			if !seen[n.Name] {
+				seen[n.Name] = true
+				visit(called.Root)
+			}
+		}
+	}
+	visit(tree.Root)
+	return ok
+}
+
+func renderMarkupFindings(found []markupFinding) []templateFinding {
+	sort.SliceStable(found, func(i, j int) bool {
+		if found[i].file != found[j].file {
+			return found[i].file < found[j].file
+		}
+		return found[i].line < found[j].line
+	})
+	seen := map[string]bool{}
+	out := make([]templateFinding, 0, len(found))
+	for _, f := range found {
+		detail := fmt.Sprintf("line %d: %s", f.line, f.message)
+		if key := f.file + "\x00" + detail; !seen[key] {
+			seen[key] = true
+			out = append(out, templateFinding{path: f.file, detail: detail + f.context})
+		}
 	}
 	return out
 }
@@ -145,9 +347,22 @@ func newlineOffsets(content string) []int {
 	return offsets
 }
 
+// markupFinding is one rule broken, at a file and line. context says where a page reading found
+// it, the call that reached the template and the layout the page was read in, and is left out when
+// findings are matched, so one already found reading the file alone is not reported again.
 type markupFinding struct {
+	file    string
 	line    int
 	message string
+	context string
+}
+
+// markupWhere is where a node is: its file and line, and, inside a template a call reached, where
+// the call was made.
+type markupWhere struct {
+	file string
+	line int
+	via  string
 }
 
 type markupMode int
@@ -171,16 +386,87 @@ const (
 // hole stands for an action in a value read as JSON: a value whatever the action renders.
 const hole = "null"
 
+// rawAlternatives bounds the bodies of one raw-text element kept apart, one per combination of
+// branches inside it; past it, the first ones are kept.
+const rawAlternatives = 32
+
+// markupStep is one branch taken: the branching node, by its tree and position, and which of its
+// lists, the body (0) or the else (1).
+type markupStep struct {
+	tree   string
+	pos    int
+	branch int
+}
+
+// markupPath is the branches taken to reach a fact.
+type markupPath []markupStep
+
+// holdsWherever reports whether a fact on path p renders wherever one on q does: p is a prefix of q.
+func (p markupPath) holdsWherever(q markupPath) bool {
+	if len(p) > len(q) {
+		return false
+	}
+	for i := range p {
+		if p[i] != q[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// covers reports whether facts on the paths given render wherever path p does: one is on a prefix
+// of p, or under p every list of one branching node holds a fact, each list covered the same way, as
+// an id declared in every arm of an if, else if and else is.
+func covers(paths []markupPath, p markupPath) bool {
+	for _, f := range paths {
+		if f.holdsWherever(p) {
+			return true
+		}
+	}
+	nodes := map[markupStep]bool{}
+	for _, f := range paths {
+		if len(f) > len(p) && p.holdsWherever(f) {
+			step := f[len(p)]
+			step.branch = 0
+			nodes[step] = true
+		}
+	}
+	for node := range nodes {
+		all := true
+		for branch := 0; branch < 2 && all; branch++ {
+			step := node
+			step.branch = branch
+			all = covers(paths, append(append(markupPath{}, p...), step))
+		}
+		if all {
+			return true
+		}
+	}
+	return false
+}
+
+// excludes reports whether facts on p and q never render together: they take different lists of
+// one branching node.
+func (p markupPath) excludes(q markupPath) bool {
+	for i := 0; i < len(p) && i < len(q); i++ {
+		if p[i] == q[i] {
+			continue
+		}
+		return p[i].tree == q[i].tree && p[i].pos == q[i].pos && p[i].branch != q[i].branch
+	}
+	return false
+}
+
 type markupAttr struct {
-	name    string
-	value   string // as written, each action spelled as the parser prints it
-	dynamic bool   // the value holds an action
+	name  string
+	value string // as written, each action spelled as the parser prints it
+	maybe bool   // written in some branches only
 }
 
 type markupTag struct {
 	name      string
 	end       bool
-	line      int
+	where     markupWhere
 	attrs     []markupAttr
 	dynamic   bool // an action stands among the attributes, so any of them may be present
 	selfClose bool
@@ -193,16 +479,17 @@ func (t *markupTag) clone() *markupTag {
 	if t == nil {
 		return nil
 	}
-	n := &markupTag{name: t.name, end: t.end, line: t.line, dynamic: t.dynamic, selfClose: t.selfClose,
+	n := &markupTag{name: t.name, end: t.end, where: t.where, dynamic: t.dynamic, selfClose: t.selfClose,
 		attrName: t.attrName, valueDyn: t.valueDyn}
 	n.attrs = append(n.attrs, t.attrs...)
 	n.attrValue.WriteString(t.attrValue.String())
 	return n
 }
 
+// attr returns the attribute name written in every branch.
 func (t *markupTag) attr(name string) (markupAttr, bool) {
 	for _, a := range t.attrs {
-		if a.name == name {
+		if a.name == name && !a.maybe {
 			return a, true
 		}
 	}
@@ -214,9 +501,18 @@ func (t *markupTag) has(name string) bool {
 	return ok
 }
 
+func (t *markupTag) written(name string) bool {
+	for _, a := range t.attrs {
+		if a.name == name {
+			return true
+		}
+	}
+	return false
+}
+
 type openElement struct {
 	name    string
-	line    int
+	where   markupWhere
 	foreign bool
 	named   bool // it holds text, an action or a named image, or carries a name of its own
 	script  string
@@ -227,16 +523,17 @@ type markupState struct {
 	quote   byte
 	tag     *markupTag
 	stack   []openElement
-	raw     strings.Builder
-	branch  int
+	raw     []string
+	path    markupPath
 	ranges  int
 	heading int
 }
 
 func (s *markupState) clone() *markupState {
-	n := &markupState{mode: s.mode, quote: s.quote, tag: s.tag.clone(), branch: s.branch, ranges: s.ranges, heading: s.heading}
+	n := &markupState{mode: s.mode, quote: s.quote, tag: s.tag.clone(), ranges: s.ranges, heading: s.heading}
 	n.stack = append(n.stack, s.stack...)
-	n.raw.WriteString(s.raw.String())
+	n.raw = append(n.raw, s.raw...)
+	n.path = append(n.path, s.path...)
 	return n
 }
 
@@ -250,7 +547,7 @@ func (s *markupState) top() *openElement {
 func (s *markupState) within(names ...string) bool {
 	for i := range s.stack {
 		for _, n := range names {
-			if s.stack[i].name == n {
+			if s.stack[i].name == n && !s.stack[i].foreign {
 				return true
 			}
 		}
@@ -258,9 +555,19 @@ func (s *markupState) within(names ...string) bool {
 	return false
 }
 
+// svgHTMLPoints are the SVG elements whose content is HTML again.
+var svgHTMLPoints = map[string]bool{"foreignObject": true, "desc": true, "title": true}
+
+// foreign reports whether the next element is SVG or MathML content rather than HTML.
 func (s *markupState) foreign() bool {
 	top := s.top()
-	return top != nil && (top.foreign || top.name == "svg" || top.name == "math")
+	if top == nil {
+		return false
+	}
+	if top.foreign {
+		return !svgHTMLPoints[top.name]
+	}
+	return top.name == "svg" || top.name == "math"
 }
 
 // markName marks every open element as holding content a name can come from.
@@ -270,118 +577,214 @@ func (s *markupState) markName() {
 	}
 }
 
-type markupControl struct {
-	id   string
-	line int
+func (s *markupState) appendRaw(text string) {
+	if len(s.raw) == 0 {
+		s.raw = []string{""}
+	}
+	for i := range s.raw {
+		s.raw[i] += text
+	}
+}
+
+type markupFact struct {
+	value string
+	path  markupPath
+	where markupWhere
+}
+
+type markupID struct {
+	markupFact
+	dynamic bool
 }
 
 type markupRef struct {
+	markupFact
 	attr string
-	id   string
-	line int
 }
 
-type markupChecker struct {
-	lines     []int
-	found     []markupFinding
-	ids       map[string]bool
-	staticIDs map[string]int
-	labelFor  map[string]bool
-	controls  []markupControl
-	refs      []markupRef
-	h1        []int
+// markupWalk is one reading of a template tree, every call it makes resolved against trees: a file
+// alone, or a page as served. Facts about ids, labels and headings are kept for the whole reading.
+type markupWalk struct {
+	set      *templateSet
+	trees    map[string]*parse.Tree
+	whole    bool   // the reading is a whole page, which owes one <h1>
+	pageFile string // the page, when the reading is one
+	page     string // the layout the page is read in, when it is
+	frames   []markupFrame
+	found    []markupFinding
+	ids      []markupID
+	labels   []markupFact
+	controls []markupFact
+	refs     []markupRef
+	h1       []markupFact
 }
 
-func (c *markupChecker) line(pos int) int {
-	return sort.SearchInts(c.lines, pos) + 1
+type markupFrame struct {
+	tree *parse.Tree
+	file *templateFile
+	via  string
 }
 
-func (c *markupChecker) report(line int, format string, args ...any) {
-	c.found = append(c.found, markupFinding{line: line, message: fmt.Sprintf(format, args...)})
+func newMarkupWalk(set *templateSet, trees map[string]*parse.Tree, whole bool) *markupWalk {
+	return &markupWalk{set: set, trees: trees, whole: whole}
 }
 
-func (c *markupChecker) walkList(s *markupState, list *parse.ListNode) {
+func (w *markupWalk) at(pos int) markupWhere {
+	frame := w.frames[len(w.frames)-1]
+	return markupWhere{file: frame.file.path, line: sort.SearchInts(frame.file.lines, pos) + 1, via: frame.via}
+}
+
+func (w *markupWalk) reportAt(where markupWhere, format string, args ...any) {
+	context := ""
+	if where.via != "" {
+		context += " (where " + where.via + " calls it)"
+	}
+	context += pageSuffix(w.page)
+	w.found = append(w.found, markupFinding{file: where.file, line: where.line, message: fmt.Sprintf(format, args...), context: context})
+}
+
+func (w *markupWalk) report(pos int, format string, args ...any) {
+	w.reportAt(w.at(pos), format, args...)
+}
+
+func (w *markupWalk) walkTree(tree *parse.Tree) {
+	w.frames = append(w.frames, markupFrame{tree: tree, file: w.set.files[tree.ParseName]})
+	s := &markupState{}
+	w.walkList(s, tree.Root)
+	w.finish(s)
+	w.frames = w.frames[:len(w.frames)-1]
+}
+
+func (w *markupWalk) walkList(s *markupState, list *parse.ListNode) {
 	if list == nil {
 		return
 	}
 	for _, node := range list.Nodes {
-		c.walkNode(s, node)
+		w.walkNode(s, node)
 	}
 }
 
-func (c *markupChecker) walkNode(s *markupState, node parse.Node) {
+func (w *markupWalk) walkNode(s *markupState, node parse.Node) {
 	switch n := node.(type) {
 	case *parse.TextNode:
-		c.text(s, string(n.Text), int(n.Pos))
+		w.text(s, string(n.Text), int(n.Pos))
 	case *parse.ActionNode:
 		if n.Pipe != nil && (len(n.Pipe.Decl) > 0 || n.Pipe.IsAssign) {
 			return // a declaration or an assignment renders nothing
 		}
-		c.action(s, n.String(), int(n.Pos))
+		w.action(s, n.String(), int(n.Pos))
 	case *parse.TemplateNode:
-		c.action(s, n.String(), int(n.Pos))
+		w.call(s, n)
 	case *parse.IfNode:
-		c.branches(s, int(n.Pos), false, n.List, n.ElseList)
+		w.branches(s, int(n.Pos), false, n.List, n.ElseList)
 	case *parse.WithNode:
-		c.branches(s, int(n.Pos), false, n.List, n.ElseList)
+		w.branches(s, int(n.Pos), false, n.List, n.ElseList)
 	case *parse.RangeNode:
-		c.branches(s, int(n.Pos), true, n.List, n.ElseList)
+		w.branches(s, int(n.Pos), true, n.List, n.ElseList)
 	case *parse.ListNode:
-		c.walkList(s, n)
+		w.walkList(s, n)
 	}
 }
 
-// branches walks each branch from the state before it, and requires each to end in that state:
-// what a branch opens, it closes. The state after is the state before, holding what any branch
-// added to it: an attribute, or content that names an element still open.
-func (c *markupChecker) branches(s *markupState, pos int, isRange bool, body, otherwise *parse.ListNode) {
-	c.settle(s)
+// call reads the template a {{template}} names where the call is made, when it is one of the
+// trees the reading resolves against; otherwise the call stands for whatever it renders.
+func (w *markupWalk) call(s *markupState, n *parse.TemplateNode) {
+	called, ok := w.trees[n.Name]
+	if !ok || len(w.frames) > 16 {
+		w.action(s, n.String(), int(n.Pos))
+		return
+	}
+	for _, f := range w.frames {
+		if f.tree == called {
+			w.action(s, n.String(), int(n.Pos))
+			return
+		}
+	}
+	site := w.at(int(n.Pos))
+	via := fmt.Sprintf("%s line %d", site.file, site.line)
+	w.frames = append(w.frames, markupFrame{tree: called, file: w.set.files[called.ParseName], via: via})
+	w.walkList(s, called.Root)
+	w.frames = w.frames[:len(w.frames)-1]
+}
+
+// branches walks each list of a branching node from the state before it, and requires each to end
+// in that state: what a branch opens, it closes. The state after is the state before, holding what
+// every branch added to it: an attribute written in all, a name every branch gives an element still
+// open, and, inside a raw-text element, each branch's body as an alternative of its own.
+func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, otherwise *parse.ListNode) {
+	w.settle(s)
 	before := s.clone()
+	tree := w.frames[len(w.frames)-1].tree.ParseName
 	var ends []*markupState
 	for i, list := range []*parse.ListNode{body, otherwise} {
 		b := before.clone()
-		b.branch++
+		b.path = append(b.path, markupStep{tree: tree, pos: pos, branch: i})
 		if isRange && i == 0 {
 			b.ranges++
 		}
-		c.walkList(b, list)
-		c.settle(b)
+		w.walkList(b, list)
+		w.settle(b)
 		ends = append(ends, b)
 	}
+	shaped := true
 	for _, b := range ends {
 		if !sameShape(before, b) {
-			c.report(c.line(pos), "a branch ends %s, where it began %s: what a branch opens it closes, "+
+			shaped = false
+			w.report(pos, "a branch ends %s, where it began %s: what a branch opens it closes, "+
 				"so the page reads the same whichever branch runs", describeShape(b), describeShape(before))
 		}
 	}
-	for _, b := range ends {
-		if len(b.stack) == len(s.stack) {
-			for i := range s.stack {
-				s.stack[i].named = s.stack[i].named || b.stack[i].named
-			}
+	if !shaped {
+		return
+	}
+
+	for i := range s.stack {
+		all := true
+		for _, b := range ends {
+			all = all && b.stack[i].named
 		}
-		if s.tag != nil && b.tag != nil {
+		s.stack[i].named = s.stack[i].named || all
+	}
+	if s.tag != nil {
+		for _, b := range ends {
 			s.tag.dynamic = s.tag.dynamic || b.tag.dynamic
 			for _, a := range b.tag.attrs {
-				if !s.tag.has(a.name) {
-					s.tag.attrs = append(s.tag.attrs, a)
+				if s.tag.written(a.name) {
+					continue
 				}
+				inAll := true
+				for _, other := range ends {
+					inAll = inAll && other.tag.has(a.name)
+				}
+				a.maybe = !inAll
+				s.tag.attrs = append(s.tag.attrs, a)
 			}
 		}
+	}
+	if s.mode == modeRawText {
+		s.raw = nil
+		for _, b := range ends {
+			s.raw = append(s.raw, b.raw...)
+		}
+		if len(s.raw) > rawAlternatives {
+			s.raw = s.raw[:rawAlternatives]
+		}
+	}
+	for _, b := range ends {
 		if b.heading > s.heading {
 			s.heading = b.heading
 		}
 	}
 }
 
-// settle completes an attribute name in progress: an attribute written alone in a branch, such
+// settle completes a tag name or an attribute name in progress: one written alone in a branch, such
 // as {{if .checked}}checked{{end}}, ends where the branch does.
-func (c *markupChecker) settle(s *markupState) {
+func (w *markupWalk) settle(s *markupState) {
 	if s.mode == modeTagName {
 		s.mode = modeTag
 	}
 	if s.mode == modeAttrName || s.mode == modeAfterAttrName {
-		c.commitAttr(s)
+		w.commitAttr(s)
 		s.mode = modeTag
 	}
 }
@@ -421,24 +824,24 @@ func describeShape(s *markupState) string {
 	return where + " with " + strings.Join(names, " ") + " open"
 }
 
-func (c *markupChecker) action(s *markupState, spelled string, pos int) {
+func (w *markupWalk) action(s *markupState, spelled string, pos int) {
 	switch s.mode {
 	case modeText:
 		s.markName()
 	case modeTagOpen:
-		c.report(c.line(pos), "an action writes a tag's name; write the name")
-		s.tag = &markupTag{name: "?", line: c.line(pos)}
+		w.report(pos, "an action writes a tag's name; write the name")
+		s.tag = &markupTag{name: "?", where: w.at(pos)}
 		s.mode = modeTagName
 	case modeTagName, modeTag, modeAfterAttrName, modeSelfClosing:
 		if s.mode == modeAfterAttrName {
-			c.commitAttr(s)
+			w.commitAttr(s)
 		}
 		s.tag.dynamic = true
 		s.mode = modeTag
 	case modeAttrName:
 		s.tag.attrName += spelled
 	case modeBeforeValue, modeValueUnquoted:
-		c.report(c.line(pos), "attribute %s is not quoted: write %s=\"%s\"", s.tag.attrName, s.tag.attrName, spelled)
+		w.report(pos, "attribute %s is not quoted: write %s=\"%s\"", s.tag.attrName, s.tag.attrName, spelled)
 		s.tag.attrValue.WriteString(spelled)
 		s.tag.valueDyn = true
 		s.mode = modeValueUnquoted
@@ -446,12 +849,31 @@ func (c *markupChecker) action(s *markupState, spelled string, pos int) {
 		s.tag.attrValue.WriteString(spelled)
 		s.tag.valueDyn = true
 	case modeRawText:
-		s.raw.WriteString(hole)
+		s.appendRaw(hole)
 	case modeComment, modeDeclaration:
 	}
 }
 
-func (c *markupChecker) text(s *markupState, text string, base int) {
+// rawTextEnd returns where the end tag of the raw-text element name starts in lower, the rest of a
+// text node lowercased: "</name" followed by a space, a slash, a ">" or the end of the node, which
+// is where a browser ends the element. -1 when the node holds none.
+func rawTextEnd(lower, name string) int {
+	from := 0
+	for {
+		at := strings.Index(lower[from:], "</"+name)
+		if at < 0 {
+			return -1
+		}
+		at += from
+		after := at + 2 + len(name)
+		if after == len(lower) || isMarkupSpace(lower[after]) || lower[after] == '/' || lower[after] == '>' {
+			return at
+		}
+		from = at + 1
+	}
+}
+
+func (w *markupWalk) text(s *markupState, text string, base int) {
 	for i := 0; i < len(text); i++ {
 		ch := text[i]
 		pos := base + i
@@ -463,7 +885,7 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 			case !isMarkupSpace(ch):
 				s.markName()
 				if top := s.top(); top != nil && !top.foreign && textForbiddenIn[top.name] {
-					c.report(c.line(pos), "text directly in a <%s>, which a browser moves out of it", top.name)
+					w.report(pos, "text directly in a <%s>, which a browser moves out of it", top.name)
 				}
 			}
 		case modeTagOpen:
@@ -476,13 +898,13 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 					s.mode = modeDeclaration
 				}
 			case ch == '/':
-				s.tag = &markupTag{end: true, line: c.line(pos)}
+				s.tag = &markupTag{end: true, where: w.at(pos)}
 				s.mode = modeTagName
 			case isNameStart(ch):
-				s.tag = &markupTag{name: string(ch), line: c.line(pos)}
+				s.tag = &markupTag{name: string(ch), where: w.at(pos)}
 				s.mode = modeTagName
 			default:
-				c.report(c.line(pos), "a bare < in text: write &lt;")
+				w.report(pos, "a bare < in text: write &lt;")
 				s.mode = modeText
 				i--
 			}
@@ -491,7 +913,7 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 			case isMarkupSpace(ch):
 				s.mode = modeTag
 			case ch == '>':
-				c.finishTag(s)
+				w.finishTag(s)
 			case ch == '/':
 				s.mode = modeSelfClosing
 			default:
@@ -501,7 +923,7 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 			switch {
 			case isMarkupSpace(ch):
 			case ch == '>':
-				c.finishTag(s)
+				w.finishTag(s)
 			case ch == '/':
 				s.mode = modeSelfClosing
 			default:
@@ -515,10 +937,10 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 			case ch == '=':
 				s.mode = modeBeforeValue
 			case ch == '>':
-				c.commitAttr(s)
-				c.finishTag(s)
+				w.commitAttr(s)
+				w.finishTag(s)
 			case ch == '/':
-				c.commitAttr(s)
+				w.commitAttr(s)
 				s.mode = modeSelfClosing
 			default:
 				s.tag.attrName += string(ch)
@@ -529,13 +951,13 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 			case ch == '=':
 				s.mode = modeBeforeValue
 			case ch == '>':
-				c.commitAttr(s)
-				c.finishTag(s)
+				w.commitAttr(s)
+				w.finishTag(s)
 			case ch == '/':
-				c.commitAttr(s)
+				w.commitAttr(s)
 				s.mode = modeSelfClosing
 			default:
-				c.commitAttr(s)
+				w.commitAttr(s)
 				s.tag.attrName = string(ch)
 				s.mode = modeAttrName
 			}
@@ -546,17 +968,17 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 				s.quote = ch
 				s.mode = modeValue
 			case ch == '>':
-				c.report(c.line(pos), "attribute %s has an = and no value", s.tag.attrName)
-				c.commitAttr(s)
-				c.finishTag(s)
+				w.report(pos, "attribute %s has an = and no value", s.tag.attrName)
+				w.commitAttr(s)
+				w.finishTag(s)
 			default:
-				c.report(c.line(pos), "attribute %s is not quoted", s.tag.attrName)
+				w.report(pos, "attribute %s is not quoted", s.tag.attrName)
 				s.tag.attrValue.WriteByte(ch)
 				s.mode = modeValueUnquoted
 			}
 		case modeValue:
 			if ch == s.quote {
-				c.commitAttr(s)
+				w.commitAttr(s)
 				s.quote = 0
 				s.mode = modeTag
 			} else {
@@ -565,18 +987,18 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 		case modeValueUnquoted:
 			switch {
 			case isMarkupSpace(ch):
-				c.commitAttr(s)
+				w.commitAttr(s)
 				s.mode = modeTag
 			case ch == '>':
-				c.commitAttr(s)
-				c.finishTag(s)
+				w.commitAttr(s)
+				w.finishTag(s)
 			default:
 				s.tag.attrValue.WriteByte(ch)
 			}
 		case modeSelfClosing:
 			if ch == '>' {
 				s.tag.selfClose = true
-				c.finishTag(s)
+				w.finishTag(s)
 			} else if !isMarkupSpace(ch) {
 				s.mode = modeTag
 				i--
@@ -591,39 +1013,61 @@ func (c *markupChecker) text(s *markupState, text string, base int) {
 				s.mode = modeText
 			}
 		case modeRawText:
-			name := s.top().name
-			rest := strings.ToLower(text[i:])
-			at := strings.Index(rest, "</"+name)
+			at := rawTextEnd(strings.ToLower(text[i:]), s.top().name)
 			if at < 0 {
-				s.raw.WriteString(text[i:])
+				s.appendRaw(text[i:])
 				return
 			}
-			s.raw.WriteString(text[i : i+at])
-			c.closeRawText(s)
-			s.tag = &markupTag{end: true, line: c.line(base + i + at)}
+			s.appendRaw(text[i : i+at])
+			w.closeRawText(s)
+			s.tag = &markupTag{end: true, where: w.at(base + i + at)}
 			s.mode = modeTagName
 			i += at + 1
 		}
 	}
 }
 
-func (c *markupChecker) commitAttr(s *markupState) {
+// commitAttr completes the attribute in progress, and records the ids it declares and the ids it
+// names on the branches it is written in.
+func (w *markupWalk) commitAttr(s *markupState) {
 	t := s.tag
 	name := strings.ToLower(t.attrName)
 	value := t.attrValue.String()
-	if name != "" {
-		if t.has(name) {
-			c.report(t.line, "<%s> carries %s twice", t.name, name)
-		} else {
-			t.attrs = append(t.attrs, markupAttr{name: name, value: value, dynamic: t.valueDyn})
-		}
-	}
+	dynamic := t.valueDyn
 	t.attrName = ""
 	t.attrValue.Reset()
 	t.valueDyn = false
+	if name == "" {
+		return
+	}
+	if t.written(name) {
+		w.reportAt(t.where, "<%s> carries %s twice", t.name, name)
+		return
+	}
+	t.attrs = append(t.attrs, markupAttr{name: name, value: value})
+
+	fact := markupFact{value: value, path: append(markupPath{}, s.path...), where: t.where}
+	switch name {
+	case "id":
+		if !dynamic && s.ranges > 0 {
+			w.reportAt(t.where, "id %q is written inside a {{range}}, so it repeats on the page", value)
+		}
+		w.ids = append(w.ids, markupID{markupFact: fact, dynamic: dynamic})
+	case "aria-labelledby", "aria-describedby":
+		for _, id := range strings.Fields(value) {
+			ref := fact
+			ref.value = id
+			w.refs = append(w.refs, markupRef{markupFact: ref, attr: name})
+		}
+	case "for":
+		if strings.EqualFold(t.name, "label") {
+			w.labels = append(w.labels, fact)
+			w.refs = append(w.refs, markupRef{markupFact: fact, attr: "for"})
+		}
+	}
 }
 
-func (c *markupChecker) finishTag(s *markupState) {
+func (w *markupWalk) finishTag(s *markupState) {
 	t := s.tag
 	s.tag = nil
 	s.mode = modeText
@@ -635,10 +1079,10 @@ func (c *markupChecker) finishTag(s *markupState) {
 		t.name = strings.ToLower(t.name)
 	}
 	if t.end {
-		c.closeElement(s, t)
+		w.closeElement(s, t)
 		return
 	}
-	c.startElement(s, t, foreign)
+	w.startElement(s, t, foreign)
 }
 
 var voidElements = map[string]bool{
@@ -677,72 +1121,61 @@ var headingLevel = map[string]int{"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "
 
 var jsonScriptType = regexp.MustCompile(`^application/(ld\+)?json$`)
 
-func (c *markupChecker) startElement(s *markupState, t *markupTag, foreign bool) {
-	name, line := t.name, t.line
+func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
+	name, where := t.name, t.where
 	parent := s.top()
 
 	for _, a := range t.attrs {
 		if strings.HasPrefix(a.name, "on") && len(a.name) > 2 {
-			c.report(line, "<%s> carries %s: register the handler from a static script", name, a.name)
+			w.reportAt(where, "<%s> carries %s: register the handler from a static script", name, a.name)
 		}
 		switch a.name {
 		case "href", "src", "action", "formaction", "xlink:href":
 			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(a.value)), "javascript:") {
-				c.report(line, "<%s %s> is a javascript: URL: register the behaviour from a static script", name, a.name)
+				w.reportAt(where, "<%s %s> is a javascript: URL: register the behaviour from a static script", name, a.name)
 			}
 		case "tabindex":
 			if n, err := strconv.Atoi(strings.TrimSpace(a.value)); err == nil && n > 0 {
-				c.report(line, "<%s> has tabindex %d: a positive tabindex reorders the keyboard path", name, n)
-			}
-		case "id":
-			c.declareID(s, a, line)
-		case "aria-labelledby", "aria-describedby":
-			for _, id := range strings.Fields(a.value) {
-				c.refs = append(c.refs, markupRef{attr: a.name, id: id, line: line})
-			}
-		case "for":
-			if name == "label" {
-				if c.labelFor == nil {
-					c.labelFor = map[string]bool{}
-				}
-				c.labelFor[a.value] = true
-				c.refs = append(c.refs, markupRef{attr: "for", id: a.value, line: line})
+				w.reportAt(where, "<%s> has tabindex %d: a positive tabindex reorders the keyboard path", name, n)
 			}
 		}
 	}
 
 	if foreign {
+		if strings.EqualFold(name, "script") {
+			w.reportAt(where, "a <script> inside SVG runs code: move it to a static file")
+		}
 		if t.selfClose {
 			return
 		}
-		s.stack = append(s.stack, openElement{name: name, line: line, foreign: true})
+		s.stack = append(s.stack, openElement{name: name, where: where, foreign: true})
 		return
 	}
 
 	if t.selfClose {
 		if voidElements[name] {
-			c.report(line, "<%s/>: write a void element without the trailing slash", name)
+			w.reportAt(where, "<%s/>: write a void element without the trailing slash", name)
 		} else if name != "svg" && name != "math" {
-			c.report(line, "<%s/>: the slash does not close an HTML element; write </%s>", name, name)
+			w.reportAt(where, "<%s/>: the slash does not close an HTML element; write </%s>", name, name)
 		}
 	}
 
 	// Nesting a browser repairs.
 	if blockElements[name] && s.within("p") {
-		c.report(line, "<%s> inside a <p>, which a browser closes before it", name)
+		w.reportAt(where, "<%s> inside a <p>, which a browser closes before it", name)
 	}
 	if name == "form" && s.within("form") {
-		c.report(line, "a <form> inside a <form>, which a browser drops")
+		w.reportAt(where, "a <form> inside a <form>, which a browser drops")
 	}
 	if (name == "a" || name == "button") && s.within("a", "button") {
-		c.report(line, "<%s> inside a link or a button", name)
+		w.reportAt(where, "<%s> inside a link or a button", name)
 	}
-	if name == "li" && (parent == nil || (parent.name != "ul" && parent.name != "ol" && parent.name != "menu")) {
-		c.report(line, "<li> outside a list")
+	if name == "li" && (parent == nil || parent.foreign || (parent.name != "ul" && parent.name != "ol" && parent.name != "menu")) {
+		w.reportAt(where, "<li> outside a list")
 	}
-	if parent != nil {
+	if parent != nil && !parent.foreign {
 		if allowed, ok := tableChildren[parent.name]; ok && !allowed[name] && name != "script" && name != "template" {
-			c.report(line, "<%s> directly in a <%s>, which a browser moves out of it", name, parent.name)
+			w.reportAt(where, "<%s> directly in a <%s>, which a browser moves out of it", name, parent.name)
 		}
 	}
 
@@ -751,11 +1184,11 @@ func (c *markupChecker) startElement(s *markupState, t *markupTag, foreign bool)
 	switch name {
 	case "html":
 		if !t.has("lang") && !t.dynamic {
-			c.report(line, "<html> has no lang")
+			w.reportAt(where, "<html> has no lang")
 		}
 	case "img":
 		if !t.has("alt") && !t.dynamic {
-			c.report(line, "<img> has no alt: describe it, or write alt=\"\" if it only decorates")
+			w.reportAt(where, "<img> has no alt: describe it, or write alt=\"\" if it only decorates")
 		}
 		if alt, ok := t.attr("alt"); ok && strings.TrimSpace(alt.value) != "" {
 			s.markName()
@@ -763,7 +1196,7 @@ func (c *markupChecker) startElement(s *markupState, t *markupTag, foreign bool)
 	case "svg":
 		hidden, _ := t.attr("aria-hidden")
 		if hidden.value != "true" && !named {
-			c.report(line, "<svg> is neither hidden with aria-hidden=\"true\" nor named")
+			w.reportAt(where, "<svg> is neither hidden with aria-hidden=\"true\" nor named")
 		}
 	case "input", "select", "textarea":
 		typ, _ := t.attr("type")
@@ -775,45 +1208,44 @@ func (c *markupChecker) startElement(s *markupState, t *markupTag, foreign bool)
 		}
 		id, ok := t.attr("id")
 		if !ok {
-			c.report(line, "<%s> has no label: give it an id a <label for> names, or aria-label", name)
+			w.reportAt(where, "<%s> has no label: give it an id a <label for> names, or aria-label", name)
 		} else {
-			c.controls = append(c.controls, markupControl{id: id.value, line: line})
+			w.controls = append(w.controls, markupFact{value: id.value, path: append(markupPath{}, s.path...), where: where})
 		}
 	}
 	if level, ok := headingLevel[name]; ok {
 		if s.heading > 0 && level > s.heading+1 {
-			c.report(line, "<%s> follows an <h%d>: heading levels do not skip on the way down", name, s.heading)
+			w.reportAt(where, "<%s> follows an <h%d>: heading levels do not skip on the way down", name, s.heading)
 		}
 		s.heading = level
 		if level == 1 {
-			c.h1 = append(c.h1, line)
+			w.h1 = append(w.h1, markupFact{path: append(markupPath{}, s.path...), where: where})
 		}
 	}
 
 	if voidElements[name] {
 		return
 	}
-	el := openElement{name: name, line: line, named: named}
+	el := openElement{name: name, where: where, named: named}
 	if name == "script" {
 		typ, hasType := t.attr("type")
-		_, hasSrc := t.attr("src")
 		switch {
-		case hasSrc:
+		case t.written("src"):
 			el.script = "src"
 		case hasType && jsonScriptType.MatchString(strings.ToLower(strings.TrimSpace(typ.value))):
 			el.script = "json"
-		case !hasType || isJavaScriptType(typ.value):
-			c.report(line, "an inline <script> runs code: move it to a static file, or make it a "+
+		case !t.written("type") || isJavaScriptType(typ.value):
+			w.reportAt(where, "an inline <script> runs code: move it to a static file, or make it a "+
 				"<script type=\"application/json\"> data block")
 			el.script = "code"
 		default:
-			c.report(line, "<script type=%q> is neither JavaScript nor JSON", typ.value)
+			w.reportAt(where, "<script type=%q> is neither JavaScript nor JSON", typ.value)
 			el.script = "other"
 		}
 	}
 	s.stack = append(s.stack, el)
 	if rawTextElements[name] {
-		s.raw.Reset()
+		s.raw = []string{""}
 		s.mode = modeRawText
 	}
 }
@@ -826,101 +1258,131 @@ func isJavaScriptType(t string) bool {
 	return false
 }
 
-// closeRawText checks what a raw-text element holds, before its end tag closes it.
-func (c *markupChecker) closeRawText(s *markupState) {
+// closeRawText checks what a raw-text element holds, in each of its alternatives, before its end
+// tag closes it.
+func (w *markupWalk) closeRawText(s *markupState) {
 	top := s.top()
-	body := s.raw.String()
-	s.raw.Reset()
-	switch top.script {
-	case "src":
+	bodies := s.raw
+	s.raw = nil
+	nonEmpty := false
+	for _, body := range bodies {
 		if strings.TrimSpace(body) != "" {
-			c.report(top.line, "a <script src> also holds code, which a browser never runs")
-		}
-	case "json":
-		if !json.Valid([]byte(body)) {
-			c.report(top.line, "the JSON data block is not valid JSON, reading each action as a value")
+			nonEmpty = true
 		}
 	}
-	if strings.TrimSpace(body) != "" {
-		s.stack[len(s.stack)-1].named = true
+	switch top.script {
+	case "src":
+		if nonEmpty {
+			w.reportAt(top.where, "a <script src> also holds code, which a browser never runs")
+		}
+	case "json":
+		for _, body := range bodies {
+			if !json.Valid([]byte(body)) {
+				w.reportAt(top.where, "the JSON data block is not valid JSON in every branch, reading each action as a value")
+				break
+			}
+		}
+	}
+	if nonEmpty {
+		top.named = true
 	}
 }
 
-func (c *markupChecker) closeElement(s *markupState, t *markupTag) {
+func (w *markupWalk) closeElement(s *markupState, t *markupTag) {
 	name := t.name
 	if voidElements[name] && !s.foreign() {
-		c.report(t.line, "</%s>: a void element has no end tag", name)
+		w.reportAt(t.where, "</%s>: a void element has no end tag", name)
 		return
 	}
 	at := -1
 	for i := len(s.stack) - 1; i >= 0; i-- {
-		if s.stack[i].name == name {
+		if strings.EqualFold(s.stack[i].name, name) {
 			at = i
 			break
 		}
 	}
 	if at < 0 {
-		c.report(t.line, "</%s> closes nothing that is open", name)
+		w.reportAt(t.where, "</%s> closes nothing that is open", name)
 		return
 	}
 	for i := len(s.stack) - 1; i > at; i-- {
-		c.report(s.stack[i].line, "<%s> is not closed before </%s> on line %d", s.stack[i].name, name, t.line)
+		w.reportAt(s.stack[i].where, "<%s> is not closed before </%s> on line %d", s.stack[i].name, name, t.where.line)
 	}
 	el := s.stack[at]
-	named := el.named
 	s.stack = s.stack[:at]
-	if named {
+	if el.named {
 		s.markName()
 	}
-	if (name == "a" || name == "button") && !named && !el.foreign {
-		c.report(el.line, "<%s> has no name: give it text, or aria-label if it shows only an icon", name)
+	if (name == "a" || name == "button") && !el.named && !el.foreign {
+		w.reportAt(el.where, "<%s> has no name in every branch: give it text, or aria-label if it shows only an icon", name)
 	}
 }
 
-func (c *markupChecker) declareID(s *markupState, a markupAttr, line int) {
-	if c.ids == nil {
-		c.ids = map[string]bool{}
-	}
-	c.ids[a.value] = true
-	if a.dynamic {
-		return
-	}
-	if s.ranges > 0 {
-		c.report(line, "id %q is written inside a {{range}}, so it repeats on the page", a.value)
-		return
-	}
-	if s.branch > 0 {
-		return
-	}
-	c.staticIDs[a.value]++
-	if c.staticIDs[a.value] == 2 {
-		c.report(line, "id %q is declared twice", a.value)
-	}
-}
-
-func (c *markupChecker) finishTree(s *markupState) {
+// finish checks what a reading leaves: the state it ends in, and the facts about the whole tree.
+func (w *markupWalk) finish(s *markupState) {
 	if s.mode != modeText {
-		c.report(c.line(0), "the template ends %s", describeShape(s))
+		w.report(0, "the template ends %s", describeShape(s))
 	}
 	for _, e := range s.stack {
-		c.report(e.line, "<%s> is never closed", e.name)
+		w.reportAt(e.where, "<%s> is never closed", e.name)
+	}
+
+	pathsOf := func(facts []markupFact, value string) []markupPath {
+		var paths []markupPath
+		for _, f := range facts {
+			if f.value == value {
+				paths = append(paths, f.path)
+			}
+		}
+		return paths
+	}
+	declared := make([]markupFact, 0, len(w.ids))
+	for _, id := range w.ids {
+		declared = append(declared, id.markupFact)
+	}
+	for _, ctl := range w.controls {
+		if !covers(pathsOf(w.labels, ctl.value), ctl.path) {
+			w.reportAt(ctl.where, "the control with id %q has no <label for=%q> wherever it renders, and no aria-label", ctl.value, ctl.value)
+		}
+	}
+	for _, ref := range w.refs {
+		if !covers(pathsOf(declared, ref.value), ref.path) {
+			w.reportAt(ref.where, "%s names id %q, which is not declared wherever the reference renders", ref.attr, ref.value)
+		}
+	}
+	for i, a := range w.ids {
+		for _, b := range w.ids[:i] {
+			if !a.dynamic && !b.dynamic && a.value == b.value && !a.path.excludes(b.path) {
+				w.reportAt(a.where, "id %q is declared twice where both can render", a.value)
+				break
+			}
+		}
+	}
+	for i, a := range w.h1 {
+		for _, b := range w.h1[:i] {
+			if !a.path.excludes(b.path) {
+				w.reportAt(a.where, "a second <h1>: a page has one, its title")
+				break
+			}
+		}
+	}
+	if w.whole {
+		unconditional := false
+		for _, h := range w.h1 {
+			unconditional = unconditional || len(h.path) == 0
+		}
+		if !unconditional {
+			w.found = append(w.found, markupFinding{file: w.pageFile, line: 1,
+				message: "the page has no <h1> on every branch", context: pageSuffix(w.page)})
+		}
 	}
 }
 
-func (c *markupChecker) finishFile() {
-	for _, ctl := range c.controls {
-		if !c.labelFor[ctl.id] {
-			c.report(ctl.line, "the control with id %q has no <label for=%q>, and no aria-label", ctl.id, ctl.id)
-		}
+func pageSuffix(page string) string {
+	if page == "" {
+		return ""
 	}
-	for _, ref := range c.refs {
-		if !c.ids[ref.id] {
-			c.report(ref.line, "%s names id %q, which this template does not declare", ref.attr, ref.id)
-		}
-	}
-	if len(c.h1) > 1 {
-		c.report(c.h1[1], "a second <h1>: a page has one, its title")
-	}
+	return " (in " + page + ")"
 }
 
 func isMarkupSpace(ch byte) bool {

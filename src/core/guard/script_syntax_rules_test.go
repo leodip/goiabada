@@ -43,6 +43,19 @@ func TestScriptSyntax_TheCapTable(t *testing.T) {
 		{"a hashbang", "#!/usr/bin/env node\nx();", "line 1: a hashbang is ES2023"},
 		{"an import", `import { a } from "./a.js";`, "import is module syntax, which a classic script cannot use"},
 		{"an export", "export const a = 1;", "export is module syntax, which a classic script cannot use"},
+		{"import.meta", "console.log(import.meta.url);", "import.meta is module syntax, which a classic script cannot use"},
+		{"for await outside an async function", "for await (const x of y) {}", "for await outside an async function is a syntax error in a script"},
+		{"an assignment to a literal", "const x = 1; 1 = x;", "= assigns to 1, which is not a variable, a property or a destructuring pattern"},
+		{"a compound assignment to a call", "f() += 1;", "+= assigns to (f()), which is not a variable, a property or a destructuring pattern"},
+		{"an assignment to an optional chain", "a?.b = 1;", "which is not a variable, a property or a destructuring pattern"},
+		{"an increment of a literal", "1++;", "changes 1, which is not a variable or a property"},
+		{"an unclosed group", "const r = /(/;", "the regular expression /(/ is refused by a browser: a group is not closed"},
+		{"a stray group end", "const r = /a)/;", "the regular expression /a)/ is refused by a browser: a group is closed that was never opened"},
+		{"an unclosed character class", "const r = /[a/;", "does not parse: unexpected EOF or newline in regular expression"},
+		{"an unknown group syntax", "const r = /(?x)/;", "the regular expression /(?x)/ is refused by a browser: a group starts with an unknown (? syntax"},
+		{"a quantifier with nothing to repeat", "const r = /a|*b/;", "the regular expression /a|*b/ is refused by a browser: a quantifier has nothing to repeat"},
+		{"a repeated flag", "const r = /a/gg;", "the regular expression /a/gg has the flag g twice"},
+		{"an unknown flag", "const r = /a/q;", "the regular expression /a/q has the unknown flag q"},
 	}
 	for _, tc := range refused {
 		t.Run(tc.name, func(t *testing.T) {
@@ -54,15 +67,18 @@ func TestScriptSyntax_TheCapTable(t *testing.T) {
 
 	admitted := map[string]string{
 		"optional chaining and nullish coalescing": "const a = b?.c ?? d;",
-		"BigInt":                     "const n = 10n;",
-		"await in an async function": "async function f() { await g(); for await (const x of y) {} }",
-		"await in an async arrow":    "const f = async () => { await g(); };",
-		"await in an async method":   "class A { async m() { await g(); } }",
-		"classes with methods":       "class A extends B { constructor() { super(); } get x() { return 1; } static s() {} }",
-		"spread and destructuring":   "const { a, ...rest } = o; const b = [...rest];",
-		"template literals":          "const s = `a ${b} c`;",
-		"a regular expression":       "const r = /a(?:b)c/gimsuy;",
-		"a number with a decimal":    "const n = 1.5e3;",
+		"BigInt":                                               "const n = 10n;",
+		"await in an async function":                           "async function f() { await g(); for await (const x of y) {} }",
+		"await in an async arrow":                              "const f = async () => { await g(); };",
+		"await in an async method":                             "class A { async m() { await g(); } }",
+		"classes with methods":                                 "class A extends B { constructor() { super(); } get x() { return 1; } static s() {} }",
+		"spread and destructuring":                             "const { a, ...rest } = o; const b = [...rest];",
+		"template literals":                                    "const s = `a ${b} c`;",
+		"a regular expression":                                 "const r = /a(?:b)c/gimsuy;",
+		"regular expressions a browser compiles":               "const r = [/[(]/, /\\(/, /(?<y>\\d{4})-(?=\\d)(?!x)(?<=a)(?<!b)/u, /a+?b*?c??/, /[\\]]/];",
+		"destructuring, compound and grouped assignments":      "let a, b; [a, b] = [b, a]; ({ a } = o); a += 1; (b) = 2; o.p++; o[k]--;",
+		"for await in an async function":                       "async function f() { for await (const x of y) {} }",
+		"a number with a decimal":                              "const n = 1.5e3;",
 		"an await identifier is a name in a script, unawaited": "const delay = 1;",
 	}
 	for name, src := range admitted {
