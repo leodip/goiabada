@@ -1,8 +1,6 @@
 package apihandlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 
@@ -32,9 +30,9 @@ func HandleSettingsSessionsGet() http.HandlerFunc {
 	}
 }
 
-// settingsSessionsDatabase is what the session settings endpoint needs: the settings write.
+// settingsSessionsDatabase is what the session settings endpoint needs: the settings save.
 type settingsSessionsDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	settingsSaveDatabase
 }
 
 // HandleSettingsSessionsPut - PUT /api/v1/admin/settings/sessions
@@ -89,14 +87,16 @@ func HandleSettingsSessionsPut(
 			return
 		}
 
-		oldVals := sessionsSettingsAuditValues(currentSettings)
-
-		// Apply updates
-		currentSettings.UserSessionIdleTimeoutInSeconds = req.UserSessionIdleTimeoutInSeconds
-		currentSettings.UserSessionMaxLifetimeInSeconds = req.UserSessionMaxLifetimeInSeconds
-		currentSettings.MaxUserSessionsPerUser = *req.MaxUserSessionsPerUser
-
-		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
+		// Apply updates, onto the row as stored when the save runs (#407). The old values are that
+		// row's, read under the save's lock, which is what the save replaced.
+		var oldVals map[string]interface{}
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+			oldVals = sessionsSettingsAuditValues(stored)
+			stored.UserSessionIdleTimeoutInSeconds = req.UserSessionIdleTimeoutInSeconds
+			stored.UserSessionMaxLifetimeInSeconds = req.UserSessionMaxLifetimeInSeconds
+			stored.MaxUserSessionsPerUser = *req.MaxUserSessionsPerUser
+		})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -106,13 +106,13 @@ func HandleSettingsSessionsPut(
 		auditLogger.Log(r.Context(), audit.EventUpdatedSessionsSettings, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
 			"old":            oldVals,
-			"new":            sessionsSettingsAuditValues(currentSettings),
+			"new":            sessionsSettingsAuditValues(saved),
 		})
 
 		resp := api.SettingsSessionsResponse{
-			UserSessionIdleTimeoutInSeconds: currentSettings.UserSessionIdleTimeoutInSeconds,
-			UserSessionMaxLifetimeInSeconds: currentSettings.UserSessionMaxLifetimeInSeconds,
-			MaxUserSessionsPerUser:          currentSettings.MaxUserSessionsPerUser,
+			UserSessionIdleTimeoutInSeconds: saved.UserSessionIdleTimeoutInSeconds,
+			UserSessionMaxLifetimeInSeconds: saved.UserSessionMaxLifetimeInSeconds,
+			MaxUserSessionsPerUser:          saved.MaxUserSessionsPerUser,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)

@@ -186,6 +186,8 @@ const (
 	beforeBindingBind beforeBindingAnswer = iota + 1
 	// beforeBindingUserMissing answers 500: the ceremony's user no longer exists.
 	beforeBindingUserMissing
+	// beforeBindingHintMismatch answers login_required: the ceremony's user is not the id_token_hint's.
+	beforeBindingHintMismatch
 	// beforeBindingUserDisabled answers access_denied: the ceremony's user has been disabled.
 	beforeBindingUserDisabled
 	// beforeBindingGenerationMoved restarts the ceremony at level 1 (restart route 1).
@@ -198,9 +200,14 @@ const (
 // decideBeforeBinding decides on the ceremony's user before either arm binds a session, so a refused
 // or restarted ceremony leaves no session row behind that /auth/issue would refuse to use (#522
 // decision 6). ceremonyGeneration is the authentication generation the ceremony holds, captured at
-// its password step or inherited from the session it reused. In order of precedence:
+// its password step or inherited from the session it reused. hintSubject is the id_token_hint's
+// sub, empty when the request carried none. In order of precedence:
 //
 //   - a missing user is refused;
+//   - a user who is not the hint's is refused, the answer /auth/issue gives the same ceremony one
+//     step later (#535). It is asked before the disabled user, as /auth/issue asks it there: the
+//     client is owed login_required for the user its hint named, not access_denied about an
+//     account the hint never named;
 //   - a disabled user is refused, as /auth/issue refuses one. It is asked before the generation,
 //     which a disable moves on too: the client is owed access_denied, not a password form the
 //     disabled account cannot get past;
@@ -214,9 +221,13 @@ const (
 //     would merge otp back into the lowered session. An authenticator set up since makes no
 //     difference: the code came from the one removed. The write asks again under the user's row
 //     lock, for a removal landing after this (#542 decision 1).
-func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim otpcredential.OTPClaim) beforeBindingAnswer {
+func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim otpcredential.OTPClaim,
+	hintSubject string) beforeBindingAnswer {
 	if user == nil {
 		return beforeBindingUserMissing
+	}
+	if hintSubject != "" && user.Subject != hintSubject {
+		return beforeBindingHintMismatch
 	}
 	if !user.Enabled {
 		return beforeBindingUserDisabled
@@ -230,37 +241,37 @@ func decideBeforeBinding(user *record.User, ceremonyGeneration int64, otpClaim o
 	return beforeBindingBind
 }
 
-// AfterBindingFact is a fact DecideAfterBinding needs and has not been given. Completion loads it
+// afterBindingFact is a fact decideAfterBinding needs and has not been given. Completion loads it
 // and asks again.
-type AfterBindingFact int
+type afterBindingFact int
 
 const (
-	// AfterBindingFactNone means the answer is decided.
-	AfterBindingFactNone AfterBindingFact = iota
-	// AfterBindingFactEffectiveScope is the ceremony's scope narrowed to what the user holds, as
+	// afterBindingFactNone means the answer is decided.
+	afterBindingFactNone afterBindingFact = iota
+	// afterBindingFactEffectiveScope is the ceremony's scope narrowed to what the user holds, as
 	// AuthContext.SetScope stores it.
-	AfterBindingFactEffectiveScope
-	// AfterBindingFactConsent is the user's stored consent to the client, or none.
-	AfterBindingFactConsent
+	afterBindingFactEffectiveScope
+	// afterBindingFactConsent is the user's stored consent to the client, or none.
+	afterBindingFactConsent
 )
 
-// AfterBindingAnswer is where a ceremony bound to a session goes next.
-type AfterBindingAnswer int
+// afterBindingAnswer is where a ceremony bound to a session goes next.
+type afterBindingAnswer int
 
 const (
-	// AfterBindingUndecided is returned beside a fact still to load.
-	AfterBindingUndecided AfterBindingAnswer = iota
-	// AfterBindingNoScope answers access_denied for a user holding none of the requested scopes.
-	AfterBindingNoScope
-	// AfterBindingConsent goes on to the consent screen.
-	AfterBindingConsent
-	// AfterBindingIssue goes on to issuance.
-	AfterBindingIssue
+	// afterBindingUndecided is returned beside a fact still to load.
+	afterBindingUndecided afterBindingAnswer = iota
+	// afterBindingNoScope answers access_denied for a user holding none of the requested scopes.
+	afterBindingNoScope
+	// afterBindingConsent goes on to the consent screen.
+	afterBindingConsent
+	// afterBindingIssue goes on to issuance.
+	afterBindingIssue
 )
 
-// AfterBindingFacts is what DecideAfterBinding decides from. EffectiveScope is nil until it has been
+// afterBindingFacts is what decideAfterBinding decides from. EffectiveScope is nil until it has been
 // loaded.
-type AfterBindingFacts struct {
+type afterBindingFacts struct {
 	// PromptConsent is the prompt's consent token.
 	PromptConsent bool
 	// ConsentRequired is the client's ConsentRequired.
@@ -273,7 +284,7 @@ type AfterBindingFacts struct {
 	Consent       *record.UserConsent
 }
 
-// DecideAfterBinding decides where a ceremony goes once it is bound to a session, or names the next
+// decideAfterBinding decides where a ceremony goes once it is bound to a session, or names the next
 // fact it needs to decide that. The user is enabled by now, since decideBeforeBinding refused a
 // disabled one, so the scope is filtered only for a user who may be issued something. In order of
 // precedence:
@@ -288,24 +299,24 @@ type AfterBindingFacts struct {
 //   - otherwise the ceremony goes on to issuance.
 //
 // The consent table on the Clients concept page is held to this, with the consent step's own rule,
-// by the handlers package's consent docs test.
-func DecideAfterBinding(f AfterBindingFacts) (AfterBindingAnswer, AfterBindingFact) {
+// by this package's consent_docs_test.go.
+func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFact) {
 	if f.EffectiveScope == nil {
-		return AfterBindingUndecided, AfterBindingFactEffectiveScope
+		return afterBindingUndecided, afterBindingFactEffectiveScope
 	}
 	if len(*f.EffectiveScope) == 0 {
-		return AfterBindingNoScope, AfterBindingFactNone
+		return afterBindingNoScope, afterBindingFactNone
 	}
 	if f.PromptConsent || f.ConsentRequired || oidc.HasOfflineAccessScope(*f.EffectiveScope) {
-		return AfterBindingConsent, AfterBindingFactNone
+		return afterBindingConsent, afterBindingFactNone
 	}
 	if owed := userconsent.AlwaysOwed(f.ClientIdentifier, *f.EffectiveScope); len(owed) > 0 {
 		if !f.ConsentLoaded {
-			return AfterBindingUndecided, AfterBindingFactConsent
+			return afterBindingUndecided, afterBindingFactConsent
 		}
 		if !userconsent.Covers(f.Consent, owed) {
-			return AfterBindingConsent, AfterBindingFactNone
+			return afterBindingConsent, afterBindingFactNone
 		}
 	}
-	return AfterBindingIssue, AfterBindingFactNone
+	return afterBindingIssue, afterBindingFactNone
 }

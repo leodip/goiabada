@@ -1,8 +1,6 @@
 package apihandlers
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 
@@ -32,9 +30,9 @@ func HandleSettingsAuditLogsGet() http.HandlerFunc {
 	}
 }
 
-// settingsAuditLogsDatabase is what the audit log settings endpoint needs: the settings write.
+// settingsAuditLogsDatabase is what the audit log settings endpoint needs: the settings save.
 type settingsAuditLogsDatabase interface {
-	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
+	settingsSaveDatabase
 }
 
 // HandleSettingsAuditLogsPut - PUT /api/v1/admin/settings/audit-logs
@@ -71,15 +69,16 @@ func HandleSettingsAuditLogsPut(
 			return
 		}
 
-		// Saved from a copy, so the settings on the request's context stay the ones it started
-		// with. The change is then recorded under those, the audit logger's switches, so switching
-		// logging off is recorded too, and a save the database refuses records nothing.
-		updated := *currentSettings
-		updated.AuditLogsInConsoleEnabled = req.AuditLogsInConsoleEnabled
-		updated.AuditLogsInDatabaseEnabled = req.AuditLogsInDatabaseEnabled
-		updated.AuditLogRetentionDays = req.AuditLogRetentionDays
-
-		if err := database.UpdateSettings(r.Context(), nil, &updated); err != nil {
+		// Saved onto the row as stored when the save runs (#407), so the settings on the request's
+		// context stay the ones it started with. The change is then recorded under those, the audit
+		// logger's switches, so switching logging off is recorded too, and a save the database
+		// refuses records nothing.
+		updated, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+			stored.AuditLogsInConsoleEnabled = req.AuditLogsInConsoleEnabled
+			stored.AuditLogsInDatabaseEnabled = req.AuditLogsInDatabaseEnabled
+			stored.AuditLogRetentionDays = req.AuditLogRetentionDays
+		})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

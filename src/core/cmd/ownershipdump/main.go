@@ -27,6 +27,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/internal/refgraph"
+	"github.com/leodip/goiabada/core/sourceroot"
 )
 
 func main() {
@@ -41,7 +42,7 @@ func run() error {
 	if err != nil {
 		return errs.Wrap(err, "getting the working directory")
 	}
-	root, err := refgraph.FindSourceRoot(cwd)
+	root, err := sourceroot.FindSourceRoot(cwd)
 	if err != nil {
 		return errs.Wrap(err, "finding the source root")
 	}

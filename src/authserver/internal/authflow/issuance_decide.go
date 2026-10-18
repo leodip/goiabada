@@ -139,7 +139,8 @@ type issuanceFacts struct {
 //  3. An id_token_hint names the ceremony's user. OIDC Core 1.0 section 3.1.2.2: "The Authorization
 //     Server MUST NOT reply with an ID Token or Access Token for a different user, even if they have
 //     an active session with the Authorization Server." A user who no longer exists is not the
-//     hint's either.
+//     hint's either. Completion asks this before it binds anything (#535); this check stays as the
+//     last line.
 //  4. The ceremony may bind a grant to the browser's session: it exists (#129 decision 6), is the
 //     ceremony user's (#133), and is valid (#241), for both flows. An empty identifier is the gone
 //     shape: middleware.SessionIdentifier puts an identifier on the request only when its row exists,

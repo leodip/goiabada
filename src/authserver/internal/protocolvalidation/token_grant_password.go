@@ -64,6 +64,23 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 		return nil, err
 	}
 
+	// A client whose default ACR level is level 2 (mandatory) asks every sign-in for a second
+	// factor, and a password is all this grant ever checks, so the client's floor cannot be
+	// met: refuse rather than issue a level 1 token below it. The level is read only while the
+	// authorization code flow is on, as the admin console and the Admin API read it: with the
+	// flow off it is not applicable, neither shown nor writable, and the answer's advice would
+	// name a flow the client cannot use. Before the account is looked up, since the answer
+	// depends on the client alone: unauthorized_client (RFC 6749 section 5.2), as the switch
+	// above is, so no password is compared, none is charged to the account's rate-limit budget
+	// or audited as a failed guess, and the answer says nothing of the account (#533).
+	if client.AuthorizationCodeEnabled && client.DefaultAcrLevel == record.AcrLevel2Mandatory {
+		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
+			"Resource owner password credentials grant is not available for a client whose "+
+				"default ACR level is urn:goiabada:level2_mandatory. "+
+				"Please use the authorization code flow instead.",
+			http.StatusBadRequest)
+	}
+
 	// Validate resource owner credentials.
 	//
 	// Normalized to exactly what the rate limiter's account key does, and to what every

@@ -51,6 +51,12 @@ func rotatedRecords(capture *logtest.SlogCapture) []logtest.CapturedRecord {
 	return found
 }
 
+// expectNoSharedIdentifiers answers the startup warning's read with nothing, which every start
+// that gets past the rotation makes.
+func expectNoSharedIdentifiers(db *datamocks.Database) {
+	db.EXPECT().GetIdentifiersSharedByClientsAndResources(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+}
+
 // TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey pins what a start does with no
 // previous key to rotate from, or one it ignores: it still reads the canary, so a key that opens
 // nothing stops the start with ErrDataKeyMismatch, where before nothing was read and the first token
@@ -79,6 +85,9 @@ func TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey(t *testing.T)
 			t.Run(p.name+", "+st.name, func(t *testing.T) {
 				db := datamocks.NewDatabase(t)
 				db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(st.keys(t), nil).Once()
+				if !st.mismatch {
+					expectNoSharedIdentifiers(db)
+				}
 
 				err := runStartupDataTasks(context.Background(), db, currentKey, p.previous)
 				if st.mismatch {
@@ -123,6 +132,7 @@ func TestRunStartupDataTasks_NothingToRotate(t *testing.T) {
 			capture := logtest.CaptureSlog(t)
 			db := datamocks.NewDatabase(t)
 			db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(tc.keys(t), nil).Once()
+			expectNoSharedIdentifiers(db)
 
 			require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
 			db.AssertNotCalled(t, "ReencryptToKey", mock.Anything, mock.Anything, mock.Anything)
@@ -144,6 +154,7 @@ func TestRunStartupDataTasks_RotatesACanaryUnderThePreviousKey(t *testing.T) {
 	db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
 		Return([]record.KeyPair{{}, canaryUnder(t, previousKey)}, nil).Once()
 	db.EXPECT().ReencryptToKey(mock.Anything, previousKey, currentKey).Return(nil).Once()
+	expectNoSharedIdentifiers(db)
 
 	require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
 
@@ -240,4 +251,75 @@ func TestRunStartupDataTasks_AStopDuringTheRotationLetsItFinish(t *testing.T) {
 
 	assert.NoError(t, reencryptCtxErr, "the re-key ran under a context the stop could not end")
 	assert.Len(t, rotatedRecords(capture), 1, "and it finished, and said so")
+	db.AssertNotCalled(t, "GetIdentifiersSharedByClientsAndResources", mock.Anything, mock.Anything)
+}
+
+// sharedIdentifierRecord is the message of the startup warning about a client and a resource
+// sharing an identifier (#151).
+const sharedIdentifierRecord = "a client and a resource share an identifier"
+
+// TestRunStartupDataTasks_WarnsOfEachIdentifierAClientAndAResourceShare pins the startup warning of
+// #151: one Warn record per identifier that both a client and a resource hold, naming it as both,
+// and none when there is no such identifier. The admin API refuses a new pair, so these are pairs
+// stored before that check or landed by two overlapping writes, which the start names rather than
+// refuses.
+func TestRunStartupDataTasks_WarnsOfEachIdentifierAClientAndAResourceShare(t *testing.T) {
+	cases := []struct {
+		name   string
+		shared []string
+	}{
+		{"no shared identifier", nil},
+		{"one shared identifier", []string{"myapp"}},
+		{"two shared identifiers", []string{"billing", "myapp"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			capture := logtest.CaptureSlog(t)
+			db := datamocks.NewDatabase(t)
+			db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
+				Return([]record.KeyPair{canaryUnder(t, currentKey)}, nil).Once()
+			db.EXPECT().GetIdentifiersSharedByClientsAndResources(mock.Anything, (*sql.Tx)(nil)).Return(tc.shared, nil).Once()
+
+			require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, nil),
+				"a shared identifier is warned of, never refused")
+
+			var warned []string
+			for _, logRecord := range capture.Records() {
+				if logRecord.Message != sharedIdentifierRecord {
+					continue
+				}
+				assert.Equal(t, slog.LevelWarn, logRecord.Level)
+				assert.Equal(t, logRecord.Attrs["client_identifier"], logRecord.Attrs["resource_identifier"],
+					"the record names the identifier as the client's and as the resource's")
+				identifier, _ := logRecord.Attrs["client_identifier"].(string)
+				warned = append(warned, identifier)
+			}
+			assert.Equal(t, tc.shared, warned, "one record per shared identifier, in the order read")
+		})
+	}
+}
+
+// TestRunStartupDataTasks_AFailedSharedIdentifierReadDoesNotStopTheStart pins that the warning is
+// not fail-closed: it changes nothing, so a read of it that fails is logged at Warn and the start
+// goes on.
+func TestRunStartupDataTasks_AFailedSharedIdentifierReadDoesNotStopTheStart(t *testing.T) {
+	capture := logtest.CaptureSlog(t)
+	db := datamocks.NewDatabase(t)
+	db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
+		Return([]record.KeyPair{canaryUnder(t, currentKey)}, nil).Once()
+	boom := errors.New("storage is unavailable")
+	db.EXPECT().GetIdentifiersSharedByClientsAndResources(mock.Anything, (*sql.Tx)(nil)).Return(nil, boom).Once()
+
+	require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, nil))
+
+	var failed []logtest.CapturedRecord
+	for _, logRecord := range capture.Records() {
+		if logRecord.Message == "unable to check for identifiers shared by a client and a resource" {
+			failed = append(failed, logRecord)
+		}
+	}
+	require.Len(t, failed, 1, "the failed read is said once")
+	assert.Equal(t, slog.LevelWarn, failed[0].Level)
+	assert.NotNil(t, failed[0].Attrs["error"], "and carries the error")
 }

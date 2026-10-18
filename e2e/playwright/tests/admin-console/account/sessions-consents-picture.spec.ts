@@ -28,6 +28,22 @@ test("the user sees their sessions, the current one marked, and ends another", a
   await own.context.close();
 });
 
+// The modal says ending the current session signs out at once, so the page posts the sign-out
+// rather than navigating to the console's GET /auth/logout, which would ask a second time (#411).
+test("ending the current session signs the user out at once, with no second confirmation", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/sessions");
+  const current = own.page.locator("table tbody tr").filter({ hasText: "Current session" });
+  await current.getByRole("button", { name: "End session" }).click();
+  await own.page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
+
+  // Through the auth server's end-session endpoint and back to the console's home page.
+  await own.page.waitForURL((url) => url.origin === env.adminUrl && url.pathname === "/");
+  await own.page.goto(`${env.adminUrl}/account/profile`);
+  await expect(own.page.locator('input[name="password"]')).toBeVisible();
+  await own.context.close();
+});
+
 test("the user sees the consent they gave a client, and revokes it", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });

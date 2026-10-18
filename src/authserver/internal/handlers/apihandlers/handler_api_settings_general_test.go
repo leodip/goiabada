@@ -51,7 +51,8 @@ func TestHandleSettingsGeneralPut_KeepsEmailVerificationWhileSelfRegistrationIsO
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		var saved *record.Settings
-		database.On("UpdateSettings", mock.Anything, mock.Anything, mock.Anything).
+		expectSettingsSave(database)
+		database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.Anything).
 			Run(func(args mock.Arguments) { saved = args.Get(2).(*record.Settings) }).Return(nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventUpdatedGeneralSettings, mock.Anything).Return().Once()
 

@@ -154,18 +154,38 @@ func TestDecideCompletion(t *testing.T) {
 
 // What /auth/completed does with the ceremony's user before an arm binds a session (#522 decision
 // 6). The ceremony authenticated at generation 7, and names no one-time code unless claimsOTP says,
-// from the authenticator at otp_config_generation claimGeneration.
+// from the authenticator at otp_config_generation claimGeneration. It carries no id_token_hint
+// unless hintSubject says one.
 func TestDecideBeforeBinding(t *testing.T) {
 	testCases := []struct {
 		name            string
 		user            *record.User
 		claimsOTP       bool
 		claimGeneration int64
+		hintSubject     string
 		want            beforeBindingAnswer
 	}{
 		{name: "an enabled user at the ceremony's generation is bound",
 			user: &record.User{Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
 		{name: "a missing user", user: nil, want: beforeBindingUserMissing},
+		{name: "a user with a subject is bound when the request carried no hint",
+			user: &record.User{Subject: "s", Enabled: true, AuthStateGeneration: 7}, want: beforeBindingBind},
+		{name: "the hint's user is bound",
+			user:        &record.User{Subject: "the-hint", Enabled: true, AuthStateGeneration: 7},
+			hintSubject: "the-hint", want: beforeBindingBind},
+		{name: "a user who is not the hint's is refused",
+			user:        &record.User{Subject: "someone-else", Enabled: true, AuthStateGeneration: 7},
+			hintSubject: "the-hint", want: beforeBindingHintMismatch},
+		{
+			// The answer /auth/issue gives the same ceremony, and its order: the client is owed
+			// login_required, not access_denied about an account the hint never named (#535).
+			name:        "a hint mismatch is refused before a disabled user is answered",
+			user:        &record.User{Subject: "someone-else", Enabled: false, AuthStateGeneration: 7},
+			hintSubject: "the-hint", want: beforeBindingHintMismatch,
+		},
+		{name: "a hint mismatch is refused before the generation is compared",
+			user:        &record.User{Subject: "someone-else", Enabled: true, AuthStateGeneration: 8},
+			hintSubject: "the-hint", want: beforeBindingHintMismatch},
 		{name: "a disabled user is refused",
 			user: &record.User{Enabled: false, AuthStateGeneration: 7}, want: beforeBindingUserDisabled},
 		{
@@ -210,7 +230,7 @@ func TestDecideBeforeBinding(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			claim := otpcredential.OTPClaim{Claimed: tc.claimsOTP, Generation: &tc.claimGeneration}
-			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, claim))
+			assert.Equal(t, tc.want, decideBeforeBinding(tc.user, 7, claim, tc.hintSubject))
 		})
 	}
 }
@@ -224,31 +244,31 @@ type afterBindingWorld struct {
 	consentScope     *string // nil for no consent row
 }
 
-// driveAfterBinding runs DecideAfterBinding as Completion.Run does, loading each fact it
+// driveAfterBinding runs decideAfterBinding as Completion.Run does, loading each fact it
 // asks for from the world, and answers the answer and the facts in the order they were asked for.
-func driveAfterBinding(t *testing.T, world afterBindingWorld) (AfterBindingAnswer, []AfterBindingFact) {
+func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswer, []afterBindingFact) {
 	t.Helper()
 
-	facts := AfterBindingFacts{
+	facts := afterBindingFacts{
 		PromptConsent:    world.promptConsent,
 		ConsentRequired:  world.consentRequired,
 		ClientIdentifier: world.clientIdentifier,
 	}
-	var asked []AfterBindingFact
+	var asked []afterBindingFact
 	for {
-		answer, need := DecideAfterBinding(facts)
-		if need == AfterBindingFactNone {
-			require.NotEqual(t, AfterBindingUndecided, answer, "a decided ceremony has an answer")
+		answer, need := decideAfterBinding(facts)
+		if need == afterBindingFactNone {
+			require.NotEqual(t, afterBindingUndecided, answer, "a decided ceremony has an answer")
 			return answer, asked
 		}
 		require.NotContains(t, asked, need, "each fact is loaded once")
 		asked = append(asked, need)
 
 		switch need {
-		case AfterBindingFactEffectiveScope:
+		case afterBindingFactEffectiveScope:
 			scope := world.effectiveScope
 			facts.EffectiveScope = &scope
-		case AfterBindingFactConsent:
+		case afterBindingFactConsent:
 			facts.ConsentLoaded = true
 			if world.consentScope != nil {
 				facts.Consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
@@ -262,52 +282,52 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (AfterBindingAnswe
 // Where a ceremony bound to a session goes, and whether the scope is filtered on the way.
 func TestDecideAfterBinding(t *testing.T) {
 	const (
-		scope   = AfterBindingFactEffectiveScope
-		consent = AfterBindingFactConsent
+		scope   = afterBindingFactEffectiveScope
+		consent = afterBindingFactConsent
 	)
 	scopes := func(s string) *string { return &s }
 
 	testCases := []struct {
 		name       string
 		world      afterBindingWorld
-		wantAnswer AfterBindingAnswer
-		wantReads  []AfterBindingFact
+		wantAnswer afterBindingAnswer
+		wantReads  []afterBindingFact
 	}{
 		{
 			name:       "a user holding none of the scopes is refused",
 			world:      afterBindingWorld{effectiveScope: ""},
-			wantAnswer: AfterBindingNoScope,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingNoScope,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "no scope is refused before prompt=consent is honoured",
 			world:      afterBindingWorld{promptConsent: true, effectiveScope: ""},
-			wantAnswer: AfterBindingNoScope,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingNoScope,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "prompt=consent goes to the consent screen",
 			world:      afterBindingWorld{promptConsent: true, effectiveScope: "openid"},
-			wantAnswer: AfterBindingConsent,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "a client requiring consent goes to the consent screen",
 			world:      afterBindingWorld{consentRequired: true, effectiveScope: "openid"},
-			wantAnswer: AfterBindingConsent,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "offline_access in the effective scope goes to the consent screen",
 			world:      afterBindingWorld{effectiveScope: "openid offline_access"},
-			wantAnswer: AfterBindingConsent,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "no consent needed goes to issuance",
 			world:      afterBindingWorld{effectiveScope: "openid profile"},
-			wantAnswer: AfterBindingIssue,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
 		},
 		// authserver:manage-account is owed the consent screen whatever the client's Consent
 		// required says, unless the user's stored consent to the client covers it, and the admin
@@ -316,15 +336,15 @@ func TestDecideAfterBinding(t *testing.T) {
 			name: "manage-account from a consent-off client with no stored consent goes to the consent screen",
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
 				effectiveScope: "openid authserver:manage-account"},
-			wantAnswer: AfterBindingConsent,
-			wantReads:  []AfterBindingFact{scope, consent},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope, consent},
 		},
 		{
 			name: "manage-account with a stored consent leaving it out goes to the consent screen",
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
 				effectiveScope: "openid authserver:manage-account", consentScope: scopes("openid profile")},
-			wantAnswer: AfterBindingConsent,
-			wantReads:  []AfterBindingFact{scope, consent},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope, consent},
 		},
 		{
 			// A consent-off client is asked about manage-account and nothing else, so a stored
@@ -333,23 +353,23 @@ func TestDecideAfterBinding(t *testing.T) {
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client",
 				effectiveScope: "openid profile authserver:manage-account",
 				consentScope:   scopes("openid authserver:manage-account")},
-			wantAnswer: AfterBindingIssue,
-			wantReads:  []AfterBindingFact{scope, consent},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope, consent},
 		},
 		{
 			name: "the admin console's client goes to issuance with manage-account and reads no consent",
 			world: afterBindingWorld{clientIdentifier: "admin-console-client",
 				effectiveScope: "authserver:manage authserver:manage-account email openid profile"},
-			wantAnswer: AfterBindingIssue,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			// The user's permissions narrowed the scope, and what is about to be granted is what
 			// the rule reads.
 			name:       "manage-account filtered out of the effective scope is owed nothing",
 			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: "openid"},
-			wantAnswer: AfterBindingIssue,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingIssue,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			// A client requiring consent goes to the consent step as before, which reads the
@@ -357,14 +377,14 @@ func TestDecideAfterBinding(t *testing.T) {
 			name: "manage-account from a client requiring consent goes to the consent screen without a read here",
 			world: afterBindingWorld{clientIdentifier: "crafted-link-client", consentRequired: true,
 				effectiveScope: "openid authserver:manage-account"},
-			wantAnswer: AfterBindingConsent,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope},
 		},
 		{
 			name:       "no scope is refused before manage-account is asked about",
 			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: ""},
-			wantAnswer: AfterBindingNoScope,
-			wantReads:  []AfterBindingFact{scope},
+			wantAnswer: afterBindingNoScope,
+			wantReads:  []afterBindingFact{scope},
 		},
 	}
 

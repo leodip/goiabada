@@ -265,6 +265,17 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			portuguese: "O identificador do recurso já está em uso",
 		},
 		{
+			name: "create naming a client's identifier",
+			serve: create(`{"resourceIdentifier":"a-resource","description":"d"}`, func(database *datamocks.Database) {
+				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "a-resource").Return(nil, nil).Once()
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "a-resource").Return(&record.Client{Id: 8, ClientIdentifier: "a-resource"}, nil).Once()
+			}),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "The resource identifier is already in use by a client",
+			portuguese: "O identificador do recurso já está em uso por um cliente",
+		},
+		{
 			name:       "update with no identifier",
 			serve:      update(ordinary(), `{"resourceIdentifier":"","description":"d"}`, nil),
 			status:     http.StatusBadRequest,
@@ -288,6 +299,17 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			code:       "VALIDATION_ERROR",
 			english:    "The resource identifier is already in use",
 			portuguese: "O identificador do recurso já está em uso",
+		},
+		{
+			name: "update onto a client's identifier",
+			serve: update(ordinary(), `{"resourceIdentifier":"named-like-a-client","description":"d"}`, func(database *datamocks.Database) {
+				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-client").Return(nil, nil).Once()
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-client").Return(&record.Client{Id: 8, ClientIdentifier: "named-like-a-client"}, nil).Once()
+			}),
+			status:     http.StatusBadRequest,
+			code:       "VALIDATION_ERROR",
+			english:    "The resource identifier is already in use by a client",
+			portuguese: "O identificador do recurso já está em uso por um cliente",
 		},
 		{
 			name:       "update renaming the system resource",

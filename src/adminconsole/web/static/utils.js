@@ -53,6 +53,18 @@ function goToSessionEnded() {
   window.location.assign(SESSION_ENDED_PATH);
 }
 
+// submitSignOut ends the administrator's session as the sign-out confirmation's own button does:
+// a form posted to /auth/logout, which the origin check guards and passes as same-origin. A page
+// whose own dialog has already confirmed ending the current session calls it rather than
+// navigating to /auth/logout, whose GET only asks again (#411).
+function submitSignOut() {
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = "/auth/logout";
+  document.body.appendChild(form);
+  form.submit();
+}
+
 // withPageLanguage names the catalog this page rendered from, which the layout publishes as
 // data-catalog-lang, as ui_locales on a request the page sends. The console resolves each request's
 // language afresh, and ui_locales is the explicit intent neither the browser's Accept-Language nor

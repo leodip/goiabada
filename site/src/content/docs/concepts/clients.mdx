@@ -47,6 +47,8 @@ A client identifier you enter is 3 to 38 characters long. (A self-registered cli
 
 It's case-sensitive: `my-app` and `My-App` are two different clients, and a request whose `client_id` differs only in case finds no client.
 
+It can't be a resource's identifier either, since an ID token's `aud` is the client identifier and an access token's names resources. [Resources and permissions](/concepts/resources-and-permissions/#identifiers) says what happens to a client and a resource that already share one.
+
 ## Settings a new client starts with
 
 A client you create in the admin console starts:
@@ -162,6 +164,8 @@ The ACR level is how strongly a user must sign in to use the client:
 New clients start at `urn:goiabada:level2_optional`. The field shows only while **Authorization code with PKCE** is on. Change it on the client's **Settings** tab and click **Save**.
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
+
+The [password grant](/legacy-flows/ropc/#who-cant-use-it) can't ask for a one-time code, so at `urn:goiabada:level2_mandatory` it is refused for every user. With **Authorization code with PKCE** off, the level doesn't apply, and neither does that refusal.
 
 ## Administrative scopes
 

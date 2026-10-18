@@ -37,6 +37,11 @@ type completedFixture struct {
 
 const completedSessionIdentifier = "test-session"
 
+// consentManageAccountScope is authserver:manage-account as a request spells it. The consent docs
+// guard that owned the spelling moved to authflow with the decision it holds (#584), so this file
+// names the scope itself.
+const consentManageAccountScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+
 func newCompletedFixture(t *testing.T, authContext *ceremony.AuthContext) *completedFixture {
 	f := &completedFixture{
 		pageRenderer:       handlersmocks.NewPageRenderer(t),

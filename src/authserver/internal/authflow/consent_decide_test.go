@@ -194,7 +194,7 @@ func TestConsentScreenOwed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, ConsentScreenOwed(tc.scopes, tc.scope, tc.promptConsent))
+			assert.Equal(t, tc.want, consentScreenOwed(tc.scopes, tc.scope, tc.promptConsent))
 		})
 	}
 }
