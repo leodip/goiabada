@@ -11,7 +11,8 @@
 
 <form method="post" class="stacked" novalidate>
   {{/* errorField names the field a refusal is about, which is marked invalid and described by
-       the notice. */}}
+       the notice. Focus goes where typing starts again: the address, or the password, since both
+       password fields come back empty. */}}
   {{ if .error }}
   <div class="notice notice-danger" role="alert" id="register-error">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
@@ -21,13 +22,13 @@
 
   <div class="field">
     <label class="field-label" for="email">{{ T $.ctx "common.field.email" }}</label>
-    <input class="control" id="email" type="email" name="email" value="{{ .email }}" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus{{ if .error }}{{ if eq .errorField "email" }} aria-invalid="true" aria-describedby="register-error"{{ end }}{{ end }}>
+    <input class="control" id="email" type="email" name="email" value="{{ .email }}" autocomplete="username" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "email" }} aria-invalid="true" aria-describedby="register-error" autofocus{{ end }}{{ else }} autofocus{{ end }}>
   </div>
 
   {{ if not .requiresEmailVerification }}
   <div class="field">
     <label class="field-label" for="password">{{ T $.ctx "common.field.password" }}</label>
-    <input class="control" id="password" type="password" name="password" autocomplete="new-password"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="register-error"{{ end }}{{ end }}>
+    <input class="control" id="password" type="password" name="password" autocomplete="new-password"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="register-error"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}>
   </div>
 
   <div class="field">

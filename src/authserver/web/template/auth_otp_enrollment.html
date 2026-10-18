@@ -27,7 +27,7 @@
     </li>
     <li>
       <div class="field">
-        <label class="field-label" for="otp">{{ T $.ctx "auth.otp_enrollment.step3" }}</label>
+        <label for="otp">{{ T $.ctx "auth.otp_enrollment.step3" }}</label>
         <input class="control control-mono" id="otp" type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" autofocus{{ if .error }} aria-invalid="true" aria-describedby="otp-error"{{ end }}>
       </div>
     </li>
