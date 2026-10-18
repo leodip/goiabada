@@ -59,16 +59,16 @@ func TestPasswordRules_TheValidatorAppliesWhatTheFormDescribes(t *testing.T) {
 			require.NoError(t, validator.ValidatePassword(policy, passwordFor(rules, rules.MinLength, "")),
 				"a password meeting exactly the described rules is refused")
 			if rules.MinLength > 1 {
-				assert.Error(t, validator.ValidatePassword(policy, passwordFor(rules, rules.MinLength-1, "")),
+				require.Error(t, validator.ValidatePassword(policy, passwordFor(rules, rules.MinLength-1, "")),
 					"a password one character short of the described length passed")
 			}
 			for _, kind := range passwordKinds {
 				password := passwordFor(rules, rules.MinLength, kind.name)
 				if kind.required(rules) {
-					assert.Error(t, validator.ValidatePassword(policy, password),
+					require.Error(t, validator.ValidatePassword(policy, password),
 						"a password with no %s character passed, although the form says one is required", kind.name)
 				} else {
-					assert.NoError(t, validator.ValidatePassword(policy, password),
+					require.NoError(t, validator.ValidatePassword(policy, password),
 						"a password with no %s character was refused, although the form does not ask for one", kind.name)
 				}
 			}
