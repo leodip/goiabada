@@ -828,9 +828,6 @@
   .gap-0\.5 {
     gap: calc(var(--spacing) * 0.5);
   }
-  .text-center {
-    text-align: center;
-  }
   .text-right {
     text-align: right;
   }
