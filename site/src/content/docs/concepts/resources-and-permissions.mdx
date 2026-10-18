@@ -39,7 +39,7 @@ A description is at most 100 characters, and can't contain `<` or `>`.
 
 Two resources can't share an identifier, and neither can two permissions of one resource.
 
-A resource can't share its identifier with a client either. An access token's `aud` names resources and an ID token's names the client, so a string that's both would let one token pass for the other. See [Check a token](/concepts/tokens/#check-a-token).
+A resource can't share its identifier with a client either. An access token's audience, its `aud` claim, names resources, and an ID token's names the client, so a string that's both could let one token pass for the other. See [Check a token](/concepts/tokens/#check-a-token).
 
 ## A permission belongs to its resource
 

@@ -60,7 +60,7 @@ The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can com
 - **A Gateway and three HTTPRoutes:** one route per host name, and one redirecting HTTP to HTTPS.
 - **A PodMonitor,** if you ask for one, or scrape annotations. See [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes).
 
-`goiabada-secrets.yaml`, beside it, holds the two Secrets the Deployments read: `goiabada-encryption-key`, with the AES key alone, and `goiabada-secrets`, with every other secret. If you gave the wizard a database client certificate, it holds a third, `goiabada-db-client-tls`, with the certificate and its key, mounted read-only into the auth server's pods at `/etc/goiabada/db-client-tls`. **Never** commit it. See [Secrets](/deploy/kubernetes/secrets/).
+`goiabada-secrets.yaml`, beside it, holds the Secrets the Deployments read: `goiabada-encryption-key`, with the AES key alone, `goiabada-secrets`, with every other secret, and, if you gave the wizard a database client certificate, `goiabada-db-client-tls`, with the certificate and its key. **Never** commit the file. See [Secrets](/deploy/kubernetes/secrets/).
 
 Both servers trust one proxy hop, the gateway, to tell them each client's IP address, and log one record per request. See [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes) and [Logs](/deploy/logs/).
 

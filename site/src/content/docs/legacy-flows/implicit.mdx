@@ -41,7 +41,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
    Location: https://app.example.com/callback#access_token=eyJhbGciOiJSUzI1NiIs...&token_type=Bearer&expires_in=300&id_token=eyJhbGciOiJSUzI1NiIs...&scope=openid+email&state=af0ifjsldkj&iss=https%3A%2F%2Fauth.example.com
    ```
 
-6. Check that `state` is the one you kept, and that `iss` is the auth server's issuer. Check the ID token as [a web app does](/guides/add-sign-in-to-a-web-app/#what-the-id-token-says), `nonce` included, and check its `at_hash` against the access token. Then replace the address in the browser's history with one that has no `#` part, so the tokens don't stay there.
+6. Check that `state` is the one you kept, and that `iss` is the auth server's [issuer](/reference/endpoints/discovery-and-jwks/). Check the ID token as [a web app does](/guides/add-sign-in-to-a-web-app/#what-the-id-token-says), `nonce` included, and check its `at_hash` against the access token. Then replace the address in the browser's history with one that has no `#` part, so the tokens don't stay there.
 
 </Steps>
 

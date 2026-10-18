@@ -20,7 +20,7 @@ Your app doesn't call this endpoint itself: it sends the user's browser there. T
    Host: auth.example.com
    ```
 
-2. The user signs in. When the browser comes back, check that `state` is the one you sent, and that `iss` is the auth server's issuer:
+2. The user signs in. When the browser comes back, check that `state` is the one you sent, and that `iss` is the auth server's [issuer](/reference/endpoints/discovery-and-jwks/):
 
    ```http
    HTTP/1.1 302 Found
@@ -131,7 +131,7 @@ The allowance is read again just before the code or the implicit flow's tokens a
 
 A successful response carries `code`, `state` when your app sent one, and `iss`. An error response carries `error`, `error_description`, `state` when your app sent one, and `iss`. `error_description` is English, holds no character outside those RFC 6749 allows in it, and is at most 512 bytes.
 
-`iss` is the auth server's issuer: the same value as `issuer` in the [discovery document](/reference/endpoints/discovery-and-jwks/) and the `iss` claim in every token. Every response carries it, success or error, in every response mode, and the discovery document says so with `authorization_response_iss_parameter_supported: true`. Compare it with the issuer you expect before you read anything else in the response. An app that signs in with more than one authorization server learns from it which one answered, so a response from one can't pass for another's ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html)). Many client libraries check it for you once discovery advertises it.
+`iss` is the auth server's issuer, the `issuer` in the [discovery document](/reference/endpoints/discovery-and-jwks/) and the `iss` claim in every token. Compare it with the issuer you expect before you read anything else in the response. It tells an app that signs in with more than one auth server which one answered, so a response from one can't pass for another's ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207.html)).
 
 `response_mode` says how they travel:
 

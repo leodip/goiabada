@@ -60,7 +60,7 @@ A sign-out the auth server can tie to your app happens at once. Any other asks t
 | A POST with a hint it can't confirm | `303 See Other` to `GET /auth/logout`, which asks the user |
 | A POST from another origin with no hint, another site or another host of the same domain | `403 Forbidden`. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/). |
 
-If the user clicks **No**, nothing ends and your app hears nothing: the browser goes back to the page it came from, or, with nowhere to go back to, such as a sign-out opened in a new tab, shows a page saying they're still signed in and can close it.
+If the user clicks **No**, nothing ends and your app hears nothing. The browser goes back to the page it came from when it can, and otherwise shows "You are still signed in. You can close this page."
 
 A hint that can't be confirmed isn't an error your app sees: it only means the user is asked. The `303` keeps `post_logout_redirect_uri`, `state` and `ui_locales`, and drops `id_token_hint` and `client_id`.
 

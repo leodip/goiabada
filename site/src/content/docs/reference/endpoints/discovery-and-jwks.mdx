@@ -68,9 +68,9 @@ The auth server serves its discovery document at two addresses, the one OpenID C
 - `/.well-known/openid-configuration`, which OpenID Connect libraries read.
 - `/.well-known/oauth-authorization-server`, which OAuth clients read. MCP clients try it first.
 
-Both answer with the same document, so they can't disagree. Each answers `GET` and `HEAD`.
+Both answer `GET` and `HEAD` with the same document.
 
-A client checks that the document's `issuer` is exactly the URL it put the well-known path into, and refuses the document when it isn't, as RFC 8414 section 3.3 and OpenID Connect Discovery 1.0 section 4.3 require. So keep the issuer the address the auth server is reached at: an issuer naming another host breaks discovery at both addresses.
+Keep the issuer the address clients reach the auth server at. A client refuses the discovery document when its `issuer` isn't exactly the URL it fetched the document under, as RFC 8414 section 3.3 and OpenID Connect Discovery 1.0 section 4.3 require. An issuer naming another host breaks discovery at both addresses.
 
 ## The discovery document
 
