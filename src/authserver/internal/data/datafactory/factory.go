@@ -166,15 +166,17 @@ func recordPool(ctx context.Context, pool data.PoolConfig) {
 // on by now, and the DSN is SQLite's (#438 decision 3).
 func mysqlConfig(c *config.DatabaseConfig) *mysqldb.DatabaseConfig {
 	return &mysqldb.DatabaseConfig{
-		Username: c.Username,
-		Password: c.Password,
-		Host:     c.Host,
-		Port:     c.Port,
-		Name:     c.Name,
-		Create:   c.Create,
-		Pool:     serverPool(c),
-		TLSMode:  c.EffectiveTLSMode(),
-		TLSRoots: c.TLSRoots,
+		Username:             c.Username,
+		Password:             c.Password,
+		Host:                 c.Host,
+		Port:                 c.Port,
+		Name:                 c.Name,
+		Create:               c.Create,
+		Pool:                 serverPool(c),
+		TLSMode:              c.EffectiveTLSMode(),
+		TLSRoots:             c.TLSRoots,
+		TLSClientCertificate: c.TLSClientCertificate,
+		TLSServerName:        c.TLSServerName,
 	}
 }
 
@@ -193,15 +195,17 @@ func serverPool(c *config.DatabaseConfig) *data.PoolConfig {
 // mapping is extracted.
 func postgresConfig(c *config.DatabaseConfig) *postgresdb.DatabaseConfig {
 	return &postgresdb.DatabaseConfig{
-		Username: c.Username,
-		Password: c.Password,
-		Host:     c.Host,
-		Port:     c.Port,
-		Name:     c.Name,
-		Create:   c.Create,
-		Pool:     serverPool(c),
-		TLSMode:  c.EffectiveTLSMode(),
-		TLSRoots: c.TLSRoots,
+		Username:             c.Username,
+		Password:             c.Password,
+		Host:                 c.Host,
+		Port:                 c.Port,
+		Name:                 c.Name,
+		Create:               c.Create,
+		Pool:                 serverPool(c),
+		TLSMode:              c.EffectiveTLSMode(),
+		TLSRoots:             c.TLSRoots,
+		TLSClientCertificate: c.TLSClientCertificate,
+		TLSServerName:        c.TLSServerName,
 	}
 }
 
@@ -209,15 +213,16 @@ func postgresConfig(c *config.DatabaseConfig) *postgresdb.DatabaseConfig {
 // mapping is extracted.
 func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 	return &mssqldb.DatabaseConfig{
-		Username: c.Username,
-		Password: c.Password,
-		Host:     c.Host,
-		Port:     c.Port,
-		Name:     c.Name,
-		Create:   c.Create,
-		Pool:     serverPool(c),
-		TLSMode:  c.EffectiveTLSMode(),
-		TLSRoots: c.TLSRoots,
+		Username:      c.Username,
+		Password:      c.Password,
+		Host:          c.Host,
+		Port:          c.Port,
+		Name:          c.Name,
+		Create:        c.Create,
+		Pool:          serverPool(c),
+		TLSMode:       c.EffectiveTLSMode(),
+		TLSRoots:      c.TLSRoots,
+		TLSServerName: c.TLSServerName,
 	}
 }
 

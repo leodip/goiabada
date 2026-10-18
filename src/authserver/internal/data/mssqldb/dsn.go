@@ -86,6 +86,13 @@ var tlsQuery = map[data.TLSMode]string{
 func connectionURL(cfg *DatabaseConfig, database string) string {
 	q := url.Values{}
 	q.Add("database", database)
+	// The host name verify-full checks the certificate against, in go-mssqldb's own parameter: the
+	// URL's host names the address dialed and nothing else, and an operator connecting through an
+	// address the certificate does not name — an IP address, a pooler, a private endpoint — has
+	// nowhere else to put the name that is certified (#546).
+	if cfg.TLSServerName != "" {
+		q.Add("hostNameInCertificate", cfg.TLSServerName)
+	}
 	u := url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(cfg.Username, cfg.Password),

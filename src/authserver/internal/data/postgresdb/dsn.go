@@ -1,6 +1,7 @@
 package postgresdb
 
 import (
+	"crypto/tls"
 	"net/url"
 
 	"github.com/jackc/pgx/v5"
@@ -20,8 +21,9 @@ const maintenanceDatabase = "postgres"
 // and an IPv6 host (#424). The host goes through hostport.Join, which also reads `[::1]` as
 // `::1`: the one IPv6 spelling the Sprintf'd URL accepted.
 //
-// The URL is not the whole connection: the CA file's authorities cannot be written into it, so
-// the connection is opened from ConnConfig, which adds them.
+// The URL is not the whole connection: the CA file's authorities, the client certificate pair and
+// the host name override cannot be written into it, so the connection is opened from ConnConfig,
+// which adds them.
 func DSN(cfg *DatabaseConfig) string {
 	return connectionURL(cfg, cfg.Name)
 }
@@ -33,7 +35,8 @@ func MaintenanceDSN(cfg *DatabaseConfig) string {
 }
 
 // ConnConfig is the configuration the application database's connection is opened with: DSN as
-// pgx reads it, and the CA file's authorities.
+// pgx reads it, and the TLS the settings add — the CA file's authorities, the client certificate
+// pair and the host name override.
 func ConnConfig(cfg *DatabaseConfig) (*pgx.ConnConfig, error) {
 	return connConfig(cfg, DSN(cfg))
 }
@@ -45,14 +48,26 @@ func MaintenanceConnConfig(cfg *DatabaseConfig) (*pgx.ConnConfig, error) {
 
 // connConfig reads dsn through pgx and hands a mode that checks the certificate the CA file's
 // authorities, nil leaving the system's roots. pgx's verify-ca check reads the roots off this same
-// configuration when the server's certificate arrives, so setting them here covers both modes.
+// configuration when the server's certificate arrives, so setting them here covers both modes. The
+// client certificate pair and the host name override reach the handshake here too: the URL blanks
+// sslcert and sslkey, and names no host to check the certificate against, and the load refuses the
+// pair beside disable and prefer and the override beside every mode but verify-full, so both
+// arrive only where they are read (#546).
 func connConfig(cfg *DatabaseConfig, dsn string) (*pgx.ConnConfig, error) {
 	c, err := pgx.ParseConfig(dsn)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to parse the connection URL")
 	}
-	if cfg.TLSMode.OrPrefer().ChecksCertificate() && c.TLSConfig != nil {
-		c.TLSConfig.RootCAs = cfg.TLSRoots
+	if c.TLSConfig != nil {
+		if cfg.TLSMode.OrPrefer().ChecksCertificate() {
+			c.TLSConfig.RootCAs = cfg.TLSRoots
+		}
+		if cfg.TLSClientCertificate != nil {
+			c.TLSConfig.Certificates = []tls.Certificate{*cfg.TLSClientCertificate}
+		}
+		if cfg.TLSServerName != "" {
+			c.TLSConfig.ServerName = cfg.TLSServerName
+		}
 	}
 	return c, nil
 }
@@ -62,7 +77,8 @@ func connConfig(cfg *DatabaseConfig, dsn string) (*pgx.ConnConfig, error) {
 // libpq's PGSSL* variables, from a service file PGSERVICE names, and from the root certificate and
 // client pair under ~/.postgresql; a key the URL carries, even empty, wins over all three. So
 // no root file, no client certificate and no key passphrase, which leaves the system's roots and
-// the CA file ConnConfig adds; SNI on and the negotiation PostgreSQL's own, libpq's defaults.
+// the CA file, the client certificate pair and the host name override ConnConfig adds; SNI on and
+// the negotiation PostgreSQL's own, libpq's defaults.
 const tlsQuery = "&sslrootcert=&sslcert=&sslkey=&sslpassword=&sslsni=1&sslnegotiation=postgres"
 
 func connectionURL(cfg *DatabaseConfig, database string) string {

@@ -124,6 +124,7 @@ type mysqlCase struct {
 	Name, Engine, Host, Username, Password, Database string
 	Port                                             int
 	TLSMode                                          string       `json:"tlsMode"`
+	ServerName                                       string       `json:"serverName"`
 	MySQL                                            *mysqlFields `json:"mysql"`
 	MySQLMaintenance                                 *mysqlFields `json:"mysqlMaintenance"`
 }
@@ -190,7 +191,7 @@ func TestConnConfig_MatchesTheSetupWizardsCaseFile(t *testing.T) {
 		require.NotNilf(t, c.MySQL, "%s: no mysql fields", c.Name)
 		require.NotNilf(t, c.MySQLMaintenance, "%s: no mysqlMaintenance fields", c.Name)
 		cfg := &DatabaseConfig{Username: c.Username, Password: c.Password, Host: c.Host, Port: c.Port, Name: c.Database,
-			TLSMode: data.TLSMode(c.TLSMode)}
+			TLSMode: data.TLSMode(c.TLSMode), TLSServerName: c.ServerName}
 		conn, err := ConnConfig(cfg)
 		require.NoError(t, err)
 		maintenance, err := MaintenanceConnConfig(cfg)

@@ -289,6 +289,35 @@ var configVariables = []configVar{
 		with: map[string]string{"GOIABADA_DB_TYPE": "postgres", "GOIABADA_DB_TLS_MODE": "verify-ca"},
 		read: func(c *Config) any { return c.Database.TLSCAFile },
 	},
+	// The client certificate loads only as a pair, so each row's `with` names the other half.
+	// The two certificates differ between the variable and the flag; both carry the one key's
+	// public key, since a pair is a certificate and the key it was signed with (#546).
+	{
+		env: "GOIABADA_DB_TLS_CLIENT_CERT_FILE", flag: "db-tls-client-cert-file", def: "",
+		envValue: "testdata/db-tls-client-cert-env.pem", envWant: "testdata/db-tls-client-cert-env.pem",
+		flagValue: "testdata/db-tls-client-cert-flag.pem", flagWant: "testdata/db-tls-client-cert-flag.pem",
+		with: map[string]string{"GOIABADA_DB_TYPE": "postgres", "GOIABADA_DB_TLS_MODE": "verify-full",
+			"GOIABADA_DB_TLS_CLIENT_KEY_FILE": "testdata/db-tls-client-key-env.pem"},
+		read: func(c *Config) any { return c.Database.TLSClientCertFile },
+	},
+	// The two key files hold the same key under two names, since the certificate `with` names is
+	// fixed for both cases and one certificate pairs with one key only (#546).
+	{
+		env: "GOIABADA_DB_TLS_CLIENT_KEY_FILE", flag: "db-tls-client-key-file", def: "",
+		envValue: "testdata/db-tls-client-key-env.pem", envWant: "testdata/db-tls-client-key-env.pem",
+		flagValue: "testdata/db-tls-client-key-flag.pem", flagWant: "testdata/db-tls-client-key-flag.pem",
+		with: map[string]string{"GOIABADA_DB_TYPE": "postgres", "GOIABADA_DB_TLS_MODE": "verify-full",
+			"GOIABADA_DB_TLS_CLIENT_CERT_FILE": "testdata/db-tls-client-cert-env.pem"},
+		read: func(c *Config) any { return c.Database.TLSClientKeyFile },
+	},
+	// The host name override loads only beside verify-full, the only mode that checks the name.
+	{
+		env: "GOIABADA_DB_TLS_SERVER_NAME", flag: "db-tls-server-name", def: "",
+		envValue: "db-1.internal.example", envWant: "db-1.internal.example",
+		flagValue: "db-2.internal.example", flagWant: "db-2.internal.example",
+		with: map[string]string{"GOIABADA_DB_TYPE": "mysql", "GOIABADA_DB_TLS_MODE": "verify-full"},
+		read: func(c *Config) any { return c.Database.TLSServerName },
+	},
 
 	// Initial setup and the data-encryption keys
 	// One default for unset and empty alike, the address the seed falls back to for an empty
@@ -756,7 +785,10 @@ var authServerFlags = []string{
 	"db-password",
 	"db-port",
 	"db-tls-ca-file",
+	"db-tls-client-cert-file",
+	"db-tls-client-key-file",
 	"db-tls-mode",
+	"db-tls-server-name",
 	"db-type",
 	"db-username",
 }
@@ -773,6 +805,9 @@ var flagsAddedAfterTheSplit = []string{
 	"db-max-open-conns",
 	"db-tls-ca-file",
 	"db-tls-mode",
+	"db-tls-client-cert-file",
+	"db-tls-client-key-file",
+	"db-tls-server-name",
 }
 
 // refusedFlags is the other half of the narrowing, named rather than merely absent: the 13 admin
@@ -955,8 +990,8 @@ func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *test
 			want[name] = true
 		}
 	}
-	if len(want) != 14 {
-		t.Fatalf("authServerFlags names %d db- flags, want 14, so this case would check the wrong set", len(want))
+	if len(want) != 17 {
+		t.Fatalf("authServerFlags names %d db- flags, want 17, so this case would check the wrong set", len(want))
 	}
 
 	registered := map[string]string{}

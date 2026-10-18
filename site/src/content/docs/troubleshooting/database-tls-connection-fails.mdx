@@ -18,9 +18,10 @@ The auth server stops with `unable to create the database connection`. Its `erro
 | The `error` says | Why | Fix it |
 |---|---|---|
 | `x509: certificate signed by unknown authority` | The auth server doesn't trust the authority that signed the certificate. | Set `GOIABADA_DB_TLS_CA_FILE` to a PEM file holding that authority, and any intermediate one. It replaces the system's authorities. |
-| `x509: certificate is valid for db-1.internal.example, not db.example.com` | `verify-full`, and the certificate doesn't name `GOIABADA_DB_HOST`, here `db.example.com`. | Set `GOIABADA_DB_HOST` to a name the certificate carries. If you can't, such as behind a connection pooler, use `verify-ca`. |
-| `x509: cannot validate certificate for 10.0.0.5 because it doesn't contain any IP SANs` | `verify-full`, and `GOIABADA_DB_HOST` is an IP address, here `10.0.0.5`, that the certificate doesn't carry. | Set `GOIABADA_DB_HOST` to a host name the certificate carries, or use `verify-ca`. |
+| `x509: certificate is valid for db-1.internal.example, not db.example.com` | `verify-full`, and the certificate doesn't name the host checked, here `db.example.com`: `GOIABADA_DB_TLS_SERVER_NAME` when it's set, `GOIABADA_DB_HOST` when it isn't. | Set `GOIABADA_DB_TLS_SERVER_NAME` to a name the certificate carries, here `db-1.internal.example`. The auth server still dials `GOIABADA_DB_HOST`, so this works behind a connection pooler too. |
+| `x509: cannot validate certificate for 10.0.0.5 because it doesn't contain any IP SANs` | `verify-full`, `GOIABADA_DB_HOST` is an IP address, here `10.0.0.5`, that the certificate doesn't carry, and `GOIABADA_DB_TLS_SERVER_NAME` is unset. | Set `GOIABADA_DB_TLS_SERVER_NAME` to a host name the certificate carries. |
 | `x509: certificate has expired or is not yet valid` | A certificate in the chain has expired or doesn't start yet, or the auth server's clock is wrong. | See [Check the certificate dates](#check-the-certificate-dates). |
+| `connection requires a valid client certificate` or `certificate authentication failed for user` (PostgreSQL), `Access denied for user` on an account that requires X509 (MySQL), or `remote error: tls: unknown certificate authority` | The database authenticates by client certificate, and the auth server presented none, or one the database doesn't trust or doesn't match to the user. | Set `GOIABADA_DB_TLS_CLIENT_CERT_FILE` and `GOIABADA_DB_TLS_CLIENT_KEY_FILE` to a certificate the database trusts, issued for the database user, with `require`, `verify-ca` or `verify-full`. See [A client certificate](/deploy/database/#a-client-certificate). MySQL says `Access denied` for a wrong password too, so check that first. |
 | `server refused TLS connection` (PostgreSQL), `TLS requested but server does not support TLS` (MySQL) or `server does not support encryption` (SQL Server) | The database serves no TLS. | Turn TLS on at the database. If nobody else can reach its network, you can set `GOIABADA_DB_TLS_MODE=prefer` instead. |
 
 On MySQL and SQL Server in `verify-ca`, an `x509:` error comes after `unable to verify the database server's certificate chain`.
@@ -28,6 +29,8 @@ On MySQL and SQL Server in `verify-ca`, an `x509:` error comes after `unable to 
 The auth server reads the CA file only at start, so restart it after you change the file. On Kubernetes, the file is in [the `goiabada-db-ca` ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
 
 A CA file the auth server can't use stops it before it connects, with a `malformed configuration:` line naming `GOIABADA_DB_TLS_CA_FILE`. That happens when the file can't be read, holds no certificate, or is set with `disable`, `prefer` or `require`, which read none.
+
+A client certificate or host name the auth server can't use stops it the same way, with a line naming the setting: a certificate without its key or a key without its certificate, a file that can't be read, two files that don't pair, a certificate with `disable` or `prefer` or on SQL Server, and `GOIABADA_DB_TLS_SERVER_NAME` with any mode but `verify-full`. The auth server reads the two files only at start too. On Kubernetes, they're in [the `goiabada-db-client-tls` Secret](/deploy/kubernetes/security/#present-a-client-certificate).
 
 ## Check the certificate dates
 
@@ -59,6 +62,6 @@ After `x509: certificate has expired or is not yet valid`, the `error` gives the
 ## Next steps
 
 <CardGrid>
-  <LinkCard title="Database" description="Choose a TLS mode and trusted authorities." href="/deploy/database/#where-the-database-sits" />
+  <LinkCard title="Database" description="Choose a TLS mode, trusted authorities and a client certificate." href="/deploy/database/#where-the-database-sits" />
   <LinkCard title="CrashLoopBackOff" description="Other reasons the auth server stops at startup." href="/troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection/" />
 </CardGrid>

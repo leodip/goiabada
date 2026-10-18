@@ -157,3 +157,36 @@ func TestNew_RefusesAModeOutsideTheFive(t *testing.T) {
 	assert.Nil(t, database)
 	assert.Equal(t, `GOIABADA_DB_TLS_MODE "verify-identity" is not one of the five modes`, err.Error())
 }
+
+// TestConnConfig_ChecksTheNamedHost: the host name override reaches the driver as its
+// hostNameInCertificate parameter, on the application database's connection and master alike, and
+// verify-full checks the certificate against it rather than the host dialled (#546). The pair
+// needs no row here: the load refuses a client certificate on SQL Server outright, go-mssqldb
+// taking none.
+func TestConnConfig_ChecksTheNamedHost(t *testing.T) {
+	const host = "db.example.com"
+	const override = "db-1.internal.example"
+	ours := tlstest.NewAuthority(t, "ours")
+	forDialled := ours.Issue(t, host)
+	forOverride := ours.Issue(t, override)
+
+	for _, conn := range []struct {
+		which string
+		build func(*DatabaseConfig) (msdsn.Config, error)
+	}{{"ConnConfig", ConnConfig}, {"MaintenanceConnConfig", MaintenanceConnConfig}} {
+		t.Run(conn.which, func(t *testing.T) {
+			cfg := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: host, Port: 1433, Name: "goiabada",
+				TLSMode: data.TLSVerifyFull, TLSRoots: ours.Pool(), TLSServerName: override}
+			parsed, err := conn.build(cfg)
+			require.NoError(t, err)
+			require.NotNil(t, parsed.TLSConfig)
+			assert.Equal(t, override, parsed.TLSConfig.ServerName, "the driver checks the override, not the host dialled")
+			assert.True(t, parsed.HostInCertificateProvided, "the driver knows the name was given")
+
+			require.NoError(t, tlstest.Handshake(t, parsed.TLSConfig, forOverride),
+				"a certificate naming the override is accepted")
+			require.Error(t, tlstest.Handshake(t, parsed.TLSConfig, forDialled),
+				"a certificate naming the host dialled is refused")
+		})
+	}
+}

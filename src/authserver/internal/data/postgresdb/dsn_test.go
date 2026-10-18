@@ -93,6 +93,7 @@ func TestDSN_MatchesTheSetupWizardsCaseFile(t *testing.T) {
 			Port                                                  int
 			MaintenanceDSN                                        string `json:"maintenanceDSN"`
 			TLSMode                                               string `json:"tlsMode"`
+			ServerName                                            string `json:"serverName"`
 		} `json:"cases"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &file))
@@ -104,7 +105,7 @@ func TestDSN_MatchesTheSetupWizardsCaseFile(t *testing.T) {
 		}
 		found++
 		cfg := &DatabaseConfig{Username: c.Username, Password: c.Password, Host: c.Host, Port: c.Port, Name: c.Database,
-			TLSMode: data.TLSMode(c.TLSMode)}
+			TLSMode: data.TLSMode(c.TLSMode), TLSServerName: c.ServerName}
 		assert.Equalf(t, c.DSN, DSN(cfg), "%s: DSN", c.Name)
 		assert.Equalf(t, c.MaintenanceDSN, MaintenanceDSN(cfg), "%s: MaintenanceDSN", c.Name)
 	}

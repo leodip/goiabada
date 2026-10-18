@@ -299,3 +299,60 @@ func greeting(offerTLS bool) []byte {
 	p = append(p, "mysql_native_password\x00"...)
 	return append([]byte{byte(len(p)), byte(len(p) >> 8), byte(len(p) >> 16), 0}, p...)
 }
+
+// TestConnConfig_PresentsTheClientPairAndChecksTheNamedHost: the pair the configuration carries is
+// presented by the configuration of the builder's own, in require as in the verifying modes — the
+// driver's skip-verify string carrying no certificate — and the host name override replaces the
+// host dialled in what verify-full checks, on the application database's connection and the
+// maintenance one alike (#546).
+func TestConnConfig_PresentsTheClientPairAndChecksTheNamedHost(t *testing.T) {
+	const host = "db.example.com"
+	ours := tlstest.NewAuthority(t, "ours")
+	pair := ours.IssueClient(t, "goiabada")
+	const override = "db-1.internal.example"
+	forDialled := ours.Issue(t, host)
+	forOverride := ours.Issue(t, override)
+	// require checks no certificate, so with a pair, on the configuration of the builder's own, it
+	// still accepts one no authority it trusts signed, for another host.
+	untrustedForAnother := tlstest.NewAuthority(t, "theirs").Issue(t, "other.example.com")
+
+	for _, tt := range []struct {
+		name  string
+		mode  data.TLSMode
+		roots *x509.CertPool
+	}{
+		{"require, which checks nothing", data.TLSRequire, nil},
+		{"verify-ca, which checks the chain", data.TLSVerifyCA, ours.Pool()},
+		{"verify-full, which checks the chain and the name", data.TLSVerifyFull, ours.Pool()},
+	} {
+		for _, conn := range []struct {
+			which string
+			build func(*DatabaseConfig) (*mysqldriver.Config, error)
+		}{{"ConnConfig", ConnConfig}, {"MaintenanceConnConfig", MaintenanceConnConfig}} {
+			t.Run(tt.name+"/"+conn.which, func(t *testing.T) {
+				cfg := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: host, Port: 3306, Name: "goiabada",
+					TLSMode: tt.mode, TLSRoots: tt.roots, TLSClientCertificate: &pair, TLSServerName: override}
+				c, err := conn.build(cfg)
+				require.NoError(t, err)
+				_, err = mysqldriver.NewConnector(c)
+				require.NoError(t, err, "the driver must accept the configuration")
+
+				tlsConfig, _ := driverTLS(t, c)
+				require.NotNil(t, tlsConfig, "the connection is TLS")
+				assert.Equal(t, []tls.Certificate{pair}, tlsConfig.Certificates, "the connection presents the pair")
+				assert.Equal(t, override, tlsConfig.ServerName, "the TLS configuration names the override")
+
+				if tt.mode == data.TLSRequire {
+					require.NoError(t, tlstest.Handshake(t, tlsConfig, untrustedForAnother),
+						"require checks no certificate, with a pair as without one")
+				}
+				if tt.mode == data.TLSVerifyFull {
+					require.NoError(t, tlstest.Handshake(t, tlsConfig, forOverride),
+						"a certificate naming the override is accepted")
+					require.Error(t, tlstest.Handshake(t, tlsConfig, forDialled),
+						"a certificate naming the host dialled is refused")
+				}
+			})
+		}
+	}
+}
