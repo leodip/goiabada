@@ -87,9 +87,8 @@ func HandleSettingsGeneralPut(
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil))
 			return
 		}
-		const issuerMaxLength = 60
-		if inputvalidation.TextLength(issuer) > issuerMaxLength {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}))
+		if inputvalidation.TextLength(issuer) > oidc.IssuerMaxLength {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": oidc.IssuerMaxLength}))
 			return
 		}
 		// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of
