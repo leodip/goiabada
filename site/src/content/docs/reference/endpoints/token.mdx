@@ -76,6 +76,8 @@ A public client sends `client_id` in the body and no secret, which discovery cal
 
 RFC 6749 section 2.3.1 uses form encoding for both credentials: a space becomes `+`, a literal plus `%2B`, a percent sign `%25`, and a colon `%3A`. For example, the secret `a b+c` becomes `a+b%2Bc` before Base64 encoding. OAuth client libraries handle this for you; curl's `-u` expects you to encode these characters first.
 
+The auth server Base64-decodes the header, splits it at the first `:`, and form-decodes each part before checking the credentials. Thus `a+b%2Bc` is checked as `a b+c`.
+
 When the client can't be authenticated, the answer is `401 Unauthorized` with `invalid_client` and a `WWW-Authenticate: Basic realm="goiabada"` header, whichever way the credentials came:
 
 | `error_description` | Why |
