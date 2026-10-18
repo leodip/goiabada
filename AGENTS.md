@@ -650,17 +650,6 @@ which is the only thing that catches an interface newly named in a config. Keyin
 `Code generated ... DO NOT EDIT` marker rather than on the filename is what leaves the countries
 and timezones tables, which have generators of their own, out of it (#338).
 
-**Tools built against a newer x/tools**: `unparam` and `mockery` load packages through
-`golang.org/x/tools`, so a Go release whose export data their pinned x/tools cannot read stops both:
-Go 1.27.2's version 5 did, against v0.49.0 (mvdan/unparam#94, vektra/mockery#1187). Until each
-upstream caught up, the dev container and CI's Lint job built the two pinned releases, unchanged,
-against `tools.x-tools-override` in `versions.yaml` through `src/.devcontainer/go-install-with-x-tools.sh`,
-because `go install tool@version` takes no override. Both now require v0.51.0 or newer, so they are
-installed with plain `go install` again, and the key and the script are gone; the script is in git
-history for the next time. With no key pinned, `./version-manager.sh override-status` says so and
-the daily **Upstream tools** workflow (`.github/workflows/upstream-tools.yml`) does nothing; with one
-pinned, it opens an issue the day either tool no longer needs it.
-
 **Lint tier**: `./run-tests.sh --type lint` runs golangci-lint and `unparam -exported` over the
 four modules with the commands CI's Lint job uses, then regenerates the Tailwind CSS and the mocks
 and fails if either differs from what is committed; `all` includes it. It fails rather than skips

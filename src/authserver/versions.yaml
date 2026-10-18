@@ -37,15 +37,6 @@
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
 #
-# No x-tools-override is pinned. When a Go release writes export data that the
-# golang.org/x/tools unparam or mockery require cannot read, as Go 1.27.2 did
-# (mvdan/unparam#94, vektra/mockery#1187), tools.x-tools-override names the newer
-# x/tools to build them against until upstream catches up:
-# `./version-manager.sh override-status`, run daily by the Upstream tools workflow,
-# reports when it can go. The script that built them against it,
-# src/.devcontainer/go-install-with-x-tools.sh, went with the last override and is
-# in git history.
-#
 # alpine is pinned to a minor rather than a patch: the alpine:X.Y tag receives
 # Alpine's patch releases, security fixes included, at the next image build, so
 # only the six-monthly minor release is a bump made here, and

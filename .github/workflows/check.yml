@@ -218,7 +218,7 @@ jobs:
           mockery version
           for tool in golangci-lint unparam mockery; do
             path=$(command -v "$tool") || { echo "::error::$tool not on PATH"; exit 1; }
-            go version -m "$path" | awk -v t="$tool" '$1 == "mod" { print t ": " $2 " " $3 } $1 == "dep" && $2 == "golang.org/x/tools" { print t ": built against " $2 " " $3 }'
+            go version -m "$path" | awk -v t="$tool" '$1 == "mod" { print t ": " $2 " " $3 }'
           done
 
       # The standalone staticcheck binary is deliberately not run. It does not
