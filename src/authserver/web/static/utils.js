@@ -1,25 +1,6 @@
 // utils.js is the auth server's shared page behaviour. Both layouts load it with defer, so it runs
 // once the document is parsed and before DOMContentLoaded.
 
-function showModalDialog(id, title, message, btn1callback, btn2callback) {
-  document.getElementById(id + "_modalDialogTitle").innerText = title;
-  document.getElementById(id + "_modalDialogMessage").textContent = message;
-
-  const btn1 = document.getElementById(id + "_btnModal1");
-  if (btn1 && btn1callback) {
-    btn1.onclick = null;
-    btn1.onclick = btn1callback;
-  }
-
-  const btn2 = document.getElementById(id + "_btnModal2");
-  if (btn2 && btn2callback) {
-    btn2.onclick = null;
-    btn2.onclick = btn2callback;
-  }
-
-  document.getElementById(id + "_modalDialog").showModal();
-}
-
 // submitOnce lets a form that must be sent once through on its first submission: the password and
 // the two code forms. The first submission goes, and the form's buttons are disabled, so a double
 // click or a repeated Enter sends no second one; implicit submission does not go through a disabled
@@ -69,4 +50,16 @@ document.querySelectorAll("form[data-submit-once]").forEach(function (form) {
 
 document.querySelectorAll("img[data-hide-on-error]").forEach(function (img) {
   hideBrokenImage(img);
+});
+
+// A link marked data-history-back goes back through the browser's history when there is any: the
+// sign-out page's "Stay signed in", which returns to the page that asked. With no history, or with
+// JavaScript off, the link's own href is the answer.
+document.querySelectorAll("a[data-history-back]").forEach(function (link) {
+  link.addEventListener("click", function (event) {
+    if (history.length > 1) {
+      event.preventDefault();
+      history.back();
+    }
+  });
 });

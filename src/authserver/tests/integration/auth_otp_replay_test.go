@@ -206,7 +206,7 @@ func assertOtpRefused(t *testing.T, resp *http.Response) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Contains(t, doc.Find("p.text-error").Text(), "Incorrect OTP Code")
+	assert.Contains(t, doc.Find(`[role="alert"]`).Text(), "That code isn't right")
 }
 
 // nextStepCode returns a code from one time step after the current one, which is inside the

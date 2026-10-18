@@ -1,21 +1,13 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "account.register_check_email.page_title" }}{{end}}
-{{define "head"}}
-
-{{end}}
+{{define "title"}}{{ T $.ctx "account.register_check_email.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
-
-    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "account.register_check_email.title" }}</h2>
-
-    <div class="mb-3">
-
-        {{/* One page for every well-formed address, whatever it leads to, so the page itself does
-             not tell a new address from one that already has an account (#207 decisions 4 and 13). */}}
-        <div class="w-full mt-4 form-control">
-            <p>{{ T $.ctx "account.register_check_email.message_sent" "email" .email }}</p>
-            <p class="mt-2">{{ T $.ctx "account.register_check_email.no_message" }}</p>
-        </div>
-
-    </div>
-
+{{/* One page for every well-formed address, whatever it leads to, so the page itself does not
+     tell a new address from one that already has an account (#207 decisions 4 and 13). */}}
+<div class="auth-status">
+  <span class="status-icon status-icon-note"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z"/><path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z"/></svg></span>
+  <h1 class="auth-title">{{ T $.ctx "account.register_check_email.title" }}</h1>
+  <p>{{ T $.ctx "account.register_check_email.message_sent" "email" .email }}</p>
+  <p class="text-ink-muted">{{ T $.ctx "account.register_check_email.no_message" }}</p>
+</div>
 {{end}}

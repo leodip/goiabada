@@ -11,12 +11,8 @@ var formTag = regexp.MustCompile(`(?s)<form\b[^>]*>`)
 
 // submitOnceMarker is the attribute a form that must be sent once carries: utils.js registers a
 // submit listener on every form carrying it, which lets the first submission through and refuses
-// every later one. submitOnceHandler is the inline handler that did the same before the pages moved
-// their scripts out of the templates (#617), which a form not yet moved still carries.
-const (
-	submitOnceMarker  = "data-submit-once"
-	submitOnceHandler = `onsubmit="return submitOnce(this)"`
-)
+// every later one.
+const submitOnceMarker = "data-submit-once"
 
 // The password form and the two code forms, the verification and the enrolment, send one submission
 // however often they are submitted: a double click or a repeated Enter. Each step's rotation of the
@@ -25,7 +21,7 @@ const (
 // through, and before #579 it landed on the account page with its sign-in lost (#579 decision 3).
 //
 // This is lexical, as static_lint_test.go's guards are, since this module has no JavaScript runner:
-// each form carries the marker or the handler, the layout it is rendered in loads the script
+// each form carries the marker, the layout it is rendered in loads the script
 // declaring and registering it, and the declaration does what it is for.
 // TestUtilsJS_EveryFunctionIsReachedFromATemplate holds the declaration to these callers.
 func TestTemplates_CredentialFormsSubmitOnce(t *testing.T) {
@@ -43,9 +39,9 @@ func TestTemplates_CredentialFormsSubmitOnce(t *testing.T) {
 			t.Errorf("%s: %d forms, want the one credential form", path, len(forms))
 			continue
 		}
-		if !strings.Contains(forms[0], submitOnceMarker) && !strings.Contains(forms[0], submitOnceHandler) {
-			t.Errorf("%s: the form %s carries neither %s nor %s, so a double click sends it twice",
-				path, forms[0], submitOnceMarker, submitOnceHandler)
+		if !strings.Contains(forms[0], submitOnceMarker) {
+			t.Errorf("%s: the form %s does not carry %s, so a double click sends it twice",
+				path, forms[0], submitOnceMarker)
 		}
 	}
 

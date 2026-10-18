@@ -418,9 +418,12 @@ func HandleResetPasswordPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		renderError := func(message string) {
+		// renderError redraws the form with message, marking the field it names, by its form name,
+		// invalid.
+		renderError := func(field, message string) {
 			bind := map[string]interface{}{
-				"error": message,
+				"error":      message,
+				"errorField": field,
 				// Echoed from the submission rather than read from the marker, because
 				// these rejections happen before the continuation is checked against it. A
 				// mistyped confirmation must not cost the user their continuation, and
@@ -459,12 +462,12 @@ func HandleResetPasswordPost(
 
 		// i18n surface: A — browser-flow form rerender.
 		if len(password) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
+			renderError("password", i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if password != passwordConfirmation {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
+			renderError("passwordConfirmation", i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
 			return
 		}
 
@@ -478,9 +481,9 @@ func HandleResetPasswordPost(
 			// i18n surface: A — browser-flow form rerender.
 			var locErr *i18n.LocalizedError
 			if errors.As(err, &locErr) {
-				renderError(locErr.Localize(r.Context()))
+				renderError("password", locErr.Localize(r.Context()))
 			} else {
-				renderError(err.Error())
+				renderError("password", err.Error())
 			}
 			return
 		}

@@ -4656,6 +4656,116 @@
     font-size: 0.9375rem;
     text-align: center;
   }
+  .auth-title:has(+ .auth-lead) {
+    margin-bottom: 0.5rem;
+  }
+  .auth-lead {
+    margin-bottom: 1.5rem;
+    color: var(--color-ink-muted);
+    text-align: center;
+  }
+  .auth-status {
+    text-align: center;
+  }
+  .auth-status > .auth-title {
+    margin-bottom: 0.75rem;
+  }
+  .auth-status > p + p {
+    margin-top: 0.75rem;
+  }
+  .auth-status > * + .button {
+    margin-top: 1.5rem;
+  }
+  .status-icon {
+    display: flex;
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 1rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: var(--color-subtle);
+    color: var(--color-ink-muted);
+  }
+  .status-icon > svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  .status-icon-danger {
+    background-color: var(--color-danger-soft);
+    color: var(--color-danger-ink);
+  }
+  .status-icon-positive {
+    background-color: var(--color-positive-soft);
+    color: var(--color-positive-ink);
+  }
+  .status-icon-caution {
+    background-color: var(--color-caution-soft);
+    color: var(--color-caution-ink);
+  }
+  .status-icon-note {
+    background-color: var(--color-note-soft);
+    color: var(--color-note-ink);
+  }
+  .auth-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+    gap: 0.75rem;
+  }
+  .auth-steps {
+    display: grid;
+    gap: 1.25rem;
+    counter-reset: step;
+  }
+  .auth-steps > li {
+    position: relative;
+    min-height: 1.75rem;
+    padding-left: 2.5rem;
+    counter-increment: step;
+  }
+  .auth-steps > li::before {
+    content: counter(step);
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: var(--color-note-soft);
+    color: var(--color-note-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .auth-qr {
+    display: block;
+    width: 12rem;
+    height: 12rem;
+    margin-top: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+  }
+  .secret-key {
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    letter-spacing: 0.06em;
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+  .code-hint {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--color-ink-muted);
+    overflow-wrap: anywhere;
+  }
   .app-shell {
     min-height: 100vh;
     min-height: 100dvh;

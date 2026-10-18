@@ -1,50 +1,42 @@
+{{- /* The form_post response page. Always read from the built-in templates, never from
+     GOIABADA_AUTHSERVER_TEMPLATEDIR: it encodes an authorization response on the wire. It is parsed
+     alone, with no layout and no template functions, so everything it shows arrives in .page. With
+     JavaScript, form-post.js submits it as soon as it is parsed; without, its button does. */ -}}
 <!DOCTYPE html>
-<html>
+<html lang="{{ .page.Lang }}"{{ with .page.Theme }} data-theme="{{ . }}"{{ end }}>
 
 <head>
-    <!-- Internal auto-submitting page. Briefly visible (≤ 50ms) before
-         JavaScript auto-submits the form. Not localized — title text is
-         effectively never seen by the user. Always read from the built-in
-         templates, never from GOIABADA_AUTHSERVER_TEMPLATEDIR: it encodes
-         an authorization response on the wire. -->
-    <title>Submit this form</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="{{ with .page.Theme }}{{ . }}{{ else }}light dark{{ end }}">
+  <title>{{ .page.Title }} – {{ .page.AppName }}</title>
+  <link rel="stylesheet" href="{{ .page.Stylesheet }}">
+  <script src="{{ .page.Script }}" defer></script>
 </head>
 
-<body onload="javascript:document.forms[0].submit()">
-
-    <form method="post" action="{{.redirectURI}}">
-        {{if .code}}
-            <input type="hidden" name="code" value="{{.code}}" />
-        {{end}}
-        {{if .access_token}}
-            <input type="hidden" name="access_token" value="{{.access_token}}" />
-        {{end}}
-        {{if .token_type}}
-            <input type="hidden" name="token_type" value="{{.token_type}}" />
-        {{end}}
-        {{if .expires_in}}
-            <input type="hidden" name="expires_in" value="{{.expires_in}}" />
-        {{end}}
-        {{if .id_token}}
-            <input type="hidden" name="id_token" value="{{.id_token}}" />
-        {{end}}
-        {{if .scope}}
-            <input type="hidden" name="scope" value="{{.scope}}" />
-        {{end}}
-        {{if .error}}
-            <input type="hidden" name="error" value="{{.error}}" />
-        {{end}}
-        {{if .error_description}}
-            <input type="hidden" name="error_description" value="{{.error_description}}" />
-        {{end}}
-        {{if .state}}
-            <input type="hidden" name="state" value="{{.state}}" />
-        {{end}}
-        {{if .iss}}
-            <input type="hidden" name="iss" value="{{.iss}}" />
-        {{end}}
-    </form>
-
+<body>
+  <main class="auth-page">
+    <div class="panel auth-card">
+      <div class="panel-body">
+        <p class="auth-brand">{{ .page.AppName }}</p>
+        <form class="auth-status" method="post" action="{{ .redirectURI }}" data-auto-submit>
+          {{ if .code }}<input type="hidden" name="code" value="{{ .code }}">{{ end }}
+          {{ if .access_token }}<input type="hidden" name="access_token" value="{{ .access_token }}">{{ end }}
+          {{ if .token_type }}<input type="hidden" name="token_type" value="{{ .token_type }}">{{ end }}
+          {{ if .expires_in }}<input type="hidden" name="expires_in" value="{{ .expires_in }}">{{ end }}
+          {{ if .id_token }}<input type="hidden" name="id_token" value="{{ .id_token }}">{{ end }}
+          {{ if .scope }}<input type="hidden" name="scope" value="{{ .scope }}">{{ end }}
+          {{ if .error }}<input type="hidden" name="error" value="{{ .error }}">{{ end }}
+          {{ if .error_description }}<input type="hidden" name="error_description" value="{{ .error_description }}">{{ end }}
+          {{ if .state }}<input type="hidden" name="state" value="{{ .state }}">{{ end }}
+          {{ if .iss }}<input type="hidden" name="iss" value="{{ .iss }}">{{ end }}
+          <h1 class="auth-title">{{ .page.Title }}</h1>
+          <p>{{ .page.Message }}</p>
+          <button class="button button-primary" type="submit">{{ .page.Button }}</button>
+        </form>
+      </div>
+    </div>
+  </main>
 </body>
 
 </html>

@@ -13,12 +13,11 @@
 "common.button.no" = "No"
 "common.button.cancel" = "Cancel"
 "common.button.ok" = "Ok"
-"common.button.home" = "Home"
+"common.button.home" = "Go to the home page"
 "common.field.email" = "Email"
-"common.field.email_placeholder" = "user@example.com"
 "common.field.password" = "Password"
-"common.field.password_confirmation" = "Password confirmation"
-"common.link.click_here" = "click here"
+"common.field.password_confirmation" = "Confirm password"
+"common.link.sign_in_to_account" = "Sign in to your account"
 
 # --- Dates and durations -----------------------------------------------------
 #
@@ -52,66 +51,69 @@
 
 # --- OTP verification (auth/otp) --------------------------------------------
 
-"auth.otp.page_title" = "OTP"
-"auth.otp.title" = "One-time password (OTP)"
-"auth.otp.instructions" = "Please input the six-digit code from your authenticator app into the field below."
-"auth.otp.code_label" = "OTP code"
+"auth.otp.page_title" = "Two-factor authentication"
+"auth.otp.title" = "Two-factor authentication"
+"auth.otp.instructions" = "Enter the 6-digit code from your authenticator app."
+"auth.otp.code_label" = "One-time code"
 "auth.otp.button" = "Verify"
 
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
-"auth.otp_enrollment.page_title" = "OTP"
-"auth.otp_enrollment.title" = "One-time password (OTP) enrollment"
-"auth.otp_enrollment.intro" = "To continue, we require you to enroll in two factor authentication using the one-time password (OTP) method. Please follow these steps:"
-"auth.otp_enrollment.step1_prefix" = "Download and install an OTP-compatible authenticator app to your smartphone or device, such as "
+"auth.otp_enrollment.page_title" = "Set up two-factor authentication"
+"auth.otp_enrollment.title" = "Set up two-factor authentication"
+"auth.otp_enrollment.intro" = "To continue, set up an authenticator app. It gives you a one-time code each time you sign in."
+"auth.otp_enrollment.step1_prefix" = "Install an authenticator app on your phone, such as "
 "auth.otp_enrollment.step1_microsoft_label" = "Microsoft Authenticator"
 "auth.otp_enrollment.step1_separator1" = ", "
 "auth.otp_enrollment.step1_google_label" = "Google Authenticator"
 "auth.otp_enrollment.step1_separator2" = " or "
 "auth.otp_enrollment.step1_freeotp_label" = "FreeOTP"
 "auth.otp_enrollment.step1_suffix" = "."
-"auth.otp_enrollment.step2" = "Scan this QR code using your authenticator app:"
-"auth.otp_enrollment.qr_alt" = "OTP QR code"
-"auth.otp_enrollment.scan_alternative" = "If you're unable to scan the QR code, you can alternatively enter the OTP secret into your app:"
-"auth.otp_enrollment.step3" = "To finish enrolling, enter your app's verification code:"
+"auth.otp_enrollment.step2" = "Scan this QR code with the app."
+"auth.otp_enrollment.qr_alt" = "QR code to scan with your authenticator app"
+"auth.otp_enrollment.scan_alternative" = "Can't scan it? Enter this key in the app instead:"
+"auth.otp_enrollment.step3" = "Enter the 6-digit code the app shows."
 
 # --- Consent screen (auth/consent) ------------------------------------------
 
-"consent.page_title" = "Authorize"
-"consent.title" = "Authorize client"
-"consent.intro" = "The client below has requested the following permissions. Please take a moment to review them and give your consent if they are acceptable."
+"consent.page_title" = "Allow access"
+"consent.title" = "Allow access"
+"consent.intro" = "This application is asking for the access below. Untick anything you don't want to share."
 "consent.client_unverified" = "This application registered itself and has not been verified."
-"consent.button.cancel" = "Cancel consent"
-"consent.button.submit" = "Give consent"
-"consent.scope.openid.description" = "Authenticate your user and identify you via a unique ID"
-"consent.scope.profile.description" = "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at"
-"consent.scope.email.description" = "Access to claims: email, email_verified"
-"consent.scope.address.description" = "Access to the address claim"
-"consent.scope.phone.description" = "Access to claims: phone_number and phone_number_verified"
-"consent.scope.groups.description" = "Access to the list of groups that you belong to"
-"consent.scope.attributes.description" = "Access to the attributes assigned to you by an admin, stored as key-value pairs"
-"consent.scope.offline_access.description" = "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
+"consent.button.cancel" = "Don't allow"
+"consent.button.submit" = "Allow"
+"consent.scopes_legend" = "Access requested"
+"consent.scope.openid.description" = "Identify you by an ID unique to your account"
+"consent.scope.profile.description" = "Your profile: name, nickname, username, picture, website, gender, birth date, time zone and language"
+"consent.scope.email.description" = "Your email address, and whether it's verified"
+"consent.scope.address.description" = "Your postal address"
+"consent.scope.phone.description" = "Your phone number, and whether it's verified"
+"consent.scope.groups.description" = "The groups you belong to"
+"consent.scope.attributes.description" = "The attributes an administrator has assigned to you"
+"consent.scope.offline_access.description" = "Keep access while you're away, without asking you again"
 "consent.scope.permission_template" = "Permission {{.permission}} on resource {{.resource}}"
 "consent.scope.authserver_manage_account.description" = "Manage your account for you: change your profile, phone, address and picture, see and sign out your sessions, and withdraw consents you have given. Changing your email, password or two-factor authentication still needs your password."
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 
-"logout_consent.page_title" = "Sign-out consent"
+"logout_consent.page_title" = "Sign out"
 "logout_consent.title" = "Sign out"
-"logout_consent.confirm" = "Are you sure you want to sign out?"
+"logout_consent.confirm" = "Do you want to sign out?"
+"logout_consent.button.stay" = "Stay signed in"
+"logout_consent.button.sign_out" = "Sign out"
 
 # --- Logout declined (auth/logout/declined) ----------------------------------
 
 "logout_declined.page_title" = "Still signed in"
 "logout_declined.title" = "Still signed in"
-"logout_declined.message" = "You are still signed in. You can close this page."
+"logout_declined.message" = "You're still signed in. You can close this page."
 
 # --- Logged out (auth/logout) -----------------------------------------------
 
 "logged_out.page_title" = "Signed out"
 "logged_out.title" = "Signed out"
-"logged_out.message" = "You have been signed out."
-"logged_out.redirect_declined" = "We could not return you to the application that signed you out."
+"logged_out.message" = "You're signed out."
+"logged_out.redirect_declined" = "We couldn't take you back to the application you signed out from."
 
 # --- OAuth/internal error page (auth_error.html) ----------------------------
 
@@ -152,20 +154,24 @@
 "auth_redirect_blocked.unverified" = "It registered itself with this server, so nobody here has checked who it is or where it wants to send you."
 "auth_redirect_blocked.closing" = "The request stops here. You can close this window."
 
+# --- Form post response page (form_post.html) ------------------------------
+
+"form_post.title" = "Returning you to the application"
+"form_post.message" = "If nothing happens, select Continue."
+"form_post.button" = "Continue"
+
 # --- Self-registration (account/register) -----------------------------------
 
-"account.register.page_title" = "Register"
-"account.register.title" = "Register"
-"account.register.button" = "Register"
+"account.register.page_title" = "Create an account"
+"account.register.title" = "Create an account"
+"account.register.button" = "Create account"
 "account.register.have_account_prompt" = "Already have an account?"
 "account.register.login_link" = "Sign in"
 "account.register.verification_hint" = "We'll email you a link to choose your password."
 
-"account.register_success.page_title" = "Register"
-"account.register_success.title" = "Register"
-"account.register_success.account_created" = "Your account has been created."
-"account.register_success.login_prompt_prefix" = "If you wish, "
-"account.register_success.login_prompt_suffix" = " to sign in and access your account page."
+"account.register_success.page_title" = "Account created"
+"account.register_success.title" = "Account created"
+"account.register_success.account_created" = "Your account is ready."
 
 "account.register_check_email.page_title" = "Check your email"
 "account.register_check_email.title" = "Check your email"
@@ -177,54 +183,54 @@
 "account.activate_password.intro" = "Choose a password for {{.email}} to finish creating your account."
 "account.activate_password.button" = "Create account"
 
-"account.activation_result.page_title" = "Register"
-"account.activation_result.title" = "Register"
-"account.activation_result.expired_body" = "Unable to activate the account. The verification code appears to be expired."
-"account.activation_result.expired_link_prefix" = "Please "
-"account.activation_result.expired_link_suffix" = " to attempt the registration process again."
-"account.activation_result.success_body" = "Congratulations! Your account has been activated."
-"account.activation_result.login_prompt_prefix" = "If you wish, "
-"account.activation_result.login_prompt_suffix" = " to sign in and access your account page."
+"account.activation_result.page_title" = "Account activated"
+"account.activation_result.title" = "Account activated"
+"account.activation_result.expired_title" = "This link can't be used"
+"account.activation_result.expired_body" = "An activation link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
+"account.activation_result.expired_recovery" = "Register again to get a new link. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
+"account.activation_result.register_again" = "Register again"
+"account.activation_result.success_body" = "Your account is ready."
 
 # --- Forgot password (forgot-password) --------------------------------------
 
-"forgot_password.page_title" = "Forgot password"
-"forgot_password.title" = "Forgot your password"
-"forgot_password.instructions" = "Please provide your email address, and we will send you a link to reset your password."
-"forgot_password.button" = "Send password reset link"
-"forgot_password.modal_title" = "Password reset"
-"forgot_password.modal_body" = "If you're a registered user, a password reset link has been sent to your email address. Make sure to search both your inbox and spam/junk folder for the link."
+"forgot_password.page_title" = "Reset your password"
+"forgot_password.title" = "Reset your password"
+"forgot_password.instructions" = "Enter your email address and we'll send you a link to reset your password."
+"forgot_password.button" = "Send reset link"
+"forgot_password.modal_title" = "Check your email"
+"forgot_password.modal_body" = "If an account uses that address, we've sent it a link to reset your password. The link expires after 5 minutes. Check your spam folder if you don't see it."
 
 # --- Reset password (reset-password) ----------------------------------------
 
-"reset_password.page_title" = "Set password"
-"reset_password.title" = "Set password"
-"reset_password.button" = "Set my password"
-"reset_password.code_invalid_prefix" = "Unable to set the password. The verification code appears to be invalid or expired. Please "
-"reset_password.code_invalid_link" = "click this link"
-"reset_password.code_invalid_suffix" = " and attempt the verification process again."
+"reset_password.page_title" = "Set your password"
+"reset_password.title" = "Set your password"
+"reset_password.button" = "Set password"
+"reset_password.code_invalid_title" = "This link can't be used"
+"reset_password.code_invalid_message" = "A password link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
+"reset_password.code_invalid_recovery" = "Request a new link. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
+"reset_password.code_invalid_link" = "Request a new link"
 "reset_password.modal_title" = "Password set"
-"reset_password.modal_body" = "Your password has been successfully set."
+"reset_password.modal_body" = "Your password is set. You can sign in with it now."
 
 # --- Generic error and not-found pages --------------------------------------
 
-"error.page_title" = "Error"
-"error.title" = "Server error"
-"error.body" = "We're sorry, but an error has occurred. You can find further information in the server logs."
-"error.request_id_label" = "Request id:"
+"error.page_title" = "Something went wrong"
+"error.title" = "Something went wrong"
+"error.body" = "The server couldn't complete your request. Try again in a moment, and if it keeps happening, give your administrator the request ID below."
+"error.request_id_label" = "Request ID:"
 # Written by httpmw.CSRF, which answers on the root router before the locale
 # middleware runs and so resolves a tentative localizer of its own. The reason for
 # the refusal goes to the log, not to the browser: it names the deployment's own
 # origin handling and is of no use to the person reading the page.
 "error.csrf_refused" = "Your request was refused for security reasons. Please reload the page and try again."
 
-"not_found.page_title" = "Not found"
-"not_found.title" = "Not found (404)"
-"not_found.body" = "Sorry, the page you are looking for could not be found. Please check the URL and try again."
+"not_found.page_title" = "Page not found"
+"not_found.title" = "Page not found"
+"not_found.body" = "The address may be mistyped, or the page may have moved."
 
-"unauthorized.page_title" = "Unauthorized"
-"unauthorized.title" = "Unauthorized (401)"
-"unauthorized.body" = "Apologies, but you don't have the required privileges to enter this page."
+"unauthorized.page_title" = "Access denied"
+"unauthorized.title" = "Access denied"
+"unauthorized.body" = "You don't have permission to view this page."
 
 # === Adminconsole foundation =================================================
 
@@ -1609,14 +1615,14 @@
 
 "handler.email.required" = "Email is required."
 "handler.password.required" = "Password is required."
-"handler.password.confirmation_required" = "Password confirmation is required."
-"handler.password.confirmation_mismatch" = "The password confirmation does not match the password."
+"handler.password.confirmation_required" = "Confirm your password."
+"handler.password.confirmation_mismatch" = "The passwords don't match."
 
 # --- OTP handler (LocalizedError-backed) -------------------------------------
 
 "handler.otp.account_disabled" = "Your account is disabled."
-"handler.otp.code_required" = "OTP code is required."
-"handler.otp.incorrect_code" = "Incorrect OTP Code. OTP codes are time-sensitive and change every 30 seconds. Make sure you're using the most recent code generated by your authenticator app."
+"handler.otp.code_required" = "Enter the 6-digit code from your authenticator app."
+"handler.otp.incorrect_code" = "That code isn't right. Codes change every 30 seconds, so enter the one your app shows now."
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------
 

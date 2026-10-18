@@ -1,33 +1,25 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "account.activation_result.page_title" }}{{end}}
-{{define "head"}}
-
-
-{{end}}
+{{define "title"}}{{ if .linkHasExpired }}{{ T $.ctx "account.activation_result.expired_title" }}{{ else }}{{ T $.ctx "account.activation_result.page_title" }}{{ end }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
-
-    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "account.activation_result.title" }}</h2>
-
-    <div class="mb-3">
-
-        {{if .linkHasExpired}}
-            <div class="w-full mt-4 form-control">
-                <p>{{ T $.ctx "account.activation_result.expired_body" }}</p>
-                {{if .registrationAvailable}}
-                <p class="mt-2">{{ T $.ctx "account.activation_result.expired_link_prefix" }}<a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer"
-                    href="/account/register">{{ T $.ctx "common.link.click_here" }}</a>{{ T $.ctx "account.activation_result.expired_link_suffix" }}</p>
-                {{end}}
-            </div>
-        {{end}}
-
-        {{if not .linkHasExpired}}
-            <div class="w-full mt-4 form-control">
-                <p>{{ T $.ctx "account.activation_result.success_body" }}</p>
-                <p class="mt-2">{{ T $.ctx "account.activation_result.login_prompt_prefix" }}<a class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer"
-                    href="{{.adminConsoleBaseUrl}}/account/profile">{{ T $.ctx "common.link.click_here" }}</a>{{ T $.ctx "account.activation_result.login_prompt_suffix" }}</p>
-            </div>
-        {{end}}
-
-    </div>
-
+{{/* Every refused link is answered alike, so the page cannot tell an address with an account
+     from one without: the cause is in the audit record alone. */}}
+{{ if .linkHasExpired }}
+<div class="auth-status">
+  <span class="status-icon status-icon-caution"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M2.22 2.22a.75.75 0 0 1 1.06 0l4.46 4.46c.128-.178.272-.349.432-.508l3-3a4 4 0 0 1 5.657 5.656l-1.225 1.225a.75.75 0 1 1-1.06-1.06l1.224-1.225a2.5 2.5 0 0 0-3.536-3.536l-3 3a2.504 2.504 0 0 0-.406.533l2.59 2.59a2.49 2.49 0 0 0-.79-1.254.75.75 0 1 1 .977-1.138 3.997 3.997 0 0 1 1.306 3.886l4.871 4.87a.75.75 0 1 1-1.06 1.061l-5.177-5.177-.006-.005-4.134-4.134a.65.65 0 0 1-.005-.006L2.22 3.28a.75.75 0 0 1 0-1.06Zm3.237 7.727a.75.75 0 0 1 0 1.06l-1.225 1.225a2.5 2.5 0 0 0 3.536 3.536l1.879-1.879a.75.75 0 1 1 1.06 1.06L8.83 16.83a4 4 0 0 1-5.657-5.657l1.224-1.225a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg></span>
+  <h1 class="auth-title">{{ T $.ctx "account.activation_result.expired_title" }}</h1>
+  <p>{{ T $.ctx "account.activation_result.expired_body" }}</p>
+  {{ if .registrationAvailable }}
+  <p>{{ T $.ctx "account.activation_result.expired_recovery" }}</p>
+  <a class="button button-primary" href="/account/register">{{ T $.ctx "account.activation_result.register_again" }}</a>
+  {{ end }}
+</div>
+{{ else }}
+<div class="auth-status">
+  <span class="status-icon status-icon-positive"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg></span>
+  <h1 class="auth-title">{{ T $.ctx "account.activation_result.title" }}</h1>
+  <p>{{ T $.ctx "account.activation_result.success_body" }}</p>
+  <a class="button button-primary" href="{{ .adminConsoleBaseUrl }}/account/profile">{{ T $.ctx "common.link.sign_in_to_account" }}</a>
+</div>
+{{ end }}
 {{end}}

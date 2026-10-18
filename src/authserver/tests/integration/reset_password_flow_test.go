@@ -309,8 +309,8 @@ func passwordHashOf(t *testing.T, userId int64) string {
 	return user.PasswordHash
 }
 
-const resetCodeInvalidText = "The verification code appears to be invalid or expired"
-const resetSucceededText = "Your password has been successfully set."
+const resetCodeInvalidText = "A password link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
+const resetSucceededText = "Your password is set. You can sign in with it now."
 
 // The end-to-end guard for #112 itself: an address containing '+' completes a reset from the
 // link Goiabada emailed it. Before this change the link carried the address, form-urlencoded

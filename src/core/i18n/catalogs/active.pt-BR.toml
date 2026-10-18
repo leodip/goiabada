@@ -11,12 +11,11 @@
 "common.button.no" = "Não"
 "common.button.cancel" = "Cancelar"
 "common.button.ok" = "Ok"
-"common.button.home" = "Início"
+"common.button.home" = "Ir para a página inicial"
 "common.field.email" = "E-mail"
-"common.field.email_placeholder" = "usuario@exemplo.com"
 "common.field.password" = "Senha"
-"common.field.password_confirmation" = "Confirmação da senha"
-"common.link.click_here" = "clique aqui"
+"common.field.password_confirmation" = "Confirme a senha"
+"common.link.sign_in_to_account" = "Entrar na sua conta"
 
 # --- Datas e durações --------------------------------------------------------
 #
@@ -50,53 +49,56 @@
 
 # --- Verificação OTP (auth/otp) ----------------------------------------------
 
-"auth.otp.page_title" = "OTP"
-"auth.otp.title" = "Senha de uso único (OTP)"
-"auth.otp.instructions" = "Insira o código de seis dígitos do seu aplicativo autenticador no campo abaixo."
-"auth.otp.code_label" = "Código OTP"
+"auth.otp.page_title" = "Autenticação de dois fatores"
+"auth.otp.title" = "Autenticação de dois fatores"
+"auth.otp.instructions" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
+"auth.otp.code_label" = "Código de uso único"
 "auth.otp.button" = "Verificar"
 
 # --- Cadastro de OTP (auth/otp, primeira vez) --------------------------------
 
-"auth.otp_enrollment.page_title" = "OTP"
-"auth.otp_enrollment.title" = "Cadastro de senha de uso único (OTP)"
-"auth.otp_enrollment.intro" = "Para continuar, é necessário cadastrar a autenticação de dois fatores usando o método de senha de uso único (OTP). Siga os passos abaixo:"
-"auth.otp_enrollment.step1_prefix" = "Baixe e instale um aplicativo autenticador compatível com OTP no seu smartphone ou dispositivo, como o "
+"auth.otp_enrollment.page_title" = "Configure a autenticação de dois fatores"
+"auth.otp_enrollment.title" = "Configure a autenticação de dois fatores"
+"auth.otp_enrollment.intro" = "Para continuar, configure um aplicativo autenticador. Ele gera um código de uso único sempre que você entrar."
+"auth.otp_enrollment.step1_prefix" = "Instale um aplicativo autenticador no seu celular, como o "
 "auth.otp_enrollment.step1_microsoft_label" = "Microsoft Authenticator"
 "auth.otp_enrollment.step1_separator1" = ", "
 "auth.otp_enrollment.step1_google_label" = "Google Authenticator"
 "auth.otp_enrollment.step1_separator2" = " ou "
 "auth.otp_enrollment.step1_freeotp_label" = "FreeOTP"
 "auth.otp_enrollment.step1_suffix" = "."
-"auth.otp_enrollment.step2" = "Escaneie este QR code usando o seu aplicativo autenticador:"
-"auth.otp_enrollment.qr_alt" = "QR code do OTP"
-"auth.otp_enrollment.scan_alternative" = "Se não conseguir escanear o QR code, você pode digitar o segredo OTP diretamente no aplicativo:"
-"auth.otp_enrollment.step3" = "Para concluir o cadastro, insira o código de verificação do seu aplicativo:"
+"auth.otp_enrollment.step2" = "Escaneie este QR code com o aplicativo."
+"auth.otp_enrollment.qr_alt" = "QR code para escanear com o seu aplicativo autenticador"
+"auth.otp_enrollment.scan_alternative" = "Não consegue escanear? Digite esta chave no aplicativo:"
+"auth.otp_enrollment.step3" = "Digite o código de 6 dígitos que o aplicativo mostra."
 
 # --- Tela de consentimento (auth/consent) ------------------------------------
 
-"consent.page_title" = "Autorizar"
-"consent.title" = "Autorizar cliente"
-"consent.intro" = "O cliente abaixo solicitou as permissões a seguir. Revise-as e dê seu consentimento se estiverem aceitáveis."
+"consent.page_title" = "Permitir acesso"
+"consent.title" = "Permitir acesso"
+"consent.intro" = "Este aplicativo está pedindo o acesso abaixo. Desmarque o que você não quiser compartilhar."
 "consent.client_unverified" = "Este aplicativo se registrou sozinho e não foi verificado."
-"consent.button.cancel" = "Cancelar consentimento"
-"consent.button.submit" = "Dar consentimento"
-"consent.scope.openid.description" = "Autenticar seu usuário e identificá-lo por um ID único"
-"consent.scope.profile.description" = "Acesso aos claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale e updated_at"
-"consent.scope.email.description" = "Acesso aos claims: email, email_verified"
-"consent.scope.address.description" = "Acesso ao claim de endereço"
-"consent.scope.phone.description" = "Acesso aos claims: phone_number e phone_number_verified"
-"consent.scope.groups.description" = "Acesso à lista de grupos aos quais você pertence"
-"consent.scope.attributes.description" = "Acesso aos atributos atribuídos a você por um administrador, armazenados como pares de chave-valor"
-"consent.scope.offline_access.description" = "Acesso a um token de atualização offline, permitindo que o cliente obtenha um novo token de acesso sem exigir sua interação imediata"
+"consent.button.cancel" = "Não permitir"
+"consent.button.submit" = "Permitir"
+"consent.scopes_legend" = "Acesso solicitado"
+"consent.scope.openid.description" = "Identificar você por um ID exclusivo da sua conta"
+"consent.scope.profile.description" = "Seu perfil: nome, apelido, nome de usuário, foto, site, gênero, data de nascimento, fuso horário e idioma"
+"consent.scope.email.description" = "Seu endereço de e-mail e se ele foi verificado"
+"consent.scope.address.description" = "Seu endereço postal"
+"consent.scope.phone.description" = "Seu número de telefone e se ele foi verificado"
+"consent.scope.groups.description" = "Os grupos aos quais você pertence"
+"consent.scope.attributes.description" = "Os atributos que um administrador atribuiu a você"
+"consent.scope.offline_access.description" = "Manter o acesso enquanto você estiver ausente, sem pedir de novo"
 "consent.scope.permission_template" = "Permissão {{.permission}} no recurso {{.resource}}"
 "consent.scope.authserver_manage_account.description" = "Gerenciar sua conta por você: alterar seu perfil, telefone, endereço e foto, ver e encerrar suas sessões e revogar consentimentos que você deu. Alterar seu e-mail, senha ou autenticação de dois fatores ainda exige sua senha."
 
 # --- Confirmação de logout (auth/logout) -------------------------------------
 
-"logout_consent.page_title" = "Confirmação de saída"
+"logout_consent.page_title" = "Sair"
 "logout_consent.title" = "Sair"
-"logout_consent.confirm" = "Tem certeza de que deseja sair?"
+"logout_consent.confirm" = "Deseja sair?"
+"logout_consent.button.stay" = "Continuar conectado"
+"logout_consent.button.sign_out" = "Sair"
 
 # --- Sessão mantida (auth/logout/declined) -----------------------------------
 
@@ -109,7 +111,7 @@
 "logged_out.page_title" = "Sessão encerrada"
 "logged_out.title" = "Sessão encerrada"
 "logged_out.message" = "Você saiu da sua conta."
-"logged_out.redirect_declined" = "Não foi possível retornar você ao aplicativo que solicitou a saída."
+"logged_out.redirect_declined" = "Não foi possível levar você de volta ao aplicativo do qual você saiu."
 
 # --- Página de erro OAuth/interno (auth_error.html) --------------------------
 
@@ -140,20 +142,24 @@
 "auth_redirect_blocked.unverified" = "Ele se registrou sozinho neste servidor, portanto ninguém aqui verificou quem ele é nem para onde ele quer enviar você."
 "auth_redirect_blocked.closing" = "A solicitação termina aqui. Você pode fechar esta janela."
 
+# --- Página de resposta form_post (form_post.html) --------------------------
+
+"form_post.title" = "Levando você de volta ao aplicativo"
+"form_post.message" = "Se nada acontecer, selecione Continuar."
+"form_post.button" = "Continuar"
+
 # --- Cadastro próprio (account/register) -------------------------------------
 
-"account.register.page_title" = "Cadastro"
-"account.register.title" = "Cadastro"
-"account.register.button" = "Cadastrar"
+"account.register.page_title" = "Criar uma conta"
+"account.register.title" = "Criar uma conta"
+"account.register.button" = "Criar conta"
 "account.register.have_account_prompt" = "Já tem uma conta?"
 "account.register.login_link" = "Entrar"
 "account.register.verification_hint" = "Enviaremos por e-mail um link para você escolher sua senha."
 
-"account.register_success.page_title" = "Cadastro"
-"account.register_success.title" = "Cadastro"
-"account.register_success.account_created" = "Sua conta foi criada."
-"account.register_success.login_prompt_prefix" = "Se desejar, "
-"account.register_success.login_prompt_suffix" = " para entrar e acessar sua página de conta."
+"account.register_success.page_title" = "Conta criada"
+"account.register_success.title" = "Conta criada"
+"account.register_success.account_created" = "Sua conta está pronta."
 
 "account.register_check_email.page_title" = "Verifique seu e-mail"
 "account.register_check_email.title" = "Verifique seu e-mail"
@@ -165,50 +171,50 @@
 "account.activate_password.intro" = "Escolha uma senha para {{.email}} para terminar de criar sua conta."
 "account.activate_password.button" = "Criar conta"
 
-"account.activation_result.page_title" = "Cadastro"
-"account.activation_result.title" = "Cadastro"
-"account.activation_result.expired_body" = "Não foi possível ativar a conta. O código de verificação parece ter expirado."
-"account.activation_result.expired_link_prefix" = "Por favor "
-"account.activation_result.expired_link_suffix" = " para tentar o processo de cadastro novamente."
-"account.activation_result.success_body" = "Parabéns! Sua conta foi ativada."
-"account.activation_result.login_prompt_prefix" = "Se desejar, "
-"account.activation_result.login_prompt_suffix" = " para entrar e acessar sua página de conta."
+"account.activation_result.page_title" = "Conta ativada"
+"account.activation_result.title" = "Conta ativada"
+"account.activation_result.expired_title" = "Este link não pode ser usado"
+"account.activation_result.expired_body" = "Um link de ativação funciona uma única vez e expira em 5 minutos, e um navegador só pode ter um link enviado por e-mail em andamento por vez."
+"account.activation_result.expired_recovery" = "Cadastre-se novamente para receber um novo link. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
+"account.activation_result.register_again" = "Cadastrar novamente"
+"account.activation_result.success_body" = "Sua conta está pronta."
 
 # --- Esqueci a senha (forgot-password) ---------------------------------------
 
-"forgot_password.page_title" = "Esqueci a senha"
-"forgot_password.title" = "Esqueceu sua senha"
-"forgot_password.instructions" = "Informe seu e-mail e enviaremos um link para você redefinir sua senha."
-"forgot_password.button" = "Enviar link de redefinição de senha"
-"forgot_password.modal_title" = "Redefinição de senha"
-"forgot_password.modal_body" = "Se você for um usuário cadastrado, um link para redefinição de senha foi enviado para seu e-mail. Verifique sua caixa de entrada e a pasta de spam/lixo eletrônico."
+"forgot_password.page_title" = "Redefina sua senha"
+"forgot_password.title" = "Redefina sua senha"
+"forgot_password.instructions" = "Digite seu endereço de e-mail e enviaremos um link para você redefinir sua senha."
+"forgot_password.button" = "Enviar link de redefinição"
+"forgot_password.modal_title" = "Verifique seu e-mail"
+"forgot_password.modal_body" = "Se houver uma conta com esse endereço, enviamos para ele um link para redefinir sua senha. O link expira em 5 minutos. Verifique a pasta de spam se não encontrá-lo."
 
 # --- Redefinir senha (reset-password) ----------------------------------------
 
-"reset_password.page_title" = "Definir senha"
-"reset_password.title" = "Definir senha"
-"reset_password.button" = "Definir minha senha"
-"reset_password.code_invalid_prefix" = "Não foi possível definir a senha. O código de verificação parece ser inválido ou estar expirado. Por favor "
-"reset_password.code_invalid_link" = "clique neste link"
-"reset_password.code_invalid_suffix" = " e tente o processo de verificação novamente."
+"reset_password.page_title" = "Defina sua senha"
+"reset_password.title" = "Defina sua senha"
+"reset_password.button" = "Definir senha"
+"reset_password.code_invalid_title" = "Este link não pode ser usado"
+"reset_password.code_invalid_message" = "Um link de senha funciona uma única vez e expira em 5 minutos, e um navegador só pode ter um link enviado por e-mail em andamento por vez."
+"reset_password.code_invalid_recovery" = "Solicite um novo link. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
+"reset_password.code_invalid_link" = "Solicitar um novo link"
 "reset_password.modal_title" = "Senha definida"
-"reset_password.modal_body" = "Sua senha foi definida com sucesso."
+"reset_password.modal_body" = "Sua senha foi definida. Você já pode entrar com ela."
 
 # --- Páginas genéricas de erro e não encontrada ------------------------------
 
-"error.page_title" = "Erro"
-"error.title" = "Erro no servidor"
-"error.body" = "Pedimos desculpas, ocorreu um erro. Mais informações podem ser encontradas nos logs do servidor."
+"error.page_title" = "Algo deu errado"
+"error.title" = "Algo deu errado"
+"error.body" = "O servidor não conseguiu concluir sua solicitação. Tente novamente em instantes e, se continuar acontecendo, informe ao administrador o ID da requisição abaixo."
 "error.request_id_label" = "ID da requisição:"
 "error.csrf_refused" = "Sua requisição foi recusada por motivos de segurança. Recarregue a página e tente novamente."
 
-"not_found.page_title" = "Não encontrado"
-"not_found.title" = "Não encontrado (404)"
-"not_found.body" = "Desculpe, não foi possível encontrar a página solicitada. Verifique a URL e tente novamente."
+"not_found.page_title" = "Página não encontrada"
+"not_found.title" = "Página não encontrada"
+"not_found.body" = "O endereço pode estar digitado errado, ou a página pode ter mudado de lugar."
 
-"unauthorized.page_title" = "Não autorizado"
-"unauthorized.title" = "Não autorizado (401)"
-"unauthorized.body" = "Pedimos desculpas, mas você não tem os privilégios necessários para acessar esta página."
+"unauthorized.page_title" = "Acesso negado"
+"unauthorized.title" = "Acesso negado"
+"unauthorized.body" = "Você não tem permissão para ver esta página."
 
 # === Adminconsole — fundação =================================================
 
@@ -1530,12 +1536,12 @@
 
 "handler.email.required" = "O e-mail é obrigatório."
 "handler.password.required" = "A senha é obrigatória."
-"handler.password.confirmation_required" = "A confirmação da senha é obrigatória."
-"handler.password.confirmation_mismatch" = "A confirmação da senha não confere com a senha."
+"handler.password.confirmation_required" = "Confirme sua senha."
+"handler.password.confirmation_mismatch" = "As senhas não conferem."
 
 "handler.otp.account_disabled" = "Sua conta está desativada."
-"handler.otp.code_required" = "O código OTP é obrigatório."
-"handler.otp.incorrect_code" = "Código OTP incorreto. Códigos OTP são sensíveis ao tempo e mudam a cada 30 segundos. Confirme que está usando o código mais recente gerado pelo seu aplicativo autenticador."
+"handler.otp.code_required" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
+"handler.otp.incorrect_code" = "Esse código não está correto. Os códigos mudam a cada 30 segundos, então digite o que o aplicativo mostra agora."
 
 "handler.admin_resource_permissions.description_html_not_allowed" = "A descrição contém caracteres inválidos: não permitimos uso de HTML na descrição."
 "handler.admin_resource_permissions.permission_identifier_required" = "O identificador da permissão é obrigatório."

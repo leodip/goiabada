@@ -454,15 +454,15 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 // What it does not establish is that a browser can use this page. Three inputs to that are outside a
 // parsed document altogether and no refusal here reaches them:
 //
-//   - Style from an external stylesheet. The layout links /static/main.css and two CDN stylesheets,
-//     any of which can hide a control this helper has just read and approved. What the document
+//   - Style from an external stylesheet. The layout links /static/main.css, which can hide a
+//     control this helper has just read and approved. What the document
 //     declares itself is refused, the style attribute above the form and inside it and a <style>
 //     block anywhere in it; what another file declares needs a CSS engine.
-//   - Script. A handler registered from /static/utils.js, the one script this server serves, can
-//     cancel the submit event. The sets below refuse an inline handler on the form and on the
-//     affirmative control, and refuse a <script> inside the form, which is the part the template
-//     declares; the declining link's onclick is the one inline handler permitted, because with
-//     script unavailable the link still goes somewhere (#152); the rest needs a JavaScript engine.
+//   - Script. A handler registered from /static/utils.js, the one script these pages load, can
+//     cancel the submit event or a click. The sets below refuse an inline handler anywhere in the
+//     form and a <script> inside it, which is the part the template declares; the declining link
+//     carries data-history-back, which utils.js reads to go back through the history, and its href
+//     still goes somewhere with script unavailable (#152); the rest needs a JavaScript engine.
 //   - An ancestor attribute outside consentHidingAttrs, which is a denylist for the reason recorded
 //     on it, so its tail is open by construction where every other set here is closed.
 //
@@ -473,7 +473,7 @@ var (
 	consentInputAttrs  = map[string]bool{"type": true, "name": true, "value": true, "class": true}
 	consentButtonAttrs = map[string]bool{"type": true, "name": true, "value": true, "class": true}
 	consentLayoutAttrs = map[string]bool{"class": true}
-	consentAnchorAttrs = map[string]bool{"class": true, "href": true, "onclick": true}
+	consentAnchorAttrs = map[string]bool{"class": true, "href": true, "data-history-back": true}
 
 	consentFormTags = map[string]map[string]bool{
 		"input":  consentInputAttrs,
@@ -484,10 +484,7 @@ var (
 	}
 
 	consentClassTokens = map[string]bool{
-		"mt-2": true, "mt-5": true, "mt-6": true, "mt-8": true,
-		"text-center": true, "text-error": true,
-		"grid": true, "grid-cols-2": true, "gap-3": true,
-		"w-full": true, "btn": true, "btn-primary": true, "btn-secondary": true,
+		"stacked": true, "text-center": true, "auth-actions": true, "button": true, "button-primary": true,
 	}
 
 	// The element types the form may sit inside, which is the auth layout's own structure. An
@@ -562,8 +559,8 @@ type consentLabels struct{ yes, no string }
 // Keyed by the ui_locales the case asks for, empty meaning the default locale, so a case that drives
 // the page in a language nobody recorded labels for fails rather than skipping the check.
 var consentLabelsByLocale = map[string]consentLabels{
-	"":      {yes: "Yes", no: "No"},
-	"pt-BR": {yes: "Sim", no: "Não"},
+	"":      {yes: "Sign out", no: "Stay signed in"},
+	"pt-BR": {yes: "Sair", no: "Continuar conectado"},
 }
 
 // unmodelledAttrs names every attribute across the selection that the given set does not cover, each
@@ -893,14 +890,14 @@ var (
 	signedOutEnglish = signedOutTexts{
 		pageTitle: "Signed out",
 		heading:   "Signed out",
-		message:   "You have been signed out.",
-		declined:  "We could not return you to the application that signed you out.",
+		message:   "You're signed out.",
+		declined:  "We couldn't take you back to the application you signed out from.",
 	}
 	signedOutPortuguese = signedOutTexts{
 		pageTitle: "Sessão encerrada",
 		heading:   "Sessão encerrada",
 		message:   "Você saiu da sua conta.",
-		declined:  "Não foi possível retornar você ao aplicativo que solicitou a saída.",
+		declined:  "Não foi possível levar você de volta ao aplicativo do qual você saiu.",
 	}
 )
 
@@ -918,8 +915,8 @@ func assertSignedOutPage(t *testing.T, resp *http.Response, texts signedOutTexts
 	require.NoError(t, err)
 
 	assert.Contains(t, doc.Find("title").Text(), texts.pageTitle, "the browser tab title")
-	require.Equal(t, 1, doc.Find("h2").Length(), "the page has one heading, which the next line names")
-	assert.Equal(t, texts.heading, strings.TrimSpace(doc.Find("h2").Text()), "the page heading")
+	require.Equal(t, 1, doc.Find("h1").Length(), "the page has one heading, which the next line names")
+	assert.Equal(t, texts.heading, strings.TrimSpace(doc.Find("h1").Text()), "the page heading")
 
 	rendered := doc.Text()
 	assert.Contains(t, rendered, texts.message,
@@ -1207,7 +1204,7 @@ var (
 	declinedEnglish = declinedTexts{
 		pageTitle: "Still signed in",
 		heading:   "Still signed in",
-		message:   "You are still signed in. You can close this page.",
+		message:   "You're still signed in. You can close this page.",
 	}
 	declinedPortuguese = declinedTexts{
 		pageTitle: "Sessão mantida",
@@ -1226,8 +1223,8 @@ func assertDeclinedPage(t *testing.T, resp *http.Response, texts declinedTexts) 
 	require.NoError(t, err)
 
 	assert.Contains(t, doc.Find("title").Text(), texts.pageTitle, "the browser tab title")
-	require.Equal(t, 1, doc.Find("h2").Length(), "the page has one heading, which the next line names")
-	assert.Equal(t, texts.heading, strings.TrimSpace(doc.Find("h2").Text()), "the page heading")
+	require.Equal(t, 1, doc.Find("h1").Length(), "the page has one heading, which the next line names")
+	assert.Equal(t, texts.heading, strings.TrimSpace(doc.Find("h1").Text()), "the page heading")
 	assert.Contains(t, doc.Text(), texts.message, "the page says the End-User is still signed in")
 	assert.Equal(t, 0, doc.Find("form").Length(), "the declined page asks nothing, so it carries no form")
 	assert.Equal(t, 0, doc.Find("main button").Length(), "the declined page asks nothing, so it carries no button")

@@ -33,6 +33,12 @@ type assetFingerprint struct {
 	sum     string
 }
 
+// NewAssetURLs answers static file URLs with their fingerprints over staticFS, as the layouts'
+// asset function does, for the one page rendered outside a Renderer: the form_post page.
+func NewAssetURLs(staticFS fs.FS) func(path string) (string, error) {
+	return newAssetFingerprints(staticFS).url
+}
+
 func newAssetFingerprints(staticFS fs.FS) *assetFingerprints {
 	return &assetFingerprints{fsys: staticFS, known: map[string]assetFingerprint{}}
 }

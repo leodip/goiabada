@@ -190,7 +190,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
-	assert.Contains(t, body, "Your account has been created.")
+	assert.Contains(t, body, "Your account is ready.")
 	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 	// Regression guard: the old broken behavior was a 302 to /auth/pwd.
 	assert.NotEqual(t, http.StatusFound, resp.StatusCode)
@@ -223,7 +223,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
-	assert.Contains(t, body, "Your account has been created.")
+	assert.Contains(t, body, "Your account is ready.")
 	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
@@ -307,8 +307,8 @@ func followActivationLink(t *testing.T, client *http.Client, link string) string
 	return appConfig.AuthServer.BaseURL + location.Path
 }
 
-const activationSucceededText = "Congratulations! Your account has been activated."
-const activationExpiredText = "Unable to activate the account. The verification code appears to be expired."
+const activationSucceededText = "Your account is ready."
+const activationExpiredText = "An activation link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
 const activationFormTitle = "Choose your password"
 
 // loadActivationForm fetches the clean URL the first hop redirected to, which renders the

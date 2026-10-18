@@ -1,73 +1,42 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "logout_consent.page_title" }}{{end}}
-{{define "head"}}
-
-<script>
-    function NoBtnClick(elem, evt) {
-        if (history.length > 1) {
-            evt.preventDefault();
-
-            history.back();
-            return false;
-        }
-
-        // No history to go back to: leave the link's own href in charge, which leads to the
-        // page saying the End-User is still signed in and can close it. It is also what a
-        // browser without JavaScript does with the control, there being no script to prevent.
-    }
-</script>
-
-{{end}}
+{{define "title"}}{{ T $.ctx "logout_consent.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "logout_consent.title" }}</h1>
+<!-- An explicit action, not action="", because action="" resolves to the current URL
+     INCLUDING its query string, which on this page carries the id_token_hint that could
+     not be confirmed. Confirming this page must be a hintless POST: a hintless POST is not
+     CSRF-exempt, so it has to pass the origin check, and this action is a same-origin path
+     so the submission passes it. That is what proves the request came from here. A POST
+     carrying a hint is only trusted when that hint validates. Sending the hint back would
+     let a cross-site POST with a bogus hint reach a teardown, since the CSRF exemption for
+     the POST binding can only key on the hint being present and cannot judge whether it is
+     genuine (#109). There is no hidden CSRF token in this form: #155 replaced the token
+     with the origin check, and this argument used to be made by the token (#155).
 
-    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "logout_consent.title" }}</h2>
-    <!-- An explicit action, not action="", because action="" resolves to the current URL
-         INCLUDING its query string, which on this page carries the id_token_hint that could
-         not be confirmed. Confirming this page must be a hintless POST: a hintless POST is not
-         CSRF-exempt, so it has to pass the origin check, and this action is a same-origin path
-         so the submission passes it. That is what proves the request came from here. A POST
-         carrying a hint is only trusted when that hint validates. Sending the hint back would
-         let a cross-site POST with a bogus hint reach a teardown, since the CSRF exemption for
-         the POST binding can only key on the hint being present and cannot judge whether it is
-         genuine (#109). There is no hidden CSRF token in this form: #155 replaced the token
-         with the origin check, and this argument used to be made by the token (#155).
+     The parameters that must survive the round trip are hidden fields instead. state is
+     emitted whenever it was present, empty value included, because an RP that sent
+     "state=" must get "state=" back and one that sent nothing must get no state at all;
+     an unconditional field would make every confirmation look like the former. -->
+<form action="{{ .formAction }}" method="post" class="stacked">
+  {{ if .postLogoutRedirectUri }}<input type="hidden" name="post_logout_redirect_uri" value="{{ .postLogoutRedirectUri }}">{{ end }}
+  {{ if .clientId }}<input type="hidden" name="client_id" value="{{ .clientId }}">{{ end }}
+  {{ if .statePresent }}<input type="hidden" name="state" value="{{ .state }}">{{ end }}
+  {{ if .uiLocales }}<input type="hidden" name="ui_locales" value="{{ .uiLocales }}">{{ end }}
 
-         The parameters that must survive the round trip are hidden fields instead. state is
-         emitted whenever it was present, empty value included, because an RP that sent
-         "state=" must get "state=" back and one that sent nothing must get no state at all;
-         an unconditional field would make every confirmation look like the former. -->
-    <form action="{{.formAction}}" method="post">
+  <p class="text-center">{{ T $.ctx "logout_consent.confirm" }}</p>
 
-        {{if .postLogoutRedirectUri}}<input type="hidden" name="post_logout_redirect_uri" value="{{.postLogoutRedirectUri}}" />{{end}}
-        {{if .clientId}}<input type="hidden" name="client_id" value="{{.clientId}}" />{{end}}
-        {{if .statePresent}}<input type="hidden" name="state" value="{{.state}}" />{{end}}
-        {{if .uiLocales}}<input type="hidden" name="ui_locales" value="{{.uiLocales}}" />{{end}}
-
-        <div class="mt-5">
-
-            <p>{{ T $.ctx "logout_consent.confirm" }}</p>
-
-        </div>
-
-        {{if .error}}
-            <p class="mt-8 text-center text-error">{{.error}}</p>
-        {{else}}
-            <p class="mt-6">&nbsp;</p>
-        {{end}}
-
-        <!-- The declining control is a link rather than a button, because a button with no type
-             attribute is a submit control by HTML's missing-value default and only the click
-             handler above could stop it submitting: with JavaScript unavailable, clicking No
-             answered Yes and tore the session down (#152). A link cannot submit the form, and its
-             href is a destination that needs no script: the declined page, which says the End-User
-             is still signed in and can close it, carrying ui_locales and nothing else, since a
-             decline is not a logout and hands the RP nothing. That is also the answer to the
-             no-history case NoBtnClick falls back to above. -->
-        <div class="grid grid-cols-2 gap-3">
-            <a class="w-full mt-2 btn btn-secondary" href="{{.declineHref}}" onclick="return NoBtnClick(this, event);">{{ T $.ctx "common.button.no" }}</a>
-            <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "common.button.yes" }}</button>
-        </div>
-
-    </form>
-
+  <!-- The declining control is a link rather than a button, because a button with no type
+       attribute is a submit control by HTML's missing-value default and only a click handler
+       could stop it submitting: with JavaScript unavailable, clicking No answered Yes and tore
+       the session down (#152). A link cannot submit the form, and its href is a destination that
+       needs no script: the declined page, which says the End-User is still signed in and can
+       close it, carrying ui_locales and nothing else, since a decline is not a logout and hands
+       the RP nothing. With script, utils.js sends the link back through the browser's history
+       when there is any (data-history-back), and leaves the href in charge when there is none. -->
+  <div class="auth-actions">
+    <a class="button" href="{{ .declineHref }}" data-history-back>{{ T $.ctx "logout_consent.button.stay" }}</a>
+    <button class="button button-primary" type="submit">{{ T $.ctx "logout_consent.button.sign_out" }}</button>
+  </div>
+</form>
 {{end}}

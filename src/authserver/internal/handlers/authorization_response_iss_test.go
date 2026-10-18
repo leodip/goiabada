@@ -153,7 +153,7 @@ func TestAuthorizationResponse_ARegisteredIssIsReplaced(t *testing.T) {
 }
 
 // hiddenInputPattern reads the built-in form_post page's hidden inputs, in the order they are posted.
-var hiddenInputPattern = regexp.MustCompile(`<input type="hidden" name="([^"]+)" value="([^"]*)" />`)
+var hiddenInputPattern = regexp.MustCompile(`<input type="hidden" name="([^"]+)" value="([^"]*)">`)
 
 // formPostFields is the page's hidden inputs as name and value pairs, in page order.
 func formPostFields(body string) [][2]string {
@@ -254,7 +254,7 @@ func TestNewClientErrorResponder_TheFormPostPageIsTheBuiltInOne(t *testing.T) {
 		testRedirectError("login_required", "Login required", "form_post", callback, "st", "code")))
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `<form method="post" action="https://example.com/callback">`)
+	assert.Contains(t, w.Body.String(), `<form class="auth-status" method="post" action="https://example.com/callback" data-auto-submit>`)
 	assert.Equal(t, [][2]string{{"error", "login_required"}, {"error_description", "Login required"}, {"state", "st"},
 		{"iss", testResponseIssuer}}, formPostFields(w.Body.String()))
 }

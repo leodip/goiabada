@@ -167,6 +167,6 @@ func TestInternalServerError_RenderFailureSpeaksTheRequestsLocale(t *testing.T) 
 	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	require.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.True(t, strings.HasPrefix(w.Body.String(), "Pedimos desculpas"), "got %q", w.Body.String())
+	assert.True(t, strings.HasPrefix(w.Body.String(), "O servidor não conseguiu"), "got %q", w.Body.String())
 	assert.Contains(t, w.Body.String(), "ID da requisição:")
 }

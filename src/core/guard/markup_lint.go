@@ -28,7 +28,9 @@ import (
 // puts it, and the rules about a whole page, its labels, references, ids and headings, to the page
 // as it is served. Every fact is kept per branch: an attribute, a value or a name written in one
 // branch alone is not taken as written in the other, a label shown in one branch labels no control
-// outside it, and two <h1> or two ids in branches that never render together do not collide.
+// outside it, and two <h1> or two ids in branches that never render together do not collide. Two
+// {{if}} on the same field, such as .error, read from the same dot in the same call, take the same
+// branch, so a field's aria-describedby under one names a notice declared under the other.
 //
 // Markup:
 //   - every element is closed explicitly and in order, a void element never is, and none is closed
@@ -557,68 +559,92 @@ const hole = "null"
 const maxAlternatives = 32
 
 // markupStep is one branch taken: the branching node, by its tree and position, and which of its
-// lists, the body (0) or the else (1).
+// lists, the body (0) or the else (1). An {{if}} on the same condition as one before it, read from
+// the same dot in the same call, is keyed by that first one's position: the two take the same list.
 type markupStep struct {
 	tree   string
 	pos    int
 	branch int
 }
 
-// markupPath is the branches taken to reach a fact.
+// markupPath is the branches taken to reach a fact. Each step is a condition the fact needs, so the
+// order they are listed in says nothing a reading needs.
 type markupPath []markupStep
 
-// holdsWherever reports whether a fact on path p renders wherever one on q does: p is a prefix of q.
+// holdsWherever reports whether a fact on path p renders wherever one on q does: every branch p takes,
+// q takes too.
 func (p markupPath) holdsWherever(q markupPath) bool {
-	if len(p) > len(q) {
-		return false
-	}
-	for i := range p {
-		if p[i] != q[i] {
+	for _, step := range p {
+		if !q.takes(step) {
 			return false
 		}
 	}
 	return true
 }
 
-// covers reports whether facts on the paths given render wherever path p does: one is on a prefix
-// of p, or under p every list of one branching node holds a fact, each list covered the same way, as
-// an id declared in every arm of an if, else if and else is.
-func covers(paths []markupPath, p markupPath) bool {
-	for _, f := range paths {
-		if f.holdsWherever(p) {
-			return true
-		}
-	}
-	nodes := map[markupStep]bool{}
-	for _, f := range paths {
-		if len(f) > len(p) && p.holdsWherever(f) {
-			step := f[len(p)]
-			step.branch = 0
-			nodes[step] = true
-		}
-	}
-	for node := range nodes {
-		all := true
-		for branch := 0; branch < 2 && all; branch++ {
-			step := node
-			step.branch = branch
-			all = covers(paths, append(append(markupPath{}, p...), step))
-		}
-		if all {
+func (p markupPath) takes(step markupStep) bool {
+	for _, s := range p {
+		if s == step {
 			return true
 		}
 	}
 	return false
 }
 
+// decides reports whether p takes either list of the node step names.
+func (p markupPath) decides(step markupStep) bool {
+	for _, s := range p {
+		if s.tree == step.tree && s.pos == step.pos {
+			return true
+		}
+	}
+	return false
+}
+
+// covers reports whether facts on the paths given render wherever path p does. It splits on a node
+// some fact needs and p leaves open, and asks again under each of its lists: an id declared in every
+// arm of an if, else if and else covers a reference after them, and so does an id under {{if .error}}
+// a reference under another {{if .error}} written beside it. A node nested in a branch is reached
+// only through that branch, and every fact under it needs that branch too, so a split is never
+// answered by a list that cannot run.
+func covers(paths []markupPath, p markupPath) bool {
+	var split *markupStep
+	for _, f := range paths {
+		if f.excludes(p) {
+			continue
+		}
+		if f.holdsWherever(p) {
+			return true
+		}
+		for _, step := range f {
+			if split == nil && !p.decides(step) {
+				node := step
+				split = &node
+			}
+		}
+	}
+	if split == nil {
+		return false
+	}
+	for branch := 0; branch < 2; branch++ {
+		step := *split
+		step.branch = branch
+		if !covers(paths, append(append(markupPath{}, p...), step)) {
+			return false
+		}
+	}
+	return true
+}
+
 // excludes reports whether facts on p and q never render together: they take different lists of
 // one branching node.
 func (p markupPath) excludes(q markupPath) bool {
-	for i := 0; i < len(p) && i < len(q); i++ {
-		if p[i] == q[i] {
-			continue
+	for _, a := range p {
+		for _, b := range q {
+			if a.tree == b.tree && a.pos == b.pos && a.branch != b.branch {
+				return true
+			}
 		}
-		return p[i].tree == q[i].tree && p[i].pos == q[i].pos && p[i].branch != q[i].branch
 	}
 	return false
 }
@@ -729,13 +755,16 @@ type markupState struct {
 	raw    []string
 	path   markupPath
 	ranges int
+	// scope names the dot: the {{with}} and {{range}} bodies the state is inside, each of which
+	// rebinds it.
+	scope string
 	// headings holds the levels the last heading may have had, bit 0 for none yet, one bit per level
 	// a branch may have left.
 	headings uint8
 }
 
 func (s *markupState) clone() *markupState {
-	n := &markupState{mode: s.mode, quote: s.quote, tag: s.tag.clone(), ranges: s.ranges, headings: s.headings}
+	n := &markupState{mode: s.mode, quote: s.quote, tag: s.tag.clone(), ranges: s.ranges, scope: s.scope, headings: s.headings}
 	n.stack = append(n.stack, s.stack...)
 	n.raw = append(n.raw, s.raw...)
 	n.path = append(n.path, s.path...)
@@ -846,6 +875,8 @@ type markupWalk struct {
 	controls []markupFact
 	refs     []markupRef
 	h1       []markupFact
+	// conditions keys each {{if}} condition sameBranch reads to the first {{if}} on it.
+	conditions map[string]int
 }
 
 type markupFrame struct {
@@ -855,7 +886,7 @@ type markupFrame struct {
 }
 
 func newMarkupWalk(set *templateSet, trees map[string]*parse.Tree, kind readingKind) *markupWalk {
-	return &markupWalk{set: set, trees: trees, kind: kind}
+	return &markupWalk{set: set, trees: trees, kind: kind, conditions: map[string]int{}}
 }
 
 // pageRules reports whether the reading holds the rules about a whole page.
@@ -910,11 +941,11 @@ func (w *markupWalk) walkNode(s *markupState, node parse.Node) {
 	case *parse.TemplateNode:
 		w.call(s, n)
 	case *parse.IfNode:
-		w.branches(s, int(n.Pos), false, n.List, n.ElseList)
+		w.branches(s, branching{pos: int(n.Pos), key: w.sameBranch(s, n)}, n.List, n.ElseList)
 	case *parse.WithNode:
-		w.branches(s, int(n.Pos), false, n.List, n.ElseList)
+		w.branches(s, branching{pos: int(n.Pos), key: int(n.Pos), rebinds: true}, n.List, n.ElseList)
 	case *parse.RangeNode:
-		w.branches(s, int(n.Pos), true, n.List, n.ElseList)
+		w.branches(s, branching{pos: int(n.Pos), key: int(n.Pos), rebinds: true, isRange: true}, n.List, n.ElseList)
 	case *parse.ListNode:
 		w.walkList(s, n)
 	}
@@ -949,10 +980,63 @@ func (w *markupWalk) call(s *markupState, n *parse.TemplateNode) {
 // levels it may leave for its next run. Starting the body from those too is enough: a second run
 // leaves no level the first could not.
 func (w *markupWalk) levelsLeft(s *markupState, body *parse.ListNode) uint8 {
-	probe := &markupWalk{set: w.set, trees: w.trees, kind: w.kind, frames: append([]markupFrame(nil), w.frames...)}
+	probe := &markupWalk{set: w.set, trees: w.trees, kind: w.kind, frames: append([]markupFrame(nil), w.frames...),
+		conditions: w.conditions}
 	end := s.clone()
 	probe.walkList(end, body)
 	return end.headings
+}
+
+// branching is one {{if}}, {{with}} or {{range}}: where it is, which node its lists are taken as
+// (its own position, or an earlier {{if}}'s on the same condition), whether its body rebinds dot, and
+// whether it is a {{range}}.
+type branching struct {
+	pos     int
+	key     int
+	rebinds bool
+	isRange bool
+}
+
+// sameBranch answers the node an {{if}} is keyed as: the first {{if}} of this reading on the same
+// condition, in the same call and read from the same dot, when the condition reads fields alone, such
+// as .error or $.error, which nothing between the two can change; otherwise the {{if}} itself. So
+// {{if .error}} around a notice and {{if .error}} around the aria-describedby naming it are one
+// branch, and the reference is read as rendering only where the notice does.
+func (w *markupWalk) sameBranch(s *markupState, n *parse.IfNode) int {
+	cond, ok := fieldCondition(n.Pipe)
+	if !ok {
+		return int(n.Pos)
+	}
+	var key strings.Builder
+	for _, f := range w.frames {
+		key.WriteString(f.tree.ParseName + "\x00" + f.tree.Name + "\x00" + f.via + "\x00")
+	}
+	if !strings.HasPrefix(cond, "$") {
+		key.WriteString(s.scope)
+	}
+	key.WriteString("\x00" + cond)
+	if first, seen := w.conditions[key.String()]; seen {
+		return first
+	}
+	w.conditions[key.String()] = int(n.Pos)
+	return int(n.Pos)
+}
+
+// fieldCondition answers the condition a pipeline reads when it is a field of dot or of $ and
+// nothing else: no function, no variable but $, no declaration.
+func fieldCondition(pipe *parse.PipeNode) (string, bool) {
+	if pipe == nil || len(pipe.Decl) > 0 || pipe.IsAssign || len(pipe.Cmds) != 1 || len(pipe.Cmds[0].Args) != 1 {
+		return "", false
+	}
+	switch arg := pipe.Cmds[0].Args[0].(type) {
+	case *parse.FieldNode, *parse.DotNode:
+		return arg.String(), true
+	case *parse.VariableNode:
+		if arg.Ident[0] == "$" {
+			return arg.String(), true
+		}
+	}
+	return "", false
 }
 
 // branches walks each list of a branching node from the state before it, and requires each to end
@@ -961,15 +1045,19 @@ func (w *markupWalk) levelsLeft(s *markupState, body *parse.ListNode) uint8 {
 // open, the heading levels any branch may have left, and, inside an attribute value or a raw-text
 // element, each branch's text as an alternative of its own. A {{range}} body starts from the levels
 // it may leave too, since it may run again.
-func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, otherwise *parse.ListNode) {
+func (w *markupWalk) branches(s *markupState, node branching, body, otherwise *parse.ListNode) {
+	pos := node.pos
 	w.settle(s)
 	before := s.clone()
 	tree := w.frames[len(w.frames)-1].tree.ParseName
 	var ends []*markupState
 	for i, list := range []*parse.ListNode{body, otherwise} {
 		b := before.clone()
-		b.path = append(b.path, markupStep{tree: tree, pos: pos, branch: i})
-		if isRange && i == 0 {
+		b.path = append(b.path, markupStep{tree: tree, pos: node.key, branch: i})
+		if node.rebinds && i == 0 {
+			b.scope += "\x00" + tree + "@" + strconv.Itoa(pos)
+		}
+		if node.isRange && i == 0 {
 			b.ranges++
 			b.headings |= w.levelsLeft(b, list)
 		}

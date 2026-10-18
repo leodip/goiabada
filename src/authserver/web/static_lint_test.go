@@ -99,7 +99,7 @@ func jsDecls(src string) []jsDecl {
 // roots here are the calls a template makes, and the set grows only through the bodies of functions
 // already reachable.
 //
-// It is also why this is not spelled as "utils.js must define showModalDialog and nothing else":
+// It is also why this is not spelled as "utils.js must define submitOnce and nothing else":
 // TestLayouts_JSBootstrapHasAReader below promises that a future page needing client-side strings
 // may add `t` back, and a denylist would refuse it. Reachability admits it the moment a template
 // calls it, and refuses it until then.
@@ -179,11 +179,11 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 			}
 		}
 
-		// The file this guard was written for. Without this, deleting showModalDialog and its two
-		// callers together would leave an empty file passing every assertion above.
-		if file == "static/utils.js" && !reached["showModalDialog"] {
-			t.Errorf("static/utils.js: showModalDialog is gone, and it is what forgot_password.html " +
-				"and reset_password.html call. If that is deliberate, this guard needs a new " +
+		// The file this guard was written for. Without this, deleting submitOnce and its
+		// registration together would leave an empty file passing every assertion above.
+		if file == "static/utils.js" && !reached["submitOnce"] {
+			t.Errorf("static/utils.js: submitOnce is gone, and it is what the sign-in and the two " +
+				"one-time code forms rely on. If that is deliberate, this guard needs a new " +
 				"anchor rather than deletion")
 		}
 	}
