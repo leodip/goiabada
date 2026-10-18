@@ -34,9 +34,10 @@ func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 
 // TestTemplates_AreWellFormed holds this server's pages to well-formed HTML and to the
 // accessibility rules a template can be held to unrendered, through
-// core/guard.AssertWellFormedTemplates, which carries each rule and its reasoning (#617).
+// core/guard.AssertWellFormedTemplates, which carries each rule and its reasoning (#617). Each page
+// is read as served, in the layouts the handlers under ../internal render it in.
 func TestTemplates_AreWellFormed(t *testing.T) {
-	guard.AssertWellFormedTemplates(t, templateFS, "template", emailTemplates, pendingTemplates)
+	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates, pendingTemplates)
 }
 
 // emailTemplates are not pages: no rule reads them.

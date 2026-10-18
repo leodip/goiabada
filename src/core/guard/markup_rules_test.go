@@ -104,6 +104,14 @@ func TestWellFormedTemplates_TheRuleTable(t *testing.T) {
 		{"a JSON data block with one branch that is not JSON",
 			`<script type="application/json" id="d">{{if .x}}{"a": 1}{{else}}{a: 1}{{end}}</script>`,
 			[]string{`line 1: the JSON data block is not valid JSON in every branch, reading each action as a value`}},
+		{"a javascript: URL in one branch of a value", `<a href="{{if .x}}javascript:go(){{else}}/safe{{end}}">Go</a>`,
+			[]string{`line 1: <a href> is a javascript: URL: register the behaviour from a static script`}},
+		{"a script whose src is written in one branch alone", `<script{{if .x}} src="/static/x.js"{{end}}>go()</script>`,
+			[]string{`line 1: an inline <script> runs code: move it to a static file, or make it a <script type="application/json"> data block`}},
+		{"a JSON data block with more branch combinations than are read",
+			`<script type="application/json" id="d">[{{if .a}}1{{else}}2{{end}},{{if .b}}1{{else}}2{{end}},{{if .c}}1{{else}}2{{end}},` +
+				`{{if .d}}1{{else}}2{{end}},{{if .e}}1{{else}}2{{end}},{{if .f}}1{{else}}2,{{end}}]</script>`,
+			[]string{`line 1: this <script> takes more than 32 branch combinations, more than this guard reads; simplify it`}},
 		{"a JSON data block that is not JSON", `<script type="application/json" id="d">{a: 1}</script>`,
 			[]string{`line 1: the JSON data block is not valid JSON in every branch, reading each action as a value`}},
 		{"a script file", `<script src="/static/x.js" defer></script>`, nil},
@@ -153,6 +161,9 @@ func TestWellFormedTemplates_TheRuleTable(t *testing.T) {
 		{"an h1 in each of two exclusive branches", `{{if .x}}<h1>A</h1>{{else}}<h1>B</h1>{{end}}`, nil},
 		{"a skipped heading level", `<h1>A</h1><h3>B</h3>`,
 			[]string{`line 1: <h3> follows an <h1>: heading levels do not skip on the way down`}},
+		{"a heading level skipped on some branches", `<h1>A</h1>{{if .x}}{{if .y}}<h2>B</h2>{{end}}{{end}}<h3>C</h3>`,
+			[]string{`line 1: <h3> follows an <h1>: heading levels do not skip on the way down`}},
+		{"a heading level reached on every branch", `<h1>A</h1>{{if .x}}<h2>B</h2>{{else}}<h2>C</h2>{{end}}<h3>D</h3>`, nil},
 		{"a positive tabindex", `<div tabindex="2">x</div>`,
 			[]string{`line 1: <div> has tabindex 2: a positive tabindex reorders the keyboard path`}},
 		{"a html without lang", `<html><body></body></html>`,
@@ -194,58 +205,148 @@ func TestWellFormedTemplates_EachBlockIsCheckedOnItsOwn(t *testing.T) {
 	assert.Equal(t, []string{`line 3: <div> is never closed`}, markupDetails(src))
 }
 
-// pageDetails reads one page of a fixture tree as the guard does, the page alone and as served.
-func pageDetails(t *testing.T, fsys fstest.MapFS, page string) []string {
+// pageDetails reads one page of a fixture tree as the guard does, the page alone and as served in
+// the layouts bindings name.
+func pageDetails(t *testing.T, fsys fstest.MapFS, bindings map[string][]string, page string) []string {
 	t.Helper()
 	contents := map[string]string{}
 	for path, file := range fsys {
 		contents[path] = string(file.Data)
 	}
 	var out []string
-	for _, f := range newTemplateSet("template", contents, nil).problems(page) {
+	for _, f := range newTemplateSet("template", contents, nil, bindings).problems(page) {
 		out = append(out, f.path+": "+f.detail)
 	}
 	return out
 }
 
-// A page is read in each layout that finds every template it calls, with the partials, a call
-// resolved where it is made: a partial is held to where the page puts it, and the page to the
-// rules about a whole page.
+const servedLayout = `<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head>` +
+	`<body>{{template "body" .}}</body></html>`
+
+// A page is read in each layout a handler renders it in, with the partials, a call resolved where
+// it is made: a partial is held to where the page puts it, and the page to the rules about a whole
+// page.
 func TestWellFormedTemplates_APageIsReadAsServed(t *testing.T) {
-	layout := `<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head>` +
-		`<body>{{template "body" .}}</body></html>`
 	fsys := fstest.MapFS{
-		"template/layouts/base.html":    {Data: []byte(layout)},
+		"template/layouts/base.html":    {Data: []byte(servedLayout)},
+		"template/layouts/nested.html":  {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head><body><p>{{template "body" .}}</p></body></html>`)},
+		"template/layouts/extra.html":   {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head><body>{{template "body" .}}{{template "footer" .}}</body></html>`)},
 		"template/partials/notice.html": {Data: []byte(`{{define "notice"}}<div class="notice">Saved</div>{{end}}`)},
+		"template/partials/label.html":  {Data: []byte(`{{define "searchLabel"}}<label for="q">Search</label>{{end}}`)},
 		"template/good.html": {Data: []byte(`{{define "title"}}Good{{end}}` +
 			`{{define "body"}}<main><h1 id="t">Good</h1><section aria-labelledby="t">{{template "notice" .}}</section></main>{{end}}`)},
 		"template/nested.html": {Data: []byte(`{{define "title"}}Nested{{end}}` +
 			`{{define "body"}}<main><h1>Nested</h1><p>{{template "notice" .}}</p></main>{{end}}`)},
 		"template/untitled.html": {Data: []byte(`{{define "title"}}Untitled{{end}}` +
 			`{{define "body"}}<main><h2>Section</h2></main>{{end}}`)},
-		"template/misnamed.html": {Data: []byte(`{{define "title"}}Misnamed{{end}}` +
-			`{{define "content"}}<main><h1>Misnamed</h1></main>{{end}}`)},
+		"template/either.html": {Data: []byte(`{{define "title"}}Either{{end}}` +
+			`{{define "body"}}<main>{{if .x}}<h1>A</h1>{{else if .y}}<h1>B</h1>{{else}}<h1>C</h1>{{end}}</main>{{end}}`)},
+		"template/across.html": {Data: []byte(`{{define "title"}}Across{{end}}` +
+			`{{define "body"}}<main><h1 id="heading">Across</h1>{{template "searchLabel" .}}<input id="q" name="q">{{template "more" .}}</main>{{end}}` +
+			`{{define "more"}}<section aria-labelledby="heading"><p>More</p></section>{{end}}`)},
+		"template/unbound.html":  {Data: []byte(`{{define "title"}}Unbound{{end}}{{define "body"}}<main><h1>Unbound</h1></main>{{end}}`)},
+		"template/footless.html": {Data: []byte(`{{define "title"}}Footless{{end}}{{define "body"}}<main><h1>Footless</h1></main>{{end}}`)},
+		"template/whole.html":    {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>Whole</title></head><body><h1>Whole</h1>{{template "missing" .}}</body></html>`)},
+	}
+	bindings := map[string][]string{
+		"good.html":     {"layouts/base.html"},
+		"nested.html":   {"layouts/base.html"},
+		"untitled.html": {"layouts/base.html"},
+		"either.html":   {"layouts/base.html"},
+		"across.html":   {"layouts/base.html"},
+		"footless.html": {"layouts/extra.html"},
 	}
 
-	assert.Empty(t, pageDetails(t, fsys, "template/good.html"))
+	assert.Empty(t, pageDetails(t, fsys, bindings, "template/good.html"), "the layout that would nest the page in a <p> is no handler's, so it is not read")
 	assert.Equal(t, []string{
 		"template/partials/notice.html: line 1: <div> inside a <p>, which a browser closes before it" +
 			" (where template/nested.html line 1 calls it) (in template/layouts/base.html)",
-	}, pageDetails(t, fsys, "template/nested.html"))
+	}, pageDetails(t, fsys, bindings, "template/nested.html"))
 	assert.Equal(t, []string{
 		"template/untitled.html: line 1: the page has no <h1> on every branch (in template/layouts/base.html)",
-	}, pageDetails(t, fsys, "template/untitled.html"))
+	}, pageDetails(t, fsys, bindings, "template/untitled.html"))
+	assert.Empty(t, pageDetails(t, fsys, bindings, "template/either.html"), "an <h1> in every arm is an <h1> on every branch")
+	assert.Empty(t, pageDetails(t, fsys, bindings, "template/across.html"), "a label in a partial and an id in another template of the page")
 	assert.Equal(t, []string{
-		"template/misnamed.html: line 1: no layout under layouts/ finds every template it calls in this page",
-	}, pageDetails(t, fsys, "template/misnamed.html"))
+		"template/unbound.html: line 1: no handler renders this page: no RenderTemplate call names it",
+	}, pageDetails(t, fsys, bindings, "template/unbound.html"))
+	assert.Equal(t, []string{
+		`template/layouts/extra.html: line 1: calls template "footer", which neither the page, its layout nor a partial defines (in template/layouts/extra.html)`,
+	}, pageDetails(t, fsys, bindings, "template/footless.html"))
+	assert.Equal(t, []string{
+		`template/whole.html: line 1: calls template "missing", which neither the page, its layout nor a partial defines`,
+	}, pageDetails(t, fsys, bindings, "template/whole.html"))
+}
+
+// The pages a handler renders, and the layout it renders each in, are read from the calls it makes:
+// a literal, or a variable its function assigns literals to; a call passing its function's own
+// parameters forwards and binds nothing; any other call is unresolved.
+func TestWellFormedTemplates_TheBindingsAreTheHandlersCalls(t *testing.T) {
+	handlers := fstest.MapFS{
+		"handlers/pages.go": {Data: []byte(`package handlers
+
+func Pwd(h Renderer) {
+	h.RenderTemplate(w, r, "/layouts/auth_layout.html", "/auth_pwd.html", nil)
+}
+
+func Otp(h Renderer, enrol bool) {
+	template := "/auth_otp.html"
+	if enrol {
+		template = "/auth_otp_enrollment.html"
+	}
+	h.RenderTemplate(w, r, "/layouts/auth_layout.html", template, nil)
+}
+
+func Mail(h Renderer) {
+	h.RenderTemplateToBuffer(r, "/layouts/email_layout.html", "/emails/welcome.html", nil)
+}
+
+func (h *Renderer) RenderTemplate(w W, r R, layoutName string, templateName string, data D) error {
+	return h.RenderTemplateToBuffer(r, layoutName, templateName, data)
+}
+
+func Odd(h Renderer, pages map[string]string) {
+	h.RenderTemplate(w, r, "/layouts/auth_layout.html", pages["x"], nil)
+}
+`)},
+		"handlers/pages_test.go": {Data: []byte(`package handlers
+
+func TestX(h Renderer) { h.RenderTemplate(w, r, "/layouts/test.html", "/test.html", nil) }
+`)},
+	}
+
+	bindings, unresolved, err := findRenderBindings(handlers)
+	require.NoError(t, err)
+	assert.Equal(t, map[string][]string{
+		"auth_pwd.html":            {"layouts/auth_layout.html"},
+		"auth_otp.html":            {"layouts/auth_layout.html"},
+		"auth_otp_enrollment.html": {"layouts/auth_layout.html"},
+		"emails/welcome.html":      {"layouts/email_layout.html"},
+	}, bindings)
+	require.Len(t, unresolved, 1)
+	assert.Contains(t, unresolved[0], "handlers/pages.go:24:")
+	assert.Contains(t, unresolved[0], "cannot tell which page it renders")
+}
+
+// handlerSource is a handler file rendering each page in layouts/base.html.
+func handlerSource(pages ...string) fstest.MapFS {
+	src := "package handlers\n\nfunc Render(h Renderer) {\n"
+	for _, page := range pages {
+		src += `	h.RenderTemplate(w, r, "/layouts/base.html", "/` + page + `", nil)` + "\n"
+	}
+	return fstest.MapFS{"handlers.go": {Data: []byte(src + "}\n")}}
 }
 
 func TestWellFormedTemplates_TheGuardFailsOnATreeThatBreaksARule(t *testing.T) {
 	fsys := fstest.MapFS{
-		"template/page.html": {Data: []byte(`<h1>Search</h1><form><input name="q"></form>`)},
+		"template/layouts/base.html": {Data: []byte(servedLayout)},
+		"template/page.html": {Data: []byte(`{{define "title"}}Search{{end}}` +
+			`{{define "body"}}<main><h1>Search</h1><form><input name="q"></form></main>{{end}}`)},
 	}
 
-	report := Run(func(r Reporter) { assertWellFormedTemplates(r, fsys, "template", nil, nil) })
+	report := Run(func(r Reporter) {
+		assertWellFormedTemplates(r, fsys, "template", handlerSource("page.html"), nil, nil)
+	})
 
 	require.True(t, report.Failed(), "an unlabelled control passed the guard")
 	assert.Contains(t, report.Text(), "template/page.html: line 1: <input> has no label")
@@ -253,13 +354,15 @@ func TestWellFormedTemplates_TheGuardFailsOnATreeThatBreaksARule(t *testing.T) {
 
 func TestWellFormedTemplates_TheGuardPassesACleanTree(t *testing.T) {
 	fsys := fstest.MapFS{
-		"template/page.html":           {Data: []byte(`<h1>Search</h1><form><label for="q">Search</label><input id="q" name="q"></form>`)},
+		"template/layouts/base.html": {Data: []byte(servedLayout)},
+		"template/page.html": {Data: []byte(`{{define "title"}}Search{{end}}` +
+			`{{define "body"}}<main><h1>Search</h1><form><label for="q">Search</label><input id="q" name="q"></form></main>{{end}}`)},
 		"template/emails/message.html": {Data: []byte(`<p>An email, <br/> unchecked</p>`)},
-		"template/old.html":            {Data: []byte(`<h1>Old</h1><button onclick="go()">Go</button>`)},
+		"template/old.html":            {Data: []byte(`{{define "title"}}Old{{end}}{{define "body"}}<button onclick="go()">Go</button>{{end}}`)},
 	}
 
 	report := Run(func(r Reporter) {
-		assertWellFormedTemplates(r, fsys, "template", []string{"emails/"}, []string{"old.html"})
+		assertWellFormedTemplates(r, fsys, "template", handlerSource("page.html", "old.html"), []string{"emails/"}, []string{"old.html"})
 	})
 
 	assert.False(t, report.Failed(), "a clean tree failed the guard: %s", report.Text())
@@ -269,12 +372,12 @@ func TestWellFormedTemplates_TheGuardPassesACleanTree(t *testing.T) {
 // no template, are each reported.
 func TestWellFormedTemplates_ThePendingListOnlyShrinks(t *testing.T) {
 	fsys := fstest.MapFS{
-		"template/page.html": {Data: []byte(`<h1>Fine</h1>`)},
-		"template/done.html": {Data: []byte(`<h1>Fine too</h1>`)},
+		"template/page.html": {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>Fine</title></head><body><h1>Fine</h1></body></html>`)},
+		"template/done.html": {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>Done</title></head><body><h1>Fine too</h1></body></html>`)},
 	}
 
 	report := Run(func(r Reporter) {
-		assertWellFormedTemplates(r, fsys, "template", []string{"gone/missing.html"}, []string{"done.html", "deleted.html"})
+		assertWellFormedTemplates(r, fsys, "template", handlerSource("other.html"), []string{"gone/missing.html"}, []string{"done.html", "deleted.html"})
 	})
 
 	require.True(t, report.Failed())
@@ -286,12 +389,22 @@ func TestWellFormedTemplates_ThePendingListOnlyShrinks(t *testing.T) {
 
 func TestWellFormedTemplates_AWalkThatReachesNothingIsFatal(t *testing.T) {
 	empty := fstest.MapFS{"template/readme.txt": {Data: []byte("no pages here")}}
-	report := Run(func(r Reporter) { assertWellFormedTemplates(r, empty, "template", nil, nil) })
+	report := Run(func(r Reporter) {
+		assertWellFormedTemplates(r, empty, "template", handlerSource("page.html"), nil, nil)
+	})
 	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
 	assert.Contains(t, report.Fatal, "walked no .html files under template")
 
 	exempt := fstest.MapFS{"template/emails/a.html": {Data: []byte(`<p>x</p>`)}}
-	report = Run(func(r Reporter) { assertWellFormedTemplates(r, exempt, "template", []string{"emails/"}, nil) })
+	report = Run(func(r Reporter) {
+		assertWellFormedTemplates(r, exempt, "template", handlerSource("page.html"), []string{"emails/"}, nil)
+	})
 	require.True(t, report.Stopped, "a walk whose every page is exempt checks nothing, and must be fatal")
 	assert.Contains(t, report.Fatal, "every .html file under template is out of scope or pending")
+
+	report = Run(func(r Reporter) {
+		assertWellFormedTemplates(r, exempt, "template", fstest.MapFS{"x.go": {Data: []byte("package x\n")}}, nil, nil)
+	})
+	require.True(t, report.Stopped, "handlers naming no page leave every page unread as served, and must be fatal")
+	assert.Contains(t, report.Fatal, "found no RenderTemplate call naming a layout and a page")
 }

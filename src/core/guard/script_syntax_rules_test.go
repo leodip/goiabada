@@ -55,6 +55,11 @@ func TestScriptSyntax_TheCapTable(t *testing.T) {
 		{"an unknown group syntax", "const r = /(?x)/;", "the regular expression /(?x)/ is refused by a browser: a group starts with an unknown (? syntax"},
 		{"a quantifier with nothing to repeat", "const r = /a|*b/;", "the regular expression /a|*b/ is refused by a browser: a quantifier has nothing to repeat"},
 		{"a repeated flag", "const r = /a/gg;", "the regular expression /a/gg has the flag g twice"},
+		{"a class range out of order", "const r = /[z-a]/;", "the regular expression /[z-a]/ is refused by a browser: a character class range is out of order"},
+		{"a group name used twice", "const r = /(?<x>a)(?<x>b)/;", "the regular expression /(?<x>a)(?<x>b)/ is refused by a browser: the group name x is used twice"},
+		{"a literal in a destructuring pattern", "[1] = x;", "which is not a variable, a property or a destructuring pattern"},
+		{"a nested literal in a destructuring pattern", "({ a: [b, 2] } = x);", "which is not a variable, a property or a destructuring pattern"},
+		{"an assignment through an optional chain", "a?.b.c = 1;", "which is not a variable, a property or a destructuring pattern"},
 		{"an unknown flag", "const r = /a/q;", "the regular expression /a/q has the unknown flag q"},
 	}
 	for _, tc := range refused {
@@ -77,6 +82,8 @@ func TestScriptSyntax_TheCapTable(t *testing.T) {
 		"a regular expression":                                 "const r = /a(?:b)c/gimsuy;",
 		"regular expressions a browser compiles":               "const r = [/[(]/, /\\(/, /(?<y>\\d{4})-(?=\\d)(?!x)(?<=a)(?<!b)/u, /a+?b*?c??/, /[\\]]/];",
 		"destructuring, compound and grouped assignments":      "let a, b; [a, b] = [b, a]; ({ a } = o); a += 1; (b) = 2; o.p++; o[k]--;",
+		"a modifier-like class and a Unicode group name":       "const r = [/[(?i:)]/, /(?<π>a)\\k<π>/u, /[a-z0-9_-]/, /[\\d-z]/];",
+		"destructuring with defaults, rest and nesting":        "let a, b, c; [a = 1, , ...b] = x; ({ a, b: { c = 2 }, ...b } = x);",
 		"for await in an async function":                       "async function f() { for await (const x of y) {} }",
 		"a number with a decimal":                              "const n = 1.5e3;",
 		"an await identifier is a name in a script, unawaited": "const delay = 1;",

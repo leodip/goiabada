@@ -3,7 +3,11 @@ package guard
 import (
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -17,14 +21,14 @@ import (
 // template's parse tree, so every branch of every {{if}}, {{with}} and {{range}} is checked, and an
 // action stands for the text, attribute or value it renders.
 //
-// Each template file is checked on its own, and each page again as the renderer assembles it: with
-// every layout under layouts/ that finds all the templates it calls in the page, and with every
-// partial under partials/, a {{template}} call resolved where it is made. A partial is therefore held
-// to the place each page puts it, and the rules about a whole page, its one <h1> and the ids its
-// references name, are held to the page as it is served. Every fact is kept per branch: an attribute
-// or a name present in one branch alone is not taken as present in the other, a label shown in one
-// branch labels no control outside it, and two <h1> or two ids in branches that never render together
-// do not collide.
+// Each template file is read on its own for its structure, and each page again as it is served:
+// in every layout a handler under handlers renders it in, found from the layout and page each
+// RenderTemplate or RenderTemplateToBuffer call names, with the partials under partials/, each
+// {{template}} call resolved where it is made. A partial is therefore held to the place each page
+// puts it, and the rules about a whole page, its labels, references, ids and headings, to the page
+// as it is served. Every fact is kept per branch: an attribute, a value or a name written in one
+// branch alone is not taken as written in the other, a label shown in one branch labels no control
+// outside it, and two <h1> or two ids in branches that never render together do not collide.
 //
 // Markup:
 //   - every element is closed explicitly and in order, a void element never is, and none is closed
@@ -36,15 +40,17 @@ import (
 //     link or button in a link or button, a list item outside a list, stray content in a table;
 //   - no executable script: an inline <script> is a JSON data block, <script type="application/json">,
 //     whose body is valid JSON in every branch with each action read as a value, or loads a file with
-//     src and has no body; no <script> inside SVG; no on... attribute and no javascript: URL.
+//     src and has no body; no <script> inside SVG; no on... attribute and no javascript: URL in any
+//     branch;
+//   - a page calls no template that neither it, its layout nor a partial defines.
 //
 // Accessibility:
 //   - every form control has a label: a <label for> naming its id wherever it renders, a <label>
 //     around it, or aria-label or aria-labelledby;
 //   - every <img> has alt, every <svg> is hidden from assistive technology or named, and every link
 //     and button has a name in every branch: text, an action, or aria-label or aria-labelledby;
-//   - a page has one <h1> on every branch, heading levels never skip on the way down, <html> has
-//     lang, and no tabindex is positive;
+//   - a page has an <h1> on every branch and one at most where several can render, heading levels
+//     never skip on the way down on any branch, <html> has lang, and no tabindex is positive;
 //   - every id that for, aria-labelledby or aria-describedby names is declared wherever the reference
 //     renders, and an id written without an action is neither repeated inside {{range}} nor declared
 //     twice where both can render.
@@ -52,16 +58,27 @@ import (
 // outOfScope names the files no rule reads, a path or a directory ending in "/": the email
 // templates, which are not pages. pending names the pages not yet brought under the rules, which
 // are read and must still fail: one that passes is reported, so the list only shrinks.
-func AssertWellFormedTemplates(t *testing.T, fsys fs.FS, root string, outOfScope, pending []string) {
+func AssertWellFormedTemplates(t *testing.T, fsys fs.FS, root, handlers string, outOfScope, pending []string) {
 	t.Helper()
 
-	assertWellFormedTemplates(t, fsys, root, outOfScope, pending)
+	assertWellFormedTemplates(t, fsys, root, os.DirFS(handlers), outOfScope, pending)
 }
 
 // assertWellFormedTemplates is the reporting half, failing through a Reporter so a rule test can
-// drive it against a fixture FS. See Reporter in guard.go.
-func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, outOfScope, pending []string) {
+// drive it against fixture trees. See Reporter in guard.go.
+func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, handlers fs.FS, outOfScope, pending []string) {
 	r.Helper()
+
+	bindings, unresolved, err := findRenderBindings(handlers)
+	if err != nil {
+		r.Fatalf("reading the handlers for the pages they render: %v", err)
+	}
+	if len(bindings) == 0 {
+		r.Fatalf("found no RenderTemplate call naming a layout and a page; this guard reads no page as served")
+	}
+	for _, u := range unresolved {
+		r.Errorf("%s", u)
+	}
 
 	files := map[string]string{}
 	n, err := walkHTMLTemplates(fsys, root, func(path, content string) {
@@ -74,13 +91,10 @@ func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, outOfScope, 
 		r.Fatalf("walked no .html files under %s; this guard is checking nothing", root)
 	}
 
-	set := newTemplateSet(root, files, outOfScope)
+	set := newTemplateSet(root, files, outOfScope, bindings)
 	checked := 0
 	for _, path := range set.order {
-		rel := strings.TrimPrefix(path, root+"/")
-		if matchesTemplateList(rel, outOfScope) {
-			continue
-		}
+		rel := set.rel(path)
 		found := set.problems(path)
 		if listsTemplate(rel, pending) {
 			if len(found) == 0 {
@@ -121,15 +135,142 @@ func listsTemplate(rel string, list []string) bool {
 	return false
 }
 
-// findMarkupProblems checks one template file on its own, as a rule test reads it: the file's rules,
-// without the rules about a whole page.
+// renderMethods are the renderer's two methods and where each takes its layout; the page follows.
+var renderMethods = map[string]int{"RenderTemplate": 2, "RenderTemplateToBuffer": 1}
+
+// findRenderBindings reads the Go sources under fsys, tests left out, for the layout and page each
+// render call names, keyed by the page as a path under the templates' root. A name is a string
+// literal, or a variable the call's function assigns string literals to, each of them a binding. A
+// call forwarding its function's own parameters, as the renderer's helpers do, binds nothing; any
+// other call is returned as unresolved, so the bindings stay complete.
+func findRenderBindings(fsys fs.FS) (map[string][]string, []string, error) {
+	bindings := map[string][]string{}
+	var unresolved []string
+	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+			return nil
+		}
+		src, err := fs.ReadFile(fsys, p)
+		if err != nil {
+			return err
+		}
+		fset := token.NewFileSet()
+		file, err := parser.ParseFile(fset, p, src, 0)
+		if err != nil {
+			return err
+		}
+		var scan func(params map[string]bool, body *ast.BlockStmt)
+		scan = func(params map[string]bool, body *ast.BlockStmt) {
+			ast.Inspect(body, func(n ast.Node) bool {
+				if lit, ok := n.(*ast.FuncLit); ok {
+					scan(paramNames(lit.Type), lit.Body)
+					return false
+				}
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				at, ok := renderMethods[sel.Sel.Name]
+				if !ok || len(call.Args) < at+2 {
+					return true
+				}
+				layouts, okLayout := templateNames(call.Args[at], params, body)
+				pages, okPage := templateNames(call.Args[at+1], params, body)
+				switch {
+				case layouts == nil || pages == nil:
+					// A forwarder: the names are its own parameters.
+				case !okLayout || !okPage:
+					unresolved = append(unresolved, fmt.Sprintf("%s: %s names a layout or a page that is neither a "+
+						"string literal nor a variable its function assigns string literals to, so the template guard "+
+						"cannot tell which page it renders", fset.Position(call.Pos()), sel.Sel.Name))
+				default:
+					for _, page := range pages {
+						for _, layout := range layouts {
+							key := strings.TrimPrefix(page, "/")
+							value := strings.TrimPrefix(layout, "/")
+							if !listsTemplate(value, bindings[key]) {
+								bindings[key] = append(bindings[key], value)
+							}
+						}
+					}
+				}
+				return true
+			})
+		}
+		for _, decl := range file.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+				scan(paramNames(fn.Type), fn.Body)
+			}
+		}
+		return nil
+	})
+	return bindings, unresolved, err
+}
+
+func paramNames(ft *ast.FuncType) map[string]bool {
+	names := map[string]bool{}
+	if ft.Params != nil {
+		for _, field := range ft.Params.List {
+			for _, name := range field.Names {
+				names[name.Name] = true
+			}
+		}
+	}
+	return names
+}
+
+// templateNames returns the template names an argument can hold, and whether it was read: nil and
+// true for one of the function's parameters, which a forwarder passes through.
+func templateNames(arg ast.Expr, params map[string]bool, body *ast.BlockStmt) ([]string, bool) {
+	switch a := arg.(type) {
+	case *ast.BasicLit:
+		if s, err := strconv.Unquote(a.Value); err == nil && a.Kind == token.STRING {
+			return []string{s}, true
+		}
+	case *ast.Ident:
+		if params[a.Name] {
+			return nil, true
+		}
+		var names []string
+		ast.Inspect(body, func(n ast.Node) bool {
+			assign, ok := n.(*ast.AssignStmt)
+			if !ok || len(assign.Lhs) != len(assign.Rhs) {
+				return true
+			}
+			for i, lhs := range assign.Lhs {
+				if id, ok := lhs.(*ast.Ident); ok && id.Name == a.Name {
+					if lit, ok := assign.Rhs[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						if s, err := strconv.Unquote(lit.Value); err == nil {
+							names = append(names, s)
+						}
+					}
+				}
+			}
+			return true
+		})
+		if len(names) > 0 {
+			return names, true
+		}
+	}
+	return []string{}, false
+}
+
+// findMarkupProblems checks one template file on its own, as a rule test reads it: each tree's
+// structure and the rules about a page, but no <h1> owed.
 func findMarkupProblems(path, content string) []templateFinding {
-	set := newTemplateSet("", map[string]string{path: content}, nil)
+	set := newTemplateSet("", map[string]string{path: content}, nil, nil)
 	f := set.files[path]
 	if f.err != nil {
 		return []templateFinding{{path: path, detail: "does not parse: " + f.err.Error()}}
 	}
-	return renderMarkupFindings(set.fileProblems(f))
+	return renderMarkupFindings(set.treeProblems(f, singleReading))
 }
 
 type templateKind int
@@ -151,23 +292,25 @@ type templateFile struct {
 }
 
 type templateSet struct {
-	files map[string]*templateFile
-	order []string
+	root     string
+	files    map[string]*templateFile
+	order    []string
+	bindings map[string][]string
 }
 
-func newTemplateSet(root string, contents map[string]string, outOfScope []string) *templateSet {
-	set := &templateSet{files: map[string]*templateFile{}}
+func newTemplateSet(root string, contents map[string]string, outOfScope []string, bindings map[string][]string) *templateSet {
+	set := &templateSet{root: root, files: map[string]*templateFile{}, bindings: bindings}
 	for path, content := range contents {
-		rel := strings.TrimPrefix(path, root+"/")
+		rel := set.rel(path)
+		if matchesTemplateList(rel, outOfScope) {
+			continue
+		}
 		f := &templateFile{path: path, lines: newlineOffsets(content), trees: map[string]*parse.Tree{}}
 		switch {
 		case strings.HasPrefix(rel, "layouts/"):
 			f.kind = layoutTemplate
 		case strings.HasPrefix(rel, "partials/"):
 			f.kind = partialTemplate
-		}
-		if matchesTemplateList(rel, outOfScope) {
-			continue
 		}
 		tree := parse.New(path)
 		tree.Mode = parse.SkipFuncCheck | parse.ParseComments
@@ -181,23 +324,30 @@ func newTemplateSet(root string, contents map[string]string, outOfScope []string
 	return set
 }
 
-// problems returns one finding per rule the file breaks: read on its own, and for a page read as
-// served, in each layout that can render it.
+func (set *templateSet) rel(path string) string {
+	if set.root == "" {
+		return path
+	}
+	return strings.TrimPrefix(path, set.root+"/")
+}
+
+// problems returns one finding per rule the file breaks: each of its trees read on its own for its
+// structure, and a page read as served in each layout a handler renders it in.
 func (set *templateSet) problems(path string) []templateFinding {
 	f := set.files[path]
 	if f.err != nil {
 		return []templateFinding{{path: path, detail: "does not parse: " + f.err.Error()}}
 	}
-	found := set.fileProblems(f)
+	found := set.treeProblems(f, fileReading)
 	if f.kind == pageTemplate {
 		found = append(found, set.pageProblems(f)...)
 	}
 	return renderMarkupFindings(found)
 }
 
-// fileProblems reads each of a file's trees on its own, a call to a template the file defines
+// treeProblems reads each of a file's trees on its own, a call to a template the file defines
 // resolved where it is made.
-func (set *templateSet) fileProblems(f *templateFile) []markupFinding {
+func (set *templateSet) treeProblems(f *templateFile, kind readingKind) []markupFinding {
 	var found []markupFinding
 	names := make([]string, 0, len(f.trees))
 	for name := range f.trees {
@@ -209,48 +359,50 @@ func (set *templateSet) fileProblems(f *templateFile) []markupFinding {
 		if tree.Root == nil {
 			continue
 		}
-		w := newMarkupWalk(set, f.trees, false)
+		w := newMarkupWalk(set, f.trees, kind)
 		w.walkTree(tree)
 		found = append(found, w.found...)
 	}
 	return found
 }
 
-// pageProblems reads a page as served: inside each layout that finds every template it calls in
-// the page and the partials, as the renderer parses them, the layout first, then the page, then
-// the partials. A page that is a whole document of its own is read alone.
+// pageProblems reads a page as served: inside each layout a handler renders it in, with the
+// partials, as the renderer parses them, the layout first, then the page, then the partials. A page
+// no handler renders in a layout is read alone when it is a whole document of its own.
 func (set *templateSet) pageProblems(page *templateFile) []markupFinding {
+	layouts := set.bindings[set.rel(page.path)]
+	if len(layouts) == 0 {
+		top := page.trees[page.path]
+		if top == nil || parse.IsEmptyTree(top.Root) {
+			return []markupFinding{{file: page.path, line: 1, message: "no handler renders this page: no RenderTemplate call names it"}}
+		}
+		w := newMarkupWalk(set, set.composed(nil, page), pageReading)
+		w.pageFile = page.path
+		w.walkTree(top)
+		return w.found
+	}
 	var found []markupFinding
-	rendered := false
-	for _, path := range set.order {
+	for _, name := range layouts {
+		path := name
+		if set.root != "" {
+			path = set.root + "/" + name
+		}
 		layout := set.files[path]
-		if layout.kind != layoutTemplate || layout.err != nil {
+		if layout == nil {
+			found = append(found, markupFinding{file: page.path, line: 1,
+				message: fmt.Sprintf("a handler renders this page in %s, which is no template here", name)})
 			continue
 		}
-		trees := set.composed(layout, page)
-		root := layout.trees[layout.path]
-		if root == nil || !resolvesEveryCall(root, trees, map[string]bool{}) {
+		if layout.err != nil {
 			continue
 		}
-		rendered = true
-		w := newMarkupWalk(set, trees, true)
+		w := newMarkupWalk(set, set.composed(layout, page), pageReading)
 		w.pageFile = page.path
 		w.page = layout.path
-		w.walkTree(root)
+		w.walkTree(layout.trees[layout.path])
 		found = append(found, w.found...)
 	}
-	if rendered {
-		return found
-	}
-	top := page.trees[page.path]
-	if top == nil || parse.IsEmptyTree(top.Root) {
-		return []markupFinding{{file: page.path, line: 1, message: "no layout under layouts/ finds every template it calls in this page"}}
-	}
-	trees := set.composed(nil, page)
-	w := newMarkupWalk(set, trees, true)
-	w.pageFile = page.path
-	w.walkTree(top)
-	return w.found
+	return found
 }
 
 func (set *templateSet) composed(layout, page *templateFile) map[string]*parse.Tree {
@@ -278,44 +430,6 @@ func (set *templateSet) composed(layout, page *templateFile) map[string]*parse.T
 		}
 	}
 	return trees
-}
-
-// resolvesEveryCall reports whether every {{template}} call reachable from tree names a template in
-// trees.
-func resolvesEveryCall(tree *parse.Tree, trees map[string]*parse.Tree, seen map[string]bool) bool {
-	ok := true
-	var visit func(parse.Node)
-	visit = func(node parse.Node) {
-		switch n := node.(type) {
-		case *parse.ListNode:
-			if n != nil {
-				for _, c := range n.Nodes {
-					visit(c)
-				}
-			}
-		case *parse.IfNode:
-			visit(n.List)
-			visit(n.ElseList)
-		case *parse.WithNode:
-			visit(n.List)
-			visit(n.ElseList)
-		case *parse.RangeNode:
-			visit(n.List)
-			visit(n.ElseList)
-		case *parse.TemplateNode:
-			called, found := trees[n.Name]
-			if !found {
-				ok = false
-				return
-			}
-			if !seen[n.Name] {
-				seen[n.Name] = true
-				visit(called.Root)
-			}
-		}
-	}
-	visit(tree.Root)
-	return ok
 }
 
 func renderMarkupFindings(found []markupFinding) []templateFinding {
@@ -386,9 +500,9 @@ const (
 // hole stands for an action in a value read as JSON: a value whatever the action renders.
 const hole = "null"
 
-// rawAlternatives bounds the bodies of one raw-text element kept apart, one per combination of
-// branches inside it; past it, the first ones are kept.
-const rawAlternatives = 32
+// maxAlternatives bounds the texts of one attribute value or one raw-text element kept apart, one
+// per combination of branches inside it. A text with more is reported rather than read in part.
+const maxAlternatives = 32
 
 // markupStep is one branch taken: the branching node, by its tree and position, and which of its
 // lists, the body (0) or the else (1).
@@ -459,8 +573,9 @@ func (p markupPath) excludes(q markupPath) bool {
 
 type markupAttr struct {
 	name  string
-	value string // as written, each action spelled as the parser prints it
-	maybe bool   // written in some branches only
+	value string   // as written in the first branch, each action spelled as the parser prints it
+	alts  []string // as written in each branch, when branches write it
+	maybe bool     // written in some branches only
 }
 
 type markupTag struct {
@@ -471,7 +586,7 @@ type markupTag struct {
 	dynamic   bool // an action stands among the attributes, so any of them may be present
 	selfClose bool
 	attrName  string
-	attrValue strings.Builder
+	values    []string // the value in progress, one text per combination of branches inside it
 	valueDyn  bool
 }
 
@@ -482,8 +597,17 @@ func (t *markupTag) clone() *markupTag {
 	n := &markupTag{name: t.name, end: t.end, where: t.where, dynamic: t.dynamic, selfClose: t.selfClose,
 		attrName: t.attrName, valueDyn: t.valueDyn}
 	n.attrs = append(n.attrs, t.attrs...)
-	n.attrValue.WriteString(t.attrValue.String())
+	n.values = append(n.values, t.values...)
 	return n
+}
+
+func (t *markupTag) appendValue(text string) {
+	if len(t.values) == 0 {
+		t.values = []string{""}
+	}
+	for i := range t.values {
+		t.values[i] += text
+	}
 }
 
 // attr returns the attribute name written in every branch.
@@ -519,18 +643,20 @@ type openElement struct {
 }
 
 type markupState struct {
-	mode    markupMode
-	quote   byte
-	tag     *markupTag
-	stack   []openElement
-	raw     []string
-	path    markupPath
-	ranges  int
-	heading int
+	mode   markupMode
+	quote  byte
+	tag    *markupTag
+	stack  []openElement
+	raw    []string
+	path   markupPath
+	ranges int
+	// headings holds the levels the last heading may have had, bit 0 for none yet, one bit per level
+	// a branch may have left.
+	headings uint8
 }
 
 func (s *markupState) clone() *markupState {
-	n := &markupState{mode: s.mode, quote: s.quote, tag: s.tag.clone(), ranges: s.ranges, heading: s.heading}
+	n := &markupState{mode: s.mode, quote: s.quote, tag: s.tag.clone(), ranges: s.ranges, headings: s.headings}
 	n.stack = append(n.stack, s.stack...)
 	n.raw = append(n.raw, s.raw...)
 	n.path = append(n.path, s.path...)
@@ -602,12 +728,26 @@ type markupRef struct {
 	attr string
 }
 
+// readingKind is what a reading holds a tree to.
+type readingKind int
+
+const (
+	// fileReading reads one tree of a file for its structure, leaving the rules about a page to the
+	// page readings, where a label, an id or a heading in another template is in reach.
+	fileReading readingKind = iota
+	// singleReading reads one tree as a rule test does: its structure and the rules about a page,
+	// but no <h1> owed.
+	singleReading
+	// pageReading reads a page as served.
+	pageReading
+)
+
 // markupWalk is one reading of a template tree, every call it makes resolved against trees: a file
 // alone, or a page as served. Facts about ids, labels and headings are kept for the whole reading.
 type markupWalk struct {
 	set      *templateSet
 	trees    map[string]*parse.Tree
-	whole    bool   // the reading is a whole page, which owes one <h1>
+	kind     readingKind
 	pageFile string // the page, when the reading is one
 	page     string // the layout the page is read in, when it is
 	frames   []markupFrame
@@ -625,8 +765,13 @@ type markupFrame struct {
 	via  string
 }
 
-func newMarkupWalk(set *templateSet, trees map[string]*parse.Tree, whole bool) *markupWalk {
-	return &markupWalk{set: set, trees: trees, whole: whole}
+func newMarkupWalk(set *templateSet, trees map[string]*parse.Tree, kind readingKind) *markupWalk {
+	return &markupWalk{set: set, trees: trees, kind: kind}
+}
+
+// pageRules reports whether the reading holds the rules about a whole page.
+func (w *markupWalk) pageRules() bool {
+	return w.kind != fileReading
 }
 
 func (w *markupWalk) at(pos int) markupWhere {
@@ -649,7 +794,7 @@ func (w *markupWalk) report(pos int, format string, args ...any) {
 
 func (w *markupWalk) walkTree(tree *parse.Tree) {
 	w.frames = append(w.frames, markupFrame{tree: tree, file: w.set.files[tree.ParseName]})
-	s := &markupState{}
+	s := &markupState{headings: 1}
 	w.walkList(s, tree.Root)
 	w.finish(s)
 	w.frames = w.frames[:len(w.frames)-1]
@@ -687,15 +832,19 @@ func (w *markupWalk) walkNode(s *markupState, node parse.Node) {
 }
 
 // call reads the template a {{template}} names where the call is made, when it is one of the
-// trees the reading resolves against; otherwise the call stands for whatever it renders.
+// trees the reading resolves against. A page reading reports a call to a template nothing defines,
+// which the renderer refuses; any other reading reads the call as whatever it renders.
 func (w *markupWalk) call(s *markupState, n *parse.TemplateNode) {
 	called, ok := w.trees[n.Name]
-	if !ok || len(w.frames) > 16 {
+	if !ok {
+		if w.kind == pageReading {
+			w.report(int(n.Pos), "calls template %q, which neither the page, its layout nor a partial defines", n.Name)
+		}
 		w.action(s, n.String(), int(n.Pos))
 		return
 	}
 	for _, f := range w.frames {
-		if f.tree == called {
+		if f.tree == called || len(w.frames) > 16 {
 			w.action(s, n.String(), int(n.Pos))
 			return
 		}
@@ -707,10 +856,47 @@ func (w *markupWalk) call(s *markupState, n *parse.TemplateNode) {
 	w.frames = w.frames[:len(w.frames)-1]
 }
 
+// headingInText matches a heading's start tag, for the levels a {{range}} body can leave for its
+// next iteration.
+var headingInText = regexp.MustCompile(`(?i)<h([1-6])[\s>]`)
+
+// headingLevelsIn returns the levels of the headings a list writes, as bits.
+func headingLevelsIn(list *parse.ListNode) uint8 {
+	var levels uint8
+	var visit func(parse.Node)
+	visit = func(node parse.Node) {
+		switch n := node.(type) {
+		case *parse.ListNode:
+			if n != nil {
+				for _, c := range n.Nodes {
+					visit(c)
+				}
+			}
+		case *parse.TextNode:
+			for _, m := range headingInText.FindAllSubmatch(n.Text, -1) {
+				levels |= 1 << (m[1][0] - '0')
+			}
+		case *parse.IfNode:
+			visit(n.List)
+			visit(n.ElseList)
+		case *parse.WithNode:
+			visit(n.List)
+			visit(n.ElseList)
+		case *parse.RangeNode:
+			visit(n.List)
+			visit(n.ElseList)
+		}
+	}
+	visit(list)
+	return levels
+}
+
 // branches walks each list of a branching node from the state before it, and requires each to end
 // in that state: what a branch opens, it closes. The state after is the state before, holding what
 // every branch added to it: an attribute written in all, a name every branch gives an element still
-// open, and, inside a raw-text element, each branch's body as an alternative of its own.
+// open, the heading levels any branch may have left, and, inside an attribute value or a raw-text
+// element, each branch's text as an alternative of its own. A {{range}} body starts from the levels
+// its own headings may have left too, since it may run again.
 func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, otherwise *parse.ListNode) {
 	w.settle(s)
 	before := s.clone()
@@ -721,6 +907,7 @@ func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, other
 		b.path = append(b.path, markupStep{tree: tree, pos: pos, branch: i})
 		if isRange && i == 0 {
 			b.ranges++
+			b.headings |= headingLevelsIn(list)
 		}
 		w.walkList(b, list)
 		w.settle(b)
@@ -760,20 +947,33 @@ func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, other
 				s.tag.attrs = append(s.tag.attrs, a)
 			}
 		}
+		if s.mode == modeValue || s.mode == modeValueUnquoted {
+			s.tag.values = nil
+			for _, b := range ends {
+				s.tag.values = append(s.tag.values, b.tag.values...)
+				s.tag.valueDyn = s.tag.valueDyn || b.tag.valueDyn
+			}
+			if len(s.tag.values) > maxAlternatives {
+				w.report(pos, "attribute %s takes more than %d branch combinations, more than this guard reads; "+
+					"simplify it", s.tag.attrName, maxAlternatives)
+				s.tag.values = s.tag.values[:maxAlternatives]
+			}
+		}
 	}
 	if s.mode == modeRawText {
 		s.raw = nil
 		for _, b := range ends {
 			s.raw = append(s.raw, b.raw...)
 		}
-		if len(s.raw) > rawAlternatives {
-			s.raw = s.raw[:rawAlternatives]
+		if len(s.raw) > maxAlternatives {
+			w.report(pos, "this <%s> takes more than %d branch combinations, more than this guard reads; "+
+				"simplify it", s.top().name, maxAlternatives)
+			s.raw = s.raw[:maxAlternatives]
 		}
 	}
+	s.headings = 0
 	for _, b := range ends {
-		if b.heading > s.heading {
-			s.heading = b.heading
-		}
+		s.headings |= b.headings
 	}
 }
 
@@ -842,11 +1042,11 @@ func (w *markupWalk) action(s *markupState, spelled string, pos int) {
 		s.tag.attrName += spelled
 	case modeBeforeValue, modeValueUnquoted:
 		w.report(pos, "attribute %s is not quoted: write %s=\"%s\"", s.tag.attrName, s.tag.attrName, spelled)
-		s.tag.attrValue.WriteString(spelled)
+		s.tag.appendValue(spelled)
 		s.tag.valueDyn = true
 		s.mode = modeValueUnquoted
 	case modeValue:
-		s.tag.attrValue.WriteString(spelled)
+		s.tag.appendValue(spelled)
 		s.tag.valueDyn = true
 	case modeRawText:
 		s.appendRaw(hole)
@@ -966,6 +1166,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 			case isMarkupSpace(ch):
 			case ch == '"' || ch == '\'':
 				s.quote = ch
+				s.tag.values = []string{""}
 				s.mode = modeValue
 			case ch == '>':
 				w.report(pos, "attribute %s has an = and no value", s.tag.attrName)
@@ -973,7 +1174,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 				w.finishTag(s)
 			default:
 				w.report(pos, "attribute %s is not quoted", s.tag.attrName)
-				s.tag.attrValue.WriteByte(ch)
+				s.tag.appendValue(string(ch))
 				s.mode = modeValueUnquoted
 			}
 		case modeValue:
@@ -982,7 +1183,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 				s.quote = 0
 				s.mode = modeTag
 			} else {
-				s.tag.attrValue.WriteByte(ch)
+				s.tag.appendValue(string(ch))
 			}
 		case modeValueUnquoted:
 			switch {
@@ -993,7 +1194,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 				w.commitAttr(s)
 				w.finishTag(s)
 			default:
-				s.tag.attrValue.WriteByte(ch)
+				s.tag.appendValue(string(ch))
 			}
 		case modeSelfClosing:
 			if ch == '>' {
@@ -1028,14 +1229,21 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 }
 
 // commitAttr completes the attribute in progress, and records the ids it declares and the ids it
-// names on the branches it is written in.
+// names on the branches it is written in. A value that branches write differently counts as written
+// by an action.
 func (w *markupWalk) commitAttr(s *markupState) {
 	t := s.tag
 	name := strings.ToLower(t.attrName)
-	value := t.attrValue.String()
+	values := t.values
+	if len(values) == 0 {
+		values = []string{""}
+	}
 	dynamic := t.valueDyn
+	for _, v := range values[1:] {
+		dynamic = dynamic || v != values[0]
+	}
 	t.attrName = ""
-	t.attrValue.Reset()
+	t.values = nil
 	t.valueDyn = false
 	if name == "" {
 		return
@@ -1044,7 +1252,8 @@ func (w *markupWalk) commitAttr(s *markupState) {
 		w.reportAt(t.where, "<%s> carries %s twice", t.name, name)
 		return
 	}
-	t.attrs = append(t.attrs, markupAttr{name: name, value: value})
+	value := values[0]
+	t.attrs = append(t.attrs, markupAttr{name: name, value: value, alts: values})
 
 	fact := markupFact{value: value, path: append(markupPath{}, s.path...), where: t.where}
 	switch name {
@@ -1131,8 +1340,11 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 		}
 		switch a.name {
 		case "href", "src", "action", "formaction", "xlink:href":
-			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(a.value)), "javascript:") {
-				w.reportAt(where, "<%s %s> is a javascript: URL: register the behaviour from a static script", name, a.name)
+			for _, v := range a.alts {
+				if strings.HasPrefix(strings.ToLower(strings.TrimSpace(v)), "javascript:") {
+					w.reportAt(where, "<%s %s> is a javascript: URL: register the behaviour from a static script", name, a.name)
+					break
+				}
 			}
 		case "tabindex":
 			if n, err := strconv.Atoi(strings.TrimSpace(a.value)); err == nil && n > 0 {
@@ -1214,10 +1426,15 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 		}
 	}
 	if level, ok := headingLevel[name]; ok {
-		if s.heading > 0 && level > s.heading+1 {
-			w.reportAt(where, "<%s> follows an <h%d>: heading levels do not skip on the way down", name, s.heading)
+		if w.pageRules() {
+			for previous := 1; previous <= 6; previous++ {
+				if s.headings&(1<<previous) != 0 && level > previous+1 {
+					w.reportAt(where, "<%s> follows an <h%d>: heading levels do not skip on the way down", name, previous)
+					break
+				}
+			}
 		}
-		s.heading = level
+		s.headings = 1 << level
 		if level == 1 {
 			w.h1 = append(w.h1, markupFact{path: append(markupPath{}, s.path...), where: where})
 		}
@@ -1230,7 +1447,7 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 	if name == "script" {
 		typ, hasType := t.attr("type")
 		switch {
-		case t.written("src"):
+		case t.has("src"):
 			el.script = "src"
 		case hasType && jsonScriptType.MatchString(strings.ToLower(strings.TrimSpace(typ.value))):
 			el.script = "json"
@@ -1318,7 +1535,8 @@ func (w *markupWalk) closeElement(s *markupState, t *markupTag) {
 	}
 }
 
-// finish checks what a reading leaves: the state it ends in, and the facts about the whole tree.
+// finish checks what a reading leaves: the state it ends in, and, where it holds them, the rules
+// about a whole page.
 func (w *markupWalk) finish(s *markupState) {
 	if s.mode != modeText {
 		w.report(0, "the template ends %s", describeShape(s))
@@ -1326,11 +1544,14 @@ func (w *markupWalk) finish(s *markupState) {
 	for _, e := range s.stack {
 		w.reportAt(e.where, "<%s> is never closed", e.name)
 	}
+	if !w.pageRules() {
+		return
+	}
 
 	pathsOf := func(facts []markupFact, value string) []markupPath {
 		var paths []markupPath
 		for _, f := range facts {
-			if f.value == value {
+			if value == "" || f.value == value {
 				paths = append(paths, f.path)
 			}
 		}
@@ -1366,15 +1587,9 @@ func (w *markupWalk) finish(s *markupState) {
 			}
 		}
 	}
-	if w.whole {
-		unconditional := false
-		for _, h := range w.h1 {
-			unconditional = unconditional || len(h.path) == 0
-		}
-		if !unconditional {
-			w.found = append(w.found, markupFinding{file: w.pageFile, line: 1,
-				message: "the page has no <h1> on every branch", context: pageSuffix(w.page)})
-		}
+	if w.kind == pageReading && !covers(pathsOf(w.h1, ""), nil) {
+		w.found = append(w.found, markupFinding{file: w.pageFile, line: 1,
+			message: "the page has no <h1> on every branch", context: pageSuffix(w.page)})
 	}
 }
 

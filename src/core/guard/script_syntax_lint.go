@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/tdewolff/parse/v2"
 	"github.com/tdewolff/parse/v2/js"
@@ -101,9 +102,6 @@ type syntaxCap struct {
 	found *[]string
 }
 
-// regexpModifier matches an inline modifier group, such as (?i:...) or (?-m:...).
-var regexpModifier = regexp.MustCompile(`\(\?[ims]*-?[ims]+:`)
-
 func (v *syntaxCap) Enter(n js.INode) js.IVisitor {
 	switch n := n.(type) {
 	case *js.FuncDecl:
@@ -190,82 +188,137 @@ var assignmentOps = map[js.TokenType]bool{
 }
 
 // simpleTarget reports whether e is a variable or a property, what an increment or a compound
-// assignment may change. An optional chain is neither.
+// assignment may change. A property read through an optional chain, anywhere in it, is not.
 func simpleTarget(e js.IExpr) bool {
 	switch e := e.(type) {
 	case *js.Var:
 		return true
 	case *js.DotExpr:
-		return !e.Optional
+		return !inOptionalChain(e)
 	case *js.IndexExpr:
-		return !e.Optional
+		return !inOptionalChain(e)
 	case *js.GroupExpr:
 		return simpleTarget(e.X)
 	}
 	return false
 }
 
+func inOptionalChain(e js.IExpr) bool {
+	switch e := e.(type) {
+	case *js.DotExpr:
+		return e.Optional || inOptionalChain(e.X)
+	case *js.IndexExpr:
+		return e.Optional || inOptionalChain(e.X)
+	case *js.CallExpr:
+		return e.Optional || inOptionalChain(e.X)
+	}
+	return false
+}
+
 // assignmentTarget reports whether e may stand left of an assignment: a simple target, or for a
-// plain = a destructuring pattern.
+// plain = a destructuring pattern, every target in it valid in turn.
 func assignmentTarget(e js.IExpr, plain bool) bool {
-	switch e.(type) {
-	case *js.ArrayExpr, *js.ObjectExpr:
-		return plain
+	switch e := e.(type) {
+	case *js.ArrayExpr:
+		if !plain {
+			return false
+		}
+		for _, el := range e.List {
+			if el.Value != nil && !patternTarget(el.Value) {
+				return false
+			}
+		}
+		return true
+	case *js.ObjectExpr:
+		if !plain {
+			return false
+		}
+		for _, p := range e.List {
+			if p.Value != nil && !patternTarget(p.Value) {
+				return false
+			}
+		}
+		return true
 	}
 	return simpleTarget(e)
 }
 
-// regexpGroupStart matches what may follow "(?" in a group: a non-capturing group, a lookahead or a
-// lookbehind, or a named group. An inline modifier is matched apart, as syntax past the cap.
-var regexpGroupStart = regexp.MustCompile(`^(?::|=|!|<=|<!|<[A-Za-z_$][\w$]*>)`)
+// patternTarget reports whether e may stand in a destructuring pattern: a target, with or without
+// a default value.
+func patternTarget(e js.IExpr) bool {
+	if b, ok := e.(*js.BinaryExpr); ok && b.Op == js.EqToken {
+		return assignmentTarget(b.X, true)
+	}
+	return assignmentTarget(e, true)
+}
 
-// regexpProblem returns why a browser refuses a regular expression's pattern, or "": an unbalanced
-// group or character class, an unknown group syntax, or a quantifier with nothing to repeat.
-func regexpProblem(pattern string) string {
+// regexpModifierStart matches an inline modifier group at the start of what follows "(?", such as
+// "i:" or "-m:".
+var regexpModifierStart = regexp.MustCompile(`^[ims]*-?[ims]*:`)
+
+// regexpProblem reads a regular expression's pattern as a browser compiles it, character classes
+// apart, and returns why one would refuse it, or "": an unbalanced group, an unknown group syntax,
+// a group name used twice, a character class range out of order or not closed, or a quantifier with
+// nothing to repeat. modifier reports an inline modifier group outside every class, syntax past the
+// cap.
+func regexpProblem(pattern string) (problem string, modifier bool) {
 	depth := 0
 	canRepeat := false
-	for i := 0; i < len(pattern); i++ {
-		switch c := pattern[i]; c {
+	names := map[string]bool{}
+	runes := []rune(pattern)
+	for i := 0; i < len(runes); i++ {
+		switch c := runes[i]; c {
 		case '\\':
 			i++
 			canRepeat = true
 		case '[':
-			end := i + 1
-			for ; end < len(pattern) && pattern[end] != ']'; end++ {
-				if pattern[end] == '\\' {
-					end++
-				}
-			}
-			if end >= len(pattern) {
-				return "a character class is not closed"
+			end, problem := regexpClass(runes, i+1)
+			if problem != "" {
+				return problem, modifier
 			}
 			i = end
 			canRepeat = true
 		case '(':
 			depth++
-			if strings.HasPrefix(pattern[i+1:], "?") {
-				if m := regexpModifier.FindString(pattern[i:]); m != "" && strings.HasPrefix(pattern[i:], m) {
-					i += len(m) - 1
-				} else if m := regexpGroupStart.FindString(pattern[i+2:]); m != "" {
-					i += 1 + len(m)
-				} else {
-					return "a group starts with an unknown (? syntax"
-				}
-			}
 			canRepeat = false
+			if i+1 >= len(runes) || runes[i+1] != '?' {
+				continue
+			}
+			rest := string(runes[i+2:])
+			switch {
+			case regexpModifierStart.MatchString(rest) && len(regexpModifierStart.FindString(rest)) > 1:
+				modifier = true
+				i += 1 + len([]rune(regexpModifierStart.FindString(rest)))
+			case strings.HasPrefix(rest, ":") || strings.HasPrefix(rest, "=") || strings.HasPrefix(rest, "!"):
+				i += 2
+			case strings.HasPrefix(rest, "<=") || strings.HasPrefix(rest, "<!"):
+				i += 3
+			case strings.HasPrefix(rest, "<"):
+				name, ok := regexpGroupName(runes[i+3:])
+				if !ok {
+					return "a group starts with an unknown (? syntax", modifier
+				}
+				if names[name] {
+					return "the group name " + name + " is used twice", modifier
+				}
+				names[name] = true
+				i += 3 + len([]rune(name))
+			default:
+				return "a group starts with an unknown (? syntax", modifier
+			}
 		case ')':
 			depth--
 			if depth < 0 {
-				return "a group is closed that was never opened"
+				return "a group is closed that was never opened", modifier
 			}
 			canRepeat = true
 		case '|':
 			canRepeat = false
 		case '*', '+', '?':
 			if !canRepeat {
-				return "a quantifier has nothing to repeat"
+				return "a quantifier has nothing to repeat", modifier
 			}
-			if i+1 < len(pattern) && pattern[i+1] == '?' {
+			if i+1 < len(runes) && runes[i+1] == '?' {
 				i++
 			}
 			canRepeat = false
@@ -274,9 +327,66 @@ func regexpProblem(pattern string) string {
 		}
 	}
 	if depth > 0 {
-		return "a group is not closed"
+		return "a group is not closed", modifier
 	}
-	return ""
+	return "", modifier
+}
+
+// regexpGroupName reads a group's name up to its ">": a letter, "$" or "_", then letters, digits,
+// "$" and "_".
+func regexpGroupName(runes []rune) (string, bool) {
+	for i, r := range runes {
+		switch {
+		case r == '>':
+			return string(runes[:i]), i > 0
+		case unicode.IsLetter(r) || r == '$' || r == '_':
+		case i > 0 && unicode.IsDigit(r):
+		default:
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// regexpClass reads a character class from just after its "[" and returns where its "]" is, or why
+// a browser refuses it: not closed, or a range whose end comes before its start.
+func regexpClass(runes []rune, from int) (int, string) {
+	// atom reads one class atom at i: its character and whether it stands for itself, which a
+	// class escape such as \d does not.
+	atom := func(i int) (rune, bool, int) {
+		if runes[i] == '\\' && i+1 < len(runes) {
+			switch runes[i+1] {
+			case 'd', 'D', 'w', 'W', 's', 'S', 'p', 'P':
+				return 0, false, i + 2
+			case 'n':
+				return '\n', true, i + 2
+			case 't':
+				return '\t', true, i + 2
+			}
+			return runes[i+1], true, i + 2
+		}
+		return runes[i], true, i + 1
+	}
+	i := from
+	if i < len(runes) && runes[i] == '^' {
+		i++
+	}
+	for i < len(runes) {
+		if runes[i] == ']' {
+			return i, ""
+		}
+		start, literal, next := atom(i)
+		if next+1 < len(runes) && runes[next] == '-' && runes[next+1] != ']' {
+			end, endLiteral, after := atom(next + 1)
+			if literal && endLiteral && end < start {
+				return 0, "a character class range is out of order"
+			}
+			i = after
+			continue
+		}
+		i = next
+	}
+	return 0, "a character class is not closed"
 }
 
 func (v *syntaxCap) literal(n *js.LiteralExpr) {
@@ -292,7 +402,8 @@ func (v *syntaxCap) literal(n *js.LiteralExpr) {
 				v.add("the regular expression %s has the flag %c twice", data, f)
 			}
 		}
-		if problem := regexpProblem(pattern); problem != "" {
+		problem, modifier := regexpProblem(pattern)
+		if problem != "" {
 			v.add("the regular expression %s is refused by a browser: %s", data, problem)
 		}
 		if strings.ContainsRune(flags, 'd') {
@@ -301,7 +412,7 @@ func (v *syntaxCap) literal(n *js.LiteralExpr) {
 		if strings.ContainsRune(flags, 'v') {
 			v.add("the regular expression flag v, in %s, is ES2024", data)
 		}
-		if regexpModifier.MatchString(pattern) {
+		if modifier {
 			v.add("an inline modifier group, in %s, is ES2025", data)
 		}
 	case js.IsNumeric(n.TokenType) && strings.ContainsRune(data, '_'):
