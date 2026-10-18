@@ -289,12 +289,14 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertNoStaleDeferredBodyCloses` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertRequestPathContext` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertScriptSyntax` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSectionSays` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertWellFormedTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `ContextValueExemption` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `HTMLSinkAllowance` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `ReadScripts` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
