@@ -450,6 +450,14 @@ func TestWizard_RefusesTheTLSFlagsTheServerRefuses(t *testing.T) {
 	cert, key := testClientPair(t)
 	certPath := writeFile(t, "client-cert.pem", cert)
 	keyPath := writeFile(t, "client-key.pem", key)
+	der, err := x509.MarshalPKCS8PrivateKey(testKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherKey := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+	otherKeyPath := writeFile(t, "other-client-key.pem", otherKey)
+	absentCertPath := filepath.Join(t.TempDir(), "absent-cert.pem")
+	absentKeyPath := filepath.Join(t.TempDir(), "absent-key.pem")
 	native := CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 		DBHost: "pg.internal", SkipDBTest: true}
 	for _, tc := range []struct {
@@ -462,6 +470,21 @@ func TestWizard_RefusesTheTLSFlagsTheServerRefuses(t *testing.T) {
 			f.DBTLSMode, f.DBTLSClientCertFile = "require", certPath
 			return f
 		}(), `without --db-tls-client-key-file: name both or neither`},
+		{"an unreadable certificate", func() CLIFlags {
+			f := native
+			f.DBTLSMode, f.DBTLSClientCertFile, f.DBTLSClientKeyFile = "require", absentCertPath, keyPath
+			return f
+		}(), `GOIABADA_DB_TLS_CLIENT_CERT_FILE (--db-tls-client-cert-file) is "` + absentCertPath + `", which cannot be read`},
+		{"an unreadable private key", func() CLIFlags {
+			f := native
+			f.DBTLSMode, f.DBTLSClientCertFile, f.DBTLSClientKeyFile = "verify-full", certPath, absentKeyPath
+			return f
+		}(), `GOIABADA_DB_TLS_CLIENT_KEY_FILE (--db-tls-client-key-file) is "` + absentKeyPath + `", which cannot be read`},
+		{"a mismatched pair", func() CLIFlags {
+			f := native
+			f.DBTLSMode, f.DBTLSClientCertFile, f.DBTLSClientKeyFile = "require", certPath, otherKeyPath
+			return f
+		}(), "do not pair"},
 		{"a pair on SQL Server", func() CLIFlags {
 			f := native
 			f.DBType, f.DBTLSMode = "mssql", "require"
@@ -485,6 +508,7 @@ func TestWizard_RefusesTheTLSFlagsTheServerRefuses(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("setup refused with %v, want it to say %q\n%s", err, tc.want, out)
 			}
+			assertNothingWritten(t, tc.flags.Output)
 		})
 	}
 }
