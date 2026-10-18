@@ -310,7 +310,7 @@ func passwordHashOf(t *testing.T, userId int64) string {
 }
 
 const resetCodeInvalidText = "A password link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
-const resetSucceededText = "Your password is set. You can sign in with it now."
+const resetSucceededText = "Your password is set. You can now sign in with:"
 
 // The end-to-end guard for #112 itself: an address containing '+' completes a reset from the
 // link Goiabada emailed it. Before this change the link carried the address, form-urlencoded
@@ -598,9 +598,9 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 		"the second submission of one marker must not overwrite the first")
 }
 
-// linkSentText is the modal the forgot-password page shows once a request is accepted, whatever
-// became of it. Cut before the apostrophe, which the page's script escapes.
-const linkSentText = "a password reset link has been sent to your email address."
+// linkSentText is the sentence the forgot-password page shows once a request is accepted, whatever
+// became of it, as html/template writes it: its apostrophe escaped.
+const linkSentText = "If an account uses this address, we&#39;ve sent it a link to reset your password:"
 
 // Recovery goes only to a verified address on an enabled account. An unverified address and a
 // disabled account are answered as an address with no account is, and nothing is mailed or

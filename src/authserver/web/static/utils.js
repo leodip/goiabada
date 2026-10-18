@@ -63,3 +63,34 @@ document.querySelectorAll("a[data-history-back]").forEach(function (link) {
     }
   });
 });
+
+// A button marked data-copy-target copies the text of the element it names, for a secret a person
+// would otherwise type again, such as an authenticator key, and says so for a moment on itself and
+// in the status element data-copy-status names. It stays hidden where the browser cannot write to
+// the clipboard, where the text is still there to select.
+document.querySelectorAll("button[data-copy-target]").forEach(function (button) {
+  const source = document.getElementById(button.dataset.copyTarget);
+  const status = document.getElementById(button.dataset.copyStatus);
+  const label = button.querySelector("span");
+  if (!source || !label || !navigator.clipboard) {
+    return;
+  }
+  const idle = label.textContent;
+  let timer = 0;
+  button.hidden = false;
+  button.addEventListener("click", function () {
+    navigator.clipboard.writeText(source.textContent.trim()).then(function () {
+      label.textContent = button.dataset.copiedLabel;
+      if (status) {
+        status.textContent = button.dataset.copiedLabel;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        label.textContent = idle;
+        if (status) {
+          status.textContent = "";
+        }
+      }, 2000);
+    });
+  });
+});

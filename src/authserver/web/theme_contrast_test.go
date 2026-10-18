@@ -97,6 +97,7 @@ func TestThemeContrast_EveryPairMeetsWCAGAA(t *testing.T) {
 		{"line-strong", "canvas"}, {"line-strong", "surface"},
 		{"focus", "canvas"}, {"focus", "surface"}, {"focus", "subtle"},
 		{"brand", "subtle"},
+		{"danger", "surface"},
 	}
 
 	for theme, palette := range map[string]map[string]string{"light": light, "dark": dark} {

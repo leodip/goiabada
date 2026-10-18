@@ -196,6 +196,7 @@ func HandleActivateGet(
 		bind := map[string]interface{}{
 			"email":          preRegistration.Email,
 			"continuationId": marker.ContinuationId,
+			"passwordRules":  passwordRulesHint(r),
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_activate_password.html", bind)
@@ -423,9 +424,10 @@ func HandleActivatePost(
 		// invalid.
 		renderError := func(field, message string) {
 			bind := map[string]interface{}{
-				"email":      preRegistration.Email,
-				"error":      message,
-				"errorField": field,
+				"email":         preRegistration.Email,
+				"error":         message,
+				"errorField":    field,
+				"passwordRules": passwordRulesHint(r),
 				// Echoed from the submission rather than read from the marker, because these
 				// rejections happen before the continuation is checked against it, as the reset
 				// form echoes it: a mistyped confirmation must not cost the continuation.
@@ -543,6 +545,7 @@ func HandleActivatePost(
 		}
 
 		bind := map[string]interface{}{
+			"email":               createdUser.Email,
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
 		}
 

@@ -288,12 +288,12 @@ failures are one key per cause, each a whole sentence.
 
 | Code | Args | English message |
 |---|---|---|
-| `validator.password.too_short` | `min` (int) | The minimum length for the password is {{.min}} characters |
-| `validator.password.too_long` | `max` (int) | The password can be at most {{.max}} bytes long. Accented and other non-English characters count as two or more bytes each. |
-| `validator.password.lowercase_required` | (none) | As per our policy, a lowercase character is required in the password. |
-| `validator.password.uppercase_required` | (none) | As per our policy, an uppercase character is required in the password. |
-| `validator.password.number_required` | (none) | As per our policy, your password must contain a numerical digit. |
-| `validator.password.special_char_required` | (none) | As per our policy, a special character/symbol is required in the password. |
+| `validator.password.too_short` | `min` (int) | Use at least {{.min}} characters for the password. |
+| `validator.password.too_long` | `max` (int) | Use at most {{.max}} bytes for the password. Accented and other non-English characters count as two or more bytes each. |
+| `validator.password.lowercase_required` | (none) | Add a lowercase letter to the password. |
+| `validator.password.uppercase_required` | (none) | Add an uppercase letter to the password. |
+| `validator.password.number_required` | (none) | Add a number to the password. |
+| `validator.password.special_char_required` | (none) | Add a symbol to the password. |
 
 ## Profile validator
 

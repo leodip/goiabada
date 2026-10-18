@@ -316,7 +316,9 @@ func HandleResetPasswordGet(
 		// The form carries the continuation id back, which is what ties this rendering to
 		// the marker that produced it once the session moves on.
 		bind := map[string]interface{}{
+			"email":          user.Email,
 			"continuationId": marker.ContinuationId,
+			"passwordRules":  passwordRulesHint(r),
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/reset_password.html", bind)
@@ -418,12 +420,27 @@ func HandleResetPasswordPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		// The credential comes from the session marker, not the query: template/reset-form
+		// has an empty action, so this POST re-submits to the clean URL the first hop
+		// redirected to, and there is nothing in it to read.
+		//
+		// Resolved before the password is looked at, so a link that is refused, a disabled
+		// account's included, is refused whatever was typed into the form, rather than
+		// answered with another form to fill in (#404 decision 2).
+		marker, user := resolveResetPasswordMarker(pageRenderer, httpSession, database, auditLogger,
+			w, r, http.StatusBadRequest)
+		if user == nil {
+			return
+		}
+
 		// renderError redraws the form with message, marking the field it names, by its form name,
 		// invalid.
 		renderError := func(field, message string) {
 			bind := map[string]interface{}{
-				"error":      message,
-				"errorField": field,
+				"email":         user.Email,
+				"error":         message,
+				"errorField":    field,
+				"passwordRules": passwordRulesHint(r),
 				// Echoed from the submission rather than read from the marker, because
 				// these rejections happen before the continuation is checked against it. A
 				// mistyped confirmation must not cost the user their continuation, and
@@ -436,19 +453,6 @@ func HandleResetPasswordPost(
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 			}
-		}
-
-		// The credential comes from the session marker, not the query: template/reset-form
-		// has an empty action, so this POST re-submits to the clean URL the first hop
-		// redirected to, and there is nothing in it to read.
-		//
-		// Resolved before the password is looked at, so a link that is refused, a disabled
-		// account's included, is refused whatever was typed into the form, rather than
-		// answered with another form to fill in (#404 decision 2).
-		marker, user := resolveResetPasswordMarker(pageRenderer, httpSession, database, auditLogger,
-			w, r, http.StatusBadRequest)
-		if user == nil {
-			return
 		}
 
 		// r.PostFormValue rather than r.FormValue throughout this handler, including the
@@ -591,6 +595,7 @@ func HandleResetPasswordPost(
 
 		bind := map[string]interface{}{
 			"passwordReset":       true,
+			"email":               user.Email,
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
 		}
 

@@ -28,7 +28,11 @@
   {{ if not .requiresEmailVerification }}
   <div class="field">
     <label class="field-label" for="password">{{ T $.ctx "common.field.password" }}</label>
-    <input class="control" id="password" type="password" name="password" autocomplete="new-password"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="register-error"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}>
+    <input class="control" id="password" type="password" name="password" autocomplete="new-password"
+      {{- if .error }}{{ if eq .errorField "password" }} aria-invalid="true"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}
+      {{- if .passwordRules }} aria-describedby="{{ if .error }}{{ if eq .errorField "password" }}register-error {{ end }}{{ end }}password-rules"
+      {{- else if .error }}{{ if eq .errorField "password" }} aria-describedby="register-error"{{ end }}{{ end }}>
+    {{ if .passwordRules }}<p class="field-hint" id="password-rules">{{ .passwordRules }}</p>{{ end }}
   </div>
 
   <div class="field">

@@ -700,12 +700,13 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
   `panel`, `panel-body`, `panel-footer`; `button`, with `-primary` for a form's one main action,
   `-danger`, `-quiet`, `-sm`, `-icon` and `-block`; `field`, holding `field-label`, a `control`,
-  `field-hint` and `field-error`; `choice`, `switch`, `option-card`; `notice` with `-danger`,
-  `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a `data-table`; `tab-bar` and
-  `tab-item`; `pager`; `dialog`; `empty-state`; `spinner`; `text-link`. The auth server's card adds
-  `auth-title`, `auth-lead`, `auth-status` with a `status-icon` (`-danger`, `-positive`, `-caution`,
-  `-note`), `auth-actions` for two answers side by side, `auth-steps`, `auth-qr`, `secret-key` and
-  `code-hint`.
+  `field-hint` and `field-error`; `choice`, `switch`, `option-card`, `check-list` of `check-row`;
+  `notice` with `-danger`, `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a
+  `data-table`; `tab-bar` and `tab-item`; `pager`; `dialog`; `empty-state`; `spinner`;
+  `text-link`. The auth server's card adds `auth-title`, `auth-lead`, `auth-status` with a
+  `status-icon` (`-danger`, `-positive`, `-caution`, `-note`), `auth-actions` for two answers side
+  by side, `auth-steps`, `auth-qr`, `secret-key` with `secret-key-row`, `code-hint` and
+  `auth-address`.
 - **Markup**: `core/guard.AssertWellFormedTemplates` holds every page to well-formed HTML and to
   the accessibility rules readable from a template: every element closed explicitly and in order,
   what a branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for
@@ -737,12 +738,14 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   (`admin_settings_sessions.html`): eyebrow, title and lead, one `panel` holding the notices at its
   top and the fields in a `form-grid`, each field's help visible under it, and Save in the
   `panel-footer`. A choice among a few options (`admin_settings_ui_theme.html`): `option-card`s in
-  a fieldset with a legend. A confirmation that deletes or removes says so on its buttons: "Cancel",
+  a fieldset with a legend; several of many (`consent.html`): a `check-list` of `check-row`s in a
+  fieldset with a legend. A confirmation that deletes or removes says so on its buttons: "Cancel",
   and the action in `button-danger`. On the auth server, a form (`auth_pwd.html`): the title, an
   `auth-lead` saying what the page asks when the title does not, the notice at the top of the form,
   the fields, and one `button-block` primary button; a page that reports (`auth_error.html`): an
-  `auth-status` with a `status-icon` in the outcome's tone, the title, the message, and at most one
-  action, a button. A new shape gets its reference page and a line here when its first page is
+  `auth-status` with a `status-icon` in the outcome's tone, the title and the icon centered, the
+  message left-aligned, an address it names in an `auth-address`, and at most one action, a
+  `button-block`. A new shape gets its reference page and a line here when its first page is
   built.
 - **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
   out, client, one-time code, two-factor authentication, auth server. The auth server's pages speak

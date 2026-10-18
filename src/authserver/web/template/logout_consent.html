@@ -3,6 +3,7 @@
 
 {{define "body"}}
 <h1 class="auth-title">{{ T $.ctx "logout_consent.title" }}</h1>
+<p class="auth-lead">{{ T $.ctx "logout_consent.confirm" }}</p>
 <!-- An explicit action, not action="", because action="" resolves to the current URL
      INCLUDING its query string, which on this page carries the id_token_hint that could
      not be confirmed. Confirming this page must be a hintless POST: a hintless POST is not
@@ -23,8 +24,6 @@
   {{ if .clientId }}<input type="hidden" name="client_id" value="{{ .clientId }}">{{ end }}
   {{ if .statePresent }}<input type="hidden" name="state" value="{{ .state }}">{{ end }}
   {{ if .uiLocales }}<input type="hidden" name="ui_locales" value="{{ .uiLocales }}">{{ end }}
-
-  <p class="text-center">{{ T $.ctx "logout_consent.confirm" }}</p>
 
   <!-- The declining control is a link rather than a button, because a button with no type
        attribute is a submit control by HTML's missing-value default and only a click handler

@@ -11,7 +11,7 @@
   <p>{{ T $.ctx "account.activation_result.expired_body" }}</p>
   {{ if .registrationAvailable }}
   <p>{{ T $.ctx "account.activation_result.expired_recovery" }}</p>
-  <a class="button button-primary" href="/account/register">{{ T $.ctx "account.activation_result.register_again" }}</a>
+  <a class="button button-primary button-block" href="/account/register">{{ T $.ctx "account.activation_result.register_again" }}</a>
   {{ end }}
 </div>
 {{ else }}
@@ -19,7 +19,8 @@
   <span class="status-icon status-icon-positive"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg></span>
   <h1 class="auth-title">{{ T $.ctx "account.activation_result.title" }}</h1>
   <p>{{ T $.ctx "account.activation_result.success_body" }}</p>
-  <a class="button button-primary" href="{{ .adminConsoleBaseUrl }}/account/profile">{{ T $.ctx "common.link.sign_in_to_account" }}</a>
+  <code class="auth-address">{{ .email }}</code>
+  <a class="button button-primary button-block" href="{{ .adminConsoleBaseUrl }}/account/profile">{{ T $.ctx "common.link.sign_in_to_account" }}</a>
 </div>
 {{ end }}
 {{end}}

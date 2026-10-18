@@ -32,17 +32,19 @@
   </div>
   {{ end }}
 
-  <fieldset class="grid gap-2">
+  <fieldset>
     <legend class="field-label mb-2">{{ T $.ctx "consent.scopes_legend" }}</legend>
-    {{ range $i, $s := .scopes }}
-    <label class="option-card" for="consent{{ $i }}">
-      <input type="checkbox" id="consent{{ $i }}" name="consent{{ $i }}" checked>
-      <span class="grid min-w-0 flex-1 gap-0.5">
-        <span class="choice-label">{{ .Description }}</span>
-        <span class="code-hint">{{ .Scope }}</span>
-      </span>
-    </label>
-    {{ end }}
+    <div class="check-list">
+      {{ range $i, $s := .scopes }}
+      <label class="check-row" for="consent{{ $i }}">
+        <input type="checkbox" id="consent{{ $i }}" name="consent{{ $i }}" checked>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ .Description }}</span>
+          <span class="code-hint">{{ .Scope }}</span>
+        </span>
+      </label>
+      {{ end }}
+    </div>
   </fieldset>
 
   <div class="auth-actions">

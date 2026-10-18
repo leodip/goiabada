@@ -92,7 +92,6 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
-	pages.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
 	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))

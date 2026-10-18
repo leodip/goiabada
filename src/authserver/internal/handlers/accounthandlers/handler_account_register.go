@@ -119,6 +119,7 @@ func HandleRegisterGet(
 		bind := map[string]interface{}{
 			"ceremonyId":                registrationCeremonyId(r),
 			"requiresEmailVerification": registrationRequiresEmailVerification(settings),
+			"passwordRules":             passwordRulesHint(r),
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -269,6 +270,7 @@ func HandleRegisterPost(
 				"errorField":                field,
 				"ceremonyId":                registrationCeremonyId(r),
 				"requiresEmailVerification": requiresEmailVerification,
+				"passwordRules":             passwordRulesHint(r),
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -438,6 +440,7 @@ func HandleRegisterPost(
 		}
 
 		bind := map[string]interface{}{
+			"email":               email,
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
 		}
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_success.html", bind)

@@ -1,4 +1,4 @@
-{{define "title"}}{{ T $.ctx "auth_error.page_title" }} – {{ .appName }}{{end}}
+{{define "title"}}{{ with .title }}{{ . }}{{ else }}{{ T $.ctx "auth_error.page_title" }}{{ end }} – {{ .appName }}{{end}}
 {{define "head"}}{{end}}
 
 {{define "body"}}

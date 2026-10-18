@@ -59,8 +59,12 @@
 }
 
 @layer base {
+  /* The root carries the page color too, so an overscroll shows the canvas rather than white.
+     --root-bg is daisyUI's own root color, set here for as long as daisyUI is built in (#617). */
   :root {
     color-scheme: light;
+    background-color: var(--color-canvas);
+    --root-bg: var(--color-canvas);
 
     @variant dark {
       color-scheme: dark;
@@ -399,6 +403,12 @@
     border-color: var(--color-danger);
   }
 
+  /* An invalid field keeps saying so while it has focus: its ring is drawn in the danger color
+     rather than a blue ring around a red border. */
+  .control[aria-invalid="true"]:focus-visible {
+    outline-color: var(--color-danger);
+  }
+
   .control:disabled,
   .control[readonly] {
     background-color: var(--color-subtle);
@@ -521,6 +531,44 @@
     height: 1.125rem;
     margin-top: 0.1875rem;
     accent-color: var(--color-brand);
+  }
+
+  /* A checklist: several of many, each a checkbox row with its description, in one box. An
+     unticked row's text is dimmed, so what is left out shows at a glance. */
+
+  .check-list {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    overflow: hidden;
+  }
+
+  .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    cursor: pointer;
+  }
+
+  .check-row + .check-row {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .check-row:hover {
+    background-color: var(--color-subtle);
+  }
+
+  .check-row > input {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.1875rem;
+    accent-color: var(--color-brand);
+  }
+
+  .check-row:has(> input:not(:checked)) .choice-label {
+    color: var(--color-ink-muted);
   }
 
   /* Notices: a message about the page or the last action. */
@@ -1005,22 +1053,45 @@
     text-align: center;
   }
 
-  /* A page that reports rather than asks: an icon over the title, and the message under it. */
+  /* An address the lead names, such as the account a password is for, centered under it. */
 
-  .auth-status {
+  .auth-lead:has(+ .auth-address) {
+    margin-bottom: 0;
+  }
+
+  .auth-lead + .auth-address {
+    margin-bottom: 1.5rem;
     text-align: center;
   }
+
+  /* A page that reports rather than asks: an icon over the title, both centered as its headline,
+     and the message under them, read left to right as the forms' fields are. */
 
   .auth-status > .auth-title {
     margin-bottom: 0.75rem;
   }
 
-  .auth-status > p + p {
+  .auth-status > * + p {
     margin-top: 0.75rem;
   }
 
   .auth-status > * + .button {
     margin-top: 1.5rem;
+  }
+
+  /* An address the page names, on a line of its own so it is read rather than skimmed: where a
+     client asked to send the person, or where a message was sent. */
+
+  .auth-address {
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .status-icon {
@@ -1068,36 +1139,28 @@
     gap: 0.75rem;
   }
 
-  /* Numbered steps, each a list item whose number is drawn beside it. */
+  /* Numbered steps: a quiet number beside each, as a plain numbered list draws it. */
 
   .auth-steps {
     display: grid;
-    gap: 1.25rem;
+    gap: 1rem;
     counter-reset: step;
   }
 
   .auth-steps > li {
     position: relative;
-    min-height: 1.75rem;
-    padding-left: 2.5rem;
+    padding-left: 1.5rem;
     counter-increment: step;
   }
 
   .auth-steps > li::before {
-    content: counter(step);
+    content: counter(step) ".";
     position: absolute;
     top: 0;
     left: 0;
-    display: flex;
-    width: 1.75rem;
-    height: 1.75rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    background-color: var(--color-note-soft);
-    color: var(--color-note-ink);
-    font-size: 0.875rem;
+    color: var(--color-ink-muted);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   /* A QR code, which keeps its own light background in either theme so any camera reads it. */
@@ -1106,22 +1169,35 @@
     display: block;
     width: 12rem;
     height: 12rem;
-    margin-top: 0.75rem;
+    margin: 0.75rem auto 0;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-control);
   }
 
-  /* A secret a person copies by hand, such as an authenticator key. */
+  /* A secret a person copies by hand, such as an authenticator key, and the button that copies it
+     where the browser can. */
+
+  .secret-key-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .secret-key-row > .secret-key {
+    flex: 1 1 14rem;
+    margin-top: 0;
+  }
 
   .secret-key {
     display: block;
     margin-top: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.625rem;
     border-radius: var(--radius-control);
     background-color: var(--color-subtle);
     font-family: var(--font-mono);
-    font-size: 0.9375rem;
-    letter-spacing: 0.06em;
+    font-size: 0.8125rem;
     overflow-wrap: anywhere;
     user-select: all;
   }

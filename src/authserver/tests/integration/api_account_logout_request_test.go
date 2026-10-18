@@ -484,7 +484,7 @@ var (
 	}
 
 	consentClassTokens = map[string]bool{
-		"stacked": true, "text-center": true, "auth-actions": true, "button": true, "button-primary": true,
+		"stacked": true, "auth-actions": true, "button": true, "button-primary": true,
 	}
 
 	// The element types the form may sit inside, which is the auth layout's own structure. An
@@ -890,13 +890,13 @@ var (
 	signedOutEnglish = signedOutTexts{
 		pageTitle: "Signed out",
 		heading:   "Signed out",
-		message:   "You're signed out.",
+		message:   "You're signed out. Any application that signs you in here will ask you to sign in again. You can close this page.",
 		declined:  "We couldn't take you back to the application you signed out from.",
 	}
 	signedOutPortuguese = signedOutTexts{
 		pageTitle: "Sessão encerrada",
 		heading:   "Sessão encerrada",
-		message:   "Você saiu da sua conta.",
+		message:   "Você saiu da sua conta. Qualquer aplicativo que use este login vai pedir que você entre de novo. Você pode fechar esta página.",
 		declined:  "Não foi possível levar você de volta ao aplicativo do qual você saiu.",
 	}
 )

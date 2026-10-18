@@ -17,6 +17,16 @@
 "common.field.password_confirmation" = "Confirme a senha"
 "common.link.sign_in_to_account" = "Entrar na sua conta"
 
+# As regras de senha que um formulário que define uma senha mostra sob o campo. accountvalidation.DescribePasswordRules
+# monta a frase a partir das regras que o validador de senha aplica, então estas partes mudam com elas.
+"password_rules.length" = "Pelo menos {{.min}} caracteres."
+"password_rules.length_with" = "Pelo menos {{.min}} caracteres, com {{.requirements}}."
+"password_rules.lowercase" = "uma letra minúscula"
+"password_rules.uppercase" = "uma letra maiúscula"
+"password_rules.number" = "um número"
+"password_rules.symbol" = "um símbolo"
+"password_rules.list" = "{{.items}} e {{.last}}"
+
 # --- Datas e durações --------------------------------------------------------
 #
 # O layout é um layout de referência do Go, traduzível porque o Go formata os
@@ -70,6 +80,8 @@
 "auth.otp_enrollment.step2" = "Escaneie este QR code com o aplicativo."
 "auth.otp_enrollment.qr_alt" = "QR code para escanear com o seu aplicativo autenticador"
 "auth.otp_enrollment.scan_alternative" = "Não consegue escanear? Digite esta chave no aplicativo:"
+"auth.otp_enrollment.copy_key" = "Copiar chave"
+"auth.otp_enrollment.key_copied" = "Chave copiada"
 "auth.otp_enrollment.step3" = "Digite o código de 6 dígitos que o aplicativo mostra."
 
 # --- Tela de consentimento (auth/consent) ------------------------------------
@@ -110,7 +122,7 @@
 
 "logged_out.page_title" = "Sessão encerrada"
 "logged_out.title" = "Sessão encerrada"
-"logged_out.message" = "Você saiu da sua conta."
+"logged_out.message" = "Você saiu da sua conta. Qualquer aplicativo que use este login vai pedir que você entre de novo. Você pode fechar esta página."
 "logged_out.redirect_declined" = "Não foi possível levar você de volta ao aplicativo do qual você saiu."
 
 # --- Página de erro OAuth/interno (auth_error.html) --------------------------
@@ -138,7 +150,7 @@
 
 "auth_redirect_blocked.page_title" = "Autorização interrompida"
 "auth_redirect_blocked.title" = "Você não foi enviado a lugar nenhum"
-"auth_redirect_blocked.destination" = "Este aplicativo pediu para enviar você para {{.destination}}."
+"auth_redirect_blocked.destination" = "Este aplicativo pediu para enviar você para:"
 "auth_redirect_blocked.unverified" = "Ele se registrou sozinho neste servidor, portanto ninguém aqui verificou quem ele é nem para onde ele quer enviar você."
 "auth_redirect_blocked.closing" = "A solicitação termina aqui. Você pode fechar esta janela."
 
@@ -159,16 +171,17 @@
 
 "account.register_success.page_title" = "Conta criada"
 "account.register_success.title" = "Conta criada"
-"account.register_success.account_created" = "Sua conta está pronta."
+"account.register_success.account_created" = "Sua conta está pronta. Agora você pode entrar com:"
 
 "account.register_check_email.page_title" = "Verifique seu e-mail"
 "account.register_check_email.title" = "Verifique seu e-mail"
-"account.register_check_email.message_sent" = "Enviamos uma mensagem para {{.email}} com o próximo passo. Se o endereço for novo, ela contém um link para você escolher sua senha, válido por 5 minutos. Se o endereço já tiver uma conta, ela explica como entrar."
+"account.register_check_email.message_sent" = "Enviamos uma mensagem para:"
+"account.register_check_email.message_detail" = "Ela traz o próximo passo. Se o endereço for novo, ela contém um link para você escolher sua senha, válido por 5 minutos. Se o endereço já tiver uma conta, ela explica como entrar."
 "account.register_check_email.no_message" = "Não recebeu a mensagem? Verifique sua pasta de spam ou cadastre-se novamente em 10 minutos para receber um novo link."
 
 "account.activate_password.page_title" = "Escolha sua senha"
 "account.activate_password.title" = "Escolha sua senha"
-"account.activate_password.intro" = "Escolha uma senha para {{.email}} para terminar de criar sua conta."
+"account.activate_password.intro" = "Escolha uma senha para a sua nova conta:"
 "account.activate_password.button" = "Criar conta"
 
 "account.activation_result.page_title" = "Conta ativada"
@@ -177,7 +190,7 @@
 "account.activation_result.expired_body" = "Um link de ativação funciona uma única vez e expira em 5 minutos, e um navegador só pode ter um link enviado por e-mail em andamento por vez."
 "account.activation_result.expired_recovery" = "Cadastre-se novamente para receber um novo link. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
 "account.activation_result.register_again" = "Cadastrar novamente"
-"account.activation_result.success_body" = "Sua conta está pronta."
+"account.activation_result.success_body" = "Sua conta está pronta. Agora você pode entrar com:"
 
 # --- Esqueci a senha (forgot-password) ---------------------------------------
 
@@ -186,19 +199,21 @@
 "forgot_password.instructions" = "Digite seu endereço de e-mail e enviaremos um link para você redefinir sua senha."
 "forgot_password.button" = "Enviar link de redefinição"
 "forgot_password.modal_title" = "Verifique seu e-mail"
-"forgot_password.modal_body" = "Se houver uma conta com esse endereço, enviamos para ele um link para redefinir sua senha. O link expira em 5 minutos. Verifique a pasta de spam se não encontrá-lo."
+"forgot_password.modal_body" = "Se houver uma conta com este endereço, enviamos para ele um link para redefinir sua senha:"
+"forgot_password.modal_detail" = "O link expira em 5 minutos. Verifique a pasta de spam se não encontrá-lo."
 
 # --- Redefinir senha (reset-password) ----------------------------------------
 
 "reset_password.page_title" = "Defina sua senha"
 "reset_password.title" = "Defina sua senha"
+"reset_password.intro" = "Escolha uma senha para a sua conta:"
 "reset_password.button" = "Definir senha"
 "reset_password.code_invalid_title" = "Este link não pode ser usado"
 "reset_password.code_invalid_message" = "Um link de senha funciona uma única vez e expira em 5 minutos, e um navegador só pode ter um link enviado por e-mail em andamento por vez."
 "reset_password.code_invalid_recovery" = "Solicite um novo link. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
 "reset_password.code_invalid_link" = "Solicitar um novo link"
 "reset_password.modal_title" = "Senha definida"
-"reset_password.modal_body" = "Sua senha foi definida. Você já pode entrar com ela."
+"reset_password.modal_body" = "Sua senha foi definida. Agora você pode entrar com:"
 
 # --- Páginas genéricas de erro e não encontrada ------------------------------
 
@@ -211,10 +226,6 @@
 "not_found.page_title" = "Página não encontrada"
 "not_found.title" = "Página não encontrada"
 "not_found.body" = "O endereço pode estar digitado errado, ou a página pode ter mudado de lugar."
-
-"unauthorized.page_title" = "Acesso negado"
-"unauthorized.title" = "Acesso negado"
-"unauthorized.body" = "Você não tem permissão para ver esta página."
 
 # === Adminconsole — fundação =================================================
 
@@ -1699,12 +1710,12 @@
 "handler.settings_audit_logs.retention_days_negative" = "Os dias de retenção de logs de auditoria não podem ser negativos. Use 0 para retenção indefinida."
 "handler.settings_audit_logs.retention_days_too_large" = "Os dias de retenção de logs de auditoria não podem passar de 3650 dias (10 anos)."
 
-"validator.password.too_short" = "O comprimento mínimo para a senha é {{.min}} caracteres"
-"validator.password.too_long" = "A senha pode ter no máximo {{.max}} bytes. Caracteres acentuados e de outros alfabetos contam como dois ou mais bytes cada."
-"validator.password.lowercase_required" = "Conforme nossa política, é obrigatório um caractere minúsculo na senha."
-"validator.password.uppercase_required" = "Conforme nossa política, é obrigatório um caractere maiúsculo na senha."
-"validator.password.number_required" = "Conforme nossa política, sua senha precisa conter um dígito numérico."
-"validator.password.special_char_required" = "Conforme nossa política, é obrigatório um caractere especial/símbolo na senha."
+"validator.password.too_short" = "Use pelo menos {{.min}} caracteres na senha."
+"validator.password.too_long" = "Use no máximo {{.max}} bytes na senha. Caracteres acentuados e de outros alfabetos contam como dois ou mais bytes cada."
+"validator.password.lowercase_required" = "Adicione uma letra minúscula à senha."
+"validator.password.uppercase_required" = "Adicione uma letra maiúscula à senha."
+"validator.password.number_required" = "Adicione um número à senha."
+"validator.password.special_char_required" = "Adicione um símbolo à senha."
 
 "validator.profile.username_taken" = "Desculpe, este nome de usuário já está em uso."
 "validator.profile.username_invalid" = "Nomes de usuário precisam começar com uma letra e conter apenas letras, números e sublinhados. Devem ter entre 2 e 24 caracteres."

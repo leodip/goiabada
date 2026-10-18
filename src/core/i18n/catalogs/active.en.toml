@@ -19,6 +19,16 @@
 "common.field.password_confirmation" = "Confirm password"
 "common.link.sign_in_to_account" = "Sign in to your account"
 
+# The password rules a form that sets a password shows under its field. accountvalidation.DescribePasswordRules
+# builds the sentence from the rules the password validator applies, so these pieces change with them.
+"password_rules.length" = "At least {{.min}} characters."
+"password_rules.length_with" = "At least {{.min}} characters, with {{.requirements}}."
+"password_rules.lowercase" = "a lowercase letter"
+"password_rules.uppercase" = "an uppercase letter"
+"password_rules.number" = "a number"
+"password_rules.symbol" = "a symbol"
+"password_rules.list" = "{{.items}} and {{.last}}"
+
 # --- Dates and durations -----------------------------------------------------
 #
 # The layout is a Go reference-time layout, translatable because Go formats
@@ -72,6 +82,8 @@
 "auth.otp_enrollment.step2" = "Scan this QR code with the app."
 "auth.otp_enrollment.qr_alt" = "QR code to scan with your authenticator app"
 "auth.otp_enrollment.scan_alternative" = "Can't scan it? Enter this key in the app instead:"
+"auth.otp_enrollment.copy_key" = "Copy key"
+"auth.otp_enrollment.key_copied" = "Key copied"
 "auth.otp_enrollment.step3" = "Enter the 6-digit code the app shows."
 
 # --- Consent screen (auth/consent) ------------------------------------------
@@ -112,7 +124,7 @@
 
 "logged_out.page_title" = "Signed out"
 "logged_out.title" = "Signed out"
-"logged_out.message" = "You're signed out."
+"logged_out.message" = "You're signed out. Any application that signs you in here will ask you to sign in again. You can close this page."
 "logged_out.redirect_declined" = "We couldn't take you back to the application you signed out from."
 
 # --- OAuth/internal error page (auth_error.html) ----------------------------
@@ -150,7 +162,7 @@
 
 "auth_redirect_blocked.page_title" = "Authorization stopped"
 "auth_redirect_blocked.title" = "You have not been sent anywhere"
-"auth_redirect_blocked.destination" = "This application asked to send you to {{.destination}}."
+"auth_redirect_blocked.destination" = "This application asked to send you to:"
 "auth_redirect_blocked.unverified" = "It registered itself with this server, so nobody here has checked who it is or where it wants to send you."
 "auth_redirect_blocked.closing" = "The request stops here. You can close this window."
 
@@ -171,16 +183,17 @@
 
 "account.register_success.page_title" = "Account created"
 "account.register_success.title" = "Account created"
-"account.register_success.account_created" = "Your account is ready."
+"account.register_success.account_created" = "Your account is ready. You can now sign in with:"
 
 "account.register_check_email.page_title" = "Check your email"
 "account.register_check_email.title" = "Check your email"
-"account.register_check_email.message_sent" = "We've sent a message to {{.email}} with the next step. If the address is new, it contains a link to choose your password, valid for 5 minutes. If the address already has an account, it tells you how to sign in."
+"account.register_check_email.message_sent" = "We've sent a message to:"
+"account.register_check_email.message_detail" = "It has the next step. If the address is new, it holds a link to choose your password, valid for 5 minutes. If the address already has an account, it tells you how to sign in."
 "account.register_check_email.no_message" = "No message? Check your spam folder, or register again in 10 minutes to get a new link."
 
 "account.activate_password.page_title" = "Choose your password"
 "account.activate_password.title" = "Choose your password"
-"account.activate_password.intro" = "Choose a password for {{.email}} to finish creating your account."
+"account.activate_password.intro" = "Choose a password for your new account:"
 "account.activate_password.button" = "Create account"
 
 "account.activation_result.page_title" = "Account activated"
@@ -189,7 +202,7 @@
 "account.activation_result.expired_body" = "An activation link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
 "account.activation_result.expired_recovery" = "Register again to get a new link. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
 "account.activation_result.register_again" = "Register again"
-"account.activation_result.success_body" = "Your account is ready."
+"account.activation_result.success_body" = "Your account is ready. You can now sign in with:"
 
 # --- Forgot password (forgot-password) --------------------------------------
 
@@ -198,19 +211,21 @@
 "forgot_password.instructions" = "Enter your email address and we'll send you a link to reset your password."
 "forgot_password.button" = "Send reset link"
 "forgot_password.modal_title" = "Check your email"
-"forgot_password.modal_body" = "If an account uses that address, we've sent it a link to reset your password. The link expires after 5 minutes. Check your spam folder if you don't see it."
+"forgot_password.modal_body" = "If an account uses this address, we've sent it a link to reset your password:"
+"forgot_password.modal_detail" = "The link expires after 5 minutes. Check your spam folder if you don't see it."
 
 # --- Reset password (reset-password) ----------------------------------------
 
 "reset_password.page_title" = "Set your password"
 "reset_password.title" = "Set your password"
+"reset_password.intro" = "Choose a password for your account:"
 "reset_password.button" = "Set password"
 "reset_password.code_invalid_title" = "This link can't be used"
 "reset_password.code_invalid_message" = "A password link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
 "reset_password.code_invalid_recovery" = "Request a new link. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
 "reset_password.code_invalid_link" = "Request a new link"
 "reset_password.modal_title" = "Password set"
-"reset_password.modal_body" = "Your password is set. You can sign in with it now."
+"reset_password.modal_body" = "Your password is set. You can now sign in with:"
 
 # --- Generic error and not-found pages --------------------------------------
 
@@ -227,10 +242,6 @@
 "not_found.page_title" = "Page not found"
 "not_found.title" = "Page not found"
 "not_found.body" = "The address may be mistyped, or the page may have moved."
-
-"unauthorized.page_title" = "Access denied"
-"unauthorized.title" = "Access denied"
-"unauthorized.body" = "You don't have permission to view this page."
 
 # === Adminconsole foundation =================================================
 
@@ -1790,12 +1801,12 @@
 
 # --- Password validator (LocalizedError-backed) ------------------------------
 
-"validator.password.too_short" = "The minimum length for the password is {{.min}} characters"
-"validator.password.too_long" = "The password can be at most {{.max}} bytes long. Accented and other non-English characters count as two or more bytes each."
-"validator.password.lowercase_required" = "As per our policy, a lowercase character is required in the password."
-"validator.password.uppercase_required" = "As per our policy, an uppercase character is required in the password."
-"validator.password.number_required" = "As per our policy, your password must contain a numerical digit."
-"validator.password.special_char_required" = "As per our policy, a special character/symbol is required in the password."
+"validator.password.too_short" = "Use at least {{.min}} characters for the password."
+"validator.password.too_long" = "Use at most {{.max}} bytes for the password. Accented and other non-English characters count as two or more bytes each."
+"validator.password.lowercase_required" = "Add a lowercase letter to the password."
+"validator.password.uppercase_required" = "Add an uppercase letter to the password."
+"validator.password.number_required" = "Add a number to the password."
+"validator.password.special_char_required" = "Add a symbol to the password."
 
 # --- Profile validator (LocalizedError-backed) -------------------------------
 
