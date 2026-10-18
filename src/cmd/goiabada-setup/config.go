@@ -85,12 +85,17 @@ func (c *Config) rateLimiterDefault() bool {
 }
 
 // dbTLSComment is the comment above the TLS mode in an output that asks it, Kubernetes and native
-// binaries: what the mode chosen does, and what a verifying one checks the certificate against.
+// binaries: what the mode chosen does, and what a verifying one checks the certificate against,
+// GOIABADA_DB_TLS_SERVER_NAME's name rather than the host when the file writes one (#546).
 func (c *Config) dbTLSComment() []string {
+	description := tlsModeDescription(c.DBTLSMode, c.Engine.name)
+	if checksHostName(c.DBTLSMode) && c.DBTLSServerName != "" {
+		description = verifyFullOverrideDescription
+	}
 	lines := []string{
 		"How the auth server protects its connection to the database: disable, prefer, require,",
 		"verify-ca or verify-full.",
-		c.DBTLSMode + ": " + tlsModeDescription(c.DBTLSMode, c.Engine.name) + ".",
+		c.DBTLSMode + ": " + description + ".",
 	}
 	switch {
 	case !checksCertificate(c.DBTLSMode):

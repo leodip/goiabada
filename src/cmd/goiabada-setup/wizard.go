@@ -818,7 +818,11 @@ func (w *wizard) databaseTLSFromPrompts() error {
 		if m.name == c.DBTLSMode || (offered == "" && m.name == defaultTLSMode) {
 			offered = number
 		}
-		w.out.printf("  %s. %s: %s\n", number, m.name, m.describedFor(c.Engine.name))
+		description := m.describedFor(c.Engine.name)
+		if checksHostName(m.name) {
+			description += verifyFullOverrideMenuNote
+		}
+		w.out.printf("  %s. %s: %s\n", number, m.name, description)
 	}
 	w.out.println("Only verify-full makes sure the auth server reached your database and nothing in between.")
 	w.out.println()
@@ -874,7 +878,9 @@ func (w *wizard) databaseTLSFromPrompts() error {
 func (w *wizard) clientCertificateFromPrompts() error {
 	c := w.config
 	for {
-		cert, err := w.validated("Client certificate the auth server presents to the database (PEM), blank for none", c.DBTLSClientCertFile, "client certificate",
+		// No default: a blank answer means none, the second time round as the first, rather than the
+		// certificate a blank key returned from (#546).
+		cert, err := w.validated("Client certificate the auth server presents to the database (PEM), blank for none", "", "client certificate",
 			func(path string) error {
 				if path == "" {
 					c.DBTLSClientCertFile, c.DBTLSClientKeyFile, c.DBTLSClientCert, c.DBTLSClientKey = "", "", "", ""
@@ -943,7 +949,11 @@ func (w *wizard) databaseTLSFromFlags() error {
 		}
 		return errs.Errorf("--db-tls-ca-file is set while --db-tls-mode is %s, which checks no certificate: only verify-ca and verify-full read a CA file", described)
 	case w.flags.DBTLSCAFile == "":
-		w.out.info("Database CA: the system's roots")
+		// Only a mode that checks the certificate has roots to name; disable, prefer and require
+		// check none, and the warning below says so (#546).
+		if checksCertificate(mode) {
+			w.out.info("Database CA: the system's roots")
+		}
 	default:
 		absolute, certificates, err := readCAFile(w.flags.DBTLSCAFile)
 		if err != nil {

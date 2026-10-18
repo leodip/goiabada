@@ -70,7 +70,7 @@ data:
   GOIABADA_DB_USERNAME: "goiabada-user"
   # How the auth server protects its connection to the database: disable, prefer, require,
   # verify-ca or verify-full.
-  # verify-full: verify-ca, and the certificate must name the host the auth server connects to.
+  # verify-full: verify-ca, and the certificate must name GOIABADA_DB_TLS_SERVER_NAME rather than GOIABADA_DB_HOST.
   # The certificate is checked against the authorities in GOIABADA_DB_TLS_CA_FILE alone.
   GOIABADA_DB_TLS_MODE: "verify-full"
   # The goiabada-db-ca ConfigMap below, mounted into the auth server's pods.

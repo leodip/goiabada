@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
@@ -212,4 +214,19 @@ func TestMigrateCommand_HelpPrintsTheUsageAndOpensNothing(t *testing.T) {
 	assert.Equal(t, migrateUsage+"\n", stdout.String())
 	assert.Empty(t, stderr.String())
 	assert.NoFileExists(t, a)
+}
+
+// TestMigrateUsage_NamesEveryDatabaseFlag: every flag config.RegisterDatabaseFlags registers can
+// follow migrate, so the usage, the only place they are spelled out, names each one, the TLS
+// client certificate pair and host name override among them (#546).
+func TestMigrateUsage_NamesEveryDatabaseFlag(t *testing.T) {
+	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	config.RegisterDatabaseFlags(fs, &config.DatabaseConfig{})
+	var names []string
+	fs.VisitAll(func(f *flag.Flag) { names = append(names, f.Name) })
+	require.NotEmpty(t, names)
+	for _, name := range names {
+		named := regexp.MustCompile(`--` + regexp.QuoteMeta(name) + `([^-a-z]|$)`)
+		assert.Truef(t, named.MatchString(migrateUsage), "the migrate usage does not name --%s", name)
+	}
 }

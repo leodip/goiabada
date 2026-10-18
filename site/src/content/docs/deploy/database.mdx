@@ -27,7 +27,7 @@ The auth server creates every table itself, at each start, as [Upgrade Goiabada]
 
 ## Where the database sits
 
-The connection to PostgreSQL, MySQL or SQL Server carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts. You protect it with two settings, which work the same way on all three engines. SQLite has no connection to protect, so it ignores both.
+The connection to PostgreSQL, MySQL or SQL Server carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts. You protect it with the `GOIABADA_DB_TLS_*` settings below, which work the same way on all three engines, apart from the client certificate SQL Server can't present. SQLite has no connection to protect, so it ignores them all.
 
 `GOIABADA_DB_TLS_MODE` picks one of five modes. They're PostgreSQL's `sslmode` names:
 
@@ -37,9 +37,9 @@ The connection to PostgreSQL, MySQL or SQL Server carries the database password 
 | `prefer`, the default | On PostgreSQL and MySQL, when the server offers TLS, and in plain text when it offers none. On SQL Server, the login, and the whole session when the server forces encryption, as Azure SQL Database does. | No |
 | `require` | Always, the whole session. A server that offers no TLS is refused. | No |
 | `verify-ca` | Always, the whole session. | The certificate must chain to a trusted authority. The host name isn't checked. |
-| `verify-full` | Always, the whole session. | The certificate must chain to a trusted authority and name `GOIABADA_DB_HOST`. An IP address must be one of the certificate's IP addresses. |
+| `verify-full` | Always, the whole session. | The certificate must chain to a trusted authority and name `GOIABADA_DB_TLS_SERVER_NAME` when it's set, or `GOIABADA_DB_HOST` when it isn't. An IP address must be one of the certificate's IP addresses. |
 
-Only `verify-full` makes sure the auth server reached your database and nothing in between, so use it when you can. Use `verify-ca` only when the auth server reaches the database by a name its certificate doesn't carry, such as an IP address or a connection pooler's host name.
+Only `verify-full` makes sure the auth server reached your database and nothing in between, so use it when you can. When the auth server reaches the database by a name its certificate doesn't carry, such as an IP address or a connection pooler's host name, keep `verify-full` and set [the host name it checks](#the-host-name-verify-full-checks). Use `verify-ca` only when the certificate names no host you can give.
 
 <Aside type="danger" title="Three of the modes check no certificate">
 **Never** use `disable`, `prefer` or `require` across a network you don't trust. They check no certificate, so anyone on the path can pose as your database and read or change the traffic.
@@ -60,9 +60,23 @@ If the database's certificate doesn't verify, or the database offers no TLS, the
 
 The auth server won't start if the file can't be read, holds no certificate, or is set with `disable`, `prefer` or `require`, which check no certificate. On Kubernetes, the setup wizard puts the file in [a ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
 
+### The host name verify-full checks
+
+`GOIABADA_DB_TLS_SERVER_NAME` names the host `verify-full` checks the certificate against, in place of `GOIABADA_DB_HOST`. Set it when the address the auth server dials isn't a name the certificate carries: an IP address, a pooler, a private endpoint. The auth server still dials `GOIABADA_DB_HOST`.
+
+The auth server won't start if it's set with any mode but `verify-full`, the only one that checks a host name.
+
+### A client certificate
+
+Some databases tell who's connecting by a TLS client certificate, beside or instead of the password: PostgreSQL's `cert` authentication and `clientcert=verify-full`, MySQL's `REQUIRE X509`. Name the certificate in `GOIABADA_DB_TLS_CLIENT_CERT_FILE` and its private key in `GOIABADA_DB_TLS_CLIENT_KEY_FILE`, both PEM files. The auth server reads them once, at start, and presents them in `require`, `verify-ca` and `verify-full`.
+
+Make the key file readable only by the user the auth server runs as, such as with `chmod 600`. That's what `psql` requires before it uses a key. Goiabada doesn't check the file's permissions itself, so a looser key works with Goiabada and is refused by `psql`.
+
+The auth server won't start if one file is set without the other, either can't be read, the two don't pair, the key needs a passphrase, or the mode is `disable` or `prefer`, which may send no TLS. SQL Server's driver can't present a client certificate, so the auth server refuses one there. On Kubernetes, the setup wizard puts both files in [a Secret](/deploy/kubernetes/secrets/#the-database-client-certificate).
+
 ### PostgreSQL's own variables
 
-On PostgreSQL, these two settings are the whole of the connection's TLS. The auth server doesn't read PostgreSQL's own `PGSSL*` variables, such as `PGSSLMODE` and `PGSSLROOTCERT`, and won't start while one is set: see [PostgreSQL TLS variables stop startup](/troubleshooting/postgresql-tls-variables/).
+On PostgreSQL, the `GOIABADA_DB_TLS_*` settings are the whole of the connection's TLS. The auth server doesn't read PostgreSQL's own `PGSSL*` variables, such as `PGSSLMODE` and `PGSSLROOTCERT`, and won't start while one is set: see [PostgreSQL TLS variables stop startup](/troubleshooting/postgresql-tls-variables/).
 
 ## PostgreSQL
 

@@ -312,6 +312,9 @@ func TestConnConfig_PresentsTheClientPairAndChecksTheNamedHost(t *testing.T) {
 	const override = "db-1.internal.example"
 	forDialled := ours.Issue(t, host)
 	forOverride := ours.Issue(t, override)
+	// require checks no certificate, so with a pair, on the configuration of the builder's own, it
+	// still accepts one no authority it trusts signed, for another host.
+	untrustedForAnother := tlstest.NewAuthority(t, "theirs").Issue(t, "other.example.com")
 
 	for _, tt := range []struct {
 		name  string
@@ -339,6 +342,10 @@ func TestConnConfig_PresentsTheClientPairAndChecksTheNamedHost(t *testing.T) {
 				assert.Equal(t, []tls.Certificate{pair}, tlsConfig.Certificates, "the connection presents the pair")
 				assert.Equal(t, override, tlsConfig.ServerName, "the TLS configuration names the override")
 
+				if tt.mode == data.TLSRequire {
+					require.NoError(t, tlstest.Handshake(t, tlsConfig, untrustedForAnother),
+						"require checks no certificate, with a pair as without one")
+				}
 				if tt.mode == data.TLSVerifyFull {
 					require.NoError(t, tlstest.Handshake(t, tlsConfig, forOverride),
 						"a certificate naming the override is accepted")

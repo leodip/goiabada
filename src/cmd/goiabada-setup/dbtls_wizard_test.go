@@ -51,7 +51,15 @@ func writeFile(t *testing.T, name, content string) string {
 // answered as given, followed by the CA file's answers, each one read in turn.
 func withTLSAnswers(t *testing.T, kind deploymentType, mode string, caAnswers ...string) []scriptedStep {
 	t.Helper()
-	steps := interactiveScript(deployments[kind], testEngine("postgres"))
+	return withTLSAnswersOn(t, kind, "postgres", mode, caAnswers...)
+}
+
+// withTLSAnswersOn is withTLSAnswers on the engine named, which is offered the client certificate
+// pair only when its driver reads one (#546).
+func withTLSAnswersOn(t *testing.T, kind deploymentType, engineName, mode string, caAnswers ...string) []scriptedStep {
+	t.Helper()
+	e := testEngine(engineName)
+	steps := interactiveScript(deployments[kind], e)
 	for i := range steps {
 		if steps[i].prompt == tlsModePrompt {
 			steps[i].answer = mode
@@ -63,7 +71,9 @@ func withTLSAnswers(t *testing.T, kind deploymentType, mode string, caAnswers ..
 			// the host name override to verify-full alone (#546).
 			switch mode {
 			case "3", "4", "5":
-				ca = append(ca, scriptedStep{prompt: clientCertPrompt, answer: ""})
+				if e.takesClientCertificate {
+					ca = append(ca, scriptedStep{prompt: clientCertPrompt, answer: ""})
+				}
 			}
 			if mode == "5" {
 				ca = append(ca, scriptedStep{prompt: serverNamePrompt, answer: ""})
@@ -162,6 +172,10 @@ func TestWizard_AsksTheTLSMode(t *testing.T) {
 				if !strings.Contains(out.String(), ". "+mode+": ") {
 					t.Errorf("the menu offers no %s:\n%s", mode, out)
 				}
+			}
+			// verify-full's line says the certificate may name the host name asked after it (#546).
+			if !strings.Contains(out.String(), ". verify-full: "+tlsModeDescription("verify-full", "postgres")+verifyFullOverrideMenuNote+"\n") {
+				t.Errorf("the menu's verify-full line does not mention the host name override:\n%s", out)
 			}
 		})
 	}
@@ -620,4 +634,266 @@ func connectionTLS(t *testing.T, c dbConnection) *tls.Config {
 	}
 	t.Fatalf("connection %+v carries no driver configuration", c)
 	return nil
+}
+
+// The check dials each of its two connections with the client certificate pair and the host name
+// override, as the auth server's builders do: the pair presented on MySQL and PostgreSQL in the
+// three modes that carry one, and the override what verify-full checks the certificate against on
+// all three engines, so a certificate naming it is accepted and one naming the host dialled is
+// refused. require still checks nothing with a pair, accepting a certificate no authority it trusts
+// signed for another host (#546).
+func TestCheckDatabase_DialsWithTheClientPairAndTheNamedHost(t *testing.T) {
+	const host, override = "db.example.com", "db-1.internal.example"
+	cert, key := testClientPair(t)
+	pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ours := newTestAuthority(t, "ours")
+	theirs := newTestAuthority(t, "theirs")
+	oursPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ours.cert.Raw}))
+	forOverride := ours.issue(t, override)
+	forDialled := ours.issue(t, host)
+	untrustedForAnother := theirs.issue(t, "other.example.com")
+
+	for _, name := range []string{"mysql", "postgres", "mssql"} {
+		e := testEngine(name)
+		for _, mode := range []string{"require", "verify-ca", "verify-full"} {
+			if !e.takesClientCertificate && mode != "verify-full" {
+				continue
+			}
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				config := goldenConfig(deploymentNative, name)
+				config.DBHost, config.DBTLSMode = host, mode
+				if checksCertificate(mode) {
+					config.DBTLSCAFile, config.DBTLSCA = "/etc/ssl/db-ca.pem", oursPEM
+				}
+				if e.takesClientCertificate {
+					config.DBTLSClientCertFile, config.DBTLSClientKeyFile = "/etc/ssl/client-cert.pem", "/etc/ssl/client-key.pem"
+					config.DBTLSClientCert, config.DBTLSClientKey = cert, key
+				}
+				if checksHostName(mode) {
+					config.DBTLSServerName = override
+				}
+				db := &fakeDatabase{counts: map[string]int{e.existenceQuery: 1}}
+				var opened []dbConnection
+				open := func(c dbConnection) (dbConn, error) {
+					opened = append(opened, c)
+					return &fakeConn{db: db, dsn: connectionKey(c)}, nil
+				}
+				var out strings.Builder
+				if !checkConfiguredDatabase(&console{w: &out}, open, config) {
+					t.Fatalf("the check failed:\n%s", out.String())
+				}
+				if len(opened) != 2 {
+					t.Fatalf("opened %d connections, want the maintenance one and the application database's", len(opened))
+				}
+				for i, c := range opened {
+					tlsConfig := connectionTLS(t, c)
+					if tlsConfig == nil {
+						t.Fatalf("connection %d has no TLS configuration", i)
+					}
+					presented := len(tlsConfig.Certificates) == 1 &&
+						slices.EqualFunc(tlsConfig.Certificates[0].Certificate, pair.Certificate, slices.Equal[[]byte])
+					if presented != e.takesClientCertificate {
+						t.Errorf("connection %d presents the pair: %v, want %v", i, presented, e.takesClientCertificate)
+					}
+					switch mode {
+					case "require":
+						if err := testHandshake(t, tlsConfig, untrustedForAnother); err != nil {
+							t.Errorf("connection %d refuses, under require, a certificate it was never to check: %v", i, err)
+						}
+					case "verify-full":
+						if tlsConfig.ServerName != override {
+							t.Errorf("connection %d names server %q, want the override %q", i, tlsConfig.ServerName, override)
+						}
+						if c.mssql != nil && !c.mssql.HostInCertificateProvided {
+							t.Errorf("connection %d carries no hostNameInCertificate", i)
+						}
+						if err := testHandshake(t, tlsConfig, forOverride); err != nil {
+							t.Errorf("connection %d refuses a certificate naming the override: %v", i, err)
+						}
+						if testHandshake(t, tlsConfig, forDialled) == nil {
+							t.Errorf("connection %d accepts a certificate naming only the host dialled", i)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+// A certificate and key that do not pair fail the check before anything is dialled, as the auth
+// server refuses them before it connects (#546).
+func TestCheckDatabase_AClientPairThatDoesNotPairOpensNothing(t *testing.T) {
+	cert, _ := testClientPair(t)
+	der, err := x509.MarshalPKCS8PrivateKey(testKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherKey := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+	for _, name := range []string{"mysql", "postgres"} {
+		t.Run(name, func(t *testing.T) {
+			config := goldenConfig(deploymentNative, name)
+			config.DBTLSMode = "require"
+			config.DBTLSClientCertFile, config.DBTLSClientKeyFile = "/etc/ssl/client-cert.pem", "/etc/ssl/client-key.pem"
+			config.DBTLSClientCert, config.DBTLSClientKey = cert, otherKey
+			opened := 0
+			open := func(dbConnection) (dbConn, error) {
+				opened++
+				return &fakeConn{db: &fakeDatabase{}}, nil
+			}
+			var out strings.Builder
+			if checkConfiguredDatabase(&console{w: &out}, open, config) {
+				t.Errorf("the check passed a pair that does not pair:\n%s", out.String())
+			}
+			if opened != 0 {
+				t.Errorf("opened %d connections, want none", opened)
+			}
+			if !strings.Contains(out.String(), "do not pair") {
+				t.Errorf("the failure does not say the two do not pair:\n%s", out.String())
+			}
+		})
+	}
+}
+
+// The three new flags answer their questions: the pair read from the two files and written as their
+// absolute paths, the override written beside it, and the generated file's comment naming the
+// override as what the certificate must name (#546).
+func TestWizard_TheClientCertificateAndHostNameFlagsAnswerTheQuestions(t *testing.T) {
+	cert, key := testClientPair(t)
+	certPath := writeFile(t, "client-cert.pem", cert)
+	keyPath := writeFile(t, "client-key.pem", key)
+	caPath := writeFile(t, "db-ca.pem", readTestCA(t))
+	flags := &CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org",
+		DBHost: "10.0.0.5", DBTLSMode: "verify-full", DBTLSCAFile: caPath,
+		DBTLSClientCertFile: certPath, DBTLSClientKeyFile: keyPath, DBTLSServerName: "db.internal.example.com"}
+
+	w, _, out, calls := testWizard(t, flags, nil)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	c := w.config
+	if c.DBTLSClientCertFile != certPath || c.DBTLSClientKeyFile != keyPath || c.DBTLSClientCert != cert || c.DBTLSClientKey != key {
+		t.Errorf("pair is %q and %q, want %q and %q with their contents", c.DBTLSClientCertFile, c.DBTLSClientKeyFile, certPath, keyPath)
+	}
+	if c.DBTLSServerName != "db.internal.example.com" {
+		t.Errorf("host name is %q, want db.internal.example.com", c.DBTLSServerName)
+	}
+	if len(*calls) != 1 {
+		t.Errorf("connection checks %+v, want one", *calls)
+	}
+	env, _, err := systemdEnvironmentFile(descriptionOf(c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for variable, want := range map[string]string{
+		"GOIABADA_DB_TLS_MODE":             "verify-full",
+		"GOIABADA_DB_TLS_CLIENT_CERT_FILE": certPath,
+		"GOIABADA_DB_TLS_CLIENT_KEY_FILE":  keyPath,
+		"GOIABADA_DB_TLS_SERVER_NAME":      "db.internal.example.com",
+	} {
+		if got := env[variable]; got != want {
+			t.Errorf("%s is %q, want %q", variable, got, want)
+		}
+	}
+	written, err := os.ReadFile(w.paths.description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), "# verify-full: "+verifyFullOverrideDescription+".\n") {
+		t.Errorf("the env file's comment does not say the certificate must name the override:\n%s", written)
+	}
+	for _, said := range []string{"Database client certificate: " + certPath + " and " + keyPath, "Database certificate host name: db.internal.example.com"} {
+		if !strings.Contains(out.String(), said) {
+			t.Errorf("the wizard does not say %q:\n%s", said, out)
+		}
+	}
+}
+
+// A certificate named and its key left blank returns to the certificate question, where a blank
+// answer means none, as it did the first time: the connection presents no pair, the key is not
+// asked again, and verify-full goes on to the host name (#546).
+func TestWizard_ABlankCertificateAfterABlankKeyMeansNone(t *testing.T) {
+	cert, _ := testClientPair(t)
+	certPath := writeFile(t, "client-cert.pem", cert)
+
+	steps := withTLSAnswers(t, deploymentNative, "5", "")
+	certAt := slices.IndexFunc(steps, func(s scriptedStep) bool { return s.prompt == clientCertPrompt })
+	if certAt < 0 || steps[certAt+1].prompt != serverNamePrompt {
+		t.Fatal("the script does not ask the host name right after the client certificate")
+	}
+	steps[certAt].answer = certPath
+	steps = slices.Insert(steps, certAt+1,
+		scriptedStep{prompt: clientKeyPrompt, answer: ""},
+		scriptedStep{prompt: clientCertPrompt, answer: ""})
+
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	c := w.config
+	if c.DBTLSClientCertFile != "" || c.DBTLSClientKeyFile != "" || c.DBTLSClientCert != "" || c.DBTLSClientKey != "" {
+		t.Errorf("a blank certificate left a pair: %q and %q", c.DBTLSClientCertFile, c.DBTLSClientKeyFile)
+	}
+	asked := 0
+	for _, prompt := range in.prompts {
+		if prompt == clientKeyPrompt {
+			asked++
+		}
+	}
+	if asked != 1 {
+		t.Errorf("the key was asked %d times, want once", asked)
+	}
+	env, err := os.ReadFile(w.paths.description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(env), "GOIABADA_DB_TLS_CLIENT_") {
+		t.Errorf("the env file names a client certificate:\n%s", env)
+	}
+}
+
+// SQL Server's driver takes no client certificate, and the auth server refuses one there, so the
+// interactive wizard never offers it: in each of the three modes that would carry one, the CA file
+// and the host name are asked as on the other engines, with no certificate between them (#546).
+func TestWizard_NeverOffersSQLServerAClientCertificate(t *testing.T) {
+	for _, kind := range []deploymentType{deploymentNative, deploymentKubernetes} {
+		for mode, ca := range map[string][]string{"3": nil, "4": {""}, "5": {""}} {
+			t.Run(deployments[kind].name+"/"+tlsModes[mode[0]-'1'].name, func(t *testing.T) {
+				w, in, out, _ := testWizard(t, &CLIFlags{}, withTLSAnswersOn(t, kind, "mssql", mode, ca...))
+				if err := w.setup(); err != nil {
+					t.Fatalf("setup: %v\n%s", err, out)
+				}
+				in.assertConsumed()
+				for _, prompt := range in.prompts {
+					if strings.HasPrefix(prompt, "Client certificate") {
+						t.Errorf("SQL Server was asked %q", prompt)
+					}
+				}
+				if w.config.DBTLSClientCertFile != "" || w.config.DBTLSClientCert != "" {
+					t.Error("SQL Server's configuration carries a client certificate")
+				}
+			})
+		}
+	}
+}
+
+// The CA line names the system's roots only for a mode that checks the certificate against them:
+// disable, prefer and require check none, which the warning beside them says (#546).
+func TestWizard_TheTLSFlagsNameTheSystemsRootsOnlyForAModeThatChecks(t *testing.T) {
+	for mode, named := range map[string]bool{"disable": false, "": false, "require": false, "verify-ca": true, "verify-full": true} {
+		t.Run("mode "+mode, func(t *testing.T) {
+			flags := &CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org",
+				DBHost: "pg.internal", DBTLSMode: mode}
+			w, _, out, _ := testWizard(t, flags, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			if said := strings.Contains(out.String(), "Database CA: the system's roots"); said != named {
+				t.Errorf("names the system's roots: %v, want %v\n%s", said, named, out)
+			}
+		})
+	}
 }

@@ -32,6 +32,15 @@ var tlsModes = []tlsMode{
 	{"verify-full", "verify-ca, and the certificate must name the host the auth server connects to"},
 }
 
+// verifyFullOverrideMenuNote is what the menu adds to verify-full's line, which is asked before the
+// host name override: the certificate may name the override instead of the host dialled (#546).
+const verifyFullOverrideMenuNote = ", or the host name you give after it"
+
+// verifyFullOverrideDescription is verify-full's line in a generated file that also writes
+// GOIABADA_DB_TLS_SERVER_NAME, whose name the certificate must carry instead of the host dialled
+// (#546).
+const verifyFullOverrideDescription = "verify-ca, and the certificate must name GOIABADA_DB_TLS_SERVER_NAME rather than GOIABADA_DB_HOST"
+
 // defaultTLSMode is the mode the auth server takes when none is set, and the one the wizard offers
 // and writes on Compose: what it did before the setting existed (#502 decision 1).
 const defaultTLSMode = "prefer"
