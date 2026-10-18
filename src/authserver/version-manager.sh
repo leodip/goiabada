@@ -16,9 +16,10 @@
 #   generate - Regenerate committed data files (timezones, countries)
 #   all     - Run all commands in sequence (check → update → deps)
 #
-# Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind,
+# Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, daisyUI, humanize-duration). It does NOT manage the product version.
+# images' Alpine base, daisyUI, humanize-duration, cropperjs, acorn). It does NOT
+# manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
 #   1. Edit versions.yaml to set desired versions
@@ -176,6 +177,7 @@ get_all_versions() {
         # Fallback: read each key individually
         echo "tools.go=$(get_version 'tools.go')"
         echo "tools.tailwind=$(get_version 'tools.tailwind')"
+        echo "tools.node=$(get_version 'tools.node')"
         echo "tools.golangci-lint=$(get_version 'tools."golangci-lint"')"
         echo "tools.mockery=$(get_version 'tools.mockery')"
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
@@ -185,6 +187,7 @@ get_all_versions() {
         echo "vendored.daisyui=$(get_version 'vendored.daisyui')"
         echo "vendored.humanize-duration=$(get_version 'vendored."humanize-duration"')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
+        echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
 }
 
@@ -237,6 +240,16 @@ get_go_latest() {
     response=$(curl -s --connect-timeout 10 "https://go.dev/dl/?mode=json" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$response" ]; then
         echo "$response" | grep -o '"version"[[:space:]]*:[[:space:]]*"go[0-9.]*"' | head -1 | cut -d'"' -f4 | sed 's/^go//'
+    fi
+}
+
+# Fetch the newest Node.js LTS release from nodejs.org. index.json lists releases newest first, an
+# LTS one with its line's codename in "lts" and the others with false.
+get_node_latest() {
+    local response
+    response=$(curl -s --connect-timeout 10 "https://nodejs.org/dist/index.json" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        echo "$response" | grep -o '"version":"v[0-9.]*"[^}]*"lts":"' | head -1 | cut -d'"' -f4 | sed 's/^v//'
     fi
 }
 
@@ -324,6 +337,7 @@ cmd_show() {
     echo -e "\n${BOLD}Tools:${NC}"
     printf "  %-23s ${GREEN}%s${NC}\n" "go" "$(get_version 'tools.go')"
     printf "  %-23s ${GREEN}%s${NC}\n" "tailwind" "$(get_version 'tools.tailwind')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "node" "$(get_version 'tools.node')"
     printf "  %-23s ${GREEN}%s${NC}\n" "golangci-lint" "$(get_version 'tools."golangci-lint"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "mockery" "$(get_version 'tools.mockery')"
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
@@ -331,11 +345,12 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
 
-    # Vendored web dependencies
-    echo -e "\n${BOLD}Vendored web dependencies:${NC}"
+    # Vendored dependencies
+    echo -e "\n${BOLD}Vendored dependencies:${NC}"
     printf "  %-23s ${GREEN}%s${NC}\n" "daisyui" "$(get_version 'vendored.daisyui')"
     printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'vendored."humanize-duration"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "cropperjs" "$(get_version 'vendored.cropperjs')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "acorn" "$(get_version 'vendored.acorn')"
 
     echo ""
     print_info "Edit versions.yaml to change versions, then run: ./version-manager.sh update"
@@ -385,6 +400,23 @@ cmd_check() {
             updates_available+=("Tailwind CSS|$current_tailwind|$latest_tailwind|https://github.com/tailwindlabs/tailwindcss/releases")
         else
             print_success "Up to date ($current_tailwind)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- Node.js ---
+    # Compared with the newest LTS release, so a pin on a line before it enters LTS reads as up
+    # to date.
+    echo -n "Checking Node.js... "
+    local current_node=$(get_version 'tools.node')
+    local latest_node=$(get_node_latest)
+    if [ -n "$latest_node" ]; then
+        if version_lt "$current_node" "$latest_node"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Node.js|$current_node|$latest_node|https://nodejs.org/en/about/previous-releases")
+        else
+            print_success "Up to date ($current_node)"
         fi
     else
         print_warning "Check failed"
@@ -538,6 +570,21 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
+    # --- acorn ---
+    echo -n "Checking acorn... "
+    local current_acorn=$(get_version 'vendored.acorn')
+    local latest_acorn=$(get_npm_latest "acorn")
+    if [ -n "$latest_acorn" ]; then
+        if version_lt "$current_acorn" "$latest_acorn"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("acorn|$current_acorn|$latest_acorn|https://www.npmjs.com/package/acorn")
+        else
+            print_success "Up to date ($current_acorn)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
     # --- Summary ---
     echo ""
     if [ ${#updates_available[@]} -gt 0 ]; then
@@ -567,6 +614,7 @@ cmd_update() {
     # Load all versions from YAML
     local GO_VERSION=$(get_version 'tools.go')
     local TAILWIND_VERSION=$(get_version 'tools.tailwind')
+    local NODE_VERSION=$(get_version 'tools.node')
     local GOLANGCI_VERSION=$(get_version 'tools."golangci-lint"')
     local MOCKERY_VERSION=$(get_version 'tools.mockery')
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
@@ -576,6 +624,7 @@ cmd_update() {
     local DAISYUI_VERSION=$(get_version 'vendored.daisyui')
     local HUMANIZE_VERSION=$(get_version 'vendored."humanize-duration"')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
+    local ACORN_VERSION=$(get_version 'vendored.acorn')
 
     local success_count=0
     local fail_count=0
@@ -610,6 +659,15 @@ cmd_update() {
         if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
             "s|tailwindcss/releases/download/v[0-9.]*/tailwindcss-linux-x64|tailwindcss/releases/download/v${TAILWIND_VERSION}/tailwindcss-linux-x64|g" \
             "Tailwind CSS"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+
+        # Node.js: nodejs.org/dist/vX.Y.Z/node-vX.Y.Z-linux-x64.tar.gz, and the binary's path in it
+        if update_file "$BASE_DIR/src/.devcontainer/Dockerfile" \
+            "s|nodejs\.org/dist/v[0-9.]*/|nodejs.org/dist/v${NODE_VERSION}/|g; s|node-v[0-9.]*-linux-x64|node-v${NODE_VERSION}-linux-x64|g" \
+            "Node.js"; then
             ((success_count++))
         else
             ((fail_count++))
@@ -741,11 +799,11 @@ cmd_update() {
     done
 
     # -------------------------------------------------------------------------
-    # Vendored web dependencies
+    # Vendored dependencies
     # -------------------------------------------------------------------------
     # The pinned version of each, downloaded into the repository with its license and
     # its digest written beside the pin; no page loads them from a CDN (#542).
-    echo -e "\n${BOLD}Vendored web dependencies${NC}"
+    echo -e "\n${BOLD}Vendored dependencies${NC}"
     local daisyui_before
     daisyui_before=$(get_version 'vendored."daisyui-sha256"')
     # One bundle, beside each server's input.css, so a copy of either tailwindcss folder builds on
@@ -779,6 +837,17 @@ cmd_update() {
             "$cropper_dir/cropper.min.css" "cropperjs-css-sha256" &&
         vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/LICENSE" \
             "$cropper_dir/LICENSE"; then
+        ((success_count++))
+    else
+        ((fail_count++))
+    fi
+    # acorn's single-file build, which core/guard embeds and runs under Node to parse the static
+    # scripts (#617).
+    local acorn_dir="$BASE_DIR/src/core/guard/scriptcheck"
+    if vendor_fetch "https://cdn.jsdelivr.net/npm/acorn@${ACORN_VERSION}/dist/acorn.js" \
+            "$acorn_dir/acorn.js" "acorn-sha256" &&
+        vendor_fetch "https://cdn.jsdelivr.net/npm/acorn@${ACORN_VERSION}/LICENSE" \
+            "$acorn_dir/acorn.LICENSE"; then
         ((success_count++))
     else
         ((fail_count++))

@@ -715,8 +715,10 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`
   attributes, and text by message ID: through `T`, except the console's `js.*` strings, which carry
   client-side placeholders and go through `i18n.Raw` in `JSBootstrap`. ES2020 at most, with no build
-  step (`core/guard.AssertScriptSyntax`), for the declared floor: Chrome and Edge 111, Safari 16.4,
-  Firefox 128. The auth server's pages work with JavaScript off; the console says it needs it.
+  step, for the declared floor: Chrome and Edge 111, Safari 16.4, Firefox 128.
+  `core/guard.AssertScriptSyntax` parses every static script with acorn under Node, both pinned in
+  `versions.yaml`, so each module's unit tier needs `node` on the path, as the dev container and the
+  test jobs have it. The auth server's pages work with JavaScript off; the console says it needs it.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
