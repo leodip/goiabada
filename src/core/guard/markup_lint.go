@@ -1005,19 +1005,44 @@ type branching struct {
 	isRange bool
 }
 
-// rootBinding reports a pipeline that declares or assigns $. The guard reads $ as the data the
-// template was called with, which is what sameBranch keys a $ condition by, so a template rebinding
-// it could pass a reference to a notice that does not render.
+// rootBinding reports a pipeline that declares or assigns $, itself or in a pipeline nested in its
+// arguments, such as {{$x := ($ = .form)}}. The guard reads $ as the data the template was called
+// with, which is what sameBranch keys a $ condition by, so a template rebinding it could pass a
+// reference to a notice that does not render.
 func (w *markupWalk) rootBinding(pipe *parse.PipeNode) {
+	if at, ok := rebindingOf(pipe); ok {
+		w.report(at, "rebinds $, which is the data the template was called with: give the value a variable of its own")
+	}
+}
+
+// rebindingOf answers where pipe, or a pipeline nested in its arguments, under a field chain such as
+// ($ = .form).error too, declares or assigns $.
+func rebindingOf(pipe *parse.PipeNode) (int, bool) {
 	if pipe == nil {
-		return
+		return 0, false
 	}
 	for _, v := range pipe.Decl {
 		if v.Ident[0] == "$" {
-			w.report(int(pipe.Pos), "rebinds $, which is the data the template was called with: give the value a variable of its own")
-			return
+			return int(pipe.Pos), true
 		}
 	}
+	for _, cmd := range pipe.Cmds {
+		for _, arg := range cmd.Args {
+			for {
+				chain, ok := arg.(*parse.ChainNode)
+				if !ok {
+					break
+				}
+				arg = chain.Node
+			}
+			if nested, ok := arg.(*parse.PipeNode); ok {
+				if at, found := rebindingOf(nested); found {
+					return at, true
+				}
+			}
+		}
+	}
+	return 0, false
 }
 
 // sameBranch answers the node an {{if}} is keyed as: the first {{if}} of this reading on the same
