@@ -340,6 +340,28 @@ func TestConditionalStore_ChangeAndSaveFailureIsReturnedAndSetsNoCookie(t *testi
 		assert.Equal(t, 1, backend.conditionalUpdates-updates, "a failure is not a lost race, and is not retried")
 		assert.Empty(t, w.Result().Cookies())
 	})
+
+	t.Run("first create", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newConditionalTestStore(backend)
+		req := httptest.NewRequest("GET", "/", nil)
+		session, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+		session.Values["unsaved"] = "kept"
+		cause := errors.New("the database is unreachable")
+		backend.createErr = cause
+
+		w := httptest.NewRecorder()
+		err = store.ChangeAndSave(req, w, session, set("marker", "set"))
+
+		require.ErrorIs(t, err, cause)
+		assert.Equal(t, 1, backend.creates, "a storage failure is not retried")
+		assert.Empty(t, backend.rows)
+		assert.Empty(t, w.Result().Cookies())
+		assert.Empty(t, session.ID)
+		assert.True(t, session.IsNew)
+		assert.Equal(t, map[string]any{"unsaved": "kept"}, session.Values)
+	})
 }
 
 // A session never stored has no row anyone could have written in between, so the change is

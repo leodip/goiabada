@@ -45,6 +45,33 @@ test("an address that names no account is refused, and the same sign-in then suc
   await startSignIn(page);
   // A fresh address each run, so its failure budget is never shared with another run's.
   const nobody = `nobody-${randomUUID()}@example.com`;
+  await page.locator('input[name="email"]').fill(nobody);
+  await page.locator('input[name="password"]').fill("not-a-password-anyone-has");
+
+  // Hold the form on this page while its real submit handler runs twice. A persisted pageshow
+  // then restores it without depending on whether this browser caches the navigation (#581).
+  const submissions = await page.locator("form").evaluate((form: HTMLFormElement) => {
+    const accepted: boolean[] = [];
+    const stayHere = (event: Event) => {
+      accepted.push(!event.defaultPrevented);
+      event.preventDefault();
+    };
+    form.addEventListener("submit", stayHere);
+    try {
+      form.requestSubmit();
+      form.requestSubmit();
+      const disabled = Array.from(form.querySelectorAll("button")).every((button) => button.disabled);
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+      const restored = Array.from(form.querySelectorAll("button")).every((button) => !button.disabled);
+      return { accepted, disabled, restored };
+    } finally {
+      form.removeEventListener("submit", stayHere);
+    }
+  });
+  expect(submissions.accepted).toEqual([true, false]);
+  expect(submissions.disabled).toBe(true);
+  expect(submissions.restored).toBe(true);
+
   await submitPassword(page, nobody, "not-a-password-anyone-has");
 
   await expectRefused(page, "Authentication failed.");
