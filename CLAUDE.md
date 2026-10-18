@@ -722,6 +722,17 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
   is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
   least 24 pixels.
+- **Page patterns**: every page is one of a few shapes, built the same way each time, and the first
+  page of each shape is its reference. A list (`admin_users.html`): the page header with the main
+  action, a GET search form if the list searches, a `data-table-stack` table whose first cell links
+  to the record and whose last holds the row's other actions as links, a `notice` or `empty-state`
+  for nothing found, and the paginator only past one page. A settings form
+  (`admin_settings_sessions.html`): eyebrow, title and lead, one `panel` holding the notices at its
+  top and the fields in a `form-grid`, each field's help visible under it, and Save in the
+  `panel-footer`. A choice among a few options (`admin_settings_ui_theme.html`): `option-card`s in
+  a fieldset with a legend. A confirmation that deletes or removes says so on its buttons: "Cancel",
+  and the action in `button-danger`. A new shape gets its reference page and a line here when its
+  first page is built.
 - **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
   out, client, one-time code, two-factor authentication, auth server. Sentence case; a button says
   what it does ("Save", "New user"); a page title reads "Page – app name". Both catalogs change

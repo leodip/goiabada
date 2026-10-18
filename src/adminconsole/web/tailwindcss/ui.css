@@ -1015,17 +1015,19 @@
   }
 
   /* The panel slides only while the menu button opens or closes it, never when the window crosses
-     the width where the sidebar becomes a panel. */
+     the width where the sidebar becomes a panel. Opening shows it at once, so focus can move into
+     it in the same moment; closing hides it once it has slid away. */
   .app-sidebar[data-open] {
     transition:
       transform 0.2s,
-      visibility 0.2s;
+      visibility 0s linear 0.2s;
   }
 
   .app-sidebar[data-open="true"] {
     box-shadow: var(--shadow-overlay);
     transform: none;
     visibility: visible;
+    transition: transform 0.2s;
   }
 
   .app-backdrop {

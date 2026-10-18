@@ -2,19 +2,23 @@
 // opens the sidebar as a panel on narrow screens, and the user menu in the header. Both are
 // disclosures: a button whose aria-expanded says whether what it controls is shown.
 
-// The sidebar panel. While it is open the rest of the page is inert, so neither the keyboard nor a
-// screen reader reaches what is behind it; Escape, the close button and a click on the backdrop
-// close it, and focus goes back to the menu button. On a wide screen the sidebar is always shown
-// and the panel never opens.
+// The sidebar panel. While it is open the rest of the page, the skip link included, is inert, so
+// neither the keyboard nor a screen reader reaches what is behind it, and focus moves into it;
+// Escape, the close button and a click on the backdrop close it, and focus goes back to the menu
+// button. On a wide screen the sidebar is always shown and the panel never opens.
 function setUpSidebar() {
   const sidebar = document.getElementById("app-sidebar");
   const openButton = document.querySelector("[data-app-menu-open]");
   const closeButton = document.querySelector("[data-app-menu-close]");
   const backdrop = document.querySelector("[data-app-backdrop]");
-  const body = document.querySelector(".app-body");
+  const behind = [document.querySelector(".app-body"), document.querySelector(".skip-link")];
   const wide = window.matchMedia("(min-width: 64rem)");
-  if (!sidebar || !openButton || !body) {
+  if (!sidebar || !openButton) {
     return;
+  }
+
+  function isOpen() {
+    return sidebar.dataset.open === "true";
   }
 
   function setOpen(open, restoreFocus) {
@@ -23,7 +27,11 @@ function setUpSidebar() {
     if (backdrop) {
       backdrop.hidden = !open;
     }
-    body.inert = open;
+    behind.forEach(function (element) {
+      if (element) {
+        element.inert = open;
+      }
+    });
     if (open) {
       const first = closeButton || sidebar.querySelector("a, button");
       if (first) {
@@ -47,15 +55,15 @@ function setUpSidebar() {
       setOpen(false, true);
     });
   }
-  sidebar.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && sidebar.dataset.open === "true") {
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && isOpen()) {
       setOpen(false, true);
     }
   });
   // Crossing the width either way forgets the panel's state, so the sidebar settles where the new
   // width puts it without sliding.
   wide.addEventListener("change", function () {
-    if (sidebar.dataset.open === "true") {
+    if (isOpen()) {
       setOpen(false, false);
     }
     delete sidebar.dataset.open;

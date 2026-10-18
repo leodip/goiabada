@@ -2198,12 +2198,13 @@
     visibility: hidden;
   }
   .app-sidebar[data-open] {
-    transition: transform 0.2s, visibility 0.2s;
+    transition: transform 0.2s, visibility 0s linear 0.2s;
   }
   .app-sidebar[data-open="true"] {
     box-shadow: var(--shadow-overlay);
     transform: none;
     visibility: visible;
+    transition: transform 0.2s;
   }
   .app-backdrop {
     position: fixed;
