@@ -35,7 +35,7 @@
 # one tag via ldflags, so they cannot disagree with each other.
 #
 # Requirements:
-#   - yq (YAML parser) - installed in devcontainer
+#   - mikefarah's yq (YAML parser) - installed in devcontainer
 #   - curl (for online version checks)
 #   - go, npm (for dependency updates)
 # =============================================================================
@@ -94,10 +94,19 @@ print_info() {
 # Prerequisites Check
 # =============================================================================
 
-# Verify yq is installed (required for YAML parsing)
+# Verify yq is installed (required for YAML parsing), and that it is mikefarah's, the one the
+# devcontainer installs. Debian and Ubuntu's yq package is another program of the same name, a
+# Python wrapper handing the filter to jq, which reads a key like golangci-lint as a subtraction.
 require_yq() {
     if ! command -v yq &> /dev/null; then
         print_error "yq is required but not installed."
+        echo "Install yq: https://github.com/mikefarah/yq#install"
+        echo "Or rebuild the devcontainer which includes yq."
+        exit 1
+    fi
+    if ! yq --version 2>/dev/null | grep -q 'mikefarah/yq'; then
+        print_error "$(command -v yq) is not mikefarah's yq, which this script is written for."
+        echo "Debian and Ubuntu's yq package is a different program with the same name."
         echo "Install yq: https://github.com/mikefarah/yq#install"
         echo "Or rebuild the devcontainer which includes yq."
         exit 1
@@ -120,6 +129,7 @@ check_internet() {
 
 # Read a version from versions.yaml
 # Usage: get_version "tools.go" -> "1.26.5"
+# A key holding a hyphen is quoted, tools."golangci-lint", which every yq reads as one key.
 get_version() {
     local key="$1"
     yq -r ".$key" "$VERSIONS_FILE"
@@ -167,14 +177,14 @@ get_all_versions() {
         # Fallback: read each key individually
         echo "tools.go=$(get_version 'tools.go')"
         echo "tools.tailwind=$(get_version 'tools.tailwind')"
-        echo "tools.golangci-lint=$(get_version 'tools.golangci-lint')"
+        echo "tools.golangci-lint=$(get_version 'tools."golangci-lint"')"
         echo "tools.mockery=$(get_version 'tools.mockery')"
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "vendored.daisyui=$(get_version 'vendored.daisyui')"
-        echo "vendored.humanize-duration=$(get_version 'vendored.humanize-duration')"
+        echo "vendored.humanize-duration=$(get_version 'vendored."humanize-duration"')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
     }
 }
@@ -328,7 +338,7 @@ cmd_show() {
     echo -e "\n${BOLD}Tools:${NC}"
     printf "  %-23s ${GREEN}%s${NC}\n" "go" "$(get_version 'tools.go')"
     printf "  %-23s ${GREEN}%s${NC}\n" "tailwind" "$(get_version 'tools.tailwind')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "golangci-lint" "$(get_version 'tools.golangci-lint')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "golangci-lint" "$(get_version 'tools."golangci-lint"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "mockery" "$(get_version 'tools.mockery')"
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
@@ -338,7 +348,7 @@ cmd_show() {
     # Vendored web dependencies
     echo -e "\n${BOLD}Vendored web dependencies:${NC}"
     printf "  %-23s ${GREEN}%s${NC}\n" "daisyui" "$(get_version 'vendored.daisyui')"
-    printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'vendored.humanize-duration')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'vendored."humanize-duration"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "cropperjs" "$(get_version 'vendored.cropperjs')"
 
     echo ""
@@ -396,7 +406,7 @@ cmd_check() {
 
     # --- golangci-lint ---
     echo -n "Checking golangci-lint... "
-    local current_lint=$(get_version 'tools.golangci-lint')
+    local current_lint=$(get_version 'tools."golangci-lint"')
     local latest_lint=$(get_github_latest "golangci/golangci-lint")
     if [ -n "$latest_lint" ]; then
         if version_lt "$current_lint" "$latest_lint"; then
@@ -511,7 +521,7 @@ cmd_check() {
 
     # --- humanize-duration ---
     echo -n "Checking humanize-duration... "
-    local current_humanize=$(get_version 'vendored.humanize-duration')
+    local current_humanize=$(get_version 'vendored."humanize-duration"')
     local latest_humanize=$(get_npm_latest "humanize-duration")
     if [ -n "$latest_humanize" ]; then
         if version_lt "$current_humanize" "$latest_humanize"; then
@@ -575,7 +585,7 @@ cmd_update() {
     # Load all versions from YAML
     local GO_VERSION=$(get_version 'tools.go')
     local TAILWIND_VERSION=$(get_version 'tools.tailwind')
-    local GOLANGCI_VERSION=$(get_version 'tools.golangci-lint')
+    local GOLANGCI_VERSION=$(get_version 'tools."golangci-lint"')
     local MOCKERY_VERSION=$(get_version 'tools.mockery')
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
@@ -583,7 +593,7 @@ cmd_update() {
     local XTOOLS_OVERRIDE=$(get_version 'tools."x-tools-override"')
     local ALPINE_VERSION=$(get_version 'tools.alpine')
     local DAISYUI_VERSION=$(get_version 'vendored.daisyui')
-    local HUMANIZE_VERSION=$(get_version 'vendored.humanize-duration')
+    local HUMANIZE_VERSION=$(get_version 'vendored."humanize-duration"')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
 
     local success_count=0
