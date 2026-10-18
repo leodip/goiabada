@@ -114,6 +114,10 @@ func TestWellFormedTemplates_TheRuleTable(t *testing.T) {
 			[]string{`line 1: this <script> takes more than 32 branch combinations, more than this guard reads; simplify it`}},
 		{"a JSON data block that is not JSON", `<script type="application/json" id="d">{a: 1}</script>`,
 			[]string{`line 1: the JSON data block is not valid JSON in every branch, reading each action as a value`}},
+		{"a javascript: URL in one of two branches writing the attribute", `<a {{if .x}}href="/safe"{{else}}href="javascript:go()"{{end}}>Go</a>`,
+			[]string{`line 1: <a href> is a javascript: URL: register the behaviour from a static script`}},
+		{"a script typed JavaScript in one branch of its type", `<script type="{{if .x}}application/json{{else}}text/javascript{{end}}">{}</script>`,
+			[]string{`line 1: an inline <script> runs code: move it to a static file, or make it a <script type="application/json"> data block`}},
 		{"a script file", `<script src="/static/x.js" defer></script>`, nil},
 		{"a script file with a body", `<script src="/static/x.js">go()</script>`,
 			[]string{`line 1: a <script src> also holds code, which a browser never runs`}},
@@ -159,12 +163,23 @@ func TestWellFormedTemplates_TheRuleTable(t *testing.T) {
 		{"a second h1", "<h1>A</h1>\n<h1>B</h1>",
 			[]string{`line 2: a second <h1>: a page has one, its title`}},
 		{"an h1 in each of two exclusive branches", `{{if .x}}<h1>A</h1>{{else}}<h1>B</h1>{{end}}`, nil},
+		{"an h1 in a range", `{{range .rows}}<h1>{{.}}</h1>{{else}}<h1>Empty</h1>{{end}}`,
+			[]string{`line 1: an <h1> inside a {{range}} repeats on the page: a page has one, its title`}},
+		{"an h1 in a range's else", `{{range .rows}}<p>{{.}}</p>{{else}}<h1>Empty</h1>{{end}}`, nil},
 		{"a skipped heading level", `<h1>A</h1><h3>B</h3>`,
 			[]string{`line 1: <h3> follows an <h1>: heading levels do not skip on the way down`}},
 		{"a heading level skipped on some branches", `<h1>A</h1>{{if .x}}{{if .y}}<h2>B</h2>{{end}}{{end}}<h3>C</h3>`,
 			[]string{`line 1: <h3> follows an <h1>: heading levels do not skip on the way down`}},
 		{"a heading level reached on every branch", `<h1>A</h1>{{if .x}}<h2>B</h2>{{else}}<h2>C</h2>{{end}}<h3>D</h3>`, nil},
+		{"a heading in a range's textarea is text", `<h1>A</h1><h2>B</h2><h3>C</h3>{{range .}}<textarea aria-label="Code"><h2>Example</h2></textarea><h4>Row</h4>{{end}}`, nil},
+		{"a heading level a called template skips on the next run of a range",
+			`{{define "row"}}{{if .x}}<h2>A</h2>{{else}}<h4>B</h4>{{end}}{{end}}<h1>T</h1><h2>S</h2><h3>U</h3>{{range .}}{{template "row" .}}{{end}}`,
+			[]string{`line 1: <h4> follows an <h2>: heading levels do not skip on the way down (where template/t.html line 1 calls it)`}},
 		{"a positive tabindex", `<div tabindex="2">x</div>`,
+			[]string{`line 1: <div> has tabindex 2: a positive tabindex reorders the keyboard path`}},
+		{"a positive tabindex in one branch of its value", `<div tabindex="{{if .x}}0{{else}}2{{end}}">x</div>`,
+			[]string{`line 1: <div> has tabindex 2: a positive tabindex reorders the keyboard path`}},
+		{"a positive tabindex in one of two branches writing it", `<div {{if .x}}tabindex="0"{{else}}tabindex="2"{{end}}>x</div>`,
 			[]string{`line 1: <div> has tabindex 2: a positive tabindex reorders the keyboard path`}},
 		{"a html without lang", `<html><body></body></html>`,
 			[]string{`line 1: <html> has no lang`}},
@@ -173,6 +188,12 @@ func TestWellFormedTemplates_TheRuleTable(t *testing.T) {
 		{"a description naming an id shown in one branch alone",
 			`{{if .x}}<p id="hint">h</p>{{end}}<input id="a" aria-describedby="hint" aria-label="A">`,
 			[]string{`line 1: aria-describedby names id "hint", which is not declared wherever the reference renders`}},
+		{"a description naming a missing id in one branch of its value",
+			`<p id="hint">h</p><input aria-label="A" aria-describedby="{{if .x}}hint{{else}}missing{{end}}">`,
+			[]string{`line 1: aria-describedby names id "missing", which is not declared wherever the reference renders`}},
+		{"an id in one branch of its value declared again", `<p id="a">x</p><p id="{{if .x}}a{{else}}b{{end}}">y</p>`,
+			[]string{`line 1: id "a" is declared twice where both can render`}},
+		{"an id in each branch of its value", `<p id="{{if .x}}a{{else}}b{{end}}">x</p><p id="c">y</p>`, nil},
 		{"an id declared in every arm of an if, else if and else",
 			`{{if .a}}<p id="h">a</p>{{else if .b}}<p id="h">b</p>{{else}}<p id="h">c</p>{{end}}<input aria-label="X" aria-describedby="h">`, nil},
 		{"an id declared in two of three arms",
@@ -228,11 +249,12 @@ const servedLayout = `<!DOCTYPE html><html lang="en"><head><title>{{template "ti
 // page.
 func TestWellFormedTemplates_APageIsReadAsServed(t *testing.T) {
 	fsys := fstest.MapFS{
-		"template/layouts/base.html":    {Data: []byte(servedLayout)},
-		"template/layouts/nested.html":  {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head><body><p>{{template "body" .}}</p></body></html>`)},
-		"template/layouts/extra.html":   {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head><body>{{template "body" .}}{{template "footer" .}}</body></html>`)},
-		"template/partials/notice.html": {Data: []byte(`{{define "notice"}}<div class="notice">Saved</div>{{end}}`)},
-		"template/partials/label.html":  {Data: []byte(`{{define "searchLabel"}}<label for="q">Search</label>{{end}}`)},
+		"template/layouts/base.html":     {Data: []byte(servedLayout)},
+		"template/layouts/nested.html":   {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head><body><p>{{template "body" .}}</p></body></html>`)},
+		"template/layouts/extra.html":    {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>{{template "title" .}}</title></head><body>{{template "body" .}}{{template "footer" .}}</body></html>`)},
+		"template/partials/notice.html":  {Data: []byte(`{{define "notice"}}<div class="notice">Saved</div>{{end}}`)},
+		"template/partials/label.html":   {Data: []byte(`{{define "searchLabel"}}<label for="q">Search</label>{{end}}`)},
+		"template/partials/control.html": {Data: []byte(`{{define "queryControl"}}<input name="q">{{end}}{{define "queryItem"}}<li>Query</li>{{end}}`)},
 		"template/good.html": {Data: []byte(`{{define "title"}}Good{{end}}` +
 			`{{define "body"}}<main><h1 id="t">Good</h1><section aria-labelledby="t">{{template "notice" .}}</section></main>{{end}}`)},
 		"template/nested.html": {Data: []byte(`{{define "title"}}Nested{{end}}` +
@@ -244,6 +266,10 @@ func TestWellFormedTemplates_APageIsReadAsServed(t *testing.T) {
 		"template/across.html": {Data: []byte(`{{define "title"}}Across{{end}}` +
 			`{{define "body"}}<main><h1 id="heading">Across</h1>{{template "searchLabel" .}}<input id="q" name="q">{{template "more" .}}</main>{{end}}` +
 			`{{define "more"}}<section aria-labelledby="heading"><p>More</p></section>{{end}}`)},
+		"template/wrapped.html": {Data: []byte(`{{define "title"}}Wrapped{{end}}` +
+			`{{define "body"}}<main><h1>Wrapped</h1><label>Query {{template "queryControl" .}}</label><ul>{{template "queryItem" .}}</ul></main>{{end}}`)},
+		"template/bare.html": {Data: []byte(`{{define "title"}}Bare{{end}}` +
+			`{{define "body"}}<main><h1>Bare</h1>{{template "queryControl" .}}{{template "queryItem" .}}</main>{{end}}`)},
 		"template/unbound.html":  {Data: []byte(`{{define "title"}}Unbound{{end}}{{define "body"}}<main><h1>Unbound</h1></main>{{end}}`)},
 		"template/footless.html": {Data: []byte(`{{define "title"}}Footless{{end}}{{define "body"}}<main><h1>Footless</h1></main>{{end}}`)},
 		"template/whole.html":    {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>Whole</title></head><body><h1>Whole</h1>{{template "missing" .}}</body></html>`)},
@@ -255,6 +281,8 @@ func TestWellFormedTemplates_APageIsReadAsServed(t *testing.T) {
 		"either.html":   {"layouts/base.html"},
 		"across.html":   {"layouts/base.html"},
 		"footless.html": {"layouts/extra.html"},
+		"wrapped.html":  {"layouts/base.html"},
+		"bare.html":     {"layouts/base.html"},
 	}
 
 	assert.Empty(t, pageDetails(t, fsys, bindings, "template/good.html"), "the layout that would nest the page in a <p> is no handler's, so it is not read")
@@ -267,6 +295,13 @@ func TestWellFormedTemplates_APageIsReadAsServed(t *testing.T) {
 	}, pageDetails(t, fsys, bindings, "template/untitled.html"))
 	assert.Empty(t, pageDetails(t, fsys, bindings, "template/either.html"), "an <h1> in every arm is an <h1> on every branch")
 	assert.Empty(t, pageDetails(t, fsys, bindings, "template/across.html"), "a label in a partial and an id in another template of the page")
+	assert.Empty(t, pageDetails(t, fsys, bindings, "template/partials/control.html"), "a partial read alone is held to its structure, its context being the page's")
+	assert.Empty(t, pageDetails(t, fsys, bindings, "template/wrapped.html"), "a control a partial writes inside the page's label, a list item inside its list")
+	assert.Equal(t, []string{
+		"template/partials/control.html: line 1: <input> has no label: give it an id a <label for> names, or aria-label" +
+			" (where template/bare.html line 1 calls it) (in template/layouts/base.html)",
+		"template/partials/control.html: line 1: <li> outside a list (where template/bare.html line 1 calls it) (in template/layouts/base.html)",
+	}, pageDetails(t, fsys, bindings, "template/bare.html"))
 	assert.Equal(t, []string{
 		"template/unbound.html: line 1: no handler renders this page: no RenderTemplate call names it",
 	}, pageDetails(t, fsys, bindings, "template/unbound.html"))
@@ -279,8 +314,9 @@ func TestWellFormedTemplates_APageIsReadAsServed(t *testing.T) {
 }
 
 // The pages a handler renders, and the layout it renders each in, are read from the calls it makes:
-// a literal, or a variable its function assigns literals to; a call passing its function's own
-// parameters forwards and binds nothing; any other call is unresolved.
+// a literal, or a variable its function assigns literals and nothing else to; a call passing its
+// function's own parameters, never reassigned, forwards and binds nothing; any other call is
+// unresolved.
 func TestWellFormedTemplates_TheBindingsAreTheHandlersCalls(t *testing.T) {
 	handlers := fstest.MapFS{
 		"handlers/pages.go": {Data: []byte(`package handlers
@@ -308,6 +344,25 @@ func (h *Renderer) RenderTemplate(w W, r R, layoutName string, templateName stri
 func Odd(h Renderer, pages map[string]string) {
 	h.RenderTemplate(w, r, "/layouts/auth_layout.html", pages["x"], nil)
 }
+
+func Chosen(h Renderer, x bool) {
+	page := "/p.html"
+	if x {
+		page = choosePage()
+	}
+	h.RenderTemplate(w, r, "/layouts/base.html", page, nil)
+}
+
+func Half(h Renderer, layoutName string, pages map[string]string) {
+	h.RenderTemplate(w, r, layoutName, pages["x"], nil)
+}
+
+func Defaulted(h Renderer, page string) {
+	if page == "" {
+		page = "/fallback.html"
+	}
+	h.RenderTemplate(w, r, "/layouts/base.html", page, nil)
+}
 `)},
 		"handlers/pages_test.go": {Data: []byte(`package handlers
 
@@ -323,9 +378,11 @@ func TestX(h Renderer) { h.RenderTemplate(w, r, "/layouts/test.html", "/test.htm
 		"auth_otp_enrollment.html": {"layouts/auth_layout.html"},
 		"emails/welcome.html":      {"layouts/email_layout.html"},
 	}, bindings)
-	require.Len(t, unresolved, 1)
-	assert.Contains(t, unresolved[0], "handlers/pages.go:24:")
-	assert.Contains(t, unresolved[0], "cannot tell which page it renders")
+	require.Len(t, unresolved, 4, "a name not read from literals alone, a forwarder's other name unread, a parameter reassigned")
+	for i, line := range []string{"24", "32", "36", "43"} {
+		assert.Contains(t, unresolved[i], "handlers/pages.go:"+line+":")
+		assert.Contains(t, unresolved[i], "cannot tell which page it renders")
+	}
 }
 
 // handlerSource is a handler file rendering each page in layouts/base.html.

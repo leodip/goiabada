@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+	"unicode/utf16"
 
 	"github.com/tdewolff/parse/v2"
 	"github.com/tdewolff/parse/v2/js"
@@ -24,8 +25,9 @@ import (
 // The parser accepts some scripts a browser refuses when it compiles them, the early errors of the
 // language, and the walk refuses the ones a slip of the hand writes: an assignment or an increment
 // whose target is not a variable, a property or a destructuring pattern, and a regular expression
-// with an unknown or repeated flag, an unbalanced group or character class, an unknown group
-// syntax, or a quantifier with nothing to repeat.
+// with an unknown or repeated flag, an unbalanced group, an unknown group syntax, a group name that
+// is no identifier or is used twice, a character class range out of order, or a quantifier with
+// nothing to repeat.
 //
 // The pages load these files as they are written: there is no build step that could translate one
 // down, so the cap is the language the files are written in.
@@ -216,15 +218,22 @@ func inOptionalChain(e js.IExpr) bool {
 }
 
 // assignmentTarget reports whether e may stand left of an assignment: a simple target, or for a
-// plain = a destructuring pattern, every target in it valid in turn.
+// plain = a destructuring pattern, every target in it valid in turn. A rest element comes last and
+// has no default; an object's rest is a simple target.
 func assignmentTarget(e js.IExpr, plain bool) bool {
 	switch e := e.(type) {
 	case *js.ArrayExpr:
 		if !plain {
 			return false
 		}
-		for _, el := range e.List {
-			if el.Value != nil && !patternTarget(el.Value) {
+		for i, el := range e.List {
+			switch {
+			case el.Value == nil:
+			case el.Spread:
+				if i != len(e.List)-1 || !assignmentTarget(el.Value, true) {
+					return false
+				}
+			case !patternTarget(el.Value):
 				return false
 			}
 		}
@@ -233,8 +242,13 @@ func assignmentTarget(e js.IExpr, plain bool) bool {
 		if !plain {
 			return false
 		}
-		for _, p := range e.List {
-			if p.Value != nil && !patternTarget(p.Value) {
+		for i, p := range e.List {
+			switch {
+			case p.Spread:
+				if i != len(e.List)-1 || !simpleTarget(p.Value) {
+					return false
+				}
+			case p.Value != nil && !patternTarget(p.Value):
 				return false
 			}
 		}
@@ -257,11 +271,11 @@ func patternTarget(e js.IExpr) bool {
 var regexpModifierStart = regexp.MustCompile(`^[ims]*-?[ims]*:`)
 
 // regexpProblem reads a regular expression's pattern as a browser compiles it, character classes
-// apart, and returns why one would refuse it, or "": an unbalanced group, an unknown group syntax,
-// a group name used twice, a character class range out of order or not closed, or a quantifier with
-// nothing to repeat. modifier reports an inline modifier group outside every class, syntax past the
-// cap.
-func regexpProblem(pattern string) (problem string, modifier bool) {
+// apart, with the u flag or without, and returns why one would refuse it, or "": an unbalanced
+// group, an unknown group syntax, a group name that is no identifier or is used twice, a character
+// class range out of order or not closed, or a quantifier with nothing to repeat. modifier reports
+// an inline modifier group outside every class, syntax past the cap.
+func regexpProblem(pattern string, unicodeMode bool) (problem string, modifier bool) {
 	depth := 0
 	canRepeat := false
 	names := map[string]bool{}
@@ -272,7 +286,7 @@ func regexpProblem(pattern string) (problem string, modifier bool) {
 			i++
 			canRepeat = true
 		case '[':
-			end, problem := regexpClass(runes, i+1)
+			end, problem := regexpClass(runes, i+1, unicodeMode)
 			if problem != "" {
 				return problem, modifier
 			}
@@ -294,7 +308,7 @@ func regexpProblem(pattern string) (problem string, modifier bool) {
 			case strings.HasPrefix(rest, "<=") || strings.HasPrefix(rest, "<!"):
 				i += 3
 			case strings.HasPrefix(rest, "<"):
-				name, ok := regexpGroupName(runes[i+3:])
+				name, length, ok := regexpGroupName(runes[i+3:])
 				if !ok {
 					return "a group starts with an unknown (? syntax", modifier
 				}
@@ -302,7 +316,7 @@ func regexpProblem(pattern string) (problem string, modifier bool) {
 					return "the group name " + name + " is used twice", modifier
 				}
 				names[name] = true
-				i += 3 + len([]rune(name))
+				i += 3 + length
 			default:
 				return "a group starts with an unknown (? syntax", modifier
 			}
@@ -332,41 +346,102 @@ func regexpProblem(pattern string) (problem string, modifier bool) {
 	return "", modifier
 }
 
-// regexpGroupName reads a group's name up to its ">": a letter, "$" or "_", then letters, digits,
-// "$" and "_".
-func regexpGroupName(runes []rune) (string, bool) {
-	for i, r := range runes {
-		switch {
-		case r == '>':
-			return string(runes[:i]), i > 0
-		case unicode.IsLetter(r) || r == '$' || r == '_':
-		case i > 0 && unicode.IsDigit(r):
-		default:
-			return "", false
+// regexpGroupName reads a group's name up to its ">", and returns it with its escapes decoded and
+// how many characters it spans: an identifier, each character written as itself or as a \u escape.
+func regexpGroupName(runes []rune) (string, int, bool) {
+	var name []rune
+	for i := 0; i < len(runes); {
+		r, next := runes[i], i+1
+		if r == '>' {
+			return string(name), i, len(name) > 0
+		}
+		if r == '\\' {
+			var ok bool
+			if r, next, ok = regexpUnicodeEscape(runes, i+1, true); !ok {
+				return "", 0, false
+			}
+		}
+		if !identifierChar(r, len(name) == 0) {
+			return "", 0, false
+		}
+		name = append(name, r)
+		i = next
+	}
+	return "", 0, false
+}
+
+// identifierChar reports whether r may start an identifier, or continue one, as ECMAScript reads
+// Unicode's ID_Start and ID_Continue, with $ and _, and the two joiners after the start.
+func identifierChar(r rune, start bool) bool {
+	switch {
+	case r == '$' || r == '_':
+		return true
+	case unicode.In(r, unicode.Pattern_Syntax, unicode.Pattern_White_Space):
+		return false
+	case unicode.IsLetter(r) || unicode.In(r, unicode.Nl, unicode.Other_ID_Start):
+		return true
+	case start:
+		return false
+	}
+	return r == 0x200C || r == 0x200D || unicode.In(r, unicode.Mn, unicode.Mc, unicode.Nd, unicode.Pc, unicode.Other_ID_Continue)
+}
+
+// regexpUnicodeEscape reads the \u escape whose u is at i and returns its character and where it
+// ends: four hex digits, or, with the u flag and in a group name, also a surrogate pair of two such
+// escapes or a code point in braces.
+func regexpUnicodeEscape(runes []rune, i int, unicodeMode bool) (rune, int, bool) {
+	if i >= len(runes) || runes[i] != 'u' {
+		return 0, 0, false
+	}
+	if unicodeMode && i+1 < len(runes) && runes[i+1] == '{' {
+		for end := i + 2; end < len(runes); end++ {
+			if runes[end] == '}' {
+				v, ok := hexValue(runes[i+2 : end])
+				return v, end + 1, ok
+			}
+		}
+		return 0, 0, false
+	}
+	if i+5 > len(runes) {
+		return 0, 0, false
+	}
+	v, ok := hexValue(runes[i+1 : i+5])
+	if !ok {
+		return 0, 0, false
+	}
+	if unicodeMode && v >= 0xD800 && v < 0xDC00 && i+11 <= len(runes) && runes[i+5] == '\\' && runes[i+6] == 'u' {
+		if low, ok := hexValue(runes[i+7 : i+11]); ok && low >= 0xDC00 && low <= 0xDFFF {
+			return utf16.DecodeRune(v, low), i + 11, true
 		}
 	}
-	return "", false
+	return v, i + 5, true
+}
+
+// hexValue reads hex digits as a code point: at least one digit, and at most U+10FFFF.
+func hexValue(digits []rune) (rune, bool) {
+	var v rune
+	for _, d := range digits {
+		switch {
+		case d >= '0' && d <= '9':
+			v = v*16 + d - '0'
+		case d >= 'a' && d <= 'f':
+			v = v*16 + d - 'a' + 10
+		case d >= 'A' && d <= 'F':
+			v = v*16 + d - 'A' + 10
+		default:
+			return 0, false
+		}
+		if v > unicode.MaxRune {
+			return 0, false
+		}
+	}
+	return v, len(digits) > 0
 }
 
 // regexpClass reads a character class from just after its "[" and returns where its "]" is, or why
-// a browser refuses it: not closed, or a range whose end comes before its start.
-func regexpClass(runes []rune, from int) (int, string) {
-	// atom reads one class atom at i: its character and whether it stands for itself, which a
-	// class escape such as \d does not.
-	atom := func(i int) (rune, bool, int) {
-		if runes[i] == '\\' && i+1 < len(runes) {
-			switch runes[i+1] {
-			case 'd', 'D', 'w', 'W', 's', 'S', 'p', 'P':
-				return 0, false, i + 2
-			case 'n':
-				return '\n', true, i + 2
-			case 't':
-				return '\t', true, i + 2
-			}
-			return runes[i+1], true, i + 2
-		}
-		return runes[i], true, i + 1
-	}
+// a browser refuses it: not closed, a range whose end comes before its start, or with the u flag a
+// range with a set such as \d at one end, which without it reads as the set, a "-" and a character.
+func regexpClass(runes []rune, from int, unicodeMode bool) (int, string) {
 	i := from
 	if i < len(runes) && runes[i] == '^' {
 		i++
@@ -375,10 +450,15 @@ func regexpClass(runes []rune, from int) (int, string) {
 		if runes[i] == ']' {
 			return i, ""
 		}
-		start, literal, next := atom(i)
+		start, single, next := regexpClassAtom(runes, i, unicodeMode)
 		if next+1 < len(runes) && runes[next] == '-' && runes[next+1] != ']' {
-			end, endLiteral, after := atom(next + 1)
-			if literal && endLiteral && end < start {
+			end, endSingle, after := regexpClassAtom(runes, next+1, unicodeMode)
+			switch {
+			case !single || !endSingle:
+				if unicodeMode {
+					return 0, `a character class range has a set such as \d at one end`
+				}
+			case end < start:
 				return 0, "a character class range is out of order"
 			}
 			i = after
@@ -387,6 +467,69 @@ func regexpClass(runes []rune, from int) (int, string) {
 		i = next
 	}
 	return 0, "a character class is not closed"
+}
+
+// regexpClassAtom reads the class atom at i and returns the character it stands for, whether it
+// stands for one character, which a set such as \d does not, and where it ends. An escape is decoded
+// as a browser decodes it, without the u flag its legacy forms included: a lone \c as a backslash,
+// \c with a digit or _, and octal escapes up to \377.
+func regexpClassAtom(runes []rune, i int, unicodeMode bool) (rune, bool, int) {
+	if runes[i] != '\\' || i+1 >= len(runes) {
+		return runes[i], true, i + 1
+	}
+	c, next := runes[i+1], i+2
+	switch c {
+	case 'd', 'D', 'w', 'W', 's', 'S':
+		return 0, false, next
+	case 'p', 'P':
+		if unicodeMode {
+			for end := next; end < len(runes); end++ {
+				if runes[end] == '}' {
+					return 0, false, end + 1
+				}
+			}
+		}
+	case 'b':
+		return '\b', true, next
+	case 't':
+		return '\t', true, next
+	case 'n':
+		return '\n', true, next
+	case 'v':
+		return '\v', true, next
+	case 'f':
+		return '\f', true, next
+	case 'r':
+		return '\r', true, next
+	case 'c':
+		if next < len(runes) {
+			l := runes[next]
+			if (l >= 'a' && l <= 'z') || (l >= 'A' && l <= 'Z') || (!unicodeMode && ((l >= '0' && l <= '9') || l == '_')) {
+				return l % 32, true, next + 1
+			}
+		}
+		if !unicodeMode {
+			return '\\', true, i + 1
+		}
+	case 'x':
+		if next+2 <= len(runes) {
+			if v, ok := hexValue(runes[next : next+2]); ok {
+				return v, true, next + 2
+			}
+		}
+	case 'u':
+		if v, end, ok := regexpUnicodeEscape(runes, i+1, unicodeMode); ok {
+			return v, true, end
+		}
+	case '0', '1', '2', '3', '4', '5', '6', '7':
+		v, end := c-'0', next
+		for n := 1; !unicodeMode && n < 3 && end < len(runes) && runes[end] >= '0' && runes[end] <= '7' && (n < 2 || c <= '3'); n++ {
+			v = v*8 + runes[end] - '0'
+			end++
+		}
+		return v, true, end
+	}
+	return c, true, next
 }
 
 func (v *syntaxCap) literal(n *js.LiteralExpr) {
@@ -402,7 +545,7 @@ func (v *syntaxCap) literal(n *js.LiteralExpr) {
 				v.add("the regular expression %s has the flag %c twice", data, f)
 			}
 		}
-		problem, modifier := regexpProblem(pattern)
+		problem, modifier := regexpProblem(pattern, strings.ContainsRune(flags, 'u'))
 		if problem != "" {
 			v.add("the regular expression %s is refused by a browser: %s", data, problem)
 		}

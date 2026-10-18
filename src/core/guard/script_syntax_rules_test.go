@@ -61,6 +61,13 @@ func TestScriptSyntax_TheCapTable(t *testing.T) {
 		{"a nested literal in a destructuring pattern", "({ a: [b, 2] } = x);", "which is not a variable, a property or a destructuring pattern"},
 		{"an assignment through an optional chain", "a?.b.c = 1;", "which is not a variable, a property or a destructuring pattern"},
 		{"an unknown flag", "const r = /a/q;", "the regular expression /a/q has the unknown flag q"},
+		{"a class range ending before an escaped start", "const r = /[\\x7a-a]/;", "the regular expression /[\\x7a-a]/ is refused by a browser: a character class range is out of order"},
+		{"a class range with a set at one end under u", "const r = /[\\d-z]/u;", "a character class range has a set such as \\d at one end"},
+		{"a group name used twice, once escaped", "const r = /(?<a>x)(?<\\u0061>y)/;", "the group name a is used twice"},
+		{"a rest element with a default", "let a; [...a = []] = x;", "which is not a variable, a property or a destructuring pattern"},
+		{"a rest element before the last", "let a, b; [...a, b] = x;", "which is not a variable, a property or a destructuring pattern"},
+		{"a rest property with a default", "let a; ({ ...a = 1 } = x);", "which is not a variable, a property or a destructuring pattern"},
+		{"a rest property holding a pattern", "let a; ({ ...{ a } } = x);", "which is not a variable, a property or a destructuring pattern"},
 	}
 	for _, tc := range refused {
 		t.Run(tc.name, func(t *testing.T) {
@@ -85,6 +92,9 @@ func TestScriptSyntax_TheCapTable(t *testing.T) {
 		"a modifier-like class and a Unicode group name":       "const r = [/[(?i:)]/, /(?<π>a)\\k<π>/u, /[a-z0-9_-]/, /[\\d-z]/];",
 		"destructuring with defaults, rest and nesting":        "let a, b, c; [a = 1, , ...b] = x; ({ a, b: { c = 2 }, ...b } = x);",
 		"for await in an async function":                       "async function f() { for await (const x of y) {} }",
+		"class ranges between escapes a browser decodes":       "const r = [/[z-\\x7e]/, /[\\b-\\t]/, /[\\0-\\x1f]/, /[\\cA-\\cZ]/, /[\\u0041-\\u{5a}]/u, /[\\uD83D\\uDE00-\\uD83D\\uDE4F]/u, /[\\p{L}-]/u];",
+		"group names with escapes and combining marks":         "const r = [/(?<\\u0061b>x)\\k<ab>/, /(?<e\u0301x>a)/, /(?<\\u{62}>a)/];",
+		"a rest element holding a pattern":                     "let a, b; [...[a, b]] = x;",
 		"a number with a decimal":                              "const n = 1.5e3;",
 		"an await identifier is a name in a script, unawaited": "const delay = 1;",
 	}

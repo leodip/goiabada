@@ -140,9 +140,11 @@ var renderMethods = map[string]int{"RenderTemplate": 2, "RenderTemplateToBuffer"
 
 // findRenderBindings reads the Go sources under fsys, tests left out, for the layout and page each
 // render call names, keyed by the page as a path under the templates' root. A name is a string
-// literal, or a variable the call's function assigns string literals to, each of them a binding. A
-// call forwarding its function's own parameters, as the renderer's helpers do, binds nothing; any
-// other call is returned as unresolved, so the bindings stay complete.
+// literal, or a variable the call's function assigns string literals and nothing else to, each of
+// them a binding. A call forwarding its function's own parameters untouched, as the renderer's
+// helpers do, binds nothing; any other call is returned as unresolved, so the bindings stay
+// complete. A variable is matched by its name across the function, closures included, so a
+// shadowed one adds names or leaves the call unresolved, and never takes one away.
 func findRenderBindings(fsys fs.FS) (map[string][]string, []string, error) {
 	bindings := map[string][]string{}
 	var unresolved []string
@@ -184,12 +186,12 @@ func findRenderBindings(fsys fs.FS) (map[string][]string, []string, error) {
 				layouts, okLayout := templateNames(call.Args[at], params, body)
 				pages, okPage := templateNames(call.Args[at+1], params, body)
 				switch {
-				case layouts == nil || pages == nil:
-					// A forwarder: the names are its own parameters.
 				case !okLayout || !okPage:
 					unresolved = append(unresolved, fmt.Sprintf("%s: %s names a layout or a page that is neither a "+
 						"string literal nor a variable its function assigns string literals to, so the template guard "+
 						"cannot tell which page it renders", fset.Position(call.Pos()), sel.Sel.Name))
+				case layouts == nil || pages == nil:
+					// A forwarder: a name is one of its own parameters, passed on untouched.
 				default:
 					for _, page := range pages {
 						for _, layout := range layouts {
@@ -227,39 +229,89 @@ func paramNames(ft *ast.FuncType) map[string]bool {
 }
 
 // templateNames returns the template names an argument can hold, and whether it was read: nil and
-// true for one of the function's parameters, which a forwarder passes through.
+// true for one of the function's parameters, which a forwarder passes through untouched.
 func templateNames(arg ast.Expr, params map[string]bool, body *ast.BlockStmt) ([]string, bool) {
 	switch a := arg.(type) {
 	case *ast.BasicLit:
-		if s, err := strconv.Unquote(a.Value); err == nil && a.Kind == token.STRING {
+		if s, ok := stringLiteral(a); ok {
 			return []string{s}, true
 		}
 	case *ast.Ident:
+		names, literal := assignedLiterals(a.Name, body)
 		if params[a.Name] {
-			return nil, true
+			if literal && len(names) == 0 {
+				return nil, true
+			}
+			return []string{}, false
 		}
-		var names []string
-		ast.Inspect(body, func(n ast.Node) bool {
-			assign, ok := n.(*ast.AssignStmt)
-			if !ok || len(assign.Lhs) != len(assign.Rhs) {
-				return true
-			}
-			for i, lhs := range assign.Lhs {
-				if id, ok := lhs.(*ast.Ident); ok && id.Name == a.Name {
-					if lit, ok := assign.Rhs[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
-						if s, err := strconv.Unquote(lit.Value); err == nil {
-							names = append(names, s)
-						}
-					}
-				}
-			}
-			return true
-		})
-		if len(names) > 0 {
+		if literal && len(names) > 0 {
 			return names, true
 		}
 	}
 	return []string{}, false
+}
+
+// assignedLiterals returns the string literals body assigns to a variable named name, and whether
+// it assigns nothing else: no other value, no compound assignment, no range variable of that name,
+// and no pointer to it. A declaration without a value, the zero value, names no template.
+func assignedLiterals(name string, body *ast.BlockStmt) ([]string, bool) {
+	var names []string
+	literal := true
+	assign := func(value ast.Expr) {
+		if lit, ok := value.(*ast.BasicLit); ok {
+			if s, ok := stringLiteral(lit); ok {
+				names = append(names, s)
+				return
+			}
+		}
+		literal = false
+	}
+	named := func(e ast.Expr) bool {
+		id, ok := e.(*ast.Ident)
+		return ok && id.Name == name
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.AssignStmt:
+			for i, lhs := range n.Lhs {
+				switch {
+				case !named(lhs):
+				case (n.Tok == token.ASSIGN || n.Tok == token.DEFINE) && len(n.Lhs) == len(n.Rhs):
+					assign(n.Rhs[i])
+				default:
+					literal = false
+				}
+			}
+		case *ast.ValueSpec:
+			for i, id := range n.Names {
+				switch {
+				case id.Name != name || len(n.Values) == 0:
+				case len(n.Values) == len(n.Names):
+					assign(n.Values[i])
+				default:
+					literal = false
+				}
+			}
+		case *ast.RangeStmt:
+			if named(n.Key) || named(n.Value) {
+				literal = false
+			}
+		case *ast.UnaryExpr:
+			if n.Op == token.AND && named(n.X) {
+				literal = false
+			}
+		}
+		return true
+	})
+	return names, literal
+}
+
+func stringLiteral(lit *ast.BasicLit) (string, bool) {
+	if lit.Kind != token.STRING {
+		return "", false
+	}
+	s, err := strconv.Unquote(lit.Value)
+	return s, err == nil
 }
 
 // findMarkupProblems checks one template file on its own, as a rule test reads it: each tree's
@@ -571,11 +623,22 @@ func (p markupPath) excludes(q markupPath) bool {
 	return false
 }
 
+// markupText is one text an attribute value may hold, each action spelled as the parser prints it,
+// and the branches taken to write it.
+type markupText struct {
+	text string
+	path markupPath
+}
+
+// dynamic reports whether an action writes part of the text.
+func (v markupText) dynamic() bool {
+	return strings.Contains(v.text, "{{")
+}
+
 type markupAttr struct {
 	name  string
-	value string   // as written in the first branch, each action spelled as the parser prints it
-	alts  []string // as written in each branch, when branches write it
-	maybe bool     // written in some branches only
+	alts  []markupText // one per branch writing it, and per combination of branches inside its value
+	maybe bool         // written in some branches only
 }
 
 type markupTag struct {
@@ -586,8 +649,7 @@ type markupTag struct {
 	dynamic   bool // an action stands among the attributes, so any of them may be present
 	selfClose bool
 	attrName  string
-	values    []string // the value in progress, one text per combination of branches inside it
-	valueDyn  bool
+	values    []markupText // the value in progress, one text per combination of branches inside it
 }
 
 func (t *markupTag) clone() *markupTag {
@@ -595,19 +657,10 @@ func (t *markupTag) clone() *markupTag {
 		return nil
 	}
 	n := &markupTag{name: t.name, end: t.end, where: t.where, dynamic: t.dynamic, selfClose: t.selfClose,
-		attrName: t.attrName, valueDyn: t.valueDyn}
+		attrName: t.attrName}
 	n.attrs = append(n.attrs, t.attrs...)
 	n.values = append(n.values, t.values...)
 	return n
-}
-
-func (t *markupTag) appendValue(text string) {
-	if len(t.values) == 0 {
-		t.values = []string{""}
-	}
-	for i := range t.values {
-		t.values[i] += text
-	}
 }
 
 // attr returns the attribute name written in every branch.
@@ -632,6 +685,32 @@ func (t *markupTag) written(name string) bool {
 		}
 	}
 	return false
+}
+
+// texts returns every text the attribute name holds, in the branches writing it.
+func (t *markupTag) texts(name string) []string {
+	var out []string
+	for _, a := range t.attrs {
+		if a.name == name {
+			for _, v := range a.alts {
+				out = append(out, v.text)
+			}
+		}
+	}
+	return out
+}
+
+// every reports whether every branch writes the attribute name, each text it holds meeting ok.
+func (t *markupTag) every(name string, ok func(string) bool) bool {
+	if !t.has(name) {
+		return false
+	}
+	for _, v := range t.texts(name) {
+		if !ok(v) {
+			return false
+		}
+	}
+	return true
 }
 
 type openElement struct {
@@ -703,6 +782,16 @@ func (s *markupState) markName() {
 	}
 }
 
+// appendValue adds text to each text the attribute value in progress may hold.
+func (s *markupState) appendValue(text string) {
+	if len(s.tag.values) == 0 {
+		s.tag.values = []markupText{{path: append(markupPath{}, s.path...)}}
+	}
+	for i := range s.tag.values {
+		s.tag.values[i].text += text
+	}
+}
+
 func (s *markupState) appendRaw(text string) {
 	if len(s.raw) == 0 {
 		s.raw = []string{""}
@@ -733,7 +822,7 @@ type readingKind int
 
 const (
 	// fileReading reads one tree of a file for its structure, leaving the rules about a page to the
-	// page readings, where a label, an id or a heading in another template is in reach.
+	// page readings, where a label, an id, a heading or a list in another template is in reach.
 	fileReading readingKind = iota
 	// singleReading reads one tree as a rule test does: its structure and the rules about a page,
 	// but no <h1> owed.
@@ -856,39 +945,14 @@ func (w *markupWalk) call(s *markupState, n *parse.TemplateNode) {
 	w.frames = w.frames[:len(w.frames)-1]
 }
 
-// headingInText matches a heading's start tag, for the levels a {{range}} body can leave for its
-// next iteration.
-var headingInText = regexp.MustCompile(`(?i)<h([1-6])[\s>]`)
-
-// headingLevelsIn returns the levels of the headings a list writes, as bits.
-func headingLevelsIn(list *parse.ListNode) uint8 {
-	var levels uint8
-	var visit func(parse.Node)
-	visit = func(node parse.Node) {
-		switch n := node.(type) {
-		case *parse.ListNode:
-			if n != nil {
-				for _, c := range n.Nodes {
-					visit(c)
-				}
-			}
-		case *parse.TextNode:
-			for _, m := range headingInText.FindAllSubmatch(n.Text, -1) {
-				levels |= 1 << (m[1][0] - '0')
-			}
-		case *parse.IfNode:
-			visit(n.List)
-			visit(n.ElseList)
-		case *parse.WithNode:
-			visit(n.List)
-			visit(n.ElseList)
-		case *parse.RangeNode:
-			visit(n.List)
-			visit(n.ElseList)
-		}
-	}
-	visit(list)
-	return levels
+// levelsLeft walks a {{range}} body from s, recording and reporting nothing, and returns the heading
+// levels it may leave for its next run. Starting the body from those too is enough: a second run
+// leaves no level the first could not.
+func (w *markupWalk) levelsLeft(s *markupState, body *parse.ListNode) uint8 {
+	probe := &markupWalk{set: w.set, trees: w.trees, kind: w.kind, frames: append([]markupFrame(nil), w.frames...)}
+	end := s.clone()
+	probe.walkList(end, body)
+	return end.headings
 }
 
 // branches walks each list of a branching node from the state before it, and requires each to end
@@ -896,7 +960,7 @@ func headingLevelsIn(list *parse.ListNode) uint8 {
 // every branch added to it: an attribute written in all, a name every branch gives an element still
 // open, the heading levels any branch may have left, and, inside an attribute value or a raw-text
 // element, each branch's text as an alternative of its own. A {{range}} body starts from the levels
-// its own headings may have left too, since it may run again.
+// it may leave too, since it may run again.
 func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, otherwise *parse.ListNode) {
 	w.settle(s)
 	before := s.clone()
@@ -907,7 +971,7 @@ func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, other
 		b.path = append(b.path, markupStep{tree: tree, pos: pos, branch: i})
 		if isRange && i == 0 {
 			b.ranges++
-			b.headings |= headingLevelsIn(list)
+			b.headings |= w.levelsLeft(b, list)
 		}
 		w.walkList(b, list)
 		w.settle(b)
@@ -933,25 +997,44 @@ func (w *markupWalk) branches(s *markupState, pos int, isRange bool, body, other
 		s.stack[i].named = s.stack[i].named || all
 	}
 	if s.tag != nil {
+		// Each attribute the branches write, holding the texts of every branch writing it.
+		var merged []markupAttr
+		writes := map[string]int{}
 		for _, b := range ends {
 			s.tag.dynamic = s.tag.dynamic || b.tag.dynamic
 			for _, a := range b.tag.attrs {
 				if s.tag.written(a.name) {
 					continue
 				}
-				inAll := true
-				for _, other := range ends {
-					inAll = inAll && other.tag.has(a.name)
+				at := len(merged)
+				for i := range merged {
+					if merged[i].name == a.name {
+						at = i
+					}
 				}
-				a.maybe = !inAll
-				s.tag.attrs = append(s.tag.attrs, a)
+				if at == len(merged) {
+					merged = append(merged, markupAttr{name: a.name})
+				}
+				merged[at].alts = append(merged[at].alts, a.alts...)
+				if !a.maybe {
+					writes[a.name]++
+				}
 			}
+		}
+		for _, a := range merged {
+			a.maybe = writes[a.name] < len(ends)
+			s.tag.attrs = append(s.tag.attrs, a)
 		}
 		if s.mode == modeValue || s.mode == modeValueUnquoted {
 			s.tag.values = nil
 			for _, b := range ends {
-				s.tag.values = append(s.tag.values, b.tag.values...)
-				s.tag.valueDyn = s.tag.valueDyn || b.tag.valueDyn
+				for _, v := range b.tag.values {
+					// A text the branch carried on from before it is written on the branch's path.
+					if !b.path.holdsWherever(v.path) {
+						v.path = b.path
+					}
+					s.tag.values = append(s.tag.values, v)
+				}
 			}
 			if len(s.tag.values) > maxAlternatives {
 				w.report(pos, "attribute %s takes more than %d branch combinations, more than this guard reads; "+
@@ -1042,12 +1125,10 @@ func (w *markupWalk) action(s *markupState, spelled string, pos int) {
 		s.tag.attrName += spelled
 	case modeBeforeValue, modeValueUnquoted:
 		w.report(pos, "attribute %s is not quoted: write %s=\"%s\"", s.tag.attrName, s.tag.attrName, spelled)
-		s.tag.appendValue(spelled)
-		s.tag.valueDyn = true
+		s.appendValue(spelled)
 		s.mode = modeValueUnquoted
 	case modeValue:
-		s.tag.appendValue(spelled)
-		s.tag.valueDyn = true
+		s.appendValue(spelled)
 	case modeRawText:
 		s.appendRaw(hole)
 	case modeComment, modeDeclaration:
@@ -1166,7 +1247,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 			case isMarkupSpace(ch):
 			case ch == '"' || ch == '\'':
 				s.quote = ch
-				s.tag.values = []string{""}
+				s.tag.values = []markupText{{path: append(markupPath{}, s.path...)}}
 				s.mode = modeValue
 			case ch == '>':
 				w.report(pos, "attribute %s has an = and no value", s.tag.attrName)
@@ -1174,7 +1255,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 				w.finishTag(s)
 			default:
 				w.report(pos, "attribute %s is not quoted", s.tag.attrName)
-				s.tag.appendValue(string(ch))
+				s.appendValue(string(ch))
 				s.mode = modeValueUnquoted
 			}
 		case modeValue:
@@ -1183,7 +1264,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 				s.quote = 0
 				s.mode = modeTag
 			} else {
-				s.tag.appendValue(string(ch))
+				s.appendValue(string(ch))
 			}
 		case modeValueUnquoted:
 			switch {
@@ -1194,7 +1275,7 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 				w.commitAttr(s)
 				w.finishTag(s)
 			default:
-				s.tag.appendValue(string(ch))
+				s.appendValue(string(ch))
 			}
 		case modeSelfClosing:
 			if ch == '>' {
@@ -1229,22 +1310,17 @@ func (w *markupWalk) text(s *markupState, text string, base int) {
 }
 
 // commitAttr completes the attribute in progress, and records the ids it declares and the ids it
-// names on the branches it is written in. A value that branches write differently counts as written
-// by an action.
+// names, each text it may hold on the branches that write that text. An id an action writes part of
+// is dynamic.
 func (w *markupWalk) commitAttr(s *markupState) {
 	t := s.tag
 	name := strings.ToLower(t.attrName)
 	values := t.values
 	if len(values) == 0 {
-		values = []string{""}
-	}
-	dynamic := t.valueDyn
-	for _, v := range values[1:] {
-		dynamic = dynamic || v != values[0]
+		values = []markupText{{path: append(markupPath{}, s.path...)}}
 	}
 	t.attrName = ""
 	t.values = nil
-	t.valueDyn = false
 	if name == "" {
 		return
 	}
@@ -1252,26 +1328,27 @@ func (w *markupWalk) commitAttr(s *markupState) {
 		w.reportAt(t.where, "<%s> carries %s twice", t.name, name)
 		return
 	}
-	value := values[0]
-	t.attrs = append(t.attrs, markupAttr{name: name, value: value, alts: values})
+	t.attrs = append(t.attrs, markupAttr{name: name, alts: values})
 
-	fact := markupFact{value: value, path: append(markupPath{}, s.path...), where: t.where}
-	switch name {
-	case "id":
-		if !dynamic && s.ranges > 0 {
-			w.reportAt(t.where, "id %q is written inside a {{range}}, so it repeats on the page", value)
-		}
-		w.ids = append(w.ids, markupID{markupFact: fact, dynamic: dynamic})
-	case "aria-labelledby", "aria-describedby":
-		for _, id := range strings.Fields(value) {
-			ref := fact
-			ref.value = id
-			w.refs = append(w.refs, markupRef{markupFact: ref, attr: name})
-		}
-	case "for":
-		if strings.EqualFold(t.name, "label") {
-			w.labels = append(w.labels, fact)
-			w.refs = append(w.refs, markupRef{markupFact: fact, attr: "for"})
+	for _, v := range values {
+		fact := markupFact{value: v.text, path: v.path, where: t.where}
+		switch name {
+		case "id":
+			if !v.dynamic() && s.ranges > 0 {
+				w.reportAt(t.where, "id %q is written inside a {{range}}, so it repeats on the page", v.text)
+			}
+			w.ids = append(w.ids, markupID{markupFact: fact, dynamic: v.dynamic()})
+		case "aria-labelledby", "aria-describedby":
+			for _, id := range strings.Fields(v.text) {
+				ref := fact
+				ref.value = id
+				w.refs = append(w.refs, markupRef{markupFact: ref, attr: name})
+			}
+		case "for":
+			if strings.EqualFold(t.name, "label") {
+				w.labels = append(w.labels, fact)
+				w.refs = append(w.refs, markupRef{markupFact: fact, attr: "for"})
+			}
 		}
 	}
 }
@@ -1341,14 +1418,17 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 		switch a.name {
 		case "href", "src", "action", "formaction", "xlink:href":
 			for _, v := range a.alts {
-				if strings.HasPrefix(strings.ToLower(strings.TrimSpace(v)), "javascript:") {
+				if strings.HasPrefix(strings.ToLower(strings.TrimSpace(v.text)), "javascript:") {
 					w.reportAt(where, "<%s %s> is a javascript: URL: register the behaviour from a static script", name, a.name)
 					break
 				}
 			}
 		case "tabindex":
-			if n, err := strconv.Atoi(strings.TrimSpace(a.value)); err == nil && n > 0 {
-				w.reportAt(where, "<%s> has tabindex %d: a positive tabindex reorders the keyboard path", name, n)
+			for _, v := range a.alts {
+				if n, err := strconv.Atoi(strings.TrimSpace(v.text)); err == nil && n > 0 {
+					w.reportAt(where, "<%s> has tabindex %d: a positive tabindex reorders the keyboard path", name, n)
+					break
+				}
 			}
 		}
 	}
@@ -1382,8 +1462,12 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 	if (name == "a" || name == "button") && s.within("a", "button") {
 		w.reportAt(where, "<%s> inside a link or a button", name)
 	}
-	if name == "li" && (parent == nil || parent.foreign || (parent.name != "ul" && parent.name != "ol" && parent.name != "menu")) {
-		w.reportAt(where, "<li> outside a list")
+	if name == "li" {
+		inList := parent != nil && !parent.foreign && (parent.name == "ul" || parent.name == "ol" || parent.name == "menu")
+		// A tree read alone does not see what its caller puts its first element in; the pages do.
+		if !inList && (parent != nil || w.pageRules()) {
+			w.reportAt(where, "<li> outside a list")
+		}
 	}
 	if parent != nil && !parent.foreign {
 		if allowed, ok := tableChildren[parent.name]; ok && !allowed[name] && name != "script" && name != "template" {
@@ -1402,27 +1486,28 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 		if !t.has("alt") && !t.dynamic {
 			w.reportAt(where, "<img> has no alt: describe it, or write alt=\"\" if it only decorates")
 		}
-		if alt, ok := t.attr("alt"); ok && strings.TrimSpace(alt.value) != "" {
+		if t.every("alt", func(v string) bool { return strings.TrimSpace(v) != "" }) {
 			s.markName()
 		}
 	case "svg":
-		hidden, _ := t.attr("aria-hidden")
-		if hidden.value != "true" && !named {
+		if !named && !t.every("aria-hidden", func(v string) bool { return v == "true" }) {
 			w.reportAt(where, "<svg> is neither hidden with aria-hidden=\"true\" nor named")
 		}
 	case "input", "select", "textarea":
-		typ, _ := t.attr("type")
-		if name == "input" && unlabelledInputTypes[strings.ToLower(typ.value)] {
+		if name == "input" && t.every("type", func(v string) bool { return unlabelledInputTypes[strings.ToLower(v)] }) {
 			break
 		}
-		if named || s.within("label") {
+		// A tree read alone may be called inside its page's <label>; the page readings hold it.
+		if named || s.within("label") || !w.pageRules() {
 			break
 		}
 		id, ok := t.attr("id")
 		if !ok {
 			w.reportAt(where, "<%s> has no label: give it an id a <label for> names, or aria-label", name)
-		} else {
-			w.controls = append(w.controls, markupFact{value: id.value, path: append(markupPath{}, s.path...), where: where})
+			break
+		}
+		for _, v := range id.alts {
+			w.controls = append(w.controls, markupFact{value: v.text, path: v.path, where: where})
 		}
 	}
 	if level, ok := headingLevel[name]; ok {
@@ -1436,6 +1521,9 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 		}
 		s.headings = 1 << level
 		if level == 1 {
+			if s.ranges > 0 {
+				w.reportAt(where, "an <h1> inside a {{range}} repeats on the page: a page has one, its title")
+			}
 			w.h1 = append(w.h1, markupFact{path: append(markupPath{}, s.path...), where: where})
 		}
 	}
@@ -1445,26 +1533,40 @@ func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 	}
 	el := openElement{name: name, where: where, named: named}
 	if name == "script" {
-		typ, hasType := t.attr("type")
-		switch {
-		case t.has("src"):
-			el.script = "src"
-		case hasType && jsonScriptType.MatchString(strings.ToLower(strings.TrimSpace(typ.value))):
-			el.script = "json"
-		case !t.written("type") || isJavaScriptType(typ.value):
-			w.reportAt(where, "an inline <script> runs code: move it to a static file, or make it a "+
-				"<script type=\"application/json\"> data block")
-			el.script = "code"
-		default:
-			w.reportAt(where, "<script type=%q> is neither JavaScript nor JSON", typ.value)
-			el.script = "other"
-		}
+		el.script = w.scriptKind(t)
 	}
 	s.stack = append(s.stack, el)
 	if rawTextElements[name] {
 		s.raw = []string{""}
 		s.mode = modeRawText
 	}
+}
+
+// scriptKind reads what a <script> is in every branch: a file when each gives it a src; otherwise
+// code when a type it may carry, or the type a branch leaves it without, is JavaScript; then a type
+// that is neither JavaScript nor JSON; else a JSON data block. Code and the unknown type are refused.
+func (w *markupWalk) scriptKind(t *markupTag) string {
+	if t.has("src") {
+		return "src"
+	}
+	types := t.texts("type")
+	if !t.has("type") {
+		types = append(types, "")
+	}
+	for _, typ := range types {
+		if isJavaScriptType(typ) {
+			w.reportAt(t.where, "an inline <script> runs code: move it to a static file, or make it a "+
+				"<script type=\"application/json\"> data block")
+			return "code"
+		}
+	}
+	for _, typ := range types {
+		if !jsonScriptType.MatchString(strings.ToLower(strings.TrimSpace(typ))) {
+			w.reportAt(t.where, "<script type=%q> is neither JavaScript nor JSON", typ)
+			return "other"
+		}
+	}
+	return "json"
 }
 
 func isJavaScriptType(t string) bool {
