@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -296,6 +297,58 @@ func TestMain_RefusesAMalformedPreviousSessionKeyAfterBootstrap(t *testing.T) {
 	assert.NotContains(t, stderr, "bootstrap credentials are not configured")
 	assert.Contains(t, stderr, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
 	assert.NotContains(t, stderr, "no listener is enabled")
+}
+
+// Startup must reach the stored-issuer warning, then continue to the listener check (#589).
+func TestMain_ReportsAStoredIssuerTheRuleRefusesAndContinues(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "issuer.db")
+	const baseURL = "https://auth.example.com"
+	env := []string{
+		"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+		"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=" + strings.Repeat("ef", 32),
+		"GOIABADA_ADMIN_EMAIL=admin@example.com",
+		"GOIABADA_ADMIN_PASSWORD=a-long-enough-password-for-the-seed",
+		"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=" + strings.Repeat("ab", 64),
+		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=" + strings.Repeat("cd", 32),
+		"GOIABADA_AUTHSERVER_BASEURL=" + baseURL,
+		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=0",
+		"GOIABADA_AUTHSERVER_LOG_FORMAT=json",
+	}
+	code, stderr := runMainProcessWith(t, path, env)
+	require.Equal(t, 1, code, "stderr: %s", stderr)
+	require.Contains(t, stderr, "database seeded")
+	require.Contains(t, stderr, "no listener is enabled")
+
+	ctx := context.Background()
+	db, err := sqlitedb.New(ctx, "file:"+path, false)
+	require.NoError(t, err)
+	settings, err := db.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	require.NotNil(t, settings)
+	settings.Issuer = "goiabada"
+	require.NoError(t, db.UpdateSettings(ctx, nil, settings))
+	require.NoError(t, db.DB.Close())
+
+	code, stderr = runMainProcessWith(t, path, env)
+	require.Equal(t, 1, code, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "no listener is enabled", "the warning does not stop startup")
+	var warnings []map[string]any
+	for _, line := range strings.Split(stderr, "\n") {
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var record map[string]any
+		require.NoError(t, json.Unmarshal([]byte(line), &record))
+		if record["issuer"] == "goiabada" {
+			warnings = append(warnings, record)
+		}
+	}
+	require.Len(t, warnings, 1, "stderr: %s", stderr)
+	assert.Equal(t, "WARN", warnings[0]["level"])
+	assert.Equal(t, baseURL, warnings[0]["auth_server_base_url"])
+	assert.Contains(t, warnings[0]["msg"], "stored issuer")
+	assert.Contains(t, warnings[0]["remedy"], "https URL")
+	assert.Contains(t, warnings[0]["remedy"], "base URL")
 }
 
 // TestMain_RefusesATimeZoneItCannotLoadBeforeOpeningAnything is decisions 10 and 14 of #331 at

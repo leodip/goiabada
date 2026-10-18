@@ -96,6 +96,8 @@ func TestHandleSettingsGeneralPut_TheIssuerRule(t *testing.T) {
 		{"a port and no host", "https://:443"},
 		{"an empty port and no host before a path", "https://:/tenant-a"},
 		{"an opaque URL", "https:auth.example.com"},
+		{"a malformed percent escape", "https://auth.example.com/%zz"},
+		{"a malformed port", "https://auth.example.com:invalid"},
 		{"a space in the host", "https://auth example.com"},
 		{"a space in the path", "https://auth.example.com/my tenant"},
 	}
