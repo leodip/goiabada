@@ -120,8 +120,6 @@ When the pod network isn't one you trust, such as a cluster shared with workload
      GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE: "/certs/ca.pem"
      ```
 
-     `GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE` adds your authority to the ones the image already trusts, and the console won't start if the file can't be read or holds no certificate. `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory, remains the process-wide way, for every outbound TLS the container makes; setting both replaces the system's authorities with yours.
-
   4. Restart both Deployments. The auth server reads its certificate when it starts, so restart it after each renewal too.
 
   </Steps>
@@ -142,19 +140,7 @@ With a CA file, the manifest carries its certificates. They're not secret:
 - **A read-only volume** mounts that ConfigMap at `/etc/goiabada/db-ca` in the auth server's pods.
 - **`GOIABADA_DB_TLS_CA_FILE`** in `goiabada-authserver-config` names the mounted file, `/etc/goiabada/db-ca/ca.pem`. The auth server then trusts those authorities in place of the system's.
 
-For `verify-full`, the wizard also asks for the host name the certificate is checked against, for when the address the auth server dials isn't a name the certificate carries. It writes your answer into `goiabada-authserver-config` as `GOIABADA_DB_TLS_SERVER_NAME`. Leave it empty to check the database host.
-
 If a pod can't verify the database's certificate, it stops at start and crash-loops: see [Database TLS connection fails](/troubleshooting/database-tls-connection-fails/).
-
-### Present a client certificate
-
-For `require`, `verify-ca` and `verify-full` on PostgreSQL or MySQL, the wizard also asks for a client certificate and its private key, for a database that tells who's connecting by certificate. Leave it empty if yours doesn't. With one, the auth server's pods need a Secret the manifest doesn't carry:
-
-- **A Secret, `goiabada-db-client-tls`,** in `goiabada-secrets.yaml`, holds the certificate under `client-cert.pem` and the key under `client-key.pem`. The key is a secret, so it's beside the others, not in the manifest. See [Secrets](/deploy/kubernetes/secrets/#the-database-client-certificate).
-- **A read-only volume** mounts that Secret at `/etc/goiabada/db-client-tls` in the auth server's pods.
-- **`GOIABADA_DB_TLS_CLIENT_CERT_FILE` and `GOIABADA_DB_TLS_CLIENT_KEY_FILE`** in `goiabada-authserver-config` name the two mounted files.
-
-The auth server's pods don't start until the Secret exists. Like the CA file, the pair is read only at start: after you replace the Secret, restart the auth server as below.
 
 ### Change the authorities
 

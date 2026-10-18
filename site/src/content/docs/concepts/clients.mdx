@@ -47,7 +47,7 @@ A client identifier you enter is 3 to 38 characters long. (A self-registered cli
 
 It's case-sensitive: `my-app` and `My-App` are two different clients, and a request whose `client_id` differs only in case finds no client.
 
-It can't be a resource's identifier either, since an ID token's `aud` is the client identifier and an access token's names resources. [Resources and permissions](/concepts/resources-and-permissions/#identifiers) says what happens to a client and a resource that already share one.
+It can't be a [resource's identifier](/concepts/resources-and-permissions/#identifiers) either.
 
 ## Settings a new client starts with
 
@@ -95,7 +95,7 @@ Every redirect URI must:
 - **have well-formed percent-escapes.** `https://example.com/a%zz` is refused.
 - **fit the limits:** at most 2048 bytes each, at most 60 per client, and no duplicates.
 
-The scheme, host and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect. The `http` rule applies only when you add a redirect URI. One the client already has keeps working, and you can still save changes to the rest of the list. Once you remove it, you can't add it back. Every code or token sent to it writes a warning to the auth server's log, naming the client and the redirect URI: see [Logs](/deploy/logs/#records-worth-knowing).
+The scheme, host and fragment rules are checked again on every authorization request, so a stored redirect URI that breaks them gets an error page instead of a redirect. The `http` rule applies only when you add a redirect URI. One the client already has keeps working, but once you remove it, you can't add it back.
 
 **A query is allowed and comes back as you registered it.** The auth server adds its response to it rather than rewriting it. The one exception is a parameter the response owns: `code`, `state`, `error`, `error_description` and `iss` are removed from the registered query in the default `query` response mode, even when the response doesn't set them. So a `state` in the callback is always the one your app sent, and no `state` comes back if your app sent none. With `response_mode=fragment` or `form_post`, the response doesn't travel in the query, and the registered query is left exactly as it is.
 
@@ -164,8 +164,6 @@ The ACR level is how strongly a user must sign in to use the client:
 New clients start at `urn:goiabada:level2_optional`. The field shows only while **Authorization code with PKCE** is on. Change it on the client's **Settings** tab and click **Save**.
 
 The default is a floor. An authorization request can ask for a stronger level with `acr_values`, but never a weaker one: the auth server uses the stronger of the two. A change applies to sign-ins that start after it. See [ACR and AMR](/concepts/acr-and-amr/).
-
-The [password grant](/legacy-flows/ropc/#who-cant-use-it) can't ask for a one-time code, so at `urn:goiabada:level2_mandatory` it is refused for every user. With **Authorization code with PKCE** off, the level doesn't apply, and neither does that refusal.
 
 ## Administrative scopes
 

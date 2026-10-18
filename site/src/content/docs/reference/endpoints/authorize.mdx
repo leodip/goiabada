@@ -73,13 +73,11 @@ The auth server checks the request before it shows the user anything. A check it
 | `client_id` names a client that exists and is enabled | 200 | "Invalid client_id parameter." and why |
 | `redirect_uri` is absolute and registered on the client | 200 | "Invalid redirect_uri parameter." and why. See [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/). |
 | `response_mode` is `query`, `fragment` or `form_post` | 400 | "Invalid response_mode parameter. Supported values are: query, fragment, form_post." |
-| `response_mode=form_post` names an `http` or `https` redirect URI, since a form can't post to a custom scheme such as `myapp://` | 400 | "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive." and the modes to use instead: `fragment` for the implicit flow, `query` or `fragment` otherwise |
+| `response_mode=form_post` names an `http` or `https` redirect URI | 400 | "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive." and the modes to use instead: `fragment` for the implicit flow, `query` or `fragment` otherwise |
 
 A missing `client_id` or `redirect_uri` is refused the same way. The page is shown in the language `ui_locales` asks for.
 
 An unsupported `response_mode` gets no error response at all, whoever is signed in. Understanding the mode is what tells the auth server how to encode a response, so it answers `400 Bad Request` with no `error`, `error_description` or `state`, as [OpenID Connect Core 1.0 section 3.1.2.6](https://openid.net/specs/openid-connect-core-1_0.html#AuthError) requires.
-
-`form_post` to a redirect URI that isn't `http` or `https` is answered the same way. That mode posts the response as a form, and no form can post to a custom scheme, so neither the code nor an error could reach your app.
 
 Every other check is answered with an error response to your redirect URI, carrying your `state`. The first that fails is the answer:
 

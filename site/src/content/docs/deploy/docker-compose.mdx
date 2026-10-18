@@ -73,14 +73,12 @@ When that isn't enough, encrypt the hop with the auth server's own HTTPS listene
    - "GOIABADA_AUTHSERVER_KEYFILE=/certs/goiabada-authserver-key.pem"
    ```
 
-3. Mount your certificate authority's certificate into the admin console's container, then point the admin console at the listener and have it trust that authority, in its `environment`:
+3. Mount your certificate authority's certificate into the admin console's container, then point the admin console at the listener and have it trust that authority with [`GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE`](/reference/environment-variables/#urls-and-listeners), in its `environment`:
 
    ```yaml
    - "GOIABADA_AUTHSERVER_INTERNALBASEURL=https://goiabada-authserver:9443"
    - "GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE=/certs/ca.pem"
    ```
-
-   `GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE` adds your authority to the ones the image already trusts, and the console won't start if the file can't be read or holds no certificate. `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory of certificates, remains the process-wide way, for every outbound TLS the container makes; setting both replaces the system's authorities with yours.
 
 4. Restart both servers with `docker compose up -d`.
 

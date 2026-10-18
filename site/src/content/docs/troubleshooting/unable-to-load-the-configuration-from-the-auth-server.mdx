@@ -53,7 +53,7 @@ The usual causes:
 
 </Steps>
 
-For an `https` internal URL, the admin console trusts the operating system's certificate authorities. To trust your own, set its `GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE` to a file of PEM certificates. The console won't start if the file can't be read or holds no certificate, and the file's authorities are trusted beside the system's, not in place of them. `SSL_CERT_FILE`, or `SSL_CERT_DIR` for a directory, remains the process-wide way, for every outbound TLS the container makes; either one alone adds to the system's authorities, and setting both replaces them.
+For an `https` internal URL, the admin console trusts the operating system's certificate authorities. If your own authority signed the auth server's certificate, set the admin console's [`GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE`](/reference/environment-variables/#urls-and-listeners) to that authority's PEM certificate, and restart the admin console.
 
 ## When only signing in fails
 

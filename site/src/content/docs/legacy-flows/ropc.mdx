@@ -83,7 +83,7 @@ The scope can hold the OpenID Connect scopes, such as `openid`, `profile` and `e
 - **An access token and a refresh token, always,** and an ID token when the scope has `openid`.
 - **An offline refresh token,** whether or not your app asked for `offline_access`, since there's no session for it to belong to. It follows the offline refresh token's idle timeout and maximum lifetime, 30 days and a year in a new install. See [Refresh tokens](/concepts/refresh-tokens/).
 - **No consent screen.** Sending the password counts as the user's consent to the scope asked for.
-- **`acr` is `urn:goiabada:level1` and `amr` is `["pwd"]`,** since a password is all that was checked. A client whose default ACR level is `urn:goiabada:level2_mandatory`, while its authorization code flow is on, is refused the grant outright, as below. An API that requires two-factor authentication refuses these tokens by their `acr`. See [ACR and AMR](/concepts/acr-and-amr/).
+- **`acr` is `urn:goiabada:level1` and `amr` is `["pwd"]`,** since a password is all that was checked. An API that requires two-factor authentication refuses these tokens by their `acr`. See [ACR and AMR](/concepts/acr-and-amr/).
 - **No `sid`.** The tokens belong to no session, so signing out of the browser doesn't touch them.
 - **`auth_time` is when the password was checked,** and stays that across every refresh.
 
@@ -93,7 +93,7 @@ Each grant leaves a `token_issued_ropc_response` entry in the [audit log](/conce
 
 - **A user with two-factor authentication.** The grant can't ask for a one-time code, so it refuses every user who has an authenticator rather than skip the second factor. They sign in through the browser instead.
 - **A disabled user,** even with the right password.
-- **A client whose default ACR level is `urn:goiabada:level2_mandatory`, while its authorization code flow is on.** That level asks every sign-in for a one-time code, which the grant can't ask for, so the grant is refused for every user, whatever the password, rather than issue a level 1 token below the client's floor. The authorization code flow meets the level. With that flow off, the default ACR level doesn't apply to the client, so it doesn't refuse the grant either.
+- **Every user, at a client whose default ACR level is `urn:goiabada:level2_mandatory`,** while **Authorization code with PKCE** is on. That level needs a one-time code at every sign-in, and the grant can't ask for one. They sign in through the browser instead.
 
 ## Turning it off
 
@@ -121,15 +121,6 @@ A user with two-factor authentication who sends the right password is told why:
 {
   "error": "invalid_grant",
   "error_description": "Resource owner password credentials grant is not available for accounts with two-factor authentication enabled. Please use the authorization code flow instead."
-}
-```
-
-So is a client whose default ACR level is `urn:goiabada:level2_mandatory`, before any password is checked:
-
-```json
-{
-  "error": "unauthorized_client",
-  "error_description": "Resource owner password credentials grant is not available for a client whose default ACR level is urn:goiabada:level2_mandatory. Please use the authorization code flow instead."
 }
 ```
 

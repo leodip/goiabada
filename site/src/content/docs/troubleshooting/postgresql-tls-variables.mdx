@@ -24,13 +24,11 @@ With `GOIABADA_DB_TYPE=postgres`, the auth server won't start while one of these
 
 3. For `verify-ca` or `verify-full`, set `GOIABADA_DB_TLS_CA_FILE` if the certificate's signing authority isn't in the system's roots.
 
-4. To present a client certificate to the database, set `GOIABADA_DB_TLS_CLIENT_CERT_FILE` and `GOIABADA_DB_TLS_CLIENT_KEY_FILE` instead of `PGSSLCERT` and `PGSSLKEY`.
-
-5. Restart the auth server.
+4. Restart the auth server.
 
 </Steps>
 
-The auth server reads no passphrase for the client key, so `PGSSLPASSWORD` has nothing to replace it. `PGSSLCERT` and `PGSSLKEY` are replaced by `GOIABADA_DB_TLS_CLIENT_CERT_FILE` and `GOIABADA_DB_TLS_CLIENT_KEY_FILE`, and are refused only until you move them over.
+If you set `PGSSLPASSWORD`, your key is encrypted, and the auth server reads no passphrase: write a copy without one, such as with `openssl pkey -in client-key.pem -out client-key-plain.pem`, and name that in `GOIABADA_DB_TLS_CLIENT_KEY_FILE`.
 
 ## Next steps
 

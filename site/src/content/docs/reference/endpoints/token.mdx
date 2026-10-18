@@ -101,7 +101,7 @@ There's no `scope` parameter: the tokens get the scope the user granted when the
 
 A code is spent the first time it's redeemed. Redeeming it again is refused, and revokes the tokens the first redemption issued, since a code presented twice may have been stolen, as RFC 6749 section 4.1.2 recommends.
 
-A code the auth server doesn't know, one already redeemed or revoked, one whose user has since been disabled or had their credentials changed, and one whose sign-in session has ended since it was issued (the user signed out, or a newer sign-in on the same browser replaced it) are all refused with `invalid_grant`, "Code is invalid.", so the answer says nothing more about the code. A code whose grant includes `offline_access` isn't tied to the session, and still redeems once the session has ended. The other refusals:
+A code the auth server doesn't know, one already redeemed or revoked, and one whose user has since been disabled or had their credentials changed are all refused with `invalid_grant`, "Code is invalid.", so the answer says nothing more about the code. The other refusals:
 
 | `error` | `error_description` | Why |
 |---|---|---|
@@ -159,7 +159,7 @@ Only a confidential client with **Client credentials** turned on can use it. The
 | `password` | Yes | The user's password |
 | `scope` | No | `openid` when left out |
 
-It's refused with `unauthorized_client` unless the flow is on for the client, and with `invalid_grant` for a user with two-factor authentication. See [ROPC](/legacy-flows/ropc/) for every rule.
+See [ROPC](/legacy-flows/ropc/#who-cant-use-it) for who can use it and every refusal.
 
 ## Administrative scopes
 
@@ -228,7 +228,7 @@ Pragma: no-cache
 
 | `error` | Status | |
 |---|---|---|
-| `invalid_request` | 400 | A parameter is missing, repeated or not allowed for this client. A token request with no `grant_type` is answered this way: "Missing required grant_type parameter." |
+| `invalid_request` | 400 | A parameter is missing, repeated or not allowed for this client |
 | `invalid_client` | 401 | The client couldn't be authenticated, with `WWW-Authenticate: Basic realm="goiabada"` |
 | `invalid_grant` | 400 | The code, refresh token or user's credentials can't be used |
 | `unauthorized_client` | 400 | The grant is off for this client |

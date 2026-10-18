@@ -31,7 +31,7 @@ The auth server couldn't tell where to send an error, so it shows it to the user
 - a missing, unknown or disabled `client_id`;
 - a missing, malformed or unregistered `redirect_uri`, as [Invalid redirect_uri](/troubleshooting/invalid-redirect-uri/) explains;
 - a `response_mode` other than `query`, `fragment` or `form_post`: "Invalid response_mode parameter. Supported values are: query, fragment, form_post.";
-- `response_mode=form_post` with a redirect URI that isn't `http` or `https`, such as `myapp://callback`: "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive." A form can't post to a custom scheme, so ask for `query` or `fragment`, or `fragment` alone in the implicit flow;
+- `response_mode=form_post` with a redirect URI that isn't `http` or `https`, such as `myapp://callback`: "response_mode=form_post posts the response to the redirect URI as a form, which no scheme other than http or https can receive.";
 - `client_id`, `redirect_uri`, `response_type` or `response_mode` sent twice, or a request that isn't correctly encoded;
 - **"This sign-in link is no longer valid."**: your app sent a POST to `/auth/authorize`, and the browser came back to its one-time link after it expired or was used.
 
@@ -50,7 +50,7 @@ The page says "This application asked to send you to" an address, and "The reque
 
 These end the sign-in on a page, and nothing is sent to your app:
 
-- **"This request is no longer active"**: another sign-in started in the same browser, such as in a second tab, and replaced this one, or the browser signed out or its session expired during the step.
+- **"This request is no longer active"**: another sign-in started in the same browser, such as in a second tab, and replaced this one.
 - **"This step is no longer available"**: the user went back in the browser to a step they had finished.
 - **"Your two-factor authentication settings changed"**: the user's authenticator changed while they were setting one up.
 

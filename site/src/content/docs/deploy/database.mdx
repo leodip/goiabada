@@ -27,7 +27,7 @@ The auth server creates every table itself, at each start, as [Upgrade Goiabada]
 
 ## Where the database sits
 
-The connection to PostgreSQL, MySQL or SQL Server carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts. You protect it with the `GOIABADA_DB_TLS_*` settings below, which work the same way on all three engines, apart from the client certificate SQL Server can't present. SQLite has no connection to protect, so it ignores them all.
+The connection to PostgreSQL, MySQL or SQL Server carries the database password and everything Goiabada stores, apart from the secrets the [AES key](/deploy/secrets/#what-each-secret-protects) encrypts. You protect it with the `GOIABADA_DB_TLS_*` settings below. SQLite has no connection to protect, so it ignores them.
 
 `GOIABADA_DB_TLS_MODE` picks one of five modes. They're PostgreSQL's `sslmode` names:
 
@@ -64,15 +64,13 @@ The auth server won't start if the file can't be read, holds no certificate, or 
 
 `GOIABADA_DB_TLS_SERVER_NAME` names the host `verify-full` checks the certificate against, in place of `GOIABADA_DB_HOST`. Set it when the address the auth server dials isn't a name the certificate carries: an IP address, a pooler, a private endpoint. The auth server still dials `GOIABADA_DB_HOST`.
 
-The auth server won't start if it's set with any mode but `verify-full`, the only one that checks a host name.
-
 ### A client certificate
 
 Some databases tell who's connecting by a TLS client certificate, beside or instead of the password: PostgreSQL's `cert` authentication and `clientcert=verify-full`, MySQL's `REQUIRE X509`. Name the certificate in `GOIABADA_DB_TLS_CLIENT_CERT_FILE` and its private key in `GOIABADA_DB_TLS_CLIENT_KEY_FILE`, both PEM files. The auth server reads them once, at start, and presents them in `require`, `verify-ca` and `verify-full`.
 
-Make the key file readable only by the user the auth server runs as, such as with `chmod 600`. That's what `psql` requires before it uses a key. Goiabada doesn't check the file's permissions itself, so a looser key works with Goiabada and is refused by `psql`.
+Make the key file readable only by the user the auth server runs as, such as with `chmod 600`.
 
-The auth server won't start if one file is set without the other, either can't be read, the two don't pair, the key needs a passphrase, or the mode is `disable` or `prefer`, which may send no TLS. SQL Server's driver can't present a client certificate, so the auth server refuses one there. On Kubernetes, the setup wizard puts both files in [a Secret](/deploy/kubernetes/secrets/#the-database-client-certificate).
+The key must have no passphrase: the auth server reads none. SQL Server's driver can't present a client certificate, so the auth server refuses one there. On Kubernetes, the setup wizard puts both files in [a Secret](/deploy/kubernetes/secrets/#the-database-client-certificate).
 
 ### PostgreSQL's own variables
 
