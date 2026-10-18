@@ -46,7 +46,7 @@
 tools:
   go: "1.27.2"
   tailwind: "4.3.3"
-  golangci-lint: "2.14.0"
+  golangci-lint: "2.15.0"
   mockery: "3.8.1"
   staticcheck: "0.8.2"
   unparam: "0.0.0-20261011093844-7a2c2c0b7aa6"
@@ -67,8 +67,8 @@ tools:
 # cropperjs:          image cropping in the admin console, 1.x (2.x is another API):
 #                     src/adminconsole/web/static/vendor/cropperjs/, from npm
 vendored:
-  daisyui: "5.7.48"
-  daisyui-sha256: "72ea75c3799ca80666e7e7cfc1f6904f1e0dd417eff78b3137acb64086e14270"
+  daisyui: "5.7.50"
+  daisyui-sha256: "d69de07c7463bb1f41548e2688f88ee105cdadf9779fce5b3c47b3bfaa6be472"
   humanize-duration: "3.35.0"
   humanize-duration-sha256: "fa557682d97d4cf89e978aa3d32599206e9a6b54651aa05f6b6af84d78edefcc"
   cropperjs: "1.6.2"

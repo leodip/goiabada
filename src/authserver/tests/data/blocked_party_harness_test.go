@@ -71,7 +71,8 @@ func unrelatedContention(t *testing.T) (release func()) {
 	return func() {
 		_ = database.RollbackTransaction(context.Background(), holder)
 		select {
-		case <-waiterDone:
+		case err := <-waiterDone:
+			require.NoError(t, err, "the unrelated waiter takes its row once its holder releases")
 		case <-time.After(lockWaitCeiling):
 			t.Fatal("the unrelated waiter never returned after its holder released")
 		}
