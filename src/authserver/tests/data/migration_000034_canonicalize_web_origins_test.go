@@ -2,7 +2,9 @@ package datatests
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -136,26 +138,24 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 
 	// 3. Every seeded shape lands where the table says.
 	for i, c := range cases {
-		got, err := h.DB.GetWebOriginById(context.Background(), nil, ids[i])
-		require.NoErrorf(t, err, "read back the row seeded from %q", c.raw)
+		got, found := webOrigin000034(t, h, ids[i])
 
 		if c.deleted {
-			assert.Nilf(t, got, "%q must be deleted: %s", c.raw, c.why)
+			assert.Falsef(t, found, "%q must be deleted: %s", c.raw, c.why)
 			continue
 		}
-		if assert.NotNilf(t, got, "%q must survive as %q: %s", c.raw, c.want, c.why) {
-			assert.Equalf(t, c.want, got.Origin, "%q must be repaired to %q: %s", c.raw, c.want, c.why)
+		if assert.Truef(t, found, "%q must survive as %q: %s", c.raw, c.want, c.why) {
+			assert.Equalf(t, c.want, got, "%q must be repaired to %q: %s", c.raw, c.want, c.why)
 		}
 	}
 
 	// 4, continued.
 	survivors := 0
 	for _, id := range dupIds {
-		row, err := h.DB.GetWebOriginById(context.Background(), nil, id)
-		require.NoError(t, err, "read back a duplicate row")
-		if row != nil {
+		origin, found := webOrigin000034(t, h, id)
+		if found {
 			survivors++
-			assert.Equal(t, "https://dup.example.com", row.Origin,
+			assert.Equal(t, "https://dup.example.com", origin,
 				"the surviving duplicate must carry the canonical value")
 			assert.Equalf(t, dupIds[0], id,
 				"the dedupe must keep MIN(id), the earliest registration, since the survivors are byte-identical and created_at is all that distinguishes them")
@@ -163,11 +163,10 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	}
 	assert.Equal(t, 1, survivors, "three rows canonicalizing to one value must leave one row for that client")
 
-	other, err := h.DB.GetWebOriginById(context.Background(), nil, otherClientDup)
-	require.NoError(t, err, "read back the second client's row")
-	if assert.NotNil(t, other,
+	other, found := webOrigin000034(t, h, otherClientDup)
+	if assert.True(t, found,
 		"an origin listed by a second client must survive: the index is (origin, client_id), and UNIQUE(origin) alone would have deleted this") {
-		assert.Equal(t, "https://dup.example.com", other.Origin)
+		assert.Equal(t, "https://dup.example.com", other)
 	}
 
 	// 5 and 6.
@@ -310,15 +309,17 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 			"the same invariant and be unusable by WebOriginExists", phase, webOriginsIndex000034)
 
 	// Enforced, not merely declared.
-	dup := &record.WebOrigin{Origin: "https://dup.example.com", ClientId: clientAId}
-	require.Errorf(t, h.DB.CreateWebOrigin(context.Background(), nil, dup),
-		"[%s] a second row with the same origin for the same client must be refused", phase)
+	// The probe is SQL rather than the ORM, and held to its cause: the index is the subject
+	// here and the record is incidental (#510), so the write names only the columns the
+	// 000033 schema carries, and a refusal any other fault produced fails the assertion.
+	_, dupErr := h.SQL.Exec(fmt.Sprintf(
+		"INSERT INTO web_origins (origin, client_id) VALUES ('https://dup.example.com', %d)", clientAId))
+	assertUniqueRefusal(t, dupErr, "web_origins.origin, web_origins.client_id", webOriginsIndex000034,
+		fmt.Sprintf("[%s] a second row with the same origin for the same client must be refused", phase))
 
 	// And enforced no more widely than that.
-	spare := &record.WebOrigin{Origin: "https://spare.example.com", ClientId: clientBId}
-	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, spare),
-		"[%s] an origin no client lists yet must still be insertable", phase)
-	require.NoErrorf(t, h.DB.DeleteWebOrigin(context.Background(), nil, spare.Id), "[%s] clean up the spare row", phase)
+	spareId := seedWebOrigin(t, h, clientBId, "https://spare.example.com")
+	require.NoError(t, h.DB.DeleteWebOrigin(context.Background(), nil, spareId), "[%s] clean up the spare row", phase)
 }
 
 // seedClient000034 writes the client in SQL rather than through the ORM: the database is at 000033,
@@ -326,19 +327,33 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 // among them.
 func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *record.Client {
 	t.Helper()
-	return &record.Client{Id: seedClient000035(t, h, identifier), ClientIdentifier: identifier}
+	return &record.Client{Id: seedClient(t, h, identifier), ClientIdentifier: identifier}
 }
 
-// seedWebOrigin000034 stores raw verbatim and returns its id. It goes through the
-// ORM rather than raw SQL because the data layer stores what it is given: the
-// validation this migration exists to backfill has only ever lived in the API
-// handler.
+// seedWebOrigin000034 stores raw verbatim and returns its id, through the shared SQL seed
+// (#510): the database is at 000033 and the record follows the head schema. The seed binds raw,
+// so the row holds exactly the fixture on every engine -- the validation this migration exists
+// to backfill has only ever lived in the API handler.
 func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientId int64, raw string) int64 {
 	t.Helper()
 
-	webOrigin := &record.WebOrigin{Origin: raw, ClientId: clientId}
-	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, webOrigin), "seed web origin %q", raw)
-	return webOrigin.Id
+	return seedWebOrigin(t, h, clientId, raw)
+}
+
+// webOrigin000034 reads one row's origin back by id, and whether the row is there at all. In SQL
+// rather than through GetWebOriginById, for the seeds' reason: the read runs at 000034, below
+// head, and the ORM's SELECT names every column the record declares, so the next column any
+// migration adds to web_origins would fail it for a reason this migration does not own (#510).
+func webOrigin000034(t *testing.T, h *isolatedDB, id int64) (origin string, found bool) {
+	t.Helper()
+
+	err := h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
+		"SELECT origin FROM web_origins WHERE id = %d", id)).Scan(&origin)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false
+	}
+	require.NoErrorf(t, err, "read back web origin %d", id)
+	return origin, true
 }
 
 func isSQLite000034() bool {

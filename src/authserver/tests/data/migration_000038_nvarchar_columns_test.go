@@ -75,7 +75,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
-	clientId := seedClient000035(t, h, "mig38-client")
+	clientId := seedClient(t, h, "mig38-client")
 	setOidcClaimsSetting000038(t, h, clientId, "on")
 
 	before := dumpAffectedTables000038(t, h)

@@ -112,8 +112,8 @@ func TestMigration000040_CollationParity(t *testing.T) {
 
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), prior), "migrate to %d", prior)
 
-	clientId := seedClient000035(t, h, "mig40-client")
-	userId := seedUser000035(t, h, "mig40user")
+	clientId := seedClient(t, h, "mig40-client")
+	userId := seedUser(t, h, userSeed{Enabled: true, Username: "mig40user", Email: "mig40user@test.local"})
 
 	before := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationBefore000040, "at "+fmt.Sprint(prior))
@@ -168,8 +168,8 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 
 	// The pair that could not have existed before this migration. That it can be inserted at
 	// all is the whole of what #283 fixes, so seeding it is also an assertion.
-	dupeId := seedClient000035(t, h, "Dupe40Client")
-	seedClient000035(t, h, "dupe40client")
+	dupeId := seedClient(t, h, "Dupe40Client")
+	seedClient(t, h, "dupe40client")
 
 	// The catalog shape the refusal must leave exactly as it found it, on SQL Server. Read as
 	// a DIFFERENCE rather than as a list of 23 index names, for seam 2's reason: a hand-written

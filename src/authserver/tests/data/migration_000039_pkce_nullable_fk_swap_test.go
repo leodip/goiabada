@@ -256,7 +256,8 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 
 	err := createChallengelessCode000039(t, h, client, user, nil)
 	if isSQLite000039() {
-		require.Errorf(t, err, "at %06d SQLite still holds codes.code_challenge NOT NULL: that failure is the defect", pred)
+		require.ErrorContainsf(t, err, "NOT NULL constraint failed: codes.code_challenge",
+			"at %06d SQLite still holds codes.code_challenge NOT NULL: the refusal must name the column, and only that failure is the defect", pred)
 	} else {
 		require.NoErrorf(t, err, "the other three engines have accepted a NULL challenge since their own 000007 (%s)", dbType())
 	}
@@ -287,8 +288,8 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 		assert.True(t, afterDown.CodeChallengeMethod.Valid, "the down converts the method column too")
 		assert.Empty(t, afterDown.CodeChallengeMethod.String, "the down writes an empty string")
 
-		require.Error(t, createChallengelessCode000039(t, h, client, user, nil),
-			"after the down SQLite must refuse a NULL challenge again: the constraint is back")
+		require.ErrorContainsf(t, createChallengelessCode000039(t, h, client, user, nil), "NOT NULL constraint failed: codes.code_challenge",
+			"after the down SQLite must refuse a NULL challenge again: the constraint is back, and the refusal must name the column it refused")
 	} else {
 		require.NoError(t, createChallengelessCode000039(t, h, client, user, nil),
 			"the down does not touch nullability on %s, which was never the divergence there", dbType())
@@ -369,28 +370,21 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 // says it should, and hand-written INSERTs per dialect would be asserting the test's own
 // column list rather than the migration's.
 //
-// The client is the exception. 000039 rebuilds codes and refresh_tokens, not clients, and only
-// the client's id is read here; the record names columns later migrations add to clients,
-// administrative_scopes_allowed (000060) among them, so the ORM's insert no longer fits the
-// schema before 000039.
+// The client and the user are the exceptions. 000039 rebuilds codes and refresh_tokens, not
+// clients, and only the client's id is read here; the record names columns later migrations add
+// to clients, administrative_scopes_allowed (000060) among them, so the ORM's insert no longer
+// fits the schema before 000039. The user goes through the shared SQL seed for the same reason
+// (#510): only its id is read, and users is not what this migration tests.
 
 func seedClient000039(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
 	identifier := "c-" + fake.UUID()[:8]
-	return &record.Client{Id: seedClient000035(t, h, identifier), ClientIdentifier: identifier}
+	return &record.Client{Id: seedClient(t, h, identifier), ClientIdentifier: identifier}
 }
 
 func seedUser000039(t *testing.T, h *isolatedDB) *record.User {
 	t.Helper()
-	user := &record.User{
-		Subject:      fake.UUID(),
-		Enabled:      true,
-		Email:        fake.UUID() + "@example.com",
-		Username:     "u-" + fake.UUID()[:8],
-		PasswordHash: "x",
-	}
-	require.NoError(t, h.DB.CreateUser(context.Background(), nil, user), "seed user")
-	return user
+	return &record.User{Id: seedUser(t, h, userSeed{Enabled: true})}
 }
 
 // seedCode000039 gives every column its own recognisable value, so a copy that crossed two

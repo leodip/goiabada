@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -51,31 +52,48 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, before), "migrate an empty database up to %d on %s", before, dbType())
 
 	f := &userinfoFixture000050{h: h}
-	f.resource = &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
-	require.NoError(t, h.DB.CreateResource(ctx, nil, f.resource))
-	f.userinfo = &record.Permission{PermissionIdentifier: "userinfo", Description: userinfoDescription000050, ResourceId: f.resource.Id}
-	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.userinfo))
-	f.control = &record.Permission{PermissionIdentifier: "mig50-control", Description: "Control", ResourceId: f.resource.Id}
-	require.NoError(t, h.DB.CreatePermission(ctx, nil, f.control))
+	// Seeded through the shared SQL seeds rather than the ORM: the database is one version
+	// below 000050, the records follow the head schema, and the next column any migration
+	// adds to one of these tables would break the seeding for a reason this migration does
+	// not own (#510).
+	// A permission on another resource, written first and granted to nobody, so the fixture's
+	// permission ids run ahead of the link tables' own ids: a grant read that returned a link
+	// row's id where its permission_id belongs then disagrees with every assertion below.
+	unrelated := seedResource(t, h, "mig50-unrelated", "Migration 000050 unrelated resource")
+	seedPermission(t, h, unrelated, "mig50-unrelated", "Unrelated")
 
-	f.user = &record.User{
+	f.resource = &record.Resource{
+		Id:                 seedResource(t, h, builtin.AuthServerResourceIdentifier, "Authorization server (system-level)"),
+		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
+	}
+	f.userinfo = &record.Permission{
+		Id:                   seedPermission(t, h, f.resource.Id, "userinfo", userinfoDescription000050),
+		PermissionIdentifier: "userinfo",
+	}
+	f.control = &record.Permission{
+		Id:                   seedPermission(t, h, f.resource.Id, "mig50-control", "Control"),
+		PermissionIdentifier: "mig50-control",
+	}
+
+	f.user = &record.User{Id: seedUser(t, h, userSeed{
 		Enabled:      true,
 		Subject:      "00000000-0000-0000-0000-000000050001",
 		Username:     "mig50user",
 		Email:        "mig50@example.com",
 		PasswordHash: "not-a-real-hash",
+	})}
+	f.group = &record.Group{
+		Id:              seedGroup(t, h, "mig50-group", "Migration 000050 test group"),
+		GroupIdentifier: "mig50-group",
 	}
-	require.NoError(t, h.DB.CreateUser(ctx, nil, f.user))
-	f.group = &record.Group{GroupIdentifier: "mig50-group", Description: "Migration 000050 test group"}
-	require.NoError(t, h.DB.CreateGroup(ctx, nil, f.group))
 	// In SQL rather than through the ORM, whose record names clients columns later migrations add,
 	// administrative_scopes_allowed (000060) among them.
-	f.client = &record.Client{Id: seedClient000035(t, h, "mig50-client"), ClientIdentifier: "mig50-client"}
+	f.client = &record.Client{Id: seedClient(t, h, "mig50-client"), ClientIdentifier: "mig50-client"}
 
 	for _, permission := range []*record.Permission{f.userinfo, f.control} {
-		require.NoError(t, h.DB.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: f.user.Id, PermissionId: permission.Id}))
-		require.NoError(t, h.DB.CreateGroupPermission(ctx, nil, &record.GroupPermission{GroupId: f.group.Id, PermissionId: permission.Id}))
-		require.NoError(t, h.DB.CreateClientPermission(ctx, nil, &record.ClientPermission{ClientId: f.client.Id, PermissionId: permission.Id}))
+		seedUserPermission(t, h, f.user.Id, permission.Id)
+		seedGroupPermission(t, h, f.group.Id, permission.Id)
+		seedClientPermission(t, h, f.client.Id, permission.Id)
 	}
 
 	userHolds, groupHolds, clientHolds := f.held(t)
@@ -87,37 +105,49 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 
 // held reads the permission ids the user, the group and the client each hold, straight from the
 // three link tables: none of the reads joins permissions, so a grant left behind by a deleted
-// permission is still returned.
+// permission is still returned. The reads, like identifiers', are SQL rather than the ORM's: they
+// run below head, and the ORM's SELECT names every column the record declares, so the next column
+// any migration adds to one of these tables would fail them for a reason this migration does not
+// own (#510).
 func (f *userinfoFixture000050) held(t *testing.T) (userHolds, groupHolds, clientHolds []int64) {
 	t.Helper()
-	ctx := context.Background()
-	userPermissions, err := f.h.DB.GetUserPermissionsByUserId(ctx, nil, f.user.Id)
-	require.NoError(t, err)
-	for _, p := range userPermissions {
-		userHolds = append(userHolds, p.PermissionId)
-	}
-	groupPermissions, err := f.h.DB.GetGroupPermissionsByGroupId(ctx, nil, f.group.Id)
-	require.NoError(t, err)
-	for _, p := range groupPermissions {
-		groupHolds = append(groupHolds, p.PermissionId)
-	}
-	clientPermissions, err := f.h.DB.GetClientPermissionsByClientId(ctx, nil, f.client.Id)
-	require.NoError(t, err)
-	for _, p := range clientPermissions {
-		clientHolds = append(clientHolds, p.PermissionId)
-	}
+	userHolds = f.permissionIds(t, "users_permissions", "user_id", f.user.Id)
+	groupHolds = f.permissionIds(t, "groups_permissions", "group_id", f.group.Id)
+	clientHolds = f.permissionIds(t, "clients_permissions", "client_id", f.client.Id)
 	return userHolds, groupHolds, clientHolds
+}
+
+// permissionIds reads the permission ids one principal holds in one link table.
+func (f *userinfoFixture000050) permissionIds(t *testing.T, table, principalColumn string, principalId int64) []int64 {
+	t.Helper()
+	rows, err := f.h.SQL.QueryContext(context.Background(), fmt.Sprintf(
+		"SELECT permission_id FROM %s WHERE %s = %d ORDER BY id", table, principalColumn, principalId))
+	require.NoErrorf(t, err, "read the %s grants", table)
+	defer func() { _ = rows.Close() }()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		require.NoError(t, rows.Scan(&id))
+		ids = append(ids, id)
+	}
+	require.NoError(t, rows.Err())
+	return ids
 }
 
 // identifiers reads the resource's permissions as identifier to description.
 func (f *userinfoFixture000050) identifiers(t *testing.T) map[string]string {
 	t.Helper()
-	permissions, err := f.h.DB.GetPermissionsByResourceId(context.Background(), nil, f.resource.Id)
+	rows, err := f.h.SQL.QueryContext(context.Background(), fmt.Sprintf(
+		"SELECT permission_identifier, description FROM permissions WHERE resource_id = %d", f.resource.Id))
 	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
 	out := map[string]string{}
-	for _, p := range permissions {
-		out[p.PermissionIdentifier] = p.Description
+	for rows.Next() {
+		var identifier, description string
+		require.NoError(t, rows.Scan(&identifier, &description))
+		out[identifier] = description
 	}
+	require.NoError(t, rows.Err())
 	return out
 }
 
@@ -239,9 +269,12 @@ func TestMigration000050_AnEmptyDatabase(t *testing.T) {
 	ctx := context.Background()
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, deleteUserinfoPermission000050), "migrate an empty database through 000050 on %s", dbType())
-	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
-	require.NoError(t, err)
-	require.Nil(t, resource, "the chain creates no authserver resource; the seed does")
+	// Counted in SQL rather than through GetResourceByResourceIdentifier: the database is at
+	// 000050, below head, and the ORM's SELECT names every column the record declares (#510).
+	var resources int
+	require.NoError(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT COUNT(*) FROM resources WHERE resource_identifier = '%s'", builtin.AuthServerResourceIdentifier)).Scan(&resources))
+	require.Zero(t, resources, "the chain creates no authserver resource; the seed does")
 
 	countPermissions := func() int {
 		t.Helper()

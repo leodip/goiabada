@@ -73,21 +73,25 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 			col, dbType())
 	}
 
-	// Seeded through the data layer, which names neither column any more, and then the two
-	// columns filled with SQL, the way a row from before v0.7 can still hold them.
+	// Seeded through the shared SQL seed, which names neither phone verification column any
+	// more, and then the two columns filled with SQL, the way a row from before v0.7 can still
+	// hold them. The seed is SQL rather than the ORM because the record follows the head schema
+	// and the next column any migration adds to users would break the seeding at 000058
+	// (#510); otp_secret_encrypted is bound as bytes, the one value no engine-neutral literal
+	// can carry.
 	const seed = "JBSWY3DPEHPK3PXP"
 	encryptedSeed, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
-	user := &record.User{
+	email := "mig59-" + fake.UUID() + "@example.com"
+	user := &record.User{Id: seedUser(t, h, userSeed{
 		Enabled:            true,
 		Subject:            fake.UUID(),
 		Username:           "mig59user",
-		Email:              "mig59-" + fake.UUID() + "@example.com",
+		Email:              email,
 		PasswordHash:       "a-stored-password-hash",
 		OTPEnabled:         true,
 		OTPSecretEncrypted: encryptedSeed,
-	}
-	require.NoErrorf(t, h.DB.CreateUser(ctx, nil, user), "seed a user at 000058 on %s", dbType())
+	}), Email: email}
 
 	_, err = h.SQL.Exec(fmt.Sprintf(
 		`UPDATE users SET phone_number_verification_code_encrypted = %s, phone_number_verification_code_issued_at = %s WHERE id = %d`,
@@ -116,7 +120,11 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 	assert.Equalf(t, wantAfterDrop, afterDrop,
 		"000059 must drop the two phone verification columns and touch nothing else of users on %s", dbType())
 
-	// 2. The user survives, its seed included.
+	// 2. The user survives, its seed included. Read through the ORM at head: its SELECT names
+	// every column the record declares, so a read at 000059 would fail on the next column any
+	// migration adds to users, for a reason this migration does not own (#510). The two dropped
+	// columns stay dropped on the way.
+	require.NoErrorf(t, h.Migrator.Up(ctx), "migrate to head on %s", dbType())
 	got, err := h.DB.GetUserById(ctx, nil, user.Id)
 	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.Id, dbType())
 	require.NotNilf(t, got, "users.id=%d is gone on %s; this migration deletes no rows", user.Id, dbType())
@@ -140,10 +148,11 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 			"000059's down restores the shape, never the values: users.%s reads NULL on %s", col, dbType())
 	}
 
-	rolledBack, err := h.DB.GetUserById(ctx, nil, user.Id)
-	require.NoErrorf(t, err, "read users.id=%d back after the roll back on %s", user.Id, dbType())
-	require.NotNilf(t, rolledBack, "the roll back must keep users.id=%d on %s", user.Id, dbType())
-	assert.Equal(t, user.Email, rolledBack.Email)
+	// In SQL: the database is at 000058, below head, where the ORM's read is not this test's to make.
+	var rolledBackEmail string
+	require.NoErrorf(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf("SELECT email FROM users WHERE id = %d", user.Id)).Scan(&rolledBackEmail),
+		"the roll back must keep users.id=%d on %s", user.Id, dbType())
+	assert.Equal(t, user.Email, rolledBackEmail)
 
 	// 4. Forward again, which is what an operator who rolled back and retried does.
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, dropPhoneVerificationCode000059),
