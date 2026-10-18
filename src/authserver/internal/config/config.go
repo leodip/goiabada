@@ -362,7 +362,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	return c, nil
 }
 
-// RegisterDatabaseFlags registers the fourteen --db-* flags on fs, each writing into c and
+// RegisterDatabaseFlags registers every --db-* flag on fs, each writing into c and
 // defaulting to the value c already holds.
 //
 // It is the one registration of those names. The server's parse registers them over the loaded

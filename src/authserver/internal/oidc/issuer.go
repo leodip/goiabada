@@ -8,8 +8,9 @@ import (
 
 // IssuerIsAcceptable is the issuer rule, the one the general settings save applies to a changed
 // issuer and the start applies to the stored one (#576 decisions 3 and 4). It accepts an https URL
-// naming a host, with no query, fragment or user info, which is what RFC 8414 section 2, RFC 9207
-// section 2 and OpenID Connect Discovery 1.0 section 3 require of an issuer, and it accepts exactly
+// naming a host, with no query or fragment, which is what RFC 8414 section 2, RFC 9207 section 2
+// and OpenID Connect Discovery 1.0 section 3 require of an issuer, and no user info, which OpenID
+// Connect Core 1.0 section 1.2 leaves out of one, and it accepts exactly
 // baseURL whatever its scheme: discovery is fetched under the base URL, which RFC 8414 section 3.3
 // requires the issuer to equal, and a new install seeds it as the issuer, http on a deployment with
 // no TLS.

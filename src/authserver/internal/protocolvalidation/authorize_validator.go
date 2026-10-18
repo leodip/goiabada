@@ -144,7 +144,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 // ValidateClientAndRedirectURI answers RFC 6749 4.1.2.1: a missing or invalid client_id, or a
 // missing, non-absolute or unregistered redirect_uri, "MUST NOT automatically redirect the
 // user-agent to the invalid redirection URI". Every rejection here therefore reaches a rendered
-// page and never an error_description, which is why these seven are *i18n.LocalizedError and
+// page and never an error_description, which is why these six are *i18n.LocalizedError and
 // render in the visitor's locale, while the validations that run after this one return
 // oauth.ErrorDetail and stay English (#213).
 //
