@@ -125,7 +125,7 @@ func TestAjax_ThePagesLanguageOutranksTheBrowserAndTheProfile(t *testing.T) {
 			req.Header.Set("Accept-Language", "en")
 			w := httptest.NewRecorder()
 			handler := adminresourcehandlers.HandlePermissionsPost(render.New(nil), nil,
-				apiclient.NewAuthServerClient(upstream.URL, nil))
+				apiclient.NewAuthServerClient(upstream.URL, nil, nil))
 			i18n.Locale(nil)(middleware.LocaleFromJWT()(handler)).ServeHTTP(w, req)
 
 			require.Equal(t, tc.status, w.Code)

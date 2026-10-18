@@ -56,7 +56,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	s := &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  newTestSessionStore(),
-		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{AdminConsole: config.AdminConsoleConfig{LogHttpRequests: logHttpRequests}},
 		metrics:       metrics.NewRegistry(),
 	}

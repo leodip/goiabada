@@ -37,7 +37,7 @@ func TestHTTPBackend_RecordsEachAttemptUnderTheSessionsTarget(t *testing.T) {
 		alwaysOK(api.SessionLoadResponse{Data: "ciphertext"})(w, attempt)
 	})
 	reg := metrics.NewRegistry()
-	backend := New(stub.server.URL, newStubTokens(), upstreammetrics.Register(reg))
+	backend := New(stub.server.URL, newStubTokens(), nil, upstreammetrics.Register(reg))
 
 	_, err := backend.Load(context.Background(), httpTestSessionId)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestHTTPBackend_AnEndpointNothingAnswersIsAnErrorPerAttempt(t *testing.T) {
 	require.NoError(t, closed.Close())
 
 	reg := metrics.NewRegistry()
-	backend := New(baseURL, newStubTokens(), upstreammetrics.Register(reg))
+	backend := New(baseURL, newStubTokens(), nil, upstreammetrics.Register(reg))
 
 	_, err = backend.Load(context.Background(), httpTestSessionId)
 	require.Error(t, err)

@@ -109,7 +109,7 @@ func TestExecutor_ACancelledRequestContextStopsTheCall(t *testing.T) {
 		server.Close()
 	})
 
-	client := NewAuthServerClient(server.URL, nil)
+	client := NewAuthServerClient(server.URL, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -129,7 +129,7 @@ func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing
 		server.Close()
 	})
 
-	client := NewAuthServerClient(server.URL, nil)
+	client := NewAuthServerClient(server.URL, nil, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -151,7 +151,7 @@ func TestExecutor_ARequestDeadlineStopsACallTheAuthServerNeverAnswers(t *testing
 // at the real value would cost the suite ten seconds of sleeping on every run, forever, to observe
 // a contract net/http already holds.
 func TestNewAuthServerClient_CarriesADeadline(t *testing.T) {
-	client := NewAuthServerClient("http://auth.example.com", nil)
+	client := NewAuthServerClient("http://auth.example.com", nil, nil)
 
 	assert.Equal(t, generalAPITimeout, client.httpClient.Timeout,
 		"every request this client makes is bounded")
@@ -174,7 +174,7 @@ func TestExecutor_RecordsEveryCallUnderTheAdminAPITarget(t *testing.T) {
 	defer server.Close()
 
 	reg := metrics.NewRegistry()
-	client := NewAuthServerClient(server.URL, upstreammetrics.Register(reg))
+	client := NewAuthServerClient(server.URL, nil, upstreammetrics.Register(reg))
 
 	_, err := client.GetSettingsGeneral(context.Background(), charAccessToken)
 	require.NoError(t, err)

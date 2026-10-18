@@ -13,6 +13,8 @@
 package apiclient
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"net/http"
 
@@ -59,12 +61,21 @@ func parseAPIError(resp *http.Response, body []byte) *APIError {
 }
 
 // NewAuthServerClient builds the client, every call its executor makes recorded by upstream under
-// the admin_api target, one target for all of its methods (#400 decision 6).
-func NewAuthServerClient(authServerBaseURL string, upstream *upstreammetrics.Recorder) *AuthServerClient {
+// the admin_api target, one target for all of its methods (#400 decision 6). rootCAs is the pool
+// it verifies the auth server's certificate against, nil for the system roots alone; the routes
+// hand it the pool main built, so an https internal URL a private CA signed verifies once the
+// operator names the CA through GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (#525).
+func NewAuthServerClient(authServerBaseURL string, rootCAs *x509.CertPool, upstream *upstreammetrics.Recorder) *AuthServerClient {
+	// The transport is the default one carrying the configured roots, so the file's authorities
+	// are trusted beside the system roots rather than in their place (#525).
+	client := &http.Client{Timeout: generalAPITimeout}
+	if rootCAs != nil {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
+		client.Transport = transport
+	}
 	return &AuthServerClient{
-		baseURL: authServerBaseURL,
-		httpClient: upstream.Client(upstreammetrics.AdminAPI, &http.Client{
-			Timeout: generalAPITimeout,
-		}),
+		baseURL:    authServerBaseURL,
+		httpClient: upstream.Client(upstreammetrics.AdminAPI, client),
 	}
 }

@@ -46,9 +46,9 @@ func newMetricsTestServer(t *testing.T) *Server {
 	}
 	registry := metrics.NewRegistry()
 	upstream := upstreammetrics.Register(registry)
-	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, upstream), publicsettings.DefaultTTL, registry)
+	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, upstream), publicsettings.DefaultTTL, registry)
 
-	s := NewServer(chi.NewRouter(), newTestSessionStore(), cache, nil, cfg, nil, nil, registry, upstream)
+	s := NewServer(chi.NewRouter(), newTestSessionStore(), cache, nil, cfg, nil, nil, nil, registry, upstream)
 	s.registerRoutes()
 	return s
 }

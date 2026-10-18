@@ -91,7 +91,7 @@ func newStaticBranchTestServer(authServerBaseURL string, store *sessionstore.Ser
 	return &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  store,
-		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
+		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{},
 		metrics:       metrics.NewRegistry(),
 		staticFS:      fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},

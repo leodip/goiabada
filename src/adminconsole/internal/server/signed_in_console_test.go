@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/x509"
 	"encoding/gob"
 	"encoding/json"
 	"net/http"
@@ -31,8 +32,32 @@ import (
 // accepts as a session is made once.
 func newSignedInConsole(t *testing.T, scope string, adminAPI http.HandlerFunc) (*Server, []*http.Cookie) {
 	t.Helper()
+	return newSignedInConsoleServedBy(t, scope, adminAPI, httptest.NewServer, nil)
+}
+
+// newSignedInConsoleOverTLS is newSignedInConsole with the auth server served over TLS under a
+// certificate the system roots do not hold, and the root pool holding it handed to the server and
+// the clients composed beside it, as main hands them the pool GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE
+// names (#525).
+func newSignedInConsoleOverTLS(t *testing.T, scope string, adminAPI http.HandlerFunc) (*Server, []*http.Cookie) {
+	t.Helper()
+	var roots *x509.CertPool
+	serve := func(handler http.Handler) *httptest.Server {
+		server := httptest.NewTLSServer(handler)
+		roots = x509.NewCertPool()
+		roots.AddCert(server.Certificate())
+		return server
+	}
+	return newSignedInConsoleServedBy(t, scope, adminAPI, serve, func() *x509.CertPool { return roots })
+}
+
+// newSignedInConsoleServedBy is newSignedInConsole with the auth server started by serve, and the
+// root pool rootCAs answers, nil for the system roots, handed to everything that calls it.
+func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.HandlerFunc,
+	serve func(http.Handler) *httptest.Server, rootCAs func() *x509.CertPool) (*Server, []*http.Cookie) {
+	t.Helper()
 	signing, _ := oauthclienttest.Keys(t)
-	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	authServer := serve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/public/settings":
@@ -50,11 +75,15 @@ func newSignedInConsole(t *testing.T, scope string, adminAPI http.HandlerFunc) (
 		AdminConsole: config.AdminConsoleConfig{BaseURL: "https://console.example.test"},
 		AuthServer:   config.AuthServerConfig{BaseURL: authServer.URL},
 	}
+	var roots *x509.CertPool
+	if rootCAs != nil {
+		roots = rootCAs()
+	}
 	registry := metrics.NewRegistry()
 	upstream := upstreammetrics.Register(registry)
-	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, upstream), publicsettings.DefaultTTL, registry)
+	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, roots, upstream), publicsettings.DefaultTTL, registry)
 	store := newTestSessionStore()
-	s := NewServer(chi.NewRouter(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(), nil, registry, upstream)
+	s := NewServer(chi.NewRouter(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(roots), roots, nil, registry, upstream)
 	s.registerRoutes()
 
 	claims := oauthclienttest.ValidClaims()

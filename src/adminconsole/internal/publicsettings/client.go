@@ -2,6 +2,8 @@ package publicsettings
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -43,12 +45,21 @@ type Client struct {
 }
 
 // NewClient builds the client, every call it makes recorded by upstream under the settings
-// target (#400 decision 6).
-func NewClient(authServerBaseURL string, upstream *upstreammetrics.Recorder) *Client {
+// target (#400 decision 6). rootCAs is the pool it verifies the auth server's certificate
+// against, nil for the system roots alone; main hands it the pool it built, so an https internal
+// URL a private CA signed verifies once the operator names the CA through
+// GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (#525).
+func NewClient(authServerBaseURL string, rootCAs *x509.CertPool, upstream *upstreammetrics.Recorder) *Client {
+	// The transport is the default one carrying the configured roots, so the file's authorities
+	// are trusted beside the system roots rather than in their place (#525).
+	client := &http.Client{Timeout: clientTimeout}
+	if rootCAs != nil {
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
+		client.Transport = transport
+	}
 	return &Client{
-		httpClient: upstream.Client(upstreammetrics.Settings, &http.Client{
-			Timeout: clientTimeout,
-		}),
+		httpClient:        upstream.Client(upstreammetrics.Settings, client),
 		authServerBaseURL: authServerBaseURL,
 	}
 }

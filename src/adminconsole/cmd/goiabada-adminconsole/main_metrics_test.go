@@ -37,8 +37,8 @@ type metricsChild struct {
 // startMetricsChild starts main with the http listener and the metrics listener on loopback, the
 // latter on metricsPort, against the auth server at authServerURL, and delivers each record it
 // writes as it writes it. enabled is the value of the metrics setting, and an empty one leaves the
-// setting out of the environment.
-func startMetricsChild(t *testing.T, ctx context.Context, authServerURL string, httpPort, metricsPort int, enabled string) *metricsChild {
+// setting out of the environment. extraEnv is appended to the environment, so it wins.
+func startMetricsChild(t *testing.T, ctx context.Context, authServerURL string, httpPort, metricsPort int, enabled string, extraEnv ...string) *metricsChild {
 	t.Helper()
 
 	cmd := exec.CommandContext(ctx, os.Args[0])
@@ -58,6 +58,7 @@ func startMetricsChild(t *testing.T, ctx context.Context, authServerURL string, 
 	if enabled != "" {
 		cmd.Env = append(cmd.Env, "GOIABADA_ADMINCONSOLE_METRICS_ENABLED="+enabled)
 	}
+	cmd.Env = append(cmd.Env, extraEnv...)
 	stderr, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())

@@ -6,6 +6,8 @@
 package config
 
 import (
+	"crypto/x509"
+	"errors"
 	"flag"
 	"log/slog"
 	"net"
@@ -50,6 +52,16 @@ type AdminConsoleConfig struct {
 	// catalogs, or empty for none. It has no flag, like the auth server's, so the one variable
 	// configures both servers the same way (#431).
 	I18nOverridesDir string
+	// InternalCAFile is the PEM file whose authorities the console appends to the system roots
+	// before it verifies the auth server's certificate on an https internal URL, so a private CA
+	// can sign that URL without the process's own roots being replaced. Empty, its calls verify
+	// against the system roots alone (#525).
+	InternalCAFile string
+	// InternalRoots is the pool Load read InternalCAFile into: the system roots with the file's
+	// authorities appended, which every client main and the route table build verifies the auth
+	// server's certificate against. nil while InternalCAFile is unset, which is the system roots
+	// alone (#525).
+	InternalRoots *x509.CertPool
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -114,7 +126,8 @@ type Config struct {
 // configuration at request time (#441).
 //
 // It answers a whole configuration or an error: the parse's, or one naming every numeric or
-// boolean variable that is set and does not parse. A flag given for the same setting does not
+// boolean variable that is set and does not parse, and the internal CA file when it cannot be read
+// or holds no certificate (#525). A flag given for the same setting does not
 // rescue the variable: the value the operator wrote is wrong whichever of the two wins (#434).
 func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	var malformed malformedValues
@@ -143,6 +156,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 			ListenHostMetrics:                getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS", "0.0.0.0"),
 			ListenPortMetrics:                getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_METRICS", 9191, &malformed),
 			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
+			InternalCAFile:                   getEnv("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", ""),
 		},
 		AuthServer: AuthServerConfig{
 			BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
@@ -166,6 +180,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.StringVar(&c.AdminConsole.KeyFile, "adminconsole-keyfile", c.AdminConsole.KeyFile, "Key file for HTTPS (admin console)")
 	fs.StringVar(&c.AdminConsole.StaticDir, "adminconsole-staticdir", c.AdminConsole.StaticDir, "Static files directory for admin console")
 	fs.StringVar(&c.AdminConsole.TemplateDir, "adminconsole-templatedir", c.AdminConsole.TemplateDir, "Template files directory for admin console")
+	fs.StringVar(&c.AdminConsole.InternalCAFile, "adminconsole-internal-ca-file", c.AdminConsole.InternalCAFile, "PEM file of certificate authorities trusted on top of the system roots for the calls to the auth server (admin console)")
 	fs.StringVar(&c.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", c.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 	fs.BoolVar(&c.AdminConsole.MetricsEnabled, "adminconsole-metrics-enabled", c.AdminConsole.MetricsEnabled, "Serve Prometheus metrics on the admin console's metrics listener")
 	fs.StringVar(&c.AdminConsole.ListenHostMetrics, "adminconsole-listen-host-metrics", c.AdminConsole.ListenHostMetrics, "Admin console metrics host")
@@ -187,6 +202,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
 	c.AdminConsole.TrustedProxies = splitCSV(adminConsoleTrustedProxies)
+
+	// After the parse, because the flag can name the file too.
+	readInternalRoots(&c.AdminConsole, &malformed)
 
 	// Warn about removed settings still present in the environment so a
 	// deployment relying on them notices they are now ignored. The Secure cookie
@@ -218,12 +236,61 @@ func getEnv(key string, defaultVal string) string {
 	return strings.TrimSpace(defaultVal)
 }
 
-// malformedValues collects every numeric or boolean variable Load could not parse, so one
-// refusal names them all rather than costing the operator a restart per typo (#434).
+// malformedValues collects every numeric or boolean variable Load could not parse, and the internal
+// CA file when it cannot build a pool from it (#525), so one refusal names them all rather than
+// costing the operator a restart per typo (#434).
 type malformedValues []string
 
 func (m *malformedValues) add(key, value, want string) {
 	*m = append(*m, key+" is "+strconv.Quote(value)+", not "+want)
+}
+
+// addLine records a refusal that is not a value out of its form, written whole by the caller,
+// who quotes any value in it.
+func (m *malformedValues) addLine(refusal string) {
+	*m = append(*m, refusal)
+}
+
+// readInternalRoots reads the internal CA file into c.InternalRoots, which is how the file is read
+// once, at start, and refuses one it cannot build a pool from, as the auth server's database CA
+// file is refused (#502): one that cannot be read, and one holding no PEM certificate. Each is a
+// malformed value, so the console stops with one stderr line and exit 2, naming it beside every
+// other malformed value rather than on the next start (#525).
+//
+// The file's authorities are appended to the system roots rather than put in their place, which is
+// the difference from the auth server's database CA file: SSL_CERT_FILE and SSL_CERT_DIR are the
+// way to replace the roots wholesale, and an operator naming one CA has asked to trust it beside
+// the roots the process already had, not to stop trusting them.
+func readInternalRoots(c *AdminConsoleConfig, malformed *malformedValues) {
+	c.InternalRoots = nil
+	if c.InternalCAFile == "" {
+		return
+	}
+
+	const setting = "GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE (--adminconsole-internal-ca-file) is "
+	file := strconv.Quote(c.InternalCAFile)
+	pemBytes, err := os.ReadFile(c.InternalCAFile)
+	if err != nil {
+		// The cause alone: the path is quoted above, and the error repeats it unquoted.
+		reason := err.Error()
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			reason = pathErr.Err.Error()
+		}
+		malformed.addLine(setting + file + ", which cannot be read: " + reason)
+		return
+	}
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		// Quoted, because the error names a path from SSL_CERT_FILE or SSL_CERT_DIR, unquoted.
+		malformed.addLine(setting + file + ", whose authorities join the system roots, which do not load: " + strconv.Quote(err.Error()))
+		return
+	}
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		malformed.addLine(setting + file + ", which holds no PEM certificate")
+		return
+	}
+	c.InternalRoots = roots
 }
 
 // err is the refusal: one line, whatever the values hold, because main writes it to stderr

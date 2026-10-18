@@ -95,7 +95,7 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 }
 
 // configVariables is every live GOIABADA_* variable this process loads: the admin console's own
-// 23 and the 2 auth server endpoints it talks to, of which 20 have a flag. The names Load
+// 24 and the 2 auth server endpoints it talks to, of which 21 have a flag. The names Load
 // mentions that are not live configuration are in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Admin console
@@ -171,6 +171,11 @@ var configVariables = []configVar{
 		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
 		read: func(c *Config) any { return c.AdminConsole.I18nOverridesDir },
 	},
+	// Load reads the file the setting names, and refuses one it cannot (#525), so both values
+	// are real files: certificates and nothing else.
+	strVar("GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE", "adminconsole-internal-ca-file", "",
+		"testdata/internal-ca-env.pem", "testdata/internal-ca-flag.pem",
+		func(c *Config) any { return c.AdminConsole.InternalCAFile }),
 
 	// Auth server: the two endpoints this process talks to. The other 22 GOIABADA_AUTHSERVER_*
 	// variables are the peer's own and are not loaded here, so they have no row -- and the drift
@@ -365,9 +370,9 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 // Seam 2: the registered flag set of this binary
 // -----------------------------------------------------------------------------
 
-// adminConsoleFlags is the 20 flags the admin console registers: its own 18, and the two auth
+// adminConsoleFlags is the 21 flags the admin console registers: its own 19, and the two auth
 // server endpoints it talks to. 17 were what the split left (#351); the three metrics listener
-// flags came after it (#400).
+// flags came after it (#400), and the internal CA file's after #525.
 //
 // It is written out rather than derived from configVariables, and that is the whole point. A
 // derived expectation cannot fail when a flag is dropped from the table and from config.go
@@ -377,6 +382,7 @@ func TestLoad_FlagBeatsTheEnvironment(t *testing.T) {
 var adminConsoleFlags = []string{
 	"adminconsole-baseurl",
 	"adminconsole-certfile",
+	"adminconsole-internal-ca-file",
 	"adminconsole-keyfile",
 	"adminconsole-listen-host-http",
 	"adminconsole-listen-host-https",
@@ -403,6 +409,7 @@ var flagsAddedAfterTheSplit = []string{
 	"adminconsole-listen-host-metrics",
 	"adminconsole-listen-port-metrics",
 	"adminconsole-metrics-enabled",
+	"adminconsole-internal-ca-file",
 }
 
 // refusedFlags is the other half of the narrowing, named rather than merely absent: the 28
