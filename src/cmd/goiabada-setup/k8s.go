@@ -181,6 +181,13 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		fmt.Fprintf(&sb, "      - name: %s\n", dbClientTLSSecret)
 		sb.WriteString("        secret:\n")
 		fmt.Fprintf(&sb, "          secretName: %s\n", dbClientTLSSecret)
+		// The two keys are named, so a Secret holding others, such as the tls.crt and tls.key
+		// `kubectl create secret tls` writes, leaves the pod waiting on an event that names the
+		// missing key, and the docs' create command is held to these keys.
+		sb.WriteString("          items:\n")
+		for _, key := range []string{dbClientCertFileName, dbClientKeyFileName} {
+			fmt.Fprintf(&sb, "          - key: %s\n            path: %s\n", key, key)
+		}
 	}
 	sb.WriteString("\n")
 	writeDisruptionBudget(&sb, ns, "goiabada-authserver")

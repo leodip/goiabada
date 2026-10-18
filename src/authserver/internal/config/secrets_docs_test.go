@@ -354,6 +354,55 @@ func TestKubernetesDocs_AMatchingContractPasses(t *testing.T) {
 	}
 }
 
+// A Secret a volume mounts is held by its items, as one an env entry reads is by its key: a create
+// command leaving a mounted key out fails, one creating both passes, and a volume mounting a
+// Secret whole is a finding of its own, since it names no key to hold the docs to (#546).
+func TestKubernetesDocs_AMountedSecretIsHeldByItsItems(t *testing.T) {
+	const items = "          items:\n          - key: client-cert.pem\n            path: client-cert.pem\n" +
+		"          - key: client-key.pem\n            path: client-key.pem\n"
+	mounting := func(items string) string {
+		volume := "      volumes:\n      - name: client-tls\n        secret:\n          secretName: goiabada-db-client-tls\n" + items
+		return strings.Replace(contractManifest, "              optional: true\n---", "              optional: true\n"+volume+"---", 1)
+	}
+	const both = "\n```bash\nkubectl create secret generic goiabada-db-client-tls -n goiabada \\\n" +
+		"  --from-file=client-cert.pem=client.crt \\\n  --from-file=client-key.pem=client.key\n```\n"
+	const certOnly = "\n```bash\nkubectl create secret generic goiabada-db-client-tls -n goiabada --from-file=client-cert.pem=client.crt\n```\n"
+
+	tests := []struct {
+		name, manifest, command string
+		want                    []string
+	}{
+		{"both keys, both created", mounting(items), both, nil},
+		{"both keys, one created", mounting(items), certOnly,
+			[]string{"`kubectl create secret generic goiabada-db-client-tls` creates [client-cert.pem], want [client-cert.pem client-key.pem]"}},
+		{"mounted whole", mounting(""), both, []string{
+			"kubernetes-postgres.golden: a volume mounts the Secret goiabada-db-client-tls whole; list the keys the server reads under its items",
+			"`kubectl create secret generic goiabada-db-client-tls` creates [client-cert.pem client-key.pem], want []"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeManifestFixture(t, root, "src/cmd/goiabada-setup/testdata/kubernetes-postgres.golden", tt.manifest)
+			writeContractPages(t, root, contractPage+tt.command, contractUpgradePage)
+
+			report := guard.Run(func(r guard.Reporter) { assertSecretContract(r, root) })
+
+			if report.Stopped {
+				t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+			}
+			text := report.Text()
+			for _, want := range tt.want {
+				if !strings.Contains(text, want) {
+					t.Errorf("no failure says %q:\n%s", want, text)
+				}
+			}
+			if len(report.Errors) != len(tt.want) {
+				t.Errorf("%d failures, want %d:\n%s", len(report.Errors), len(tt.want), text)
+			}
+		})
+	}
+}
+
 // A key two rows name is refused, so a later table cannot hide an earlier row that is wrong.
 func TestKubernetesDocs_AKeyTwoRowsNameIsRefused(t *testing.T) {
 	const header = "| Secret | Key | Variable | Read by | Value |\n|---|---|---|---|---|\n"
@@ -570,6 +619,21 @@ func secretContractFindings(root string) ([]string, error) {
 			continue
 		}
 		examined++
+		mounted, whole, err := secretVolumeKeys(content)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", rel, err)
+		}
+		for _, secret := range whole {
+			findings = append(findings, fmt.Sprintf("%s: a volume mounts the Secret %s whole; list the keys the server reads under its items, so the docs' commands can be held to them", rel, secret))
+		}
+		for secret, keys := range mounted {
+			if keysRead[secret] == nil {
+				keysRead[secret] = map[string]bool{}
+			}
+			for key := range keys {
+				keysRead[secret][key] = true
+			}
+		}
 		for ref, reader := range read {
 			if keysRead[ref.secret] == nil {
 				keysRead[ref.secret] = map[string]bool{}
@@ -705,6 +769,51 @@ func secretReferences(content []byte) (map[secretRef]secretReader, int, error) {
 		read[ref] = secretReader{reader, !required[ref]}
 	}
 	return read, deployments, nil
+}
+
+// secretVolumeKeys is every key a Deployment mounts from a Secret through a volume's items, and
+// every Secret a volume mounts whole. A whole mount names no key, so neither the docs' commands
+// nor the table could be held to it: each is a finding of its own, and the manifest lists the
+// keys its server reads (#546).
+func secretVolumeKeys(content []byte) (map[string]map[string]bool, []string, error) {
+	keys := map[string]map[string]bool{}
+	var whole []string
+	decoder := yaml.NewDecoder(bytes.NewReader(content))
+	for {
+		var doc map[string]any
+		err := decoder.Decode(&doc)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if doc["kind"] != "Deployment" {
+			continue
+		}
+		volumes, _ := mapAt(doc, "spec", "template", "spec")["volumes"].([]any)
+		for _, v := range volumes {
+			volume, _ := v.(map[string]any)
+			secret := mapAt(volume, "secret")
+			if secret == nil {
+				continue
+			}
+			name := fmt.Sprint(secret["secretName"])
+			items, _ := secret["items"].([]any)
+			if len(items) == 0 {
+				whole = append(whole, name)
+				continue
+			}
+			if keys[name] == nil {
+				keys[name] = map[string]bool{}
+			}
+			for _, i := range items {
+				item, _ := i.(map[string]any)
+				keys[name][fmt.Sprint(item["key"])] = true
+			}
+		}
+	}
+	return keys, whole, nil
 }
 
 type createCommand struct {
@@ -969,6 +1078,18 @@ func manifestSecretKeys(root string) (map[string]map[string]bool, error) {
 				keys[ref.secret] = map[string]bool{}
 			}
 			keys[ref.secret][ref.key] = true
+		}
+		mounted, _, err := secretVolumeKeys(content)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Base(path), err)
+		}
+		for secret, mountedKeys := range mounted {
+			if keys[secret] == nil {
+				keys[secret] = map[string]bool{}
+			}
+			for key := range mountedKeys {
+				keys[secret][key] = true
+			}
 		}
 	}
 	if examined == 0 {

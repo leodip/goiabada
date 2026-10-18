@@ -319,6 +319,11 @@ spec:
       - name: goiabada-db-client-tls
         secret:
           secretName: goiabada-db-client-tls
+          items:
+          - key: client-cert.pem
+            path: client-cert.pem
+          - key: client-key.pem
+            path: client-key.pem
 
 ---
 # A voluntary disruption, such as a node drain or a cluster upgrade, evicts one pod at a
