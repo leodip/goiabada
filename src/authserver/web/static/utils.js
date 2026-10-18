@@ -67,7 +67,9 @@ document.querySelectorAll("a[data-history-back]").forEach(function (link) {
 // A button marked data-copy-target copies the text of the element it names, for a secret a person
 // would otherwise type again, such as an authenticator key, and says so for a moment on itself and
 // in the status element data-copy-status names. It stays hidden where the browser cannot write to
-// the clipboard, where the text is still there to select.
+// the clipboard, where the text is still there to select. Where the browser has the clipboard but
+// refuses the write, as a denied permission does, it selects the text instead and says so, with
+// data-copy-failed-label on itself and data-copy-failed-status in the status element.
 document.querySelectorAll("button[data-copy-target]").forEach(function (button) {
   const source = document.getElementById(button.dataset.copyTarget);
   const status = document.getElementById(button.dataset.copyStatus);
@@ -77,20 +79,29 @@ document.querySelectorAll("button[data-copy-target]").forEach(function (button) 
   }
   const idle = label.textContent;
   let timer = 0;
+  const say = function (text, announcement) {
+    label.textContent = text || idle;
+    if (status) {
+      status.textContent = announcement || "";
+    }
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      label.textContent = idle;
+      if (status) {
+        status.textContent = "";
+      }
+    }, 2000);
+  };
   button.hidden = false;
   button.addEventListener("click", function () {
     navigator.clipboard.writeText(source.textContent.trim()).then(function () {
-      label.textContent = button.dataset.copiedLabel;
-      if (status) {
-        status.textContent = button.dataset.copiedLabel;
+      say(button.dataset.copiedLabel, button.dataset.copiedLabel);
+    }, function () {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.selectAllChildren(source);
       }
-      clearTimeout(timer);
-      timer = setTimeout(function () {
-        label.textContent = idle;
-        if (status) {
-          status.textContent = "";
-        }
-      }, 2000);
+      say(button.dataset.copyFailedLabel, button.dataset.copyFailedStatus);
     });
   });
 });

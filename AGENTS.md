@@ -729,7 +729,9 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
   least 24 pixels. A refusal about one field marks it `aria-invalid="true"` and names the notice in
   its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
-  reads as one branch; a handler whose form has several fields says which in `errorField`.
+  reads as one branch; a handler whose form has several fields says which in `errorField`. No
+  template rebinds `$`, which the guard refuses, since it reads `$` as the data the template was
+  called with.
 - **Page patterns**: every page is one of a few shapes, built the same way each time, and the first
   page of each shape is its reference. A list (`admin_users.html`): the page header with the main
   action, a GET search form if the list searches, a `data-table-stack` table whose first cell links

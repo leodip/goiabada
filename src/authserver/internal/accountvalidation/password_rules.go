@@ -11,7 +11,9 @@ import (
 // DescribePasswordRules is the sentence a form that sets a password shows under the field, in the
 // language of ctx: the length and the kinds of character PasswordRulesFor answers for policy, in
 // the order ValidatePassword checks them. It is empty when the policy asks for a single character,
-// which needs no telling.
+// which needs no telling. The maximum is left to its refusal, which explains it: it counts bytes,
+// so a sentence in characters would misstate it for an accented password, and one in bytes would
+// ask every reader what a byte is, for a bound few passwords reach.
 func DescribePasswordRules(ctx context.Context, policy record.PasswordPolicy) string {
 	rules := PasswordRulesFor(policy)
 	if rules.MinLength <= 1 && !rules.LowerCase && !rules.UpperCase && !rules.Number && !rules.SpecialCharacter {

@@ -7,8 +7,12 @@
 <form method="post" class="stacked" novalidate data-submit-once>
   <input type="hidden" name="ceremonyId" value="{{ .ceremonyId }}">
 
+  {{/* errorField names the field a refusal is about, the address or the password left empty,
+       which is marked invalid and described by the notice; a refusal of the pair names neither.
+       Focus goes where typing starts again: the address when it is the one missing, otherwise the
+       password, which comes back empty. */}}
   {{ if .error }}
-  <div class="notice notice-danger" role="alert">
+  <div class="notice notice-danger" role="alert" id="pwd-error">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
       <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
     </svg>
@@ -18,12 +22,12 @@
 
   <div class="field">
     <label class="field-label" for="email">{{ T $.ctx "auth.pwd.email_label" }}</label>
-    <input class="control" id="email" type="email" name="email" value="{{ .email }}" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
+    <input class="control" id="email" type="email" name="email" value="{{ .email }}" autocomplete="username" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "email" }} aria-invalid="true" aria-describedby="pwd-error" autofocus{{ end }}{{ else }} autofocus{{ end }}>
   </div>
 
   <div class="field">
     <label class="field-label" for="password">{{ T $.ctx "auth.pwd.password_label" }}</label>
-    <input class="control" id="password" type="password" name="password" autocomplete="current-password">
+    <input class="control" id="password" type="password" name="password" autocomplete="current-password"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="pwd-error"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}>
     {{ if .smtpEnabled }}
     <p class="text-right text-sm"><a class="text-link" href="/forgot-password">{{ T $.ctx "auth.pwd.forgot_password" }}</a></p>
     {{ end }}

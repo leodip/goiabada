@@ -82,6 +82,8 @@
 "auth.otp_enrollment.scan_alternative" = "Não consegue escanear? Digite esta chave no aplicativo:"
 "auth.otp_enrollment.copy_key" = "Copiar chave"
 "auth.otp_enrollment.key_copied" = "Chave copiada"
+"auth.otp_enrollment.copy_failed" = "Não foi possível copiar"
+"auth.otp_enrollment.copy_failed_status" = "Não foi possível copiar a chave. Ela está selecionada para você copiar."
 "auth.otp_enrollment.step3" = "Digite o código de 6 dígitos que o aplicativo mostra."
 
 # --- Tela de consentimento (auth/consent) ------------------------------------
@@ -209,8 +211,8 @@
 "reset_password.intro" = "Escolha uma senha para a sua conta:"
 "reset_password.button" = "Definir senha"
 "reset_password.code_invalid_title" = "Este link não pode ser usado"
-"reset_password.code_invalid_message" = "Um link de senha funciona uma única vez e expira em 5 minutos, e um navegador só pode ter um link enviado por e-mail em andamento por vez."
-"reset_password.code_invalid_recovery" = "Solicite um novo link. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
+"reset_password.code_invalid_message" = "Um link de senha funciona uma única vez e por tempo limitado, e um navegador só pode ter um link enviado por e-mail em andamento por vez."
+"reset_password.code_invalid_recovery" = "Solicite um novo link. Se nenhum chegar e o link era para configurar uma conta nova, peça ajuda ao administrador. Se outro link nosso estiver aberto neste navegador, conclua por lá ou aguarde 5 minutos e tente de novo."
 "reset_password.code_invalid_link" = "Solicitar um novo link"
 "reset_password.modal_title" = "Senha definida"
 "reset_password.modal_body" = "Sua senha foi definida. Agora você pode entrar com:"

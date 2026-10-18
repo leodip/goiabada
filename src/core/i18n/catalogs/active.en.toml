@@ -84,6 +84,8 @@
 "auth.otp_enrollment.scan_alternative" = "Can't scan it? Enter this key in the app instead:"
 "auth.otp_enrollment.copy_key" = "Copy key"
 "auth.otp_enrollment.key_copied" = "Key copied"
+"auth.otp_enrollment.copy_failed" = "Couldn't copy"
+"auth.otp_enrollment.copy_failed_status" = "Couldn't copy the key. It's selected, so you can copy it yourself."
 "auth.otp_enrollment.step3" = "Enter the 6-digit code the app shows."
 
 # --- Consent screen (auth/consent) ------------------------------------------
@@ -221,8 +223,8 @@
 "reset_password.intro" = "Choose a password for your account:"
 "reset_password.button" = "Set password"
 "reset_password.code_invalid_title" = "This link can't be used"
-"reset_password.code_invalid_message" = "A password link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
-"reset_password.code_invalid_recovery" = "Request a new link. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
+"reset_password.code_invalid_message" = "A password link works once and for a limited time, and a browser can have only one emailed link in progress at a time."
+"reset_password.code_invalid_recovery" = "Request a new link. If none arrives and the link was to set up a new account, ask your administrator for help. If another link from us is open in this browser, finish there, or wait 5 minutes and try again."
 "reset_password.code_invalid_link" = "Request a new link"
 "reset_password.modal_title" = "Password set"
 "reset_password.modal_body" = "Your password is set. You can now sign in with:"

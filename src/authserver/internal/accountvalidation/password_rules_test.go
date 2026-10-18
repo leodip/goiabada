@@ -1,9 +1,9 @@
 package accountvalidation
 
 // The rules a form that sets a password describes are the rules the validator applies: a password
-// built to meet exactly what PasswordRulesFor answers passes, one short of the length or missing a
-// required kind of character fails, one lacking a kind that is not required passes, and the
-// sentence DescribePasswordRules shows names exactly those rules.
+// built to meet exactly what PasswordRulesFor answers passes, one short of the length, one byte
+// past the maximum or missing a required kind of character fails, one lacking a kind that is not
+// required passes, and the sentence DescribePasswordRules shows names the length and the kinds.
 
 import (
 	"context"
@@ -62,6 +62,20 @@ func TestPasswordRules_TheValidatorAppliesWhatTheFormDescribes(t *testing.T) {
 				require.Error(t, validator.ValidatePassword(policy, passwordFor(rules, rules.MinLength-1, "")),
 					"a password one character short of the described length passed")
 			}
+			require.NoError(t, validator.ValidatePassword(policy, passwordFor(rules, rules.MaxBytes, "")),
+				"a password of exactly the maximum bytes is refused")
+			require.Error(t, validator.ValidatePassword(policy, passwordFor(rules, rules.MaxBytes+1, "")),
+				"a password one byte past the maximum passed")
+			// The maximum counts bytes: "é" is one lowercase letter of two bytes.
+			accented := passwordFor(rules, rules.MinLength, "")
+			if (rules.MaxBytes-len(accented))%2 == 1 {
+				accented += "a"
+			}
+			accented += strings.Repeat("é", (rules.MaxBytes-len(accented))/2)
+			require.NoError(t, validator.ValidatePassword(policy, accented),
+				"an accented password of exactly the maximum bytes is refused")
+			require.Error(t, validator.ValidatePassword(policy, accented+"é"),
+				"an accented password past the maximum bytes, though not past it in characters, passed")
 			for _, kind := range passwordKinds {
 				password := passwordFor(rules, rules.MinLength, kind.name)
 				if kind.required(rules) {

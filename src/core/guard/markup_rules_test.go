@@ -205,6 +205,17 @@ func TestWellFormedTemplates_TheRuleTable(t *testing.T) {
 			`{{if .error}}<p id="e">E</p>{{end}}{{if .y}}<input aria-label="X"{{if .error}}{{if .z}} aria-describedby="e"{{end}}{{end}}>{{end}}`, nil},
 		{"the root's field from another dot", `{{if $.error}}<p id="e">E</p>{{end}}` +
 			`{{with .form}}<input aria-label="X"{{if $.error}} aria-describedby="e"{{end}}>{{end}}`, nil},
+		{"the dot's field and the root's field in the template's own dot",
+			`{{if .error}}<p id="e">E</p>{{end}}<input aria-label="X"{{if $.error}} aria-describedby="e"{{end}}>`, nil},
+		{"the dot's field and the root's field in a called template's own dot",
+			`{{define "field"}}{{if .error}}<p id="e">E</p>{{end}}<input aria-label="X"{{if $.error}} aria-describedby="e"{{end}}>{{end}}` +
+				`{{template "field" .form}}`, nil},
+		{"$ assigned", `{{if $.error}}<p id="e">E</p>{{end}}{{$ = .form}}<input aria-label="X"{{if $.error}} aria-describedby="e"{{end}}>`,
+			[]string{`line 1: rebinds $, which is the data the template was called with: give the value a variable of its own`}},
+		{"$ declared", `{{$ := .form}}<p>{{.x}}</p>`,
+			[]string{`line 1: rebinds $, which is the data the template was called with: give the value a variable of its own`}},
+		{"$ declared by a range", `<ul>{{range $i, $ := .rows}}<li>{{$i}}</li>{{end}}</ul>`,
+			[]string{`line 1: rebinds $, which is the data the template was called with: give the value a variable of its own`}},
 		{"two ifs on different conditions",
 			`{{if .error}}<p id="e">E</p>{{end}}<input aria-label="X"{{if .other}} aria-describedby="e"{{end}}>`,
 			[]string{`line 1: aria-describedby names id "e", which is not declared wherever the reference renders`}},

@@ -309,7 +309,7 @@ func passwordHashOf(t *testing.T, userId int64) string {
 	return user.PasswordHash
 }
 
-const resetCodeInvalidText = "A password link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
+const resetCodeInvalidText = "A password link works once and for a limited time, and a browser can have only one emailed link in progress at a time."
 const resetSucceededText = "Your password is set. You can now sign in with:"
 
 // The end-to-end guard for #112 itself: an address containing '+' completes a reset from the

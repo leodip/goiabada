@@ -21,9 +21,11 @@ func NewPasswordValidator() *PasswordValidator {
 	return &PasswordValidator{}
 }
 
-// PasswordRules is what a password policy asks of a new password.
+// PasswordRules is what a password policy asks of a new password. MinLength counts characters and
+// MaxBytes bytes.
 type PasswordRules struct {
 	MinLength        int
+	MaxBytes         int
 	LowerCase        bool
 	UpperCase        bool
 	Number           bool
@@ -36,13 +38,13 @@ type PasswordRules struct {
 func PasswordRulesFor(policy record.PasswordPolicy) PasswordRules {
 	switch policy {
 	case record.PasswordPolicyLow:
-		return PasswordRules{MinLength: 6}
+		return PasswordRules{MinLength: 6, MaxBytes: maxPasswordBytes}
 	case record.PasswordPolicyMedium:
-		return PasswordRules{MinLength: 8, LowerCase: true, UpperCase: true, Number: true}
+		return PasswordRules{MinLength: 8, MaxBytes: maxPasswordBytes, LowerCase: true, UpperCase: true, Number: true}
 	case record.PasswordPolicyHigh:
-		return PasswordRules{MinLength: 10, LowerCase: true, UpperCase: true, Number: true, SpecialCharacter: true}
+		return PasswordRules{MinLength: 10, MaxBytes: maxPasswordBytes, LowerCase: true, UpperCase: true, Number: true, SpecialCharacter: true}
 	default:
-		return PasswordRules{MinLength: 1}
+		return PasswordRules{MinLength: 1, MaxBytes: maxPasswordBytes}
 	}
 }
 
@@ -61,8 +63,8 @@ func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, pas
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": rules.MinLength})
 	}
 
-	if len(password) > maxPasswordBytes {
-		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": maxPasswordBytes})
+	if len(password) > rules.MaxBytes {
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": rules.MaxBytes})
 	}
 
 	if rules.LowerCase && !val.containsLowerCase(password) {

@@ -879,10 +879,13 @@ type markupWalk struct {
 	conditions map[string]int
 }
 
+// markupFrame is one template of the calls the reading is inside, and scope the dot it was called
+// with, which is its $.
 type markupFrame struct {
-	tree *parse.Tree
-	file *templateFile
-	via  string
+	tree  *parse.Tree
+	file  *templateFile
+	via   string
+	scope string
 }
 
 func newMarkupWalk(set *templateSet, trees map[string]*parse.Tree, kind readingKind) *markupWalk {
@@ -934,17 +937,22 @@ func (w *markupWalk) walkNode(s *markupState, node parse.Node) {
 	case *parse.TextNode:
 		w.text(s, string(n.Text), int(n.Pos))
 	case *parse.ActionNode:
+		w.rootBinding(n.Pipe)
 		if n.Pipe != nil && (len(n.Pipe.Decl) > 0 || n.Pipe.IsAssign) {
 			return // a declaration or an assignment renders nothing
 		}
 		w.action(s, n.String(), int(n.Pos))
 	case *parse.TemplateNode:
+		w.rootBinding(n.Pipe)
 		w.call(s, n)
 	case *parse.IfNode:
+		w.rootBinding(n.Pipe)
 		w.branches(s, branching{pos: int(n.Pos), key: w.sameBranch(s, n)}, n.List, n.ElseList)
 	case *parse.WithNode:
+		w.rootBinding(n.Pipe)
 		w.branches(s, branching{pos: int(n.Pos), key: int(n.Pos), rebinds: true}, n.List, n.ElseList)
 	case *parse.RangeNode:
+		w.rootBinding(n.Pipe)
 		w.branches(s, branching{pos: int(n.Pos), key: int(n.Pos), rebinds: true, isRange: true}, n.List, n.ElseList)
 	case *parse.ListNode:
 		w.walkList(s, n)
@@ -971,7 +979,7 @@ func (w *markupWalk) call(s *markupState, n *parse.TemplateNode) {
 	}
 	site := w.at(int(n.Pos))
 	via := fmt.Sprintf("%s line %d", site.file, site.line)
-	w.frames = append(w.frames, markupFrame{tree: called, file: w.set.files[called.ParseName], via: via})
+	w.frames = append(w.frames, markupFrame{tree: called, file: w.set.files[called.ParseName], via: via, scope: s.scope})
 	w.walkList(s, called.Root)
 	w.frames = w.frames[:len(w.frames)-1]
 }
@@ -997,11 +1005,28 @@ type branching struct {
 	isRange bool
 }
 
+// rootBinding reports a pipeline that declares or assigns $. The guard reads $ as the data the
+// template was called with, which is what sameBranch keys a $ condition by, so a template rebinding
+// it could pass a reference to a notice that does not render.
+func (w *markupWalk) rootBinding(pipe *parse.PipeNode) {
+	if pipe == nil {
+		return
+	}
+	for _, v := range pipe.Decl {
+		if v.Ident[0] == "$" {
+			w.report(int(pipe.Pos), "rebinds $, which is the data the template was called with: give the value a variable of its own")
+			return
+		}
+	}
+}
+
 // sameBranch answers the node an {{if}} is keyed as: the first {{if}} of this reading on the same
 // condition, in the same call and read from the same dot, when the condition reads fields alone, such
-// as .error or $.error, which nothing between the two can change; otherwise the {{if}} itself. So
-// {{if .error}} around a notice and {{if .error}} around the aria-describedby naming it are one
-// branch, and the reference is read as rendering only where the notice does.
+// as .error or $.error, which nothing between the two can change; otherwise the {{if}} itself. $ is
+// the dot the template was called with, since no template rebinds it (rootBinding), so .error read
+// from that dot and $.error read from anywhere in the call are one condition. So {{if .error}}
+// around a notice and {{if .error}} around the aria-describedby naming it are one branch, and the
+// reference is read as rendering only where the notice does.
 func (w *markupWalk) sameBranch(s *markupState, n *parse.IfNode) int {
 	cond, ok := fieldCondition(n.Pipe)
 	if !ok {
@@ -1011,7 +1036,9 @@ func (w *markupWalk) sameBranch(s *markupState, n *parse.IfNode) int {
 	for _, f := range w.frames {
 		key.WriteString(f.tree.ParseName + "\x00" + f.tree.Name + "\x00" + f.via + "\x00")
 	}
-	if !strings.HasPrefix(cond, "$") {
+	if root, isRoot := strings.CutPrefix(cond, "$"); isRoot {
+		cond = "." + strings.TrimPrefix(root, ".")
+	} else if s.scope != w.frames[len(w.frames)-1].scope {
 		key.WriteString(s.scope)
 	}
 	key.WriteString("\x00" + cond)
