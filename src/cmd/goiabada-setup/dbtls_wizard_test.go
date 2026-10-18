@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -693,8 +694,7 @@ func TestCheckDatabase_DialsWithTheClientPairAndTheNamedHost(t *testing.T) {
 					if tlsConfig == nil {
 						t.Fatalf("connection %d has no TLS configuration", i)
 					}
-					presented := len(tlsConfig.Certificates) == 1 &&
-						slices.EqualFunc(tlsConfig.Certificates[0].Certificate, pair.Certificate, slices.Equal[[]byte])
+					presented := len(tlsConfig.Certificates) == 1 && samePair(tlsConfig.Certificates[0], pair)
 					if presented != e.takesClientCertificate {
 						t.Errorf("connection %d presents the pair: %v, want %v", i, presented, e.takesClientCertificate)
 					}
@@ -721,6 +721,17 @@ func TestCheckDatabase_DialsWithTheClientPairAndTheNamedHost(t *testing.T) {
 			})
 		}
 	}
+}
+
+// samePair reports whether got is the pair want is: the same certificate chain and the same
+// private key, which is what signs the handshake a database checking client certificates asks for.
+// A chain without its key is no pair (#546).
+func samePair(got, want tls.Certificate) bool {
+	if !slices.EqualFunc(got.Certificate, want.Certificate, slices.Equal[[]byte]) {
+		return false
+	}
+	key, ok := want.PrivateKey.(interface{ Equal(crypto.PrivateKey) bool })
+	return ok && got.PrivateKey != nil && key.Equal(got.PrivateKey)
 }
 
 // A certificate and key that do not pair fail the check before anything is dialled, as the auth
