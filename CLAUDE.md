@@ -685,6 +685,49 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 9. **Multi-row writes and list saves**: a request that writes more than one row validates the whole request first, bounds and duplicates included, so a refusal writes nothing; then writes in one `RunInTransaction` whose body reads what it needs on the transaction, returns each failure through `errs.Wrap` and writes no response, since a deadlock victim's body is rerun; then answers, audit events after the commit. A save replacing a whole list is the common case, and there are seven: a client's redirect URIs and web origins, user, group, client and resource permissions, and a user's groups. Each requires the list as its caller loaded it (`expectedRedirectURIs` and its siblings; absent or `null` is a 400, `[]` means an empty list was loaded), reads the stored rows on the transaction, and answers 409 `CONCURRENT_UPDATE` with nothing written when they differ from it as a set; otherwise it applies `replaceSet`'s plan, which deletes every row whose key is not wanted and every extra copy of one that is, so a duplicate left by an overlap is repaired by the next save. A unique-key race answers the same 409, through the one failure writer `writeListSaveFailure`. No list save takes a row lock: overlapping saves merge item by item, and the data tier's `list_save_test.go` shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, decided on and written back with a security consequence, which today means #245's public/confidential switch (`AcquireClientRow`), #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims (`AcquireUserRow`), and #407's settings section saves (`AcquireSettingsRow`), each of which reads the settings row again under it and writes its own section onto what it read, through `apihandlers.saveSettingsSection`, so a save of another section committed meanwhile is not written back over (#428)
 10. **Metric labels**: a metric label takes only values from a closed set declared when its family is registered with `core/metrics`, through `metrics.Enum` (listed in the catalog) or `metrics.Described` (named there in words, for the status codes, the route table or the build stamp), and a value outside the set is recorded as `other`, so no family can exceed the product of its sets whatever the requests. Nothing taken from a request or from the database reaches a label without being mapped into a declared set first: no user id, subject, email, username, session identifier, client identifier, IP address, raw path, query, user agent or error description. `client_identifier` is never a label, because with dynamic client registration on anyone can mint identifiers. The route label is the router's own table read once at startup, `unmatched` for a request no route answered, read through the one function `routePattern` in `core/metrics/http.go`; the method label is a standard verb or `other`; the status label is the exact code. Each server's unit tier holds every family it registers, name, type, labels and value sets, to the catalog table on the docs' Monitoring page through `core/guard.AssertMetricsCatalog`, in both directions, so a new family or label fails until the docs describe it (#400)
 
+## UI conventions
+
+Both servers draw their pages with `ui.css`, Goiabada's design tokens and components, and Tailwind
+utilities for layout (#617). The file is one copy in each application's `web/tailwindcss/`, which
+`TestUICSS_IsTheAuthServersCopy` holds byte-identical; edit one, copy it over the other, and
+regenerate both `main.css`. daisyUI still draws the pages each web package's `pendingTemplates`
+lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoClassWithDaisyUI`).
+
+- **Themes**: automatic (the settings' empty value: each visitor's device decides), light and
+  dark. The layouts write `data-theme` for light and dark alone. A color is a token, `bg-surface`,
+  `text-ink-muted`, `border-line`, never a raw value, and every pair a component draws text or a
+  boundary on is in `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both themes.
+- **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
+  `panel`, `panel-body`, `panel-footer`; `button`, with `-primary` for a form's one main action,
+  `-danger`, `-quiet`, `-sm`, `-icon` and `-block`; `field`, holding `field-label`, a `control`,
+  `field-hint` and `field-error`; `choice`, `switch`, `option-card`; `notice` with `-danger`,
+  `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a `data-table`; `tab-bar` and
+  `tab-item`; `pager`; `dialog`; `empty-state`; `spinner`; `text-link`.
+- **Markup**: `core/guard.AssertWellFormedTemplates` holds every page to well-formed HTML and to
+  the accessibility rules readable from a template: every element closed explicitly and in order,
+  what a branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for
+  every control, alt on every image, a name on every link and button, one `<h1>`, no skipped
+  heading level. A page not yet under it is in its web package's `pendingTemplates`, which only
+  shrinks.
+- **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. Page
+  behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
+  `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
+  JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`
+  attributes, and text by message ID: through `T`, except the console's `js.*` strings, which carry
+  client-side placeholders and go through `i18n.Raw` in `JSBootstrap`. ES2020 at most, with no build
+  step (`core/guard.AssertScriptSyntax`), for the declared floor: Chrome and Edge 111, Safari 16.4,
+  Firefox 128. The auth server's pages work with JavaScript off; the console says it needs it.
+- **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
+  `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
+  wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
+  is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
+  least 24 pixels.
+- **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
+  out, client, one-time code, two-factor authentication, auth server. Sentence case; a button says
+  what it does ("Save", "New user"); a page title reads "Page – app name". Both catalogs change
+  together, a message ID is kept, and a renamed one goes in the release notes, since operators'
+  override catalogs are keyed by it.
+
 ## Standards
 
 Goiabada implements published standards. When a change touches behavior one of them defines, read the relevant section of the official text (rfc-editor.org, openid.net) rather than relying on memory, and follow its MUST and SHOULD requirements. The main ones: OAuth 2.0 (RFC 6749) and bearer tokens (RFC 6750), PKCE (RFC 7636), revocation (RFC 7009), introspection (RFC 7662), dynamic client registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519) and JWK (RFC 7517), the OAuth 2.0 Security Best Current Practice (RFC 9700), and OpenID Connect Core 1.0 and Discovery 1.0.

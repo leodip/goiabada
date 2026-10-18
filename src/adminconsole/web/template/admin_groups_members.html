@@ -117,7 +117,7 @@
             </a>
         </div>
         <div class="mr-14">
-            {{template "paginator" (args .paginator (printf "/admin/groups/%v/members" .groupId)) }}
+            {{template "paginator" (args .paginator (printf "/admin/groups/%v/members" .groupId) $.ctx) }}
         </div>
     </div>
 

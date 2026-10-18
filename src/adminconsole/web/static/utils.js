@@ -1,10 +1,23 @@
-// utils.js
+// utils.js is the admin console's shared page behaviour, loaded by both layouts before any page's
+// own script.
 
-// t looks up a key in window.i18n (populated by the JSBootstrap server-side
-// helper). Falls back to the key itself so missing entries are visible during
-// development.
+// i18nTable holds the client-side strings, keyed by catalog key: the JSON data block #js-i18n that
+// both layouts write from JSBootstrap. It is read on first use rather than when this file loads,
+// so the order of the two elements in the page does not matter.
+let i18nTable = null;
+
+// t looks up a key among the client-side strings. It falls back to the key itself, so a missing
+// entry shows as its key rather than as nothing.
 function t(key) {
-  return (window.i18n && window.i18n[key]) || key;
+  if (i18nTable === null) {
+    const block = document.getElementById("js-i18n");
+    try {
+      i18nTable = block ? JSON.parse(block.textContent) : {};
+    } catch (err) {
+      i18nTable = {};
+    }
+  }
+  return i18nTable[key] || key;
 }
 
 // tFormat substitutes {{name}} placeholders in the catalog value with the
@@ -184,7 +197,7 @@ function createIconButton(pathData, evenOdd, label, onclick, data) {
   const svgNS = "http://www.w3.org/2000/svg";
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "btn-sm btn btn-ghost";
+  button.className = "button button-quiet button-sm button-icon";
   button.setAttribute("aria-label", label);
   button.setAttribute("title", label);
   for (const [key, value] of Object.entries(data || {})) {
@@ -195,7 +208,6 @@ function createIconButton(pathData, evenOdd, label, onclick, data) {
   };
 
   const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("class", "inline-block w-5 h-5 align-middle");
   svg.setAttribute("viewBox", "0 0 20 20");
   svg.setAttribute("fill", "currentColor");
   svg.setAttribute("aria-hidden", "true");
@@ -223,6 +235,28 @@ function createEditButton(label, onclick, data) {
     "M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z",
     "M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z"
   ], false, label, onclick, data);
+}
+
+// describeSeconds reads a number of seconds typed into a field as a duration a person reads, such
+// as "2 hours, 30 minutes", in the page's language. messages carries the two sentences the page
+// gives for a value that is not a whole number of seconds and for one too long to be meant: the
+// form's data-duration-invalid and data-duration-too-long.
+function describeSeconds(value, messages) {
+  const text = String(value).trim();
+  if (!/^[0-9]+$/.test(text)) {
+    return messages.durationInvalid;
+  }
+  const seconds = Number(text);
+  // About five years.
+  if (seconds > 160000000) {
+    return messages.durationTooLong;
+  }
+  const language = (document.documentElement.lang || "en").toLowerCase().split("-")[0];
+  return humanizeDuration(seconds * 1000, {
+    units: ["d", "h", "m", "s"],
+    language: language,
+    fallbacks: ["en"]
+  });
 }
 
 const debounce = (func, wait) => {

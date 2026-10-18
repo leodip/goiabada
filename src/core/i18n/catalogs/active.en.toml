@@ -41,15 +41,14 @@
 
 # --- Login page (auth/pwd) ---------------------------------------------------
 
-"auth.pwd.page_title" = "Password authentication"
+"auth.pwd.page_title" = "Sign in"
 "auth.pwd.title" = "Sign in"
 "auth.pwd.button" = "Sign in"
 "auth.pwd.email_label" = "Email"
-"auth.pwd.email_placeholder" = "user@example.com"
 "auth.pwd.password_label" = "Password"
-"auth.pwd.forgot_password" = "Forgot password?"
-"auth.pwd.no_account_prompt" = "Don't have an account yet?"
-"auth.pwd.register_link" = "Register"
+"auth.pwd.forgot_password" = "Forgot your password?"
+"auth.pwd.no_account_prompt" = "Don't have an account?"
+"auth.pwd.register_link" = "Create an account"
 
 # --- OTP verification (auth/otp) --------------------------------------------
 
@@ -235,7 +234,16 @@
 "adminconsole.menu.account" = "Account"
 "adminconsole.menu.admin" = "Admin"
 "adminconsole.menu.logout" = "Sign out"
-"adminconsole.menu.version_label" = "version:"
+"adminconsole.menu.version_label" = "Version"
+"adminconsole.layout.skip_to_content" = "Skip to main content"
+"adminconsole.layout.open_menu" = "Open menu"
+"adminconsole.layout.close_menu" = "Close menu"
+"adminconsole.layout.user_menu" = "Account menu"
+"adminconsole.layout.noscript" = "The admin console needs JavaScript. Turn it on in your browser, then reload this page."
+"adminconsole.tabs.label" = "Sections"
+"adminconsole.paginator.label" = "Pagination"
+"adminconsole.paginator.previous" = "Previous page"
+"adminconsole.paginator.next" = "Next page"
 
 # --- Sign-out confirmation page (#411) ---------------------------------------
 
@@ -262,14 +270,15 @@
 "adminconsole.admin_menu.resources" = "Resources and permissions"
 "adminconsole.admin_menu.groups" = "Groups"
 "adminconsole.admin_menu.users" = "Users"
+"adminconsole.admin_menu.section_settings" = "Settings"
 "adminconsole.admin_menu.settings_general" = "General"
-"adminconsole.admin_menu.settings_ui_theme" = "UI theme"
+"adminconsole.admin_menu.settings_ui_theme" = "Theme"
 "adminconsole.admin_menu.settings_sessions" = "Sessions"
 "adminconsole.admin_menu.settings_tokens" = "Tokens"
-"adminconsole.admin_menu.settings_keys" = "Keys"
-"adminconsole.admin_menu.settings_email" = "Email - SMTP"
-"adminconsole.admin_menu.audit_log_settings" = "Audit log settings"
-"adminconsole.admin_menu.audit_log_viewer" = "Audit log viewer"
+"adminconsole.admin_menu.settings_keys" = "Signing keys"
+"adminconsole.admin_menu.settings_email" = "Email"
+"adminconsole.admin_menu.audit_log_settings" = "Audit logging"
+"adminconsole.admin_menu.audit_log_viewer" = "Audit log"
 
 # --- Tabs (sub-navigation within sections) ----------------------------------
 
@@ -875,21 +884,21 @@
 
 # --- Admin users (list, create, delete, details) -----------------------------
 
-"adminconsole.admin_users.list.page_title" = "Admin - Users"
-"adminconsole.admin_users.list.subtitle" = "Manage users"
-"adminconsole.admin_users.list.create_new_button" = "Create new"
-"adminconsole.admin_users.list.search_placeholder" = "Search term"
+"adminconsole.admin_users.list.page_title" = "Users"
+"adminconsole.admin_users.list.subtitle" = "Users"
+"adminconsole.admin_users.list.create_new_button" = "New user"
+"adminconsole.admin_users.list.search_label" = "Search users"
+"adminconsole.admin_users.list.search_placeholder" = "Name, email, username or subject"
 "adminconsole.admin_users.list.search_button" = "Search"
-"adminconsole.admin_users.list.clear_link" = "Clear"
+"adminconsole.admin_users.list.clear_link" = "Clear search"
+"adminconsole.admin_users.list.col_name" = "Name"
 "adminconsole.admin_users.list.col_subject" = "Subject"
-"adminconsole.admin_users.list.col_username" = "Username"
 "adminconsole.admin_users.list.col_email" = "Email"
-"adminconsole.admin_users.list.col_given_name" = "Given name"
-"adminconsole.admin_users.list.col_middle_name" = "Middle name"
-"adminconsole.admin_users.list.col_family_name" = "Family name"
-"adminconsole.admin_users.list.action_manage" = "Manage"
+"adminconsole.admin_users.list.col_actions" = "Actions"
+"adminconsole.admin_users.list.no_name" = "No name"
+"adminconsole.admin_users.list.disabled_tag" = "Disabled"
 "adminconsole.admin_users.list.action_delete" = "Delete"
-"adminconsole.admin_users.list.no_results" = "Could not find any user."
+"adminconsole.admin_users.list.no_results" = "No users found."
 
 "adminconsole.admin_users.common.back_to_list" = "Back to list of users"
 "adminconsole.admin_users.common.saved_successfully" = "Saved successfully"
@@ -1384,10 +1393,10 @@
 # --- Admin settings (general, ui_theme, tokens, sessions) -------------------
 
 "adminconsole.admin_settings.common.page_title_root" = "Settings"
-"adminconsole.admin_settings.common.saved_successfully" = "Settings saved successfully"
+"adminconsole.admin_settings.common.saved_successfully" = "Settings saved."
 "adminconsole.admin_settings.common.save_button" = "Save"
-"adminconsole.admin_settings.common.too_long_warning" = "Too long. Please use a shorter duration."
-"adminconsole.admin_settings.common.invalid_duration" = "Invalid duration. Please use a positive number."
+"adminconsole.admin_settings.common.too_long_warning" = "That's too long. Enter a shorter duration."
+"adminconsole.admin_settings.common.invalid_duration" = "Enter a whole number of seconds."
 
 "adminconsole.admin_settings.general.page_title" = "Settings - General"
 "adminconsole.admin_settings.general.subtitle" = "Settings - General"
@@ -1421,10 +1430,16 @@
 "adminconsole.admin_settings.general.ropc_flow_tooltip" = "RFC 6749 Section 4.3 - Enable the OAuth 2.0 resource owner password credentials grant. This allows clients to exchange user credentials directly for tokens. Individual clients can override this setting."
 "adminconsole.admin_settings.general.ropc_flow_warning" = "Warning: The resource owner password credentials flow is deprecated in OAuth 2.1 and exposes user credentials directly to clients. Only enable this for highly trusted first-party applications or legacy migration scenarios. Use the authorization code flow with PKCE whenever possible. Note: Users with two-factor authentication enabled cannot use this flow."
 
-"adminconsole.admin_settings.ui_theme.page_title" = "Settings - UI theme"
-"adminconsole.admin_settings.ui_theme.subtitle" = "Settings - UI theme"
-"adminconsole.admin_settings.ui_theme.field.theme_selection" = "Theme selection"
-"adminconsole.admin_settings.ui_theme.default" = "Default"
+"adminconsole.admin_settings.ui_theme.page_title" = "Theme settings"
+"adminconsole.admin_settings.ui_theme.subtitle" = "Theme"
+"adminconsole.admin_settings.ui_theme.lead" = "How the sign-in pages and this admin console look."
+"adminconsole.admin_settings.ui_theme.field.theme_selection" = "Color theme"
+"adminconsole.admin_settings.ui_theme.default" = "Automatic"
+"adminconsole.admin_settings.ui_theme.default_hint" = "Light or dark, following each visitor's device."
+"adminconsole.admin_settings.ui_theme.light" = "Light"
+"adminconsole.admin_settings.ui_theme.light_hint" = "Always light."
+"adminconsole.admin_settings.ui_theme.dark" = "Dark"
+"adminconsole.admin_settings.ui_theme.dark_hint" = "Always dark."
 
 "adminconsole.admin_settings.tokens.page_title" = "Settings - Tokens"
 "adminconsole.admin_settings.tokens.subtitle" = "Settings - Tokens"
@@ -1442,13 +1457,14 @@
 "adminconsole.admin_settings.tokens.field.include_oidc_in_id_token" = "Include OpenID Connect claims in the ID token"
 "adminconsole.admin_settings.tokens.include_oidc_in_id_token_tooltip" = "When enabled, scope-based claims (email, profile, address, phone...) are included directly in ID tokens. When disabled, these claims are only available from the /userinfo endpoint, which is required for strict OIDC conformance testing. Most production OIDC servers include claims by default for better developer experience."
 
-"adminconsole.admin_settings.sessions.page_title" = "Settings - Sessions"
-"adminconsole.admin_settings.sessions.subtitle" = "Settings - Sessions"
-"adminconsole.admin_settings.sessions.field.idle_timeout" = "User session - idle timeout in seconds"
-"adminconsole.admin_settings.sessions.idle_timeout_tooltip" = "If there is no activity from the user within this timeframe, the session will be terminated."
-"adminconsole.admin_settings.sessions.field.max_lifetime" = "User session - max lifetime in seconds"
-"adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "The maximum duration a user session can last, irrespective of user activity."
-"adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "User session - max sessions per user"
+"adminconsole.admin_settings.sessions.page_title" = "Session settings"
+"adminconsole.admin_settings.sessions.subtitle" = "Sessions"
+"adminconsole.admin_settings.sessions.lead" = "How long a sign-in lasts, and how many sessions one user can keep."
+"adminconsole.admin_settings.sessions.field.idle_timeout" = "Idle timeout, in seconds"
+"adminconsole.admin_settings.sessions.idle_timeout_tooltip" = "A session ends after this long without activity."
+"adminconsole.admin_settings.sessions.field.max_lifetime" = "Maximum lifetime, in seconds"
+"adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "A session ends this long after it started, even while in use."
+"adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Maximum sessions per user"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "The most sessions one user can hold, from 0 to 1000. When a sign-in would go past it, the user's expired sessions end first, then the least recently used. 0 means no limit."
 
 # --- Admin settings (email, keys, audit logs) -------------------------------

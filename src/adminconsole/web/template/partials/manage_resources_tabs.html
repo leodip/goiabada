@@ -1,14 +1,11 @@
 {{define "manage_resources_tabs"}}
-
-{{ $type := index . 0 }}
-{{ $id := index . 1 }}
-{{ $ctx := index . 2 }}
-
-<div class="mt-2 tabs tabs-bordered">
-    <a href="/admin/resources/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">{{ T $ctx "adminconsole.resource_tabs.settings" }}</a>
-    <a href="/admin/resources/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">{{ T $ctx "adminconsole.resource_tabs.permissions" }}</a>
-    <a href="/admin/resources/{{$id}}/groups-with-permission" class="tab tab-bordered {{if eq $type "groups-with-permission"}}tab-active{{end}}">{{ T $ctx "adminconsole.resource_tabs.groups_with_permission" }}</a>
-    <a href="/admin/resources/{{$id}}/users-with-permission" class="tab tab-bordered {{if eq $type "users-with-permission"}}tab-active{{end}}">{{ T $ctx "adminconsole.resource_tabs.users_with_permission" }}</a>
-</div>
-
+{{- $type := index . 0 }}
+{{- $id := index . 1 }}
+{{- $ctx := index . 2 }}
+<nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
+  <a class="tab-item" href="/admin/resources/{{$id}}/settings"{{ if eq $type "settings" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.resource_tabs.settings" }}</a>
+  <a class="tab-item" href="/admin/resources/{{$id}}/permissions"{{ if eq $type "permissions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.resource_tabs.permissions" }}</a>
+  <a class="tab-item" href="/admin/resources/{{$id}}/groups-with-permission"{{ if eq $type "groups-with-permission" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.resource_tabs.groups_with_permission" }}</a>
+  <a class="tab-item" href="/admin/resources/{{$id}}/users-with-permission"{{ if eq $type "users-with-permission" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.resource_tabs.users_with_permission" }}</a>
+</nav>
 {{end}}

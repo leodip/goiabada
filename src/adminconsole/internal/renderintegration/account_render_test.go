@@ -75,7 +75,7 @@ func TestRender_PhonePagesHintHowToTypeTheNumber(t *testing.T) {
 
 // The account menu marks Phone as the page the user is on at /account/phone, and at no other path.
 func TestRender_AccountMenuMarksThePhonePage(t *testing.T) {
-	phoneItemRe := regexp.MustCompile(`(?s)<li class="([^"]*)">\s*<a href="/account/phone">(.*?)</a>`)
+	phoneLinkRe := regexp.MustCompile(`<a class="nav-link" href="/account/phone"([^>]*)>`)
 	bind := map[string]interface{}{
 		"selectedPhoneCountryUniqueId": "",
 		"phoneNumber":                  "",
@@ -91,10 +91,9 @@ func TestRender_AccountMenuMarksThePhonePage(t *testing.T) {
 		{"/account/address", false},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
-			m := phoneItemRe.FindStringSubmatch(renderMenuPageAt(t, tc.path, "/account_phone.html", bind))
-			require.NotNil(t, m, "the account menu has no Phone item")
-			assert.Equal(t, tc.marked, strings.Contains(m[1], "bg-base-300"), "the item's background")
-			assert.Equal(t, tc.marked, strings.Contains(m[2], "bg-primary"), "the item's bar")
+			m := phoneLinkRe.FindStringSubmatch(renderMenuPageAt(t, tc.path, "/account_phone.html", bind))
+			require.NotNil(t, m, "the account menu has no Phone link")
+			assert.Equal(t, tc.marked, strings.Contains(m[1], `aria-current="page"`), "the link marked as the current page")
 		})
 	}
 }

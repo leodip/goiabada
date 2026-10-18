@@ -139,7 +139,7 @@
                 </a>
             </div>
             <div class="mr-14">
-                {{template "paginator" (args .paginator (printf "/admin/resources/%v/users-with-permission?permission=%v" .resourceId .selectedPermission)) }}
+                {{template "paginator" (args .paginator (printf "/admin/resources/%v/users-with-permission?permission=%v" .resourceId .selectedPermission) $.ctx) }}
             </div>
         </div>
 

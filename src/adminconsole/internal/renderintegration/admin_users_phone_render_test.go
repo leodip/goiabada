@@ -45,7 +45,7 @@ func (s *phoneTabAPI) UpdateUserPhone(_ context.Context, _ string, _ int64,
 }
 
 // userTabLinkRe matches the href of every tab the users tab strip draws.
-var userTabLinkRe = regexp.MustCompile(`<a href="(/admin/users/[^"]*)" class="tab tab-bordered`)
+var userTabLinkRe = regexp.MustCompile(`<a class="tab-item" href="(/admin/users/[^"]*)"`)
 
 // A refused save draws the tab with its user, as the first draw does: the title names the user's
 // email and every tab links to that user, keeping the list position. It used to bind no user at

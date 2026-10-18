@@ -45,14 +45,16 @@ func assertClientNameInHTML(t *testing.T, doc *goquery.Document, expectedName st
 	var found bool
 	var actualName string
 
-	// Auth layout pattern: <span class="mt-1 text-sm text-base-content/80">CLIENT_NAME</span>
-	doc.Find("span.text-sm").Each(func(i int, s *goquery.Selection) {
+	// Auth layout pattern: <p class="auth-client-name">CLIENT_NAME</p>. consent.html, not yet
+	// drawn with ui.css (#617), writes the old one: <span class="mt-1 text-sm text-base-content/80">.
+	doc.Find("p.auth-client-name, span.text-sm").Each(func(i int, s *goquery.Selection) {
 		class, _ := s.Attr("class")
-		if strings.Contains(class, "text-base-content") && strings.Contains(class, "mt-1") {
-			actualName = strings.TrimSpace(s.Text())
-			if actualName == expectedName {
-				found = true
-			}
+		if s.Is("span") && (!strings.Contains(class, "text-base-content") || !strings.Contains(class, "mt-1")) {
+			return
+		}
+		actualName = strings.TrimSpace(s.Text())
+		if actualName == expectedName {
+			found = true
 		}
 	})
 
@@ -111,12 +113,13 @@ func assertClientDescriptionInHTML(t *testing.T, doc *goquery.Document, expected
 		// When not expecting description, verify it's not in either layout pattern
 		if expectedDescription != "" {
 			var foundInAuthLayout bool
-			doc.Find("span.text-xs").Each(func(i int, s *goquery.Selection) {
+			doc.Find("p.auth-client-description, span.text-xs").Each(func(i int, s *goquery.Selection) {
 				class, _ := s.Attr("class")
-				if strings.Contains(class, "text-base-content") {
-					if strings.Contains(s.Text(), expectedDescription) {
-						foundInAuthLayout = true
-					}
+				if s.Is("span") && !strings.Contains(class, "text-base-content") {
+					return
+				}
+				if strings.Contains(s.Text(), expectedDescription) {
+					foundInAuthLayout = true
 				}
 			})
 
@@ -139,14 +142,15 @@ func assertClientDescriptionInHTML(t *testing.T, doc *goquery.Document, expected
 	// When expecting description, check both layout patterns
 	var found bool
 
-	// Auth layout pattern: <span class="text-xs text-base-content/80">
-	doc.Find("span.text-xs").Each(func(i int, s *goquery.Selection) {
+	// Auth layout pattern: <p class="auth-client-description">; consent.html's, not yet drawn with
+	// ui.css (#617): <span class="text-xs text-base-content/60">.
+	doc.Find("p.auth-client-description, span.text-xs").Each(func(i int, s *goquery.Selection) {
 		class, _ := s.Attr("class")
-		if strings.Contains(class, "text-base-content") {
-			text := strings.TrimSpace(s.Text())
-			if text == expectedDescription {
-				found = true
-			}
+		if s.Is("span") && !strings.Contains(class, "text-base-content") {
+			return
+		}
+		if strings.TrimSpace(s.Text()) == expectedDescription {
+			found = true
 		}
 	})
 

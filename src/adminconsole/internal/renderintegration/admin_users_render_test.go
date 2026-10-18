@@ -55,10 +55,9 @@ func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 	assert.NotRegexp(t, `loadedGroupIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
 }
 
-// TestRender_AdminUsersPaginator is the template hop of the paginator swap (#271): the partial is
-// unchanged and now reads a *pagination.Paginator instead of the unmaintained library's value, so
-// what needs proving is that a Go template resolves the replacement's exported fields the way it
-// resolved the library's niladic methods, and that addUrlParam turns them into page links.
+// TestRender_AdminUsersPaginator is the template hop of the paginator (#271): the partial reads a
+// *pagination.Paginator, so what needs proving is that a Go template resolves its exported fields,
+// and that addUrlParam turns them into page links.
 //
 // 73 users at 10 a page on page 4 is 8 pages, which exercises both ends of the bar at once:
 // "1 2 3 [4] 5 6 ...". The lone "1" is decision 3's rule, the one place this change departs from
@@ -81,10 +80,9 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	assert.Contains(t, out, `href="/admin/users?page=2"`)
 	assert.Contains(t, out, `href="/admin/users?page=6"`)
 
-	// One set of dots, at the trailing end, standing for pages 7 and 8. btn-disabled is the
-	// partial's ellipsis class and nothing else on this page uses it.
-	assert.Equal(t, 1, strings.Count(out, "btn-disabled"), "expected exactly one ellipsis in the bar")
-	assert.Contains(t, out, ">...</a>")
+	// One set of dots, at the trailing end, standing for pages 7 and 8, hidden from assistive
+	// technology since it is no page.
+	assert.Equal(t, 1, strings.Count(out, `<span class="pager-item" aria-hidden="true">…</span>`), "expected exactly one ellipsis in the bar")
 
 	// Pages 3 and 5 are each a number link and an arrow target, so two occurrences each. That
 	// count is what says Previous and Next resolved at all: a field the template cannot read
@@ -92,9 +90,9 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(out, `href="/admin/users?page=3"`), "page 3 as a number and as the back arrow")
 	assert.Equal(t, 2, strings.Count(out, `href="/admin/users?page=5"`), "page 5 as a number and as the forward arrow")
 
-	// The current page is the active button and carries no link of its own.
-	assert.Contains(t, out, `class="join-item btn btn-sm btn-active">4</a>`)
-	assert.NotContains(t, out, `href="/admin/users?page=4"`)
+	// The current page is marked as such, and is its number's only link.
+	assert.Contains(t, out, `<a class="pager-item" aria-current="page" href="/admin/users?page=4">4</a>`)
+	assert.Equal(t, 1, strings.Count(out, `href="/admin/users?page=4"`))
 
 	// The -1 sentinel must never reach addUrlParam: it means "ellipsis", not a page.
 	assert.NotContains(t, out, "page=-1")

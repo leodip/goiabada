@@ -538,3 +538,9 @@ func TestUtilsJS_DialogMarkupBrandIsPrivate(t *testing.T) {
 			"closure, and this check names it by that (#120)", weakSets)
 	}
 }
+
+// TestStaticScripts_ParseWithinTheSyntaxCap holds every script this server serves to JavaScript the
+// floor browsers run, through core/guard.AssertScriptSyntax, which carries the cap and why (#617).
+func TestStaticScripts_ParseWithinTheSyntaxCap(t *testing.T) {
+	guard.AssertScriptSyntax(t, staticFS, "static")
+}

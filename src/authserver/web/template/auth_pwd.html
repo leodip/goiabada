@@ -1,54 +1,43 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "auth.pwd.page_title" }}{{end}}
-{{define "head"}}
-
-{{end}}
+{{define "title"}}{{ T $.ctx "auth.pwd.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "auth.pwd.title" }}</h1>
 
-    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "auth.pwd.title" }}</h2>
-    <form action="" method="post" onsubmit="return submitOnce(this)">
+<form method="post" class="stacked" novalidate data-submit-once>
+  <input type="hidden" name="ceremonyId" value="{{ .ceremonyId }}">
 
-        <input type="hidden" name="ceremonyId" value="{{.ceremonyId}}" />
+  {{ if .error }}
+  <div class="notice notice-danger" role="alert">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/>
+    </svg>
+    <p>{{ .error }}</p>
+  </div>
+  {{ end }}
 
-        <div class="mb-3">
+  <div class="field">
+    <label class="field-label" for="email">{{ T $.ctx "auth.pwd.email_label" }}</label>
+    <input class="control" id="email" type="email" name="email" value="{{ .email }}" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
+  </div>
 
-            <div class="w-full mt-4 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "auth.pwd.email_label" }}</span>
-                </label>
-                <input type="text" name="email" autocomplete="username" value="{{.email}}" placeholder="{{ T $.ctx "auth.pwd.email_placeholder" }}"
-                    class="w-full input input-bordered" autofocus  />
-            </div>
+  <div class="field">
+    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <label class="field-label" for="password">{{ T $.ctx "auth.pwd.password_label" }}</label>
+      {{ if .smtpEnabled }}
+      <a class="text-link text-sm" href="/forgot-password">{{ T $.ctx "auth.pwd.forgot_password" }}</a>
+      {{ end }}
+    </div>
+    <input class="control" id="password" type="password" name="password" autocomplete="current-password">
+  </div>
 
-            <div class="w-full mt-4 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "auth.pwd.password_label" }}</span>
-                </label>
-                <input type="password" name="password" autocomplete="current-password" value="" placeholder="" class="w-full input input-bordered" />
-            </div>
+  <button class="button button-primary button-block" type="submit">{{ T $.ctx "auth.pwd.button" }}</button>
+</form>
 
-        </div>
-
-        {{if .smtpEnabled}}
-        <div class='text-right text-primary'><a href="/forgot-password"><span
-                    class="inline-block text-sm transition duration-200 hover:text-primary hover:underline hover:cursor-pointer">{{ T $.ctx "auth.pwd.forgot_password" }}</span></a>
-        </div>
-        {{end}}
-
-        {{if .error}}
-            <p class="mt-8 text-center text-error">{{.error}}</p>
-        {{else}}
-            <p class="mt-6">&nbsp;</p>
-        {{end}}
-
-        <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "auth.pwd.button" }}</button>
-
-        {{if .registrationAvailable}}
-        <div class='mt-4 text-center'>{{ T $.ctx "auth.pwd.no_account_prompt" }} <a href="/account/register?ceremony={{.ceremonyId}}"><span
-                    class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">{{ T $.ctx "auth.pwd.register_link" }}</span></a>
-        </div>
-        {{end}}
-
-    </form>
-
+{{ if .registrationAvailable }}
+<p class="auth-footer">
+  {{ T $.ctx "auth.pwd.no_account_prompt" }}
+  <a class="text-link" href="/account/register?ceremony={{ .ceremonyId }}">{{ T $.ctx "auth.pwd.register_link" }}</a>
+</p>
+{{ end }}
 {{end}}

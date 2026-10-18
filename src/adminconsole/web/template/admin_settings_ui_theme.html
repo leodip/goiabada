@@ -1,71 +1,68 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.ui_theme.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.ui_theme.subtitle" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.admin_settings.ui_theme.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const themeSelection = document.getElementById('themeSelection');
-        themeSelection.addEventListener('change', function () {
-            let uiTheme = themeSelection.value;
-            let htmlElem = document.getElementsByTagName("html")[0];
-            htmlElem.setAttribute("data-theme", uiTheme);
-        });
-    });
-</script>
-
+<script src="/static/pages/admin-settings-ui-theme.js" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{- $uiTheme := .settings.UITheme }}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_settings.ui_theme.subtitle" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_settings.ui_theme.lead" }}</p>
+  </div>
+</div>
 
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-
-            <div class="w-full form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_settings.ui_theme.field.theme_selection" }}
-                    </span>
-                </label>
-                <select class="select select-bordered" id="themeSelection" name="themeSelection">
-                    {{ $uiTheme := .settings.UITheme }}
-                    <option value="" {{if eq "" $uiTheme}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.ui_theme.default" }}</option>
-                    {{range .uiThemes}}
-                        <option value="{{.}}" {{if eq . $uiTheme}}selected{{end}}>{{.}}</option>
-                    {{end}}
-                </select>
-            </div>
-
-        </div>
-
+<form class="panel" method="post">
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
-        </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
+    <fieldset>
+      <legend class="field-label mb-3">{{ T $.ctx "adminconsole.admin_settings.ui_theme.field.theme_selection" }}</legend>
+      <div class="grid gap-3 md:grid-cols-3">
+        <label class="option-card">
+          <input type="radio" name="themeSelection" value=""{{ if eq "" $uiTheme }} checked{{ end }} aria-labelledby="theme-name-auto" aria-describedby="theme-hint-auto">
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch theme-swatch-auto" aria-hidden="true"><span class="theme-swatch-light"></span><span class="theme-swatch-dark"></span></span>
+            <span class="choice-label" id="theme-name-auto">{{ T $.ctx "adminconsole.admin_settings.ui_theme.default" }}</span>
+            <span class="field-hint" id="theme-hint-auto">{{ T $.ctx "adminconsole.admin_settings.ui_theme.default_hint" }}</span>
+          </span>
+        </label>
+        {{ range .uiThemes }}
+        <label class="option-card">
+          <input type="radio" name="themeSelection" value="{{ . }}"{{ if eq . $uiTheme }} checked{{ end }} aria-labelledby="theme-name-{{ . }}" aria-describedby="theme-hint-{{ . }}">
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="theme-swatch theme-swatch-{{ . }}" aria-hidden="true"></span>
+            {{ if eq . "light" }}
+            <span class="choice-label" id="theme-name-{{ . }}">{{ T $.ctx "adminconsole.admin_settings.ui_theme.light" }}</span>
+            <span class="field-hint" id="theme-hint-{{ . }}">{{ T $.ctx "adminconsole.admin_settings.ui_theme.light_hint" }}</span>
+            {{ else if eq . "dark" }}
+            <span class="choice-label" id="theme-name-{{ . }}">{{ T $.ctx "adminconsole.admin_settings.ui_theme.dark" }}</span>
+            <span class="field-hint" id="theme-hint-{{ . }}">{{ T $.ctx "adminconsole.admin_settings.ui_theme.dark_hint" }}</span>
+            {{ else }}
+            <span class="choice-label" id="theme-name-{{ . }}">{{ . }}</span>
+            <span class="field-hint" id="theme-hint-{{ . }}"></span>
+            {{ end }}
+          </span>
+        </label>
+        {{ end }}
+      </div>
+    </fieldset>
+  </div>
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
+  </div>
 </form>
-
 {{end}}

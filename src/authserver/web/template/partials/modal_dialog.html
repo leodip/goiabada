@@ -1,33 +1,22 @@
 {{define "modal_dialog"}}
-
-{{ $id := index . 0 }}
-{{ $type := index . 1 }}
-{{ $ctx := index . 2 }}
-
-<dialog id="{{$id}}_modalDialog" class="modal">
-    <div class="modal-box">
-        <h3 class="text-lg font-bold" id="{{$id}}_modalDialogTitle"></h3>
-        <p class="py-4" id="{{$id}}_modalDialogMessage"></p>
-        <div class="modal-action">
-            {{ if eq $type "close" }}
-                <form method="dialog">
-                    <button id="{{$id}}_btnModal1" class="btn btn-primary">{{ T $ctx "common.button.close" }}</button>
-                </form>
-            {{end}}
-            {{ if eq $type "yes_no" }}
-                <form method="dialog">
-                    <button id="{{$id}}_btnModal1" class="btn">{{ T $ctx "common.button.no" }}</button>
-                    <button id="{{$id}}_btnModal2" class="btn btn-primary">{{ T $ctx "common.button.yes" }}</button>
-                </form>
-            {{end}}
-            {{ if eq $type "cancel_ok" }}
-                <form method="dialog">
-                    <button id="{{$id}}_btnModal1" class="btn">{{ T $ctx "common.button.cancel" }}</button>
-                    <button id="{{$id}}_btnModal2" class="btn btn-primary">{{ T $ctx "common.button.ok" }}</button>
-                </form>
-            {{end}}
-        </div>
+{{- $id := index . 0 }}
+{{- $type := index . 1 }}
+{{- $ctx := index . 2 }}
+<dialog id="{{ $id }}_modalDialog" class="dialog" aria-labelledby="{{ $id }}_modalDialogTitle" aria-describedby="{{ $id }}_modalDialogMessage">
+  <form method="dialog" class="dialog-panel">
+    <h2 class="dialog-title" id="{{ $id }}_modalDialogTitle"></h2>
+    <p class="dialog-message" id="{{ $id }}_modalDialogMessage"></p>
+    <div class="dialog-actions">
+      {{- if eq $type "close" }}
+      <button id="{{ $id }}_btnModal1" class="button button-primary">{{ T $ctx "common.button.close" }}</button>
+      {{- else if eq $type "yes_no" }}
+      <button id="{{ $id }}_btnModal1" class="button">{{ T $ctx "common.button.no" }}</button>
+      <button id="{{ $id }}_btnModal2" class="button button-primary">{{ T $ctx "common.button.yes" }}</button>
+      {{- else if eq $type "cancel_ok" }}
+      <button id="{{ $id }}_btnModal1" class="button">{{ T $ctx "common.button.cancel" }}</button>
+      <button id="{{ $id }}_btnModal2" class="button button-primary">{{ T $ctx "common.button.ok" }}</button>
+      {{- end }}
     </div>
+  </form>
 </dialog>
-
 {{end}}

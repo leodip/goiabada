@@ -39,15 +39,14 @@
 
 # --- Tela de login (auth/pwd) ------------------------------------------------
 
-"auth.pwd.page_title" = "Autenticação por senha"
+"auth.pwd.page_title" = "Entrar"
 "auth.pwd.title" = "Entrar"
 "auth.pwd.button" = "Entrar"
 "auth.pwd.email_label" = "E-mail"
-"auth.pwd.email_placeholder" = "usuario@exemplo.com"
 "auth.pwd.password_label" = "Senha"
-"auth.pwd.forgot_password" = "Esqueceu a senha?"
-"auth.pwd.no_account_prompt" = "Ainda não tem uma conta?"
-"auth.pwd.register_link" = "Cadastre-se"
+"auth.pwd.forgot_password" = "Esqueceu sua senha?"
+"auth.pwd.no_account_prompt" = "Não tem uma conta?"
+"auth.pwd.register_link" = "Criar uma conta"
 
 # --- Verificação OTP (auth/otp) ----------------------------------------------
 
@@ -219,7 +218,16 @@
 "adminconsole.menu.account" = "Conta"
 "adminconsole.menu.admin" = "Admin"
 "adminconsole.menu.logout" = "Sair"
-"adminconsole.menu.version_label" = "versão:"
+"adminconsole.menu.version_label" = "Versão"
+"adminconsole.layout.skip_to_content" = "Pular para o conteúdo principal"
+"adminconsole.layout.open_menu" = "Abrir menu"
+"adminconsole.layout.close_menu" = "Fechar menu"
+"adminconsole.layout.user_menu" = "Menu da conta"
+"adminconsole.layout.noscript" = "O console de administração precisa de JavaScript. Ative-o no seu navegador e recarregue esta página."
+"adminconsole.tabs.label" = "Seções"
+"adminconsole.paginator.label" = "Paginação"
+"adminconsole.paginator.previous" = "Página anterior"
+"adminconsole.paginator.next" = "Próxima página"
 
 # --- Página de confirmação de saída (#411) ------------------------------------
 
@@ -246,14 +254,15 @@
 "adminconsole.admin_menu.resources" = "Recursos e permissões"
 "adminconsole.admin_menu.groups" = "Grupos"
 "adminconsole.admin_menu.users" = "Usuários"
+"adminconsole.admin_menu.section_settings" = "Configurações"
 "adminconsole.admin_menu.settings_general" = "Geral"
-"adminconsole.admin_menu.settings_ui_theme" = "Tema da interface"
+"adminconsole.admin_menu.settings_ui_theme" = "Tema"
 "adminconsole.admin_menu.settings_sessions" = "Sessões"
 "adminconsole.admin_menu.settings_tokens" = "Tokens"
-"adminconsole.admin_menu.settings_keys" = "Chaves"
-"adminconsole.admin_menu.settings_email" = "E-mail - SMTP"
-"adminconsole.admin_menu.audit_log_settings" = "Configurações de log de auditoria"
-"adminconsole.admin_menu.audit_log_viewer" = "Visualizador de log de auditoria"
+"adminconsole.admin_menu.settings_keys" = "Chaves de assinatura"
+"adminconsole.admin_menu.settings_email" = "E-mail"
+"adminconsole.admin_menu.audit_log_settings" = "Registro de auditoria"
+"adminconsole.admin_menu.audit_log_viewer" = "Log de auditoria"
 
 # --- Abas (subnavegação dentro das seções) ----------------------------------
 
@@ -822,19 +831,19 @@
 
 # === Adminconsole — usuários admin ===========================================
 
-"adminconsole.admin_users.list.page_title" = "Admin - Usuários"
-"adminconsole.admin_users.list.subtitle" = "Gerenciar usuários"
-"adminconsole.admin_users.list.create_new_button" = "Criar novo"
-"adminconsole.admin_users.list.search_placeholder" = "Termo de busca"
+"adminconsole.admin_users.list.page_title" = "Usuários"
+"adminconsole.admin_users.list.subtitle" = "Usuários"
+"adminconsole.admin_users.list.create_new_button" = "Novo usuário"
+"adminconsole.admin_users.list.search_label" = "Buscar usuários"
+"adminconsole.admin_users.list.search_placeholder" = "Nome, e-mail, nome de usuário ou subject"
 "adminconsole.admin_users.list.search_button" = "Buscar"
-"adminconsole.admin_users.list.clear_link" = "Limpar"
+"adminconsole.admin_users.list.clear_link" = "Limpar busca"
+"adminconsole.admin_users.list.col_name" = "Nome"
 "adminconsole.admin_users.list.col_subject" = "Subject"
-"adminconsole.admin_users.list.col_username" = "Nome de usuário"
 "adminconsole.admin_users.list.col_email" = "E-mail"
-"adminconsole.admin_users.list.col_given_name" = "Nome"
-"adminconsole.admin_users.list.col_middle_name" = "Nome do meio"
-"adminconsole.admin_users.list.col_family_name" = "Sobrenome"
-"adminconsole.admin_users.list.action_manage" = "Gerenciar"
+"adminconsole.admin_users.list.col_actions" = "Ações"
+"adminconsole.admin_users.list.no_name" = "Sem nome"
+"adminconsole.admin_users.list.disabled_tag" = "Desativado"
 "adminconsole.admin_users.list.action_delete" = "Excluir"
 "adminconsole.admin_users.list.no_results" = "Nenhum usuário encontrado."
 
@@ -1321,10 +1330,10 @@
 # === Adminconsole — configurações admin ======================================
 
 "adminconsole.admin_settings.common.page_title_root" = "Configurações"
-"adminconsole.admin_settings.common.saved_successfully" = "Configurações salvas com sucesso"
+"adminconsole.admin_settings.common.saved_successfully" = "Configurações salvas."
 "adminconsole.admin_settings.common.save_button" = "Salvar"
-"adminconsole.admin_settings.common.too_long_warning" = "Tempo muito longo. Use uma duração menor."
-"adminconsole.admin_settings.common.invalid_duration" = "Duração inválida. Use um número positivo."
+"adminconsole.admin_settings.common.too_long_warning" = "Tempo longo demais. Informe uma duração menor."
+"adminconsole.admin_settings.common.invalid_duration" = "Informe um número inteiro de segundos."
 
 "adminconsole.admin_settings.general.page_title" = "Configurações - Geral"
 "adminconsole.admin_settings.general.subtitle" = "Configurações - Geral"
@@ -1358,10 +1367,16 @@
 "adminconsole.admin_settings.general.ropc_flow_tooltip" = "RFC 6749 Seção 4.3 - Habilita o grant resource owner password credentials do OAuth 2.0. Permite que clientes troquem credenciais do usuário diretamente por tokens. Clientes individuais podem sobrescrever esta configuração."
 "adminconsole.admin_settings.general.ropc_flow_warning" = "Atenção: o fluxo resource owner password credentials está depreciado no OAuth 2.1 e expõe credenciais do usuário diretamente aos clientes. Habilite isto apenas para aplicativos próprios altamente confiáveis ou cenários de migração legada. Use o fluxo authorization code com PKCE sempre que possível. Observação: usuários com 2FA habilitado não podem usar este fluxo."
 
-"adminconsole.admin_settings.ui_theme.page_title" = "Configurações - Tema da interface"
-"adminconsole.admin_settings.ui_theme.subtitle" = "Configurações - Tema da interface"
-"adminconsole.admin_settings.ui_theme.field.theme_selection" = "Seleção de tema"
-"adminconsole.admin_settings.ui_theme.default" = "Padrão"
+"adminconsole.admin_settings.ui_theme.page_title" = "Configurações de tema"
+"adminconsole.admin_settings.ui_theme.subtitle" = "Tema"
+"adminconsole.admin_settings.ui_theme.lead" = "A aparência das páginas de entrada e deste console de administração."
+"adminconsole.admin_settings.ui_theme.field.theme_selection" = "Tema de cores"
+"adminconsole.admin_settings.ui_theme.default" = "Automático"
+"adminconsole.admin_settings.ui_theme.default_hint" = "Claro ou escuro, conforme o dispositivo de cada visitante."
+"adminconsole.admin_settings.ui_theme.light" = "Claro"
+"adminconsole.admin_settings.ui_theme.light_hint" = "Sempre claro."
+"adminconsole.admin_settings.ui_theme.dark" = "Escuro"
+"adminconsole.admin_settings.ui_theme.dark_hint" = "Sempre escuro."
 
 "adminconsole.admin_settings.tokens.page_title" = "Configurações - Tokens"
 "adminconsole.admin_settings.tokens.subtitle" = "Configurações - Tokens"
@@ -1379,13 +1394,14 @@
 "adminconsole.admin_settings.tokens.field.include_oidc_in_id_token" = "Incluir claims OpenID Connect no ID token"
 "adminconsole.admin_settings.tokens.include_oidc_in_id_token_tooltip" = "Quando habilitado, claims baseadas em escopo (email, profile, address, phone...) são incluídas diretamente nos ID tokens. Quando desabilitado, essas claims só estão disponíveis pelo endpoint /userinfo, o que é exigido para testes estritos de conformidade OIDC. A maioria dos servidores OIDC em produção inclui claims por padrão para melhor experiência do desenvolvedor."
 
-"adminconsole.admin_settings.sessions.page_title" = "Configurações - Sessões"
-"adminconsole.admin_settings.sessions.subtitle" = "Configurações - Sessões"
-"adminconsole.admin_settings.sessions.field.idle_timeout" = "Sessão de usuário - timeout por inatividade em segundos"
-"adminconsole.admin_settings.sessions.idle_timeout_tooltip" = "Se não houver atividade do usuário neste período, a sessão será encerrada."
-"adminconsole.admin_settings.sessions.field.max_lifetime" = "Sessão de usuário - tempo máximo de vida em segundos"
-"adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "Duração máxima de uma sessão de usuário, independentemente da atividade do usuário."
-"adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Sessão de usuário - máximo de sessões por usuário"
+"adminconsole.admin_settings.sessions.page_title" = "Configurações de sessão"
+"adminconsole.admin_settings.sessions.subtitle" = "Sessões"
+"adminconsole.admin_settings.sessions.lead" = "Quanto tempo dura uma entrada e quantas sessões um usuário pode manter."
+"adminconsole.admin_settings.sessions.field.idle_timeout" = "Tempo limite de inatividade, em segundos"
+"adminconsole.admin_settings.sessions.idle_timeout_tooltip" = "A sessão termina após esse tempo sem atividade."
+"adminconsole.admin_settings.sessions.field.max_lifetime" = "Duração máxima, em segundos"
+"adminconsole.admin_settings.sessions.max_lifetime_tooltip" = "A sessão termina esse tempo depois de iniciada, mesmo em uso."
+"adminconsole.admin_settings.sessions.field.max_sessions_per_user" = "Máximo de sessões por usuário"
 "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" = "O número máximo de sessões que um usuário pode ter, de 0 a 1000. Quando um login ultrapassar esse limite, as sessões expiradas do usuário são encerradas primeiro, e depois as usadas há mais tempo. 0 significa sem limite."
 
 "adminconsole.admin_settings.email.page_title" = "Configurações - E-mail"
