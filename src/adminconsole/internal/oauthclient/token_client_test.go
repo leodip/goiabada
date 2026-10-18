@@ -255,12 +255,12 @@ func TestTokenClient_AuthenticatesAsBasicOnEveryGrant(t *testing.T) {
 // A secret the encoding changes still reads back as the one the client was built with.
 // The bootstrap seed stores an operator-chosen console secret with no charset check
 // (#474), so it may hold a '+', a '%', a space or a ':', and the auth server's Basic
-// parser un-escapes each half of the header with url.PathUnescape (percentDecoded, in
+// parser un-escapes each half of the header with url.QueryUnescape (percentDecoded, in
 // its handler_token.go). The decode below is that parser's -- split on the first
 // colon, then un-escape each half -- so the pair here is the one the endpoint accepts.
 func TestTokenClient_EncodesTheSecretTheServerDecodes(t *testing.T) {
-	// The characters the encoding and the parser disagree over, then "~~~", which
-	// url.PathEscape leaves alone and which puts a '+' in the header's Base64, the one
+	// The characters form encoding changes, then "~~~", which
+	// url.QueryEscape leaves alone and which puts a '+' in the header's Base64, the one
 	// place the standard alphabet the parser decodes and the URL-safe one differ.
 	const secret = "a%25b+c d:e~~~"
 
@@ -278,7 +278,8 @@ func TestTokenClient_EncodesTheSecretTheServerDecodes(t *testing.T) {
 	require.True(t, ok, "the identifier and the secret, joined by one colon")
 
 	assert.Equal(t, "the-client-id", encodedId, "an identifier the encoding does not change")
-	unescapedSecret, err := url.PathUnescape(encodedSecret)
+	assert.Equal(t, "a%2525b%2Bc+d%3Ae~~~", encodedSecret, "RFC 6749's form encoding, before Base64")
+	unescapedSecret, err := url.QueryUnescape(encodedSecret)
 	require.NoError(t, err)
 	assert.Equal(t, secret, unescapedSecret, "the secret reads back through the server's own decode")
 

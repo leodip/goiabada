@@ -67,14 +67,14 @@ A body that can't be read, such as one with a broken `%` escape or one over 64 K
 
 A [confidential client](/concepts/clients/#public-and-confidential-clients) proves who it is with its client secret, in one of two ways:
 
-- **`client_secret_basic`**: an `Authorization: Basic` header holding `client_id:client_secret` in Base64. curl builds it with `-u my-app:my-secret`.
+- **`client_secret_basic`**: form-encode `client_id` and `client_secret` separately, join them with `:`, then Base64-encode the result in an `Authorization: Basic` header. For `my-app` and `my-secret`, curl builds it with `-u my-app:my-secret`.
 - **`client_secret_post`**: `client_id` and `client_secret` in the body.
 
 Use one. Sending a secret both ways is refused with `invalid_request`. With the header, the auth server reads the client from it and ignores a `client_id` in the body.
 
 A public client sends `client_id` in the body and no secret, which discovery calls `none`. Sending a secret for a public client is refused with `invalid_request`, since it has none to check.
 
-RFC 6749 section 2.3.1 has a client form-encode its identifier and its secret before it builds the header, and some libraries, such as openid-client, escape every character but a letter or a digit, writing `my-app` as `my%2Dapp`. The auth server decodes `%` escapes in the header, so a client that encodes and one that doesn't, like curl, are read the same.
+RFC 6749 section 2.3.1 uses form encoding for both credentials: a space becomes `+`, a literal plus `%2B`, a percent sign `%25`, and a colon `%3A`. For example, the secret `a b+c` becomes `a+b%2Bc` before Base64 encoding. OAuth client libraries handle this for you; curl's `-u` expects you to encode these characters first.
 
 When the client can't be authenticated, the answer is `401 Unauthorized` with `invalid_client` and a `WWW-Authenticate: Basic realm="goiabada"` header, whichever way the credentials came:
 

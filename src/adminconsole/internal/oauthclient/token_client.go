@@ -247,17 +247,12 @@ func (c *TokenClient) clientCredentialsRemedy(code, scope string) string {
 }
 
 // basicAuthorization is the Authorization header every grant authenticates with: RFC 6749
-// section 2.3.1's HTTP Basic scheme, the identifier and the secret percent-encoded, joined
-// by one colon and base64'd. The encoding is url.PathEscape because it is the exact inverse
-// of what the auth server's Basic parser undoes, which un-escapes each half with
-// url.PathUnescape (percentDecoded, in its handler_token.go): a '+' leaves as itself and
-// reads back as one, a space leaves as %20 rather than the '+' of form-encoding, which the
-// parser keeps, a '%' leaves as %25, and a ':' leaves as itself, safe because the parser
-// splits at the first colon and the identifier before it never holds one. No credential
+// section 2.3.1's HTTP Basic scheme, the identifier and the secret form-encoded separately,
+// joined by one colon and base64'd. A space is '+', a literal plus '%2B', and a colon '%3A'. No credential
 // rides the body: client_secret_post is the scheme section 2.3.1 keeps for clients that
 // cannot use Basic, and this client can (#474).
 func (c *TokenClient) basicAuthorization() string {
-	credentials := url.PathEscape(c.clientID) + ":" + url.PathEscape(c.clientSecret)
+	credentials := url.QueryEscape(c.clientID) + ":" + url.QueryEscape(c.clientSecret)
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(credentials))
 }
 

@@ -605,21 +605,28 @@ func TestParseBasicAuth(t *testing.T) {
 	// RFC 6749 section 2.3.1: the client form-urlencodes both values before it joins them, which
 	// openid-client does, escaping even '-', '.' and '_'. Every generated secret holds those.
 	t.Run("Form-urlencoded credentials are decoded", func(t *testing.T) {
-		encoded := base64.StdEncoding.EncodeToString([]byte("my%2Dclient%5Fid:s3cr%2Et%2Dwith%2Bplus%3Aand%25"))
+		encoded := base64.StdEncoding.EncodeToString([]byte("my%2Dclient%5Fid:s3cr%2Et%2Dwith%2Bplus%3Aand%25+a+space"))
 		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
 		assert.True(t, ok)
 		assert.Equal(t, "my-client_id", clientId)
-		assert.Equal(t, "s3cr.t-with+plus:and%", clientSecret)
+		assert.Equal(t, "s3cr.t-with+plus:and% a space", clientSecret)
 	})
 
-	// A client that skips the encoding, such as curl -u, sends an operator's secret as is: a '+' in
-	// it stays a '+', and a '%' not followed by two hex digits stays a '%'.
-	t.Run("Credentials sent unencoded are kept as sent", func(t *testing.T) {
+	// Preserve the legacy fallback only when form decoding fails on a malformed percent escape.
+	t.Run("A malformed escape keeps the unencoded value", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my-client:a+b/c=d%zz"))
 		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
 		assert.True(t, ok)
 		assert.Equal(t, "my-client", clientId)
 		assert.Equal(t, "a+b/c=d%zz", clientSecret)
+	})
+
+	t.Run("A plus in either encoded value is a space", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("my+client:a+b%2Bc"))
+		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
+		assert.True(t, ok)
+		assert.Equal(t, "my client", clientId)
+		assert.Equal(t, "a b+c", clientSecret)
 	})
 
 	t.Run("Password with colons is parsed correctly", func(t *testing.T) {
@@ -648,7 +655,7 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("Special characters in credentials", func(t *testing.T) {
 		// Test with special chars that might cause issues
-		encoded := base64.StdEncoding.EncodeToString([]byte("client+id@example.com:p@ss=word&special!"))
+		encoded := base64.StdEncoding.EncodeToString([]byte("client%2Bid%40example.com:p%40ss%3Dword%26special%21"))
 		clientId, clientSecret, ok := parseBasicAuth("Basic " + encoded)
 		assert.True(t, ok)
 		assert.Equal(t, "client+id@example.com", clientId)

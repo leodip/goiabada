@@ -460,14 +460,11 @@ func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool) 
 	return percentDecoded(credentials[:colonIdx]), percentDecoded(credentials[colonIdx+1:]), true
 }
 
-// percentDecoded undoes the encoding RFC 6749 section 2.3.1 has a client apply to its identifier
-// and its secret before it puts them in a Basic header, so a library following it, which sends
-// my-client as my%2Dclient, is matched. Only %XX escapes are decoded: a '+' stays a '+', because
-// a client that skips the encoding, such as curl -u, sends an operator's secret with a '+' in it as
-// is, and no credential holds the space a '+' would otherwise stand for. A client that encodes sends
-// a '+' as %2B. A value with a malformed escape is kept as sent.
+// percentDecoded undoes RFC 6749 section 2.3.1's form encoding before Basic authentication:
+// '+' is a space and '%2B' a literal plus. A malformed percent escape keeps the whole value
+// unchanged, preserving the existing fallback for clients that send an unencoded '%' (#474).
 func percentDecoded(value string) string {
-	decoded, err := url.PathUnescape(value)
+	decoded, err := url.QueryUnescape(value)
 	if err != nil {
 		return value
 	}
