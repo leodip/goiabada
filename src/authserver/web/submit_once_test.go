@@ -50,7 +50,7 @@ func TestTemplates_CredentialFormsSubmitOnce(t *testing.T) {
 	}
 
 	// The three pages are rendered in the auth layout (handler_auth_pwd.go, handler_auth_otp.go).
-	if !strings.Contains(templates["template/layouts/auth_layout.html"], `<script src="/static/utils.js" defer></script>`) {
+	if !strings.Contains(templates["template/layouts/auth_layout.html"], `<script src="{{ asset "/static/utils.js" }}" defer></script>`) {
 		t.Error("template/layouts/auth_layout.html does not load /static/utils.js, where submitOnce is declared")
 	}
 

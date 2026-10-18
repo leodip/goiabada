@@ -123,7 +123,7 @@ func TestRender_AdminClientTokens_TheFirstDrawShowsTheStoredClient(t *testing.T)
 	apiClient := &tokensTabAPI{stored: storedTokensClient()}
 
 	out := serveClientTokens(t,
-		adminclienthandlers.HandleTokensGet(render.New(web.TemplateFS()), newRenderSessionStore(t), apiClient),
+		adminclienthandlers.HandleTokensGet(render.New(web.TemplateFS(), web.StaticFS()), newRenderSessionStore(t), apiClient),
 		http.MethodGet, nil)
 
 	assert.Contains(t, out, `<span class="text-accent">portal</span>`)
@@ -163,7 +163,7 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 			apiClient := &tokensTabAPI{stored: storedTokensClient(), refusal: apiRefusal}
 
 			out := serveClientTokens(t,
-				adminclienthandlers.HandleTokensPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+				adminclienthandlers.HandleTokensPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 				http.MethodPost, url.Values{
 					"tokenExpirationInSeconds":                {tc.expiration},
 					"refreshTokenOfflineIdleTimeoutInSeconds": {tc.idle},

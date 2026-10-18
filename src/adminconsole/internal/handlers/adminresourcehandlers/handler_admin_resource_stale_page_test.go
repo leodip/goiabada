@@ -160,7 +160,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 			apiClient := &stalePageApiClient{grantOneApiClient: grantOneApiClient{current: tc.current}}
 
 			recorder := httptest.NewRecorder()
-			tc.build(render.New(fstest.MapFS{}), apiClient).ServeHTTP(recorder,
+			tc.build(render.New(fstest.MapFS{}, nil), apiClient).ServeHTTP(recorder,
 				handlertest.Request(http.MethodPost, "/admin/resources/2", tc.options...))
 
 			assert.Equal(t, tc.wantStatus, recorder.Code, recorder.Body.String())

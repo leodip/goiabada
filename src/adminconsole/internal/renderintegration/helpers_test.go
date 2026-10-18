@@ -81,7 +81,7 @@ func renderPageAt(t *testing.T, path, layout, page string, bind map[string]inter
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, locale))
 
-	h := render.New(web.TemplateFS())
+	h := render.New(web.TemplateFS(), web.StaticFS())
 	w := httptest.NewRecorder()
 	err := h.RenderTemplate(w, req, layout, page, bind)
 	require.NoErrorf(t, err, "render %s in %s (template referenced data the bind lacks?)", page, locale)

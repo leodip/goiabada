@@ -66,7 +66,7 @@ func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T)
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 	rec := httptest.NewRecorder()
 
-	adminuserhandlers.HandlePhonePost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example").
+	adminuserhandlers.HandlePhonePost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example").
 		ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code, "the refused save is drawn again, not redirected: %s", rec.Body.String())

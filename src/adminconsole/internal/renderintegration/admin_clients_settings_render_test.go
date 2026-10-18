@@ -230,7 +230,7 @@ func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 	rec := httptest.NewRecorder()
 
-	adminclienthandlers.HandleSettingsPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example").
+	adminclienthandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example").
 		ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code, "the refused save is drawn again, not redirected: %s", rec.Body.String())

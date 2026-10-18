@@ -75,7 +75,7 @@ func TestRender_AdminClientDelete_ARefusalDrawsTheDeletePageAgain(t *testing.T) 
 				perms: []api.PermissionResponse{{Id: 3, PermissionIdentifier: "read",
 					Resource: api.ResourceResponse{Id: 2, ResourceIdentifier: "orders"}}},
 			}
-			renderer := render.New(web.TemplateFS())
+			renderer := render.New(web.TemplateFS(), web.StaticFS())
 
 			status, out := serveClientDelete(t,
 				adminclienthandlers.HandleDeletePost(renderer, apiClient, "https://console.example"),

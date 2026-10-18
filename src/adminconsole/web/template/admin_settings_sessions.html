@@ -1,7 +1,7 @@
 {{define "title"}}{{ T $.ctx "adminconsole.admin_settings.sessions.page_title" }} – {{ .appName }}{{end}}
 {{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-<script src="/static/pages/admin-settings-sessions.js" defer></script>
+<script src="{{ asset "/static/pages/admin-settings-sessions.js" }}" defer></script>
 {{end}}
 
 {{define "page"}}

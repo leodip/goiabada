@@ -45,7 +45,7 @@ func TestRender_AdminResourceDelete_TheConsolesRefusalIsInThePagesLanguage(t *te
 		handlertest.WithForm(url.Values{"resourceIdentifier": {"shipping"}}))
 
 	w := httptest.NewRecorder()
-	adminresourcehandlers.HandleDeletePost(render.New(web.TemplateFS()), resourceToDelete{}, "https://console.example.test").
+	adminresourcehandlers.HandleDeletePost(render.New(web.TemplateFS(), web.StaticFS()), resourceToDelete{}, "https://console.example.test").
 		ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code, "the refused form is redrawn, not answered with an error page")

@@ -92,7 +92,7 @@ func (s *authenticationTabAPI) UpdateClientAuthentication(_ context.Context, _ s
 func postClientAuthentication(t *testing.T, apiClient *authenticationTabAPI, form url.Values) string {
 	t.Helper()
 	return serveRefusal(t,
-		adminclienthandlers.HandleAuthenticationPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		adminclienthandlers.HandleAuthenticationPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/clients/7/authentication", form, handlertest.WithRouteParam("clientId", "7"))
 }
 
@@ -196,7 +196,7 @@ func TestRender_AdminGroupSettings_ARefusedSaveKeepsTheStoredGroup(t *testing.T)
 		Description: "Sales team", IncludeInIdToken: true, IncludeInAccessToken: true}}
 
 	out := serveRefusal(t,
-		admingrouphandlers.HandleSettingsPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		admingrouphandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/groups/4/settings",
 		url.Values{"groupIdentifier": {"marketing"}, "description": {"Marketing team"}, "includeInIdToken": {"on"}},
 		handlertest.WithRouteParam("groupId", "4"))
@@ -236,7 +236,7 @@ func TestRender_AdminResourceSettings_ARefusedSaveKeepsTheStoredResource(t *test
 		Description: "Billing"}}
 
 	out := serveRefusal(t,
-		adminresourcehandlers.HandleSettingsPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		adminresourcehandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/resources/3/settings",
 		url.Values{"resourceIdentifier": {"invoices-api"}, "description": {"Invoices"}},
 		handlertest.WithRouteParam("resourceId", "3"))
@@ -284,7 +284,7 @@ func TestRender_AdminSettingsGeneral_ARefusedSaveKeepsTheStoredIssuer(t *testing
 		Issuer: "storedissuer", PasswordPolicy: "low"}}
 
 	out := serveRefusal(t,
-		adminsettingshandlers.HandleGeneralPost(render.New(web.TemplateFS()), nil, apiClient,
+		adminsettingshandlers.HandleGeneralPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient,
 			noInvalidation{t}, "https://console.example"),
 		"/admin/settings/general",
 		url.Values{"appName": {"A name far too long"}, "issuer": {"typedissuer"}, "passwordPolicy": {"low"}})
@@ -331,7 +331,7 @@ func TestRender_AdminGroupAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing
 			}
 
 			out := serveRefusal(t,
-				admingrouphandlers.HandleAttributesEditPost(render.New(web.TemplateFS()), apiClient),
+				admingrouphandlers.HandleAttributesEditPost(render.New(web.TemplateFS(), web.StaticFS()), apiClient),
 				"/admin/groups/4/attributes/edit/11",
 				url.Values{"attributeKey": {typedKey}, "attributeValue": {"Retail"}},
 				handlertest.WithRouteParam("groupId", "4"), handlertest.WithRouteParam("attributeId", "11"))
@@ -388,7 +388,7 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 			}
 
 			out := serveRefusal(t,
-				adminuserhandlers.HandleAttributesEditPost(render.New(web.TemplateFS()), apiClient, "https://console.example"),
+				adminuserhandlers.HandleAttributesEditPost(render.New(web.TemplateFS(), web.StaticFS()), apiClient, "https://console.example"),
 				"/admin/users/9/attributes/edit/12",
 				url.Values{"attributeKey": {tc.typedKey}, "attributeValue": {"E-200"}},
 				handlertest.WithRouteParam("userId", "9"), handlertest.WithRouteParam("attributeId", "12"))
@@ -408,7 +408,7 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 // The first draw of each page binds the stored record both ways: the inputs and the title and
 // original values agree, so a save of the page as loaded asks nothing.
 func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
-	renderer := render.New(web.TemplateFS())
+	renderer := render.New(web.TemplateFS(), web.StaticFS())
 	testCases := []struct {
 		name    string
 		handler http.HandlerFunc

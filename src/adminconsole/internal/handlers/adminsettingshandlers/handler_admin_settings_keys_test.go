@@ -104,7 +104,7 @@ func TestHandleKeysRotatePost_APIErrorReachesTheBrowser(t *testing.T) {
 			// templateFS is nil because JSONError renders no template. This is the real
 			// helper rather than a mock so the assertions below are on the bytes the
 			// browser receives.
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 
 			req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
 				handlertest.WithAccessToken(),
@@ -137,7 +137,7 @@ func TestHandleKeysRotatePost_APIErrorReachesTheBrowser(t *testing.T) {
 // failure path through a different helper cannot alter what a successful rotation answers.
 func TestHandleKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
-	httpHelper := render.New(nil)
+	httpHelper := render.New(nil, nil)
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 

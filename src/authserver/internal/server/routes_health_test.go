@@ -31,6 +31,7 @@ func TestRegisterRoutes_HealthAnswersWithTheDatabaseDown(t *testing.T) {
 
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
+	s.staticFS = web.StaticFS()
 	s.registerRoutes()
 
 	mint := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -64,6 +65,7 @@ func TestRegisterRoutes_ApplicationRoutesStillFailWithTheDatabaseDown(t *testing
 
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
+	s.staticFS = web.StaticFS()
 	s.registerRoutes()
 
 	rr := httptest.NewRecorder()

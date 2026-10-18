@@ -108,7 +108,7 @@ func newAuditedTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*R
 // on, for the cases that read the metrics.
 func newMeteredTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*RateLimiter, *stubAuditLogger, *metrics.Registry) {
 	auditLog := &stubAuditLogger{}
-	httpHelper := render.New(testTemplateFS)
+	httpHelper := render.New(testTemplateFS, nil)
 	reg := metrics.NewRegistry()
 	return NewRateLimiter(ceremonyStore, httpHelper, httpHelper, auditLog, enabled, nil, reg), auditLog, reg
 }

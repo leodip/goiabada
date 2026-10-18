@@ -40,7 +40,7 @@ func groupSwitchRe(name string) *regexp.Regexp {
 
 // The new group form opens with both include switches on.
 func TestRender_AdminGroupNew_AFirstDrawHasBothSwitchesOn(t *testing.T) {
-	out := servePage(t, admingrouphandlers.HandleNewGet(render.New(web.TemplateFS())), http.MethodGet, "/admin/groups/new")
+	out := servePage(t, admingrouphandlers.HandleNewGet(render.New(web.TemplateFS(), web.StaticFS())), http.MethodGet, "/admin/groups/new")
 
 	for _, name := range []string{"includeInAccessToken", "includeInIdToken"} {
 		toggle := groupSwitchRe(name).FindString(out)
@@ -72,7 +72,7 @@ func TestRender_AdminGroupNew_ARefusalKeepsTheSwitchesAsSubmitted(t *testing.T) 
 			tc.form.Set("groupIdentifier", "sales")
 			tc.form.Set("description", "Sales team")
 
-			out := serveRefusal(t, admingrouphandlers.HandleNewPost(render.New(web.TemplateFS()),
+			out := serveRefusal(t, admingrouphandlers.HandleNewPost(render.New(web.TemplateFS(), web.StaticFS()),
 				&groupNewAPI{refusal: refusal}, "https://console.example"), "/admin/groups/new", tc.form)
 
 			assert.Contains(t, out, `<p>`+refusal+`</p>`)
@@ -128,7 +128,7 @@ func profilePages(apiClient *profilePageAPI) []struct {
 	target  string
 	options []handlertest.Option
 } {
-	renderer := render.New(web.TemplateFS())
+	renderer := render.New(web.TemplateFS(), web.StaticFS())
 	return []struct {
 		name    string
 		handler http.HandlerFunc

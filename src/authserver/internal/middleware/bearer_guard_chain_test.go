@@ -61,7 +61,7 @@ func chainSurfaces() []chainSurface {
 		{name: "api", build: func() *BearerToken { return NewBearerTokenForAPI(chainParser{}) }},
 		{name: "userinfo", build: func() *BearerToken {
 			// The real writer, so the /userinfo body is the bytes on the wire and not a recorded call.
-			return NewBearerTokenForUserInfo(chainParser{}, render.New(nil))
+			return NewBearerTokenForUserInfo(chainParser{}, render.New(nil, nil))
 		}},
 	}
 }

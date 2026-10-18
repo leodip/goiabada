@@ -193,7 +193,7 @@ func TestHandleWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.T) {
 
 			// The real helper rather than a mock, so the assertions are on the bytes the
 			// browser receives. templateFS is nil because JSONError renders no template.
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 
 			body := `{"clientId":1,"webOrigins":["https://[2001:db8::1]"]}`
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
@@ -258,7 +258,7 @@ func TestHandleWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),

@@ -32,7 +32,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 	w := httptest.NewRecorder()
-	render.New(web.TemplateFS()).NotFound(w, req)
+	render.New(web.TemplateFS(), web.StaticFS()).NotFound(w, req)
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()

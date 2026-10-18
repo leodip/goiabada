@@ -126,7 +126,7 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 			router := chi.NewRouter()
 			router.Post("/admin/resources/{resourceId}/permissions",
 				HandlePermissionsPost(
-					render.New(nil),
+					render.New(nil, nil),
 					nil,
 					&savePermissionsApiClient{
 						resource:  &api.ResourceResponse{Id: 3},
