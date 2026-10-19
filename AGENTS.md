@@ -743,7 +743,12 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   A script that shows something following a control's value shows it again on `pageshow`, since a
   browser restoring the form, as on Back, fires no change, and a script asking the server about a
   choice drops an answer to any request but its latest, a failure included, through
-  `sendAjaxRequest`'s `current`.
+  `sendAjaxRequest`'s `current`; one asking the server to validate values applies the values it
+  sent, never the fields as they are when the answer arrives, and drops the answer once the person
+  has typed past them. A row's own action, a removal or an addition saved at once, is a button
+  marked `data-action-url`, which `static/pages/row-actions.js` posts, asking first when the
+  button carries `data-confirm`; a search that finds users to add is `#userSearchForm`, which
+  `static/pages/user-search.js` turns into a search as the person types and never lets submit.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
@@ -774,9 +779,11 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `button-block`. A list whose rows a person ends or revokes (`account_user_sessions.html`): each
   row's button asks in a `confirm` dialog with the row's own sentence in `data-confirm`, and on
   success gives way to a `tag` saying so, which takes its focus, while the page's live region says it
-  too. A home of destinations (the console's `index.html`): a `link-list`. A record with tabs
+  too; a row added the same way from a search (`admin_groups_members_add.html`) acts at once, with no
+  dialog, since one Remove undoes it. A home of destinations (the console's `index.html`): a `link-list`. A record with tabs
   (`admin_clients_settings.html`): a header linking back to the list in the eyebrow, the record's
-  identifier as the title, the `tab-bar`, then each tab one `panel`, its sections `panel-body`s
+  identifier as the title, the `tab-bar`, one partial per kind of record (`client_header`,
+  `user_header`, `group_header`, `resource_header`), then each tab one `panel`, its sections `panel-body`s
   under a `panel-title`, its yes or no settings a `check-list` whose rows say what each does, and
   Save in the `panel-footer`. A create form (`admin_clients_new.html`): the same back link, title
   and lead, one `panel`, and Cancel beside the create action. A delete confirmation page
