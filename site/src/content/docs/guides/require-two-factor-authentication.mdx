@@ -49,7 +49,7 @@ The admin console signs administrators in through its own client, `admin-console
 </Steps>
 
 <Aside type="danger">
-**There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them, or a client of your own holding `authserver:manage`. Give `authserver:manage` to at least two people before you require a code: otherwise, once the only one loses their phone, such a client or editing the database by hand are the only ways back. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
+**There are no backup codes.** An administrator who loses their authenticator needs another administrator to turn it off for them, or a client of your own holding `authserver:manage`. Give `authserver:manage` to at least two people before you require a code: otherwise, once the only one loses their phone, such a client or the auth server's `recover` command are the ways back. See [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in).
 </Aside>
 
 ## Setting up an authenticator

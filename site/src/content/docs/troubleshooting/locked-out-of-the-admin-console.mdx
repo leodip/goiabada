@@ -115,7 +115,7 @@ Sign in with the password the administrator had, and change it under **Account**
 
 ## The last administrator can't sign in
 
-The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck, and there's no recovery command. Here's what works today.
+The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck. When nobody can let them back in, the auth server's `recover` command can.
 
 **Another administrator can let them back in.** Any user with `authserver:manage` can open **Admin**, **Users**, the user, and their **Authentication** tab, then use **Set password**, or turn off **Two-factor authentication enabled**. So the best fix comes before the problem: give `authserver:manage` to a second person.
 
@@ -123,7 +123,38 @@ The auth server never lets a change leave no enabled user holding `authserver:ma
 
 **A client of your own with `authserver:manage`** can do everything another administrator could, through the Admin API: [set the administrator's password](/reference/api/admin/operations/updateuserpassword/), or [turn off their two-factor authentication](/reference/api/admin/operations/updateuserotp/). It's the same client the [client secret](#the-admin-consoles-client-secret-changed) fix needs.
 
-With none of these, the only way back is editing the database by hand, which nothing supports or records.
+### Recover the user with the auth server
+
+When none of these is left, the auth server's `recover` subcommand restores sign-in for one named user. Its authority is the database credentials it runs with, so it runs where they already are: on the host, in the container or in the pod that runs the auth server. It does only what its flags ask, and whatever is asked, the user's sessions end and their authentication generation advances, so nothing signed in before the recovery survives it. An unknown or disabled user is refused, a new password is held to the stored password policy, and the [audit log](/concepts/audit-log/) records the recovery with the command named as the actor.
+
+| Flag | What it does |
+|---|---|
+| `--email <address>` | Names the user to recover, by their stored address. Required. |
+| `--grant-manage` | Grants the `authserver:manage` permission |
+| `--password <password>` | Sets a new password, held to the stored password policy |
+| `--remove-otp` | Removes the user's OTP authenticator |
+
+One command can ask for several actions, each only as asked, and it's the same command in every deployment shape:
+
+<Tabs>
+  <TabItem label="Docker Compose">
+    ```bash
+    docker compose run --rm goiabada-authserver recover --email admin@example.com --grant-manage --password '<password>'
+    ```
+  </TabItem>
+  <TabItem label="Native binaries">
+    ```bash
+    sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password "<password>"'
+    ```
+  </TabItem>
+  <TabItem label="Kubernetes">
+    ```bash
+    kubectl exec -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com --grant-manage --password '<password>'
+    ```
+  </TabItem>
+</Tabs>
+
+A password given on the command line reaches the shell's history and the process list, so change it under **Account**, **Change password** once the administrator is back in. The deployment pages hold the command for their own shape: [Docker Compose](/deploy/docker-compose/#recover-a-locked-out-administrator), [Native binaries](/deploy/native-binaries/#recover-a-locked-out-administrator) and [Kubernetes](/deploy/kubernetes/overview/#recover-a-locked-out-administrator).
 
 ## Next steps
 
