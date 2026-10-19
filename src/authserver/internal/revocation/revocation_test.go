@@ -1421,6 +1421,7 @@ func TestReasons_AreStoredData(t *testing.T) {
 	assert.Equal(t, "password_reset", ReasonPasswordReset)
 	assert.Equal(t, "password_change", ReasonPasswordChange)
 	assert.Equal(t, "admin_password_set", ReasonAdminPasswordSet)
+	assert.Equal(t, "recovery_command", ReasonRecoveryCommand)
 	assert.Equal(t, "account_disabled", ReasonAccountDisabled)
 	assert.Equal(t, "client_became_public", ReasonClientBecamePublic)
 }

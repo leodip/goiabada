@@ -261,12 +261,13 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	return result, nil
 }
 
-// Reasons a revocation records. The first four are recorded on EventRevokedUserAuthState, one
-// per credential site (#106 decision 7). ReasonClientBecamePublic is recorded on
-// EventRevokedClientGrants, and is also the reason a family's revocation record carries when
-// RevokeClientGrants wrote it (#245, #259). Constants rather than inline strings so the sites
-// cannot drift and a log consumer has something to match against, and one block so the next
-// site's reason has one place to go. Every value is stored data: renaming a constant is free,
+// Reasons a revocation records. The first five are recorded on EventRevokedUserAuthState, one
+// per credential site (#106 decision 7), the fifth naming the recovery command that holds the
+// database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
+// is recorded on EventRevokedClientGrants, and is also the reason a family's revocation record
+// carries when RevokeClientGrants wrote it (#245, #259). Constants rather than inline strings so
+// the sites cannot drift and a log consumer has something to match against, and one block so the
+// next site's reason has one place to go. Every value is stored data: renaming a constant is free,
 // changing its string is not.
 //
 // This is the list's only home. Another, constants.RevocationReasonEmailCollisionBackfill, was
@@ -278,6 +279,7 @@ const (
 	ReasonPasswordReset      = "password_reset"
 	ReasonPasswordChange     = "password_change"
 	ReasonAdminPasswordSet   = "admin_password_set"
+	ReasonRecoveryCommand    = "recovery_command"
 	ReasonAccountDisabled    = "account_disabled"
 	ReasonClientBecamePublic = "client_became_public"
 )
