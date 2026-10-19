@@ -54,6 +54,10 @@ func (s *Server) initRoutes(root chi.Router) {
 		baseURL,
 		builtin.AdminConsoleClientIdentifier,
 	)
+	// The budget the sign-in arm admits its anonymous session rows through, mounted here
+	// on the session-ended route too, so the console's two row-writing arms answer to one
+	// rate (#620).
+	preAuthBudget := middlewareJwt.PreAuthBudget()
 	jwtSessionHandler := middlewareJwt.SessionHandler()
 	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
 	requiresAccountScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)})
@@ -104,7 +108,10 @@ func (s *Server) initRoutes(root chi.Router) {
 		// that can end a session, which is what brings it under the origin check (#411).
 		r.Get("/logout", accounthandlers.HandleLogoutConfirmGet(httpHelper, baseURL))
 		r.Post("/logout", accounthandlers.HandleLogoutPost(httpHelper, s.sessionStore, apiClient, baseURL))
-		r.Get("/session-ended", handlers.HandleSessionEndedGet(httpHelper, s.sessionStore))
+		// Every request this route serves costs the auth server a write, cookied or not,
+		// so each takes one from its address's budget; over it the answer is the budget's
+		// own 429, and no row (#620).
+		r.With(preAuthBudget.Handler()).Get("/session-ended", handlers.HandleSessionEndedGet(httpHelper, s.sessionStore))
 	})
 
 	// Account routes

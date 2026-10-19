@@ -223,8 +223,10 @@ func (w *Worker) reapAuthorizeRequests(ctx context.Context) {
 //
 // It runs on the poll, outside the claim, which is the one sweep in this worker that does.
 // The reason is a rate the others do not face: /auth/authorize writes a browser session
-// before it validates anything and is not rate limited, so an unauthenticated caller can
-// produce rows as fast as it can send requests. A pre-authentication session stops being
+// before it validates anything and is not rate limited, and the admin console writes the
+// same kind of row for an anonymous request, so an unauthenticated caller of either
+// process can produce rows as fast as it can send requests (#620). A pre-authentication
+// session stops being
 // usable after thirty minutes, but on the twelve hour claim it would go on EXISTING for up
 // to twelve, and a sustained hundred requests a second would leave about 4.3 million rows
 // waiting for one enormous DELETE. Every five minutes puts the physical bound below the

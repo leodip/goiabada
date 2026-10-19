@@ -140,8 +140,11 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			store := sessionstoremocks.NewStore(t)
+			// The ID is what the store gives a session it loaded from a row, which a
+			// Get that succeeds always did; without it the cookieless early return (#620)
+			// would answer before the Save this case exists to refuse.
 			store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
-				Return(&sessionstore.Session{Values: signedInValues()}, testCase.getErr)
+				Return(&sessionstore.Session{ID: "the-stored-session", Values: signedInValues()}, testCase.getErr)
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
