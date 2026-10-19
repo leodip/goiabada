@@ -96,8 +96,9 @@ function setPermissions(permissions, resourceIdentifier) {
 }
 
 // The resource the permission field was last asked to show, "" for none, and the number of that
-// request: an answer to an earlier one, which a slow network can deliver last, is dropped, so the
-// field never shows, nor grants, the permissions of a resource no longer chosen.
+// request: an answer to an earlier one, which a slow network can deliver last, is dropped, its
+// refusal included, so the field never shows, nor grants, the permissions of a resource no longer
+// chosen, and the page never says why a lookup no longer wanted failed.
 let requestedResource = "";
 let permissionsRequest = 0;
 
@@ -117,10 +118,11 @@ function loadPermissions() {
     method: "GET",
     bodyData: null,
     statusRegion: permissionStatus,
+    current: function () {
+      return request === permissionsRequest && resourceSelect.value === resource;
+    },
     callback: function (result) {
-      if (request === permissionsRequest && resourceSelect.value === resource) {
-        setPermissions(result.Permissions, resourceIdentifier);
-      }
+      setPermissions(result.Permissions, resourceIdentifier);
     }
   });
 }

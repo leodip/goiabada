@@ -742,7 +742,8 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `data-stored-checked`), as `shell.js` wires them; a form a script saves calls `confirmChanges`.
   A script that shows something following a control's value shows it again on `pageshow`, since a
   browser restoring the form, as on Back, fires no change, and a script asking the server about a
-  choice drops an answer to any request but its latest.
+  choice drops an answer to any request but its latest, a failure included, through
+  `sendAjaxRequest`'s `current`.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

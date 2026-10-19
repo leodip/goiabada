@@ -1,5 +1,6 @@
 // admin-settings-ui-theme.js is the theme settings page's behaviour: choosing a theme shows it on
-// this page at once, before it is saved, the way the layouts draw a saved one.
+// this page at once, before it is saved, the way the layouts draw a saved one, as does a choice the
+// browser restores.
 
 function previewTheme(theme) {
   const root = document.documentElement;
@@ -20,4 +21,13 @@ document.querySelectorAll('input[name="themeSelection"]').forEach(function (radi
       previewTheme(radio.value);
     }
   });
+});
+
+// pageshow comes after the browser restores the form, as on Back, which fires no change: the page
+// previews the theme it restored checked.
+window.addEventListener("pageshow", function () {
+  const checked = document.querySelector('input[name="themeSelection"]:checked');
+  if (checked) {
+    previewTheme(checked.value);
+  }
 });

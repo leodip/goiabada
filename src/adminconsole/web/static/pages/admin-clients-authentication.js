@@ -18,12 +18,26 @@ function showSecret(show) {
   showButton.textContent = show ? showButton.dataset.hideLabel : showLabel;
 }
 
+// One generation runs at a time, Generate disabled meanwhile, so neither a second press nor a page
+// restored from the back/forward cache mid-generation asks for a second secret that would replace
+// one already shown, and perhaps copied.
+let generating = false;
+
 function generateSecret() {
+  if (generating) {
+    return;
+  }
+  generating = true;
+  generateButton.disabled = true;
   sendAjaxRequest({
     url: "/admin/clients/generate-new-secret",
     method: "GET",
     bodyData: null,
     statusRegion: secretStatus,
+    finished: function () {
+      generating = false;
+      generateButton.disabled = false;
+    },
     callback: function (result) {
       const hadSecret = secretField.value !== "";
       secretField.value = result.NewSecret;

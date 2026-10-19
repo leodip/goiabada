@@ -747,11 +747,28 @@ const debounce = (func, wait) => {
 // props.callback. A failure is said in the dialog props.modalId names, or, on a page that answers
 // in a status region, the one props.statusRegion holds, as a notice, the way that page says its
 // successes; there an access token the admin API refused signs out at once, as the image upload
-// does, since the home page then says why.
+// does, since the home page then says why. A page that may stop wanting the answer, having asked
+// again meanwhile, gives props.current, and neither the failure nor the answer of a request it no
+// longer wants is shown; props.finished is told, once, that the request is over, however it ended.
 function sendAjaxRequest(props) {
+
+  const stale = () => typeof props.current === "function" && !props.current();
+  let over = false;
+  const finish = () => {
+    if (!over) {
+      over = true;
+      if (props.finished) {
+        props.finished();
+      }
+    }
+  };
 
   // fail says why the request failed: title and message in the dialog, message alone in a notice.
   const fail = (title, message) => {
+    finish();
+    if (stale()) {
+      return;
+    }
     if (props.statusRegion) {
       showNotice(props.statusRegion, "danger", message);
     } else {
@@ -761,6 +778,10 @@ function sendAjaxRequest(props) {
 
   // failUnexpected says that the request failed in a way the console did not answer.
   const failUnexpected = (detail) => {
+    finish();
+    if (stale()) {
+      return;
+    }
     if (props.statusRegion) {
       showNotice(props.statusRegion, "danger", tFormat("js.error.unexpected_text", { detail: detail }));
     } else {
@@ -827,6 +848,7 @@ function sendAjaxRequest(props) {
               // closes, by its button or by Escape alike.
               if (isSessionEnded(err)) {
                 setLoading(false);
+                finish();
                 if (props.statusRegion) {
                   goToSessionEnded();
                   return;
@@ -862,7 +884,10 @@ function sendAjaxRequest(props) {
       })
       .then((result) => {
         if (result !== undefined) {
-          props.callback(result);
+          finish();
+          if (!stale()) {
+            props.callback(result);
+          }
         }
       })
       .catch((err) => {
