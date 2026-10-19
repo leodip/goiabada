@@ -2,6 +2,7 @@ package adminresourcehandlers
 
 import (
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 type GroupInfo struct {
@@ -44,9 +45,13 @@ type SavePermissionsResult struct {
 	Error   string
 }
 
+// ValidatePermissionResult answers whether a permission the page adds or edits may be saved, and,
+// when it may not, why and which of its two fields, permissionIdentifier or description, the page
+// marks.
 type ValidatePermissionResult struct {
 	Valid bool
 	Error string
+	Field string
 }
 
 type UserResult struct {
@@ -75,4 +80,29 @@ func permissionIdsOf(permissions []api.PermissionResponse) []int64 {
 		ids = append(ids, p.Id)
 	}
 	return ids
+}
+
+// permissionEntry is a permission as a resource's permissions tab draws it: the id the save sends
+// back, the identifier and description, and whether it is one of the authserver resource's
+// built-in permissions, which the tab draws without Edit or Remove.
+type permissionEntry struct {
+	Id          int64
+	Identifier  string
+	Description string
+	BuiltIn     bool
+}
+
+// resourceErrorFields maps the refusals a resource's settings can meet to the field each is about:
+// the identifier the API requires, validates and finds in use by a resource or a client, or fixed on
+// the system resource, and the description it bounds.
+var resourceErrorFields = map[string]string{
+	i18n.ErrCodeResourceIdentifierRequired:         "resourceIdentifier",
+	i18n.ErrCodeResourceIdentifierInUse:            "resourceIdentifier",
+	i18n.ErrCodeResourceIdentifierNamesClient:      "resourceIdentifier",
+	i18n.ErrCodeResourceSystemLevelIdentifierFixed: "resourceIdentifier",
+	i18n.ErrCodeIdentifierInvalidFormat:            "resourceIdentifier",
+	i18n.ErrCodeIdentifierTooShort:                 "resourceIdentifier",
+	i18n.ErrCodeIdentifierTooLong:                  "resourceIdentifier",
+	i18n.ErrCodeResourceDescriptionTooLong:         "description",
+	i18n.ErrCodeDescriptionAngleBrackets:           "description",
 }

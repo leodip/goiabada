@@ -397,12 +397,12 @@ func labelFault(arg []guard.ScriptToken, has catalogHas) string {
 }
 
 // TestScriptButtons_PlainAndNamed holds every page and script this server serves to the rule: every
-// script-built button is type "button", and every icon-button call passes a label. Eight buttons are
-// built in script (the icon builder's, three row buttons, the Remove buttons of client-uri-list.js,
-// permission-list.js and user-groups.js, and user-search.js's Add) and two icon buttons are asked
-// for (the resource permissions page's edit and remove buttons).
+// script-built button is type "button", and every icon-button call passes a label. Six buttons are
+// built in script (the icon builder's, the Remove buttons of client-uri-list.js, permission-list.js
+// and user-groups.js, user-search.js's Add, and resource-permissions.js's Edit and Remove) and no
+// icon button is asked for.
 func TestScriptButtons_PlainAndNamed(t *testing.T) {
-	assertScriptButtons(t, realCatalogHas, buttonCalls{created: 8, labelled: 2},
+	assertScriptButtons(t, realCatalogHas, buttonCalls{created: 6, labelled: 0},
 		templateFS, withoutVendored{staticFS})
 }
 
@@ -589,6 +589,7 @@ func TestScriptButtons_AWalkThatReachesNothingIsFatal(t *testing.T) {
 // loads the script, and the script prevents the native submit.
 var searchPages = []string{
 	"template/admin_groups_members_add.html",
+	"template/admin_resources_users_with_permission_add.html",
 }
 
 var (

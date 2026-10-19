@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -158,6 +159,27 @@ func TestValidatePermissionPost_AWrappedRefusalStillReachesTheForm(t *testing.T)
 			assert.False(t, result.Valid)
 			assert.Equal(t, testCase.want, result.Error,
 				"the reason has to reach the form; a type switch loses it to the 500 arm")
+		})
+	}
+}
+
+// Every refusal names the field it is about, which the page marks invalid and focuses: the
+// description for markup and length, the identifier for a blank one and the validator's refusals,
+// and none when the permission may be saved (#617).
+func TestValidatePermissionPost_NamesTheRefusedField(t *testing.T) {
+	for _, tc := range []struct {
+		name, identifier, description, field string
+	}{
+		{"markup in the description", "a-permission", "<b>x</b>", "description"},
+		{"a description past the bound", "a-permission", strings.Repeat("d", 101), "description"},
+		{"no identifier", "", "Reads", "permissionIdentifier"},
+		{"an identifier the validator refuses", "9 not valid", "", "permissionIdentifier"},
+		{"a permission that may be saved", "a-permission", "Reads", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := validatePermissionResponse(t, tc.identifier, tc.description)
+			assert.Equal(t, tc.field == "", result.Valid)
+			assert.Equal(t, tc.field, result.Field)
 		})
 	}
 }

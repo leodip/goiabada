@@ -126,7 +126,7 @@ func HandleSettingsPost(
 		resourceIdentifier := r.FormValue("resourceIdentifier")
 		description := r.FormValue("description")
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"resourceId":            id,
 				"storedResource":        resource,
@@ -134,6 +134,7 @@ func HandleSettingsPost(
 				"description":           description,
 				"isSystemLevelResource": isSystemLevelResource,
 				"error":                 message,
+				"errorField":            errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_settings.html", bind)
@@ -151,7 +152,9 @@ func HandleSettingsPost(
 		// Call API
 		_, err = apiClient.UpdateResource(r.Context(), jwtInfo.TokenResponse.AccessToken, id, req)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, resourceErrorFields))
+			})
 			return
 		}
 

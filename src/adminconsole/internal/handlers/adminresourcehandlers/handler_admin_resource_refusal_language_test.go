@@ -32,22 +32,22 @@ func TestAdminResourceDeletePost_RefusesInThePagesLanguage(t *testing.T) {
 			name:       "a system-level resource",
 			resource:   systemLevel,
 			identifier: "billing",
-			english:    "System-level resources cannot be deleted.",
-			portuguese: "Recursos em nível de sistema não podem ser excluídos.",
+			english:    "This is the auth server's own resource, so it can't be deleted.",
+			portuguese: "Este é o recurso do próprio servidor de autenticação, então não pode ser excluído.",
 		},
 		{
 			name:       "no identifier typed",
 			resource:   ordinary,
 			identifier: "",
-			english:    "Resource identifier is required.",
-			portuguese: "O identificador do recurso é obrigatório.",
+			english:    "Type the resource identifier to confirm.",
+			portuguese: "Digite o identificador do recurso para confirmar.",
 		},
 		{
 			name:       "another resource's identifier typed",
 			resource:   ordinary,
 			identifier: "shipping",
-			english:    "Resource identifier does not match the resource being deleted.",
-			portuguese: "O identificador do recurso não corresponde ao recurso que está sendo excluído.",
+			english:    "That isn't this resource's identifier. Type it as shown above.",
+			portuguese: "Este não é o identificador deste recurso. Digite-o como aparece acima.",
 		},
 	}
 

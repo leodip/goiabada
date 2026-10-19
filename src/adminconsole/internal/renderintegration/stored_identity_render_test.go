@@ -246,10 +246,10 @@ func TestRender_AdminResourceSettings_ARefusedSaveKeepsTheStoredResource(t *test
 		handlertest.WithRouteParam("resourceId", "3"))
 
 	assert.Contains(t, out, "The resource identifier is already in use.")
-	assert.Contains(t, out, `<title>Test - Configurações do recurso - billing-api</title>`)
-	assert.Contains(t, out, `<span class="text-accent">billing-api</span>`, "the page title names the stored resource")
-	assert.NotContains(t, out, `<span class="text-accent">invoices-api</span>`)
-	assert.Contains(t, out, `var originalResourceIdentifier = "billing-api";`)
+	assert.Contains(t, out, `<title>Configurações – billing-api – Test</title>`)
+	assert.Contains(t, out, `<h1 class="page-title break-words" id="page-title">billing-api</h1>`, "the heading names the stored resource")
+	assert.NotContains(t, out, `id="page-title">invoices-api</h1>`)
+	assert.Contains(t, out, `data-stored-value="billing-api"`, "the rename question compares against the stored identifier")
 
 	identifier := inputRe("resourceIdentifier").FindString(out)
 	require.NotEmpty(t, identifier)
@@ -444,8 +444,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&resourceSettingsTabAPI{stored: &api.ResourceResponse{Id: 3, ResourceIdentifier: "billing-api"}}),
 			target:  "/admin/resources/3/settings",
 			options: []handlertest.Option{handlertest.WithRouteParam("resourceId", "3")},
-			want: []string{`<span class="text-accent">billing-api</span>`,
-				`var originalResourceIdentifier = "billing-api";`, `name="resourceIdentifier" value="billing-api"`},
+			want: []string{`<h1 class="page-title break-words" id="page-title">billing-api</h1>`,
+				`data-stored-value="billing-api"`, `name="resourceIdentifier" value="billing-api"`},
 		},
 		{
 			name: "general settings",

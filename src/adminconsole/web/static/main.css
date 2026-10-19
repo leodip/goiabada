@@ -3213,9 +3213,6 @@
       --modal-br: var(--radius-box);
     }
   }
-  .float-left {
-    float: left;
-  }
   .float-right {
     float: right;
   }
@@ -3464,17 +3461,8 @@
   .mt-8 {
     margin-top: calc(var(--spacing) * 8);
   }
-  .mr-1 {
-    margin-right: var(--spacing);
-  }
   .mr-2 {
     margin-right: calc(var(--spacing) * 2);
-  }
-  .mr-4 {
-    margin-right: calc(var(--spacing) * 4);
-  }
-  .mr-8 {
-    margin-right: calc(var(--spacing) * 8);
   }
   .mr-14 {
     margin-right: calc(var(--spacing) * 14);
@@ -3660,15 +3648,6 @@
   .w-6 {
     width: calc(var(--spacing) * 6);
   }
-  .w-16 {
-    width: calc(var(--spacing) * 16);
-  }
-  .w-40 {
-    width: calc(var(--spacing) * 40);
-  }
-  .w-52 {
-    width: calc(var(--spacing) * 52);
-  }
   .w-\[563px\] {
     width: 563px;
   }
@@ -3677,9 +3656,6 @@
   }
   .w-\[700px\] {
     width: 700px;
-  }
-  .w-fit {
-    width: fit-content;
   }
   .w-full {
     width: 100%;
@@ -3726,9 +3702,6 @@
   .basis-72 {
     flex-basis: calc(var(--spacing) * 72);
   }
-  .table-auto {
-    table-layout: auto;
-  }
   @layer daisyui.l1.l2.l3 {
     .link {
       cursor: pointer;
@@ -3757,12 +3730,6 @@
   }
   .resize-none {
     resize: none;
-  }
-  .list-inside {
-    list-style-position: inside;
-  }
-  .list-disc {
-    list-style-type: disc;
   }
   .grid-cols-1 {
     grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -3800,9 +3767,6 @@
   .gap-6 {
     gap: calc(var(--spacing) * 6);
   }
-  .overflow-x-auto {
-    overflow-x: auto;
-  }
   .rounded {
     border-radius: 0.25rem;
   }
@@ -3816,12 +3780,6 @@
   }
   .bg-base-100 {
     background-color: var(--color-base-100);
-  }
-  .bg-error {
-    background-color: var(--color-error);
-  }
-  .bg-info {
-    background-color: var(--color-info);
   }
   .bg-neutral {
     background-color: var(--color-neutral);
@@ -3859,9 +3817,6 @@
       background-image: none;
     }
   }
-  .stroke-current {
-    stroke: currentcolor;
-  }
   @layer daisyui.l1.l2 {
     .checkbox-sm {
       padding: 0.1875rem;
@@ -3874,17 +3829,11 @@
   .p-2 {
     padding: calc(var(--spacing) * 2);
   }
-  .p-3 {
-    padding: calc(var(--spacing) * 3);
-  }
   .p-5 {
     padding: calc(var(--spacing) * 5);
   }
   .px-2 {
     padding-inline: calc(var(--spacing) * 2);
-  }
-  .px-6 {
-    padding-inline: calc(var(--spacing) * 6);
   }
   .pb-6 {
     padding-bottom: calc(var(--spacing) * 6);
@@ -3978,12 +3927,6 @@
   .text-error {
     color: var(--color-error);
   }
-  .text-error-content {
-    color: var(--color-error-content);
-  }
-  .text-info-content {
-    color: var(--color-info-content);
-  }
   .text-ink {
     color: var(--color-ink);
   }
@@ -4041,11 +3984,6 @@
       --fontsize: 0.75rem;
       --btn-p: 0.75rem;
       --size: calc(var(--size-field, 0.25rem) * 8);
-    }
-    .btn-xs {
-      --fontsize: 0.6875rem;
-      --btn-p: 0.5rem;
-      --size: calc(var(--size-field, 0.25rem) * 6);
     }
     :is(.otp-error) {
       --input-color: var(--color-error);
