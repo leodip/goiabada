@@ -629,10 +629,10 @@
 "adminconsole.admin_clients.new.field.display_name" = "Display name"
 "adminconsole.admin_clients.new.field.display_name_tooltip" = "The name users see on the sign-in and consent pages, when the client's settings show it."
 "adminconsole.admin_clients.new.flows_legend" = "What the client does"
-"adminconsole.admin_clients.new.toggle.auth_code" = "Signs users in"
-"adminconsole.admin_clients.new.toggle.auth_code_hint" = "Authorization code flow with PKCE, for web, single-page and mobile apps."
-"adminconsole.admin_clients.new.toggle.client_creds" = "Calls APIs as itself"
-"adminconsole.admin_clients.new.toggle.client_creds_hint" = "Client credentials flow, for a backend service that calls an API with no user signed in."
+"adminconsole.admin_clients.new.toggle.auth_code" = "Authorization code with PKCE"
+"adminconsole.admin_clients.new.toggle.auth_code_hint" = "Signs users in, from a web, single-page or mobile app."
+"adminconsole.admin_clients.new.toggle.client_creds" = "Client credentials"
+"adminconsole.admin_clients.new.toggle.client_creds_hint" = "For machine-to-machine calls, such as a backend service calling an API as itself with no user signed in."
 "adminconsole.admin_clients.new.create_button" = "Create client"
 
 # --- Client logo ------------------------------------------------------------
@@ -842,7 +842,7 @@
 "adminconsole.admin_clients.oauth2_flows.legacy_hint" = "Turn these on only for software that can't use the authorization code flow."
 "adminconsole.admin_clients.oauth2_flows.global_link" = "Global settings"
 "adminconsole.admin_clients.oauth2_flows.auth_code_label" = "Authorization code with PKCE"
-"adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" = "The authorization code flow is the usual one for signing users in, in web, single-page and mobile apps alike."
+"adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" = "Signs users in, from a web, single-page or mobile app."
 "adminconsole.admin_clients.oauth2_flows.enabled" = "Enabled"
 "adminconsole.admin_clients.oauth2_flows.disabled" = "Disabled"
 "adminconsole.admin_clients.oauth2_flows.pkce_question" = "PKCE"
@@ -856,7 +856,7 @@
 "adminconsole.admin_clients.oauth2_flows.pkce_public_note" = "A public client always requires PKCE. Make the client confidential, on the Authentication tab, to change this."
 "adminconsole.admin_clients.oauth2_flows.pkce_warning_confidential" = "Without PKCE, an intercepted authorization code can be redeemed by someone else. Make it optional only for software that can't send it."
 "adminconsole.admin_clients.oauth2_flows.client_creds_label" = "Client credentials"
-"adminconsole.admin_clients.oauth2_flows.client_creds_tooltip" = "For a backend service that calls an API as itself, with no user signed in."
+"adminconsole.admin_clients.oauth2_flows.client_creds_tooltip" = "For machine-to-machine calls, such as a backend service calling an API as itself with no user signed in."
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning" = "Only a confidential client can use it. Change the type on the Authentication tab."
 "adminconsole.admin_clients.oauth2_flows.implicit_label" = "Implicit flow"
 "adminconsole.admin_clients.oauth2_flows.implicit_tooltip" = "Returns tokens straight from the authorization endpoint (RFC 6749 section 4.2)."
@@ -1614,6 +1614,7 @@
 # --- Refusals the admin console and the admin API share (LocalizedError-backed)
 
 "handler.client.identifier_required" = "Client identifier is required."
+"handler.client.description_too_long" = "The description cannot exceed a maximum length of {{.max}} characters."
 "handler.attribute.key_required" = "Attribute key is required"
 "handler.settings_email.destination_required" = "Destination email is required."
 
@@ -1688,10 +1689,10 @@
 "handler.client_web_origins.too_long" = "Web origin is too long ({{.length}} characters, the maximum is {{.max}}): {{.origin}}"
 "handler.client_web_origins.duplicate" = "Duplicate web origins are not allowed"
 "handler.client_web_origins.expected_invalid" = "Invalid web origin in expectedWebOrigins: {{.origin}}. Send the web origins exactly as you last read them."
-"handler.client_tokens.token_expiration_out_of_range" = "Token expiration in seconds must be between 0 and {{.max}}."
-"handler.client_tokens.offline_idle_timeout_out_of_range" = "Refresh token offline - idle timeout in seconds must be between 0 and {{.max}}."
-"handler.client_tokens.offline_max_lifetime_out_of_range" = "Refresh token offline - max lifetime in seconds must be between 0 and {{.max}}."
-"handler.client_tokens.offline_idle_timeout_above_max_lifetime" = "Refresh token offline - idle timeout cannot be greater than max lifetime."
+"handler.client_tokens.token_expiration_out_of_range" = "Token lifetime must be between 0 and {{.max}} seconds."
+"handler.client_tokens.offline_idle_timeout_out_of_range" = "Offline idle timeout must be between 0 and {{.max}} seconds."
+"handler.client_tokens.offline_max_lifetime_out_of_range" = "Offline maximum lifetime must be between 0 and {{.max}} seconds."
+"handler.client_tokens.offline_idle_timeout_above_max_lifetime" = "The offline idle timeout can't be longer than the offline maximum lifetime."
 "handler.client_tokens.include_claims_in_access_token_invalid" = "Invalid value for includeOpenIDConnectClaimsInAccessToken."
 "handler.client_tokens.include_claims_in_id_token_invalid" = "Invalid value for includeOpenIDConnectClaimsInIdToken."
 

@@ -135,8 +135,7 @@ The resource permissions save's description bound reuses
 `handler.admin_resource_permissions.description_too_long` above, a group's and
 a user's attribute key reuses `handler.attribute.key_required`, the user's
 phone country refusal reuses `validator.phone.country_invalid`, and a client's
-identifier and description refusals reuse `handler.client.identifier_required`
-and `handler.admin_resource_permissions.description_too_long`. The account API's
+identifier refusal reuses `handler.client.identifier_required`. The account API's
 disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
 its wrong code on enabling one `handler.otp.incorrect_code`, its email
 verification send's conflict `handler.email_verification.account_changed`, and
@@ -183,40 +182,6 @@ failures are one key per cause, each a whole sentence.
 | `handler.user.otp_not_enabled` | (none) | User does not have OTP enabled |
 | `handler.user_groups.too_many` | (none) | Too many group ids |
 | `handler.email_verification.account_changed` | (none) | The account was changed by another request while the code was being sent. Nothing was sent: try again. |
-| `handler.client.display_name_too_long` | `max` (int) | The display name cannot exceed a maximum length of {{.max}} characters. |
-| `handler.client.identifier_in_use` | (none) | The client identifier is already in use. |
-| `handler.client.identifier_names_resource` | (none) | The client identifier is already in use by a resource. |
-| `handler.client.system_level_delete_not_allowed` | (none) | Trying to delete a system level client |
-| `handler.client.system_level_identifier_fixed` | (none) | The identifier of a system-level client cannot be changed. |
-| `handler.client.self_registered_identifier_fixed` | (none) | The identifier of a self-registered client cannot be changed. |
-| `handler.client.default_acr_not_applicable` | (none) | Default ACR level is not applicable when authorization code flow is disabled. |
-| `handler.client.default_acr_invalid` | (none) | Invalid default ACR level |
-| `handler.client.website_url_too_long` | `max` (int) | The website URL cannot exceed a maximum length of {{.max}} characters. |
-| `handler.client.website_url_invalid` | (none) | Invalid website URL. |
-| `handler.client.website_url_scheme_invalid` | (none) | Website URL must use http or https scheme. |
-| `handler.client.secret_invalid` | (none) | Invalid client secret. Please generate a new one. |
-| `handler.client_administrative_scopes.allowed_required` | (none) | allowed is required. |
-| `handler.client_administrative_scopes.console_always_allowed` | (none) | The admin console's client is always allowed to request the administrative scopes. |
-| `handler.client_permissions.client_credentials_disabled` | (none) | Client permissions can only be configured when client credentials flow is enabled |
-| `handler.client_redirect_uris.no_redirect_flow` | (none) | Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client. |
-| `handler.client_redirect_uris.too_many` | `max` (int), `count` (int) | A client can have at most {{.max}} redirect URIs, and this list has {{.count}}. |
-| `handler.client_redirect_uris.empty` | (none) | Redirect URI cannot be empty |
-| `handler.client_redirect_uris.too_long` | `length` (int), `max` (int), `prefix` (string) | Redirect URI is too long ({{.length}} bytes, the maximum is {{.max}}): {{.prefix}}... |
-| `handler.client_redirect_uris.invalid` | `uri` (string) | Invalid redirect URI: {{.uri}} |
-| `handler.client_redirect_uris.insecure_http` | `uri` (string) | Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): {{.uri}} |
-| `handler.client_redirect_uris.not_absolute` | `uri` (string) | Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): {{.uri}} |
-| `handler.client_redirect_uris.duplicate` | (none) | Duplicate redirect URIs are not allowed |
-| `handler.client_web_origins.empty` | (none) | Web origin cannot be empty |
-| `handler.client_web_origins.invalid` | `origin` (string) | Invalid web origin: {{.origin}}. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero. |
-| `handler.client_web_origins.too_long` | `length` (int), `max` (int), `origin` (string) | Web origin is too long ({{.length}} characters, the maximum is {{.max}}): {{.origin}} |
-| `handler.client_web_origins.duplicate` | (none) | Duplicate web origins are not allowed |
-| `handler.client_web_origins.expected_invalid` | `origin` (string) | Invalid web origin in expectedWebOrigins: {{.origin}}. Send the web origins exactly as you last read them. |
-| `handler.client_tokens.token_expiration_out_of_range` | `max` (int) | Token expiration in seconds must be between 0 and {{.max}}. |
-| `handler.client_tokens.offline_idle_timeout_out_of_range` | `max` (int) | Refresh token offline - idle timeout in seconds must be between 0 and {{.max}}. |
-| `handler.client_tokens.offline_max_lifetime_out_of_range` | `max` (int) | Refresh token offline - max lifetime in seconds must be between 0 and {{.max}}. |
-| `handler.client_tokens.offline_idle_timeout_above_max_lifetime` | (none) | Refresh token offline - idle timeout cannot be greater than max lifetime. |
-| `handler.client_tokens.include_claims_in_access_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInAccessToken. |
-| `handler.client_tokens.include_claims_in_id_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInIdToken. |
 | `handler.account.current_password_required` | (none) | Current password is required. |
 | `handler.account.new_password_required` | (none) | New password is required. |
 | `handler.account.current_password_incorrect` | (none) | That password isn't right. Try again. |
@@ -283,6 +248,51 @@ failures are one key per cause, each a whole sentence.
 | `handler.settings_ui_theme.theme_invalid` | (none) | Invalid theme. |
 | `handler.settings_audit_logs.retention_days_negative` | (none) | Audit log retention days cannot be negative. Use 0 for infinite retention. |
 | `handler.settings_audit_logs.retention_days_too_large` | (none) | Audit log retention days cannot exceed 3650 days (10 years). |
+
+## Client refusals the admin API answers by key
+
+The admin API's clients operations write each of these with the key itself as
+the `error_code`, as `validator.*` keys are written, so the admin console marks
+the field a refusal is about (#617). The client identifier left blank is
+`handler.client.identifier_required`, above, written the same way.
+
+| Code | Args | English message |
+|---|---|---|
+| `handler.client.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters. |
+| `handler.client.display_name_too_long` | `max` (int) | The display name cannot exceed a maximum length of {{.max}} characters. |
+| `handler.client.identifier_in_use` | (none) | The client identifier is already in use. |
+| `handler.client.identifier_names_resource` | (none) | The client identifier is already in use by a resource. |
+| `handler.client.system_level_delete_not_allowed` | (none) | Trying to delete a system level client |
+| `handler.client.system_level_identifier_fixed` | (none) | The identifier of a system-level client cannot be changed. |
+| `handler.client.self_registered_identifier_fixed` | (none) | The identifier of a self-registered client cannot be changed. |
+| `handler.client.default_acr_not_applicable` | (none) | Default ACR level is not applicable when authorization code flow is disabled. |
+| `handler.client.default_acr_invalid` | (none) | Invalid default ACR level |
+| `handler.client.website_url_too_long` | `max` (int) | The website URL cannot exceed a maximum length of {{.max}} characters. |
+| `handler.client.website_url_invalid` | (none) | Invalid website URL. |
+| `handler.client.website_url_scheme_invalid` | (none) | Website URL must use http or https scheme. |
+| `handler.client.secret_invalid` | (none) | Invalid client secret. Please generate a new one. |
+| `handler.client_administrative_scopes.allowed_required` | (none) | allowed is required. |
+| `handler.client_administrative_scopes.console_always_allowed` | (none) | The admin console's client is always allowed to request the administrative scopes. |
+| `handler.client_permissions.client_credentials_disabled` | (none) | Client permissions can only be configured when client credentials flow is enabled |
+| `handler.client_redirect_uris.no_redirect_flow` | (none) | Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client. |
+| `handler.client_redirect_uris.too_many` | `max` (int), `count` (int) | A client can have at most {{.max}} redirect URIs, and this list has {{.count}}. |
+| `handler.client_redirect_uris.empty` | (none) | Redirect URI cannot be empty |
+| `handler.client_redirect_uris.too_long` | `length` (int), `max` (int), `prefix` (string) | Redirect URI is too long ({{.length}} bytes, the maximum is {{.max}}): {{.prefix}}... |
+| `handler.client_redirect_uris.invalid` | `uri` (string) | Invalid redirect URI: {{.uri}} |
+| `handler.client_redirect_uris.insecure_http` | `uri` (string) | Redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): {{.uri}} |
+| `handler.client_redirect_uris.not_absolute` | `uri` (string) | Redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): {{.uri}} |
+| `handler.client_redirect_uris.duplicate` | (none) | Duplicate redirect URIs are not allowed |
+| `handler.client_web_origins.empty` | (none) | Web origin cannot be empty |
+| `handler.client_web_origins.invalid` | `origin` (string) | Invalid web origin: {{.origin}}. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero. |
+| `handler.client_web_origins.too_long` | `length` (int), `max` (int), `origin` (string) | Web origin is too long ({{.length}} characters, the maximum is {{.max}}): {{.origin}} |
+| `handler.client_web_origins.duplicate` | (none) | Duplicate web origins are not allowed |
+| `handler.client_web_origins.expected_invalid` | `origin` (string) | Invalid web origin in expectedWebOrigins: {{.origin}}. Send the web origins exactly as you last read them. |
+| `handler.client_tokens.token_expiration_out_of_range` | `max` (int) | Token lifetime must be between 0 and {{.max}} seconds. |
+| `handler.client_tokens.offline_idle_timeout_out_of_range` | `max` (int) | Offline idle timeout must be between 0 and {{.max}} seconds. |
+| `handler.client_tokens.offline_max_lifetime_out_of_range` | `max` (int) | Offline maximum lifetime must be between 0 and {{.max}} seconds. |
+| `handler.client_tokens.offline_idle_timeout_above_max_lifetime` | (none) | The offline idle timeout can't be longer than the offline maximum lifetime. |
+| `handler.client_tokens.include_claims_in_access_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInAccessToken. |
+| `handler.client_tokens.include_claims_in_id_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInIdToken. |
 
 ## Password validator
 

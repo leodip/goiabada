@@ -28,7 +28,10 @@ import (
 type tokensTabAPI struct {
 	stored  *api.ClientResponse
 	refusal string
-	saved   bool
+	// code is the refusal's error_code, its catalog key, as the auth server answers a client's
+	// refusal (#617).
+	code  string
+	saved bool
 }
 
 func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
@@ -38,7 +41,7 @@ func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api
 func (s *tokensTabAPI) UpdateClientTokens(_ context.Context, _ string, _ int64,
 	_ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	s.saved = true
-	return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: s.refusal, StatusCode: http.StatusBadRequest}
+	return nil, &apiclient.APIError{Code: s.code, Message: s.refusal, StatusCode: http.StatusBadRequest}
 }
 
 // storedTokensClient is the client as stored: every duration a number, and the two OpenID Connect
@@ -138,7 +141,7 @@ func TestRender_AdminClientTokens_TheFirstDrawShowsTheStoredClient(t *testing.T)
 // used to be drawn from the stored client and a duration that was not a number replaced by the
 // stored one, so the page showed values nobody had submitted beside the refusal (#562).
 func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T) {
-	const apiRefusal = "Token expiration in seconds must be at least 30."
+	const apiRefusal = "Token lifetime must be between 0 and 160000000 seconds."
 	testCases := []struct {
 		name       string
 		expiration string
@@ -154,13 +157,14 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 			message: "Informe o tempo ocioso offline como um número inteiro de segundos.", field: "refreshTokenOfflineIdleTimeoutInSeconds"},
 		{name: "a max lifetime that is not a number", expiration: "600", idle: "7200", maxLife: "a day",
 			message: "Informe a duração máxima offline como um número inteiro de segundos.", field: "refreshTokenOfflineMaxLifetimeInSeconds"},
-		{name: "numbers the auth server refuses", expiration: "10", idle: "7200", maxLife: "90000",
-			message: apiRefusal, wantSaved: true},
+		{name: "numbers the auth server refuses", expiration: "160000001", idle: "7200", maxLife: "90000",
+			message: apiRefusal, field: "tokenExpirationInSeconds", wantSaved: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &tokensTabAPI{stored: storedTokensClient(), refusal: apiRefusal}
+			apiClient := &tokensTabAPI{stored: storedTokensClient(), refusal: apiRefusal,
+				code: "handler.client_tokens.token_expiration_out_of_range"}
 
 			out := serveClientTokens(t,
 				adminclienthandlers.HandleTokensPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
@@ -182,8 +186,8 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 			assert.Equal(t, "off", checkedChoice(t, out, "includeOpenIDConnectClaimsInAccessToken"))
 			assert.Equal(t, "default", checkedChoice(t, out, "includeOpenIDConnectClaimsInIdToken"))
 
-			// The duration a refusal names is marked invalid, described by the notice and focused;
-			// the auth server's refusals name no field, and none is marked.
+			// The duration a refusal names, the console's own or the auth server's by its key, is
+			// marked invalid, described by the notice and focused.
 			invalid := regexp.MustCompile(`<input [^>]*id="([A-Za-z]+)"[^>]*aria-invalid="true"[^>]*>`).FindAllStringSubmatch(out, -1)
 			if tc.field == "" {
 				assert.Empty(t, invalid)

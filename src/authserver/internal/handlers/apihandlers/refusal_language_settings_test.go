@@ -249,8 +249,8 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			serve:      tokens(300, 200, 100),
 			status:     http.StatusBadRequest,
 			code:       "VALIDATION_ERROR",
-			english:    "Refresh token offline - idle timeout cannot be greater than max lifetime.",
-			portuguese: "O refresh token offline - timeout por inatividade não pode ser maior que o tempo máximo de vida.",
+			english:    "The offline idle timeout can't be longer than the offline maximum lifetime.",
+			portuguese: "O tempo ocioso offline não pode ser maior que a duração máxima offline.",
 		},
 		{
 			name:       "a negative audit log retention",

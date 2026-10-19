@@ -6,16 +6,40 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// clientErrorFields maps the refusals of the new client and client settings forms that name their
-// field by code, the identifier's shape and angle brackets in a description or a display name, to
-// that field. The admin API answers the client's other refusals with VALIDATION_ERROR, of which a
-// form can tell only the identifier sent blank.
+// clientErrorFields maps the refusals of the new client and client settings forms to the field
+// each is about. The admin API answers a client's refusals by their catalog key, which names the
+// field (#617); the blank identifier the console refuses itself.
 var clientErrorFields = map[string]string{
-	i18n.ErrCodeIdentifierTooLong:        "clientIdentifier",
-	i18n.ErrCodeIdentifierTooShort:       "clientIdentifier",
-	i18n.ErrCodeIdentifierInvalidFormat:  "clientIdentifier",
-	i18n.ErrCodeDescriptionAngleBrackets: "description",
-	i18n.ErrCodeDisplayNameAngleBrackets: "displayName",
+	i18n.ErrCodeClientIdentifierRequired:            "clientIdentifier",
+	i18n.ErrCodeIdentifierTooLong:                   "clientIdentifier",
+	i18n.ErrCodeIdentifierTooShort:                  "clientIdentifier",
+	i18n.ErrCodeIdentifierInvalidFormat:             "clientIdentifier",
+	i18n.ErrCodeClientIdentifierInUse:               "clientIdentifier",
+	i18n.ErrCodeClientIdentifierNamesResource:       "clientIdentifier",
+	i18n.ErrCodeClientSystemLevelIdentifierFixed:    "clientIdentifier",
+	i18n.ErrCodeClientSelfRegisteredIdentifierFixed: "clientIdentifier",
+	i18n.ErrCodeClientDescriptionTooLong:            "description",
+	i18n.ErrCodeDescriptionAngleBrackets:            "description",
+	i18n.ErrCodeClientDisplayNameTooLong:            "displayName",
+	i18n.ErrCodeDisplayNameAngleBrackets:            "displayName",
+	i18n.ErrCodeClientWebsiteURLTooLong:             "websiteUrl",
+	i18n.ErrCodeClientWebsiteURLInvalid:             "websiteUrl",
+	i18n.ErrCodeClientWebsiteURLSchemeInvalid:       "websiteUrl",
+	i18n.ErrCodeClientDefaultAcrNotApplicable:       "defaultAcrLevel",
+	i18n.ErrCodeClientDefaultAcrInvalid:             "defaultAcrLevel",
+}
+
+// clientTokensErrorFields maps the token tab's refusals to the duration each is about.
+var clientTokensErrorFields = map[string]string{
+	i18n.ErrCodeClientTokensTokenExpirationOutOfRange:          "tokenExpirationInSeconds",
+	i18n.ErrCodeClientTokensOfflineIdleTimeoutOutOfRange:       "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime: "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeClientTokensOfflineMaxLifetimeOutOfRange:       "refreshTokenOfflineMaxLifetimeInSeconds",
+}
+
+// clientAuthenticationErrorFields maps the authentication tab's refusals to the field each is about.
+var clientAuthenticationErrorFields = map[string]string{
+	i18n.ErrCodeClientSecretInvalid: "clientSecret",
 }
 
 // grantedPermission is a permission a client holds, as its permissions tab lists it: the

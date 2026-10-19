@@ -363,7 +363,7 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-	assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+	assert.Equal(t, "handler.client_web_origins.too_long", errResp.ErrorCode)
 	assert.Contains(t, errResp.ErrorDescription, "too long")
 	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id),
 		"a refused save must leave the stored list as it was")

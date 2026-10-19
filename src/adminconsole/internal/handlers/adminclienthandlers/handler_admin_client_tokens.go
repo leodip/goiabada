@@ -200,7 +200,7 @@ func HandleTokensPost(
 		_, err = apiClient.UpdateClientTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
-				renderError(message, "")
+				renderError(message, render.ErrorField(err, clientTokensErrorFields))
 			})
 			return
 		}

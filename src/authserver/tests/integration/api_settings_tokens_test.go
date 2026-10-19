@@ -181,7 +181,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp7.StatusCode)
 	var err7 api.ErrorResponse
 	_ = json.NewDecoder(resp7.Body).Decode(&err7)
-	assert.Equal(t, "Refresh token offline - idle timeout cannot be greater than max lifetime.", err7.ErrorDescription)
+	assert.Equal(t, "The offline idle timeout can't be longer than the offline maximum lifetime.", err7.ErrorDescription)
 }
 
 func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {

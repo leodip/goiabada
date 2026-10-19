@@ -85,7 +85,11 @@ tags:
   - name: Permissions
     description: Permission management (Admin API)
   - name: Clients
-    description: OAuth client management (Admin API)
+    description: >-
+      OAuth client management (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.client.identifier_in_use, so a caller
+      can tell which field was refused; a malformed id and a missing expected list answer
+      VALIDATION_ERROR.
   - name: Audit Logs
     description: Audit log query (Admin API)
   - name: Settings
@@ -1940,7 +1944,8 @@ paths:
       summary: Delete client
       description: |
         Delete an OAuth2/OIDC client. The admin console's own client, the system-level client,
-        cannot be deleted: the request is refused with 400 and error_code VALIDATION_ERROR.
+        cannot be deleted: the request is refused with 400 and error_code
+        handler.client.system_level_delete_not_allowed.
       operationId: deleteClient
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2274,8 +2279,10 @@ paths:
         and reading its secret, is reserved to `authserver:manage` too.
 
         `allowed` is required: a body without it, or with null, is refused with
-        `VALIDATION_ERROR` rather than read as false. Switching the admin console's own
-        client off is refused with `VALIDATION_ERROR` too. Every switch, one to the value
+        `handler.client_administrative_scopes.allowed_required` rather than read as false.
+        Switching the admin console's own client off is refused with
+        `handler.client_administrative_scopes.console_always_allowed`, and an id that is not a
+        number with `VALIDATION_ERROR`. Every switch, one to the value
         already stored included, leaves an `updated_client_administrative_scopes` audit
         record naming the client, the new value and the caller. The answer is the client
         as it now is, with `administrativeScopesAllowed` holding the new value. No other
@@ -5800,8 +5807,8 @@ components:
           maxItems: 60
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
-            longer than 2048 bytes, or one listed twice is refused with VALIDATION_ERROR before
-            anything is written. So is a plain http one on a host other than 127.0.0.1, [::1] or
+            longer than 2048 bytes, or one listed twice is refused before anything is written, its
+            error_code the refusal's catalog key, such as handler.client_redirect_uris.too_many. So is a plain http one on a host other than 127.0.0.1, [::1] or
             localhost, unless expectedRedirectURIs lists it.
           items:
             type: string
@@ -5822,7 +5829,8 @@ components:
             maxLength: 267
             description: >-
               A web origin, stored in its canonical form. One longer than 267 bytes, the longest
-              standards-valid origin, is refused with VALIDATION_ERROR before anything is written.
+              standards-valid origin, is refused with handler.client_web_origins.too_long before
+              anything is written.
         expectedWebOrigins:
           type: array
           description: The web origins as last read; [] if there were none.

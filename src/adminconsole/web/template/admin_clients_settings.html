@@ -52,7 +52,8 @@
       </div>
       <div class="field">
         <label class="field-label" for="websiteUrl">{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url" }}</label>
-        <input class="control" id="websiteUrl" type="url" name="websiteUrl" value="{{ .client.WebsiteURL }}" placeholder="https://example.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="websiteUrlHint">
+        <input class="control" id="websiteUrl" type="url" name="websiteUrl" value="{{ .client.WebsiteURL }}" placeholder="https://example.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "websiteUrl" }}client-error {{ end }}{{ end }}websiteUrlHint"
+          {{- if .error }}{{ if eq .errorField "websiteUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <p class="field-hint" id="websiteUrlHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url_tooltip" }}</p>
       </div>
     </div>
@@ -100,7 +101,8 @@
     {{ if .client.AuthorizationCodeEnabled }}
     <div class="field">
       <label class="field-label" for="defaultAcrLevel">{{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr" }}</label>
-      <select class="control" id="defaultAcrLevel" name="defaultAcrLevel" aria-describedby="defaultAcrLevelHint">
+      <select class="control" id="defaultAcrLevel" name="defaultAcrLevel" aria-describedby="{{ if .error }}{{ if eq .errorField "defaultAcrLevel" }}client-error {{ end }}{{ end }}defaultAcrLevelHint"
+        {{- if .error }}{{ if eq .errorField "defaultAcrLevel" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <option value="urn:goiabada:level1"{{ if eq .client.DefaultAcrLevel "urn:goiabada:level1" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level1" }}</option>
         <option value="urn:goiabada:level2_optional"{{ if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_optional" }}</option>
         <option value="urn:goiabada:level2_mandatory"{{ if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_mandatory" }}</option>

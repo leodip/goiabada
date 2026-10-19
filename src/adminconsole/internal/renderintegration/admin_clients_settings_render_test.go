@@ -214,6 +214,8 @@ func TestRender_AdminClientSettings_TheIdentifierIsReadOnlyWhereItCannotChange(t
 type settingsTabAPI struct {
 	stored  *api.ClientResponse
 	refusal string
+	// code is the refusal's error_code; VALIDATION_ERROR when empty.
+	code string
 }
 
 func (s *settingsTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
@@ -222,7 +224,11 @@ func (s *settingsTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*a
 
 func (s *settingsTabAPI) UpdateClient(_ context.Context, _ string, _ int64,
 	_ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
-	return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: s.refusal, StatusCode: http.StatusBadRequest}
+	code := s.code
+	if code == "" {
+		code = "VALIDATION_ERROR"
+	}
+	return nil, &apiclient.APIError{Code: code, Message: s.refusal, StatusCode: http.StatusBadRequest}
 }
 
 // UpdateClientAdministrativeScopes is never reached: the settings' write before it is refused.
@@ -350,4 +356,31 @@ func TestConsentRequiredTooltip_English(t *testing.T) {
 		"anyway when a client requests offline_access or sends prompt=consent, and when a client other than the admin "+
 		"console's requests authserver:manage-account.",
 		i18n.T(ctx, "adminconsole.admin_clients.settings.field.consent_required_tooltip"))
+}
+
+// A refusal the auth server answers by its key marks the field it is about, described by the
+// notice and focused: the identifier for one in use, the website URL for one that is no URL (#617).
+func TestRender_AdminClientSettings_ARefusalByKeyMarksItsField(t *testing.T) {
+	for _, tc := range []struct {
+		code, refusal, field string
+	}{
+		{"handler.client.identifier_in_use", "The client identifier is already in use.", "clientIdentifier"},
+		{"handler.client.website_url_invalid", "Invalid website URL.", "websiteUrl"},
+		{"handler.client.display_name_too_long", "The display name cannot exceed a maximum length of 100 characters.", "displayName"},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			apiClient := &settingsTabAPI{
+				stored:  &api.ClientResponse{Id: 7, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true},
+				refusal: tc.refusal,
+				code:    tc.code,
+			}
+			out := postClientSettings(t, apiClient, url.Values{"clientIdentifier": {"portal"}, "websiteUrl": {"not a url"}})
+
+			invalid := regexp.MustCompile(`<(?:input|select) [^>]*id="([A-Za-z]+)"[^>]*aria-invalid="true"[^>]*>`).FindAllStringSubmatch(out, -1)
+			require.Len(t, invalid, 1, "one field is marked invalid")
+			assert.Equal(t, tc.field, invalid[0][1])
+			assert.Contains(t, invalid[0][0], `aria-describedby="client-error `)
+			assert.Contains(t, invalid[0][0], ` autofocus`)
+		})
+	}
 }

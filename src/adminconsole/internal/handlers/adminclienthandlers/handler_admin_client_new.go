@@ -86,8 +86,7 @@ func HandleNewPost(
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
-				renderError(message, render.ErrorFieldOrBlank(err, clientErrorFields,
-					render.RequiredField{Name: "clientIdentifier", Value: clientIdentifier}))
+				renderError(message, render.ErrorField(err, clientErrorFields))
 			})
 			return
 		}

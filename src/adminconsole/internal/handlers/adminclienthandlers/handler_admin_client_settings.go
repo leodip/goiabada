@@ -269,8 +269,7 @@ func HandleSettingsPost(
 		updated, err := apiClient.UpdateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
-				renderError(message, render.ErrorFieldOrBlank(err, clientErrorFields,
-					render.RequiredField{Name: "clientIdentifier", Value: adminClientSettings.ClientIdentifier}))
+				renderError(message, render.ErrorField(err, clientErrorFields))
 			})
 			return
 		}

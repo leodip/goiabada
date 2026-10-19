@@ -194,7 +194,7 @@ func HandleAuthenticationPost(
 
 		// The stored secret is read only for a refusal, as the first draw reads it, so a save that
 		// succeeds records no viewed_client_secret of its own; a public client holds none.
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			storedSecret := ""
 			if !client.IsPublic {
 				var secretErr error
@@ -209,6 +209,7 @@ func HandleAuthenticationPost(
 				"client":       adminClientAuthentication,
 				"storedClient": clientAuthenticationFrom(client, storedSecret),
 				"error":        message,
+				"errorField":   errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)
@@ -225,7 +226,9 @@ func HandleAuthenticationPost(
 
 		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, clientAuthenticationErrorFields))
+			})
 			return
 		}
 
