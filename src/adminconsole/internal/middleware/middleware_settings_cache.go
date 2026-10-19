@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/i18n"
 )
 
 // settingsGetter is what the middleware needs of the public settings cache: the settings, from the
@@ -17,8 +16,15 @@ type settingsGetter interface {
 	Get(ctx context.Context) (*api.PublicSettingsResponse, error)
 }
 
-// SettingsCache adds settings to the request context by fetching from the cache
-func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler {
+// settingsUnavailableWriter answers a request the console holds no settings for, with the page
+// titleKey and messageKey name.
+type settingsUnavailableWriter interface {
+	SettingsUnavailable(w http.ResponseWriter, r *http.Request, titleKey, messageKey string)
+}
+
+// SettingsCache adds settings to the request context by fetching from the cache, and answers a
+// request it cannot through unavailable.
+func SettingsCache(settingsCache settingsGetter, unavailable settingsUnavailableWriter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Fetch settings from cache (auto-refreshes if expired)
@@ -41,7 +47,7 @@ func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler
 				// chi's request id off the context and appends it, so the correlation is
 				// the same and no call site can spell the key differently (#320 decision 2).
 				slog.ErrorContext(r.Context(), "unable to fetch settings from the auth server", "error", err)
-				http.Error(w, i18n.T(r.Context(), "adminconsole.error.settings_unavailable"), http.StatusInternalServerError)
+				unavailable.SettingsUnavailable(w, r, "adminconsole.error.settings_unavailable_title", "adminconsole.error.settings_unavailable")
 				return
 			}
 
@@ -56,7 +62,7 @@ func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler
 			// row already answers 500 on its side, and the settings API refuses to store
 			// an issuer shorter than three characters.
 			//
-			// Both refusals answer in plain text rather than through the error page every
+			// Both refusals answer with a page of their own rather than the error page every
 			// other 500 in this module renders: that page reads settings off the context for
 			// its layout, and settings are the thing that is missing here.
 			//
@@ -69,7 +75,7 @@ func SettingsCache(settingsCache settingsGetter) func(http.Handler) http.Handler
 				// Without it this is the one 500 in the tree logged with nothing to locate it by.
 				slog.ErrorContext(r.Context(), "unable to read the auth server's issuer",
 					"error", errs.New("the auth server did not report an issuer; it may be running an older version"))
-				http.Error(w, i18n.T(r.Context(), "adminconsole.error.issuer_missing"), http.StatusInternalServerError)
+				unavailable.SettingsUnavailable(w, r, "adminconsole.error.issuer_missing_title", "adminconsole.error.issuer_missing")
 				return
 			}
 

@@ -1,101 +1,72 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.address.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.address.page_title" }}{{end}}
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.address.section_title" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.account.address.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "menu"}}
-    {{template "account_menu" . }}
-{{end}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.account.address.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.address.lead" }}</p>
+  </div>
+</div>
 
-{{define "head"}}
-
-
-{{end}}
-
-{{define "body"}}
-
-<form action="/account/address" method="post">
-
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.address.field.address_line1" }}</span>
-            </label>
-            <input type="text" name="addressLine1" value="{{.address.AddressLine1}}"
-                class="w-full input input-bordered " autocomplete="off" />
-        </div>
-
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.address.field.address_line2" }}</span>
-            </label>
-            <input type="text" name="addressLine2" value="{{.address.AddressLine2}}"
-            class="w-full input input-bordered " autocomplete="off" />
-        </div>
+{{/* errorField names the field the API refused, which is marked invalid, described by the notice
+     and focused. */}}
+<form class="panel" method="post" action="/account/address" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="address-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.address.field.locality" }}</span>
-            </label>
-            <input type="text" name="addressLocality" value="{{.address.AddressLocality}}"
-                class="w-full input input-bordered " autocomplete="off" />
-        </div>
-
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.address.field.region" }}</span>
-            </label>
-            <input type="text" name="addressRegion" value="{{.address.AddressRegion}}"
-                class="w-full input input-bordered " autocomplete="off" />
-        </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.account.address.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.address.field.postal_code" }}</span>
-            </label>
-            <input type="text" name="addressPostalCode" value="{{.address.AddressPostalCode}}"
-                class="w-full input input-bordered " autocomplete="off" />
-        </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="addressLine1">{{ T $.ctx "adminconsole.account.address.field.address_line1" }}</label>
+        <input class="control" id="addressLine1" type="text" name="addressLine1" value="{{ .address.AddressLine1 }}" autocomplete="address-line1"{{ if .error }}{{ if eq .errorField "addressLine1" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+      </div>
 
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.address.field.country" }}</span>
-            </label>
-            <select class="w-full select select-bordered country-flags" name="addressCountry">
-                <option value="" {{ if eq .address.AddressCountry "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.address.country_blank" }}</option>
-                {{ $address := .address }}
-                {{range .countries}}
-                <option class="country-flags" value="{{.Alpha2}}" {{ if eq $address.AddressCountry .Alpha2 }}selected{{ end }}>
-                    {{.Emoji}} - {{ RefCountry $.ctx .Alpha2 .Name }}</option>
-                {{end}}
-            </select>
-        </div>
+      <div class="field">
+        <label class="field-label" for="addressLine2">{{ T $.ctx "adminconsole.account.address.field.address_line2" }}</label>
+        <input class="control" id="addressLine2" type="text" name="addressLine2" value="{{ .address.AddressLine2 }}" autocomplete="address-line2"{{ if .error }}{{ if eq .errorField "addressLine2" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="addressLocality">{{ T $.ctx "adminconsole.account.address.field.locality" }}</label>
+        <input class="control" id="addressLocality" type="text" name="addressLocality" value="{{ .address.AddressLocality }}" autocomplete="address-level2"{{ if .error }}{{ if eq .errorField "addressLocality" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="addressRegion">{{ T $.ctx "adminconsole.account.address.field.region" }}</label>
+        <input class="control" id="addressRegion" type="text" name="addressRegion" value="{{ .address.AddressRegion }}" autocomplete="address-level1"{{ if .error }}{{ if eq .errorField "addressRegion" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="addressPostalCode">{{ T $.ctx "adminconsole.account.address.field.postal_code" }}</label>
+        <input class="control" id="addressPostalCode" type="text" name="addressPostalCode" value="{{ .address.AddressPostalCode }}" autocomplete="postal-code"{{ if .error }}{{ if eq .errorField "addressPostalCode" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="addressCountry">{{ T $.ctx "adminconsole.account.address.field.country" }}</label>
+        <select class="control" id="addressCountry" name="addressCountry" autocomplete="country"{{ if .error }}{{ if eq .errorField "addressCountry" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+          <option value=""{{ if eq .address.AddressCountry "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.address.country_blank" }}</option>
+          {{ range .countries }}
+          <option value="{{ .Alpha2 }}"{{ if eq $.address.AddressCountry .Alpha2 }} selected{{ end }}>{{ .Emoji }} {{ RefCountry $.ctx .Alpha2 .Name }}</option>
+          {{ end }}
+        </select>
+      </div>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
-        <div class="w-full col-span-2 mt-10">
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.account.address.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.address.update_button" }}</button>
-        </div>
-        <div>
-        </div>
-    </div>
-
+  </div>
+  <div class="panel-footer">
+    <button class="button button-primary" type="submit">{{ T $.ctx "adminconsole.account.address.update_button" }}</button>
+  </div>
 </form>
-
 {{end}}

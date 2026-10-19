@@ -344,12 +344,12 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeAccountOTPSecretKeyNotAccepted` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAccountPasswordIncorrect` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeAddressLine1TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeAddressLine2TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeAddressLocalityTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeAddressPostalCodeTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeAddressRegionTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeAddressCountryInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeAddressLine1TooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeAddressLine2TooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeAddressLocalityTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeAddressPostalCodeTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeAddressRegionTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed` | both-apps | — |
 | `core/i18n` | `ErrCodeAdminResourcePermissionsDescriptionTooLong` | both-apps | Catalog key of the permission description bound, which the admin console's permission form and the admin API's permission save both say (#559). |
 | `core/i18n` | `ErrCodeAdminResourcePermissionsIdentifierRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -400,10 +400,10 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeDescriptionAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeDisplayNameAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeEmailAlreadyExists` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodeEmailAlreadyRegistered` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeEmailInvalidFormat` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeEmailRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeEmailTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeEmailAlreadyRegistered` | both-apps | — |
+| `core/i18n` | `ErrCodeEmailInvalidFormat` | both-apps | — |
+| `core/i18n` | `ErrCodeEmailRequired` | both-apps | — |
+| `core/i18n` | `ErrCodeEmailTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeEmailVerificationAccountChanged` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeEmailVerificationCodeInvalid` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeGroupAttributeGroupIdRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -437,38 +437,38 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeOtpAccountDisabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeOtpCodeRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeOtpIncorrectCode` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePasswordLowercaseRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePasswordNumberRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePasswordSpecialCharRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePasswordTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePasswordTooShort` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePasswordUppercaseRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordNumberRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordSpecialCharRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordTooShort` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordUppercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePermissionBuiltInDeleted` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePermissionBuiltInRenamed` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePermissionDuplicateIds` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePermissionDuplicated` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePermissionIdentifierInUse` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodePermissionIdentifierRequired` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
-| `core/i18n` | `ErrCodePhoneCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePhoneCountryRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePhoneInvalidFormat` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePhoneNumberRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePhoneNumberTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePhoneNumberTooShort` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodePhoneSimplePattern` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileDobInFuture` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileDobInvalidFormat` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileFamilyNameInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileGenderInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileGivenNameInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileLocaleInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileMiddleNameInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileNicknameInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileUsernameInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileUsernameTaken` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileWebsiteInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileWebsiteTooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeProfileZoneInfoInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodePhoneCountryInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodePhoneCountryRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePhoneInvalidFormat` | both-apps | — |
+| `core/i18n` | `ErrCodePhoneNumberRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePhoneNumberTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodePhoneNumberTooShort` | both-apps | — |
+| `core/i18n` | `ErrCodePhoneSimplePattern` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileDobInFuture` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileDobInvalidFormat` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileFamilyNameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileGenderInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileGivenNameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileLocaleInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileMiddleNameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileNicknameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileUsernameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileUsernameTaken` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileWebsiteInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileWebsiteTooLong` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileZoneInfoInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeResourceDescriptionTooLong` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeResourceIdentifierInUse` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeResourceIdentifierNamesClient` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |

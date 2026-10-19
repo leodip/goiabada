@@ -1,96 +1,54 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.consents.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.consents.page_title" }}{{end}}
-
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.consents.section_title" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-
-{{define "menu"}}
-    {{template "account_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.account.consents.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    function revokeClick(elem, consentId, client, scope) {
-
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}", dialogMarkup(["{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_prefix" }}", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_middle" }}", "{{ T $.ctx "adminconsole.account.consents.modal_confirm_body_suffix" }}"], client, scope),
-            null,
-            function() {
-                // yes button
-                var loadingElement = document.getElementById("loadingIcon" + consentId);
-
-                sendAjaxRequest({
-                    "url": "/account/manage-consents",
-                    "method": "POST",
-                    "bodyData": JSON.stringify({
-                        "consentId": consentId
-                    }),
-                    "loadingElement": loadingElement,
-                    "loadingClasses": ["loading", "loading-xs"],
-                    "modalId": "modal0",
-                    "callback": function(result) {
-
-                        if(result.Success) {
-                            const revoked = document.createElement("span");
-                            revoked.setAttribute("class", "px-2 rounded text-error-content bg-error");
-                            revoked.innerHTML = "{{ T $.ctx "adminconsole.account.consents.revoked_label" }}";
-                            elem.parentNode.replaceChild(revoked, elem);
-                        }
-                    }
-                });
-            }
-        );
-    }
-
-</script>
-
+<script src="{{ asset "/static/pages/account-manage-consents.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title" id="page-title">{{ T $.ctx "adminconsole.account.consents.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.consents.intro" }}</p>
+  </div>
+</div>
 
+{{ if .consents }}
+<div class="not-empty:mb-4" id="consents-status" role="status" data-confirm-title="{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}" data-revoked="{{ T $.ctx "adminconsole.account.consents.revoked" }}" data-revoked-label="{{ T $.ctx "adminconsole.account.consents.revoked_label" }}"></div>
 
-    <p>{{ T $.ctx "adminconsole.account.consents.intro" }}</p>
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+  <table class="data-table data-table-stack">
+    <thead>
+      <tr>
+        <th scope="col">{{ T $.ctx "adminconsole.account.consents.col_client" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.account.consents.col_scope" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}</th>
+        <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.account.consents.col_actions" }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .consents }}
+      <tr>
+        <td class="cell-wrap">
+          <span class="font-semibold">{{ .Client }}</span>
+          {{ if .ClientDescription }}<span class="cell-secondary">{{ .ClientDescription }}</span>{{ end }}
+        </td>
+        <td class="cell-mono cell-wrap" data-label="{{ T $.ctx "adminconsole.account.consents.col_scope" }}">{{ .Scope }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}">{{ DateTime $.ctx .GrantedAt }}</td>
+        <td class="cell-actions">
+          <button class="button button-sm" type="button" data-revoke-consent="{{ .ConsentId }}" data-confirm="{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .Client }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .Client }}</span></button>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
 
-    {{ if gt (len .consents) 0 }}
-
-        <p class="mt-2">{{ T $.ctx "adminconsole.account.consents.list_intro" }}</p>
-
-        <div class="w-full mt-4 overflow-x-auto">
-            <table class="table w-full">
-                <thead>
-                <tr>
-                    <th>{{ T $.ctx "adminconsole.account.consents.col_client" }}</th>
-                    <th>{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}</th>
-                    <th>{{ T $.ctx "adminconsole.account.consents.col_scope" }}</th>
-                    <th class="w-44"></th>
-                </tr>
-                </thead>
-                <tbody>
-                    {{ range .consents }}
-                        <tr>
-                            <td><span class="font-semibold">{{.Client}}</span>{{if .ClientDescription}}<br />{{.ClientDescription}}{{end}}</td>
-                            <td>{{ DateTime $.ctx .GrantedAt }}</td>
-                            <td><span class="font-mono">{{.Scope}}</span></td>
-                            <td>
-                                <button class="btn btn-sm btn-primary" onclick="revokeClick(this, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}</button>
-                                <span id="loadingIcon{{.ConsentId}}" class="hidden w-5 h-5 mr-1 align-middle text-primary">&nbsp;</span>
-                            </td>
-                        </tr>
-                    {{end}}
-                </tbody>
-            </table>
-        </div>
-
-    {{else}}
-
-        <p class="mt-2"><span class="text-accent">{{ T $.ctx "adminconsole.account.consents.empty_em" }}</span>{{ T $.ctx "adminconsole.account.consents.empty_suffix" }}</p>
-
-    {{end}}
-
-    {{template "modal_dialog" (args "modal0" "close" $.ctx) }}
-    {{template "modal_dialog" (args "modal1" "yes_no" $.ctx) }}
-
+{{ template "modal_dialog" (args "revokeConsent" "confirm" $.ctx (T $.ctx "adminconsole.account.consents.revoke_dialog_button") (T $.ctx "adminconsole.account.consents.modal_confirm_title")) }}
+{{ template "modal_dialog" (args "modal0" "close" $.ctx) }}
+{{ else }}
+<div class="panel">
+  <p class="empty-state">{{ T $.ctx "adminconsole.account.consents.empty" }}</p>
+</div>
+{{ end }}
 {{end}}

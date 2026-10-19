@@ -48,11 +48,7 @@ var emailTemplates = []string{"layouts/email_layout.html"}
 
 // pendingTemplates are the pages not yet brought under the rules (#617). The guard reports one that
 // meets them all, so the list only shrinks, page by page, to nothing.
-var pendingTemplates = []string{
-	"account_address.html", "account_change_password.html", "account_email.html",
-	"account_email_verification.html", "account_logout_form_post.html",
-	"account_manage_consents.html", "account_otp.html", "account_phone.html", "account_picture.html",
-	"account_profile.html", "account_user_sessions.html", "admin_clients.html",
+var pendingTemplates = []string{"admin_clients.html",
 	"admin_clients_authentication.html", "admin_clients_delete.html", "admin_clients_logo.html",
 	"admin_clients_new.html", "admin_clients_oauth2_flows.html", "admin_clients_permissions.html",
 	"admin_clients_redirect_uris.html", "admin_clients_settings.html", "admin_clients_tokens.html",
@@ -72,6 +68,5 @@ var pendingTemplates = []string{
 	"admin_users_consents.html", "admin_users_delete.html", "admin_users_details.html",
 	"admin_users_email.html", "admin_users_groups.html", "admin_users_new.html",
 	"admin_users_permissions.html", "admin_users_phone.html", "admin_users_picture.html",
-	"admin_users_profile.html", "admin_users_sessions.html", "error.html", "index.html",
-	"not_found.html", "unauthorized.html",
+	"admin_users_profile.html", "admin_users_sessions.html",
 }

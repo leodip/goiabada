@@ -119,7 +119,7 @@ func (s *profilePageAPI) UpdateAccountProfile(_ context.Context, _ string,
 }
 
 // dateOfBirthRe matches the date-of-birth input, whatever order its attributes come in.
-var dateOfBirthRe = regexp.MustCompile(`<input type="text" name="dateOfBirth"[^>]*>`)
+var dateOfBirthRe = regexp.MustCompile(`<input[^>]* name="dateOfBirth"[^>]*>`)
 
 // profilePages are the two pages that share the profile form, each served for a refused save.
 func profilePages(apiClient *profilePageAPI) []struct {

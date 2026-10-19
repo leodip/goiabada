@@ -45,11 +45,15 @@ func TestUtilsJS_SubmitSignOutPostsTheSignOutForm(t *testing.T) {
 
 func TestTemplates_TheSessionsPagesPostTheSignOutRatherThanNavigateToIt(t *testing.T) {
 	for _, name := range []string{
-		"template/account_user_sessions.html",
+		"static/pages/account-user-sessions.js",
 		"template/admin_users_sessions.html",
 		"template/admin_clients_usersessions.html",
 	} {
-		b, err := templateFS.ReadFile(name)
+		read := templateFS.ReadFile
+		if strings.HasPrefix(name, "static/") {
+			read = staticFS.ReadFile
+		}
+		b, err := read(name)
 		require.NoError(t, err)
 		source := string(b)
 

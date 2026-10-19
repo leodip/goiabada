@@ -49,6 +49,19 @@ func HandleChangePasswordGet(
 	}
 }
 
+// changePasswordErrorFields maps the refusals a password change can meet to the field each is about:
+// the current password the auth server found wrong, and the new one the policy refused. A missing
+// password answers VALIDATION_ERROR, which names no field.
+var changePasswordErrorFields = map[string]string{
+	"AUTHENTICATION_FAILED":                 "currentPassword",
+	i18n.ErrCodePasswordTooShort:            "newPassword",
+	i18n.ErrCodePasswordTooLong:             "newPassword",
+	i18n.ErrCodePasswordLowercaseRequired:   "newPassword",
+	i18n.ErrCodePasswordUppercaseRequired:   "newPassword",
+	i18n.ErrCodePasswordNumberRequired:      "newPassword",
+	i18n.ErrCodePasswordSpecialCharRequired: "newPassword",
+}
+
 func HandleChangePasswordPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -73,9 +86,10 @@ func HandleChangePasswordPost(
 		newPassword := r.PostFormValue("newPassword")
 		newPasswordConfirmation := r.PostFormValue("newPasswordConfirmation")
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"error": message,
+				"error":      message,
+				"errorField": errorField,
 			}
 			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -84,7 +98,8 @@ func HandleChangePasswordPost(
 
 		// UI-level confirmation check only; rest is validated by the API
 		if newPassword != newPasswordConfirmation {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()),
+				"newPasswordConfirmation")
 			return
 		}
 
@@ -99,7 +114,7 @@ func HandleChangePasswordPost(
 		_, err := apiClient.UpdateAccountPassword(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
-				renderError(errorMessage)
+				renderError(errorMessage, render.ErrorField(err, changePasswordErrorFields))
 			})
 			return
 		}

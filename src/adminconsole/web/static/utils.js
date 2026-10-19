@@ -224,6 +224,87 @@ function createIconButton(pathData, evenOdd, label, onclick, data) {
   return button;
 }
 
+// The icon each tone of notice shows, as ui.css's notice draws it in the templates.
+const NOTICE_ICONS = {
+  positive: "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z",
+  caution: "M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+  danger: "M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+  note: "M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z"
+};
+
+// showNotice puts a notice of tone, "positive", "caution", "danger" or "note", saying text, in
+// region, in place of whatever it held. region is a live region the page draws empty, such as a
+// div with role="status", so the notice is announced as it appears; a script's answer to an action
+// goes there rather than into a dialog. The text is shown as text, and the notice is built with DOM
+// calls, so no value reaches an HTML parser (#120).
+function showNotice(region, tone, text) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const notice = document.createElement("div");
+  notice.className = "notice notice-" + tone;
+
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 20 20");
+  svg.setAttribute("fill", "currentColor");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(svgNS, "path");
+  path.setAttribute("fill-rule", "evenodd");
+  path.setAttribute("clip-rule", "evenodd");
+  path.setAttribute("d", NOTICE_ICONS[tone]);
+  svg.appendChild(path);
+  notice.appendChild(svg);
+
+  const message = document.createElement("p");
+  message.textContent = text;
+  notice.appendChild(message);
+
+  region.replaceChildren(notice);
+}
+
+// setUpCopyButtons gives each button marked data-copy-target the copy of the text of the element it
+// names, for a secret a person would otherwise type again, such as an authenticator key, and says
+// so for a moment on itself and in the status element data-copy-status names. It stays hidden where
+// the browser cannot write to the clipboard, where the text is still there to select. Where the
+// browser has the clipboard but refuses the write, as a denied permission does, it selects the text
+// instead and says so, with data-copy-failed-label on itself and data-copy-failed-status in the
+// status element. The auth server's utils.js does the same for its pages.
+function setUpCopyButtons() {
+  document.querySelectorAll("button[data-copy-target]").forEach(function (button) {
+    const source = document.getElementById(button.dataset.copyTarget);
+    const status = document.getElementById(button.dataset.copyStatus);
+    const label = button.querySelector("span");
+    if (!source || !label || !navigator.clipboard) {
+      return;
+    }
+    const idle = label.textContent;
+    let timer = 0;
+    const say = function (text, announcement) {
+      label.textContent = text || idle;
+      if (status) {
+        status.textContent = announcement || "";
+      }
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        label.textContent = idle;
+        if (status) {
+          status.textContent = "";
+        }
+      }, 2000);
+    };
+    button.hidden = false;
+    button.addEventListener("click", function () {
+      navigator.clipboard.writeText(source.textContent.trim()).then(function () {
+        say(button.dataset.copiedLabel, button.dataset.copiedLabel);
+      }, function () {
+        const selection = window.getSelection();
+        if (selection) {
+          selection.selectAllChildren(source);
+        }
+        say(button.dataset.copyFailedLabel, button.dataset.copyFailedStatus);
+      });
+    });
+  });
+}
+
 function createTrashCanButton(label, onclick, data) {
   return createIconButton([
     "M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"

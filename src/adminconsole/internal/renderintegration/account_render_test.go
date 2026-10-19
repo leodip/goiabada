@@ -3,6 +3,7 @@ package renderintegration
 import (
 	"context"
 	"html"
+	"io/fs"
 	"regexp"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
+	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/i18n"
@@ -288,7 +290,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
 			// The tooltip is on the Device cell, which is also what carries the labels.
-			assert.Containsf(t, out, `<td title="`+escaped+`">Chrome 120 Desktop Linux`,
+			assert.Regexpf(t, `<td(?: class="[^"]*")? title="`+regexp.QuoteMeta(escaped)+`">\s*Chrome 120 Desktop Linux`, out,
 				"%s: the Device cell carries no User-Agent tooltip", tc.page)
 
 			// And the header never reaches the page as markup. Counting the escaped form is
@@ -321,15 +323,21 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 	const layout = "02/01/2006 15:04"
 	startedCell := "<td>" + started.Format(layout) + "<br />há 3 dias</td>"
 	lastAccessedCell := "<td>" + lastAccessed.Format(layout) + "<br />há 5 minutos</td>"
+	// The account page's cells are a list's, labelled for the stacked cards, the phrase beneath
+	// the instant.
+	startedListCell := `">` + started.Format(layout) + `<span class="cell-secondary">há 3 dias</span></td>`
+	lastAccessedListCell := `">` + lastAccessed.Format(layout) + `<span class="cell-secondary">há 5 minutos</span></td>`
 
 	for _, tc := range []struct {
-		name string
-		page string
-		bind map[string]interface{}
+		name     string
+		page     string
+		bind     map[string]interface{}
+		listCell bool
 	}{
 		{
-			name: "account",
-			page: "/account_user_sessions.html",
+			name:     "account",
+			page:     "/account_user_sessions.html",
+			listCell: true,
 			bind: map[string]interface{}{
 				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
@@ -363,8 +371,12 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
-			assert.Containsf(t, out, startedCell, "%s: the Started cell is not localized", tc.page)
-			assert.Containsf(t, out, lastAccessedCell,
+			wantStarted, wantLastAccessed := startedCell, lastAccessedCell
+			if tc.listCell {
+				wantStarted, wantLastAccessed = startedListCell, lastAccessedListCell
+			}
+			assert.Containsf(t, out, wantStarted, "%s: the Started cell is not localized", tc.page)
+			assert.Containsf(t, out, wantLastAccessed,
 				"%s: the Last accessed cell is not localized", tc.page)
 
 			assert.NotContains(t, out, started.Format(time.RFC1123),
@@ -397,15 +409,17 @@ func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 // A label is derived from Sec-CH-UA and Sec-CH-UA-Platform, whose values UA-CH requires a
 // server to accept arbitrarily (authserver/internal/useragent pins that premise), so any user
 // can put markup in their own session's label by completing a login with hand-written headers.
-// On these two pages the End Session button hands that label to endSessionClick, which builds the
-// dialog's message. html/template escapes the label for the JavaScript string literal in the
+// On the admin user's sessions page the End Session button hands that label to endSessionClick,
+// which builds the dialog's message. html/template escapes the label for the JavaScript string literal in the
 // onclick attribute and stops there (#281). The message keeps its accent span, so the label joins
 // it as a value of dialogMarkup, which escapes it once; escaping it before that would show its
 // entities as typed, and concatenating it into the message would show the span as tags. Only
 // rendered HTML can see which it is (#120).
 //
-// The third session page passes the user's email rather than the device label to its modal, so
-// it is asserted here as the negative: no device concatenation to escape.
+// The admin client's sessions page passes the user's email rather than the device label to its
+// modal, so it is asserted here as the negative: no device concatenation to escape. The account
+// page's buttons carry their sentence in data-confirm instead, which
+// TestRender_AccountSessionsAskWithTheirOwnSentence holds.
 func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 	const markup = `<script>alert(1)</script>`
 
@@ -422,17 +436,6 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 		bind       map[string]interface{}
 		modalTakes bool
 	}{
-		{
-			name: "account",
-			page: "/account_user_sessions.html",
-			bind: map[string]interface{}{
-				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
-					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
-				}},
-			},
-			modalTakes: true,
-		},
 		{
 			name: "admin user",
 			page: "/admin_users_sessions.html",
@@ -491,8 +494,8 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 	}
 }
 
-// The End Session button's arguments against endSessionClick's parameters, on all three session
-// pages.
+// The End Session button's arguments against endSessionClick's parameters, on the two admin session
+// pages, which declare it.
 //
 // Folded in with #281: the admin-client page declared six parameters -- it kept a `device` the
 // body never reads, unlike the two pages whose modal names the device -- and its button passed
@@ -515,16 +518,6 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 		page string
 		bind map[string]interface{}
 	}{
-		{
-			name: "account",
-			page: "/account_user_sessions.html",
-			bind: map[string]interface{}{
-				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
-					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
-				}},
-			},
-		},
 		{
 			name: "admin user",
 			page: "/admin_users_sessions.html",
@@ -572,6 +565,52 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 	}
 }
 
+// The sessions page's End session buttons, which carry what their dialog says rather than handing it
+// to a function: data-dialog names the dialog, the one for the device in use whose button says it
+// signs out, and data-confirm the sentence, the device label in it escaped for the attribute. The
+// script shows that sentence as the dialog's plain message, which is drawn as text (#120, #281).
+func TestRender_AccountSessionsAskWithTheirOwnSentence(t *testing.T) {
+	const markup = `<script>alert(1)</script>`
+	out := renderMenuPage(t, "/account_user_sessions.html", map[string]interface{}{
+		"sessions": []render.SessionInfo{
+			{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+			{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+		},
+	})
+
+	assert.NotContains(t, out, markup, "the device label must never reach the page as markup")
+	assert.Regexp(t, `data-end-session="1" data-dialog="endCurrentSession" data-confirm="[^"]*&lt;script&gt;alert\(1\)&lt;/script&gt;`, out,
+		"the device in use asks in its own dialog, its label escaped in the sentence")
+	assert.Regexp(t, `data-end-session="2" data-dialog="endSession" data-confirm="[^"]*Firefox 128 Desktop Windows`, out)
+	assert.Contains(t, out, `id="endSession_modalDialog"`)
+	assert.Contains(t, out, `id="endCurrentSession_modalDialog"`)
+	assert.Regexp(t, `id="endCurrentSession_btnModal2" class="button button-danger">Encerrar sessão e sair</button>`, out,
+		"ending the session in use says it signs out")
+
+	script, err := fs.ReadFile(web.StaticFS(), "pages/account-user-sessions.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(script), `showModalDialog(button.dataset.dialog, sessionsStatus.dataset.confirmTitle, button.dataset.confirm,`,
+		"the sentence reaches the dialog as its plain message, which is drawn as text")
+}
+
+// The consents page's Revoke buttons, held as the sessions page's are: the sentence, the
+// application's name in it escaped, rides in data-confirm and reaches the dialog as its plain
+// message.
+func TestRender_AccountConsentsAskWithTheirOwnSentence(t *testing.T) {
+	const markup = `<b>web-app</b>`
+	out := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
+		"consents": []render.ConsentInfo{{ConsentId: 4, Client: markup, Scope: "openid"}},
+	})
+
+	assert.NotContains(t, out, markup, "the application's name must never reach the page as markup")
+	assert.Regexp(t, `data-revoke-consent="4" data-confirm="[^"]*&lt;b&gt;web-app&lt;/b&gt;`, out)
+	assert.Contains(t, out, `id="revokeConsent_modalDialog"`)
+
+	script, err := fs.ReadFile(web.StaticFS(), "pages/account-manage-consents.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(script), `showModalDialog("revokeConsent", consentsStatus.dataset.confirmTitle, button.dataset.confirm,`)
+}
+
 // The two consent pages, which are two of decision 8's seven other dates (#373). Each rendered
 // GrantedAt as an English RFC1123 string its handler had already formatted -- "Wed, 16 Sep 2026
 // 12:00:00 UTC" beside Portuguese column headings -- and each now binds the instant and lets the
@@ -584,10 +623,12 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		name string
 		page string
 		bind map[string]interface{}
+		cell string
 	}{
 		{
 			name: "account",
 			page: "/account_manage_consents.html",
+			cell: `<td data-label="Concedido em">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
 				"consents": []render.ConsentInfo{{
 					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
@@ -613,8 +654,11 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
-			assert.Containsf(t, out, "<td>16/09/2026 12:00</td>",
-				"%s: the granted-at cell is not localized", tc.page)
+			cell := tc.cell
+			if cell == "" {
+				cell = "<td>16/09/2026 12:00</td>"
+			}
+			assert.Containsf(t, out, cell, "%s: the granted-at cell is not localized", tc.page)
 			assert.NotContainsf(t, out, granted.Format(time.RFC1123),
 				"%s: RFC1123 names the month and weekday in English under every locale", tc.page)
 		})
@@ -632,7 +676,7 @@ func TestRender_ConsentPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
 		}},
 	})
 
-	assert.Contains(t, out, "<td></td>", "a nil instant must render an empty cell")
+	assert.Contains(t, out, `<td data-label="Concedido em"></td>`, "a nil instant must render an empty cell")
 	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
 }
 
@@ -725,9 +769,15 @@ func TestRender_AccountLogoutFormPost(t *testing.T) {
 		"the id_token_hint appears only as a form field, never in a URL")
 	assert.NotContains(t, out, endpoint+"?", "nothing may turn the endpoint back into a query string")
 
-	assert.Contains(t, out, `document.getElementById("logoutForm").submit()`,
-		"the form submits itself; without the hook the visitor sits on a blank page")
-	assert.Contains(t, out, "<noscript>", "a browser without JavaScript still needs a way through")
+	// form-post.js submits every form marked data-auto-submit as soon as the page is parsed.
+	assert.Contains(t, out, `data-auto-submit>`, "the form submits itself; without the hook the visitor waits on the page")
+	assert.Contains(t, out, `<script src="/static/form-post.js?v=`, "the page loads the script that submits it")
+	script, err := fs.ReadFile(web.StaticFS(), "form-post.js")
+	require.NoError(t, err)
+	assert.Contains(t, string(script), `document.querySelectorAll("form[data-auto-submit]")`)
+	assert.Contains(t, string(script), `form.submit();`)
+	assert.Regexp(t, `(?s)<button class="[^"]*" type="submit">[^<]+</button>\s*</form>`, out,
+		"a browser without JavaScript still needs a way through: the form's own button")
 }
 
 // The sign-out confirmation (#411), through the real template and layout: the GET renders this
@@ -742,13 +792,13 @@ func TestRender_AccountLogoutConfirm(t *testing.T) {
 			ctx := i18n.WithLocale(context.Background(), true, locale)
 
 			assert.Equal(t, 1, strings.Count(out, "<form "), "exactly one form")
-			assert.Contains(t, out, `<form method="post" action="/auth/logout">`,
+			assert.Contains(t, out, `<form method="post" action="/auth/logout" `,
 				"the sign-out is the POST the origin check guards")
-			assert.Regexp(t, `(?s)<form method="post" action="/auth/logout">\s*<button type="submit"[^>]*>`+
-				regexp.QuoteMeta(html.EscapeString(i18n.T(ctx, "adminconsole.menu.logout")))+`</button>\s*</form>`, out,
+			assert.Regexp(t, `(?s)<form method="post" action="/auth/logout"[^>]*>.*<button class="[^"]*" type="submit">`+
+				regexp.QuoteMeta(html.EscapeString(i18n.T(ctx, "adminconsole.menu.logout")))+`</button>\s*</div>\s*</form>`, out,
 				"a plain submit inside the form, which needs no JavaScript")
-			assert.Regexp(t, `<a href="/"[^>]*>`+regexp.QuoteMeta(html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.cancel")))+`</a>`, out,
-				"Cancel goes home and changes nothing")
+			assert.Regexp(t, `<a class="button" href="/">`+regexp.QuoteMeta(html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.cancel")))+`</a>`, out,
+				"staying signed in goes home and changes nothing")
 			assert.Contains(t, out, html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.heading")))
 			assert.Contains(t, out, html.EscapeString(i18n.T(ctx, "adminconsole.logout_confirm.message")))
 		})

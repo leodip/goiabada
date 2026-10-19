@@ -42,7 +42,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 
 	out := w.Body.String()
 	assert.Containsf(t, out, `lang="pt-BR"`, "the 404 page's <html lang> is not localized")
-	assert.Contains(t, out, "Não encontrado (404)")
+	assert.Contains(t, out, "Página não encontrada")
 
 	visible := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(out, "")
 	if leak := rawKeyRe.FindString(visible); leak != "" {

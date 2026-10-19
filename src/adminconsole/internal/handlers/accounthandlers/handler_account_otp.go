@@ -101,10 +101,12 @@ func HandleOtpPost(
 		// separate GET handler rendering the form, so the query was never a submission (#202).
 		password := r.PostFormValue("password")
 
-		// renderDisableError redraws the disable form, which needs nothing but the message.
-		renderDisableError := func(message string) {
+		// renderDisableError redraws the disable form, which needs nothing but the message and the
+		// field it is about.
+		renderDisableError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"error":      message,
+				"errorField": errorField,
 				"otpEnabled": true,
 			}
 
@@ -132,7 +134,7 @@ func HandleOtpPost(
 		// The enrolment endpoint refuses a user who has OTP, and an enrolment form posted by one is
 		// a stale form refused on its own terms, a blank code or a wrong password, before the auth
 		// server looked at the state: the page reloads, as it does for the enable itself.
-		renderEnrollmentError := func(message string) {
+		renderEnrollmentError := func(message, errorField string) {
 			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if err != nil {
 				var apiErr *apiclient.APIError
@@ -146,6 +148,7 @@ func HandleOtpPost(
 
 			bind := map[string]interface{}{
 				"error":       message,
+				"errorField":  errorField,
 				"otpEnabled":  false,
 				"base64Image": enrollment.Base64Image,
 				"secretKey":   enrollment.SecretKey,
@@ -164,7 +167,7 @@ func HandleOtpPost(
 			}
 			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
 				if render.IsRateLimited(err) {
-					renderDisableError(render.RateLimitedMessage(r.Context()))
+					renderDisableError(render.RateLimitedMessage(r.Context()), "")
 					return
 				}
 				var apiErr *apiclient.APIError
@@ -175,7 +178,7 @@ func HandleOtpPost(
 						return
 					}
 					if isHandledAccountOTPError(apiErr.Code) {
-						renderDisableError(apiErr.Message)
+						renderDisableError(apiErr.Message, accountOTPErrorFields[apiErr.Code])
 						return
 					}
 				}
@@ -186,7 +189,7 @@ func HandleOtpPost(
 			otpCode := r.PostFormValue("otp")
 
 			if len(otpCode) == 0 {
-				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()))
+				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()), "otp")
 				return
 			}
 
@@ -201,7 +204,7 @@ func HandleOtpPost(
 			}
 			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
 				if render.IsRateLimited(err) {
-					renderEnrollmentError(render.RateLimitedMessage(r.Context()))
+					renderEnrollmentError(render.RateLimitedMessage(r.Context()), "")
 					return
 				}
 				var apiErr *apiclient.APIError
@@ -215,7 +218,7 @@ func HandleOtpPost(
 						return
 					}
 					if isHandledAccountOTPError(apiErr.Code) {
-						renderEnrollmentError(apiErr.Message)
+						renderEnrollmentError(apiErr.Message, accountOTPErrorFields[apiErr.Code])
 						return
 					}
 				}
@@ -226,6 +229,14 @@ func HandleOtpPost(
 
 		http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 	}
+}
+
+// accountOTPErrorFields maps the refusals the page explains to the field each is about: the
+// password the auth server found wrong, and the code it refused.
+var accountOTPErrorFields = map[string]string{
+	"AUTHENTICATION_FAILED": "password",
+	"INVALID_OTP_CODE":      "otp",
+	"OTP_CODE_REQUIRED":     "otp",
 }
 
 // isHandledAccountOTPError says whether a 400 or 409 from PUT /api/v1/account/otp is one this page

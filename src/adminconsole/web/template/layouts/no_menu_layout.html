@@ -14,12 +14,19 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
   <link rel="manifest" href="/static/favicon/site.webmanifest">
   <script type="application/json" id="js-i18n">{{ JSBootstrap $.ctx }}</script>
-  <script src="{{ asset "/static/utils.js" }}"></script>
+  <script src="{{ asset "/static/utils.js" }}" defer></script>
   {{ template "head" . }}
 </head>
 
 <body>
-  {{ template "body" . }}
+  <main id="main" class="auth-page">
+    <div class="panel auth-card">
+      <div class="panel-body">
+        <p class="auth-brand">{{ .appName }}</p>
+        {{ template "body" . }}
+      </div>
+    </div>
+  </main>
 </body>
 
 {{ versionComment }}

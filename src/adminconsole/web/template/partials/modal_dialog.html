@@ -1,10 +1,17 @@
 {{define "modal_dialog"}}
+{{- /* (args id type ctx) for a dialog that says something, type "close", or asks a question,
+     "yes_no" or "cancel_ok"; (args id "confirm" ctx action title) for one that confirms a removal,
+     titled title, its buttons "Cancel" and action, the second in the danger style. The script that
+     opens a dialog gives it its title; until then a close dialog, which says what went wrong, reads
+     "Error". */ -}}
 {{- $id := index . 0 }}
 {{- $type := index . 1 }}
 {{- $ctx := index . 2 }}
 <dialog id="{{ $id }}_modalDialog" class="dialog" aria-labelledby="{{ $id }}_modalDialogTitle" aria-describedby="{{ $id }}_modalDialogMessage">
   <form method="dialog" class="dialog-panel">
-    <h2 class="dialog-title" id="{{ $id }}_modalDialogTitle"></h2>
+    <h2 class="dialog-title" id="{{ $id }}_modalDialogTitle">
+      {{- if eq $type "confirm" }}{{ index . 4 }}{{ else if eq $type "close" }}{{ T $ctx "js.error.error_title" }}{{ end -}}
+    </h2>
     <p class="dialog-message" id="{{ $id }}_modalDialogMessage"></p>
     <div class="dialog-actions">
       {{- if eq $type "close" }}
@@ -15,6 +22,9 @@
       {{- else if eq $type "cancel_ok" }}
       <button id="{{ $id }}_btnModal1" class="button">{{ T $ctx "common.button.cancel" }}</button>
       <button id="{{ $id }}_btnModal2" class="button button-primary">{{ T $ctx "common.button.ok" }}</button>
+      {{- else if eq $type "confirm" }}
+      <button id="{{ $id }}_btnModal1" class="button">{{ T $ctx "common.button.cancel" }}</button>
+      <button id="{{ $id }}_btnModal2" class="button button-danger">{{ index . 3 }}</button>
       {{- end }}
     </div>
   </form>

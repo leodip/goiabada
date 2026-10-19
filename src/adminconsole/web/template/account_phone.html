@@ -1,76 +1,54 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.phone.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.phone.page_title" }}{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.account.phone.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.phone.section_title" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.account.phone.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.phone.lead" }}</p>
+  </div>
+</div>
 
-{{define "menu"}}
-    {{template "account_menu" . }}
-{{end}}
-
-{{define "head"}}
-
-{{end}}
-
-{{define "body"}}
-
-<form action="/account/phone" method="post">
-
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">
-                    {{ T $.ctx "adminconsole.account.phone.field.country" }}
-                </span>
-            </label>
-            <select class="w-full select select-bordered country-flags" name="phoneCountryUniqueId">
-                {{ $selectedPhoneCountryUniqueId := .selectedPhoneCountryUniqueId }}
-                <option value="" {{ if eq $selectedPhoneCountryUniqueId "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.phone.country_blank" }}</option>
-                {{range .phoneCountries}}
-                    <option class="country-flags" value="{{.UniqueId}}" {{ if eq $selectedPhoneCountryUniqueId .UniqueId }}selected{{end}}>{{ RefPhoneCountry $.ctx .Emoji .Alpha2 .CallingCode .Name }}</option>
-                {{end}}
-            </select>
-        </div>
+{{/* errorField names the field the API refused, which is marked invalid, described by the notice
+     and focused. */}}
+<form class="panel" method="post" action="/account/phone" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="phone-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
-
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.phone.field.number" }}</span>
-            </label>
-            <input type="text" id="phoneNumber" name="phoneNumber"
-                class="w-full input input-bordered" value="{{.phoneNumber}}" autocomplete="off" autofocus />
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.phone.field.number_hint" }}</span>
-                <span></span>
-            </label>
-        </div>
-
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.account.phone.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="phoneCountryUniqueId">{{ T $.ctx "adminconsole.account.phone.field.country" }}</label>
+        <select class="control" id="phoneCountryUniqueId" name="phoneCountryUniqueId"{{ if .error }}{{ if eq .errorField "phoneCountryUniqueId" }} aria-invalid="true" aria-describedby="phone-error" autofocus{{ end }}{{ end }}>
+          <option value=""{{ if eq .selectedPhoneCountryUniqueId "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.phone.country_blank" }}</option>
+          {{ range .phoneCountries }}
+          <option value="{{ .UniqueId }}"{{ if eq $.selectedPhoneCountryUniqueId .UniqueId }} selected{{ end }}>{{ RefPhoneCountry $.ctx .Emoji .Alpha2 .CallingCode .Name }}</option>
+          {{ end }}
+        </select>
+      </div>
 
-        <div class="mt-8">
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.account.phone.saved_successfully" }}</p>
-                </div>
-            {{end}}
-
-            <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.phone.update_button" }}</button>
-
-        </div>
-
+      <div class="field">
+        <label class="field-label" for="phoneNumber">{{ T $.ctx "adminconsole.account.phone.field.number" }}</label>
+        <input class="control" id="phoneNumber" type="text" name="phoneNumber" inputmode="tel" value="{{ .phoneNumber }}" autocomplete="tel-national"
+          {{- if .error }}{{ if eq .errorField "phoneNumber" }} aria-invalid="true" autofocus{{ end }}{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "phoneNumber" }}phone-error {{ end }}{{ end }}phoneNumberHint">
+        <p class="field-hint" id="phoneNumberHint">{{ T $.ctx "adminconsole.account.phone.field.number_hint" }}</p>
+      </div>
     </div>
-
+  </div>
+  <div class="panel-footer">
+    <button class="button button-primary" type="submit">{{ T $.ctx "adminconsole.account.phone.update_button" }}</button>
+  </div>
 </form>
-
 {{end}}

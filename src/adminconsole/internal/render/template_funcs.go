@@ -36,17 +36,8 @@ var jsBootstrapKeys = []string{
 	"js.image_upload.invalid_format",
 	"js.image_upload.file_too_large",
 	"js.image_upload.uploading",
-	"js.image_upload.upload_url_missing",
 	"js.image_upload.upload_failed",
-	"js.image_upload.updated_successfully",
-	"js.image_upload.confirm_delete",
-	"js.image_upload.deleting",
-	"js.image_upload.delete_url_missing",
 	"js.image_upload.delete_failed",
-	"js.image_upload.deleted_successfully",
-	"js.image_upload.upload_button",
-	"js.image_upload.delete_button",
-	"js.image_upload.error_prefix",
 }
 
 // addUrlParam is the template function that appends one query parameter to a URL. It is one of two
