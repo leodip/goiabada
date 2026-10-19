@@ -91,6 +91,17 @@
     deleteButton.disabled = on;
   }
 
+  // regainFocus puts the focus back on Upload when an operation that disabled it, and so dropped
+  // its focus, or a dialog that could not give it back to a disabled button, left the focus on
+  // nothing, or in the dialog just closed, where a browser leaves it until it next tidies up; focus
+  // the person moved elsewhere stays there.
+  function regainFocus() {
+    const focused = document.activeElement;
+    if (!focused || focused === document.body || (!cropDialog.open && cropDialog.contains(focused))) {
+      uploadButton.focus();
+    }
+  }
+
   // The CSRF header, when the page carries the token.
   function csrfHeaders() {
     const token = document.querySelector('input[name="gorilla.csrf.Token"]');
@@ -151,6 +162,7 @@
   function unreadable() {
     fileInput.value = "";
     setBusy(false);
+    regainFocus();
     showNotice(status, "danger", t("js.image_upload.unreadable"));
   }
 
@@ -365,6 +377,7 @@
     update();
     if (!uploading) {
       setBusy(false);
+      regainFocus();
     }
   }
 
@@ -424,18 +437,14 @@
   }
 
   // settle ends the sending and the operation: the controls back, the dialog closed if it is still
-  // open, which gives
-  // the focus back to Upload, and the focus put there when a dialog the browser closed left it on
-  // nothing.
+  // open, and the focus back on Upload.
   function settle() {
     setUploading(false);
     setBusy(false);
     if (cropDialog.open) {
       cropDialog.close();
     }
-    if (!document.activeElement || document.activeElement === document.body) {
-      uploadButton.focus();
-    }
+    regainFocus();
   }
 
   function confirmCrop() {
