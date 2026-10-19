@@ -27,11 +27,12 @@
 // sliders and the drawn selection agree whatever size the dialog is drawn at, and it never leaves
 // the image; what is sent is drawn from the chosen image's own pixels by the same crop. The dialog is a <dialog>, so Escape cancels it and focus goes back to
 // the button that opened it, and whichever way it closes it lets go of the chosen file. One image
-// operation runs at a time: while a crop is being sent its dialog stays open, Cancel disabled,
-// Escape ignored and the cropper locked, and the Upload and Delete buttons are disabled until the
-// server answers, as Upload is while a deletion runs. A browser that closes the dialog anyway, as
-// some do on a repeated Escape, takes nothing with it: the sending carries on, the status region
-// says so, and the buttons stay disabled until it is done.
+// operation runs at a time, a file chosen, read, cropped and sent, or a deletion: the Upload and
+// Delete buttons are disabled from its start to its end, and a callback of a file choice other
+// than the latest does nothing. While a crop is being sent its dialog stays open, Cancel disabled,
+// Escape ignored and the cropper locked. A browser that closes the dialog anyway, as some do on a
+// repeated Escape, takes nothing with it: the sending carries on, the status region says so, and
+// the buttons stay disabled until it is done.
 
 (function () {
   const maxSize = 3 * 1024 * 1024;
@@ -78,6 +79,17 @@
   let drawn = null;
   let resizeObserver = null;
   let uploading = false;
+  // Whether an image operation runs, and the latest file choice, by which a reader's or a decoder's
+  // callback knows whether it is still wanted.
+  let busy = false;
+  let choice = 0;
+
+  // setBusy starts or ends an image operation, during which no other can start.
+  function setBusy(on) {
+    busy = on;
+    uploadButton.disabled = on;
+    deleteButton.disabled = on;
+  }
 
   // The CSRF header, when the page carries the token.
   function csrfHeaders() {
@@ -87,7 +99,8 @@
 
   function chooseFile() {
     const file = fileInput.files[0];
-    if (!file) {
+    if (!file || busy) {
+      fileInput.value = "";
       return;
     }
     if (!allowedTypes.includes(file.type)) {
@@ -102,23 +115,42 @@
       return;
     }
     // The file is decoded before the dialog opens, so a file that is not the image its type
-    // claims is refused here rather than opening a crop of nothing.
+    // claims is refused here rather than opening a crop of nothing. The operation starts with the
+    // reading.
+    choice++;
+    const mine = choice;
+    setBusy(true);
     const reader = new FileReader();
-    reader.addEventListener("error", unreadable);
+    reader.addEventListener("error", function () {
+      if (mine === choice) {
+        unreadable();
+      }
+    });
     reader.addEventListener("load", function () {
+      if (mine !== choice) {
+        return;
+      }
       const image = document.createElement("img");
       image.alt = config.cropAlt;
       image.src = reader.result;
       image.decode().then(function () {
-        fileType = file.type;
-        openCrop(image);
-      }, unreadable);
+        if (mine === choice) {
+          fileType = file.type;
+          openCrop(image);
+        }
+      }, function () {
+        if (mine === choice) {
+          unreadable();
+        }
+      });
     });
     reader.readAsDataURL(file);
   }
 
+  // unreadable ends a file choice whose file is no image.
   function unreadable() {
     fileInput.value = "";
+    setBusy(false);
     showNotice(status, "danger", t("js.image_upload.unreadable"));
   }
 
@@ -243,10 +275,11 @@
     update();
   }
 
-  // followSelection has the crop follow a dragged selection. A change that would take it off the
-  // image, beyond what floating point leaves over, is refused, so what is drawn, and so what is
-  // exported, never leaves the image; a move refused that way is drawn at the image's edge instead,
-  // which is where the person was taking it. A change below the least crop is refused too.
+  // followSelection has the crop follow a dragged selection, accepting only a change that already
+  // keeps every rule clamp holds, within what floating point leaves over, so the drawn selection,
+  // the sliders and what is sent are the same crop. A move refused, which can only have left the
+  // image, is drawn at the image's edge instead, where the person was taking it; a resize refused,
+  // off the image, below the least crop or past the shape a free crop may take, stays where it was.
   function followSelection(event) {
     const box = event.detail;
     if (!drawn || (box.width === 0 && box.height === 0)) {
@@ -258,14 +291,9 @@
       width: box.width / drawn.scale,
       height: box.height / drawn.scale
     };
+    const kept = clamp(next);
     const epsilon = 1e-6;
-    const smallest = clamp({ x: 0, y: 0, width: 0, height: 0 });
-    if (next.width < smallest.width - epsilon || next.height < smallest.height - epsilon) {
-      event.preventDefault();
-      return;
-    }
-    if (next.x < -epsilon || next.y < -epsilon
-      || next.x + next.width > natural.width + epsilon || next.y + next.height > natural.height + epsilon) {
+    if (["x", "y", "width", "height"].some(function (key) { return Math.abs(kept[key] - next[key]) > epsilon; })) {
       event.preventDefault();
       const moved = Math.abs(next.width - crop.width) < 1e-3 && Math.abs(next.height - crop.height) < 1e-3;
       if (moved) {
@@ -277,7 +305,7 @@
       }
       return;
     }
-    crop = clamp(next);
+    crop = kept;
     update();
   }
 
@@ -335,6 +363,9 @@
     crop = null;
     drawn = null;
     update();
+    if (!uploading) {
+      setBusy(false);
+    }
   }
 
   // The size the crop is sent at: outputMax square when square, and when free the crop's own size,
@@ -388,17 +419,17 @@
   function setUploading(on) {
     uploading = on;
     cancelButton.disabled = on;
-    uploadButton.disabled = on;
-    deleteButton.disabled = on;
     confirmButton.textContent = on ? t("js.image_upload.uploading") : confirmLabel;
     update();
   }
 
-  // settle ends the sending: the controls back, the dialog closed if it is still open, which gives
+  // settle ends the sending and the operation: the controls back, the dialog closed if it is still
+  // open, which gives
   // the focus back to Upload, and the focus put there when a dialog the browser closed left it on
   // nothing.
   function settle() {
     setUploading(false);
+    setBusy(false);
     if (cropDialog.open) {
       cropDialog.close();
     }
@@ -457,17 +488,22 @@
   }
 
   function askToDelete() {
+    if (busy) {
+      return;
+    }
     showModalDialog("deleteImage", config.deleteTitle, config.deleteConfirm, null, deleteImage);
   }
 
-  // deleteImage deletes the image. Delete and Upload are disabled while it does, which drops
-  // Delete's focus, the focus its dialog gave back to it, so where focus goes is decided from
-  // before: to the Upload button once the image and its Delete button are gone, back to Delete when
-  // the deletion fails.
+  // deleteImage deletes the image, an operation of its own, so Delete and Upload are disabled while
+  // it runs, which drops Delete's focus, the focus its dialog gave back to it: where focus goes is
+  // decided from before, to the Upload button once the image and its Delete button are gone, back
+  // to Delete when the deletion fails.
   function deleteImage() {
+    if (busy) {
+      return;
+    }
     const hadFocus = document.activeElement === deleteButton;
-    deleteButton.disabled = true;
-    uploadButton.disabled = true;
+    setBusy(true);
     fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: csrfHeaders() })
       .then((response) => response.json().then((data) => {
         // As the upload does: a refused access token signs out at once.
@@ -481,7 +517,7 @@
         return data;
       }))
       .then(() => {
-        uploadButton.disabled = false;
+        setBusy(false);
         showImage(null);
         if (hadFocus) {
           uploadButton.focus();
@@ -492,8 +528,7 @@
         showNotice(status, "danger", error.message);
       })
       .finally(() => {
-        uploadButton.disabled = false;
-        deleteButton.disabled = false;
+        setBusy(false);
         if (hadFocus && !deleteButton.hidden) {
           deleteButton.focus();
         }
