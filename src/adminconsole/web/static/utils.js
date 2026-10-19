@@ -841,7 +841,9 @@ function sendAjaxRequest(props) {
             return;
           }
 
-          response.text().then((text) => {
+          // Returned, so a body that breaks off mid-read rejects into the catch below, which says
+          // so and ends the request, rather than escaping the chain unhandled.
+          return response.text().then((text) => {
             try {
               const err = JSON.parse(text);
               // The admin API refused the access token: say so, and sign out once the dialog
@@ -892,6 +894,7 @@ function sendAjaxRequest(props) {
       })
       .catch((err) => {
         failUnexpected(err);
+        setLoading(false);
       });
   } catch (err) {
     failUnexpected(err);
