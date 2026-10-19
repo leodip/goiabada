@@ -196,46 +196,6 @@ const { dialogMarkup, dialogMarkupFormat, showModalDialog } = (function () {
   return { dialogMarkup, dialogMarkupFormat, showModalDialog };
 })();
 
-// createIconButton returns a small ghost button holding one icon drawn from the path data in
-// pathData, built with DOM calls so no value reaches an HTML parser. onclick is called with the
-// click event and the button. Each entry of data is set through the button's data set, so a handler
-// reads it back with elem.dataset (#120).
-//
-// The button has no text, so label is its name: written as its aria-label and its title, through
-// setAttribute, and naming what it does and to which row, such as "Remove redirect URI " + uri. The
-// icon is hidden from assistive technology, which would otherwise read it as an unnamed image. And
-// it is a plain button, so inside a form it does only what onclick says and never submits it (#562).
-function createIconButton(pathData, evenOdd, label, onclick, data) {
-  const svgNS = "http://www.w3.org/2000/svg";
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "button button-quiet button-sm button-icon";
-  button.setAttribute("aria-label", label);
-  button.setAttribute("title", label);
-  for (const [key, value] of Object.entries(data || {})) {
-    button.dataset[key] = value;
-  }
-  button.onclick = function (event) {
-    onclick(event, button);
-  };
-
-  const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("viewBox", "0 0 20 20");
-  svg.setAttribute("fill", "currentColor");
-  svg.setAttribute("aria-hidden", "true");
-  pathData.forEach(function (d) {
-    const path = document.createElementNS(svgNS, "path");
-    if (evenOdd) {
-      path.setAttribute("fill-rule", "evenodd");
-      path.setAttribute("clip-rule", "evenodd");
-    }
-    path.setAttribute("d", d);
-    svg.appendChild(path);
-  });
-  button.appendChild(svg);
-  return button;
-}
-
 // The icon each tone of notice shows, as ui.css's notice draws it in the templates.
 const NOTICE_ICONS = {
   positive: "M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z",
@@ -593,19 +553,6 @@ function makeSearchable(select) {
   if (hadFocus) {
     input.focus();
   }
-}
-
-function createTrashCanButton(label, onclick, data) {
-  return createIconButton([
-    "M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"
-  ], true, label, onclick, data);
-}
-
-function createEditButton(label, onclick, data) {
-  return createIconButton([
-    "M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z",
-    "M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z"
-  ], false, label, onclick, data);
 }
 
 // describeSeconds reads a number of seconds typed into a field as a duration a person reads, such
