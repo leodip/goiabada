@@ -225,7 +225,15 @@ func requestContextOwner(rel, name string) bool {
 // hands it a request's context, which it extends and never replaces. core/i18n is in no list, so this
 // admission is what lets the fallback stand while the rest of the package is held to the rule
 // (#442).
+//
+// adminconsole's reReadSession loads the session past the per-request memoisation that rides the
+// request's own context (#269): a context derived from the request's still carries that memo, so
+// the one load that must see another request's write takes a fresh context, with the request's
+// id copied onto it so the load's records still name the request (#621). The write under it is
+// none — it is read and never saved — and its refusal to follow the browser's cancellation is
+// the same one refreshToken's detached check and write already make on purpose (#441 decision 2).
 var requestContextOwners = []slogPlainSite{
 	{scope: "core/sessionstore/server_side_store.go", name: "requestContext"},
 	{scope: "core/i18n/middleware.go", name: "WithLocale"},
+	{scope: "adminconsole/internal/middleware/middleware_jwt.go", name: "reReadSession"},
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
@@ -68,6 +70,8 @@ type JWT struct {
 	errorRenderer  ServerErrorRenderer
 	baseURL        string
 	clientID       string
+	// refreshLocks serializes the refresh grant per browser session (#621).
+	refreshLocks *sessionRefreshLocks
 }
 
 // NewJWT constructs a DB-free JWT middleware. tokenRefresher sends the refresh grant;
@@ -91,6 +95,7 @@ func NewJWT(
 		errorRenderer:  errorRenderer,
 		baseURL:        baseURL,
 		clientID:       clientID,
+		refreshLocks:   newSessionRefreshLocks(),
 	}
 }
 
@@ -110,7 +115,9 @@ func NewJWT(
 //     refresh would need a verified token to compare the new one with and to keep, and there is
 //     none (#427 decision 19).
 //  4. Refresh when the recorded expiry is due. An unknown expiry never is: the access token is
-//     used until the auth server refuses it.
+//     used until the auth server refuses it. One refresh runs per session at a time, and the
+//     request that waited for it carries the answer another request stored rather than sending
+//     a grant of its own (#621).
 //  5. The refresh's answer is validated before anything is stored.
 //  6. Put the verified ID token and the token response on the context.
 func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
@@ -164,7 +171,7 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 
 			// Steps 4 and 5.
 			if oauthclient.RefreshDue(expiresAt, time.Now()) {
-				refreshed, refused, err := m.refreshToken(w, r, tokenResponse, idToken)
+				refreshed, refused, err := m.refreshToken(w, r, sess.ID)
 				if refused != nil {
 					if errors.Is(refused, oauthclient.ErrForeignToken) {
 						m.endForeignSession(w, r, sess, refused)
@@ -237,17 +244,57 @@ func (m *JWT) endForeignSession(w http.ResponseWriter, r *http.Request, sess *se
 	m.endSession(w, r, sess)
 }
 
-// refreshToken sends the refresh grant for stored and, when the auth server answers, accepts its
-// answer through the parser against previous, the stored ID token that verified on this request,
-// before anything reaches the session. It returns the refreshed JwtInfo once it is stored. refused
-// is the parser's refusal of the answer, which ends the session; err is a grant that could not be
-// completed, which signs it out. With no refresh token all three are nil.
+// refreshToken sends the refresh grant for the session's current token set and, when the auth
+// server answers, accepts its answer through the parser against the ID token it re-read and
+// verified, before anything reaches the session. It returns the refreshed JwtInfo once it is
+// stored; refused is a token set the parser will not trust, which ends the session; err is a
+// grant that could not be completed, which signs it out. With no refresh token all three are
+// nil.
+//
+// The whole of it runs under the session's lock (#621). The auth server rotates refresh tokens
+// strictly, so two grants for one session would present the same refresh token twice and the
+// loser would be signed out over the winner's tokens. The request that waited for the lock
+// therefore re-reads the session first and carries a token set another request stored as is;
+// the grant, when there is one, presents the re-read set's refresh token. A grant the auth
+// server refuses is answered the same way (supersedingTokens): a set newer than the one
+// presented means another console won the rotation while this one was asking, and the newer
+// set is carried rather than cleared.
 func (m *JWT) refreshToken(
 	w http.ResponseWriter,
 	r *http.Request,
-	stored oauth.TokenResponse,
-	previous *oauth.JwtToken,
+	sessionID string,
 ) (refreshed *oauthclient.JwtInfo, refused error, err error) {
+	release := m.refreshLocks.Lock(sessionID)
+	defer release()
+
+	// The lock makes this request the only refresher of this session in this console, but not
+	// the first: another request may have refreshed while this one waited for it. The session
+	// is re-read before anything is sent, so a token set another request stored is carried as
+	// is, and a set that is still due is the one the grant presents.
+	current, err := m.reReadSession(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	stored, hasStored := current.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	expiresAt, hasExpiry := current.Values[sessionkeys.JWTExpiresAt].(int64)
+	if !hasStored || !hasExpiry || stored.IdToken == "" {
+		// Another request ended this session while this one waited for the lock; this
+		// request ends it the same way, and the sign-out's clear finds nothing newer to
+		// save over.
+		return nil, nil, nil
+	}
+	// Step 3's check, restated under the lock for the set this request may not have read
+	// itself: carried or refreshed, the ID token that reaches the context is verified. Its
+	// failure is refused rather than err, so the session ends whatever request stored the
+	// set, and the classification — foreign or otherwise — stays the parser's.
+	previous, err := m.tokenParser.DecodeAndValidateStoredIDToken(r.Context(), stored.IdToken)
+	if err != nil {
+		return nil, err, nil
+	}
+	if !oauthclient.RefreshDue(expiresAt, time.Now()) {
+		return &oauthclient.JwtInfo{TokenResponse: stored, IdToken: previous}, nil, nil
+	}
+
 	if stored.RefreshToken == "" {
 		return nil, nil, nil
 	}
@@ -255,6 +302,15 @@ func (m *JWT) refreshToken(
 	// The token client detaches the grant itself and bounds it at its own deadline.
 	newTokenResponse, err := m.tokenRefresher.Refresh(r.Context(), stored.RefreshToken)
 	if err != nil {
+		// A strictly rotating auth server refuses the second presentation of a refresh
+		// token, and another replica of this console — beyond this process's lock — may
+		// have presented the first and stored its answer while this grant was in flight.
+		// Clearing here would sign the administrator out over a token set that is live,
+		// so the session is re-read once more, and only a session still holding the set
+		// this request presented is signed out (#621).
+		if newer, ok := m.supersedingTokens(r, stored, err); ok {
+			return newer, nil, nil
+		}
 		return nil, nil, err
 	}
 
@@ -303,6 +359,49 @@ func (m *JWT) refreshToken(
 	}
 
 	return accepted, nil, nil
+}
+
+// reReadSession loads the session as the backend holds it now, around the store's per-request
+// memoisation: Get answers later callers on a request from the session it already loaded (#269),
+// which is the copy this request read at its start and not the row another request — on this
+// console or another — may have written since. The clone carries a fresh context, because that
+// memo lives in the request's context, with the request's own id kept on it through reqctx, the
+// way the write's detached context keeps it, so the load's records still name the request. What
+// it returns is read, never saved: the request's own session object, the one the write below
+// reaches through, is untouched.
+func (m *JWT) reReadSession(r *http.Request) (*sessionstore.Session, error) {
+	ctx := context.Background()
+	if id := chimiddleware.GetReqID(r.Context()); id != "" {
+		ctx = reqctx.WithRequestID(ctx, id)
+	}
+	return m.sessionStore.Get(r.Clone(ctx), m.sessionName)
+}
+
+// supersedingTokens re-reads the session after a grant the auth server refused, asking whether
+// another request — on another replica of this console, since this one holds the session's
+// refresh lock — has stored a token set newer than the one this request presented: a strictly
+// rotating auth server refuses the second presentation of a refresh token (#128), so the
+// refusal usually means the rotation was won elsewhere while this grant was in flight. The
+// newer set is returned once its ID token verifies. ok is false when the session still holds
+// the one presented — the token set is genuinely dead, and the sign-out stands — and when
+// nothing newer verifies, which is the sign-out's answer too.
+func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, refusedGrant error) (newer *oauthclient.JwtInfo, ok bool) {
+	current, err := m.reReadSession(r)
+	if err != nil {
+		return nil, false
+	}
+	stored, hasStored := current.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	if !hasStored || stored == presented {
+		return nil, false
+	}
+	idToken, err := m.tokenParser.DecodeAndValidateStoredIDToken(r.Context(), stored.IdToken)
+	if err != nil {
+		return nil, false
+	}
+	slog.WarnContext(r.Context(),
+		"the refresh grant was refused, but a token set newer than the one it presented had been stored meanwhile, so the session keeps it",
+		"error", refusedGrant)
+	return &oauthclient.JwtInfo{TokenResponse: stored, IdToken: idToken}, true
 }
 
 // RequiresScope is a middleware that checks if the user has the required scope to access the resource.

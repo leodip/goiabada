@@ -9,11 +9,18 @@
 // refuses a raw context read or write anywhere else in the module. The settings key once shared its
 // spelling with the auth server's, which was never one key: a context key does not leave the process
 // that set it, and the two processes store different types under theirs (#351).
+//
+// The one exception is the request's id, carried by WithRequestID onto a fresh context for the
+// session re-read under the refresh lock (#621): the key there is chi's, the one the mounted
+// RequestID middleware writes and every record reads, so that accessor writes chi's key rather
+// than a key of this package's own.
 package reqctx
 
 import (
 	"context"
 	"errors"
+
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -56,4 +63,14 @@ func WithSettings(ctx context.Context, s *api.PublicSettingsResponse) context.Co
 func SettingsFrom(ctx context.Context) (*api.PublicSettingsResponse, bool) {
 	s, ok := ctx.Value(settingsKey).(*api.PublicSettingsResponse)
 	return s, ok && s != nil
+}
+
+// WithRequestID returns a context carrying the request's id on chi's RequestID key, the one the
+// mounted RequestID middleware writes and every record the console writes reads. It exists for
+// the one site that must build a fresh context although the request's own carries a value that
+// load has to drop: the session re-read under the refresh lock loads past the per-request
+// memoisation that rides the request's context (#269), and keeps the id so the load's records
+// still name the request (#621).
+func WithRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, chimiddleware.RequestIDKey, id)
 }

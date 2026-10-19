@@ -49,16 +49,27 @@ const (
 // token and the grant's own detachment (#441 decision 2): it answers every call with one scripted
 // response or error and records what it was handed. during, when set, runs inside the call, which is
 // where a browser that goes away mid-refresh goes away.
+//
+// inOrder, when set, answers the first calls one scripted grant each, in order, and the single
+// answer and error after them — the auth server's strict rotation as the #621 tests present it,
+// where the first presentation of a refresh token claims it and the second is refused.
 type fakeRefresher struct {
-	answer *oauth.TokenResponse
-	err    error
-	during func()
+	answer  *oauth.TokenResponse
+	err     error
+	during  func()
+	inOrder []scriptedGrant
 
 	mu           sync.Mutex
 	calls        int
 	refreshToken string
 	requestID    string
 	returnedAt   time.Time
+}
+
+// scriptedGrant is one in-order answer: a token response, or the endpoint's refusal.
+type scriptedGrant struct {
+	answer *oauth.TokenResponse
+	err    error
 }
 
 func (f *fakeRefresher) Refresh(ctx context.Context, refreshToken string) (*oauth.TokenResponse, error) {
@@ -71,6 +82,15 @@ func (f *fakeRefresher) Refresh(ctx context.Context, refreshToken string) (*oaut
 		f.during()
 	}
 	f.returnedAt = time.Now()
+	if len(f.inOrder) > 0 {
+		next := f.inOrder[0]
+		f.inOrder = f.inOrder[1:]
+		if next.err != nil {
+			return nil, next.err
+		}
+		answer := *next.answer
+		return &answer, nil
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -86,12 +106,14 @@ func (f *fakeRefresher) sent() (int, string) {
 
 // contextHonouringBackend is the memory backend refusing a call on a context that is done, which is
 // what the console's real backend, an HTTP call to the auth server, does. It records the context of
-// every write, so a case can read what the write was handed.
+// every write, so a case can read what the write was handed, and counts every load, which the #621
+// race test holds a grant on until both requests have read the session.
 type contextHonouringBackend struct {
 	*sessiontest.MemoryBackend
 
 	mu     sync.Mutex
 	writes []observedContext
+	loads  int
 }
 
 // observedContext is what a context looked like at the moment it was handed over.
@@ -112,7 +134,17 @@ func (b *contextHonouringBackend) Load(ctx context.Context, id string) (*session
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	b.mu.Lock()
+	b.loads++
+	b.mu.Unlock()
 	return b.MemoryBackend.Load(ctx, id)
+}
+
+// loadsCount is how many loads the backend has answered.
+func (b *contextHonouringBackend) loadsCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.loads
 }
 
 func (b *contextHonouringBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
@@ -230,9 +262,21 @@ func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) serve
 // serveOn is serve with the request on ctx, the browser's own context.
 func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookies []*http.Cookie) served {
 	h.t.Helper()
-	m := NewJWT(h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
-		stubErrorRenderer{}, "http://console.example", "admin-console-client")
+	return h.serveThrough(ctx, h.middleware(parser), cookies)
+}
 
+// middleware returns the JWT middleware over parser that every serve in this file goes through.
+// The #621 race test asks for it directly, so its two requests share one instance: the
+// per-session refresh lock it holds is the serialization under test.
+func (h *sessionHarness) middleware(parser tokenParser) *JWT {
+	h.t.Helper()
+	return NewJWT(h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
+		stubErrorRenderer{}, "http://console.example", "admin-console-client")
+}
+
+// serveThrough sends one request carrying cookies through m, on ctx, the browser's own context.
+func (h *sessionHarness) serveThrough(ctx context.Context, m *JWT, cookies []*http.Cookie) served {
+	h.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil).WithContext(ctx)
 	for _, c := range cookies {
 		req.AddCookie(c)
