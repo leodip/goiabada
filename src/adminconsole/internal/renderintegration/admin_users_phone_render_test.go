@@ -73,7 +73,7 @@ func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T)
 	out := rec.Body.String()
 
 	assert.Contains(t, out, `<p>`+refusal+`</p>`)
-	assert.Contains(t, out, `<h1 class="page-title break-words" id="page-title">ana@example.com</h1>`, "the heading names the user")
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">ana@example.com</h1>`, "the heading names the user")
 	assert.Contains(t, out, `<title>Telefone – ana@example.com – Test</title>`)
 
 	links := userTabLinkRe.FindAllStringSubmatch(out, -1)

@@ -4184,6 +4184,7 @@
     margin-top: 0.25rem;
     color: var(--color-ink-muted);
     max-width: 65ch;
+    overflow-wrap: anywhere;
   }
   .page-actions {
     display: flex;
@@ -4346,12 +4347,14 @@
     font-size: 0.8125rem;
     line-height: 1.25rem;
     color: var(--color-ink-muted);
+    overflow-wrap: anywhere;
   }
   .field-error {
     font-size: 0.8125rem;
     line-height: 1.25rem;
     font-weight: 500;
     color: var(--color-danger-ink);
+    overflow-wrap: anywhere;
   }
   .control {
     display: block;
@@ -4660,6 +4663,7 @@
       display: block;
     }
     .data-table-stack thead {
+      display: block;
       position: absolute;
       width: 1px;
       height: 1px;

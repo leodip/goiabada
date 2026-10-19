@@ -207,7 +207,7 @@ func TestRender_AdminGroupSettings_ARefusedSaveKeepsTheStoredGroup(t *testing.T)
 
 	assert.Contains(t, out, "The group identifier is already in use.")
 	assert.Contains(t, out, `<title>Configurações – sales – Test</title>`)
-	assert.Contains(t, out, `<h1 class="page-title break-words" id="page-title">sales</h1>`, "the heading names the stored group")
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">sales</h1>`, "the heading names the stored group")
 	assert.NotContains(t, out, `id="page-title">marketing</h1>`)
 	assert.Contains(t, out, `data-stored-value="sales"`, "the rename question compares against the stored identifier")
 
@@ -247,7 +247,7 @@ func TestRender_AdminResourceSettings_ARefusedSaveKeepsTheStoredResource(t *test
 
 	assert.Contains(t, out, "The resource identifier is already in use.")
 	assert.Contains(t, out, `<title>Configurações – billing-api – Test</title>`)
-	assert.Contains(t, out, `<h1 class="page-title break-words" id="page-title">billing-api</h1>`, "the heading names the stored resource")
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">billing-api</h1>`, "the heading names the stored resource")
 	assert.NotContains(t, out, `id="page-title">invoices-api</h1>`)
 	assert.Contains(t, out, `data-stored-value="billing-api"`, "the rename question compares against the stored identifier")
 
@@ -435,7 +435,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&groupSettingsTabAPI{stored: &api.GroupResponse{Id: 4, GroupIdentifier: "sales"}}),
 			target:  "/admin/groups/4/settings",
 			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4")},
-			want: []string{`<h1 class="page-title break-words" id="page-title">sales</h1>`, `data-stored-value="sales"`,
+			want: []string{`<h1 class="page-title" id="page-title">sales</h1>`, `data-stored-value="sales"`,
 				`name="groupIdentifier" value="sales"`},
 		},
 		{
@@ -444,7 +444,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&resourceSettingsTabAPI{stored: &api.ResourceResponse{Id: 3, ResourceIdentifier: "billing-api"}}),
 			target:  "/admin/resources/3/settings",
 			options: []handlertest.Option{handlertest.WithRouteParam("resourceId", "3")},
-			want: []string{`<h1 class="page-title break-words" id="page-title">billing-api</h1>`,
+			want: []string{`<h1 class="page-title" id="page-title">billing-api</h1>`,
 				`data-stored-value="billing-api"`, `name="resourceIdentifier" value="billing-api"`},
 		},
 		{

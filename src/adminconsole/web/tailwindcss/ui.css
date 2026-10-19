@@ -173,6 +173,7 @@
     margin-top: 0.25rem;
     color: var(--color-ink-muted);
     max-width: 65ch;
+    overflow-wrap: anywhere;
   }
 
   .page-actions {
@@ -381,10 +382,13 @@
     font-weight: 600;
   }
 
+  /* A hint and a refusal wrap anywhere, since a refusal can quote a long value back, such as a
+     URL. */
   .field-hint {
     font-size: 0.8125rem;
     line-height: 1.25rem;
     color: var(--color-ink-muted);
+    overflow-wrap: anywhere;
   }
 
   .field-error {
@@ -392,6 +396,7 @@
     line-height: 1.25rem;
     font-weight: 500;
     color: var(--color-danger-ink);
+    overflow-wrap: anywhere;
   }
 
   .control {
@@ -778,7 +783,10 @@
       display: block;
     }
 
+    /* A block, so its overflow is hidden: a table header group ignores overflow, and its cells
+       would widen the page by their text. */
     .data-table-stack thead {
+      display: block;
       position: absolute;
       width: 1px;
       height: 1px;
