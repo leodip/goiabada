@@ -91,13 +91,20 @@
     deleteButton.disabled = on;
   }
 
-  // regainFocus puts the focus back on Upload when an operation that disabled it, and so dropped
-  // its focus, or a dialog that could not give it back to a disabled button, left the focus on
-  // nothing, or in the dialog just closed, where a browser leaves it until it next tidies up; focus
-  // the person moved elsewhere stays there.
-  function regainFocus() {
+  // focusLost tells whether an operation's end should place the focus: when it is on nothing, on
+  // Delete, which a deletion disables and its success hides, or in a dialog just closed, where a
+  // browser leaves it until it next tidies up. Focus the person moved elsewhere is not lost, and
+  // stays where they put it.
+  function focusLost() {
     const focused = document.activeElement;
-    if (!focused || focused === document.body || (!cropDialog.open && cropDialog.contains(focused))) {
+    return !focused || focused === document.body || focused === deleteButton
+      || focused.closest("dialog:not([open])") !== null;
+  }
+
+  // regainFocus puts lost focus back on Upload, which an operation disables, dropping its focus,
+  // and which a dialog opened during the operation could not give it back to.
+  function regainFocus() {
+    if (focusLost()) {
       uploadButton.focus();
     }
   }
@@ -504,14 +511,13 @@
   }
 
   // deleteImage deletes the image, an operation of its own, so Delete and Upload are disabled while
-  // it runs, which drops Delete's focus, the focus its dialog gave back to it: where focus goes is
-  // decided from before, to the Upload button once the image and its Delete button are gone, back
-  // to Delete when the deletion fails.
+  // it runs, which drops Delete's focus, the focus its dialog gave back to it. Lost focus goes to
+  // the Upload button once the image and its Delete button are gone, back to Delete when the
+  // deletion fails; focus the person moved elsewhere meanwhile stays.
   function deleteImage() {
     if (busy) {
       return;
     }
-    const hadFocus = document.activeElement === deleteButton;
     setBusy(true);
     fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: csrfHeaders() })
       .then((response) => response.json().then((data) => {
@@ -528,19 +534,15 @@
       .then(() => {
         setBusy(false);
         showImage(null);
-        if (hadFocus) {
-          uploadButton.focus();
-        }
+        regainFocus();
         showNotice(status, "positive", config.deleted);
       })
       .catch((error) => {
-        showNotice(status, "danger", error.message);
-      })
-      .finally(() => {
         setBusy(false);
-        if (hadFocus && !deleteButton.hidden) {
+        if (focusLost()) {
           deleteButton.focus();
         }
+        showNotice(status, "danger", error.message);
       });
   }
 
