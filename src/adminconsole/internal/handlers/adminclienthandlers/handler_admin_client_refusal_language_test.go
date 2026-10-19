@@ -36,6 +36,11 @@ func (*refusingClientApiClient) CreateClient(context.Context, string, *api.Creat
 	panic("unexpected call to CreateClient")
 }
 
+// GetSettingsTokens answers the global token settings, which the refused tokens tab names.
+func (*refusingClientApiClient) GetSettingsTokens(context.Context, string) (*api.SettingsTokensResponse, error) {
+	return &api.SettingsTokensResponse{TokenExpirationInSeconds: 300}, nil
+}
+
 func (*refusingClientApiClient) UpdateClientTokens(context.Context, string, int64, *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientTokens")
 }

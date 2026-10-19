@@ -33,24 +33,26 @@
     <div class="not-empty:block hidden" id="permissionListStatus" role="status"></div>
     <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.permissions.lead" }}</p>
 
-    <div class="form-grid items-end">
+    <div class="form-grid">
       <div class="field">
         <label class="field-label" for="resourcesSelect">{{ T $.ctx "adminconsole.admin_clients.permissions.field.resource" }}</label>
-        <select class="control" id="resourcesSelect" data-resource-select>
+        <select class="control" id="resourcesSelect" data-resource-select aria-describedby="resourcesSelect-description">
           <option value="">{{ T $.ctx "adminconsole.admin_clients.permissions.select_resource" }}</option>
           {{ range .resources }}
-          <option value="{{ .Id }}" data-resource-identifier="{{ .ResourceIdentifier }}">{{ .ResourceIdentifier }}{{ if .Description }} ({{ .Description }}){{ end }}</option>
+          <option value="{{ .Id }}" data-resource-identifier="{{ .ResourceIdentifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
           {{ end }}
         </select>
+        <p class="field-hint" id="resourcesSelect-description" data-choice-description-for="resourcesSelect" aria-live="polite"></p>
       </div>
       <div class="field">
         <label class="field-label" for="permissionsSelect">{{ T $.ctx "adminconsole.admin_clients.permissions.field.permission" }}</label>
         <div class="input-row">
-          <select class="control" id="permissionsSelect" disabled data-permission-select aria-describedby="permissionsSelect-error">
+          <select class="control" id="permissionsSelect" disabled data-permission-select aria-describedby="permissionsSelect-description permissionsSelect-error">
             <option value="">{{ T $.ctx "adminconsole.admin_clients.permissions.select_permission" }}</option>
           </select>
           <button class="button" type="button" id="grantPermissionBtn" data-permission-grant>{{ T $.ctx "adminconsole.admin_clients.permissions.grant_button" }}</button>
         </div>
+        <p class="field-hint" id="permissionsSelect-description" data-choice-description-for="permissionsSelect" aria-live="polite"></p>
       </div>
     </div>
     <p class="field-error -mt-3" id="permissionsSelect-error" data-permission-error hidden></p>

@@ -16,9 +16,11 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// clientTokensAPI is what the client tokens page needs: the client, and the token settings write.
+// clientTokensAPI is what the client tokens page needs: the client, the global token settings each
+// of its "use the global setting" choices names the value of, and the token settings write.
 type clientTokensAPI interface {
 	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetSettingsTokens(ctx context.Context, accessToken string) (*api.SettingsTokensResponse, error)
 	UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 }
 
@@ -88,9 +90,16 @@ func HandleTokensGet(
 			}
 		}
 
+		global, err := apiClient.GetSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
 			"client":            client,
+			"global":            global,
 			"savedSuccessfully": savedSuccessfully,
 		}
 
@@ -155,12 +164,19 @@ func HandleTokensPost(
 		}
 
 		// A refused save draws every input as submitted, a duration that is not a number and both
-		// choices included; the title comes from the stored client.
+		// choices included; the title comes from the stored client, and the global values the choices
+		// name from the global settings.
 		renderError := func(message, errorField string) {
+			global, globalErr := apiClient.GetSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken)
+			if globalErr != nil {
+				render.HandleAPIError(httpHelper, w, r, globalErr)
+				return
+			}
 
 			bind := map[string]interface{}{
 				"settings":   settingsInfo,
 				"client":     client,
+				"global":     global,
 				"error":      message,
 				"errorField": errorField,
 			}

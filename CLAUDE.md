@@ -704,7 +704,8 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `field-error`; `input-row` for a control and the button acting on it; `choice`, `switch`,
   `option-card`, `check-list` of `check-row`; `detail-list`, a `dl` of a record's facts;
   `notice` with `-danger`, `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a
-  `data-table`; `tab-bar` and `tab-item`; `pager`; `dialog`; `empty-state`; `spinner`;
+  `data-table`; `tab-bar` and `tab-item`, one underlined row while the tabs fit and rows of pills
+  where they do not, which `shell.js` decides, so a bar never scrolls sideways; `pager`; `dialog`; `empty-state`; `spinner`;
   `text-link`. The auth server's card adds `auth-title`, `auth-lead`, `auth-status` with a
   `status-icon` (`-danger`, `-positive`, `-caution`, `-note`), `auth-actions` for two answers side
   by side, `auth-steps`, `auth-qr`, `secret-key` with `secret-key-row`, `code-hint`,

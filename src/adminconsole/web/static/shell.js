@@ -1,8 +1,9 @@
 // shell.js is the behaviour of the console's page shell, menu_layout.html: the menu button that
 // opens the sidebar as a panel on narrow screens, and the user menu in the header. Both are
-// disclosures: a button whose aria-expanded says whether what it controls is shown. It also wires
-// the components any page of the shell may hold, from utils.js: the copy buttons, the searchable
-// lists, the durations written under their fields and the saves that ask first.
+// disclosures: a button whose aria-expanded says whether what it controls is shown. It also lays
+// out the tab bars, wrapping their tabs into rows where they do not fit, and wires the components
+// any page of the shell may hold, from utils.js: the copy buttons, the searchable lists, the
+// durations written under their fields and the saves that ask first.
 
 // The sidebar panel. While it is open the rest of the page, the skip link included, is inert, so
 // neither the keyboard nor a screen reader reaches what is behind it, and focus moves into it;
@@ -107,8 +108,29 @@ function setUpUserMenu() {
   });
 }
 
+// A tab bar whose tabs do not fit on one line: marked data-wrapped, so ui.css wraps them into rows
+// of pills rather than letting the bar scroll sideways. Measured at once, so the first frame draws
+// the bar as it stays, and again whenever the bar's width changes, with the tabs held on one line
+// for the measure, which no frame shows.
+function setUpTabBars() {
+  document.querySelectorAll(".tab-bar").forEach(function (bar) {
+    const measure = function () {
+      bar.removeAttribute("data-wrapped");
+      bar.style.flexWrap = "nowrap";
+      const overflows = bar.scrollWidth > bar.clientWidth + 1;
+      bar.style.flexWrap = "";
+      if (overflows) {
+        bar.dataset.wrapped = "";
+      }
+    };
+    measure();
+    new ResizeObserver(measure).observe(bar);
+  });
+}
+
 setUpSidebar();
 setUpUserMenu();
+setUpTabBars();
 setUpCopyButtons();
 setUpSearchableSelects();
 setUpDurations();

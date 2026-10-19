@@ -1,14 +1,15 @@
 // permission-list.js is the behaviour of a permissions tab: a resource is chosen, then one of its
-// permissions, which Grant adds to the list; permissions are removed from it in the page, and Save
-// sends the set whole, beside the set as the page drew it, so the server refuses a save from an
-// outdated page rather than undo another administrator's change (#428). The form names the save's
-// route and fields in its data set.
+// permissions, which Grant adds to the list, each field saying the chosen entry's description whole
+// beneath it; permissions are removed from it in the page, and Save sends the set whole, beside the
+// set as the page drew it, so the server refuses a save from an outdated page rather than undo
+// another administrator's change (#428). The form names the save's route and fields in its data
+// set.
 //
 // Grant with no permission chosen, or one in the list already, is refused at the permission field,
 // which says why; a permission granted or removed is announced, since the change shows only in the
 // list. Save asks first on the admin console's own client, through confirmChanges, then reloads the
-// tab, which says the permissions were saved; a refusal is said in the tab's status region, as is
-// a failure to load a resource's permissions.
+// tab, which says the permissions were saved; a refusal is said in the tab's status region, as is a
+// failure to load a resource's permissions.
 
 const permissionForm = document.getElementById("permissionListForm");
 const resourceSelect = permissionForm.querySelector("[data-resource-select]");
@@ -54,18 +55,42 @@ function clearRefusal() {
   permissionSelect.removeAttribute("aria-invalid");
 }
 
-// setPermissions fills the permission field with permissions, after the option asking for one, and
-// disables it while there are none to choose.
+// shorten cuts text to at most max characters, an ellipsis standing for what was cut, as the
+// console's render.Shorten cuts a resource's description for its choice.
+function shorten(text, max) {
+  const characters = Array.from(text.trim());
+  if (characters.length <= max) {
+    return characters.join("");
+  }
+  return characters.slice(0, max - 1).join("").trimEnd() + "…";
+}
+
+// showChoiceDescriptions writes, under each field marked data-choice-description-for, the chosen
+// option's description whole, which its label carries shortened.
+function showChoiceDescriptions() {
+  permissionForm.querySelectorAll("[data-choice-description-for]").forEach(function (hint) {
+    const select = document.getElementById(hint.dataset.choiceDescriptionFor);
+    const option = select.selectedOptions[0];
+    hint.textContent = option && option.value !== "" ? option.dataset.description || "" : "";
+  });
+}
+
+// setPermissions fills the permission field with permissions, after the option asking for one, each
+// labelled with its identifier and its description shortened, and disables it while there are none
+// to choose.
 function setPermissions(permissions) {
   const placeholder = new Option(permissionForm.dataset.choosePermission, "");
   const options = permissions.map(function (permission) {
-    const name = permission.description ? permission.permissionIdentifier + " (" + permission.description + ")" : permission.permissionIdentifier;
-    const option = new Option(name, String(permission.id));
+    const description = (permission.description || "").trim();
+    const label = description ? permission.permissionIdentifier + " – " + shorten(description, 50) : permission.permissionIdentifier;
+    const option = new Option(label, String(permission.id));
     option.dataset.permissionIdentifier = permission.permissionIdentifier;
+    option.dataset.description = description;
     return option;
   });
   permissionSelect.replaceChildren(placeholder, ...options);
   permissionSelect.disabled = options.length === 0;
+  showChoiceDescriptions();
 }
 
 function loadPermissions() {
@@ -124,6 +149,7 @@ function grant() {
   permissionRows.appendChild(rowFor(id, resource + ":" + option.dataset.permissionIdentifier));
   showEmpty();
   permissionSelect.value = "";
+  showChoiceDescriptions();
   permissionSelect.focus();
   permissionAnnounce.textContent = permissionForm.dataset.added;
 }
@@ -160,8 +186,14 @@ function save() {
   });
 }
 
-resourceSelect.addEventListener("change", loadPermissions);
-permissionSelect.addEventListener("change", clearRefusal);
+resourceSelect.addEventListener("change", function () {
+  showChoiceDescriptions();
+  loadPermissions();
+});
+permissionSelect.addEventListener("change", function () {
+  showChoiceDescriptions();
+  clearRefusal();
+});
 permissionForm.querySelector("[data-permission-grant]").addEventListener("click", grant);
 permissionRows.addEventListener("click", function (event) {
   const remove = event.target.closest("[data-list-remove]");

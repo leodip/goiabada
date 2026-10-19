@@ -759,6 +759,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* A monospace cell marked cell-wrap wraps too, as a long URI or scope in a list must, rather than
+     widen the table. */
+  .data-table .cell-mono.cell-wrap {
+    white-space: normal;
+  }
+
   /* A list table that stacks on narrow screens: each row becomes a card, its first cell the
      card's title and every other cell a line labelled with its column's name, from the cell's
      data-label. The labels are text a screen reader reads too, so a cell keeps its meaning where
@@ -832,19 +838,40 @@
     color: var(--color-ink-muted);
   }
 
-  /* Tabs: links between the sections of one record. The bar scrolls sideways on narrow screens. */
+  /* Tabs: links between the sections of one record, one row of underlined tabs while they fit.
+     Where they do not, the console's shell script marks the bar data-wrapped and the tabs wrap
+     into rows of pills, the current one filled, so the bar never scrolls; without a script they
+     wrap as they are. */
 
   /* The bar's baseline is an inset shadow rather than a border, so the current tab's underline
-     sits on it without overflowing the bar, which would give the sideways-scrolling bar a
-     vertical scrollbar too. */
+     sits on it. */
   .tab-bar {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.25rem;
     margin-bottom: 1.5rem;
-    overflow-x: auto;
-    overflow-y: hidden;
     box-shadow: inset 0 -1px 0 var(--color-line);
-    scrollbar-width: thin;
+  }
+
+  .tab-bar[data-wrapped] {
+    gap: 0.5rem;
+    box-shadow: none;
+  }
+
+  .tab-bar[data-wrapped] .tab-item {
+    padding: 0.375rem 0.875rem;
+    border: 1px solid var(--color-line);
+    border-radius: 9999px;
+  }
+
+  .tab-bar[data-wrapped] .tab-item:hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-subtle);
+  }
+
+  .tab-bar[data-wrapped] .tab-item[aria-current="page"] {
+    border-color: var(--color-brand);
+    background-color: var(--color-brand-soft);
   }
 
   .tab-item {
@@ -1941,8 +1968,9 @@
       forced-color-adjust: none;
     }
 
-    .tab-item[aria-current="page"] {
-      border-bottom-color: Highlight;
+    .tab-item[aria-current="page"],
+    .tab-bar[data-wrapped] .tab-item[aria-current="page"] {
+      border-color: Highlight;
     }
 
     .combobox-option[aria-selected="true"] {

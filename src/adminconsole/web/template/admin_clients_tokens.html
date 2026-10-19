@@ -31,21 +31,21 @@
         <label class="field-label" for="tokenExpirationInSeconds">{{ T $.ctx "adminconsole.admin_clients.tokens.field.token_expiration" }}</label>
         <input class="control" id="tokenExpirationInSeconds" type="text" inputmode="numeric" name="tokenExpirationInSeconds" value="{{ .settings.TokenExpirationInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "tokenExpirationInSeconds" }}tokens-error {{ end }}{{ end }}tokenExpirationDescription tokenExpirationHint"
           {{- if .error }}{{ if eq .errorField "tokenExpirationInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
-        <p class="field-hint font-semibold" id="tokenExpirationDescription" data-duration-for="tokenExpirationInSeconds" aria-live="polite"></p>
+        <p class="field-hint font-semibold" id="tokenExpirationDescription" data-duration-for="tokenExpirationInSeconds" data-duration-global="{{ .global.TokenExpirationInSeconds }}" aria-live="polite"></p>
         <p class="field-hint" id="tokenExpirationHint">{{ T $.ctx "adminconsole.admin_clients.tokens.field.token_expiration_tooltip" }}</p>
       </div>
       <div class="field">
         <label class="field-label" for="refreshTokenOfflineIdleTimeoutInSeconds">{{ T $.ctx "adminconsole.admin_clients.tokens.field.idle_timeout" }}</label>
         <input class="control" id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" inputmode="numeric" name="refreshTokenOfflineIdleTimeoutInSeconds" value="{{ .settings.RefreshTokenOfflineIdleTimeoutInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "refreshTokenOfflineIdleTimeoutInSeconds" }}tokens-error {{ end }}{{ end }}refreshTokenOfflineIdleTimeoutDescription refreshTokenOfflineIdleTimeoutHint"
           {{- if .error }}{{ if eq .errorField "refreshTokenOfflineIdleTimeoutInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
-        <p class="field-hint font-semibold" id="refreshTokenOfflineIdleTimeoutDescription" data-duration-for="refreshTokenOfflineIdleTimeoutInSeconds" aria-live="polite"></p>
+        <p class="field-hint font-semibold" id="refreshTokenOfflineIdleTimeoutDescription" data-duration-for="refreshTokenOfflineIdleTimeoutInSeconds" data-duration-global="{{ .global.RefreshTokenOfflineIdleTimeoutInSeconds }}" aria-live="polite"></p>
         <p class="field-hint" id="refreshTokenOfflineIdleTimeoutHint">{{ T $.ctx "adminconsole.admin_clients.tokens.field.idle_timeout_tooltip" }}</p>
       </div>
       <div class="field">
         <label class="field-label" for="refreshTokenOfflineMaxLifetimeInSeconds">{{ T $.ctx "adminconsole.admin_clients.tokens.field.max_lifetime" }}</label>
         <input class="control" id="refreshTokenOfflineMaxLifetimeInSeconds" type="text" inputmode="numeric" name="refreshTokenOfflineMaxLifetimeInSeconds" value="{{ .settings.RefreshTokenOfflineMaxLifetimeInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "refreshTokenOfflineMaxLifetimeInSeconds" }}tokens-error {{ end }}{{ end }}refreshTokenOfflineMaxLifetimeDescription refreshTokenOfflineMaxLifetimeHint"
           {{- if .error }}{{ if eq .errorField "refreshTokenOfflineMaxLifetimeInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
-        <p class="field-hint font-semibold" id="refreshTokenOfflineMaxLifetimeDescription" data-duration-for="refreshTokenOfflineMaxLifetimeInSeconds" aria-live="polite"></p>
+        <p class="field-hint font-semibold" id="refreshTokenOfflineMaxLifetimeDescription" data-duration-for="refreshTokenOfflineMaxLifetimeInSeconds" data-duration-global="{{ .global.RefreshTokenOfflineMaxLifetimeInSeconds }}" aria-live="polite"></p>
         <p class="field-hint" id="refreshTokenOfflineMaxLifetimeHint">{{ T $.ctx "adminconsole.admin_clients.tokens.field.max_lifetime_tooltip" }}</p>
       </div>
     </div>
@@ -59,7 +59,7 @@
         <div class="grid gap-2">
           <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="on"{{ if eq $access "on" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.access_yes" }}</span></label>
           <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="off"{{ if eq $access "off" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.access_no" }}</span></label>
-          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="default"{{ if eq $access "default" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.use_global" }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="default"{{ if eq $access "default" }} checked{{ end }}><span>{{ if .global.IncludeOpenIDConnectClaimsInAccessToken }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_included" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_left_out" }}{{ end }}</span></label>
         </div>
       </fieldset>
       <fieldset aria-describedby="includeClaimsInIdHint">
@@ -68,7 +68,7 @@
         <div class="grid gap-2">
           <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="on"{{ if eq $id "on" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.id_on" }}</span></label>
           <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="off"{{ if eq $id "off" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.id_off" }}</span></label>
-          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="default"{{ if eq $id "default" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.use_global" }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="default"{{ if eq $id "default" }} checked{{ end }}><span>{{ if .global.IncludeOpenIDConnectClaimsInIdToken }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_included" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_left_out" }}{{ end }}</span></label>
         </div>
       </fieldset>
     </div>

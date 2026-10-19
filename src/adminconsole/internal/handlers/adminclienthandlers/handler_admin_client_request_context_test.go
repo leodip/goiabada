@@ -78,6 +78,13 @@ func (s *ctxRecordingApiClient) GetSettingsGeneral(ctx context.Context, _ string
 	return nil, errs.New("the auth server refused")
 }
 
+// GetSettingsTokens records and refuses, as the general settings read does: the tokens tab reads it
+// after the client, before it draws.
+func (s *ctxRecordingApiClient) GetSettingsTokens(ctx context.Context, _ string) (*api.SettingsTokensResponse, error) {
+	s.seen = append(s.seen, ctx)
+	return nil, errs.New("the auth server refused")
+}
+
 // GetClientSessionsByClientId records and succeeds rather than refusing, because the session
 // delete below it is reached only through the page it answers.
 func (s *ctxRecordingApiClient) GetClientSessionsByClientId(ctx context.Context, _ string, _ int64, _, _ int) (*api.GetClientSessionsResponse, error) {

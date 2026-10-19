@@ -110,7 +110,7 @@ func HandlePermissionsGet(
 
 		bind := map[string]interface{}{
 			"client":            adminClientPermissions,
-			"resources":         resources,
+			"resources":         render.ResourceChoices(resources),
 			"savedSuccessfully": savedSuccessfully,
 		}
 

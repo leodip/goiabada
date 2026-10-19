@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -36,6 +37,13 @@ type tokensTabAPI struct {
 
 func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.stored, nil
+}
+
+// GetSettingsTokens answers the global token settings: the claims included in the ID token and
+// left out of the access token, and an hour's token lifetime.
+func (s *tokensTabAPI) GetSettingsTokens(_ context.Context, _ string) (*api.SettingsTokensResponse, error) {
+	return &api.SettingsTokensResponse{TokenExpirationInSeconds: 3600, RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000, IncludeOpenIDConnectClaimsInIdToken: true}, nil
 }
 
 func (s *tokensTabAPI) UpdateClientTokens(_ context.Context, _ string, _ int64,
@@ -134,6 +142,14 @@ func TestRender_AdminClientTokens_TheFirstDrawShowsTheStoredClient(t *testing.T)
 	assert.Equal(t, "86400", durationValue(t, out, "refreshTokenOfflineMaxLifetimeInSeconds"))
 	assert.Equal(t, "default", checkedChoice(t, out, "includeOpenIDConnectClaimsInAccessToken"))
 	assert.Equal(t, "on", checkedChoice(t, out, "includeOpenIDConnectClaimsInIdToken"))
+
+	// Each "use the global setting" names what the global setting is now: the claims left out of the
+	// access token and included in the ID token, and each duration's own, which the script says
+	// beside a 0.
+	assert.Contains(t, out, `value="default" checked><span>Usar a configuração global (não incluir)</span>`)
+	assert.Equal(t, 1, strings.Count(out, `Usar a configuração global (incluir)`))
+	assert.Contains(t, out, `data-duration-for="tokenExpirationInSeconds" data-duration-global="3600"`)
+	assert.Contains(t, out, `data-duration-for="refreshTokenOfflineMaxLifetimeInSeconds" data-duration-global="2592000"`)
 }
 
 // A refused save draws the tab again with every input as the administrator submitted it: each
