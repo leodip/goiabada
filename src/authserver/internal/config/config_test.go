@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testDataKeyHex         = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+	testDataKeyHex         = "3008ac6e5d242f37a0135f06b0fe3bc164b9147153c911ad1407c1256b0d802a"
 	testPreviousDataKeyHex = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
 )
 
@@ -27,7 +27,11 @@ func TestDataKeys(t *testing.T) {
 		wantErr string // the whole message, or "" for acceptance
 	}{
 		{"valid 32-byte hex", testDataKeyHex, ""},
-		{"surrounding whitespace is trimmed", "  " + testDataKeyHex + "\t", ""},
+		{"surrounding whitespace is trimmed", "  " + testDataKeyHex + "	", ""},
+		{"the sample key this repository published", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+			"GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published in its Compose files, so every column it sealed is readable by anyone. Generate a new one with: openssl rand -hex 32, then move the data off this key as https://goiabada.dev/deploy/rotate-secrets/ describes, keeping this one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS"},
+		{"the sample key this repository published, upper case", strings.ToUpper("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"),
+			"GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published in its Compose files, so every column it sealed is readable by anyone. Generate a new one with: openssl rand -hex 32, then move the data off this key as https://goiabada.dev/deploy/rotate-secrets/ describes, keeping this one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS"},
 		{"empty", "", "GOIABADA_AES_ENCRYPTION_KEY is required" + hint},
 		{"whitespace only", "   ", "GOIABADA_AES_ENCRYPTION_KEY is required" + hint},
 		{"not hex", "zzzz", "GOIABADA_AES_ENCRYPTION_KEY must be hex-encoded (error: encoding/hex: invalid byte: U+007A 'z')" + hint},
@@ -76,6 +80,7 @@ func TestDataKeys_Previous(t *testing.T) {
 		{"absent is fine", "", ""},
 		{"whitespace only is absent", "  ", ""},
 		{"valid previous", testPreviousDataKeyHex, ""},
+		{"the sample key this repository published rotates away", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", ""},
 		{"previous not hex", "zzzz",
 			"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: encoding/hex: invalid byte: U+007A 'z')"},
 		{"previous wrong length", "00112233445566778899aabbccddeeff",

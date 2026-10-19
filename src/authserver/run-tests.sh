@@ -522,7 +522,7 @@ configure_database() {
     # data/integration test harnesses. Honors the value from the devcontainer env
     # if present, otherwise uses a fixed test key so existing containers work
     # without a rebuild.
-    export GOIABADA_AES_ENCRYPTION_KEY="${GOIABADA_AES_ENCRYPTION_KEY:-00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff}"
+    export GOIABADA_AES_ENCRYPTION_KEY="${GOIABADA_AES_ENCRYPTION_KEY:-3008ac6e5d242f37a0135f06b0fe3bc164b9147153c911ad1407c1256b0d802a}"
 }
 
 # Drop the database configure_database just named, on the three engines with a server, so the

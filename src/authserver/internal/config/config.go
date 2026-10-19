@@ -710,6 +710,15 @@ func cannotBeRead(err error) string {
 	return reason
 }
 
+// publishedSampleDataKeyHex is the AES data key this repository's hand-written Compose samples
+// shipped until they were deleted for v1.7.0, so anyone who read a database, a backup or a
+// replica of a deployment started from one could decrypt everything it sealed: the client secrets,
+// the OTP seeds, the pending reset codes, the SMTP password and the RSA signing private keys
+// included. It is refused as the current key (#501): an operator running it must rotate, not
+// start. It stays accepted as the previous key, which is how the rotation the refusal points at
+// moves a database off it.
+const publishedSampleDataKeyHex = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+
 // DataKeys decodes the data-encryption keys: the current one, which must be present,
 // hex-encoded and exactly 32 bytes, and the previous one, nil unless a rotation is in progress
 // and held to the same rule when it is. The key is supplied from the environment rather than
@@ -719,6 +728,9 @@ func (c *Config) DataKeys() (current, previous []byte, err error) {
 	key := strings.TrimSpace(c.AESEncryptionKey)
 	if key == "" {
 		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
+	}
+	if strings.EqualFold(key, publishedSampleDataKeyHex) {
+		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published in its Compose files, so every column it sealed is readable by anyone. Generate a new one with: openssl rand -hex 32, then move the data off this key as https://goiabada.dev/deploy/rotate-secrets/ describes, keeping this one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 	current, err = hex.DecodeString(key)
 	if err != nil {
