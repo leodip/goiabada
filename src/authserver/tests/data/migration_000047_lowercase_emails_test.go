@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -306,14 +306,8 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	m, err := seed.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails000047), "step the throwaway database to 000046")
-	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
-		Enabled: true, Subject: "00000000-0000-0000-0000-000000047101",
-		Username: "mig47start0", Email: "Startup@example.com", PasswordHash: "not-a-real-hash",
-	}))
-	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
-		Enabled: true, Subject: "00000000-0000-0000-0000-000000047102",
-		Username: "mig47start1", Email: "startup@example.com", PasswordHash: "not-a-real-hash",
-	}))
+	seedStartupUser000047(t, seed.DB, "00000000-0000-0000-0000-000000047101", "mig47start0", "Startup@example.com")
+	seedStartupUser000047(t, seed.DB, "00000000-0000-0000-0000-000000047102", "mig47start1", "startup@example.com")
 	require.NoError(t, seed.DB.Close(), "close the seeding handle before the server opens its own")
 
 	opened, err := datafactory.NewDatabase(context.Background(), cfg,
@@ -336,4 +330,21 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 		"the schema must not have moved, so the operator can fix the rows and start the server again")
 	assert.False(t, dirty,
 		"a dirty database refuses to start and there is no supported way back, which is exactly what checking before Migrate avoids")
+}
+
+// seedStartupUser000047 writes one of the colliding rows straight into the throwaway database, in
+// SQL rather than through the data layer, which writes the head schema: the next column a
+// migration adds to users would break seed.CreateUser at 000046 (#510), failing this test at a
+// seed write rather than at the pre-flight it tests. The statement names only the columns the
+// 000046 schema carries, as assertEmailIndex000047's probe does, and the row is never read back
+// through the ORM, so the nullable columns stay NULL. This is the sqlite-only entry point, which
+// is why plain 1 and 0 spell the booleans rather than boolLiterals000031's per-engine pair.
+func seedStartupUser000047(t *testing.T, db *sql.DB, subject, username, email string) {
+	t.Helper()
+
+	_, err := db.Exec(fmt.Sprintf(
+		"INSERT INTO users (enabled, subject, username, email, email_verified, phone_number_verified, password_hash, otp_enabled)"+
+			" VALUES (1, '%s', '%s', '%s', 0, 0, 'not-a-real-hash', 0)",
+		subject, username, email))
+	require.NoErrorf(t, err, "seed the legacy %s row into the throwaway database", email)
 }
