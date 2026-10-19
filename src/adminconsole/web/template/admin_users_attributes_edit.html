@@ -1,108 +1,61 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.attributes_form.edit_page_title_prefix" }}{{.storedAttribute.Key}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.attributes_form.edit_page_title_prefix" }}<span class="text-accent">{{.storedAttribute.Key}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.admin_users.attributes_form.edit_title" }} {{ .storedAttribute.Key }} – {{ .user.Email }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+{{ template "user_header" (args "attributes" .user.Id .user.Email .page .query $.ctx) }}
 
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the
+     notice and focused; a refusal naming no field leaves the focus on the key. The heading keeps
+     the key as stored. */}}
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_users.attributes_form.edit_title" }} <span class="font-mono">{{ .storedAttribute.Key }}</span></h2>
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="attribute-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
 
-
-{{end}}
-
-{{define "body"}}
-
-{{template "manage_users_tabs" (args "attributes" .user.Id .page .query $.ctx) }}
-
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-
-            <div class="w-full form-control">
-                <p class="pl-1">{{ T $.ctx "adminconsole.admin_users.attributes_form.edit_intro_prefix" }}<span class="text-accent">{{.user.Email}}</span>.</p>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_users.attributes_form.field.key" }}
-                    </span>
-                </label>
-                <input id="attributeKey" type="text" name="attributeKey" value="{{.attribute.Key}}"
-                    class="w-full input input-bordered" autocomplete="off" autofocus />
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_users.attributes_form.field.value" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_users.attributes_form.value_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input type="text" name="attributeValue" value="{{.attribute.Value}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_users.attributes_form.include_access_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_access_em" }}</span>{{ T $.ctx "adminconsole.admin_users.attributes_form.include_access_suffix" }}
-                    </span>
-                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .attribute.IncludeInAccessToken}}checked{{end}} />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_users.attributes_form.include_id_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_id_em" }}</span>{{ T $.ctx "adminconsole.admin_users.attributes_form.include_id_suffix" }}
-                    </span>
-                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .attribute.IncludeInIdToken}}checked{{end}} />
-                </label>
-            </div>
-
-        </div>
-
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="attributeKey">{{ T $.ctx "adminconsole.admin_users.attributes_form.field.key" }}</label>
+        <input class="control control-mono" id="attributeKey" type="text" name="attributeKey" value="{{ .attribute.Key }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "attributeKey" }}attribute-error {{ end }}{{ end }}attributeKeyHint"
+          {{- if .error }}{{ if eq .errorField "attributeKey" }} aria-invalid="true"{{ end }}{{ if ne .errorField "attributeValue" }} autofocus{{ end }}{{ else }} autofocus{{ end }}>
+        <p class="field-hint" id="attributeKeyHint">{{ T $.ctx "adminconsole.admin_users.attributes_form.key_hint" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="attributeValue">{{ T $.ctx "adminconsole.admin_users.attributes_form.field.value" }}</label>
+        <input class="control" id="attributeValue" type="text" name="attributeValue" value="{{ .attribute.Value }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "attributeValue" }}attribute-error {{ end }}{{ end }}attributeValueHint"
+          {{- if .error }}{{ if eq .errorField "attributeValue" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="attributeValueHint">{{ T $.ctx "adminconsole.admin_users.attributes_form.value_tooltip" }}</p>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/users/{{.user.Id}}/attributes{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.attributes_form.back_to_attributes" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_users.common.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
-        </div>
-    </div>
-
+    <fieldset>
+      <legend class="field-label mb-2">{{ T $.ctx "adminconsole.admin_users.attributes_form.tokens_legend" }}</legend>
+      <div class="check-list">
+        <label class="check-row" for="includeInAccessToken">
+          <input type="checkbox" id="includeInAccessToken" name="includeInAccessToken" aria-describedby="includeInAccessTokenHint"{{ if .attribute.IncludeInAccessToken }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_access" }}</span>
+            <span class="field-hint" id="includeInAccessTokenHint">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_access_hint" }}</span>
+          </span>
+        </label>
+        <label class="check-row" for="includeInIdToken">
+          <input type="checkbox" id="includeInIdToken" name="includeInIdToken" aria-describedby="includeInIdTokenHint"{{ if .attribute.IncludeInIdToken }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_id" }}</span>
+            <span class="field-hint" id="includeInIdTokenHint">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_id_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/users/{{ .user.Id }}/attributes?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}">{{ T $.ctx "common.button.cancel" }}</a>
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_users.attributes_form.edit_button" }}</button>
+  </div>
 </form>
-
-
-
 {{end}}
-

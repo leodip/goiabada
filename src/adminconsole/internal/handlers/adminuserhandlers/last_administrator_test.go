@@ -106,7 +106,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/delete",
 		handlertest.WithAccessToken(),
 		handlertest.WithRouteParam("userId", "7"),
-		handlertest.WithForm(url.Values{}),
+		handlertest.WithForm(url.Values{"email": {"admin@example.com"}}),
 	)
 	rec := httptest.NewRecorder()
 

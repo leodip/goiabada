@@ -1,0 +1,18 @@
+{{define "user_header"}}
+{{- /* (args tab userId email page query ctx): what every page of one user opens with, the link
+     back to the list at the page and search it came from, the user's email as the page's heading,
+     and the tabs with tab current. */ -}}
+{{- $tab := index . 0 }}
+{{- $id := index . 1 }}
+{{- $email := index . 2 }}
+{{- $page := index . 3 }}
+{{- $query := index . 4 }}
+{{- $ctx := index . 5 }}
+<div class="page-header">
+  <div class="min-w-0">
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/users?page={{ $page }}{{ if $query }}&query={{ $query }}{{ end }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $ctx "adminconsole.admin_menu.users" }}</a></p>
+    <h1 class="page-title break-words" id="page-title">{{ $email }}</h1>
+  </div>
+</div>
+{{ template "manage_users_tabs" (args $tab $id $page $query $ctx) }}
+{{end}}

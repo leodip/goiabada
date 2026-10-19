@@ -1,97 +1,60 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }}{{.user.Email}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }} – {{ .user.Email }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/users?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.users" }}</a></p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_users.delete.page_title_prefix" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_users.delete.lead" }}</p>
+  </div>
+</div>
 
-
-{{end}}
-
-{{define "body"}}
-
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        <div class="w-full">
-            <p>{{ T $.ctx "adminconsole.admin_users.delete.are_you_sure" }}</p>
-            <p class="mt-6">{{ T $.ctx "adminconsole.admin_users.delete.warning_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_users.delete.warning_em" }}</span>{{ T $.ctx "adminconsole.admin_users.delete.warning_suffix" }}</p>
-        </div>
-
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="delete-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
+    {{ end }}
 
+    <dl class="detail-list">
+      <dt>{{ T $.ctx "adminconsole.admin_users.delete.field.email" }}</dt>
+      <dd class="break-words">{{ .user.Email }}</dd>
+      {{ if .userFullName }}
+      <dt>{{ T $.ctx "adminconsole.admin_users.delete.field.full_name" }}</dt>
+      <dd>{{ .userFullName }}</dd>
+      {{ end }}
+      {{ if .user.Username }}
+      <dt>{{ T $.ctx "adminconsole.admin_users.delete.field.username" }}</dt>
+      <dd>{{ .user.Username }}</dd>
+      {{ end }}
+      <dt>{{ T $.ctx "adminconsole.admin_users.delete.field.subject" }}</dt>
+      <dd class="font-mono text-sm">{{ .user.Subject }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.delete.field.created_at" }}</dt>
+      <dd>{{ DateTime $.ctx .user.CreatedAt }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.delete.field.member_of_groups" }}</dt>
+      <dd>
+        {{ if .groups }}
+        <ul class="grid gap-1">
+          {{ range .groups }}<li class="font-mono text-sm">{{ .GroupIdentifier }}</li>{{ end }}
+        </ul>
+        {{ else }}
+        <span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_users.delete.none" }}</span>
+        {{ end }}
+      </dd>
+    </dl>
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <table class="table">
-            <tbody>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.subject" }}</td>
-                    <td>{{.user.Subject}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.full_name" }}</td>
-                    <td>{{.userFullName}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.email" }}</td>
-                    <td>{{.user.Email}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.username" }}</td>
-                    <td>{{.user.Username}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.created_at" }}</td>
-                    <td>{{ DateTime $.ctx .user.CreatedAt }}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.member_of_groups" }}</td>
-                    <td>
-                        <ul>
-                            {{if .groups}}
-                                {{range .groups}}
-                                    <li>
-                                        <span class="font-mono">{{.GroupIdentifier}}</span>
-                                    </li>
-                                {{end}}
-                            {{else}}
-                                <li>{{ T $.ctx "adminconsole.admin_users.delete.none" }}</li>
-                            {{end}}
-                        </ul>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="field max-w-md">
+      <label class="field-label" for="email">{{ T $.ctx "adminconsole.admin_users.delete.field.confirm_email" }}</label>
+      <input class="control" id="email" type="text" name="email" value="" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{{ if .error }} aria-invalid="true" aria-describedby="delete-error"{{ end }}>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_users.common.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnDelete" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_users.delete.delete_button" }}</button>
-        </div>
-    </div>
-
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/users?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}">{{ T $.ctx "common.button.cancel" }}</a>
+    <button id="btnDelete" class="button button-danger" type="submit">{{ T $.ctx "adminconsole.admin_users.delete.delete_button" }}</button>
+  </div>
 </form>
-
 {{end}}

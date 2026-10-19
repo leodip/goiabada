@@ -321,23 +321,19 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 	// pt-BR's layout, written out here rather than read from the catalog: this literal is what a
 	// layout regressing to RFC1123, or to en's 01/02/2006 3:04 PM, is held against.
 	const layout = "02/01/2006 15:04"
-	startedCell := "<td>" + started.Format(layout) + "<br />há 3 dias</td>"
-	lastAccessedCell := "<td>" + lastAccessed.Format(layout) + "<br />há 5 minutos</td>"
-	// The account and client pages' cells are a list's, labelled for the stacked cards, the phrase
-	// beneath the instant.
-	startedListCell := `">` + started.Format(layout) + `<span class="cell-secondary">há 3 dias</span></td>`
-	lastAccessedListCell := `">` + lastAccessed.Format(layout) + `<span class="cell-secondary">há 5 minutos</span></td>`
+	// Each page's cells are a list's, labelled for the stacked cards, the phrase beneath the
+	// instant.
+	startedCell := `">` + started.Format(layout) + `<span class="cell-secondary">há 3 dias</span></td>`
+	lastAccessedCell := `">` + lastAccessed.Format(layout) + `<span class="cell-secondary">há 5 minutos</span></td>`
 
 	for _, tc := range []struct {
-		name     string
-		page     string
-		bind     map[string]interface{}
-		listCell bool
+		name string
+		page string
+		bind map[string]interface{}
 	}{
 		{
-			name:     "account",
-			page:     "/account_user_sessions.html",
-			listCell: true,
+			name: "account",
+			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
 				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
@@ -357,9 +353,8 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			},
 		},
 		{
-			name:     "admin client",
-			page:     "/admin_clients_usersessions.html",
-			listCell: true,
+			name: "admin client",
+			page: "/admin_clients_usersessions.html",
 			bind: map[string]interface{}{
 				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{{
@@ -372,12 +367,8 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
-			wantStarted, wantLastAccessed := startedCell, lastAccessedCell
-			if tc.listCell {
-				wantStarted, wantLastAccessed = startedListCell, lastAccessedListCell
-			}
-			assert.Containsf(t, out, wantStarted, "%s: the Started cell is not localized", tc.page)
-			assert.Containsf(t, out, wantLastAccessed,
+			assert.Containsf(t, out, startedCell, "%s: the Started cell is not localized", tc.page)
+			assert.Containsf(t, out, lastAccessedCell,
 				"%s: the Last accessed cell is not localized", tc.page)
 
 			assert.NotContains(t, out, started.Format(time.RFC1123),
@@ -405,144 +396,8 @@ func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
 }
 
-// The Device label reaches a second sink the tooltip above does not, and this is the case that
-// says it arrives there as text.
-//
-// A label is derived from Sec-CH-UA and Sec-CH-UA-Platform, whose values UA-CH requires a
-// server to accept arbitrarily (authserver/internal/useragent pins that premise), so any user
-// can put markup in their own session's label by completing a login with hand-written headers.
-// On the admin user's sessions page the End Session button hands that label to endSessionClick,
-// which builds the dialog's message. html/template escapes the label for the JavaScript string literal in the
-// onclick attribute and stops there (#281). The message keeps its accent span, so the label joins
-// it as a value of dialogMarkup, which escapes it once; escaping it before that would show its
-// entities as typed, and concatenating it into the message would show the span as tags. Only
-// rendered HTML can see which it is (#120).
-//
-// The account's and a client's sessions pages carry their buttons' sentence in data-confirm
-// instead, which TestRender_SessionListsAskWithTheirOwnSentence holds.
-func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
-	const markup = `<script>alert(1)</script>`
-
-	// The unescaped concatenation, in any spacing. This is the shape that shipped and the shape
-	// a later edit would reintroduce; matching on it rather than on the fixed text is what makes
-	// the guard survive reformatting.
-	unescaped := regexp.MustCompile(`\+\s*device\s*\+`)
-	// The label as a value of dialogMarkup, after its parts.
-	builderValue := regexp.MustCompile(`\],\s*device\)`)
-
-	for _, tc := range []struct {
-		name       string
-		page       string
-		bind       map[string]interface{}
-		modalTakes bool
-	}{
-		{
-			name: "admin user",
-			page: "/admin_users_sessions.html",
-			bind: map[string]interface{}{
-				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
-					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
-				}},
-				"page":  "1",
-				"query": "",
-			},
-			modalTakes: true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			out := renderMenuPage(t, tc.page, tc.bind)
-
-			// Neither the cell nor the onclick attribute carries the label as markup: the cell
-			// is HTML text and the attribute is a JavaScript string literal, and html/template
-			// escapes each for its own context.
-			assert.NotContains(t, out, markup,
-				"the device label must never reach the page as markup")
-			assert.Contains(t, out, "&lt;script&gt;alert(1)&lt;/script&gt;",
-				"the label belongs in the Device cell, as text")
-
-			assert.NotContains(t, out, "escapeHtml(device)",
-				"dialogMarkup escapes the label, so escaping it first shows its entities as typed")
-			if !tc.modalTakes {
-				assert.NotRegexp(t, builderValue, out)
-				assert.NotRegexp(t, unescaped, out,
-					"this page's modal takes the email, so no device label reaches it")
-				return
-			}
-
-			// And the script that reads it back out of the attribute hands it to the dialog only
-			// as a value of dialogMarkup, once for each arm of the current-session warning.
-			assert.Len(t, builderValue.FindAllString(out, -1), 2,
-				"the device label must reach the dialog as a value of dialogMarkup, which escapes it")
-			assert.NotRegexp(t, unescaped, out,
-				"the device label must not be concatenated into the modal message")
-		})
-	}
-}
-
-// The End Session button's arguments against endSessionClick's parameters, on the admin user
-// sessions page, which declares it; the client sessions page ends a session through
-// pages/user-sessions.js since #617, as the account page does.
-//
-// Folded in with #281: the admin-client page declared six parameters -- it kept a `device` the
-// body never reads, unlike the two pages whose modal names the device -- and its button passed
-// five, so `IsCurrent` landed in `device` and `isCurrent` was always undefined. The "you are
-// ending your own session" warning could therefore never appear on that page, although its
-// handler sets the flag. JavaScript pads a short call with undefined rather than failing, so
-// nothing anywhere reported it: not the renderer, not the browser, not a handler test that
-// only sees the bind.
-//
-// Counting rather than pinning the argument lists is what makes this a guard for the next edit
-// as well as this one: a parameter added to one page's function and not to its button, in
-// either direction, is the same defect and fails here too. The fixture values carry no comma,
-// which is what lets the count be commas plus one.
-func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.T) {
-	declRe := regexp.MustCompile(`function endSessionClick\(([^)]*)\)`)
-	callRe := regexp.MustCompile(`onclick="endSessionClick\(([^)]*)\)`)
-
-	for _, tc := range []struct {
-		name string
-		page string
-		bind map[string]interface{}
-	}{
-		{
-			name: "admin user",
-			page: "/admin_users_sessions.html",
-			bind: map[string]interface{}{
-				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
-					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
-				}},
-				"page":  "1",
-				"query": "",
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			out := renderMenuPage(t, tc.page, tc.bind)
-
-			decl := declRe.FindStringSubmatch(out)
-			require.NotNilf(t, decl, "%s: no endSessionClick declaration", tc.page)
-			call := callRe.FindStringSubmatch(out)
-			require.NotNilf(t, call, "%s: no End Session button", tc.page)
-
-			assert.Equal(t, strings.Count(decl[1], ",")+1, strings.Count(call[1], ",")+1,
-				"%s: endSessionClick(%s) is called with (%s)", tc.page, decl[1], call[1])
-
-			// The flag is the argument the mismatch swallowed, and it is the last one on every
-			// page, so pinning it is what says the count above lines up where it matters.
-			assert.True(t, strings.HasSuffix(strings.TrimSpace(decl[1]), "isCurrent"),
-				"%s: isCurrent is expected last, got (%s)", tc.page, decl[1])
-			assert.True(t, strings.HasSuffix(strings.TrimSpace(call[1]), "true"),
-				"%s: the current session must pass true last, got (%s)", tc.page, call[1])
-		})
-	}
-}
-
-// The End session buttons of the account's and a client's sessions pages, which carry what their
-// dialog says rather than handing it to a function: data-dialog names the dialog, the one for the
+// The End session buttons of the three sessions pages, the account's, a user's and a client's, which
+// carry what their dialog says rather than handing it to a function: data-dialog names the dialog, the one for the
 // device in use whose button says it signs out, and data-confirm the sentence, the device label in it
 // escaped for the attribute. The script, which ends the session through the route the page's status
 // region names, shows that sentence as the dialog's plain message, which is drawn as text (#120,
@@ -565,6 +420,20 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 				},
 			},
 			endURL: "/account/sessions",
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_sessions.html",
+			bind: map[string]interface{}{
+				"user": &api.UserResponse{Id: 7, Email: "admin@example.com"},
+				"sessions": []render.SessionInfo{
+					{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+					{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+				},
+				"page":  "1",
+				"query": "",
+			},
+			endURL: "/admin/users/7/sessions",
 		},
 		{
 			name: "admin client",
@@ -603,22 +472,53 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 		"the session is ended through the route the page names")
 }
 
-// The consents page's Revoke buttons, held as the sessions page's are: the sentence, the
-// application's name in it escaped, rides in data-confirm and reaches the dialog as its plain
-// message.
-func TestRender_AccountConsentsAskWithTheirOwnSentence(t *testing.T) {
+// The consent pages' Revoke buttons, held as the sessions pages' are: the sentence, the client's
+// name in it escaped, rides in data-confirm, and row-actions.js shows it as the dialog's plain
+// message, then posts the body the button names to the route it names.
+func TestRender_ConsentPagesAskWithTheirOwnSentence(t *testing.T) {
 	const markup = `<b>web-app</b>`
-	out := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
-		"consents": []render.ConsentInfo{{ConsentId: 4, Client: "web-app", ClientName: markup, Scope: "openid"}},
-	})
+	for _, tc := range []struct {
+		name   string
+		page   string
+		bind   map[string]interface{}
+		action string
+	}{
+		{
+			name: "account",
+			page: "/account_manage_consents.html",
+			bind: map[string]interface{}{
+				"consents": []render.ConsentInfo{{ConsentId: 4, Client: "web-app", ClientName: markup, Scope: "openid"}},
+			},
+			action: `data-action-url="/account/manage-consents" data-action-body="{&#34;consentId&#34;:4}"`,
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_consents.html",
+			bind: map[string]interface{}{
+				"user":     &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"consents": []render.ConsentInfo{{ConsentId: 4, Client: markup, Scope: "openid"}},
+				"page":     "1",
+				"query":    "",
+			},
+			action: `data-action-url="/admin/users/7/consents" data-action-body="{&#34;consentId&#34;:4}"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := renderMenuPage(t, tc.page, tc.bind)
 
-	assert.NotContains(t, out, markup, "the application's name must never reach the page as markup")
-	assert.Regexp(t, `data-revoke-consent="4" data-confirm="[^"]*&lt;b&gt;web-app&lt;/b&gt;`, out)
-	assert.Contains(t, out, `id="revokeConsent_modalDialog"`)
+			assert.NotContains(t, out, markup, "the client's name must never reach the page as markup")
+			assert.Contains(t, out, tc.action, "the button names the route and the consent it revokes")
+			assert.Regexp(t, `data-dialog="revokeConsent"[^>]*data-confirm="[^"]*&lt;b&gt;web-app&lt;/b&gt;`, out)
+			assert.Contains(t, out, `id="revokeConsent_modalDialog"`)
+			assert.Contains(t, out, `id="row-actions-status" role="status"`)
+		})
+	}
 
-	script, err := fs.ReadFile(web.StaticFS(), "pages/account-manage-consents.js")
+	script, err := fs.ReadFile(web.StaticFS(), "pages/row-actions.js")
 	require.NoError(t, err)
-	assert.Contains(t, string(script), `showModalDialog("revokeConsent", consentsStatus.dataset.confirmTitle, button.dataset.confirm,`)
+	assert.Contains(t, string(script), `showModalDialog(button.dataset.dialog, title, button.dataset.confirm, null,`,
+		"the sentence reaches the dialog as its plain message, which is drawn as text")
+	assert.Contains(t, string(script), `bodyData: button.dataset.actionBody || null,`)
 }
 
 // The two consent pages, which are two of decision 8's seven other dates (#373). Each rendered
@@ -649,6 +549,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		{
 			name: "admin user",
 			page: "/admin_users_consents.html",
+			cell: `<td class="sm:whitespace-nowrap" data-label="Dado em">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
 				"consents": []render.ConsentInfo{{
@@ -664,11 +565,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
-			cell := tc.cell
-			if cell == "" {
-				cell = "<td>16/09/2026 12:00</td>"
-			}
-			assert.Containsf(t, out, cell, "%s: the granted-at cell is not localized", tc.page)
+			assert.Containsf(t, out, tc.cell, "%s: the granted-at cell is not localized", tc.page)
 			assert.NotContainsf(t, out, granted.Format(time.RFC1123),
 				"%s: RFC1123 names the month and weekday in English under every locale", tc.page)
 		})

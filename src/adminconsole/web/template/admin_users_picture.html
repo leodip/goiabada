@@ -1,20 +1,14 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.picture.page_title_prefix" }}{{.user.Email}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.picture.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.user_tabs.picture" }} – {{ .user.Email }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
 <script src="{{ asset "/static/vendor/cropperjs/cropper.min.js" }}" defer></script>
 <script src="{{ asset "/static/image-upload.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{ template "user_header" (args "picture" .user.Id .user.Email .page .query $.ctx) }}
 
-{{template "manage_users_tabs" (args "picture" .user.Id .page .query $.ctx) }}
-
-<div class="mt-6 panel">
+<div class="panel">
   <div class="panel-body">
     <div class="image-upload" id="imageUploadContainer"
       data-upload-url="/admin/users/{{ .user.Id }}/picture" data-delete-url="/admin/users/{{ .user.Id }}/picture" data-field-name="picture" data-url-key="pictureUrl"
@@ -42,16 +36,4 @@
 {{ template "crop_dialog" (args $.ctx (T $.ctx "adminconsole.admin_users.picture.crop_modal_title") (T $.ctx "adminconsole.admin_users.picture.cancel_button") (T $.ctx "adminconsole.admin_users.picture.confirm_button") false) }}
 
 {{ template "modal_dialog" (args "deleteImage" "confirm" $.ctx (T $.ctx "adminconsole.admin_users.picture.delete_button") (T $.ctx "adminconsole.admin_users.picture.delete_title")) }}
-
-<div class="mt-8">
-    <div class="float-left p-3">
-        <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
-            <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
-        </a>
-    </div>
-</div>
-
 {{end}}

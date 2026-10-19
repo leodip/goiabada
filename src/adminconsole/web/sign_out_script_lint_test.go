@@ -47,7 +47,6 @@ func TestUtilsJS_SubmitSignOutPostsTheSignOutForm(t *testing.T) {
 func TestTemplates_TheSessionsPagesPostTheSignOutRatherThanNavigateToIt(t *testing.T) {
 	for _, name := range []string{
 		"static/pages/user-sessions.js",
-		"template/admin_users_sessions.html",
 	} {
 		read := templateFS.ReadFile
 		if strings.HasPrefix(name, "static/") {

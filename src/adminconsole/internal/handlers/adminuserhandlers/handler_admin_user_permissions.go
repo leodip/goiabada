@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -61,11 +62,17 @@ func HandlePermissionsGet(
 			return
 		}
 
-		// Create permission display map for template
-		permissionDisplayMap := make(map[int64]string)
+		// The permissions the user holds, in the order the tab lists them: by scope.
+		granted := make([]grantedPermission, 0, len(userPermissions))
 		for _, permission := range userPermissions {
-			permissionDisplayMap[permission.Id] = permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			granted = append(granted, grantedPermission{
+				Id:    permission.Id,
+				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
+			})
 		}
+		sort.Slice(granted, func(i, j int) bool {
+			return granted[i].Scope < granted[j].Scope
+		})
 
 		// Get all resources via API
 		resources, err := apiClient.GetAllResources(r.Context(), accessToken)
@@ -93,8 +100,8 @@ func HandlePermissionsGet(
 
 		bind := map[string]interface{}{
 			"user":              user,
-			"userPermissions":   permissionDisplayMap,
-			"resources":         resources,
+			"granted":           granted,
+			"resources":         render.ResourceChoices(resources),
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,

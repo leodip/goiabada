@@ -169,12 +169,13 @@ func HandleAddressPost(
 				}
 
 				bind := map[string]interface{}{
-					"user":      userForDisplay,
-					"address":   address,
-					"countries": countries,
-					"page":      r.URL.Query().Get("page"),
-					"query":     r.URL.Query().Get("query"),
-					"error":     errorMessage,
+					"user":       userForDisplay,
+					"address":    address,
+					"countries":  countries,
+					"page":       r.URL.Query().Get("page"),
+					"query":      r.URL.Query().Get("query"),
+					"error":      errorMessage,
+					"errorField": render.ErrorField(err, render.AddressErrorFields),
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_address.html", bind)

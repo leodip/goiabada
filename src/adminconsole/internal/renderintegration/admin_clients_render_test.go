@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 
@@ -212,11 +213,12 @@ func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 	assertListScriptSendsTheLoadedList(t, "pages/permission-list.js", "loadedIds", "grantedIds()")
 }
 
-// The Remove buttons of a client's redirect URIs, web origins and permissions are named for what they
-// do and to which row: the visible "Remove" and the row's value beside it for a screen reader, in
-// the administrator's language, as the page draws the stored rows, and as the scripts build the row
-// of an entry added in the page, from the form's data-remove-label.
-func TestRender_ClientListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
+// The Remove buttons of the lists edited in the page, a client's redirect URIs, web origins and
+// permissions and a user's permissions and groups, are named for what they do and to which row: the
+// visible "Remove" and the row's value beside it for a screen reader, in the administrator's
+// language, as the page draws the stored rows, and as the scripts build the row of an entry added
+// in the page, from the form's data-remove-label.
+func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 	type permission struct {
 		Id    int64
 		Scope string
@@ -252,6 +254,19 @@ func TestRender_ClientListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 		}{ClientId: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true, Permissions: []permission{{3, "some-resource:read"}}},
 			"resources": []api.ResourceResponse{}},
 			"some-resource:read", "pages/permission-list.js"},
+		{"/admin_users_permissions.html", map[string]interface{}{
+			"user":      &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"granted":   []permission{{3, "some-resource:read"}},
+			"resources": []render.Choice{}},
+			"some-resource:read", "pages/permission-list.js"},
+		{"/admin_users_groups.html", map[string]interface{}{
+			"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"memberships": []struct {
+				Id              int64
+				GroupIdentifier string
+			}{{3, "admins"}},
+			"groupChoices": []render.Choice{}},
+			"admins", "pages/user-groups.js"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.page, func(t *testing.T) {

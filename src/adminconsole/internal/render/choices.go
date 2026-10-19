@@ -22,25 +22,48 @@ func Shorten(text string, limit int) string {
 	return strings.TrimRightFunc(string(runes[:limit-1]), unicode.IsSpace) + "…"
 }
 
-// ResourceChoice is a resource as a list to choose one from shows it: its identifier, with its
-// description shortened beside it in the label, and whole for the field to show once it is chosen.
-type ResourceChoice struct {
-	Id                 int64
-	ResourceIdentifier string
-	Label              string
-	Description        string
+// Choice is an entry as a list to choose one from shows it: its identifier, with its description
+// shortened beside it in the label, and whole for the field to show once it is chosen.
+type Choice struct {
+	Id          int64
+	Identifier  string
+	Label       string
+	Description string
+}
+
+func choiceOf(id int64, identifier, description string) Choice {
+	label := identifier
+	description = strings.TrimSpace(description)
+	if description != "" {
+		label += " – " + Shorten(description, choiceDescriptionMax)
+	}
+	return Choice{Id: id, Identifier: identifier, Label: label, Description: description}
 }
 
 // ResourceChoices maps resources to the choices a list shows, in their order.
-func ResourceChoices(resources []api.ResourceResponse) []ResourceChoice {
-	choices := make([]ResourceChoice, 0, len(resources))
+func ResourceChoices(resources []api.ResourceResponse) []Choice {
+	choices := make([]Choice, 0, len(resources))
 	for _, r := range resources {
-		label := r.ResourceIdentifier
-		if d := strings.TrimSpace(r.Description); d != "" {
-			label += " – " + Shorten(d, choiceDescriptionMax)
-		}
-		choices = append(choices, ResourceChoice{Id: r.Id, ResourceIdentifier: r.ResourceIdentifier,
-			Label: label, Description: strings.TrimSpace(r.Description)})
+		choices = append(choices, choiceOf(r.Id, r.ResourceIdentifier, r.Description))
+	}
+	return choices
+}
+
+// GroupChoices maps groups to the choices a list shows, in their order.
+func GroupChoices(groups []api.GroupResponse) []Choice {
+	choices := make([]Choice, 0, len(groups))
+	for _, g := range groups {
+		choices = append(choices, choiceOf(g.Id, g.GroupIdentifier, g.Description))
+	}
+	return choices
+}
+
+// PermissionChoices maps one resource's permissions to the choices a list shows, in their order,
+// each named by its permission identifier alone.
+func PermissionChoices(permissions []api.PermissionResponse) []Choice {
+	choices := make([]Choice, 0, len(permissions))
+	for _, p := range permissions {
+		choices = append(choices, choiceOf(p.Id, p.PermissionIdentifier, p.Description))
 	}
 	return choices
 }

@@ -3,12 +3,13 @@
 // beneath it; permissions are removed from it in the page, and Save sends the set whole, beside the
 // set as the page drew it, so the server refuses a save from an outdated page rather than undo
 // another administrator's change (#428). The form names the save's route and fields in its data
-// set.
+// set: the owner's field, data-owner-key, only where the route takes the owner in the body, and
+// the page to reload after a save, data-reload-url, where it is not the save's route.
 //
 // Grant with no permission chosen, or one in the list already, is refused at the permission field,
 // which says why; a permission granted or removed is announced, since the change shows only in the
-// list. Save asks first on the admin console's own client, through confirmChanges, then reloads the
-// tab, which says the permissions were saved; a refusal is said in the tab's status region, as is a
+// list. Save asks first where the form says so, through confirmChanges, then reloads the tab,
+// which says the permissions were saved; a refusal is said in the tab's status region, as is a
 // failure to load a resource's permissions. Choices the browser restores, as on Back, are shown as
 // chosen, with a restored resource's permissions.
 
@@ -195,7 +196,9 @@ function removePermission(row) {
 
 function save() {
   const body = {};
-  body[permissionForm.dataset.ownerKey] = Number(permissionForm.dataset.ownerId);
+  if (permissionForm.dataset.ownerKey) {
+    body[permissionForm.dataset.ownerKey] = Number(permissionForm.dataset.ownerId);
+  }
   body[permissionForm.dataset.listKey] = grantedIds();
   body[permissionForm.dataset.expectedKey] = loadedIds;
   sendAjaxRequest({
@@ -205,7 +208,7 @@ function save() {
     statusRegion: permissionStatus,
     callback: function (result) {
       if (result.Success) {
-        window.location.href = permissionForm.dataset.saveUrl;
+        window.location.href = permissionForm.dataset.reloadUrl || permissionForm.dataset.saveUrl;
       }
     }
   });

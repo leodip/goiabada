@@ -1547,7 +1547,7 @@
   }
   .tab-item {
     flex: none;
-    padding: 0.625rem 0.875rem;
+    padding: 0.625rem;
     border-bottom: 2px solid transparent;
     color: var(--color-ink-muted);
     font-size: 0.875rem;

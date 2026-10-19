@@ -7,52 +7,58 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// The user permissions page keeps the set of grants it loaded and sends it with every save (#428).
+// The user permissions page draws the grants it loaded as rows, which permission-list.js reads
+// once, as it loads, and sends with every save (#428).
 func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_permissions.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
-		"userPermissions":   map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
-		"resources":         []api.ResourceResponse{},
-		"page":              "",
+		"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"granted": []struct {
+			Id    int64
+			Scope string
+		}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+		"resources":         []render.Choice{},
+		"page":              "2",
 		"query":             "",
 		"savedSuccessfully": false,
 	})
-	assertSendsTheLoadedPermissionIds(t, out)
+
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `data-save-url="/admin/users/5/permissions" data-reload-url="/admin/users/5/permissions?page=2"`)
+	assert.Contains(t, out, `data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"`)
+	assert.NotContains(t, out, "data-owner-key", "the route names the user, so the body does not")
+	assert.Contains(t, out, `src="/static/pages/permission-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/permission-list.js", "loadedIds", "grantedIds()")
 }
 
-// The user groups page keeps the ids of the memberships it loaded and sends them with every save,
-// so the auth server can refuse a save from an outdated page rather than undo another
-// administrator's change. The copy is taken after every loaded membership is pushed and never
-// edited, or the page would send its edited set as the loaded one and every save would pass (#428).
+// The user groups page draws the memberships it loaded as rows, which user-groups.js reads once, as
+// it loads, and sends with every save, so the auth server can refuse a save from an outdated page
+// rather than undo another administrator's change (#428).
 func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_groups.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
-		"userGroups":        map[int64]string{3: "admins", 4: "auditors"},
-		"allGroups":         []api.GroupResponse{},
+		"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"memberships": []struct {
+			Id              int64
+			GroupIdentifier string
+		}{{Id: 3, GroupIdentifier: "admins"}, {Id: 4, GroupIdentifier: "auditors"}},
+		"groupChoices":      []render.Choice{{Id: 3, Identifier: "admins", Label: "admins"}},
 		"page":              "",
 		"query":             "",
 		"savedSuccessfully": false,
 	})
 
-	const copyTaken = "const loadedGroupIds = assignedGroups.map(function(assignedGroup) { return parseInt(assignedGroup.id, 10); });"
-	// The template ranges over the map in key order, so auditors (4) is the last loaded push.
-	lastLoaded := strings.Index(out, `"groupIdentifier": "auditors"`)
-	require.NotEqual(t, -1, lastLoaded, "the loaded memberships are pushed into the editable list")
-	require.Less(t, strings.Index(out, `"groupIdentifier": "admins"`), lastLoaded)
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps the ids of the loaded memberships")
-	assert.Greater(t, copyAt, lastLoaded, "the copy is taken after every loaded membership is in the list")
-	assert.Less(t, copyAt, strings.Index(out, "function btnSaveClick"), "the copy is taken at load, before anything can edit the list")
-
-	assert.Contains(t, out, `"expectedGroupIds": loadedGroupIds`)
-	assert.NotRegexp(t, `loadedGroupIds\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedGroupIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `<a class="text-link" href="/admin/groups/4/settings">auditors</a>`)
+	assert.Contains(t, out, `data-list-key="assignedGroupsIds" data-expected-key="expectedGroupIds"`)
+	assert.Contains(t, out, `src="/static/pages/user-groups.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/user-groups.js", "loadedGroupIds", "memberOf()")
 }
 
 // TestRender_AdminUsersPaginator is the template hop of the paginator (#271): the partial reads a
@@ -175,7 +181,7 @@ func TestRender_AdminUserDelete(t *testing.T) {
 	assert.NotContains(t, out, "Jan 2026", "an English month name is what the old layout produced")
 	assert.Contains(t, out, "admins", "the memberships the deletion discards have to be on the page")
 	assert.Contains(t, out, "site-viewers")
-	assert.NotContains(t, out, "(nenhum)", "with two groups listed, the none arm must not also render")
+	assert.NotContains(t, out, ">Nenhum<", "with two groups listed, the none arm must not also render")
 }
 
 // The none arm, which is what every user saw before the fix and what a user in no groups sees now.
@@ -189,5 +195,5 @@ func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 	})
 
 	assert.Contains(t, out, "jane@example.com")
-	assert.Contains(t, out, "(nenhum)", "a user in no groups still gets the row's none arm")
+	assert.Contains(t, out, ">Nenhum</span>", "a user in no groups still gets the row's none arm")
 }

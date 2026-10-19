@@ -4,11 +4,13 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // userDeleteAPI is what the user delete page needs: the user, the groups it warns about, and the
@@ -136,6 +138,27 @@ func HandleDeletePost(
 			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_delete.html", bind); renderErr != nil {
 				httpHelper.InternalServerError(w, r, renderErr)
 			}
+		}
+
+		// The email typed to confirm, compared as the API compares addresses, without regard to
+		// case, with the user as stored now.
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if user == nil {
+			httpHelper.NotFound(w, r)
+			return
+		}
+		typed := strings.TrimSpace(r.FormValue("email"))
+		if typed == "" {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.user_delete.email_required"))
+			return
+		}
+		if !strings.EqualFold(typed, user.Email) {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.user_delete.email_mismatch"))
+			return
 		}
 
 		err = apiClient.DeleteUser(r.Context(), jwtInfo.TokenResponse.AccessToken, id)

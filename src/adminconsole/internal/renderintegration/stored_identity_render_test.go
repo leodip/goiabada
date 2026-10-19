@@ -398,8 +398,8 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 				handlertest.WithRouteParam("userId", "9"), handlertest.WithRouteParam("attributeId", "12"))
 
 			assert.Contains(t, out, tc.wantRefusal)
-			assert.Contains(t, out, `<title>Test - Editar atributo do usuário - employee-id</title>`)
-			assert.Contains(t, out, `<span class="text-accent">employee-id</span>`, "the page title names the stored key")
+			assert.Contains(t, out, `<title>Editar atributo employee-id – ana@example.com – Test</title>`)
+			assert.Contains(t, out, `<h2 class="panel-title">Editar atributo <span class="font-mono">employee-id</span></h2>`, "the heading names the stored key")
 
 			key := inputRe("attributeKey").FindString(out)
 			require.NotEmpty(t, key)
@@ -473,7 +473,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			target: "/admin/users/9/attributes/edit/12",
 			options: []handlertest.Option{handlertest.WithRouteParam("userId", "9"),
 				handlertest.WithRouteParam("attributeId", "12")},
-			want: []string{`<span class="text-accent">employee-id</span>`, `name="attributeKey" value="employee-id"`},
+			want: []string{`Editar atributo <span class="font-mono">employee-id</span></h2>`, `name="attributeKey" value="employee-id"`},
 		},
 	}
 

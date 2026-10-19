@@ -58,10 +58,4 @@ var pendingTemplates = []string{"admin_groups.html", "admin_groups_attributes.ht
 	"admin_resources_users_with_permission.html", "admin_resources_users_with_permission_add.html",
 	"admin_settings_audit_log_viewer.html", "admin_settings_audit_logs.html",
 	"admin_settings_email.html", "admin_settings_email_sendtest.html", "admin_settings_general.html",
-	"admin_settings_keys.html", "admin_settings_tokens.html", "admin_users_address.html",
-	"admin_users_attributes.html", "admin_users_attributes_add.html",
-	"admin_users_attributes_edit.html", "admin_users_authentication.html", "admin_users_consents.html",
-	"admin_users_delete.html", "admin_users_details.html", "admin_users_email.html",
-	"admin_users_groups.html", "admin_users_new.html", "admin_users_permissions.html",
-	"admin_users_phone.html", "admin_users_picture.html", "admin_users_profile.html",
-	"admin_users_sessions.html"}
+	"admin_settings_keys.html", "admin_settings_tokens.html"}

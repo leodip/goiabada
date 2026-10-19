@@ -73,8 +73,8 @@ func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T)
 	out := rec.Body.String()
 
 	assert.Contains(t, out, `<p>`+refusal+`</p>`)
-	assert.Contains(t, out, `<span class="text-accent">ana@example.com</span>`, "the page title names the user")
-	assert.Contains(t, out, `<title>Test - Usuário - Telefone - ana@example.com</title>`)
+	assert.Contains(t, out, `<h1 class="page-title break-words" id="page-title">ana@example.com</h1>`, "the heading names the user")
+	assert.Contains(t, out, `<title>Telefone – ana@example.com – Test</title>`)
 
 	links := userTabLinkRe.FindAllStringSubmatch(out, -1)
 	require.Len(t, links, 12, "the twelve user tabs")
@@ -83,10 +83,10 @@ func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T)
 		assert.True(t, strings.HasSuffix(link[1], "?page=2&query=ana"), "and keeps the list position: %s", link[1])
 	}
 
-	assert.Contains(t, out, `<option class="country-flags" value="BRA_0" selected>`, "the country as submitted")
+	assert.Contains(t, out, `<option value="BRA_0" selected>`, "the country as submitted")
 	assert.NotContains(t, out, `value="PRT_0" selected`)
-	assert.Contains(t, out, `name="phoneNumber" value="12"`, "the number as typed")
-	verified := regexp.MustCompile(`<input type="checkbox" name="phoneNumberVerified"[^>]*>`).FindString(out)
+	assert.Contains(t, out, `name="phoneNumber" inputmode="tel" value="12"`, "the number as typed")
+	verified := regexp.MustCompile(`<input type="checkbox" id="phoneNumberVerified" name="phoneNumberVerified"[^>]*>`).FindString(out)
 	require.NotEmpty(t, verified)
 	assert.NotContains(t, verified, "checked", "the verified switch as submitted: off")
 }

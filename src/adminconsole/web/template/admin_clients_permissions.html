@@ -39,7 +39,7 @@
         <select class="control" id="resourcesSelect" data-resource-select aria-describedby="resourcesSelect-description">
           <option value="">{{ T $.ctx "adminconsole.admin_clients.permissions.select_resource" }}</option>
           {{ range .resources }}
-          <option value="{{ .Id }}" data-resource-identifier="{{ .ResourceIdentifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
+          <option value="{{ .Id }}" data-resource-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
           {{ end }}
         </select>
         <p class="field-hint" id="resourcesSelect-description" data-choice-description-for="resourcesSelect" aria-live="polite"></p>

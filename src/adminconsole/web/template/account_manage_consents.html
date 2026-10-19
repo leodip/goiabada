@@ -1,7 +1,7 @@
 {{define "title"}}{{ T $.ctx "adminconsole.account.consents.page_title" }} – {{ .appName }}{{end}}
 {{define "menu"}}{{ template "account_menu" . }}{{end}}
 {{define "head"}}
-<script src="{{ asset "/static/pages/account-manage-consents.js" }}" defer></script>
+<script src="{{ asset "/static/pages/row-actions.js" }}" defer></script>
 {{end}}
 
 {{define "page"}}
@@ -14,7 +14,7 @@
 </div>
 
 {{ if .consents }}
-<div class="not-empty:mb-4" id="consents-status" role="status" data-confirm-title="{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}" data-revoked="{{ T $.ctx "adminconsole.account.consents.revoked" }}" data-revoked-label="{{ T $.ctx "adminconsole.account.consents.revoked_label" }}"></div>
+<div class="not-empty:mb-4" id="row-actions-status" role="status" data-confirm-title="{{ T $.ctx "adminconsole.account.consents.modal_confirm_title" }}"></div>
 
 <div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
   <table class="data-table data-table-stack">
@@ -44,7 +44,7 @@
         </td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}">{{ DateTime $.ctx .GrantedAt }}</td>
         <td class="cell-actions">
-          <button class="button button-sm" type="button" data-revoke-consent="{{ .ConsentId }}" data-confirm="{{ if .ClientNameUnverified }}{{ T $.ctx "adminconsole.account.consents.revoke_confirm_unverified" "client" .ClientName }}{{ else }}{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .ClientName }}{{ end }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
+          <button class="button button-sm" type="button" data-action-url="/account/manage-consents" data-action-body="{&#34;consentId&#34;:{{ .ConsentId }}}" data-dialog="revokeConsent" data-done="{{ T $.ctx "adminconsole.account.consents.revoked" }}" data-done-label="{{ T $.ctx "adminconsole.account.consents.revoked_label" }}" data-confirm="{{ if .ClientNameUnverified }}{{ T $.ctx "adminconsole.account.consents.revoke_confirm_unverified" "client" .ClientName }}{{ else }}{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .ClientName }}{{ end }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
         </td>
       </tr>
       {{ end }}

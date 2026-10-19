@@ -84,3 +84,16 @@ var PhoneErrorFields = map[string]string{
 	i18n.ErrCodePhoneSimplePattern:   "phoneNumber",
 	i18n.ErrCodePhoneInvalidFormat:   "phoneNumber",
 }
+
+// AttributeErrorFields are the attribute form's, which a user's and a group's attribute pages both
+// post: the key, which the API requires and validates as an identifier, and the value, which it
+// bounds, a user's under VALUE_TOO_LONG and a group's under its catalog key.
+var AttributeErrorFields = map[string]string{
+	i18n.ErrCodeAttributeKeyRequired:        "attributeKey",
+	i18n.ErrCodeIdentifierInvalidFormat:     "attributeKey",
+	i18n.ErrCodeIdentifierTooShort:          "attributeKey",
+	i18n.ErrCodeIdentifierTooLong:           "attributeKey",
+	i18n.ErrCodeAttributeValueTooLong:       "attributeValue",
+	"VALUE_TOO_LONG":                        "attributeValue",
+	i18n.ErrCodeAttributeValueAngleBrackets: "attributeValue",
+}
