@@ -1,14 +1,14 @@
 // account-manage-consents.js is the consents page's behaviour: each Revoke button asks in the
 // page's dialog, with its own sentence, data-confirm, and then revokes that consent. The button
 // gives way to a tag saying the consent was revoked, which takes the focus the button had, and the
-// page's status region says so.
+// page's status region says so, as it says a failure.
 
 function revokeConsent(button, status) {
   sendAjaxRequest({
     url: "/account/manage-consents",
     method: "POST",
     bodyData: JSON.stringify({ consentId: Number(button.dataset.revokeConsent) }),
-    modalId: "modal0",
+    statusRegion: status,
     callback: function (result) {
       if (!result.Success) {
         return;

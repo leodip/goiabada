@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/core/i18n"
@@ -17,6 +18,31 @@ func ErrorField(err error, fields map[string]string) string {
 		return ""
 	}
 	return fields[apiErr.Code]
+}
+
+// RequiredField is a field a form must not send blank, and the value it sent.
+type RequiredField struct {
+	Name  string
+	Value string
+}
+
+// ErrorFieldOrBlank is ErrorField, and for the admin API's VALIDATION_ERROR, the one code it
+// answers a required value left out with, which names no field, the first of required sent blank,
+// listed in the order the API checks them.
+func ErrorFieldOrBlank(err error, fields map[string]string, required ...RequiredField) string {
+	if field := ErrorField(err, fields); field != "" {
+		return field
+	}
+	var apiErr *apiclient.APIError
+	if !errors.As(err, &apiErr) || apiErr.Code != "VALIDATION_ERROR" {
+		return ""
+	}
+	for _, field := range required {
+		if strings.TrimSpace(field.Value) == "" {
+			return field.Name
+		}
+	}
+	return ""
 }
 
 // ProfileErrorFields are the profile form's, which the account profile page and the admin user

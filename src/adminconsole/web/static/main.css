@@ -5148,12 +5148,21 @@
     display: none;
   }
   .crop-area {
-    max-height: min(24rem, 60vh);
-    overflow: hidden;
+    height: min(24rem, 55vh);
   }
-  .crop-area > img {
-    display: block;
-    max-width: 100%;
+  .crop-area cropper-canvas {
+    height: 100%;
+  }
+  .crop-controls {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+  }
+  .crop-slider {
+    width: 100%;
+    accent-color: var(--color-brand);
   }
   .app-shell {
     min-height: 100vh;

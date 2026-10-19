@@ -491,7 +491,10 @@ function makeSearchable(select) {
       if (popup.hidden) {
         open();
       }
-      if (shown.length > 0) {
+      if (shown.length > 0 && active < 0) {
+        // From the field, down reaches the first match and up the last.
+        setActive(event.key === "ArrowDown" ? 0 : shown.length - 1);
+      } else if (shown.length > 0) {
         const step = event.key === "ArrowDown" ? 1 : -1;
         setActive((active + step + shown.length) % shown.length);
       }
@@ -565,6 +568,12 @@ function makeSearchable(select) {
   combobox.append(input, popup, status);
   select.after(combobox);
   showChoice();
+  // A page reached again through the browser's history can have the select's choice put back
+  // after this has run, without a change event, so the field would name one option while the
+  // form posts another. The field shows the select's choice again whenever the page is shown and
+  // whenever the select changes.
+  window.addEventListener("pageshow", showChoice);
+  select.addEventListener("change", showChoice);
   if (hadFocus) {
     input.focus();
   }
@@ -619,7 +628,31 @@ const debounce = (func, wait) => {
   };
 };
 
+// sendAjaxRequest sends a JSON request to the console and hands a success's answer to
+// props.callback. A failure is said in the dialog props.modalId names, or, on a page that answers
+// in a status region, the one props.statusRegion holds, as a notice, the way that page says its
+// successes; there an access token the admin API refused signs out at once, as the image upload
+// does, since the home page then says why.
 function sendAjaxRequest(props) {
+
+  // fail says why the request failed: title and message in the dialog, message alone in a notice.
+  const fail = (title, message) => {
+    if (props.statusRegion) {
+      showNotice(props.statusRegion, "danger", message);
+    } else {
+      showModalDialog(props.modalId, title, message);
+    }
+  };
+
+  // failUnexpected says that the request failed in a way the console did not answer.
+  const failUnexpected = (detail) => {
+    if (props.statusRegion) {
+      showNotice(props.statusRegion, "danger", tFormat("js.error.unexpected_text", { detail: detail }));
+    } else {
+      showModalDialog(props.modalId, t("js.error.error_title"),
+        dialogMarkupFormat("js.error.unexpected", { detail: detail }));
+    }
+  };
 
   let setLoading = (isLoading) => {
     if (!props.loadingElement) {
@@ -668,11 +701,7 @@ function sendAjaxRequest(props) {
 
           if(response.status == 401) {
             setLoading(false);
-            showModalDialog(
-              props.modalId,
-              t("js.error.session_expired_title"),
-              t("js.error.session_expired_body")
-            );
+            fail(t("js.error.session_expired_title"), t("js.error.session_expired_body"));
             return;
           }
 
@@ -683,6 +712,10 @@ function sendAjaxRequest(props) {
               // closes, by its button or by Escape alike.
               if (isSessionEnded(err)) {
                 setLoading(false);
+                if (props.statusRegion) {
+                  goToSessionEnded();
+                  return;
+                }
                 showModalDialog(props.modalId, t("js.error.session_expired_title"),
                   err.error_description);
                 document.getElementById(props.modalId + "_modalDialog")
@@ -698,16 +731,12 @@ function sendAjaxRequest(props) {
                 : t("js.error.error_title");
               // error_description can echo back what the user typed: handlers now
               // forward the API's 400 description verbatim so a validation failure is
-              // readable (#122). It goes to the dialog as a plain message, which is shown
-              // as text, so it is not escaped first (#120).
-              showModalDialog(props.modalId, title, err.error_description);
+              // readable (#122). It goes to the dialog as a plain message, or to a notice,
+              // each shown as text, so it is not escaped first (#120).
+              fail(title, err.error_description);
               setLoading(false);
             } catch (err) {
-              showModalDialog(
-                props.modalId,
-                t("js.error.error_title"),
-                dialogMarkupFormat("js.error.unexpected", { detail: response.status })
-              );
+              failUnexpected(response.status);
               setLoading(false);
             }
           });
@@ -722,18 +751,10 @@ function sendAjaxRequest(props) {
         }
       })
       .catch((err) => {
-        showModalDialog(
-          props.modalId,
-          t("js.error.error_title"),
-          dialogMarkupFormat("js.error.unexpected", { detail: err })
-        );
+        failUnexpected(err);
       });
   } catch (err) {
-    showModalDialog(
-      props.modalId,
-      t("js.error.error_title"),
-      dialogMarkupFormat("js.error.unexpected", { detail: err })
-    );
+    failUnexpected(err);
     setLoading(false);
   }
 }

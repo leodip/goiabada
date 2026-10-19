@@ -553,14 +553,11 @@ cmd_check() {
     fi
 
     # --- cropperjs ---
-    # Only 1.x: 2.x is a rewrite with another API, which the admin console's croppers don't use.
     echo -n "Checking cropperjs... "
     local current_cropper=$(get_version 'vendored.cropperjs')
     local latest_cropper=$(get_npm_latest "cropperjs")
     if [ -n "$latest_cropper" ]; then
-        if [ "${latest_cropper%%.*}" != "${current_cropper%%.*}" ]; then
-            print_success "Up to date on ${current_cropper%%.*}.x ($current_cropper); $latest_cropper is another API"
-        elif version_lt "$current_cropper" "$latest_cropper"; then
+        if version_lt "$current_cropper" "$latest_cropper"; then
             echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
             updates_available+=("cropperjs|$current_cropper|$latest_cropper|https://www.npmjs.com/package/cropperjs")
         else
@@ -831,10 +828,9 @@ cmd_update() {
         ((fail_count++))
     fi
     local cropper_dir="$BASE_DIR/src/adminconsole/web/static/vendor/cropperjs"
+    # 2.x draws its own elements and carries their styles, so there is no stylesheet to fetch.
     if vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/dist/cropper.min.js" \
             "$cropper_dir/cropper.min.js" "cropperjs-js-sha256" &&
-        vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/dist/cropper.min.css" \
-            "$cropper_dir/cropper.min.css" "cropperjs-css-sha256" &&
         vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/LICENSE" \
             "$cropper_dir/LICENSE"; then
         ((success_count++))

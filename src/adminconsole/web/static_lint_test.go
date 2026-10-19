@@ -43,7 +43,8 @@ func jsLiteral(s string) string {
 
 // TestUtilsJS_ErrorDescriptionReachesTheDialogAsText pins what replaced #122's fix: every read of
 // the server-supplied err.error_description in utils.js is handed to showModalDialog whole, as its
-// message, and showModalDialog shows a message its builders did not build as text. The description
+// message, or to sendAjaxRequest's fail whole, as its message, which hands it whole to
+// showModalDialog or to showNotice (#617), and each shows a message as text. The description
 // can echo back what the administrator typed, since handlers forward the API's 400 description
 // verbatim so a validation failure is readable.
 //
@@ -52,11 +53,11 @@ func jsLiteral(s string) string {
 // before it reaches the dialog would now show its entities as typed: "a < b" as "a &lt; b". Wrapping
 // it in either builder is refused too, since it carries no markup to keep. What keeps it from the
 // HTML parser is the dialog's plain branch, which core/guard.AssertNoHTMLSinks holds to writing no
-// innerHTML, and which this test reads as a textContent write besides.
+// innerHTML, and which this test reads as a textContent write besides, as it reads showNotice's.
 //
 // Lexical, like its neighbours, because no JavaScript runs in any tier: each occurrence of
 // err.error_description outside a comment must be the whole third argument of a showModalDialog
-// call. A sink that reaches the same value by another spelling, destructuring it or aliasing it
+// call or the whole second of a fail call, and fail must hand its message on whole. A sink that reaches the same value by another spelling, destructuring it or aliasing it
 // first, is out of this check's reach.
 func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 	content := utilsJS(t)
@@ -75,6 +76,23 @@ func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 		}
 		if arg := callArgument(toks, i+2, 2); len(arg) == 3 && isDescription(arg, 0) {
 			whole[arg[0].Offset] = true
+		}
+	}
+	for i, tok := range toks {
+		if !tok.Is(guard.ScriptIdent, "fail") || i+1 >= len(toks) || !toks[i+1].Is(guard.ScriptPunct, "(") {
+			continue
+		}
+		if arg := callArgument(toks, i+2, 1); len(arg) == 3 && isDescription(arg, 0) {
+			whole[arg[0].Offset] = true
+		}
+	}
+	for _, sink := range []string{
+		`showNotice(props.statusRegion, "danger", message);`,
+		`showModalDialog(props.modalId, title, message);`,
+	} {
+		if !strings.Contains(content, sink) {
+			t.Errorf("static/utils.js: sendAjaxRequest's fail no longer hands its message whole to %s; "+
+				"the description reaches a notice or the dialog as text only whole (#120, #617)", sink)
 		}
 	}
 
@@ -105,6 +123,15 @@ func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 	if !strings.Contains(body, ".textContent = message;") {
 		t.Errorf("static/utils.js: showModalDialog no longer writes a plain message through " +
 			"textContent; a message its builders did not build is shown as text (#120)")
+	}
+	_, notice, ok := functionBody(content, "showNotice")
+	if !ok {
+		t.Fatalf("static/utils.js: function showNotice not found, or its body cannot be read; " +
+			"this check cannot read it (#617)")
+	}
+	if !strings.Contains(notice, "message.textContent = text;") {
+		t.Errorf("static/utils.js: showNotice no longer writes its text through textContent; a " +
+			"notice shows a server's sentence as text (#617)")
 	}
 }
 

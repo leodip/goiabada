@@ -1,8 +1,8 @@
 // account-email-verification.js is the email verification page's behaviour: its Send code button
-// asks the console to email a code, and the answer is said in the page's status region, where the
-// button's data-sent and data-wait give the sentences. data-wait names the time to wait as {wait},
-// which only the answer knows, and which is written as a duration in the page's language, such as
-// "4 minutes, 20 seconds".
+// asks the console to email a code, and the answer, or why it failed, is said in the page's status
+// region, where the button's data-sent and data-wait give the sentences. data-wait names the time
+// to wait as {wait}, which only the answer knows, and which is written as a duration in the page's
+// language, such as "4 minutes, 20 seconds".
 
 // waitText writes a number of seconds as a duration in the page's language.
 function waitText(seconds) {
@@ -17,7 +17,7 @@ function sendVerificationCode(button) {
     url: "/account/email-send-verification",
     method: "POST",
     bodyData: JSON.stringify({}),
-    modalId: "modal0",
+    statusRegion: status,
     callback: function (result) {
       if (result.EmailVerified) {
         // Verified since the page was drawn, in another tab: draw it again to say so.

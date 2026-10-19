@@ -80,13 +80,15 @@ func HandleEmailGet(
 }
 
 // accountEmailErrorFields maps the refusals the email change can meet to the field each is about: the
-// address the validator refused, and the current password the auth server found wrong. A missing
-// password answers VALIDATION_ERROR, which names no field; it comes back empty and is focused anyway.
+// address the validator refused or another account holds, found before the write or by the unique
+// key at it, and the current password the auth server found wrong. A missing password answers
+// VALIDATION_ERROR, which names no field, so the field is the one sent blank.
 var accountEmailErrorFields = map[string]string{
 	i18n.ErrCodeEmailRequired:          "email",
 	i18n.ErrCodeEmailInvalidFormat:     "email",
 	i18n.ErrCodeEmailTooLong:           "email",
 	i18n.ErrCodeEmailAlreadyRegistered: "email",
+	"EMAIL_ALREADY_EXISTS":             "email",
 	"AUTHENTICATION_FAILED":            "currentPassword",
 }
 
@@ -153,7 +155,8 @@ func HandleEmailPost(
 					"emailVerified":     user.EmailVerified,
 					"emailConfirmation": emailConfirmation,
 					"error":             errorMessage,
-					"errorField":        render.ErrorField(err, accountEmailErrorFields),
+					"errorField": render.ErrorFieldOrBlank(err, accountEmailErrorFields,
+						render.RequiredField{Name: "currentPassword", Value: currentPassword}),
 				}
 				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); renderErr != nil {
 					httpHelper.InternalServerError(w, r, renderErr)

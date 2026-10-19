@@ -552,6 +552,7 @@
 "adminconsole.account.consents.empty" = "You haven't given consent to any application."
 "adminconsole.account.consents.modal_confirm_title" = "Revoke this consent?"
 "adminconsole.account.consents.revoke_confirm" = "Revoke the consent you gave {{.client}}? It will have to ask you again before it can use your account."
+"adminconsole.account.consents.revoke_confirm_unverified" = "Revoke the consent you gave {{.client}}, an application that registered itself and has not been verified? It will have to ask you again before it can use your account."
 
 # --- Account profile picture ------------------------------------------------
 
@@ -569,6 +570,11 @@
 "adminconsole.account.picture.deleted" = "Picture deleted."
 "adminconsole.account.picture.delete_title" = "Delete your picture?"
 "adminconsole.account.picture.delete_confirm" = "Applications will stop showing it. You can upload another at any time."
+"adminconsole.image_crop.zoom" = "Zoom"
+"adminconsole.image_crop.left_right" = "Left–right"
+"adminconsole.image_crop.up_down" = "Up–down"
+"adminconsole.image_crop.width" = "Width"
+"adminconsole.image_crop.height" = "Height"
 
 # --- Account user sessions --------------------------------------------------
 
@@ -1874,12 +1880,14 @@
 "js.error.server_error_title" = "Server error"
 "js.error.error_title" = "Error"
 "js.error.unexpected" = "An unexpected error has occurred: <span class='text-error'>{{detail}}</span>. Please refresh the page and try again."
+"js.error.unexpected_text" = "Something went wrong ({{detail}}). Reload the page and try again."
 
 "js.image_upload.invalid_format" = "Choose a JPEG, PNG, GIF or WebP image."
 "js.image_upload.file_too_large" = "This file is larger than 3 MB. Choose a smaller one."
 "js.image_upload.uploading" = "Saving…"
 "js.image_upload.upload_failed" = "The image couldn't be saved. Try again."
 "js.image_upload.delete_failed" = "The image couldn't be deleted. Try again."
+"js.image_upload.unreadable" = "That file couldn't be read as an image. Choose another one."
 "js.combobox.no_matches" = "No matches"
 "js.combobox.one_result" = "1 match"
 "js.combobox.results" = "{{count}} matches"

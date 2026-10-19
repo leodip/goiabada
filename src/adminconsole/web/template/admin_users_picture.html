@@ -6,7 +6,6 @@
 {{end}}
 
 {{define "head"}}
-<link rel="stylesheet" href="{{ asset "/static/vendor/cropperjs/cropper.min.css" }}">
 <script src="{{ asset "/static/vendor/cropperjs/cropper.min.js" }}" defer></script>
 <script src="{{ asset "/static/image-upload.js" }}" defer></script>
 {{end}}
@@ -40,16 +39,7 @@
   </div>
 </div>
 
-<dialog class="dialog dialog-wide" id="cropDialog" aria-labelledby="cropDialogTitle">
-  <div class="dialog-panel">
-    <h2 class="dialog-title" id="cropDialogTitle">{{ T $.ctx "adminconsole.admin_users.picture.crop_modal_title" }}</h2>
-    <div class="crop-area" id="cropArea"></div>
-    <div class="dialog-actions">
-      <button class="button" id="cancelCropBtn" type="button">{{ T $.ctx "adminconsole.admin_users.picture.cancel_button" }}</button>
-      <button class="button button-primary" id="confirmCropBtn" type="button">{{ T $.ctx "adminconsole.admin_users.picture.confirm_button" }}</button>
-    </div>
-  </div>
-</dialog>
+{{ template "crop_dialog" (args $.ctx (T $.ctx "adminconsole.admin_users.picture.crop_modal_title") (T $.ctx "adminconsole.admin_users.picture.cancel_button") (T $.ctx "adminconsole.admin_users.picture.confirm_button") false) }}
 
 {{ template "modal_dialog" (args "deleteImage" "confirm" $.ctx (T $.ctx "adminconsole.admin_users.picture.delete_button") (T $.ctx "adminconsole.admin_users.picture.delete_title")) }}
 

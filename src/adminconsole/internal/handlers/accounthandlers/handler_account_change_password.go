@@ -51,7 +51,7 @@ func HandleChangePasswordGet(
 
 // changePasswordErrorFields maps the refusals a password change can meet to the field each is about:
 // the current password the auth server found wrong, and the new one the policy refused. A missing
-// password answers VALIDATION_ERROR, which names no field.
+// password answers VALIDATION_ERROR, which names no field, so the field is the one sent blank.
 var changePasswordErrorFields = map[string]string{
 	"AUTHENTICATION_FAILED":                 "currentPassword",
 	i18n.ErrCodePasswordTooShort:            "newPassword",
@@ -114,7 +114,9 @@ func HandleChangePasswordPost(
 		_, err := apiClient.UpdateAccountPassword(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
-				renderError(errorMessage, render.ErrorField(err, changePasswordErrorFields))
+				renderError(errorMessage, render.ErrorFieldOrBlank(err, changePasswordErrorFields,
+					render.RequiredField{Name: "currentPassword", Value: currentPassword},
+					render.RequiredField{Name: "newPassword", Value: newPassword}))
 			})
 			return
 		}

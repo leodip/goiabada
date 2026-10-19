@@ -708,8 +708,9 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   by side, `auth-steps`, `auth-qr`, `secret-key` with `secret-key-row`, `code-hint`,
   `auth-address`, `auth-section-title`, `identity-row` and `link-list` of `link-row`; the console's
   pages without a menu (home, the error pages, sign-out) draw the same card. An uploaded image is an
-  `image-upload` with an `image-preview` (`-square` for a logo), cropped in a `dialog-wide` holding
-  a `crop-area`.
+  `image-upload` with an `image-preview` (`-square` for a logo), cropped in the `crop_dialog`
+  partial: a `crop-area` the cropper draws in, and `crop-controls` whose `crop-slider`s do what
+  dragging does, so a crop needs neither a pointer nor a drag.
 - **Markup**: `core/guard.AssertWellFormedTemplates` holds every page to well-formed HTML and to
   the accessibility rules readable from a template: every element closed explicitly and in order,
   what a branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for
@@ -727,7 +728,8 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `versions.yaml`, so each module's unit tier needs `node` on the path, as the dev container and the
   test jobs have it. The auth server's pages work with JavaScript off; the console says it needs it.
   In the console a script answers an action in a live region the page draws empty, through
-  `showNotice`, not in a dialog; a removal asks first in a `modal_dialog` of type `confirm`, whose
+  `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
+  asks first in a `modal_dialog` of type `confirm`, whose
   second button names the action; a button marked `data-copy-target` copies, and a long `select`
   marked `data-searchable` becomes a `combobox` that filters as the person types, the select kept
   hidden to post the value, as `shell.js` wires them.
@@ -738,7 +740,9 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   least 24 pixels. A refusal about one field marks it `aria-invalid="true"` and names the notice in
   its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
   reads as one branch; a handler whose form has several fields says which in `errorField`, and in
-  the console reads it off the admin API's error code through `render.ErrorField`. No
+  the console reads it off the admin API's error code through `render.ErrorField`, or, for the
+  API's `VALIDATION_ERROR`, which names no field, the first required field sent blank through
+  `render.ErrorFieldOrBlank`. No
   template rebinds `$`, which the guard refuses, since it reads `$` as the data the template was
   called with.
 - **Page patterns**: every page is one of a few shapes, built the same way each time, and the first

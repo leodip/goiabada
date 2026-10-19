@@ -114,7 +114,6 @@ func TestVendoredLibraries_AreTheFilesVersionsYAMLPins(t *testing.T) {
 	for path, key := range map[string]string{
 		"static/vendor/humanize-duration/humanize-duration.js": "humanize-duration-sha256",
 		"static/vendor/cropperjs/cropper.min.js":               "cropperjs-js-sha256",
-		"static/vendor/cropperjs/cropper.min.css":              "cropperjs-css-sha256",
 	} {
 		content, err := staticFS.ReadFile(path)
 		if err != nil {

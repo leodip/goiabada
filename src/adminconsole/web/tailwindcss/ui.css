@@ -1413,16 +1413,28 @@
     display: none;
   }
 
-  /* The area an image is cropped in, which the cropper fills. */
+  /* The area an image is cropped in, which the cropper's canvas fills, and below it the sliders
+     that do what dragging the crop does, each a label beside its slider. */
 
   .crop-area {
-    max-height: min(24rem, 60vh);
-    overflow: hidden;
+    height: min(24rem, 55vh);
   }
 
-  .crop-area > img {
-    display: block;
-    max-width: 100%;
+  .crop-area cropper-canvas {
+    height: 100%;
+  }
+
+  .crop-controls {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+  }
+
+  .crop-slider {
+    width: 100%;
+    accent-color: var(--color-brand);
   }
 
   /* The admin console's shell: a sidebar beside the page on wide screens, and a panel the menu

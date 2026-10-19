@@ -526,6 +526,7 @@
 "adminconsole.account.consents.empty" = "Você não deu consentimento a nenhum aplicativo."
 "adminconsole.account.consents.modal_confirm_title" = "Revogar este consentimento?"
 "adminconsole.account.consents.revoke_confirm" = "Revogar o consentimento que você deu a {{.client}}? Ele terá de pedir de novo antes de usar sua conta."
+"adminconsole.account.consents.revoke_confirm_unverified" = "Revogar o consentimento que você deu a {{.client}}, um aplicativo que se registrou sozinho e não foi verificado? Ele terá de pedir de novo antes de usar sua conta."
 
 # --- Foto de perfil da conta ------------------------------------------------
 
@@ -543,6 +544,11 @@
 "adminconsole.account.picture.deleted" = "Foto excluída."
 "adminconsole.account.picture.delete_title" = "Excluir sua foto?"
 "adminconsole.account.picture.delete_confirm" = "Os aplicativos deixarão de mostrá-la. Você pode enviar outra a qualquer momento."
+"adminconsole.image_crop.zoom" = "Zoom"
+"adminconsole.image_crop.left_right" = "Esquerda–direita"
+"adminconsole.image_crop.up_down" = "Cima–baixo"
+"adminconsole.image_crop.width" = "Largura"
+"adminconsole.image_crop.height" = "Altura"
 
 # --- Sessões de usuário da conta --------------------------------------------
 
@@ -1763,12 +1769,14 @@
 "js.error.server_error_title" = "Erro no servidor"
 "js.error.error_title" = "Erro"
 "js.error.unexpected" = "Ocorreu um erro inesperado: <span class='text-error'>{{detail}}</span>. Atualize a página e tente novamente."
+"js.error.unexpected_text" = "Algo deu errado ({{detail}}). Recarregue a página e tente novamente."
 
 "js.image_upload.invalid_format" = "Escolha uma imagem JPEG, PNG, GIF ou WebP."
 "js.image_upload.file_too_large" = "Este arquivo tem mais de 3 MB. Escolha um menor."
 "js.image_upload.uploading" = "Salvando…"
 "js.image_upload.upload_failed" = "Não foi possível salvar a imagem. Tente novamente."
 "js.image_upload.delete_failed" = "Não foi possível excluir a imagem. Tente novamente."
+"js.image_upload.unreadable" = "Não foi possível ler esse arquivo como imagem. Escolha outro."
 "js.combobox.no_matches" = "Nenhum resultado"
 "js.combobox.one_result" = "1 resultado"
 "js.combobox.results" = "{{count}} resultados"

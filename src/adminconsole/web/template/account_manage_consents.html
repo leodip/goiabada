@@ -44,7 +44,7 @@
         </td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}">{{ DateTime $.ctx .GrantedAt }}</td>
         <td class="cell-actions">
-          <button class="button button-sm" type="button" data-revoke-consent="{{ .ConsentId }}" data-confirm="{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .ClientName }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
+          <button class="button button-sm" type="button" data-revoke-consent="{{ .ConsentId }}" data-confirm="{{ if .ClientNameUnverified }}{{ T $.ctx "adminconsole.account.consents.revoke_confirm_unverified" "client" .ClientName }}{{ else }}{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .ClientName }}{{ end }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
         </td>
       </tr>
       {{ end }}
@@ -53,7 +53,6 @@
 </div>
 
 {{ template "modal_dialog" (args "revokeConsent" "confirm" $.ctx (T $.ctx "adminconsole.account.consents.revoke_dialog_button") (T $.ctx "adminconsole.account.consents.modal_confirm_title")) }}
-{{ template "modal_dialog" (args "modal0" "close" $.ctx) }}
 {{ else }}
 <div class="panel">
   <p class="empty-state">{{ T $.ctx "adminconsole.account.consents.empty" }}</p>

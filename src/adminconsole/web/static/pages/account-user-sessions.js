@@ -1,7 +1,7 @@
 // account-user-sessions.js is the sessions page's behaviour: each End session button asks in its
 // dialog, data-dialog, with its own sentence, data-confirm, and then ends that session. The button
 // gives way to a tag saying the session ended, which takes the focus the button had, and the page's
-// status region says so. Ending the session of the device in use signs out, posted rather than
+// status region says so, as it says a failure. Ending the session of the device in use signs out, posted rather than
 // asked again by the confirmation page, since the dialog has already asked (#411).
 
 function endSession(button, status) {
@@ -9,7 +9,7 @@ function endSession(button, status) {
     url: "/account/sessions",
     method: "POST",
     bodyData: JSON.stringify({ userSessionId: Number(button.dataset.endSession) }),
-    modalId: "modal0",
+    statusRegion: status,
     callback: function (result) {
       if (!result.Success) {
         return;
