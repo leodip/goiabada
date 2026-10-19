@@ -214,7 +214,7 @@ func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 }
 
 // The Remove buttons of the lists edited in the page, a client's redirect URIs, web origins and
-// permissions and a user's permissions and groups, are named for what they do and to which row: the
+// permissions, a user's permissions and groups, and a group's permissions, are named for what they do and to which row: the
 // visible "Remove" and the row's value beside it for a screen reader, in the administrator's
 // language, as the page draws the stored rows, and as the scripts build the row of an entry added
 // in the page, from the form's data-remove-label.
@@ -267,6 +267,14 @@ func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 			}{{3, "admins"}},
 			"groupChoices": []render.Choice{}},
 			"admins", "pages/user-groups.js"},
+		{"/admin_groups_permissions.html", map[string]interface{}{
+			"group": struct {
+				GroupId         int64
+				GroupIdentifier string
+			}{GroupId: 5, GroupIdentifier: "admins"},
+			"granted":   []permission{{3, "some-resource:read"}},
+			"resources": []render.Choice{}},
+			"some-resource:read", "pages/permission-list.js"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.page, func(t *testing.T) {

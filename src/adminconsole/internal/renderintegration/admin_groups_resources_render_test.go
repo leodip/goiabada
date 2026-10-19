@@ -4,36 +4,43 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The group permissions page does the same (#428).
+// The group permissions page draws the grants it loaded as rows, which permission-list.js reads
+// once, as it loads, and sends with every save, beside the group the route's body names (#428).
 func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups_permissions.html", map[string]interface{}{
 		"group": struct {
 			GroupId         int64
 			GroupIdentifier string
-			Permissions     map[int64]string
-		}{
-			GroupId:         5,
-			GroupIdentifier: "admins",
-			Permissions:     map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
-		},
-		"resources":         []api.ResourceResponse{},
+		}{GroupId: 5, GroupIdentifier: "admins"},
+		"granted": []struct {
+			Id    int64
+			Scope string
+		}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+		"resources":         []render.Choice{},
 		"savedSuccessfully": false,
 	})
-	assertSendsTheLoadedPermissionIds(t, out)
+
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `data-save-url="/admin/groups/5/permissions" data-owner-key="groupId" data-owner-id="5"`)
+	assert.Contains(t, out, `data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"`)
+	assert.Contains(t, out, `src="/static/pages/permission-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/permission-list.js", "loadedIds", "grantedIds()")
 }
 
 // Seam 4 for the group family (#350): the three group pages whose templates read the fields the
 // apiclient used to rebuild into a record.Group. This is the only seam that catches a template
 // naming a field the DTO does not carry, because it runs the real template FS, funcmap and layout.
 //
-// The list is the page that reads the most of the response: five columns, of which two are the
-// booleans that decide which token a membership reaches and one is the member count.
+// The list is the page that reads the most of the response: the identifier and description, the
+// member count, and the two booleans that decide which token a membership reaches, drawn as tags.
 func TestRender_AdminGroups(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{
 		"groups": []api.GroupResponse{
@@ -46,15 +53,15 @@ func TestRender_AdminGroups(t *testing.T) {
 	assert.Contains(t, out, "admins")
 	assert.Contains(t, out, "Administradores")
 	assert.Contains(t, out, "site-viewers")
-	assert.Regexp(t, `<td>\s*17\s*</td>`, out,
+	assert.Regexp(t, `data-label="Membros">17</td>`, out,
 		"the member count column is what GetGroupById's second return used to carry")
 
-	// The two token columns, both arms: "Sim" for the id token on the first row and "Não" for its
-	// access token. A row that rendered neither would still contain both words, from the other
-	// row, so the count is what tells them apart: three noes (one per row for access token, plus
-	// the second row's id token) and one yes.
-	assert.Equal(t, 1, strings.Count(out, ">Sim<"))
-	assert.Equal(t, 3, strings.Count(out, ">Não<"))
+	// The token cell, both arms: the first row's ID token tag and no access token tag, and the
+	// second row's word for neither. A row that rendered neither arm would still leave the other
+	// row's text, so the counts are what tell them apart.
+	assert.Equal(t, 1, strings.Count(out, `<span class="tag">ID token</span>`))
+	assert.Equal(t, 0, strings.Count(out, `<span class="tag">Token de acesso</span>`))
+	assert.Equal(t, 1, strings.Count(out, `<span class="text-ink-muted">Nenhum</span>`))
 }
 
 // The delete confirmation, whose member count comes off the response now rather than from a second
@@ -67,8 +74,8 @@ func TestRender_AdminGroupDelete(t *testing.T) {
 
 	assert.Contains(t, out, "admins")
 	assert.Contains(t, out, "Administradores")
-	assert.Contains(t, out, "Quantidade de membros")
-	assert.Regexp(t, `<td class="">17 <a`, out,
+	assert.Contains(t, out, "<dt>Membros</dt>")
+	assert.Regexp(t, `<dd>17 <a`, out,
 		"the count the administrator is about to orphan has to be on the page")
 }
 
@@ -90,7 +97,7 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 		assert.Contains(t, out, "tier")
 		assert.Contains(t, out, "gold")
 		assert.Contains(t, out, "region")
-		assert.NotContains(t, out, "Nenhum atributo associado ao grupo.",
+		assert.NotContains(t, out, "Nenhum atributo ainda.",
 			"with two attributes listed, the empty arm must not also render")
 	})
 
@@ -102,7 +109,7 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 			"attributes":      []api.GroupAttributeResponse{},
 		})
 
-		assert.Contains(t, out, "Nenhum atributo associado ao grupo.")
+		assert.Contains(t, out, "Nenhum atributo ainda.")
 	})
 }
 

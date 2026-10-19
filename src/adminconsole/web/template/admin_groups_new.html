@@ -1,104 +1,65 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.new.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.new.page_title" }}{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.admin_groups.new.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/groups"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.groups" }}</a></p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_groups.new.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_groups.new.lead" }}</p>
+  </div>
+</div>
 
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the
+     notice and focused; a refusal naming no field leaves the focus on the identifier. */}}
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="group-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
 
-
-{{end}}
-
-{{define "body"}}
-
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_groups.new.field.identifier" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_groups.new.identifier_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="groupIdentifier" type="text" name="groupIdentifier" value="{{.groupIdentifier}}"
-                    class="w-full input input-bordered" autocomplete="off" autofocus />
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_groups.new.field.description" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_groups.new.description_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input type="text" name="description" value="{{.description}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_groups.new.include_access_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.new.include_access_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.new.include_access_suffix" }}
-                    </span>
-                    <input type="checkbox" name="includeInAccessToken" class="ml-2 toggle" {{if .includeInAccessToken}}checked{{end}} />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_groups.new.include_id_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_groups.new.include_id_em" }}</span>{{ T $.ctx "adminconsole.admin_groups.new.include_id_suffix" }}
-                    </span>
-                    <input type="checkbox" name="includeInIdToken" class="ml-2 toggle" {{if .includeInIdToken}}checked{{end}} />
-                </label>
-            </div>
-
-        </div>
-
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="groupIdentifier">{{ T $.ctx "adminconsole.admin_groups.new.field.identifier" }}</label>
+        <input class="control control-mono" id="groupIdentifier" type="text" name="groupIdentifier" value="{{ .groupIdentifier }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "groupIdentifier" }}group-error {{ end }}{{ end }}groupIdentifierHint"
+          {{- if .error }}{{ if eq .errorField "groupIdentifier" }} aria-invalid="true"{{ end }}{{ if ne .errorField "description" }} autofocus{{ end }}{{ else }} autofocus{{ end }}>
+        <p class="field-hint" id="groupIdentifierHint">{{ T $.ctx "adminconsole.admin_groups.new.identifier_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="description">{{ T $.ctx "adminconsole.admin_groups.new.field.description" }}</label>
+        <input class="control" id="description" type="text" name="description" value="{{ .description }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "description" }}group-error {{ end }}{{ end }}descriptionHint"
+          {{- if .error }}{{ if eq .errorField "description" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="descriptionHint">{{ T $.ctx "adminconsole.admin_groups.new.description_tooltip" }}</p>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_groups.common.back_to_list" }}</span>
-                </a>
-            </div>
-            <button id="btnCreate" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_groups.new.create_button" }}</button>
-        </div>
-    </div>
-
+    <fieldset>
+      <legend class="field-label mb-2">{{ T $.ctx "adminconsole.admin_groups.common.tokens_legend" }}</legend>
+      <div class="check-list">
+        <label class="check-row" for="includeInAccessToken">
+          <input type="checkbox" id="includeInAccessToken" name="includeInAccessToken" aria-describedby="includeInAccessTokenHint"{{ if .includeInAccessToken }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_groups.common.include_access" }}</span>
+            <span class="field-hint" id="includeInAccessTokenHint">{{ T $.ctx "adminconsole.admin_groups.common.include_hint" }}</span>
+          </span>
+        </label>
+        <label class="check-row" for="includeInIdToken">
+          <input type="checkbox" id="includeInIdToken" name="includeInIdToken" aria-describedby="includeInIdTokenHint"{{ if .includeInIdToken }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_groups.common.include_id" }}</span>
+            <span class="field-hint" id="includeInIdTokenHint">{{ T $.ctx "adminconsole.admin_groups.common.include_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+  </div>
+  <div class="panel-footer">
+    <a class="button button-quiet" href="/admin/groups">{{ T $.ctx "common.button.cancel" }}</a>
+    <button id="btnCreate" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_groups.new.create_button" }}</button>
+  </div>
 </form>
-
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
 {{end}}

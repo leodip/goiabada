@@ -40,14 +40,14 @@ func TestAdminGroupDeletePost_RefusesInThePagesLanguage(t *testing.T) {
 		{
 			name:       "no identifier typed",
 			identifier: "",
-			english:    "Group identifier is required.",
-			portuguese: "O identificador do grupo é obrigatório.",
+			english:    "Type the group identifier to confirm.",
+			portuguese: "Digite o identificador do grupo para confirmar.",
 		},
 		{
 			name:       "another group's identifier typed",
 			identifier: "contractors",
-			english:    "Group identifier does not match the group being deleted.",
-			portuguese: "O identificador do grupo não corresponde ao grupo que está sendo excluído.",
+			english:    "That isn't this group's identifier. Type it as shown above.",
+			portuguese: "Este não é o identificador deste grupo. Digite-o como aparece acima.",
 		},
 	}
 

@@ -48,11 +48,7 @@ var emailTemplates = []string{"layouts/email_layout.html"}
 
 // pendingTemplates are the pages not yet brought under the rules (#617). The guard reports one that
 // meets them all, so the list only shrinks, page by page, to nothing.
-var pendingTemplates = []string{"admin_groups.html", "admin_groups_attributes.html",
-	"admin_groups_attributes_add.html", "admin_groups_attributes_edit.html",
-	"admin_groups_delete.html", "admin_groups_members.html", "admin_groups_members_add.html",
-	"admin_groups_new.html", "admin_groups_permissions.html", "admin_groups_settings.html",
-	"admin_resources.html", "admin_resources_delete.html",
+var pendingTemplates = []string{"admin_resources.html", "admin_resources_delete.html",
 	"admin_resources_groups_with_permission.html", "admin_resources_new.html",
 	"admin_resources_permissions.html", "admin_resources_settings.html",
 	"admin_resources_users_with_permission.html", "admin_resources_users_with_permission_add.html",

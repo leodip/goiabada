@@ -397,12 +397,12 @@ func labelFault(arg []guard.ScriptToken, has catalogHas) string {
 }
 
 // TestScriptButtons_PlainAndNamed holds every page and script this server serves to the rule: every
-// script-built button is type "button", and every icon-button call passes a label. Nine buttons are
-// built in script (the icon builder's, four row buttons, the Remove buttons of client-uri-list.js,
-// permission-list.js and user-groups.js, and user-search.js's Add) and three icon buttons are asked
-// for (two list pages, one with both an edit and a remove button).
+// script-built button is type "button", and every icon-button call passes a label. Eight buttons are
+// built in script (the icon builder's, three row buttons, the Remove buttons of client-uri-list.js,
+// permission-list.js and user-groups.js, and user-search.js's Add) and two icon buttons are asked
+// for (the resource permissions page's edit and remove buttons).
 func TestScriptButtons_PlainAndNamed(t *testing.T) {
-	assertScriptButtons(t, realCatalogHas, buttonCalls{created: 9, labelled: 3},
+	assertScriptButtons(t, realCatalogHas, buttonCalls{created: 8, labelled: 2},
 		templateFS, withoutVendored{staticFS})
 }
 
@@ -582,17 +582,21 @@ func TestScriptButtons_AWalkThatReachesNothingIsFatal(t *testing.T) {
 	}
 }
 
-// searchPages are the two pages whose search box sits in a form beside the rows it lists.
+// searchPages are the two pages whose search box sits in a form beside the rows it lists. Enter in
+// the box submitted that form natively, reloading the page with nothing found, until #562. Each now
+// holds the box in #userSearchForm, the form pages/user-search.js binds, whose submit the script
+// turns into a search (#617). The rule reads both halves: the page's form is that one and the page
+// loads the script, and the script prevents the native submit.
 var searchPages = []string{
 	"template/admin_groups_members_add.html",
-	"template/admin_resources_users_with_permission_add.html",
 }
 
 var (
-	formOpenRe     = regexp.MustCompile(`(?is)<form\b[^>]*>`)
-	searchInputRe  = regexp.MustCompile(`(?is)<input\b[^>]*\bid="search"[^>]*>`)
-	onsubmitRe     = regexp.MustCompile(`(?is)\bonsubmit="([^"]*)"`)
-	preventsItsOwn = regexp.MustCompile(`^\s*(?:event\.preventDefault\(\)\s*;?|return\s+false\s*;?)\s*$`)
+	formOpenRe       = regexp.MustCompile(`(?is)<form\b[^>]*>`)
+	searchInputRe    = regexp.MustCompile(`(?is)<input\b[^>]*\bid="search"[^>]*>`)
+	searchFormIdRe   = regexp.MustCompile(`(?is)\bid="userSearchForm"`)
+	searchScriptRe   = regexp.MustCompile(`/static/pages/user-search\.js`)
+	preventsSubmitRe = regexp.MustCompile(`(?s)searchForm\.addEventListener\("submit", function \(event\) \{\s*event\.preventDefault\(\);`)
 )
 
 // searchFormFault returns why the form holding the page's search box can submit natively, or "",
@@ -611,15 +615,25 @@ func searchFormFault(page string) (string, bool) {
 	if open == nil || strings.Contains(strings.ToLower(page[open[1]:input[0]]), "</form") {
 		return "", false
 	}
-	m := onsubmitRe.FindStringSubmatch(page[open[0]:open[1]])
-	if m == nil || !preventsItsOwn.MatchString(m[1]) {
-		return "the form holding the search box can submit natively; Enter in the box then submits it " +
-			"(#562)", true
+	if !searchFormIdRe.MatchString(page[open[0]:open[1]]) {
+		return "the form holding the search box is not #userSearchForm, whose submit user-search.js stops; " +
+			"Enter in the box then submits it (#562)", true
+	}
+	if !searchScriptRe.MatchString(page) {
+		return "the page does not load user-search.js, which stops the form's submit (#562)", true
 	}
 	return "", true
 }
 
-// TestSearchForms_NeverSubmitNatively holds the two real search pages to the rule.
+// searchScriptFault returns why user-search.js lets its form submit natively, or "".
+func searchScriptFault(script string) string {
+	if !preventsSubmitRe.MatchString(script) {
+		return "user-search.js no longer prevents its form's submit; Enter in the box then submits it (#562)"
+	}
+	return ""
+}
+
+// TestSearchForms_NeverSubmitNatively holds the two real search pages, and their script, to the rule.
 func TestSearchForms_NeverSubmitNatively(t *testing.T) {
 	for _, p := range searchPages {
 		b, err := templateFS.ReadFile(p)
@@ -630,11 +644,17 @@ func TestSearchForms_NeverSubmitNatively(t *testing.T) {
 			t.Errorf("%s: %s", p, why)
 		}
 	}
+	script, err := staticFS.ReadFile("static/pages/user-search.js")
+	require.NoError(t, err)
+	if why := searchScriptFault(string(script)); why != "" {
+		t.Error(why)
+	}
 }
 
-// TestSearchForms_TheRule drives the finder over fixture pages.
+// TestSearchForms_TheRule drives the finders over fixture pages and scripts.
 func TestSearchForms_TheRule(t *testing.T) {
-	const input = `<input id="search" type="text" name="search" onKeyUp="debouncedSearch();" />`
+	const input = `<input id="search" type="search" name="search">`
+	const script = `<script src="/static/pages/user-search.js" defer></script>`
 	cases := []struct {
 		name   string
 		page   string
@@ -642,12 +662,12 @@ func TestSearchForms_TheRule(t *testing.T) {
 		faulty bool
 	}{
 		{"before #562: a form that submits", `<form method="post">` + input + `</form>`, true, true},
-		{"a form whose submit is prevented", `<form method="post" onsubmit="event.preventDefault();">` + input + `</form>`, true, false},
-		{"a form that returns false", `<form onsubmit="return false">` + input + `</form>`, true, false},
-		{"a form whose handler does something else", `<form onsubmit="search();">` + input + `</form>`, true, true},
-		{"the preventing form is an earlier one", `<form onsubmit="event.preventDefault();"></form><form method="post">` + input + `</form>`, true, true},
-		{"a search box in no form", `<form onsubmit="return false"></form>` + input, false, false},
-		{"no search box", `<form method="post"><input id="name" /></form>`, false, false},
+		{"the script's form, the script loaded", script + `<form id="userSearchForm" role="search">` + input + `</form>`, true, false},
+		{"the script's form, the script not loaded", `<form id="userSearchForm" role="search">` + input + `</form>`, true, true},
+		{"another form, the script loaded", script + `<form id="otherForm">` + input + `</form>`, true, true},
+		{"the script's form is an earlier one", script + `<form id="userSearchForm"></form><form method="post">` + input + `</form>`, true, true},
+		{"a search box in no form", `<form id="userSearchForm"></form>` + input, false, false},
+		{"no search box", `<form method="post"><input id="name"></form>`, false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -656,4 +676,9 @@ func TestSearchForms_TheRule(t *testing.T) {
 			assert.Equal(t, tc.faulty, why != "", why)
 		})
 	}
+
+	assert.Empty(t, searchScriptFault("searchForm.addEventListener(\"submit\", function (event) {\n  event.preventDefault();\n  search();\n});"))
+	assert.NotEmpty(t, searchScriptFault("searchForm.addEventListener(\"submit\", function (event) {\n  search();\n});"),
+		"a submit listener that searches without stopping the submit lets the page reload")
+	assert.NotEmpty(t, searchScriptFault(""), "a script with no submit listener stops nothing")
 }

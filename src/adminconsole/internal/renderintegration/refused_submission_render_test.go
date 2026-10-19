@@ -35,7 +35,7 @@ func (s *groupNewAPI) CreateGroup(_ context.Context, _ string, _ *api.CreateGrou
 
 // groupSwitchRe matches the include switch named, whatever order its attributes come in.
 func groupSwitchRe(name string) *regexp.Regexp {
-	return regexp.MustCompile(`<input type="checkbox" name="` + name + `"[^>]*>`)
+	return regexp.MustCompile(`<input type="checkbox" id="` + name + `" name="` + name + `"[^>]*>`)
 }
 
 // The new group form opens with both include switches on.

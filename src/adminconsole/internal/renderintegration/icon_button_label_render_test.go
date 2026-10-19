@@ -8,22 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Every icon-only edit and remove button of the two list pages is named for what it does and to
+// Every icon-only edit and remove button of the resource permissions page is named for what it does and to
 // which row, in the administrator's language: the page hands the icon builder the action and the
 // thing from the catalog, joined to the row's value, and the builder writes that as the button's
 // aria-label and title (#562, section 6). The builder's half is held by the lint in web; this is
 // the template's half, rendered in both languages the console ships, since a key missing from a
 // catalog would leave its raw name in the script, where the layout's raw-key check does not look.
 func TestRender_IconButtonsAreNamedForTheirRow(t *testing.T) {
-	permissionsGroup := map[string]interface{}{
-		"group": struct {
-			GroupId         int64
-			GroupIdentifier string
-			Permissions     map[int64]string
-		}{GroupId: 5, GroupIdentifier: "admins", Permissions: map[int64]string{3: "some-resource:read"}},
-		"resources":         []api.ResourceResponse{},
-		"savedSuccessfully": false,
-	}
 	permissionsResource := map[string]interface{}{
 		"resourceId":                   2,
 		"resourceIdentifier":           "faturamento",
@@ -42,9 +33,6 @@ func TestRender_IconButtonsAreNamedForTheirRow(t *testing.T) {
 		// calls are the icon-button calls the page's script makes, in English and in Portuguese.
 		en, ptBR []string
 	}{
-		{"/admin_groups_permissions.html", permissionsGroup,
-			[]string{`createTrashCanButton("Remove permission " + value.Scope, deletePermission,`},
-			[]string{`createTrashCanButton("Remover permissão " + value.Scope, deletePermission,`}},
 		{"/admin_resources_permissions.html", permissionsResource,
 			[]string{`createEditButton("Edit permission " + perm.permissionIdentifier, editPermission,`,
 				`createTrashCanButton("Remove permission " + perm.permissionIdentifier, deletePermission,`},

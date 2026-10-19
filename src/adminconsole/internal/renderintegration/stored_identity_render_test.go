@@ -206,10 +206,10 @@ func TestRender_AdminGroupSettings_ARefusedSaveKeepsTheStoredGroup(t *testing.T)
 		handlertest.WithRouteParam("groupId", "4"))
 
 	assert.Contains(t, out, "The group identifier is already in use.")
-	assert.Contains(t, out, `<title>Test - Configurações do grupo - sales</title>`)
-	assert.Contains(t, out, `<span class="text-accent">sales</span>`, "the page title names the stored group")
-	assert.NotContains(t, out, `<span class="text-accent">marketing</span>`)
-	assert.Contains(t, out, `var originalGroupIdentifier = "sales";`)
+	assert.Contains(t, out, `<title>Configurações – sales – Test</title>`)
+	assert.Contains(t, out, `<h1 class="page-title break-words" id="page-title">sales</h1>`, "the heading names the stored group")
+	assert.NotContains(t, out, `id="page-title">marketing</h1>`)
+	assert.Contains(t, out, `data-stored-value="sales"`, "the rename question compares against the stored identifier")
 
 	identifier := inputRe("groupIdentifier").FindString(out)
 	require.NotEmpty(t, identifier)
@@ -341,8 +341,8 @@ func TestRender_AdminGroupAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing
 				handlertest.WithRouteParam("groupId", "4"), handlertest.WithRouteParam("attributeId", "11"))
 
 			assert.Contains(t, out, "The attribute key is invalid.")
-			assert.Contains(t, out, `<title>Test - Editar atributo do grupo - department</title>`)
-			assert.Contains(t, out, `<span class="text-accent">department</span>`, "the page title names the stored key")
+			assert.Contains(t, out, `<title>Editar atributo department – sales – Test</title>`)
+			assert.Contains(t, out, `<h2 class="panel-title">Editar atributo <span class="font-mono">department</span></h2>`, "the heading names the stored key")
 
 			key := inputRe("attributeKey").FindString(out)
 			require.NotEmpty(t, key)
@@ -435,7 +435,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&groupSettingsTabAPI{stored: &api.GroupResponse{Id: 4, GroupIdentifier: "sales"}}),
 			target:  "/admin/groups/4/settings",
 			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4")},
-			want: []string{`<span class="text-accent">sales</span>`, `var originalGroupIdentifier = "sales";`,
+			want: []string{`<h1 class="page-title break-words" id="page-title">sales</h1>`, `data-stored-value="sales"`,
 				`name="groupIdentifier" value="sales"`},
 		},
 		{
@@ -463,7 +463,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			target: "/admin/groups/4/attributes/edit/11",
 			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4"),
 				handlertest.WithRouteParam("attributeId", "11")},
-			want: []string{`<span class="text-accent">department</span>`, `name="attributeKey" value="department"`},
+			want: []string{`Editar atributo <span class="font-mono">department</span></h2>`, `name="attributeKey" value="department"`},
 		},
 		{
 			name: "user attribute edit",
