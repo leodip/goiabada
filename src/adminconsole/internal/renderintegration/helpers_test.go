@@ -1,6 +1,7 @@
 package renderintegration
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -114,4 +115,24 @@ func assertSendsTheLoadedPermissionIds(t *testing.T, out string) {
 	assert.Contains(t, out, `"expectedPermissionIds": loadedPermissionIds`)
 	assert.NotRegexp(t, `loadedPermissionIds\.(push|splice|pop|shift|unshift)\(`, out)
 	assert.NotRegexp(t, `loadedPermissionIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+}
+
+// assertListScriptSendsTheLoadedList is the check a list page whose script is a static file owes,
+// as assertSendsTheLoadedPermissionIds is for one whose script is inline: the page draws the list as
+// stored, in rows, and its script reads them once, as it loads, into loaded through read, sends that
+// copy with every save under the form's data-expected-key, and never edits it. A copy taken later,
+// or edited, would send the administrator's edited list as the loaded one and every save would pass
+// the check (#428).
+func assertListScriptSendsTheLoadedList(t *testing.T, script, loaded, read string) {
+	t.Helper()
+	b, err := fs.ReadFile(web.StaticFS(), script)
+	require.NoError(t, err)
+	source := string(b)
+
+	copyTaken := "\nconst " + loaded + " = " + read + ";\n"
+	require.Contains(t, source, copyTaken, "%s keeps a copy of the list as drawn, read as it loads", script)
+	assert.Regexp(t, `body\[[A-Za-z]+\.dataset\.expectedKey\] = `+loaded+`;`, source,
+		"%s sends that copy as the list it loaded", script)
+	assert.NotRegexp(t, loaded+`\.(push|splice|pop|shift|unshift|sort|reverse|fill|copyWithin)\(`, source)
+	assert.NotRegexp(t, loaded+`\s*=[^=]`, strings.Replace(source, copyTaken, "", 1))
 }

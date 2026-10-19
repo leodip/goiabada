@@ -139,13 +139,25 @@ const { dialogMarkup, dialogMarkupFormat, showModalDialog } = (function () {
   }
 
   // showModalDialog opens the dialog id with title and message. btn1callback runs when its first
-  // button is clicked (Close, No or Cancel) and btn2callback when its second is (Yes or OK).
+  // button is clicked (Close, No or Cancel) and btn2callback when its second is (Yes or OK). A
+  // message that is a list of sentences is shown as a list, one item each, and a list of one as
+  // that sentence; each is text, built with DOM calls.
   function showModalDialog(id, title, message, btn1callback, btn2callback) {
     const dialog = document.getElementById(id + "_modalDialog");
     document.getElementById(id + "_modalDialogTitle").innerText = title;
     const messageElement = document.getElementById(id + "_modalDialogMessage");
     if (built.has(message)) {
       messageElement.innerHTML = message.html;
+    } else if (Array.isArray(message) && message.length > 1) {
+      const list = document.createElement("ul");
+      message.forEach(function (sentence) {
+        const item = document.createElement("li");
+        item.textContent = sentence;
+        list.appendChild(item);
+      });
+      messageElement.replaceChildren(list);
+    } else if (Array.isArray(message)) {
+      messageElement.textContent = message[0];
     } else {
       messageElement.textContent = message;
     }
@@ -261,12 +273,13 @@ function showNotice(region, tone, text) {
 }
 
 // setUpCopyButtons gives each button marked data-copy-target the copy of the text of the element it
-// names, for a secret a person would otherwise type again, such as an authenticator key, and says
-// so for a moment on itself and in the status element data-copy-status names. It stays hidden where
-// the browser cannot write to the clipboard, where the text is still there to select. Where the
-// browser has the clipboard but refuses the write, as a denied permission does, it selects the text
-// instead and says so, with data-copy-failed-label on itself and data-copy-failed-status in the
-// status element. The auth server's utils.js does the same for its pages.
+// names, or of its value when it is a field, for a secret a person would otherwise type again, such
+// as an authenticator key or a client secret, and says so for a moment on itself and in the status
+// element data-copy-status names. It stays hidden where the browser cannot write to the clipboard,
+// where the text is still there to select. Where the browser has the clipboard but refuses the
+// write, as a denied permission does, it selects the text instead and says so, with
+// data-copy-failed-label on itself and data-copy-failed-status in the status element. The auth
+// server's utils.js does the same for its pages.
 function setUpCopyButtons() {
   document.querySelectorAll("button[data-copy-target]").forEach(function (button) {
     const source = document.getElementById(button.dataset.copyTarget);
@@ -275,6 +288,7 @@ function setUpCopyButtons() {
     if (!source || !label || !navigator.clipboard) {
       return;
     }
+    const isField = source instanceof HTMLInputElement;
     const idle = label.textContent;
     let timer = 0;
     const say = function (text, announcement) {
@@ -292,11 +306,13 @@ function setUpCopyButtons() {
     };
     button.hidden = false;
     button.addEventListener("click", function () {
-      navigator.clipboard.writeText(source.textContent.trim()).then(function () {
+      navigator.clipboard.writeText((isField ? source.value : source.textContent).trim()).then(function () {
         say(button.dataset.copiedLabel, button.dataset.copiedLabel);
       }, function () {
         const selection = window.getSelection();
-        if (selection) {
+        if (isField) {
+          source.select();
+        } else if (selection) {
           selection.selectAllChildren(source);
         }
         say(button.dataset.copyFailedLabel, button.dataset.copyFailedStatus);
@@ -593,15 +609,19 @@ function createEditButton(label, onclick, data) {
 }
 
 // describeSeconds reads a number of seconds typed into a field as a duration a person reads, such
-// as "2 hours, 30 minutes", in the page's language. messages carries the two sentences the page
-// gives for a value that is not a whole number of seconds and for one too long to be meant: the
-// form's data-duration-invalid and data-duration-too-long.
+// as "2 hours, 30 minutes", in the page's language. messages carries the sentences the page gives
+// for a value that is not a whole number of seconds and for one too long to be meant, the form's
+// data-duration-invalid and data-duration-too-long, and, where zero means something other than no
+// time at all, such as the global setting, data-duration-zero.
 function describeSeconds(value, messages) {
   const text = String(value).trim();
   if (!/^[0-9]+$/.test(text)) {
     return messages.durationInvalid;
   }
   const seconds = Number(text);
+  if (seconds === 0 && messages.durationZero) {
+    return messages.durationZero;
+  }
   // About five years.
   if (seconds > 160000000) {
     return messages.durationTooLong;
@@ -611,6 +631,88 @@ function describeSeconds(value, messages) {
     units: ["d", "h", "m", "s"],
     language: language,
     fallbacks: ["en"]
+  });
+}
+
+// setUpDurations writes, under each duration field, the number of seconds typed as a duration a
+// person reads, as the value changes: into each element marked data-duration-for, naming the
+// field, with the sentences describeSeconds takes from the field's form.
+function setUpDurations() {
+  document.querySelectorAll("[data-duration-for]").forEach(function (output) {
+    const input = document.getElementById(output.dataset.durationFor);
+    if (!input || !input.form) {
+      return;
+    }
+    const update = function () {
+      output.textContent = describeSeconds(input.value, input.form.dataset);
+    };
+    input.addEventListener("input", debounce(update, 300));
+    update();
+  });
+}
+
+// changesToConfirm lists what a save of form changes that its page asks about first: the sentence,
+// data-confirm, of each control whose change it names, then the form's data-confirm-always, which
+// every save of it asks. A field names a change when its value differs from the value stored when
+// the page was drawn, data-stored-value, unless none was stored, since nothing then changes; a
+// checkbox or a radio when it is now checked, or now unchecked, as data-confirm-when says, and was
+// not when the page was drawn, as data-stored-checked says. A control in a hidden part of the form
+// names none, since the save does not take what it holds.
+function changesToConfirm(form) {
+  const changes = [];
+  form.querySelectorAll("[data-confirm]").forEach(function (control) {
+    if (control.closest("[hidden]")) {
+      return;
+    }
+    let changed;
+    if (control.type === "checkbox" || control.type === "radio") {
+      const stored = control.dataset.storedChecked === "true";
+      changed = control.dataset.confirmWhen === "unchecked" ? stored && !control.checked : !stored && control.checked;
+    } else {
+      const stored = control.dataset.storedValue || "";
+      changed = stored !== "" && control.value.trim() !== stored;
+    }
+    if (changed) {
+      changes.push(control.dataset.confirm);
+    }
+  });
+  if (form.dataset.confirmAlways) {
+    changes.push(form.dataset.confirmAlways);
+  }
+  return changes;
+}
+
+// confirmChanges runs save at once when changesToConfirm finds nothing to ask about form, and
+// otherwise asks first, every change in one question, in the confirm_change dialog the form's
+// data-confirm-dialog names, titled data-confirm-title, and runs save if the answer is its action.
+function confirmChanges(form, save) {
+  const changes = changesToConfirm(form);
+  if (changes.length === 0) {
+    save();
+    return;
+  }
+  showModalDialog(form.dataset.confirmDialog, form.dataset.confirmTitle, changes, null, save);
+}
+
+// setUpSaveConfirmations makes each form posted by the browser, method="post", that is marked
+// data-confirm-dialog ask through confirmChanges before it is sent. A save with nothing to ask
+// about is sent as it is; one the dialog asks about is sent again from its answer, since a browser
+// ignores requestSubmit while the submit event it would fire is still being handled. A form a
+// script saves calls confirmChanges itself.
+function setUpSaveConfirmations() {
+  document.querySelectorAll("form[method=post][data-confirm-dialog]").forEach(function (form) {
+    let confirmed = false;
+    form.addEventListener("submit", function (event) {
+      if (confirmed || changesToConfirm(form).length === 0) {
+        return;
+      }
+      event.preventDefault();
+      const submitter = event.submitter;
+      confirmChanges(form, function () {
+        confirmed = true;
+        form.requestSubmit(submitter);
+      });
+    });
   });
 }
 

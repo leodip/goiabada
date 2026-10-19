@@ -698,9 +698,11 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `text-ink-muted`, `border-line`, never a raw value, and every pair a component draws text or a
   boundary on is in `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both themes.
 - **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
-  `panel`, `panel-body`, `panel-footer`; `button`, with `-primary` for a form's one main action,
-  `-danger`, `-quiet`, `-sm`, `-icon` and `-block`; `field`, holding `field-label`, a `control`,
-  `field-hint` and `field-error`; `choice`, `switch`, `option-card`, `check-list` of `check-row`;
+  `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
+  `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
+  `-sm`, `-icon` and `-block`; `field`, holding `field-label`, a `control`, `field-hint` and
+  `field-error`; `input-row` for a control and the button acting on it; `choice`, `switch`,
+  `option-card`, `check-list` of `check-row`; `detail-list`, a `dl` of a record's facts;
   `notice` with `-danger`, `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a
   `data-table`; `tab-bar` and `tab-item`; `pager`; `dialog`; `empty-state`; `spinner`;
   `text-link`. The auth server's card adds `auth-title`, `auth-lead`, `auth-status` with a
@@ -730,9 +732,13 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   In the console a script answers an action in a live region the page draws empty, through
   `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
   asks first in a `modal_dialog` of type `confirm`, whose
-  second button names the action; a button marked `data-copy-target` copies, and a long `select`
+  second button names the action; a button marked `data-copy-target` copies, a long `select`
   marked `data-searchable` becomes a `combobox` that filters as the person types, the select kept
-  hidden to post the value, as `shell.js` wires them.
+  hidden to post the value, an element marked `data-duration-for` says the seconds typed in a field
+  as a duration, and a form marked `data-confirm-dialog` asks before a save whose consequences need
+  saying, every one in one `modal_dialog` of type `confirm_change`, each from a control marked
+  `data-confirm` against the value stored when the page was drawn (`data-stored-value`,
+  `data-stored-checked`), as `shell.js` wires them; a form a script saves calls `confirmChanges`.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
@@ -763,7 +769,17 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `button-block`. A list whose rows a person ends or revokes (`account_user_sessions.html`): each
   row's button asks in a `confirm` dialog with the row's own sentence in `data-confirm`, and on
   success gives way to a `tag` saying so, which takes its focus, while the page's live region says it
-  too. A home of destinations (the console's `index.html`): a `link-list`. A new shape gets its
+  too. A home of destinations (the console's `index.html`): a `link-list`. A record with tabs
+  (`admin_clients_settings.html`): a header linking back to the list in the eyebrow, the record's
+  identifier as the title, the `tab-bar`, then each tab one `panel`, its sections `panel-body`s
+  under a `panel-title`, its yes or no settings a `check-list` whose rows say what each does, and
+  Save in the `panel-footer`. A create form (`admin_clients_new.html`): the same back link, title
+  and lead, one `panel`, and Cancel beside the create action. A delete confirmation page
+  (`admin_clients_delete.html`): a lead saying what the deletion takes with it, the record in a
+  `detail-list`, its identifier typed to confirm, and Cancel beside the action in `button-danger`. A
+  list edited in the page and saved whole (`admin_clients_redirect_uris.html`): a field and its Add
+  in an `input-row`, refused at the field, the rows drawn as stored, each with a Remove naming its
+  row, a change announced, and Save sending the list beside the list as drawn. A new shape gets its
   reference page and a line here when its first page is built.
 - **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
   out, client, one-time code, two-factor authentication, auth server. Client and application are one

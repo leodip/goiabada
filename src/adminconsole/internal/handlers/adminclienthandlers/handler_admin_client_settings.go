@@ -235,11 +235,12 @@ func HandleSettingsPost(
 		// A refusal draws the tab again with the inputs as typed, and the title and the dialogs'
 		// original values from the client as stored, so a second save of the same rename or
 		// disable still asks first.
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"client":       adminClientSettings,
 				"storedClient": clientSettingsFrom(clientResp),
 				"error":        message,
+				"errorField":   errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
@@ -267,7 +268,10 @@ func HandleSettingsPost(
 
 		updated, err := apiClient.UpdateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorFieldOrBlank(err, clientErrorFields,
+					render.RequiredField{Name: "clientIdentifier", Value: adminClientSettings.ClientIdentifier}))
+			})
 			return
 		}
 

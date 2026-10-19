@@ -22,8 +22,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// allowanceSwitchRe matches the administrative scopes switch, whatever order its attributes come in.
-var allowanceSwitchRe = regexp.MustCompile(`<input id="administrativeScopesAllowed"[^>]*>`)
+// allowanceSwitchRe matches the administrative scopes checkbox, whatever order its attributes come in.
+var allowanceSwitchRe = regexp.MustCompile(`<input [^>]*id="administrativeScopesAllowed"[^>]*>`)
+
+// hasAttr says whether tag carries the boolean attribute name, such as checked, as an attribute of
+// its own rather than inside another's name or value, such as data-stored-checked.
+func hasAttr(tag, name string) bool {
+	return regexp.MustCompile(`\s` + name + `(?:\s|>|$)`).MatchString(tag)
+}
 
 // buttonRe matches every button the page draws.
 var buttonRe = regexp.MustCompile(`<button[^>]*>`)
@@ -60,7 +66,7 @@ func TestRender_AdminClientSettings_TheAllowanceIsSavedByTheTabsOneSave(t *testi
 
 	var saves []string
 	for _, button := range buttonRe.FindAllString(out, -1) {
-		if !strings.Contains(button, `id="btnSave"`) && strings.Contains(button, "btn-primary") && !strings.Contains(button, "modal") {
+		if !strings.Contains(button, `id="btnSave"`) && strings.Contains(button, "button-primary") && !strings.Contains(button, "_btnModal") {
 			saves = append(saves, button)
 		}
 	}
@@ -70,11 +76,10 @@ func TestRender_AdminClientSettings_TheAllowanceIsSavedByTheTabsOneSave(t *testi
 	assert.Contains(t, out, "Pode solicitar escopos administrativos", "the label, in pt-BR")
 
 	consentAt := strings.Index(out, `name="consentRequired"`)
-	showLogoAt := strings.Index(out, `name="showLogo"`)
+	saveAt := strings.Index(out, `id="btnSave"`)
 	require.NotEqual(t, -1, consentAt)
-	require.NotEqual(t, -1, showLogoAt)
 	assert.Greater(t, switchAt, consentAt, "the switch sits under Consent required")
-	assert.Less(t, switchAt, showLogoAt, "and before the next setting")
+	assert.Less(t, switchAt, saveAt, "and before the one Save")
 }
 
 // The switch shows the allowance: on for an allowed client, off for one that is not, and for the
@@ -112,14 +117,15 @@ func TestRender_AdminClientSettings_TheSwitchShowsTheAllowance(t *testing.T) {
 
 			toggle := allowanceSwitchRe.FindString(out)
 			require.NotEmpty(t, toggle, "the switch is rendered")
-			assert.Equal(t, tc.wantChecked, strings.Contains(toggle, "checked"), "checked: %s", toggle)
-			assert.Equal(t, tc.wantDisabled, strings.Contains(toggle, "disabled"), "disabled: %s", toggle)
+			assert.Equal(t, tc.wantChecked, hasAttr(toggle, "checked"), "checked: %s", toggle)
+			assert.Equal(t, tc.wantDisabled, hasAttr(toggle, "disabled"), "disabled: %s", toggle)
 			assert.Equal(t, tc.wantDisabled, strings.Contains(out, alwaysAllowed))
 		})
 	}
 }
 
-// A refused allowance is shown beside the switch, and the settings, written before it, as saved.
+// A refused allowance is said in a notice at the top of the form, which the checkbox it is about
+// names and is marked invalid by, and the settings, written before it, as saved.
 func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *testing.T) {
 	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}
 
@@ -128,11 +134,14 @@ func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *t
 		"administrativeScopesError": "Only authserver:manage may switch this.",
 	})
 
+	assert.Contains(t, out, `<div class="notice notice-danger" role="alert" id="administrative-scopes-error">`)
 	refusalAt := strings.Index(out, "Only authserver:manage may switch this.")
 	require.NotEqual(t, -1, refusalAt)
-	assert.Greater(t, refusalAt, strings.Index(out, `id="administrativeScopesAllowed"`), "under the switch")
-	assert.Less(t, refusalAt, strings.Index(out, `name="showLogo"`), "and before the next setting")
-	assert.Contains(t, out, "Configurações do cliente salvas com sucesso")
+	assert.Less(t, refusalAt, strings.Index(out, `id="clientIdentifier"`), "at the top of the form")
+	toggle := allowanceSwitchRe.FindString(out)
+	assert.Contains(t, toggle, `aria-describedby="administrative-scopes-error administrativeScopesAllowedHint"`)
+	assert.True(t, hasAttr(toggle, `aria-invalid="true"`) || strings.Contains(toggle, ` aria-invalid="true"`))
+	assert.Contains(t, out, "Configurações salvas.")
 }
 
 // The question asked before a save that switches the allowance on compares against the stored
@@ -146,11 +155,14 @@ func TestRender_AdminClientSettings_TheSwitchingOnQuestionComparesWithTheStoredA
 		"client": typed, "storedClient": stored, "savedSuccessfully": false,
 	})
 
-	assert.Contains(t, out, `var originallyAllowedAdministrativeScopes = false;`)
+	toggle := allowanceSwitchRe.FindString(out)
+	assert.True(t, hasAttr(toggle, "checked"), "the checkbox keeps what was submitted: on")
+	assert.Contains(t, toggle, `data-confirm-when="checked" data-stored-checked="false"`,
+		"the question compares with the allowance as stored")
 }
 
 // identifierInputRe matches the client identifier input, whatever order its attributes come in.
-var identifierInputRe = regexp.MustCompile(`<input id="clientIdentifier"[^>]*>`)
+var identifierInputRe = regexp.MustCompile(`<input [^>]*id="clientIdentifier"[^>]*>`)
 
 // selfRegisteredIdentifierLine is the line beneath the identifier of a self-registered client, in pt-BR.
 const selfRegisteredIdentifierLine = "Um cliente autorregistrado mantém o identificador com que se registrou."
@@ -191,7 +203,7 @@ func TestRender_AdminClientSettings_TheIdentifierIsReadOnlyWhereItCannotChange(t
 			input := identifierInputRe.FindString(out)
 			require.NotEmpty(t, input, "the identifier input is rendered")
 			assert.Contains(t, input, `value="`+tc.client.ClientIdentifier+`"`)
-			assert.Equal(t, tc.wantReadOnly, strings.Contains(input, "readonly"), "readonly: %s", input)
+			assert.Equal(t, tc.wantReadOnly, hasAttr(input, "readonly"), "readonly: %s", input)
 			assert.Equal(t, tc.wantLine, strings.Contains(out, selfRegisteredIdentifierLine))
 		})
 	}
@@ -255,18 +267,20 @@ func TestRender_AdminClientSettings_ARefusedSaveKeepsTheStoredClient(t *testing.
 
 	assert.Contains(t, out, refusal)
 
-	assert.Contains(t, out, `<span class="text-accent">portal</span>`, "the page title names the stored client")
-	assert.NotContains(t, out, `<span class="text-accent">portal-renamed</span>`)
-	assert.Contains(t, out, `var originalClientIdentifier = "portal";`)
-	assert.Contains(t, out, `var originallyEnabled = true;`)
+	assert.Contains(t, out, `<title>Configurações – portal – Test</title>`, "the page title names the stored client")
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">portal</h1>`, "and so does its heading")
+	assert.NotContains(t, out, `>portal-renamed</h1>`)
 
 	input := identifierInputRe.FindString(out)
 	require.NotEmpty(t, input)
 	assert.Contains(t, input, `value="portal-renamed"`, "the input keeps what was typed")
+	assert.Contains(t, input, `data-stored-value="portal"`, "and the question compares with the stored identifier")
 	assert.Contains(t, out, `value="Renamed portal"`)
-	enabled := regexp.MustCompile(`<input id="enabledDisabled"[^>]*>`).FindString(out)
+	enabled := regexp.MustCompile(`<input [^>]*id="enabledDisabled"[^>]*>`).FindString(out)
 	require.NotEmpty(t, enabled)
-	assert.NotContains(t, enabled, "checked", "the switch keeps what was submitted: off")
+	assert.False(t, hasAttr(enabled, "checked"), "the checkbox keeps what was submitted: off")
+	assert.Contains(t, enabled, `data-confirm-when="unchecked" data-stored-checked="true"`,
+		"and the question compares with the stored enabled state")
 }
 
 // A self-registered client's identifier stays read-only, with its line, when a refused save draws
@@ -286,7 +300,7 @@ func TestRender_AdminClientSettings_ARefusedSaveKeepsASelfRegisteredIdentifierRe
 
 	input := identifierInputRe.FindString(out)
 	require.NotEmpty(t, input)
-	assert.Contains(t, input, "readonly")
+	assert.True(t, hasAttr(input, "readonly"))
 	assert.Contains(t, out, selfRegisteredIdentifierLine)
 }
 
@@ -299,33 +313,32 @@ func TestRender_AdminClientSettings_WithoutManageTheSwitchIsDisabled(t *testing.
 	out := renderClientSettings(t, client, map[string]interface{}{"isAdmin": false})
 	toggle := allowanceSwitchRe.FindString(out)
 	require.NotEmpty(t, toggle)
-	assert.Contains(t, toggle, "disabled")
-	assert.Contains(t, toggle, "checked", "it still shows the allowance")
+	assert.True(t, hasAttr(toggle, "disabled"))
+	assert.True(t, hasAttr(toggle, "checked"), "it still shows the allowance")
 	assert.Contains(t, out, manageOnly)
 
 	asManager := renderClientSettings(t, client, nil)
-	assert.NotContains(t, allowanceSwitchRe.FindString(asManager), "disabled")
+	assert.False(t, hasAttr(allowanceSwitchRe.FindString(asManager), "disabled"))
 	assert.NotContains(t, asManager, manageOnly)
 }
 
-// The Consent required tooltip keeps what the switch does and says when users are asked whatever it
+// The Consent required hint keeps what the setting does and says when users are asked whatever it
 // says: a client requesting offline_access or sending prompt=consent, and a client other than the
 // admin console's requesting authserver:manage-account (#509 decision 5). An operator puzzled by an
 // unexpected consent screen looks there first.
 func TestRender_AdminClientSettings_TheConsentTooltipSaysWhenUsersAreAskedRegardless(t *testing.T) {
 	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"}, nil)
 
-	consentAt := strings.Index(out, `name="consentRequired"`)
-	require.NotEqual(t, -1, consentAt)
-	tips := regexp.MustCompile(`data-tip="([^"]*)"`).FindAllStringSubmatchIndex(out[:consentAt], -1)
-	require.NotEmpty(t, tips, "a tooltip precedes the switch")
-	last := tips[len(tips)-1]
-	tip := html.UnescapeString(out[last[2]:last[3]])
+	consent := regexp.MustCompile(`<input [^>]*id="consentRequired"[^>]*>`).FindString(out)
+	require.NotEmpty(t, consent, "the setting is rendered")
+	assert.Contains(t, consent, `aria-describedby="consentRequiredHint"`, "the setting is described by its hint")
+	m := regexp.MustCompile(`<span class="field-hint" id="consentRequiredHint">([^<]*)</span>`).FindStringSubmatch(out)
+	require.NotNil(t, m, "the hint is rendered")
 
-	assert.Equal(t, "Se o consentimento for obrigatório, após a autenticação, o usuário verá a opção de conceder ou "+
-		"negar acesso a escopos específicos do cliente. Independentemente desta opção, os usuários sempre são "+
-		"consultados quando um cliente solicita offline_access ou envia prompt=consent, e quando um cliente que "+
-		"não seja o do console de administração solicita authserver:manage-account.", tip)
+	//nolint:misspell // the pt-BR catalog's text: "Eles" is Portuguese, not a misspelling of "Eels"
+	assert.Equal(t, "Depois de entrar, os usuários escolhem quais dos escopos solicitados o cliente recebe. Eles são "+
+		"consultados de qualquer forma quando um cliente solicita offline_access ou envia prompt=consent, e quando "+
+		"um cliente que não seja o do console de administração solicita authserver:manage-account.", html.UnescapeString(m[1]))
 }
 
 // The same sentence in English, which the render above cannot reach, since every page in this
@@ -333,9 +346,8 @@ func TestRender_AdminClientSettings_TheConsentTooltipSaysWhenUsersAreAskedRegard
 func TestConsentRequiredTooltip_English(t *testing.T) {
 	ctx := i18n.WithLocale(context.Background(), true, "en")
 
-	assert.Equal(t, "If consent is required, following the authentication process, the user will be presented with "+
-		"the option to grant or deny access to specific scopes for the client. Whatever this says, users are always "+
-		"asked when a client requests offline_access or sends prompt=consent, and when a client other than the admin "+
+	assert.Equal(t, "After signing in, users choose which of the requested scopes the client gets. Users are asked "+
+		"anyway when a client requests offline_access or sends prompt=consent, and when a client other than the admin "+
 		"console's requests authserver:manage-account.",
 		i18n.T(ctx, "adminconsole.admin_clients.settings.field.consent_required_tooltip"))
 }

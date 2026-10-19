@@ -1,8 +1,8 @@
 // shell.js is the behaviour of the console's page shell, menu_layout.html: the menu button that
 // opens the sidebar as a panel on narrow screens, and the user menu in the header. Both are
 // disclosures: a button whose aria-expanded says whether what it controls is shown. It also wires
-// the components any page of the shell may hold, from utils.js: the copy buttons and the
-// searchable lists.
+// the components any page of the shell may hold, from utils.js: the copy buttons, the searchable
+// lists, the durations written under their fields and the saves that ask first.
 
 // The sidebar panel. While it is open the rest of the page, the skip link included, is inert, so
 // neither the keyboard nor a screen reader reaches what is behind it, and focus moves into it;
@@ -111,3 +111,5 @@ setUpSidebar();
 setUpUserMenu();
 setUpCopyButtons();
 setUpSearchableSelects();
+setUpDurations();
+setUpSaveConfirmations();

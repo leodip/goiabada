@@ -124,14 +124,14 @@ func TestHandleWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 		{"https://theirs.example.com", "another-app"},
 	}, got)
 
-	// Only this client's rows stay editable: the editable map is what the page's JavaScript
-	// loads and posts back, and another client's origin appearing in it would let this page
-	// delete a row it does not own.
+	// Only this client's rows stay editable: the editable list is what the page draws as its rows,
+	// which its script reads and posts back, and another client's origin appearing in it would let
+	// this page delete a row it does not own. It is in alphabetical order, as the page lists it.
 	editable := bound.FieldByName("WebOrigins")
 	require.True(t, editable.IsValid(), "the bind carries no WebOrigins")
-	assert.Equal(t, 2, editable.Len())
-	assert.Equal(t, "https://mine-a.example.com", editable.MapIndex(reflect.ValueOf(int64(1))).String())
-	assert.Equal(t, "https://mine-b.example.com", editable.MapIndex(reflect.ValueOf(int64(2))).String())
+	require.Equal(t, 2, editable.Len())
+	assert.Equal(t, "https://mine-a.example.com", editable.Index(0).String())
+	assert.Equal(t, "https://mine-b.example.com", editable.Index(1).String())
 
 	// The page no longer gates on the authorization code flow, so the bind does not carry it.
 	// A field nothing reads is how the deleted gate would grow back.

@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -100,7 +99,7 @@ func checkedChoice(t *testing.T, out, name string) string {
 	require.Len(t, radios, 3, "the three choices of %s", name)
 	var checked []string
 	for _, radio := range radios {
-		if strings.Contains(radio, "checked") {
+		if regexp.MustCompile(`\schecked(?:\s|>|$)`).MatchString(radio) {
 			checked = append(checked, regexp.MustCompile(`value="([^"]*)"`).FindStringSubmatch(radio)[1])
 		}
 	}
@@ -111,7 +110,7 @@ func checkedChoice(t *testing.T, out, name string) string {
 // durationValue returns the value the page draws in the named duration input.
 func durationValue(t *testing.T, out, id string) string {
 	t.Helper()
-	input := regexp.MustCompile(`<input id="` + id + `"[^>]*>`).FindString(out)
+	input := regexp.MustCompile(`<input [^>]*id="` + id + `"[^>]*>`).FindString(out)
 	require.NotEmpty(t, input, "the %s input is rendered", id)
 	value := regexp.MustCompile(`value="([^"]*)"`).FindStringSubmatch(input)
 	require.NotNil(t, value, "the %s input has a value", id)
@@ -126,7 +125,7 @@ func TestRender_AdminClientTokens_TheFirstDrawShowsTheStoredClient(t *testing.T)
 		adminclienthandlers.HandleTokensGet(render.New(web.TemplateFS(), web.StaticFS()), newRenderSessionStore(t), apiClient),
 		http.MethodGet, nil)
 
-	assert.Contains(t, out, `<span class="text-accent">portal</span>`)
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">portal</h1>`)
 	assert.Equal(t, "300", durationValue(t, out, "tokenExpirationInSeconds"))
 	assert.Equal(t, "3600", durationValue(t, out, "refreshTokenOfflineIdleTimeoutInSeconds"))
 	assert.Equal(t, "86400", durationValue(t, out, "refreshTokenOfflineMaxLifetimeInSeconds"))
@@ -146,14 +145,15 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 		idle       string
 		maxLife    string
 		message    string
+		field      string
 		wantSaved  bool
 	}{
 		{name: "an expiration that is not a number", expiration: "5 minutes", idle: "7200", maxLife: "90000",
-			message: "Valor inválido para a expiração do token em segundos."},
+			message: "Informe a duração do token como um número inteiro de segundos.", field: "tokenExpirationInSeconds"},
 		{name: "an idle timeout that is not a number", expiration: "600", idle: "two hours", maxLife: "90000",
-			message: "Valor inválido para o refresh token offline - timeout por inatividade em segundos."},
+			message: "Informe o tempo ocioso offline como um número inteiro de segundos.", field: "refreshTokenOfflineIdleTimeoutInSeconds"},
 		{name: "a max lifetime that is not a number", expiration: "600", idle: "7200", maxLife: "a day",
-			message: "Valor inválido para o refresh token offline - tempo máximo de vida em segundos."},
+			message: "Informe a duração máxima offline como um número inteiro de segundos.", field: "refreshTokenOfflineMaxLifetimeInSeconds"},
 		{name: "numbers the auth server refuses", expiration: "10", idle: "7200", maxLife: "90000",
 			message: apiRefusal, wantSaved: true},
 	}
@@ -174,13 +174,25 @@ func TestRender_AdminClientTokens_ARefusedSaveKeepsWhatWasSubmitted(t *testing.T
 
 			assert.Equal(t, tc.wantSaved, apiClient.saved)
 			assert.Contains(t, out, `<p>`+tc.message+`</p>`)
-			assert.Contains(t, out, `<span class="text-accent">portal</span>`, "the page title names the stored client")
+			assert.Contains(t, out, `<h1 class="page-title" id="page-title">portal</h1>`, "the page heading names the stored client")
 
 			assert.Equal(t, tc.expiration, durationValue(t, out, "tokenExpirationInSeconds"))
 			assert.Equal(t, tc.idle, durationValue(t, out, "refreshTokenOfflineIdleTimeoutInSeconds"))
 			assert.Equal(t, tc.maxLife, durationValue(t, out, "refreshTokenOfflineMaxLifetimeInSeconds"))
 			assert.Equal(t, "off", checkedChoice(t, out, "includeOpenIDConnectClaimsInAccessToken"))
 			assert.Equal(t, "default", checkedChoice(t, out, "includeOpenIDConnectClaimsInIdToken"))
+
+			// The duration a refusal names is marked invalid, described by the notice and focused;
+			// the auth server's refusals name no field, and none is marked.
+			invalid := regexp.MustCompile(`<input [^>]*id="([A-Za-z]+)"[^>]*aria-invalid="true"[^>]*>`).FindAllStringSubmatch(out, -1)
+			if tc.field == "" {
+				assert.Empty(t, invalid)
+				return
+			}
+			require.Len(t, invalid, 1)
+			assert.Equal(t, tc.field, invalid[0][1])
+			assert.Contains(t, invalid[0][0], `aria-describedby="tokens-error `)
+			assert.Contains(t, invalid[0][0], ` autofocus`)
 		})
 	}
 }

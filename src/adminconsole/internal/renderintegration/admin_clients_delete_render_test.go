@@ -64,7 +64,7 @@ func TestRender_AdminClientDelete_ARefusalDrawsTheDeletePageAgain(t *testing.T) 
 	}{
 		{name: "an empty identifier", identifier: "", message: "O identificador do cliente é obrigatório."},
 		{name: "a wrong identifier", identifier: "portal-typo",
-			message: "O identificador do cliente não corresponde ao cliente que está sendo excluído."},
+			message: "Esse não é o identificador deste cliente. Digite-o como aparece acima."},
 	}
 
 	for _, tc := range testCases {
@@ -85,20 +85,26 @@ func TestRender_AdminClientDelete_ARefusalDrawsTheDeletePageAgain(t *testing.T) 
 			assert.False(t, apiClient.deleted, "a refused delete deletes nothing")
 
 			assert.Contains(t, out, `<p>`+tc.message+`</p>`)
-			assert.Contains(t, out, `<span class="text-accent">portal</span>`, "the page title names the client")
-			assert.Contains(t, out, `<td class="font-mono">portal</td>`)
+			assert.Contains(t, out, `<title>Excluir cliente – portal – Test</title>`, "the page title names the client")
+			assert.Contains(t, out, `<dd class="font-mono text-sm">portal</dd>`)
 			assert.Contains(t, out, `The customer portal`)
-			assert.Contains(t, out, `<li>orders:read</li>`, "the permissions the page warns about")
+			assert.Contains(t, out, `<li class="font-mono text-sm">orders:read</li>`, "the permissions the page warns about")
 			assert.Contains(t, out, `id="btnDelete"`, "and the button to try again")
+			assert.Contains(t, out, `autofocus aria-invalid="true" aria-describedby="delete-error">`,
+				"the field is marked invalid, described by the notice, and focused")
 
-			// Beyond the message, the refusal is the first draw itself.
+			// Beyond the message and the field's marking, the refusal is the first draw itself.
 			firstStatus, firstDraw := serveClientDelete(t, adminclienthandlers.HandleDeleteGet(renderer, apiClient),
 				http.MethodGet, nil)
 			require.Equal(t, http.StatusOK, firstStatus)
-			messageBlock := "\n            <div class=\"mb-4 text-right text-error\">\n                <p>" + tc.message +
-				"</p>\n            </div>\n            "
-			require.Contains(t, out, messageBlock)
-			assert.Equal(t, firstDraw, strings.Replace(out, messageBlock, "", 1))
+			start := strings.Index(out, "\n    <div class=\"notice notice-danger\" role=\"alert\" id=\"delete-error\">")
+			require.NotEqual(t, -1, start, "the refusal draws no notice")
+			end := strings.Index(out[start:], "</div>\n    ") + len("</div>\n    ")
+			messageBlock := out[start : start+end]
+			require.Contains(t, messageBlock, tc.message)
+			withoutRefusal := strings.Replace(strings.Replace(out, messageBlock, "", 1),
+				` aria-invalid="true" aria-describedby="delete-error"`, "", 1)
+			assert.Equal(t, firstDraw, withoutRefusal)
 		})
 	}
 }

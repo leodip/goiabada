@@ -152,23 +152,27 @@ func TestRender_AdminClientAuthentication_ARefusedSaveKeepsTheStoredClient(t *te
 			out := postClientAuthentication(t, apiClient, tc.form)
 
 			assert.Contains(t, out, "The client secret is invalid.")
-			assert.Contains(t, out, `<span class="text-accent">portal</span>`, "the page title names the stored client")
-			assert.Contains(t, out, `var isPublic = `+tc.wantIsPublic+`;`, "the original state is the stored one")
-			assert.Contains(t, out, `var originalClientSecret = "`+tc.wantOriginal+`";`, "the original secret is the stored one")
+			assert.Contains(t, out, `<h1 class="page-title" id="page-title">portal</h1>`, "the page heading names the stored client")
 			assert.Equal(t, tc.wantSecretReads, apiClient.secretReads, "a public client holds no secret to read")
 
 			publicRadio := inputRe("publicClientRadio").FindString(out)
 			confidentialRadio := inputRe("confidentialClientRadio").FindString(out)
 			require.NotEmpty(t, publicRadio)
 			require.NotEmpty(t, confidentialRadio)
-			assert.Equal(t, tc.wantPublicRadio, regexp.MustCompile(`\bchecked\b`).MatchString(publicRadio),
+			checked := regexp.MustCompile(`\schecked(?:\s|>|$)`)
+			assert.Equal(t, tc.wantPublicRadio, checked.MatchString(publicRadio),
 				"the choice as submitted: %s", publicRadio)
-			assert.Equal(t, !tc.wantPublicRadio, regexp.MustCompile(`\bchecked\b`).MatchString(confidentialRadio),
+			assert.Equal(t, !tc.wantPublicRadio, checked.MatchString(confidentialRadio),
 				"the choice as submitted: %s", confidentialRadio)
+			// The questions compare with the client as stored: its type, on each radio, and its secret.
+			wantConfidential := map[string]string{"true": "false", "false": "true"}[tc.wantIsPublic]
+			assert.Contains(t, publicRadio, `data-stored-checked="`+tc.wantIsPublic+`"`, "the original state is the stored one")
+			assert.Contains(t, confidentialRadio, `data-stored-checked="`+wantConfidential+`"`)
 
 			secret := inputRe("clientSecret").FindString(out)
 			require.NotEmpty(t, secret)
 			assert.Contains(t, secret, `value="`+tc.wantSecretTyped+`"`, "the secret input keeps what was submitted")
+			assert.Contains(t, secret, `data-stored-value="`+tc.wantOriginal+`"`, "the original secret is the stored one")
 		})
 	}
 }
@@ -422,8 +426,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&authenticationTabAPI{stored: &api.ClientResponse{Id: 7, ClientIdentifier: "portal"}, storedSecret: "s3cret"}),
 			target:  "/admin/clients/7/authentication",
 			options: []handlertest.Option{handlertest.WithRouteParam("clientId", "7")},
-			want: []string{`<span class="text-accent">portal</span>`, `var isPublic = false;`,
-				`var originalClientSecret = "s3cret";`, `value="s3cret"`},
+			want: []string{`<h1 class="page-title" id="page-title">portal</h1>`, `data-stored-checked="false"`,
+				`data-stored-value="s3cret"`, `value="s3cret"`},
 		},
 		{
 			name: "group settings",

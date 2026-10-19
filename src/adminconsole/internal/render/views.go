@@ -64,25 +64,32 @@ func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 
 	sort.Slice(infos, func(i, j int) bool {
 		a, b := infos[i], infos[j]
-		if a.IsCurrent != b.IsCurrent {
-			return a.IsCurrent
-		}
-		if !lastAccessed(a).Equal(lastAccessed(b)) {
-			return lastAccessed(a).After(lastAccessed(b))
-		}
-		return a.UserSessionId > b.UserSessionId
+		return SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionId, b.IsCurrent, b.LastAccessed, b.UserSessionId)
 	})
 
 	return infos
 }
 
+// SessionListedBefore says whether session a goes before session b in a list of sessions, as every
+// session page lists them: the session of the device in use first, then the others by when each was
+// last active, the most recent first, a newer session first between two last active at once.
+func SessionListedBefore(aCurrent bool, aLastAccessed *time.Time, aId int64, bCurrent bool, bLastAccessed *time.Time, bId int64) bool {
+	if aCurrent != bCurrent {
+		return aCurrent
+	}
+	if !lastAccessed(aLastAccessed).Equal(lastAccessed(bLastAccessed)) {
+		return lastAccessed(aLastAccessed).After(lastAccessed(bLastAccessed))
+	}
+	return aId > bId
+}
+
 // lastAccessed is when a session was last active, the zero instant when the response did not say,
 // which sorts it last.
-func lastAccessed(s SessionInfo) time.Time {
-	if s.LastAccessed == nil {
+func lastAccessed(t *time.Time) time.Time {
+	if t == nil {
 		return time.Time{}
 	}
-	return *s.LastAccessed
+	return *t
 }
 
 // clientNames maps a session's clients to the names their user is shown for them.

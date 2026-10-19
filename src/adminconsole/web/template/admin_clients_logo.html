@@ -1,21 +1,14 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.logo.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.logo.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.logo" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
 <script src="{{ asset "/static/vendor/cropperjs/cropper.min.js" }}" defer></script>
 <script src="{{ asset "/static/image-upload.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{ template "client_header" (args "logo" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
 
-
-{{template "manage_clients_tabs" (args "logo" .client.Id $.ctx) }}
-
-<div class="mt-6 panel">
+<div class="panel">
   <div class="panel-body">
     <div class="image-upload" id="imageUploadContainer"
       data-upload-url="/admin/clients/{{ .client.Id }}/logo" data-delete-url="/admin/clients/{{ .client.Id }}/logo" data-field-name="picture" data-url-key="pictureUrl"
@@ -43,16 +36,4 @@
 {{ template "crop_dialog" (args $.ctx (T $.ctx "adminconsole.admin_clients.logo.crop_modal_title") (T $.ctx "adminconsole.admin_clients.logo.crop_cancel") (T $.ctx "adminconsole.admin_clients.logo.crop_confirm") true) }}
 
 {{ template "modal_dialog" (args "deleteImage" "confirm" $.ctx (T $.ctx "adminconsole.admin_clients.logo.delete_button") (T $.ctx "adminconsole.admin_clients.logo.delete_title")) }}
-
-<div class="mt-8">
-    <div class="float-left p-3">
-        <a class="link-secondary" href="/admin/clients">
-            <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-            <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-        </a>
-    </div>
-</div>
-
 {{end}}

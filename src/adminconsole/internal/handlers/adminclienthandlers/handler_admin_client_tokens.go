@@ -156,12 +156,13 @@ func HandleTokensPost(
 
 		// A refused save draws every input as submitted, a duration that is not a number and both
 		// choices included; the title comes from the stored client.
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"client":   client,
-				"error":    message,
+				"settings":   settingsInfo,
+				"client":     client,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_tokens.html", bind)
@@ -172,19 +173,19 @@ func HandleTokensPost(
 
 		tokenExpirationInSeconds, err := strconv.Atoi(settingsInfo.TokenExpirationInSeconds)
 		if err != nil {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.token_expiration_invalid"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.token_expiration_invalid"), "tokenExpirationInSeconds")
 			return
 		}
 
 		refreshTokenOfflineIdleTimeoutInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds)
 		if err != nil {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid"), "refreshTokenOfflineIdleTimeoutInSeconds")
 			return
 		}
 
 		refreshTokenOfflineMaxLifetimeInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds)
 		if err != nil {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid"), "refreshTokenOfflineMaxLifetimeInSeconds")
 			return
 		}
 
@@ -198,7 +199,9 @@ func HandleTokensPost(
 
 		_, err = apiClient.UpdateClientTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, "")
+			})
 			return
 		}
 

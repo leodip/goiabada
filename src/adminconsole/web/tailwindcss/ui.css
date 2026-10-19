@@ -181,8 +181,11 @@
     gap: 0.5rem;
   }
 
+  /* One column no wider than its container, as a field's, so a table wider than the page scrolls
+     inside its .table-scroll rather than widening the page. */
   .stacked {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.25rem;
   }
 
@@ -242,6 +245,12 @@
     font-size: 1.0625rem;
     line-height: 1.5rem;
     font-weight: 600;
+  }
+
+  /* A panel in sections: each a .panel-body, under its own .panel-title, ruled off from the one
+     before. */
+  .panel-body + .panel-body {
+    border-top: 1px solid var(--color-line);
   }
 
   /* Buttons. A button names what it does; .button-primary is the one main action of its form. */
@@ -357,8 +366,11 @@
 
   /* Fields: a label, a control, an optional hint and an optional error, in that order. */
 
+  /* One column no wider than the field, so a control whose content is wider, such as a select
+     whose longest option is, shrinks to it rather than widening the page. */
   .field {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: 0.375rem;
   }
@@ -448,6 +460,19 @@
   .control-mono {
     font-family: var(--font-mono);
     font-size: 0.9375rem;
+  }
+
+  /* A control and the button that acts on it, side by side while both fit. */
+  .input-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .input-row > .control {
+    flex: 1 1 16rem;
+    width: auto;
+    min-width: 0;
   }
 
   /* A checkbox or radio with its label beside it. */
@@ -577,6 +602,14 @@
 
   .check-row:has(> input:not(:checked)) .choice-label {
     color: var(--color-ink-muted);
+  }
+
+  .check-row:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+
+  .check-row:has(> input:disabled):hover {
+    background-color: transparent;
   }
 
   /* Notices: a message about the page or the last action. */
@@ -917,6 +950,13 @@
     overflow-wrap: anywhere;
   }
 
+  .dialog-message > ul {
+    display: grid;
+    gap: 0.5rem;
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
   .dialog-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1223,6 +1263,40 @@
     line-height: 1.25rem;
     color: var(--color-ink-muted);
     overflow-wrap: anywhere;
+  }
+
+  /* A record's facts, each a term and its value, such as what deleting the record takes with it.
+     The terms sit above their values on a narrow screen and beside them on a wide one. */
+  .detail-list {
+    display: grid;
+    gap: 0.125rem 1.5rem;
+  }
+
+  .detail-list dt {
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+
+  .detail-list dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .detail-list dd + dt {
+    margin-top: 0.75rem;
+  }
+
+  @media (min-width: 40rem) {
+    .detail-list {
+      grid-template-columns: max-content minmax(0, 1fr);
+      row-gap: 0.75rem;
+    }
+
+    .detail-list dd + dt {
+      margin-top: 0;
+    }
   }
 
   /* The person signed in, with what they can do about it, such as sign out. */

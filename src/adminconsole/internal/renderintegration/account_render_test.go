@@ -290,7 +290,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
 			// The tooltip is on the Device cell, which is also what carries the labels.
-			assert.Regexpf(t, `<td(?: class="[^"]*")? title="`+regexp.QuoteMeta(escaped)+`">\s*Chrome 120 Desktop Linux`, out,
+			assert.Regexpf(t, `<td(?: [a-z-]+="[^"]*")* title="`+regexp.QuoteMeta(escaped)+`">\s*Chrome 120 Desktop Linux`, out,
 				"%s: the Device cell carries no User-Agent tooltip", tc.page)
 
 			// And the header never reaches the page as markup. Counting the escaped form is
@@ -323,8 +323,8 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 	const layout = "02/01/2006 15:04"
 	startedCell := "<td>" + started.Format(layout) + "<br />há 3 dias</td>"
 	lastAccessedCell := "<td>" + lastAccessed.Format(layout) + "<br />há 5 minutos</td>"
-	// The account page's cells are a list's, labelled for the stacked cards, the phrase beneath
-	// the instant.
+	// The account and client pages' cells are a list's, labelled for the stacked cards, the phrase
+	// beneath the instant.
 	startedListCell := `">` + started.Format(layout) + `<span class="cell-secondary">há 3 dias</span></td>`
 	lastAccessedListCell := `">` + lastAccessed.Format(layout) + `<span class="cell-secondary">há 5 minutos</span></td>`
 
@@ -357,8 +357,9 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			},
 		},
 		{
-			name: "admin client",
-			page: "/admin_clients_usersessions.html",
+			name:     "admin client",
+			page:     "/admin_clients_usersessions.html",
+			listCell: true,
 			bind: map[string]interface{}{
 				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{{
@@ -399,7 +400,8 @@ func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 		}},
 	})
 
-	assert.Contains(t, out, "<td><br /></td>", "a nil instant must render an empty cell")
+	assert.Regexp(t, `<td(?: [a-z:-]+="[^"]*")*><span class="cell-secondary"></span></td>`, out,
+		"a nil instant must render an empty cell")
 	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
 }
 
@@ -416,10 +418,8 @@ func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 // entities as typed, and concatenating it into the message would show the span as tags. Only
 // rendered HTML can see which it is (#120).
 //
-// The admin client's sessions page passes the user's email rather than the device label to its
-// modal, so it is asserted here as the negative: no device concatenation to escape. The account
-// page's buttons carry their sentence in data-confirm instead, which
-// TestRender_AccountSessionsAskWithTheirOwnSentence holds.
+// The account's and a client's sessions pages carry their buttons' sentence in data-confirm
+// instead, which TestRender_SessionListsAskWithTheirOwnSentence holds.
 func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 	const markup = `<script>alert(1)</script>`
 
@@ -449,19 +449,6 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 				"query": "",
 			},
 			modalTakes: true,
-		},
-		{
-			name: "admin client",
-			page: "/admin_clients_usersessions.html",
-			bind: map[string]interface{}{
-				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-				"sessions": []adminclienthandlers.SessionInfo{{
-					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
-					DeviceName: markup, DeviceType: "Desktop",
-					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
-				}},
-			},
-			modalTakes: false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -494,8 +481,9 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 	}
 }
 
-// The End Session button's arguments against endSessionClick's parameters, on the two admin session
-// pages, which declare it.
+// The End Session button's arguments against endSessionClick's parameters, on the admin user
+// sessions page, which declares it; the client sessions page ends a session through
+// pages/user-sessions.js since #617, as the account page does.
 //
 // Folded in with #281: the admin-client page declared six parameters -- it kept a `device` the
 // body never reads, unlike the two pages whose modal names the device -- and its button passed
@@ -531,18 +519,6 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 				"query": "",
 			},
 		},
-		{
-			name: "admin client",
-			page: "/admin_clients_usersessions.html",
-			bind: map[string]interface{}{
-				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-				"sessions": []adminclienthandlers.SessionInfo{{
-					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
-					DeviceName: "Chrome 120", DeviceType: "Desktop",
-					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
-				}},
-			},
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
@@ -565,32 +541,66 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 	}
 }
 
-// The sessions page's End session buttons, which carry what their dialog says rather than handing it
-// to a function: data-dialog names the dialog, the one for the device in use whose button says it
-// signs out, and data-confirm the sentence, the device label in it escaped for the attribute. The
-// script shows that sentence as the dialog's plain message, which is drawn as text (#120, #281).
-func TestRender_AccountSessionsAskWithTheirOwnSentence(t *testing.T) {
+// The End session buttons of the account's and a client's sessions pages, which carry what their
+// dialog says rather than handing it to a function: data-dialog names the dialog, the one for the
+// device in use whose button says it signs out, and data-confirm the sentence, the device label in it
+// escaped for the attribute. The script, which ends the session through the route the page's status
+// region names, shows that sentence as the dialog's plain message, which is drawn as text (#120,
+// #281).
+func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 	const markup = `<script>alert(1)</script>`
-	out := renderMenuPage(t, "/account_user_sessions.html", map[string]interface{}{
-		"sessions": []render.SessionInfo{
-			{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
-			{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+	for _, tc := range []struct {
+		name   string
+		page   string
+		bind   map[string]interface{}
+		endURL string
+	}{
+		{
+			name: "account",
+			page: "/account_user_sessions.html",
+			bind: map[string]interface{}{
+				"sessions": []render.SessionInfo{
+					{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+					{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+				},
+			},
+			endURL: "/account/sessions",
 		},
-	})
+		{
+			name: "admin client",
+			page: "/admin_clients_usersessions.html",
+			bind: map[string]interface{}{
+				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"sessions": []adminclienthandlers.SessionInfo{
+					{UserSessionId: 1, UserId: 7, UserEmail: "admin@example.com", DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+					{UserSessionId: 2, UserId: 8, UserEmail: "someone@example.com", DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+				},
+			},
+			endURL: "/admin/clients/3/user-sessions/delete",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := renderMenuPage(t, tc.page, tc.bind)
 
-	assert.NotContains(t, out, markup, "the device label must never reach the page as markup")
-	assert.Regexp(t, `data-end-session="1" data-dialog="endCurrentSession" data-confirm="[^"]*&lt;script&gt;alert\(1\)&lt;/script&gt;`, out,
-		"the device in use asks in its own dialog, its label escaped in the sentence")
-	assert.Regexp(t, `data-end-session="2" data-dialog="endSession" data-confirm="[^"]*Firefox 128 Desktop Windows`, out)
-	assert.Contains(t, out, `id="endSession_modalDialog"`)
-	assert.Contains(t, out, `id="endCurrentSession_modalDialog"`)
-	assert.Regexp(t, `id="endCurrentSession_btnModal2" class="button button-danger">Encerrar sessão e sair</button>`, out,
-		"ending the session in use says it signs out")
+			assert.NotContains(t, out, markup, "the device label must never reach the page as markup")
+			assert.Regexp(t, `data-end-session="1" data-dialog="endCurrentSession" data-confirm="[^"]*&lt;script&gt;alert\(1\)&lt;/script&gt;`, out,
+				"the device in use asks in its own dialog, its label escaped in the sentence")
+			assert.Regexp(t, `data-end-session="2" data-dialog="endSession" data-confirm="[^"]*Firefox 128 Desktop Windows`, out)
+			assert.Contains(t, out, `id="endSession_modalDialog"`)
+			assert.Contains(t, out, `id="endCurrentSession_modalDialog"`)
+			assert.Regexp(t, `id="endCurrentSession_btnModal2" class="button button-danger">Encerrar sessão e sair</button>`, out,
+				"ending the session in use says it signs out")
+			assert.Contains(t, out, `id="sessions-status" role="status" data-end-url="`+tc.endURL+`"`,
+				"the status region names the route the session is ended through")
+		})
+	}
 
-	script, err := fs.ReadFile(web.StaticFS(), "pages/account-user-sessions.js")
+	script, err := fs.ReadFile(web.StaticFS(), "pages/user-sessions.js")
 	require.NoError(t, err)
 	assert.Contains(t, string(script), `showModalDialog(button.dataset.dialog, sessionsStatus.dataset.confirmTitle, button.dataset.confirm,`,
 		"the sentence reaches the dialog as its plain message, which is drawn as text")
+	assert.Contains(t, string(script), `url: status.dataset.endUrl,`,
+		"the session is ended through the route the page names")
 }
 
 // The consents page's Revoke buttons, held as the sessions page's are: the sentence, the

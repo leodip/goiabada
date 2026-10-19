@@ -1,6 +1,29 @@
 package adminclienthandlers
 
-import "time"
+import (
+	"time"
+
+	"github.com/leodip/goiabada/core/i18n"
+)
+
+// clientErrorFields maps the refusals of the new client and client settings forms that name their
+// field by code, the identifier's shape and angle brackets in a description or a display name, to
+// that field. The admin API answers the client's other refusals with VALIDATION_ERROR, of which a
+// form can tell only the identifier sent blank.
+var clientErrorFields = map[string]string{
+	i18n.ErrCodeIdentifierTooLong:        "clientIdentifier",
+	i18n.ErrCodeIdentifierTooShort:       "clientIdentifier",
+	i18n.ErrCodeIdentifierInvalidFormat:  "clientIdentifier",
+	i18n.ErrCodeDescriptionAngleBrackets: "description",
+	i18n.ErrCodeDisplayNameAngleBrackets: "displayName",
+}
+
+// grantedPermission is a permission a client holds, as its permissions tab lists it: the
+// permission's id, which the save sends, and its scope, resource:permission, which the row shows.
+type grantedPermission struct {
+	Id    int64
+	Scope string
+}
 
 type PermissionsPostInput struct {
 	ClientId               int64   `json:"clientId"`
@@ -16,7 +39,6 @@ type RedirectURIsPostInput struct {
 	// ExpectedRedirectURIs is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
 	ExpectedRedirectURIs []string `json:"expectedRedirectURIs"`
-	Ids                  []int64  `json:"ids"`
 }
 
 type WebOriginsPostInput struct {
@@ -25,7 +47,6 @@ type WebOriginsPostInput struct {
 	// ExpectedWebOrigins is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
 	ExpectedWebOrigins []string `json:"expectedWebOrigins"`
-	Ids                []int64  `json:"ids"`
 }
 
 type SessionInfo struct {

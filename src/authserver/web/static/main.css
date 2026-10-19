@@ -1005,6 +1005,7 @@
   }
   .stacked {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.25rem;
   }
   .form-grid {
@@ -1053,6 +1054,9 @@
     font-size: 1.0625rem;
     line-height: 1.5rem;
     font-weight: 600;
+  }
+  .panel-body + .panel-body {
+    border-top: 1px solid var(--color-line);
   }
   .button {
     display: inline-flex;
@@ -1142,6 +1146,7 @@
   }
   .field {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: 0.375rem;
   }
@@ -1218,6 +1223,16 @@
   .control-mono {
     font-family: var(--font-mono);
     font-size: 0.9375rem;
+  }
+  .input-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .input-row > .control {
+    flex: 1 1 16rem;
+    width: auto;
+    min-width: 0;
   }
   .choice {
     display: flex;
@@ -1320,6 +1335,12 @@
   }
   .check-row:has(> input:not(:checked)) .choice-label {
     color: var(--color-ink-muted);
+  }
+  .check-row:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+  .check-row:has(> input:disabled):hover {
+    background-color: transparent;
   }
   .notice {
     display: flex;
@@ -1591,6 +1612,12 @@
     color: var(--color-ink);
     overflow-wrap: anywhere;
   }
+  .dialog-message > ul {
+    display: grid;
+    gap: 0.5rem;
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
   .dialog-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1828,6 +1855,32 @@
     line-height: 1.25rem;
     color: var(--color-ink-muted);
     overflow-wrap: anywhere;
+  }
+  .detail-list {
+    display: grid;
+    gap: 0.125rem 1.5rem;
+  }
+  .detail-list dt {
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+  .detail-list dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .detail-list dd + dt {
+    margin-top: 0.75rem;
+  }
+  @media (min-width: 40rem) {
+    .detail-list {
+      grid-template-columns: max-content minmax(0, 1fr);
+      row-gap: 0.75rem;
+    }
+    .detail-list dd + dt {
+      margin-top: 0;
+    }
   }
   .identity-row {
     display: flex;

@@ -1,0 +1,50 @@
+// admin-clients-authentication.js is the client authentication tab's behaviour. The secret shows
+// only for a confidential client, and choosing confidential for a client with none generates one.
+// Show and Hide reveal the secret, which is drawn hidden, and Generate asks the console for a new
+// one, which the field then shows, saying so in the tab's status region, as it says a failure. The
+// save, which asks first about a change of type and about a new secret, is shell.js's.
+
+const secretPanel = document.getElementById("confidentialClientPanel");
+const secretField = document.getElementById("clientSecret");
+const showButton = document.getElementById("showSecretBtn");
+const generateButton = document.getElementById("generateSecretBtn");
+const secretStatus = document.getElementById("secret-status");
+const confidentialRadio = document.getElementById("confidentialClientRadio");
+const showLabel = showButton.textContent;
+
+function showSecret(show) {
+  secretField.type = show ? "text" : "password";
+  showButton.textContent = show ? showButton.dataset.hideLabel : showLabel;
+}
+
+function generateSecret() {
+  sendAjaxRequest({
+    url: "/admin/clients/generate-new-secret",
+    method: "GET",
+    bodyData: null,
+    statusRegion: secretStatus,
+    callback: function (result) {
+      const hadSecret = secretField.value !== "";
+      secretField.value = result.NewSecret;
+      if (hadSecret) {
+        showSecret(true);
+        showNotice(secretStatus, "positive", secretStatus.dataset.generated);
+      }
+    }
+  });
+}
+
+function showType() {
+  secretPanel.hidden = !confidentialRadio.checked;
+  if (confidentialRadio.checked && secretField.value === "") {
+    generateSecret();
+  }
+}
+
+document.querySelectorAll("input[name=publicConfidential]").forEach(function (radio) {
+  radio.addEventListener("change", showType);
+});
+showButton.addEventListener("click", function () {
+  showSecret(secretField.type === "password");
+});
+generateButton.addEventListener("click", generateSecret);

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Every icon-only edit and remove button of the seven list pages is named for what it does and to
+// Every icon-only edit and remove button of the four list pages is named for what it does and to
 // which row, in the administrator's language: the page hands the icon builder the action and the
 // thing from the catalog, joined to the row's value, and the builder writes that as the button's
 // aria-label and title (#562, section 6). The builder's half is held by the lint in web; this is
@@ -40,40 +40,6 @@ func TestRender_IconButtonsAreNamedForTheirRow(t *testing.T) {
 		"resources":         []api.ResourceResponse{},
 		"savedSuccessfully": false,
 	}
-	permissionsClient := map[string]interface{}{
-		"client": struct {
-			ClientId                 int64
-			ClientIdentifier         string
-			ClientCredentialsEnabled bool
-			Permissions              map[int64]string
-			IsSystemLevelClient      bool
-		}{ClientId: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true,
-			Permissions: map[int64]string{3: "some-resource:read"}},
-		"resources":         []api.ResourceResponse{},
-		"savedSuccessfully": false,
-	}
-	redirectURIs := map[string]interface{}{
-		"client": struct {
-			ClientId              int64
-			ClientIdentifier      string
-			CanManageRedirectURIs bool
-			RedirectURIs          map[int64]string
-			IsSystemLevelClient   bool
-		}{ClientId: 7, ClientIdentifier: "an-app", CanManageRedirectURIs: true,
-			RedirectURIs: map[int64]string{1: "https://example.com/cb"}},
-		"savedSuccessfully": false,
-	}
-	webOrigins := map[string]interface{}{
-		"client": struct {
-			ClientId            int64
-			ClientIdentifier    string
-			WebOrigins          map[int64]string
-			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
-			IsSystemLevelClient bool
-		}{ClientId: 7, ClientIdentifier: "a-javascript-app",
-			WebOrigins: map[int64]string{1: "https://a.example.com"}},
-		"savedSuccessfully": false,
-	}
 	permissionsResource := map[string]interface{}{
 		"resourceId":                   2,
 		"resourceIdentifier":           "faturamento",
@@ -92,15 +58,6 @@ func TestRender_IconButtonsAreNamedForTheirRow(t *testing.T) {
 		// calls are the icon-button calls the page's script makes, in English and in Portuguese.
 		en, ptBR []string
 	}{
-		{"/admin_clients_redirect_uris.html", redirectURIs,
-			[]string{`createTrashCanButton("Remove redirect URI " + uri, deleteRedirectURI)`},
-			[]string{`createTrashCanButton("Remover URI de redirecionamento " + uri, deleteRedirectURI)`}},
-		{"/admin_clients_web_origins.html", webOrigins,
-			[]string{`createTrashCanButton("Remove web origin " + uri, deleteWebOrigin)`},
-			[]string{`createTrashCanButton("Remover origem web " + uri, deleteWebOrigin)`}},
-		{"/admin_clients_permissions.html", permissionsClient,
-			[]string{`createTrashCanButton("Remove permission " + value.Scope, deletePermission,`},
-			[]string{`createTrashCanButton("Remover permissão " + value.Scope, deletePermission,`}},
 		{"/admin_users_permissions.html", permissionsUser,
 			[]string{`createTrashCanButton("Remove permission " + value.Scope, deletePermission,`},
 			[]string{`createTrashCanButton("Remover permissão " + value.Scope, deletePermission,`}},

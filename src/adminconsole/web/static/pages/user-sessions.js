@@ -1,12 +1,13 @@
-// account-user-sessions.js is the sessions page's behaviour: each End session button asks in its
-// dialog, data-dialog, with its own sentence, data-confirm, and then ends that session. The button
+// user-sessions.js is the behaviour of a list of sessions, the account's own and a client's: each
+// End session button asks in its dialog, data-dialog, with its own sentence, data-confirm, and then
+// ends that session through the route the page's status region names, data-end-url. The button
 // gives way to a tag saying the session ended, which takes the focus the button had, and the page's
-// status region says so, as it says a failure. Ending the session of the device in use signs out, posted rather than
-// asked again by the confirmation page, since the dialog has already asked (#411).
+// status region says so, as it says a failure. Ending the session of the device in use signs out,
+// posted rather than asked again by the confirmation page, since the dialog has already asked (#411).
 
 function endSession(button, status) {
   sendAjaxRequest({
-    url: "/account/sessions",
+    url: status.dataset.endUrl,
     method: "POST",
     bodyData: JSON.stringify({ userSessionId: Number(button.dataset.endSession) }),
     statusRegion: status,
