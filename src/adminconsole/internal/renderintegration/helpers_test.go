@@ -99,30 +99,11 @@ func renderPageAt(t *testing.T, path, layout, page string, bind map[string]inter
 	return out
 }
 
-// assertSendsTheLoadedPermissionIds is the check both permission pages owe: the page takes the ids
-// of the grants it rendered once, after they are in assignedPermissions, sends that copy with every
-// save as expectedPermissionIds, and never edits it. A copy taken later, or edited, would send the
-// administrator's edited set as the loaded one and every save would pass the check (#428).
-func assertSendsTheLoadedPermissionIds(t *testing.T, out string) {
-	t.Helper()
-	const copyTaken = "const loadedPermissionIds = Object.keys(assignedPermissions).map(function(key) { return parseInt(key, 10); });"
-	loaded := regexp.MustCompile(`var assignedPermissions = \{\s*3\s*: \{\s*"Scope": "some-resource:read"\s*\},\s*4\s*: \{\s*"Scope": "some-resource:write"\s*\}\s*\};`).FindStringIndex(out)
-	require.NotNil(t, loaded, "the page renders the loaded grants into assignedPermissions")
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps the ids of the loaded grants")
-	assert.Greater(t, copyAt, loaded[1]-1, "the copy is taken after the loaded grants are in the object")
-
-	assert.Contains(t, out, `"expectedPermissionIds": loadedPermissionIds`)
-	assert.NotRegexp(t, `loadedPermissionIds\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedPermissionIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
-}
-
-// assertListScriptSendsTheLoadedList is the check a list page whose script is a static file owes,
-// as assertSendsTheLoadedPermissionIds is for one whose script is inline: the page draws the list as
-// stored, in rows, and its script reads them once, as it loads, into loaded through read, sends that
-// copy with every save under the form's data-expected-key, and never edits it. A copy taken later,
-// or edited, would send the administrator's edited list as the loaded one and every save would pass
-// the check (#428).
+// assertListScriptSendsTheLoadedList is the check a list page edited in the page owes: the page
+// draws the list as stored, in rows, and its script reads them once, as it loads, into loaded
+// through read, sends that copy with every save under the form's data-expected-key, and never edits
+// it. A copy taken later, or edited, would send the administrator's edited list as the loaded one
+// and every save would pass the check (#428).
 func assertListScriptSendsTheLoadedList(t *testing.T, script, loaded, read string) {
 	t.Helper()
 	b, err := fs.ReadFile(web.StaticFS(), script)
