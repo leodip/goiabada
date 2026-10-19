@@ -428,8 +428,8 @@ var userTargetWrites = []targetWrite{
 			database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), targetConsentId).
 				Return(&record.UserConsent{Id: targetConsentId, UserId: targetUserId, ClientId: 3}, nil).Once()
 		},
-		writes:           []string{"DeleteUserConsent"},
-		expectFirstWrite: failingWrite("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), targetConsentId),
+		writes:           []string{"RunInTransaction", "DeleteUserConsent"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
 		// A save that changes nothing gives the grant ceiling nothing to judge; the target is what

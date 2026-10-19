@@ -854,6 +854,160 @@ func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
 	}
 }
 
+// TestGetRefreshTokensByUserIdAndClientId pins the consent withdrawal's enumeration (#622): both
+// linkage shapes with the client predicate added to each, the same user's tokens with another
+// client and another user's tokens with the same client both refused, and no double-counting
+// from the UNION ALL.
+func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
+	client := createTestClient(t)
+	otherClient := createTestClient(t)
+	user := createTestUser(t)
+	otherUser := createTestUser(t)
+
+	newCode := func(clientId int64, userId int64) *record.Code {
+		code := &record.Code{
+			ClientId:            clientId,
+			UserId:              userId,
+			Code:                "code_" + fake.LetterN(8),
+			CodeHash:            "hash_" + fake.LetterN(8),
+			CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
+			CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+			RedirectURI:         "https://example.com/callback",
+			Scope:               "openid",
+			IpAddress:           "127.0.0.1",
+			UserAgent:           "test",
+			ResponseMode:        "query",
+			AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+			SessionIdentifier:   "sess_" + fake.LetterN(8),
+			AcrLevel:            "1",
+			AuthMethods:         "pwd",
+			Used:                true,
+		}
+		if err := database.CreateCode(context.Background(), nil, code); err != nil {
+			t.Fatalf("Failed to create code: %v", err)
+		}
+		return code
+	}
+
+	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
+		rt.RefreshTokenJti = fake.UUID()
+		rt.Scope = "openid"
+		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
+		if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
+			t.Fatalf("Failed to create refresh token: %v", err)
+		}
+		return rt
+	}
+
+	// The two shapes that must match: this user's tokens with THIS client, one through a code
+	// and one linked directly.
+	viaCode := newToken(&record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newCode(client.Id, user.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	ropc := newToken(&record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+
+	// The four that must not, one per branch per predicate, so that removing either predicate
+	// fails here rather than at the withdrawal.
+	otherClientViaCode := newToken(&record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newCode(otherClient.Id, user.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	otherClientRopc := newToken(&record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: otherClient.Id, Valid: true},
+		RefreshTokenType: "Offline",
+	})
+	otherUserViaCode := newToken(&record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newCode(client.Id, otherUser.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	otherUserRopc := newToken(&record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: otherUser.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+	})
+
+	got, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId failed: %v", err)
+	}
+
+	found := make(map[int64]bool, len(got))
+	for _, rt := range got {
+		found[rt.Id] = true
+	}
+
+	for _, want := range []struct {
+		label string
+		id    int64
+	}{
+		{"the user's auth-code token with this client", viaCode.Id},
+		{"the user's ROPC token with this client", ropc.Id},
+	} {
+		if !found[want.id] {
+			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
+		}
+	}
+
+	for _, unwanted := range []struct {
+		label string
+		id    int64
+	}{
+		{"the same user's auth-code token with another client", otherClientViaCode.Id},
+		{"the same user's ROPC token with another client", otherClientRopc.Id},
+		{"another user's auth-code token with this client", otherUserViaCode.Id},
+		{"another user's ROPC token with this client", otherUserRopc.Id},
+	} {
+		if found[unwanted.id] {
+			t.Errorf("returned a token outside this user and client: %s (id %d)", unwanted.label, unwanted.id)
+		}
+	}
+
+	// The union must not double-count: an auth-code token carries no client of its own and
+	// matches only the first branch.
+	if len(got) != 2 {
+		t.Errorf("expected exactly 2 tokens for this user and client, got %d (duplicates from the UNION ALL?)", len(got))
+	}
+}
+
+// TestGetRefreshTokensByUserIdAndClientId_NoTokens covers the empty result and the zero-id
+// guards, one per identifier.
+func TestGetRefreshTokensByUserIdAndClientId_NoTokens(t *testing.T) {
+	user := createTestUser(t)
+	client := createTestClient(t)
+
+	got, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId failed: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for a fresh user and client, got %d", len(got))
+	}
+
+	got, err = database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, 0, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId(0, client) should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for user id 0, got %d", len(got))
+	}
+
+	got, err = database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, 0)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId(user, 0) should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for client id 0, got %d", len(got))
+	}
+}
+
 // TestGetRefreshTokensByClientId is the exhaustive owner of this query's linkage-shape
 // coverage (seam 6, #245). The confidential-to-public flip sweeps through it, so a shape
 // the query cannot reach is a grant that survives the flip.
