@@ -222,9 +222,11 @@ func (w *Worker) reapAuthorizeRequests(ctx context.Context) {
 // reapBrowserSessions deletes browser sessions whose expires_at has passed.
 //
 // It runs on the poll, outside the claim, which is the one sweep in this worker that does.
-// The reason is a rate the others do not face: /auth/authorize writes a browser session
-// before it validates anything and is not rate limited, so an unauthenticated caller can
-// produce rows as fast as it can send requests. A pre-authentication session stops being
+// The reason is a rate the others do not face: /auth/authorize saves a browser session on
+// every request that passes its first validation, and the authorize admission tier bounds
+// how fast one address may spend those rows only while the rate limiter switch is on, so
+// with it off an unauthenticated caller can still produce them as fast as it can send
+// requests (#504). A pre-authentication session stops being
 // usable after thirty minutes, but on the twelve hour claim it would go on EXISTING for up
 // to twelve, and a sustained hundred requests a second would leave about 4.3 million rows
 // waiting for one enormous DELETE. Every five minutes puts the physical bound below the

@@ -33,6 +33,10 @@ This page helps you plan a Goiabada deployment on a Kubernetes cluster.
 
 You also need `kubectl` configured for the cluster, and the setup wizard on the machine you run it from.
 
+<Aside type="note">
+`/auth/authorize` writes a row on every request that passes its first validation, a browser session on a GET and a parked request on a POST, so an unauthenticated flood grows the database. The built-in `authorize` limit bounds it only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on; with the switch off, which is the default, give the route a budget at your gateway.
+</Aside>
+
 ## What runs where
 
 ```

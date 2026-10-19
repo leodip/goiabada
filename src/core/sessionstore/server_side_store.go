@@ -24,11 +24,13 @@ const (
 	SessionIdBytes = 32
 
 	// PreAuthLifetime is how long a browser session that has not yet authenticated
-	// lives. It is short on purpose: /auth/authorize is not rate limited and writes a
-	// session before it validates anything, so every unauthenticated caller costs a row,
-	// and this constant is what bounds how many of them can be alive at once. Generous
-	// for a first sign-in that includes installing an authenticator app and scanning a
-	// code, and far shorter than the day an authenticated session may run for (#266).
+	// lives. It is short on purpose: /auth/authorize validates a request before it writes
+	// anything, and every request that passes that validation saves a session, so an
+	// unauthenticated caller costs a row for each one it sends. The authorize admission
+	// tier bounds how fast one address may spend them (#504), and this constant is what
+	// bounds how many of them can be alive at once. Generous for a first sign-in that
+	// includes installing an authenticator app and scanning a code, and far shorter than
+	// the day an authenticated session may run for (#266).
 	PreAuthLifetime = 30 * time.Minute
 
 	// TouchThreshold is how stale last_accessed may get before a read writes it back.

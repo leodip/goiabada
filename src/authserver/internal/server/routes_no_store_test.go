@@ -23,7 +23,7 @@ import (
 // nor any handler test can make it. The table composes the middleware around a handler by hand,
 // which is exactly the arrangement that keeps passing when the r.Use line disappears from
 // routes.go; routes_ratelimiter_test.go's own header records the same lesson for the limiters,
-// where removing any one of twelve wrappers left the whole module suite green.
+// where removing any one of fourteen wrappers left the whole module suite green.
 //
 // Every route is called WITHOUT credentials, which is deliberate on two counts. It is the case the
 // mount position exists for, since RFC 6749 section 5.1's "other sensitive information" covers a
