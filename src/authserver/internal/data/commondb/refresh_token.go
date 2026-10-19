@@ -519,6 +519,69 @@ func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, use
 	return refreshTokens, nil
 }
 
+// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds with one
+// client, whatever shape links it to them: GetRefreshTokensByUserId's two branches with
+// the client predicate added to each, so an authorization-code token matches through
+// codes.user_id and codes.client_id and a ROPC token through refresh_tokens.user_id and
+// refresh_tokens.client_id.
+//
+// It exists for one caller, the consent withdrawal response, which must not sweep what
+// the user holds with every OTHER client: withdrawing consent to one app ends that app's
+// grants and leaves the user signed in everywhere else (#622). GetRefreshTokensByUserId
+// plus a client filter cannot substitute for it, because an auth-code token's row
+// carries no client at all: its client is on the code, which this query joins to.
+//
+// Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: the shapes
+// are mutually exclusive, so the union cannot produce duplicates, and each branch can
+// use its own index where an OR across the two tables would defeat both (#106).
+//
+// A zero userId or clientId returns an empty slice with no error, following
+// GetRefreshTokensByUserId: the caller's own checks already refuse such identifiers, and
+// a sweep over an empty result is a no-op either way.
+func (d *Database) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error) {
+
+	if userId == 0 || clientId == 0 {
+		return nil, nil
+	}
+
+	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
+		For(d.Flavor)
+
+	// Authorization code flow: the user and the client are both on the code, not the token.
+	viaCode := refreshTokenStruct.SelectFrom("refresh_tokens")
+	viaCode.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
+	viaCode.Where(viaCode.Equal("codes.user_id", userId), viaCode.Equal("codes.client_id", clientId))
+
+	// ROPC: the user and the client are both on the token itself and there is no code at all.
+	direct := refreshTokenStruct.SelectFrom("refresh_tokens")
+	direct.Where(direct.Equal("refresh_tokens.user_id", userId), direct.Equal("refresh_tokens.client_id", clientId))
+
+	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
+	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	var refreshTokens []*record.RefreshToken
+	for rows.Next() {
+		var refreshToken record.RefreshToken
+		addr := refreshTokenStruct.Addr(&refreshToken)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errs.Wrap(err, "unable to scan refreshToken")
+		}
+		refreshTokens = append(refreshTokens, &refreshToken)
+	}
+	// Without this a mid-stream failure would return a PARTIAL token set as success,
+	// and the caller would commit a revocation sweep that missed rows it never saw.
+	if err := rows.Err(); err != nil {
+		return nil, errs.Wrap(err, "unable to read query results")
+	}
+
+	return refreshTokens, nil
+}
+
 // GetRefreshTokensByClientId returns every refresh token belonging to a client,
 // whatever shape links it to them.
 //

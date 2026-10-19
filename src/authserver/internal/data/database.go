@@ -719,6 +719,13 @@ type Database interface {
 	// substitute for it, because that query joins through codes and so excludes ROPC
 	// rows, and because it needs a live session row to supply the identifier (#106).
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds
+	// with one client, through either linkage shape: codes.user_id with codes.client_id
+	// for the authorization code flow, refresh_tokens.user_id with
+	// refresh_tokens.client_id for ROPC. It is what a consent withdrawal sweeps, and
+	// GetRefreshTokensByUserId plus a client filter cannot substitute for it, because
+	// an auth-code token's row carries no client to filter on (#622).
+	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,
 	// where refresh_tokens.client_id is null, and refresh_tokens.client_id for ROPC,

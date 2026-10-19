@@ -11,14 +11,19 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
 
 // userConsentsDatabase is what the administrator's user consent endpoints need: one user's
 // consents and the clients they name.
-// It embeds what the administrative policy reads to judge whether the user is an administrator.
+// It embeds what the administrative policy reads to judge whether the user is an administrator,
+// and revocation.Database for what a consent withdrawal revokes beside the row it deletes
+// (#622).
 type userConsentsDatabase interface {
 	userTargetPolicyDatabase
+	revocation.Database
+
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
@@ -108,8 +113,14 @@ func HandleUserConsentDelete(
 			return
 		}
 
-		// Delete the consent
-		err = database.DeleteUserConsent(r.Context(), nil, consentId)
+		// The withdrawal also revokes the refresh tokens this user holds with this client.
+		// The refresh arm consults a stored consent only when the client has Consent required
+		// on or the grant is an offline one, so deleting the row alone would leave a
+		// once-consented client's grant standing (#622).
+		_, err = revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
+			func(tx *sql.Tx) error {
+				return database.DeleteUserConsent(r.Context(), tx, consentId)
+			})
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

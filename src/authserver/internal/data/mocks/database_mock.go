@@ -8874,6 +8874,34 @@ func (_mock *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx,
 	return r0, r1
 }
 
+// GetRefreshTokensByUserIdAndClientId provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, userId, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensByUserIdAndClientId")
+	}
+
+	var r0 []*record.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) ([]*record.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, userId, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) []*record.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*record.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
 // Database_GetRefreshTokensByUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensByUserId'
 type Database_GetRefreshTokensByUserId_Call struct {
 	*mock.Call

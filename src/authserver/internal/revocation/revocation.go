@@ -26,6 +26,7 @@ type Database interface {
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
@@ -264,7 +265,9 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // Reasons a revocation records. The first four are recorded on EventRevokedUserAuthState, one
 // per credential site (#106 decision 7). ReasonClientBecamePublic is recorded on
 // EventRevokedClientGrants, and is also the reason a family's revocation record carries when
-// RevokeClientGrants wrote it (#245, #259). Constants rather than inline strings so the sites
+// RevokeClientGrants wrote it (#245, #259). ReasonConsentWithdrawn is the reason a family's
+// revocation record carries when a consent withdrawal's sweep wrote it (#622). Constants
+// rather than inline strings so the sites
 // cannot drift and a log consumer has something to match against, and one block so the next
 // site's reason has one place to go. Every value is stored data: renaming a constant is free,
 // changing its string is not.
@@ -280,6 +283,7 @@ const (
 	ReasonAdminPasswordSet   = "admin_password_set"
 	ReasonAccountDisabled    = "account_disabled"
 	ReasonClientBecamePublic = "client_became_public"
+	ReasonConsentWithdrawn   = "consent_withdrawn"
 )
 
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
@@ -601,6 +605,88 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 	return result, nil
 }
 
+// RevokeOnConsentWithdrawalTx ends what a withdrawn consent leaves standing: it deletes the
+// consent row and sweeps the refresh tokens that user holds with that client, in ONE
+// transaction it opens and commits (#622).
+//
+// Withdrawing consent through Account, Manage consents or the admin console's user page
+// used to delete the row and nothing else, and the refresh arm consults a stored consent
+// only when the client has Consent required on or the token is an offline one. A client
+// whose Consent required was turned off after a user once approved the screen therefore
+// kept refreshing past the withdrawal for as long as the grant lived: consent withdrawn
+// in name only.
+//
+// The three writes, in the order this transaction issues them:
+//
+//  1. withdraw, the caller's own deletion of the consent row, FIRST because it is the
+//     write that decides. The sweep exists to enforce it, not the other way round, and a
+//     caller must not be able to end up revoked without the withdrawal that asked for it
+//     (RevokeUserAuthStateTx's write-then-sweep shape).
+//  2. recordFamilies, before the sweep for the reason RevokeClientGrants states (#259):
+//     rotation claims its parent and inserts its child in two separate statements, so a
+//     refresh that validated before this transaction began can insert a live child after
+//     it commits. The family record is the fact that outlives the sweep: the validator
+//     refuses a token whose family has one, and rotation re-checks it inside its own
+//     transaction, so the child is refused at its next refresh or never inserted.
+//  3. RevokeRefreshTokens over the user-and-client-scoped rows, which flips what stands
+//     now. Scoped by BOTH, because the withdrawal ends one app's access, not what the
+//     user holds with every other client and not the session they are signed in with.
+//
+// It deliberately does NOT advance the user's authentication generation and does NOT
+// touch any session: both are user-scoped, for the reason RevokeClientGrants states about
+// its own sweep, and the user withdrawing consent to one app is signed in with a session
+// that may be serving every other app.
+//
+// Access tokens already issued keep working until they expire, exactly as they do under
+// RevokeClientGrants, because nothing in resource validation consults a refresh token.
+//
+// Opened through RunInTransaction, so a deadlock reruns the body together (#301). The
+// body is safe to rerun: the deletion of an already-deleted row matches nothing, the
+// family records are written or found already written, and the sweep reads its rows
+// afresh on each attempt.
+//
+// The returned JTIs are the ones this call TRANSITIONED from live to revoked, per
+// RevokeRefreshTokens. An empty list means there was nothing live to revoke, which is
+// what a second withdrawal of the same consent finds.
+//
+// The audit events are the CALLER's, unchanged: EventDeletedOwnUserConsent and
+// EventDeletedUserConsent keep their payloads, following decision 9, which left
+// EventDeletedUserSession alone when TerminateUserSessionTx was added beside it.
+func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64, clientId int64,
+	withdraw func(tx *sql.Tx) error) ([]string, error) {
+
+	if withdraw == nil {
+		return nil, errs.New("revoking on a consent withdrawal requires the withdrawal's own write")
+	}
+
+	var revokedJtis []string
+	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		if err := withdraw(tx); err != nil {
+			return err
+		}
+
+		tokens, err := db.GetRefreshTokensByUserIdAndClientId(ctx, tx, userId, clientId)
+		if err != nil {
+			return err
+		}
+
+		if err = recordFamilies(ctx, db, tx, tokens, ReasonConsentWithdrawn); err != nil {
+			return err
+		}
+
+		jtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+		if err != nil {
+			return err
+		}
+		revokedJtis = jtis
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return revokedJtis, nil
+}
+
 // ClientGrantResult reports what revoking one client's grants actually did. It is
 // TerminationResult's two fields under a name that does not assert a session ended, and that
 // distinction is the whole reason it is a separate type (#245 decision 16): flipping a client to
@@ -683,7 +769,7 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 	// outlives the sweep, the validator refuses a token whose family has one, and the rotation checks
 	// it again inside its own transaction, so the child is refused at the next refresh or never
 	// inserted. A revoked member counts too: its sibling may be the one mid-rotation.
-	err = recordClientFamilies(ctx, db, tx, tokens)
+	err = recordFamilies(ctx, db, tx, tokens, ReasonClientBecamePublic)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
@@ -699,10 +785,11 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 	}, nil
 }
 
-// recordClientFamilies writes the revocation record of every distinct rotation family among the
-// given refresh tokens, each once. A token with no family identifier carries no family to record:
-// no issuer writes one, and RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
-func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken) error {
+// recordFamilies writes the revocation record of every distinct rotation family among the
+// given refresh tokens, each once, under the reason this sweep revokes them for. A token
+// with no family identifier carries no family to record: no issuer writes one, and
+// RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
+func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken, reason string) error {
 	seen := make(map[string]struct{}, len(tokens))
 	for _, rt := range tokens {
 		jti := rt.FirstRefreshTokenJti
@@ -713,7 +800,7 @@ func recordClientFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens [
 			continue
 		}
 		seen[jti] = struct{}{}
-		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, ReasonClientBecamePublic); err != nil {
+		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, reason); err != nil {
 			return err
 		}
 	}
