@@ -136,13 +136,16 @@
     confirmButton.disabled = true;
     confirmButton.textContent = t("js.image_upload.uploading");
     const size = canvasSize();
+    const format = outputFormat();
+    // JPEG has no transparency, and the cropper leaves a transparent area black, so a picture sent
+    // as JPEG has it filled white.
     const canvas = cropper.getCroppedCanvas({
       width: size.width,
       height: size.height,
+      fillColor: format.type === "image/jpeg" ? "#fff" : "transparent",
       imageSmoothingEnabled: true,
       imageSmoothingQuality: "high"
     });
-    const format = outputFormat();
     canvas.toBlob(function (blob) {
       upload(blob, format.name);
     }, format.type, format.quality);
@@ -181,7 +184,12 @@
     showModalDialog("deleteImage", config.deleteTitle, config.deleteConfirm, null, deleteImage);
   }
 
+  // deleteImage deletes the image. The Delete button is disabled while it does, which drops its
+  // focus, the focus its dialog gave back to it, so where focus goes is decided from before: to the
+  // Upload button once the image and its Delete button are gone, back to Delete when the deletion
+  // fails.
   function deleteImage() {
+    const hadFocus = document.activeElement === deleteButton;
     deleteButton.disabled = true;
     fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: csrfHeaders() })
       .then((response) => response.json().then((data) => {
@@ -197,6 +205,9 @@
       }))
       .then(() => {
         showImage(null);
+        if (hadFocus) {
+          uploadButton.focus();
+        }
         showNotice(status, "positive", config.deleted);
       })
       .catch((error) => {
@@ -204,12 +215,14 @@
       })
       .finally(() => {
         deleteButton.disabled = false;
+        if (hadFocus && !deleteButton.hidden) {
+          deleteButton.focus();
+        }
       });
   }
 
   // showImage puts the image at url in the preview, a fresh request each time, or takes it away
-  // when url is null. The Delete button is shown only beside an image; when it goes, focus, which
-  // its dialog gave back to it, moves to the Upload button.
+  // when url is null. The Delete button is shown only beside an image.
   function showImage(url) {
     const current = preview.querySelector("img");
     if (current) {
@@ -223,11 +236,7 @@
       deleteButton.hidden = false;
       return;
     }
-    const hadFocus = document.activeElement === deleteButton;
     deleteButton.hidden = true;
-    if (hadFocus) {
-      uploadButton.focus();
-    }
   }
 
   uploadButton.addEventListener("click", function () {

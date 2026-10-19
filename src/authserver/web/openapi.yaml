@@ -4831,9 +4831,39 @@ components:
               type: array
               items:
                 type: string
+            clients:
+              description: |
+                The same clients as clientIdentifiers, in the same order, each with the name
+                its user is shown for it.
+              type: array
+              items:
+                $ref: '#/components/schemas/SessionClientResponse'
           required:
             - isCurrent
             - clientIdentifiers
+            - clients
+
+    SessionClientResponse:
+      description: One client a session authorized.
+      type: object
+      properties:
+        clientIdentifier:
+          type: string
+        name:
+          description: |
+            The name the consent screen shows a user for this client: its display name when
+            an administrator chose to show one, else, for a client that registered itself, the
+            name it registered with, else its identifier.
+          type: string
+        nameUnverified:
+          description: |
+            Whether name is the client's own claim about itself, the name a self-registered
+            client gave and nobody has replaced, which the consent screen marks as unverified.
+          type: boolean
+      required:
+        - clientIdentifier
+        - name
+        - nameUnverified
 
     GetUserSessionsResponse:
       type: object
@@ -4927,7 +4957,24 @@ components:
           nullable: true
         clientIdentifier:
           type: string
+        clientName:
+          description: |
+            The name the consent screen showed the user for this client: its display name when
+            an administrator chose to show one, else, for a client that registered itself, the
+            name it registered with, else its identifier.
+          type: string
+        clientNameUnverified:
+          description: |
+            Whether clientName is the client's own claim about itself, the name a
+            self-registered client gave and nobody has replaced, which the consent screen marks
+            as unverified.
+          type: boolean
         clientDescription:
+          description: |
+            The client's description as stored, on the admin endpoint. The account endpoint,
+            which answers the user, carries it only as the consent screen shows it: when an
+            administrator chose to show it, and never beside an unverified clientName, which is
+            then the description already. Otherwise it is empty there.
           type: string
       required:
         - id
@@ -4938,6 +4985,8 @@ components:
         - scope
         - grantedAt
         - clientIdentifier
+        - clientName
+        - clientNameUnverified
         - clientDescription
 
     GetUserConsentsResponse:

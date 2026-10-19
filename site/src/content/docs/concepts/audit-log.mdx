@@ -192,7 +192,7 @@ Every `deleted_user_session` entry has a `reason`:
 | `same_device` | The user signed in again, and the new session replaced another of their sessions from the same browser, recognized by its [device cookie](/concepts/sessions/#how-the-auth-server-recognizes-a-browser). |
 | `session_cap` | A sign-in took the user over **User session - max sessions per user**, and this session, expired or the least recently used, was ended. See [How many sessions a user can hold](/concepts/sessions/#how-many-sessions-a-user-can-hold). |
 | `replaced_by_other_user` | Another user signed in on the browser that held it. |
-| `signed_out` | The user signed out: of the whole session, or of the last app on it, which ends the session too. |
+| `signed_out` | The user signed out: of the whole session, or of the last client on it, which ends the session too. |
 | `ended_by_user` | The user ended it from their account. |
 | `ended_by_administrator` | An administrator ended it. |
 

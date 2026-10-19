@@ -283,7 +283,7 @@
 "adminconsole.account_menu.address" = "Address"
 "adminconsole.account_menu.change_password" = "Change password"
 "adminconsole.account_menu.otp" = "Two-factor authentication"
-"adminconsole.account_menu.manage_consents" = "Manage consents"
+"adminconsole.account_menu.manage_consents" = "Consents"
 "adminconsole.account_menu.sessions" = "Sessions"
 
 # --- Adminconsole admin-side drawer -----------------------------------------
@@ -378,7 +378,7 @@
 "adminconsole.refusal.not_found" = "Sorry, the item you are looking for could not be found. It may have been deleted, or the address may be incorrect."
 "adminconsole.refusal.concurrent_update" = "This item was changed after the page was loaded. Reload the page and try again."
 "adminconsole.refusal.invalid_request_body" = "The request body is not valid JSON, or is missing information this endpoint requires."
-"adminconsole.refusal.account_email.confirmation_mismatch" = "The email and email confirmation entries must be identical."
+"adminconsole.refusal.account_email.confirmation_mismatch" = "The email addresses don't match."
 "adminconsole.refusal.client_delete.identifier_mismatch" = "Client identifier does not match the client being deleted."
 "adminconsole.refusal.client_tokens.token_expiration_invalid" = "Invalid value for token expiration in seconds."
 "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid" = "Invalid value for refresh token offline - idle timeout in seconds."
@@ -398,6 +398,7 @@
 "adminconsole.unauthorized.page_title" = "Administrators only"
 "adminconsole.unauthorized.title" = "Administrators only"
 "adminconsole.unauthorized.body" = "This page is for administrators, and your account doesn't have administrator access."
+"adminconsole.unauthorized.switch_account" = "Sign out to use another account"
 
 "adminconsole.welcome.subtitle" = "Admin console"
 "adminconsole.welcome.authenticated_label" = "You're signed in."
@@ -479,7 +480,7 @@
 "adminconsole.account.email_verification.add_email" = "Add one"
 "adminconsole.account.email_verification.instructions" = "Send a code to this address, then enter it below."
 "adminconsole.account.email_verification.code_sent" = "We sent a code to {{.email}}. Check your inbox and spam folder."
-"adminconsole.account.email_verification.wait" = "Wait {{.seconds}} seconds before asking for another code."
+"adminconsole.account.email_verification.wait" = "Wait {{.wait}} before asking for another code."
 "adminconsole.account.email_verification.smtp_disabled" = "This server can't send email, so your address can't be verified here."
 "adminconsole.account.email_verification.field.code" = "Verification code"
 "adminconsole.account.email_verification.send_button" = "Send code"
@@ -539,6 +540,8 @@
 "adminconsole.account.consents.page_title" = "Consents"
 "adminconsole.account.consents.intro" = "The applications you've allowed to use your account, and what each one can see."
 "adminconsole.account.consents.col_client" = "Application"
+"adminconsole.account.consents.unverified_tag" = "Unverified"
+"adminconsole.account.consents.unverified_note" = "This application registered itself and has not been verified."
 "adminconsole.account.consents.col_granted_at" = "Given"
 "adminconsole.account.consents.col_scope" = "Access"
 "adminconsole.account.consents.col_actions" = "Actions"
@@ -579,6 +582,7 @@
 "adminconsole.account.sessions.col_last_accessed" = "Last active"
 "adminconsole.account.sessions.col_actions" = "Actions"
 "adminconsole.account.sessions.current_label" = "This device"
+"adminconsole.account.sessions.unverified_tag" = "Unverified"
 "adminconsole.account.sessions.end_button" = "End session"
 "adminconsole.account.sessions.end_current_button" = "End session and sign out"
 "adminconsole.account.sessions.ended" = "Session ended."
@@ -683,7 +687,7 @@
 "adminconsole.admin_clients.usersessions.modal_confirm_title" = "Are you sure?"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_prefix" = "Do you want to end the session for user <span class='text-accent'>"
 "adminconsole.admin_clients.usersessions.modal_confirm_body_suffix" = "</span>?"
-"adminconsole.admin_clients.usersessions.modal_revocation_note" = " <br /><br />Applications the user authorized from this session, including ones that keep working in the background, will need to sign in again."
+"adminconsole.admin_clients.usersessions.modal_revocation_note" = " <br /><br />Clients the user signed in to from this session, including ones that keep working in the background, will need the user to sign in again."
 "adminconsole.admin_clients.usersessions.modal_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate sign-out."
 
 # --- Common modal strings used across client management pages --------------
@@ -727,8 +731,8 @@
 "adminconsole.admin_clients.settings.field.show_website_url" = "Show website URL"
 "adminconsole.admin_clients.settings.field.show_website_url_tooltip" = "When enabled, the client website URL is displayed as a link on sign-in and consent screens."
 "adminconsole.admin_clients.settings.saved_successfully" = "Client settings saved successfully"
-"adminconsole.admin_clients.settings.modal.identifier_change" = "<span class='text-accent'>You've modified the client identifier</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
-"adminconsole.admin_clients.settings.modal.disabled_warning" = "<span class='text-accent'>You've disabled the client</span>, and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
+"adminconsole.admin_clients.settings.modal.identifier_change" = "<span class='text-accent'>You've modified the client identifier</span>, so anything that signs in with this client will have to send the new one.<br /><br />Are you certain you want to save?"
+"adminconsole.admin_clients.settings.modal.disabled_warning" = "<span class='text-accent'>You've disabled the client</span>, so nothing can sign in with it or obtain tokens through it until it is enabled again.<br /><br />Are you certain you want to save?"
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "<span class='text-accent'>You are allowing this client to request the administrative scopes</span>. It will be able to obtain a token carrying a signed-in administrator's authority, and it becomes an administrator client.<br /><br />Are you certain you want to save?"
 
 # --- Client tokens ---------------------------------------------------------
@@ -767,10 +771,10 @@
 "adminconsole.admin_clients.authentication.page_title_prefix" = "Client authentication - "
 "adminconsole.admin_clients.authentication.public_client" = "Public client"
 "adminconsole.admin_clients.authentication.confidential_client" = "Confidential client"
-"adminconsole.admin_clients.authentication.public_intro_prefix" = "A public client is an application that is unable to protect its client credentials from exposure. Examples of public clients include "
+"adminconsole.admin_clients.authentication.public_intro_prefix" = "A public client cannot keep its credentials secret, because its code runs where its users can read it. Examples of public clients include "
 "adminconsole.admin_clients.authentication.public_intro_em1" = "mobile apps"
 "adminconsole.admin_clients.authentication.public_intro_middle" = " and "
-"adminconsole.admin_clients.authentication.public_intro_em2" = "javascript applications"
+"adminconsole.admin_clients.authentication.public_intro_em2" = "single-page apps"
 "adminconsole.admin_clients.authentication.public_intro_suffix" = " that run in the user's browser."
 "adminconsole.admin_clients.authentication.public_flow_prefix" = "Public clients rely on the "
 "adminconsole.admin_clients.authentication.public_flow_em1" = "Authorization Code"
@@ -778,7 +782,7 @@
 "adminconsole.admin_clients.authentication.public_flow_em2" = "PKCE"
 "adminconsole.admin_clients.authentication.public_flow_suffix" = " for improved security."
 "adminconsole.admin_clients.authentication.confidential_intro_prefix" = "A confidential client can securely maintain the secrecy of its credentials (client identifier and client secret). Examples of confidential clients include "
-"adminconsole.admin_clients.authentication.confidential_intro_em1" = "server-based applications"
+"adminconsole.admin_clients.authentication.confidential_intro_em1" = "server-side web apps"
 "adminconsole.admin_clients.authentication.confidential_intro_middle" = " and "
 "adminconsole.admin_clients.authentication.confidential_intro_em2" = "backend services"
 "adminconsole.admin_clients.authentication.confidential_intro_suffix" = " that can store their client secrets securely on the server."
@@ -790,9 +794,9 @@
 "adminconsole.admin_clients.authentication.copy_link" = "Copy"
 "adminconsole.admin_clients.authentication.copied_link" = "Copied!"
 "adminconsole.admin_clients.authentication.saved_successfully" = "Client authentication saved successfully"
-"adminconsole.admin_clients.authentication.modal.secret_change" = "<span class='text-accent'>You are changing the client secret</span>, and this could potentially affect existing applications that depend on it.<br /><br />Do you want to proceed and save?"
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "<span class='text-accent'>You are switching from confidential to public client</span>. This will remove the client secret, and any applications using it will need to be updated. Outstanding refresh tokens and authorization codes for this client will be revoked; access tokens already issued keep working until they expire, and users stay signed in to other applications.<br /><br />Do you want to proceed and save?"
-"adminconsole.admin_clients.authentication.modal.public_to_confidential" = "<span class='text-accent'>You are switching from public to confidential client</span>. This will require you to update any applications using this client to include a client secret.<br /><br />Do you want to proceed and save?"
+"adminconsole.admin_clients.authentication.modal.secret_change" = "<span class='text-accent'>You are changing the client secret</span>, so anything that still sends the old one will be refused until it is updated.<br /><br />Do you want to proceed and save?"
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "<span class='text-accent'>You are switching from confidential to public client</span>. This will remove the client secret, so anything that signs in with this client will need to be updated. Outstanding refresh tokens and authorization codes for this client will be revoked; access tokens already issued keep working until they expire, and users stay signed in to other clients.<br /><br />Do you want to proceed and save?"
+"adminconsole.admin_clients.authentication.modal.public_to_confidential" = "<span class='text-accent'>You are switching from public to confidential client</span>. Anything that signs in with this client will have to be updated to send a client secret.<br /><br />Do you want to proceed and save?"
 
 # --- Client redirect URIs --------------------------------------------------
 
@@ -815,7 +819,7 @@
 # --- Client web origins ----------------------------------------------------
 
 "adminconsole.admin_clients.web_origins.page_title_prefix" = "Client - Web origins - "
-"adminconsole.admin_clients.web_origins.intro_prefix" = "If your application is Javascript-based and needs to call the "
+"adminconsole.admin_clients.web_origins.intro_prefix" = "If this client runs in the browser and calls the "
 "adminconsole.admin_clients.web_origins.intro_em1" = "/auth/token"
 "adminconsole.admin_clients.web_origins.intro_middle" = " or "
 "adminconsole.admin_clients.web_origins.intro_em2" = "/userinfo"
@@ -830,7 +834,7 @@
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web origins registered for this client"
 "adminconsole.admin_clients.web_origins.remove_label" = "Remove web origin"
 "adminconsole.admin_clients.web_origins.effective_title" = "Origins permitted server-wide"
-"adminconsole.admin_clients.web_origins.effective_note" = "An origin registered against any client is permitted for every client. A browser's CORS preflight carries no client identity, so the server cannot narrow it to one application. The client below is a label saying where the origin was registered."
+"adminconsole.admin_clients.web_origins.effective_note" = "An origin registered against any client is permitted for every client. A browser's CORS preflight carries no client identity, so the server cannot narrow it to one client. The client below is a label saying where the origin was registered."
 "adminconsole.admin_clients.web_origins.col_effective_origin" = "Origin"
 "adminconsole.admin_clients.web_origins.col_effective_client" = "Registered for"
 "adminconsole.admin_clients.web_origins.none_yet" = "(none yet)"
@@ -864,7 +868,7 @@
 "adminconsole.admin_clients.oauth2_flows.recommended_legend" = "Recommended flows"
 "adminconsole.admin_clients.oauth2_flows.legacy_legend" = "Legacy flows (deprecated in OAuth 2.1)"
 "adminconsole.admin_clients.oauth2_flows.auth_code_label" = "Authorization code with PKCE"
-"adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" = "The Authorization Code flow is commonly used for user authentication and authorization in various applications, including web and mobile applications."
+"adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" = "The authorization code flow is the usual one for signing users in, in web, single-page and mobile apps alike."
 "adminconsole.admin_clients.oauth2_flows.enabled" = "Enabled"
 "adminconsole.admin_clients.oauth2_flows.disabled" = "Disabled"
 "adminconsole.admin_clients.oauth2_flows.pkce_question" = "PKCE requirement for this client?"
@@ -888,7 +892,7 @@
 "adminconsole.admin_clients.oauth2_flows.implicit_warning" = "Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are exposed in URLs and browser history, and no refresh tokens can be issued. Use the authorization code flow with PKCE instead whenever possible."
 "adminconsole.admin_clients.oauth2_flows.ropc_label" = "Resource Owner Password Credentials (ROPC)"
 "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" = "RFC 6749 Section 4.3 - The resource owner password credentials grant allows clients to obtain tokens using the user's username and password directly. This flow is deprecated in OAuth 2.1 due to security concerns."
-"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns. User credentials are exposed directly to the client application, bypassing the auth server's sign-in UI. This flow does not support users with two-factor authentication enabled, and a client whose default ACR level is ACR level 3 (mandatory OTP) is refused the grant while its authorization code flow is on, since the grant cannot ask for the one-time code. Use the authorization code flow with PKCE instead whenever possible."
+"adminconsole.admin_clients.oauth2_flows.ropc_warning" = "Warning: The Resource Owner Password Credentials flow is deprecated in OAuth 2.1 and has known security concerns. User credentials are exposed directly to the client, bypassing the auth server's sign-in UI. This flow does not support users with two-factor authentication enabled, and a client whose default ACR level is ACR level 3 (mandatory OTP) is refused the grant while its authorization code flow is on, since the grant cannot ask for the one-time code. Use the authorization code flow with PKCE instead whenever possible."
 "adminconsole.admin_clients.oauth2_flows.saved_successfully" = "Client OAuth2 flows saved successfully"
 
 # --- Admin users (list, create, delete, details) -----------------------------
@@ -1006,7 +1010,7 @@
 "adminconsole.admin_users.picture.uploaded" = "Picture saved."
 "adminconsole.admin_users.picture.deleted" = "Picture deleted."
 "adminconsole.admin_users.picture.delete_title" = "Delete this user's picture?"
-"adminconsole.admin_users.picture.delete_confirm" = "Applications will stop showing it."
+"adminconsole.admin_users.picture.delete_confirm" = "Clients will stop receiving it in the picture claim."
 
 "adminconsole.admin_users.authentication.page_title_prefix" = "User - Authentication - "
 "adminconsole.admin_users.authentication.field.set_password" = "Set password"
@@ -1032,7 +1036,7 @@
 "adminconsole.admin_users.sessions.modal_confirm_title" = "Are you sure?"
 "adminconsole.admin_users.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
 "adminconsole.admin_users.sessions.modal_confirm_body_suffix" = "</span>?"
-"adminconsole.admin_users.sessions.modal_revocation_note" = " <br /><br />Applications the user authorized from this session, including ones that keep working in the background, will need to sign in again."
+"adminconsole.admin_users.sessions.modal_revocation_note" = " <br /><br />Clients the user signed in to from this session, including ones that keep working in the background, will need the user to sign in again."
 "adminconsole.admin_users.sessions.modal_confirm_current_warning" = " <br /><br />Be aware that ending your current session will result in an immediate sign-out."
 "adminconsole.admin_users.sessions.col_device" = "Device"
 "adminconsole.admin_users.sessions.col_clients" = "Clients"
@@ -1165,7 +1169,7 @@
 "adminconsole.admin_groups.settings.include_id_suffix" = " if requested"
 "adminconsole.admin_groups.settings.modal_title" = "Are you sure?"
 "adminconsole.admin_groups.settings.modal_body_em" = "You've modified the group identifier"
-"adminconsole.admin_groups.settings.modal_body_suffix" = ", and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
+"adminconsole.admin_groups.settings.modal_body_suffix" = ", and clients that read the groups claim will see the new one.<br /><br />Are you certain you want to save?"
 "adminconsole.admin_groups.settings.saved_successfully" = "Group settings saved successfully"
 
 # --- Admin groups (attributes, members, permissions) ------------------------
@@ -1301,7 +1305,7 @@
 "adminconsole.admin_resources.settings.page_title_prefix" = "Resource settings - "
 "adminconsole.admin_resources.settings.modal_identifier_title" = "Are you sure?"
 "adminconsole.admin_resources.settings.modal_identifier_em" = "You've modified the resource identifier"
-"adminconsole.admin_resources.settings.modal_identifier_suffix" = ", and this change could potentially affect existing applications that depend on it.<br /><br />Are you certain you want to save?"
+"adminconsole.admin_resources.settings.modal_identifier_suffix" = ", and every scope naming it changes with it, so clients that request those scopes and APIs that check them must be updated.<br /><br />Are you certain you want to save?"
 "adminconsole.admin_resources.settings.modal_system_title" = "Are you sure?"
 "adminconsole.admin_resources.settings.modal_system_body" = "You are about to modify a <span class='text-accent'>system-level resource</span>. Incorrect changes could affect Goiabada's core functionality.<br /><br />Are you sure you want to save?"
 "adminconsole.admin_resources.settings.system_warning" = "This is a system-level resource. Modifying it incorrectly could affect Goiabada's core functionality. Proceed with caution."
@@ -1414,7 +1418,7 @@
 "adminconsole.admin_settings.general.subtitle" = "Settings - General"
 "adminconsole.admin_settings.general.modal_issuer_title" = "Are you sure?"
 "adminconsole.admin_settings.general.modal_issuer_em" = "You are changing the issuer"
-"adminconsole.admin_settings.general.modal_issuer_suffix" = ". This will affect existing applications and tokens that depend on this value. You will also be signed out.<br /><br />Do you want to proceed and save?"
+"adminconsole.admin_settings.general.modal_issuer_suffix" = ". Clients and APIs that check the issuer must be updated to the new one, and tokens issued before carry the old one. You will also be signed out.<br /><br />Do you want to proceed and save?"
 "adminconsole.admin_settings.general.field.app_name" = "App name"
 "adminconsole.admin_settings.general.app_name_tooltip" = "The name for this auth server. It will be displayed in certain areas of the user interface."
 "adminconsole.admin_settings.general.field.issuer" = "Issuer"
@@ -1440,7 +1444,7 @@
 "adminconsole.admin_settings.general.implicit_flow_warning" = "Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are exposed in URLs and browser history. Use the authorization code flow with PKCE instead whenever possible. Only enable this for legacy clients that cannot support the authorization code flow."
 "adminconsole.admin_settings.general.field.ropc_flow_enabled" = "Resource owner password credentials flow enabled"
 "adminconsole.admin_settings.general.ropc_flow_tooltip" = "RFC 6749 Section 4.3 - Enable the OAuth 2.0 resource owner password credentials grant. This allows clients to exchange user credentials directly for tokens. Individual clients can override this setting."
-"adminconsole.admin_settings.general.ropc_flow_warning" = "Warning: The resource owner password credentials flow is deprecated in OAuth 2.1 and exposes user credentials directly to clients. Only enable this for highly trusted first-party applications or legacy migration scenarios. Use the authorization code flow with PKCE whenever possible. Note: Users with two-factor authentication enabled cannot use this flow."
+"adminconsole.admin_settings.general.ropc_flow_warning" = "Warning: The resource owner password credentials flow is deprecated in OAuth 2.1 and exposes user credentials directly to clients. Only enable this for highly trusted first-party clients or legacy migration scenarios. Use the authorization code flow with PKCE whenever possible. Note: Users with two-factor authentication enabled cannot use this flow."
 
 "adminconsole.admin_settings.ui_theme.page_title" = "Theme settings"
 "adminconsole.admin_settings.ui_theme.subtitle" = "Theme"
@@ -1597,7 +1601,7 @@
 "validator.description.angle_brackets" = "The description cannot contain the characters < or >."
 "validator.display_name.angle_brackets" = "The display name cannot contain the characters < or >."
 "validator.attribute.value_angle_brackets" = "The attribute value cannot contain the characters < or >."
-"validator.settings.app_name_angle_brackets" = "The application name cannot contain the characters < or >."
+"validator.settings.app_name_angle_brackets" = "The app name cannot contain the characters < or >."
 "validator.settings.issuer_angle_brackets" = "The issuer cannot contain the characters < or >."
 "validator.settings.smtp_from_name_angle_brackets" = "The from name cannot contain the characters < or >."
 
@@ -1722,11 +1726,11 @@
 
 "handler.account.current_password_required" = "Current password is required."
 "handler.account.new_password_required" = "New password is required."
-"handler.account.current_password_incorrect" = "Authentication failed. Check your current password and try again."
-"handler.account.password_incorrect" = "Authentication failed. Check your password and try again."
+"handler.account.current_password_incorrect" = "That password isn't right. Try again."
+"handler.account.password_incorrect" = "That password isn't right. Try again."
 "handler.account.changed_since_loaded" = "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again."
 "handler.smtp.not_enabled" = "SMTP is not enabled"
-"handler.email_verification.code_invalid_or_expired" = "Invalid or expired verification code"
+"handler.email_verification.code_invalid_or_expired" = "That code isn't right, or it has expired. Send a new one if you need to."
 "handler.account_otp.already_enabled" = "OTP is already enabled"
 "handler.account_otp.secret_key_not_accepted" = "This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app."
 "handler.account_otp.code_required" = "OTP code is required to enable."
@@ -1837,11 +1841,11 @@
 # seven conditions failed is the whole value of the message.
 
 "validator.authorize.client_id_missing" = "The client_id parameter is missing."
-"validator.authorize.client_not_found" = "Invalid client_id parameter. The client does not exist."
-"validator.authorize.client_disabled" = "Invalid client_id parameter. The client is disabled."
+"validator.authorize.client_not_found" = "Invalid client_id parameter. The application does not exist."
+"validator.authorize.client_disabled" = "Invalid client_id parameter. The application is disabled."
 "validator.authorize.redirect_uri_missing" = "The redirect_uri parameter is missing."
 "validator.authorize.redirect_uri_not_absolute" = "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
-"validator.authorize.redirect_uri_not_registered" = "Invalid redirect_uri parameter. The client does not have this redirect URI registered."
+"validator.authorize.redirect_uri_not_registered" = "Invalid redirect_uri parameter. The application does not have this redirect URI registered."
 
 # --- Email subjects ----------------------------------------------------------
 #
@@ -1876,3 +1880,6 @@
 "js.image_upload.uploading" = "Saving…"
 "js.image_upload.upload_failed" = "The image couldn't be saved. Try again."
 "js.image_upload.delete_failed" = "The image couldn't be deleted. Try again."
+"js.combobox.no_matches" = "No matches"
+"js.combobox.one_result" = "1 match"
+"js.combobox.results" = "{{count}} matches"

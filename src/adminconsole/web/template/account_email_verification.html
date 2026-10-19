@@ -30,7 +30,6 @@
       <p>{{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
     </div>
     {{ end }}
-    {{ if $codeForm }}<div id="verification-status" role="status"></div>{{ end }}
 
     {{ if .email }}
     <div>
@@ -51,7 +50,8 @@
     {{ if $codeForm }}
     <p>{{ T $.ctx "adminconsole.account.email_verification.instructions" }}</p>
     <div>
-      <button class="button" type="button" data-send-verification data-sent="{{ T $.ctx "adminconsole.account.email_verification.code_sent" "email" .email }}" data-wait="{{ T $.ctx "adminconsole.account.email_verification.wait" "seconds" "{seconds}" }}">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
+      <button class="button" type="button" data-send-verification data-sent="{{ T $.ctx "adminconsole.account.email_verification.code_sent" "email" .email }}" data-wait="{{ T $.ctx "adminconsole.account.email_verification.wait" "wait" "{wait}" }}">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
+      <div class="not-empty:mt-4" id="verification-status" role="status"></div>
     </div>
     <div class="form-grid">
       <div class="field">

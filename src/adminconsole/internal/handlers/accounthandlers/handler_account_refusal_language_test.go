@@ -38,8 +38,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 			target: "/account/email",
 			form: url.Values{"email": {"new@example.com"}, "emailConfirmation": {"other@example.com"},
 				"currentPassword": {accountEmailFormPassword}},
-			english:    "The email and email confirmation entries must be identical.",
-			portuguese: "Os campos de e-mail e de confirmação de e-mail devem ser idênticos.",
+			english:    "The email addresses don't match.",
+			portuguese: "Os endereços de e-mail não conferem.",
 		},
 		{
 			name:     "a password change whose confirmation differs",

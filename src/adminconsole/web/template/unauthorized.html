@@ -7,5 +7,10 @@
   <h1 class="auth-title">{{ T $.ctx "adminconsole.unauthorized.title" }}</h1>
   <p>{{ T $.ctx "adminconsole.unauthorized.body" }}</p>
   <a class="button button-block" href="/">{{ T $.ctx "common.button.home" }}</a>
+  {{/* Whoever lands here has often signed in with the wrong account. The sign-out is a POST, as the
+       confirmation page's, which the origin check guards; it ends on the home page, signed out. */}}
+  <form class="mt-2" method="post" action="/auth/logout">
+    <button class="button button-quiet button-block" type="submit">{{ T $.ctx "adminconsole.unauthorized.switch_account" }}</button>
+  </form>
 </div>
 {{end}}

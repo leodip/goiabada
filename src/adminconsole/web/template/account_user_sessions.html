@@ -40,8 +40,8 @@
           {{ if .IsCurrent }}<span class="tag tag-note ml-1">{{ T $.ctx "adminconsole.account.sessions.current_label" }}</span>{{ end }}
         </td>
         <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.account.sessions.col_clients" }}">
-          <ul class="font-mono text-sm">
-            {{ range .Clients }}<li>{{ . }}</li>{{ end }}
+          <ul class="grid gap-1">
+            {{ range .ClientNames }}<li>{{ .Name }}{{ if .Unverified }}<span class="tag tag-caution ml-1">{{ T $.ctx "adminconsole.account.sessions.unverified_tag" }}</span>{{ end }}</li>{{ end }}
           </ul>
         </td>
         <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.account.sessions.col_ip" }}">{{ .IpAddress }}</td>

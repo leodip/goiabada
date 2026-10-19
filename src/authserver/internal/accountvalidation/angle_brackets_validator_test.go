@@ -58,7 +58,7 @@ func TestValidateNoAngleBrackets_ReturnsTheCallerSuppliedCode(t *testing.T) {
 		{i18n.ErrCodeDisplayNameAngleBrackets, "The display name cannot contain the characters < or >."},
 		{i18n.ErrCodeAttributeValueAngleBrackets, "The attribute value cannot contain the characters < or >."},
 		{i18n.ErrCodeAddressAngleBrackets, "Address fields cannot contain the characters < or >."},
-		{i18n.ErrCodeSettingsAppNameAngleBrackets, "The application name cannot contain the characters < or >."},
+		{i18n.ErrCodeSettingsAppNameAngleBrackets, "The app name cannot contain the characters < or >."},
 		{i18n.ErrCodeSettingsIssuerAngleBrackets, "The issuer cannot contain the characters < or >."},
 		{i18n.ErrCodeSettingsSmtpFromNameAngleBrackets, "The from name cannot contain the characters < or >."},
 	}

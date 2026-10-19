@@ -64,7 +64,7 @@ One piece of information inside a token, such as `sub` (who the user is) or `ema
 
 ### Client
 
-An application that asks the auth server for tokens: your app, an API calling another API, or the admin console itself. A client is identified by its client identifier, the `client_id` it sends. See [Clients](/concepts/clients/).
+An application that asks the auth server for tokens: your app, an API calling another API, or the admin console itself. A client is identified by its client identifier, the `client_id` it sends. The sign-in pages and the account pages call it an application, since that's how the person signing in knows it. See [Clients](/concepts/clients/).
 
 - A **confidential client** runs on a server and has a client secret.
 - A **public client** runs where it can't keep a secret, such as a browser or a phone, so it has none and must always use PKCE.

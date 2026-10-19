@@ -19,7 +19,7 @@
   <div class="panel-body">
     <div class="image-upload" id="imageUploadContainer"
       data-upload-url="/admin/users/{{ .user.Id }}/picture" data-delete-url="/admin/users/{{ .user.Id }}/picture" data-field-name="picture" data-url-key="pictureUrl"
-      data-crop-mode="square" data-output-format="jpeg"
+      data-crop-mode="square" data-output-format="preserve"
       data-alt="{{ T $.ctx "adminconsole.admin_users.picture.alt_text" }}" data-crop-alt="{{ T $.ctx "adminconsole.admin_users.picture.crop_alt" }}"
       data-uploaded="{{ T $.ctx "adminconsole.admin_users.picture.uploaded" }}" data-deleted="{{ T $.ctx "adminconsole.admin_users.picture.deleted" }}"
       data-delete-title="{{ T $.ctx "adminconsole.admin_users.picture.delete_title" }}" data-delete-confirm="{{ T $.ctx "adminconsole.admin_users.picture.delete_confirm" }}">

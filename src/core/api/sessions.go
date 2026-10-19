@@ -40,10 +40,24 @@ type GetUserSessionResponse struct {
 // were already in the same payload, so they were stale before the page drew them and no
 // locale could reach them; isValid was a field every producer set to true after skipping
 // every session for which it would have been false.
+//
+// Clients names the same clients as ClientIdentifiers, in the same order, each with the name its
+// user is shown for it, so the user's own sessions page names each client as the consent screen
+// did.
 type UserSessionDetailResponse struct {
 	UserSessionResponse
-	IsCurrent         bool     `json:"isCurrent"`
-	ClientIdentifiers []string `json:"clientIdentifiers"`
+	IsCurrent         bool                    `json:"isCurrent"`
+	ClientIdentifiers []string                `json:"clientIdentifiers"`
+	Clients           []SessionClientResponse `json:"clients"`
+}
+
+// SessionClientResponse is one client a session authorized: its identifier, and the name a user is
+// shown for it with whether that name is the client's own claim about itself, which a page then
+// marks as unverified (#108).
+type SessionClientResponse struct {
+	ClientIdentifier string `json:"clientIdentifier"`
+	Name             string `json:"name"`
+	NameUnverified   bool   `json:"nameUnverified"`
 }
 
 type GetUserSessionsResponse struct {

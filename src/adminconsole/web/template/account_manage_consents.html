@@ -30,13 +30,21 @@
       {{ range .consents }}
       <tr>
         <td class="cell-wrap">
-          <span class="font-semibold">{{ .Client }}</span>
-          {{ if .ClientDescription }}<span class="cell-secondary">{{ .ClientDescription }}</span>{{ end }}
+          <span class="font-semibold">{{ .ClientName }}</span>
+          {{ if .ClientNameUnverified }}<span class="tag tag-caution ml-1">{{ T $.ctx "adminconsole.account.consents.unverified_tag" }}</span>
+          <span class="cell-secondary">{{ T $.ctx "adminconsole.account.consents.unverified_note" }}</span>
+          {{ else if .ClientDescription }}<span class="cell-secondary">{{ .ClientDescription }}</span>{{ end }}
         </td>
-        <td class="cell-mono cell-wrap" data-label="{{ T $.ctx "adminconsole.account.consents.col_scope" }}">{{ .Scope }}</td>
-        <td data-label="{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}">{{ DateTime $.ctx .GrantedAt }}</td>
+        <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.account.consents.col_scope" }}">
+          <ul class="grid gap-2">
+            {{ range ScopeList $.ctx .Scope }}
+            <li class="grid gap-0.5">{{ with .Description }}<span>{{ . }}</span>{{ end }}<span class="code-hint">{{ .Scope }}</span></li>
+            {{ end }}
+          </ul>
+        </td>
+        <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.account.consents.col_granted_at" }}">{{ DateTime $.ctx .GrantedAt }}</td>
         <td class="cell-actions">
-          <button class="button button-sm" type="button" data-revoke-consent="{{ .ConsentId }}" data-confirm="{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .Client }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .Client }}</span></button>
+          <button class="button button-sm" type="button" data-revoke-consent="{{ .ConsentId }}" data-confirm="{{ T $.ctx "adminconsole.account.consents.revoke_confirm" "client" .ClientName }}">{{ T $.ctx "adminconsole.account.consents.revoke_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
         </td>
       </tr>
       {{ end }}

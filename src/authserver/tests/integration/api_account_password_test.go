@@ -79,7 +79,7 @@ func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Authentication failed. Check your current password and try again.", errResp.ErrorDescription)
+	assert.Equal(t, "That password isn't right. Try again.", errResp.ErrorDescription)
 }
 
 func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {

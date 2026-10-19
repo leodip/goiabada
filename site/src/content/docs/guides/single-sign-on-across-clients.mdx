@@ -49,7 +49,7 @@ Each app's tokens keep their own lifetimes, set under **Admin**, **Tokens**, or 
 
 ## Signing out
 
-When the user signs out of one app with its ID token as the hint, the auth server removes only that app from the session. The other apps the user signed in to stay signed in, and their normal refresh tokens keep working. The browser's session cookie is cleared, though, so the next sign-in in that browser asks for the password, for every app. See [Sign users out](/guides/sign-users-out/).
+When the user signs out of one app with its ID token as the hint, the auth server removes only that client from the session. The other apps the user signed in to stay signed in, and their normal refresh tokens keep working. The browser's session cookie is cleared, though, so the next sign-in in that browser asks for the password, for every app. See [Sign users out](/guides/sign-users-out/).
 
 The auth server doesn't tell your other apps about a sign-out. Each one keeps its own session until it ends it, or until it next asks the auth server for something the ended session no longer gives, such as a refresh.
 

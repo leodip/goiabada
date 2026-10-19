@@ -38,6 +38,9 @@ var jsBootstrapKeys = []string{
 	"js.image_upload.uploading",
 	"js.image_upload.upload_failed",
 	"js.image_upload.delete_failed",
+	"js.combobox.no_matches",
+	"js.combobox.one_result",
+	"js.combobox.results",
 }
 
 // addUrlParam is the template function that appends one query parameter to a URL. It is one of two
@@ -202,6 +205,9 @@ var templateFuncMap = template.FuncMap{
 		}
 		return m
 	},
+
+	// ScopeList words each scope of a consent as the consent screen does (scopeList).
+	"ScopeList": scopeList,
 
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {

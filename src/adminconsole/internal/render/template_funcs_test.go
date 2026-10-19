@@ -145,15 +145,16 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyTwo pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentyThree pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
-// call four: T, Lang, args and versionComment, which are also here. The other seventeen -- the
+// call four: T, Lang, args and versionComment, which are also here. The other nineteen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
 // reference-data formatters -- are this application's alone, and a new entry here means one of its
-// templates calls it. The twenty-second was marshal, which typed the keys page's JSON as already
-// safe and went in #120, the engine escaping that value itself. CatalogLang is the twenty-second
-// now, the catalog a page rendered from, which its scripts name back on every request (#559).
-func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
+// templates calls it. marshal, which typed the keys page's JSON as already safe, went in #120, the
+// engine escaping that value itself. CatalogLang came in #559, the catalog a page rendered from,
+// which its scripts name back on every request, and ScopeList in #617, the scopes the account
+// consents page names in words.
+func TestTemplateFuncMap_IsThisApplicationsTwentyThree(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -162,7 +163,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
 
 	want := []string{
 		"CatalogLang", "DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
-		"RefTimezone", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
+		"RefTimezone", "ScopeList", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
 		"isAdminClientPage", "isAdminGroupPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",
 	}

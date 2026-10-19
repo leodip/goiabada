@@ -78,7 +78,7 @@
 
       <div class="field">
         <label class="field-label" for="zoneInfo">{{ T $.ctx "adminconsole.account.profile.field.zone_info" }}</label>
-        <select class="control" id="zoneInfo" name="zoneInfo"
+        <select class="control" id="zoneInfo" name="zoneInfo" data-searchable
           {{- if .error }}{{ if eq .errorField "zoneInfo" }} aria-invalid="true" autofocus{{ end }}{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "zoneInfo" }}profile-error {{ end }}{{ end }}zoneInfoHint">
           <option value=""{{ if eq .user.ZoneInfo "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.zone_info_blank" }}</option>
           {{ $user := .user }}
@@ -91,7 +91,7 @@
 
       <div class="field">
         <label class="field-label" for="locale">{{ T $.ctx "adminconsole.account.profile.field.locale" }}</label>
-        <select class="control" id="locale" name="locale" autocomplete="language"
+        <select class="control" id="locale" name="locale" autocomplete="language" data-searchable
           {{- if .error }}{{ if eq .errorField "locale" }} aria-invalid="true" autofocus{{ end }}{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "locale" }}profile-error {{ end }}{{ end }}localeHint">
           <option value=""{{ if eq .user.Locale "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.locale_blank" }}</option>
           {{ range .locales }}

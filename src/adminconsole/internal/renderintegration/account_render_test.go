@@ -599,7 +599,7 @@ func TestRender_AccountSessionsAskWithTheirOwnSentence(t *testing.T) {
 func TestRender_AccountConsentsAskWithTheirOwnSentence(t *testing.T) {
 	const markup = `<b>web-app</b>`
 	out := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
-		"consents": []render.ConsentInfo{{ConsentId: 4, Client: markup, Scope: "openid"}},
+		"consents": []render.ConsentInfo{{ConsentId: 4, Client: "web-app", ClientName: markup, Scope: "openid"}},
 	})
 
 	assert.NotContains(t, out, markup, "the application's name must never reach the page as markup")
@@ -628,7 +628,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		{
 			name: "account",
 			page: "/account_manage_consents.html",
-			cell: `<td data-label="Concedido em">16/09/2026 12:00</td>`,
+			cell: `<td class="sm:whitespace-nowrap" data-label="Concedido em">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
 				"consents": []render.ConsentInfo{{
 					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
@@ -665,6 +665,35 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 	}
 }
 
+// The account pages name each application as the consent screen did, by its name rather than its
+// identifier, and mark a name the application gave itself, as that screen does (#108). The admin
+// pages keep the identifier, which is what an administrator knows a client by.
+func TestRender_AccountPagesNameApplicationsAsTheConsentScreenDid(t *testing.T) {
+	consents := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
+		"consents": []render.ConsentInfo{
+			{ConsentId: 1, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders and invoices", Scope: "openid"},
+			{ConsentId: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, Scope: "openid"},
+		},
+	})
+	assert.Contains(t, consents, `<span class="font-semibold">Customer portal</span>`)
+	assert.Contains(t, consents, `<span class="cell-secondary">Orders and invoices</span>`)
+	assert.Contains(t, consents, `<span class="font-semibold">Payroll Portal</span>`+"\n"+
+		`          <span class="tag tag-caution ml-1">Não verificado</span>`)
+	assert.Contains(t, consents, `<span class="cell-secondary">Este aplicativo se registrou sozinho e não foi verificado.</span>`)
+	assert.NotContains(t, consents, "dcr_a3f9")
+	assert.Equal(t, 1, strings.Count(consents, "Não verificado"), "only the unverified name is marked")
+
+	sessions := renderMenuPage(t, "/account_user_sessions.html", map[string]interface{}{
+		"sessions": []render.SessionInfo{{
+			UserSessionId: 1, DeviceName: "Firefox", DeviceType: "Desktop", DeviceOS: "Linux",
+			Clients:     []string{"portal", "dcr_a3f9"},
+			ClientNames: []render.ClientName{{Name: "Customer portal"}, {Name: "Payroll Portal", Unverified: true}},
+		}},
+	})
+	assert.Contains(t, sessions, `<li>Customer portal</li><li>Payroll Portal<span class="tag tag-caution ml-1">Não verificado</span></li>`)
+	assert.NotContains(t, sessions, "dcr_a3f9")
+}
+
 // A consent whose grantedAt is absent renders an empty cell rather than year 1. The column is NOT
 // NULL in the database, so this is the shape of a response the console cannot date rather than of
 // an ungranted consent (#350), and the guard that used to stand in front of the Format call is now
@@ -676,7 +705,7 @@ func TestRender_ConsentPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
 		}},
 	})
 
-	assert.Contains(t, out, `<td data-label="Concedido em"></td>`, "a nil instant must render an empty cell")
+	assert.Contains(t, out, `<td class="sm:whitespace-nowrap" data-label="Concedido em"></td>`, "a nil instant must render an empty cell")
 	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
 }
 

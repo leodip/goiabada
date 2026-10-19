@@ -305,6 +305,271 @@ function setUpCopyButtons() {
   });
 }
 
+// setUpSearchableSelects turns each select marked data-searchable, a long list such as the time
+// zones, into a combobox: a field that filters the select's options by any part of their text as
+// the person types, accents and case aside, and the matches in a list below it, the WAI-ARIA
+// editable combobox with list autocomplete. The arrow keys move through the matches, Enter or a
+// click chooses one, Escape closes the list and puts back the choice, and leaving the field keeps
+// the option its text names or else puts back the choice too; an empty field chooses the select's
+// empty option, whose text becomes the field's placeholder. The select stays in the form, hidden,
+// and holds the value it posts; the field takes its id, so the label names it, and its
+// aria-invalid, aria-describedby and autofocus. Without JavaScript the select is what the page shows.
+function setUpSearchableSelects() {
+  document.querySelectorAll("select[data-searchable]").forEach(makeSearchable);
+}
+
+function makeSearchable(select) {
+  const fold = function (text) {
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  };
+  const id = select.id;
+  const listId = id + "-options";
+  const label = document.querySelector('label[for="' + id + '"]');
+  if (label && !label.id) {
+    label.id = id + "-label";
+  }
+
+  const combobox = document.createElement("div");
+  combobox.className = "combobox";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "control combobox-input";
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-expanded", "false");
+  input.setAttribute("aria-controls", listId);
+  if (select.hasAttribute("aria-invalid")) {
+    input.setAttribute("aria-invalid", select.getAttribute("aria-invalid"));
+  }
+  if (select.hasAttribute("aria-describedby")) {
+    input.setAttribute("aria-describedby", select.getAttribute("aria-describedby"));
+  }
+
+  const popup = document.createElement("div");
+  popup.className = "combobox-popup";
+  popup.hidden = true;
+  const list = document.createElement("ul");
+  list.id = listId;
+  list.setAttribute("role", "listbox");
+  if (label) {
+    list.setAttribute("aria-labelledby", label.id);
+  }
+  const empty = document.createElement("p");
+  empty.className = "combobox-empty";
+  empty.textContent = t("js.combobox.no_matches");
+  empty.hidden = true;
+  const status = document.createElement("span");
+  status.className = "sr-only";
+  status.setAttribute("role", "status");
+
+  const entries = Array.from(select.options, function (option, index) {
+    const item = document.createElement("li");
+    item.id = listId + "-" + index;
+    item.className = "combobox-option";
+    item.setAttribute("role", "option");
+    item.textContent = option.textContent.trim();
+    list.appendChild(item);
+    return { option: option, item: item, key: fold(item.textContent) };
+  });
+  const blank = entries.find(function (entry) {
+    return entry.option.value === "";
+  });
+  if (blank) {
+    input.placeholder = blank.item.textContent;
+  }
+
+  let shown = entries;
+  let active = -1;
+  // A press that began in the list and has not ended in a choice. On a touch screen the list
+  // cannot always keep the focus in the field, so the blur such a press causes is not the person
+  // leaving the field.
+  let pressInList = false;
+
+  function chosen() {
+    return entries.find(function (entry) {
+      return entry.option.selected;
+    });
+  }
+
+  function showChoice() {
+    const entry = chosen();
+    input.value = entry && entry !== blank ? entry.item.textContent : "";
+  }
+
+  function setActive(index) {
+    if (active >= 0 && shown[active]) {
+      shown[active].item.removeAttribute("aria-selected");
+    }
+    active = index;
+    if (active >= 0) {
+      shown[active].item.setAttribute("aria-selected", "true");
+      shown[active].item.scrollIntoView({ block: "nearest" });
+      input.setAttribute("aria-activedescendant", shown[active].item.id);
+    } else {
+      input.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  function filter() {
+    setActive(-1);
+    const query = fold(input.value.trim());
+    shown = entries.filter(function (entry) {
+      const match = query === "" || entry.key.includes(query);
+      entry.item.hidden = !match;
+      entry.item.classList.toggle("combobox-option-chosen", entry.option.selected);
+      return match;
+    });
+    empty.hidden = shown.length > 0;
+    status.textContent = shown.length === 1 ? t("js.combobox.one_result")
+      : tFormat("js.combobox.results", { count: shown.length });
+  }
+
+  // place opens the list below the field, or above it when there is little room below and more
+  // above, and caps its height at the room on that side within the visible part of the page,
+  // which on a phone leaves out the on-screen keyboard.
+  function place() {
+    const viewport = window.visualViewport;
+    const top = viewport ? viewport.offsetTop : 0;
+    const height = viewport ? viewport.height : window.innerHeight;
+    const box = input.getBoundingClientRect();
+    const below = top + height - box.bottom;
+    const above = box.top - top;
+    const up = below < 192 && above > below;
+    popup.classList.toggle("combobox-popup-up", up);
+    popup.style.maxHeight = Math.max(96, Math.min(256, (up ? above : below) - 12)) + "px";
+  }
+
+  function open() {
+    popup.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    filter();
+    place();
+  }
+
+  function close() {
+    setActive(-1);
+    popup.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    status.textContent = "";
+  }
+
+  function choose(entry) {
+    if (!entry.option.selected) {
+      select.value = entry.option.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    showChoice();
+    close();
+  }
+
+  // commit keeps the option the field's text names, the empty one when the field is empty, and
+  // otherwise puts the choice back, and closes the list.
+  function commit() {
+    const text = fold(input.value.trim());
+    const named = text === "" ? blank : entries.find(function (entry) {
+      return entry.key === text;
+    });
+    if (named) {
+      choose(named);
+    } else {
+      showChoice();
+      close();
+    }
+  }
+
+  input.addEventListener("input", open);
+  input.addEventListener("click", function () {
+    if (popup.hidden) {
+      open();
+    }
+  });
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (popup.hidden) {
+        open();
+      }
+      if (shown.length > 0) {
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        setActive((active + step + shown.length) % shown.length);
+      }
+    } else if (event.key === "Enter" && !popup.hidden) {
+      event.preventDefault();
+      const entry = active >= 0 ? shown[active] : shown[0];
+      if (entry) {
+        choose(entry);
+      }
+    } else if (event.key === "Escape" && !popup.hidden) {
+      event.preventDefault();
+      showChoice();
+      close();
+    }
+  });
+  input.addEventListener("blur", function () {
+    if (!pressInList) {
+      commit();
+    }
+  });
+
+  // A press on the list keeps the focus in the field where the browser lets it, and a tap chooses
+  // on the click that ends it. A finger that scrolls the list instead is cancelled and chooses
+  // nothing.
+  popup.addEventListener("pointerdown", function () {
+    pressInList = true;
+  });
+  popup.addEventListener("pointerup", function () {
+    setTimeout(function () {
+      pressInList = false;
+    }, 400);
+  });
+  popup.addEventListener("pointercancel", function () {
+    pressInList = false;
+  });
+  popup.addEventListener("mousedown", function (event) {
+    event.preventDefault();
+  });
+  list.addEventListener("click", function (event) {
+    pressInList = false;
+    const entry = entries.find(function (candidate) {
+      return candidate.item === event.target.closest(".combobox-option");
+    });
+    if (entry) {
+      choose(entry);
+    }
+  });
+  // A press anywhere else, on a touch screen too, where it does not always blur the field.
+  document.addEventListener("pointerdown", function (event) {
+    if (!popup.hidden && !combobox.contains(event.target)) {
+      commit();
+    }
+  });
+  // The room around the field changes as the page scrolls, and as a phone's keyboard opens.
+  const replace = function () {
+    if (!popup.hidden) {
+      place();
+    }
+  };
+  window.addEventListener("scroll", replace, { passive: true });
+  window.addEventListener("resize", replace);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", replace);
+  }
+
+  const hadFocus = document.activeElement === select || select.autofocus;
+  select.id = id + "-select";
+  select.hidden = true;
+  input.id = id;
+  popup.append(list, empty);
+  combobox.append(input, popup, status);
+  select.after(combobox);
+  showChoice();
+  if (hadFocus) {
+    input.focus();
+  }
+}
+
 function createTrashCanButton(label, onclick, data) {
   return createIconButton([
     "M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"

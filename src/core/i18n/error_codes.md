@@ -55,7 +55,7 @@ address family's code is in the address table above.
 | `validator.description.angle_brackets` | (none) | The description cannot contain the characters < or >. |
 | `validator.display_name.angle_brackets` | (none) | The display name cannot contain the characters < or >. |
 | `validator.attribute.value_angle_brackets` | (none) | The attribute value cannot contain the characters < or >. |
-| `validator.settings.app_name_angle_brackets` | (none) | The application name cannot contain the characters < or >. |
+| `validator.settings.app_name_angle_brackets` | (none) | The app name cannot contain the characters < or >. |
 | `validator.settings.issuer_angle_brackets` | (none) | The issuer cannot contain the characters < or >. |
 | `validator.settings.smtp_from_name_angle_brackets` | (none) | The from name cannot contain the characters < or >. |
 
@@ -219,11 +219,11 @@ failures are one key per cause, each a whole sentence.
 | `handler.client_tokens.include_claims_in_id_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInIdToken. |
 | `handler.account.current_password_required` | (none) | Current password is required. |
 | `handler.account.new_password_required` | (none) | New password is required. |
-| `handler.account.current_password_incorrect` | (none) | Authentication failed. Check your current password and try again. |
-| `handler.account.password_incorrect` | (none) | Authentication failed. Check your password and try again. |
+| `handler.account.current_password_incorrect` | (none) | That password isn't right. Try again. |
+| `handler.account.password_incorrect` | (none) | That password isn't right. Try again. |
 | `handler.account.changed_since_loaded` | (none) | The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again. |
 | `handler.smtp.not_enabled` | (none) | SMTP is not enabled |
-| `handler.email_verification.code_invalid_or_expired` | (none) | Invalid or expired verification code |
+| `handler.email_verification.code_invalid_or_expired` | (none) | That code isn't right, or it has expired. Send a new one if you need to. |
 | `handler.account_otp.already_enabled` | (none) | OTP is already enabled |
 | `handler.account_otp.secret_key_not_accepted` | (none) | This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app. |
 | `handler.account_otp.code_required` | (none) | OTP code is required to enable. |
@@ -333,8 +333,8 @@ these are rendered on the refusal page rather than returned to the client
 | Code | Args | English message |
 |---|---|---|
 | `validator.authorize.client_id_missing` | (none) | The client_id parameter is missing. |
-| `validator.authorize.client_not_found` | (none) | Invalid client_id parameter. The client does not exist. |
-| `validator.authorize.client_disabled` | (none) | Invalid client_id parameter. The client is disabled. |
+| `validator.authorize.client_not_found` | (none) | Invalid client_id parameter. The application does not exist. |
+| `validator.authorize.client_disabled` | (none) | Invalid client_id parameter. The application is disabled. |
 | `validator.authorize.redirect_uri_missing` | (none) | The redirect_uri parameter is missing. |
 | `validator.authorize.redirect_uri_not_absolute` | (none) | Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host. |
-| `validator.authorize.redirect_uri_not_registered` | (none) | Invalid redirect_uri parameter. The client does not have this redirect URI registered. |
+| `validator.authorize.redirect_uri_not_registered` | (none) | Invalid redirect_uri parameter. The application does not have this redirect URI registered. |

@@ -728,8 +728,9 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   test jobs have it. The auth server's pages work with JavaScript off; the console says it needs it.
   In the console a script answers an action in a live region the page draws empty, through
   `showNotice`, not in a dialog; a removal asks first in a `modal_dialog` of type `confirm`, whose
-  second button names the action; a button marked `data-copy-target` copies, as `shell.js` wires
-  it.
+  second button names the action; a button marked `data-copy-target` copies, and a long `select`
+  marked `data-searchable` becomes a `combobox` that filters as the person types, the select kept
+  hidden to post the value, as `shell.js` wires them.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
@@ -761,9 +762,15 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   too. A home of destinations (the console's `index.html`): a `link-list`. A new shape gets its
   reference page and a line here when its first page is built.
 - **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
-  out, client, one-time code, two-factor authentication, auth server. The auth server's pages speak
-  to the person signing in, who knows a client as an application, and call it one, and so do the
-  console's account pages, which speak to the account's owner. Sentence case; a
+  out, client, one-time code, two-factor authentication, auth server. Client and application are one
+  thing with a name per reader. Wherever an administrator or a developer reads, the console's admin
+  pages, the admin API's messages and the docs, it is a client, which is OAuth's word and the API's.
+  Wherever the person signing in reads, the auth server's pages and the console's account pages, it
+  is an application, since that person never registered one; a page quoting such a screen quotes it
+  as it reads. No page calls it both, though a parameter's name, such as `client_id`, stays as it
+  is. On an administrator's page "app" names a kind of software, such as a single-page app or a
+  mobile app, and never a client: a sentence about what uses a client says that ("anything that
+  signs in with this client"). Sentence case; a
   button says what it does ("Save", "New user"); a page title reads "Page – app name". Both catalogs
   change together, a message ID is kept, and a renamed one goes in the release notes, since
   operators' override catalogs are keyed by it.

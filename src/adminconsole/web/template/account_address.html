@@ -56,7 +56,7 @@
 
       <div class="field">
         <label class="field-label" for="addressCountry">{{ T $.ctx "adminconsole.account.address.field.country" }}</label>
-        <select class="control" id="addressCountry" name="addressCountry" autocomplete="country"{{ if .error }}{{ if eq .errorField "addressCountry" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
+        <select class="control" id="addressCountry" name="addressCountry" autocomplete="country" data-searchable{{ if .error }}{{ if eq .errorField "addressCountry" }} aria-invalid="true" aria-describedby="address-error" autofocus{{ end }}{{ end }}>
           <option value=""{{ if eq .address.AddressCountry "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.address.country_blank" }}</option>
           {{ range .countries }}
           <option value="{{ .Alpha2 }}"{{ if eq $.address.AddressCountry .Alpha2 }} selected{{ end }}>{{ .Emoji }} {{ RefCountry $.ctx .Alpha2 .Name }}</option>

@@ -319,7 +319,7 @@ func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Authentication failed. Check your password and try again.", errResp.ErrorDescription)
+	assert.Equal(t, "That password isn't right. Try again.", errResp.ErrorDescription)
 }
 
 func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {

@@ -169,6 +169,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `SearchUsersWithGroupAnnotationResponse` | both-apps | — |
 | `core/api` | `SearchUsersWithPermissionAnnotationResponse` | both-apps | — |
 | `core/api` | `SendTestEmailRequest` | both-apps | — |
+| `core/api` | `SessionClientResponse` | both-apps | — |
 | `core/api` | `SessionLoadRequest` | both-apps | — |
 | `core/api` | `SessionLoadResponse` | both-apps | — |
 | `core/api` | `SessionOwnerResponse` | both-apps | — |

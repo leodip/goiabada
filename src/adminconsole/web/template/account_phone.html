@@ -31,7 +31,7 @@
     <div class="form-grid">
       <div class="field">
         <label class="field-label" for="phoneCountryUniqueId">{{ T $.ctx "adminconsole.account.phone.field.country" }}</label>
-        <select class="control" id="phoneCountryUniqueId" name="phoneCountryUniqueId"{{ if .error }}{{ if eq .errorField "phoneCountryUniqueId" }} aria-invalid="true" aria-describedby="phone-error" autofocus{{ end }}{{ end }}>
+        <select class="control" id="phoneCountryUniqueId" name="phoneCountryUniqueId" data-searchable{{ if .error }}{{ if eq .errorField "phoneCountryUniqueId" }} aria-invalid="true" aria-describedby="phone-error" autofocus{{ end }}{{ end }}>
           <option value=""{{ if eq .selectedPhoneCountryUniqueId "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.phone.country_blank" }}</option>
           {{ range .phoneCountries }}
           <option value="{{ .UniqueId }}"{{ if eq $.selectedPhoneCountryUniqueId .UniqueId }} selected{{ end }}>{{ RefPhoneCountry $.ctx .Emoji .Alpha2 .CallingCode .Name }}</option>

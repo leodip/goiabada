@@ -181,7 +181,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid or expired verification code", errResp.ErrorDescription)
+	assert.Equal(t, "That code isn't right, or it has expired. Send a new one if you need to.", errResp.ErrorDescription)
 	assert.Equal(t, "INVALID_OR_EXPIRED_VERIFICATION_CODE", errResp.ErrorCode)
 }
 
@@ -208,7 +208,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Invalid or expired verification code", errResp.ErrorDescription)
+	assert.Equal(t, "That code isn't right, or it has expired. Send a new one if you need to.", errResp.ErrorDescription)
 }
 
 func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
