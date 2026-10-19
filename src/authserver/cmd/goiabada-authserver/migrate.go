@@ -243,7 +243,6 @@ func walkFlagTokens(fs *flag.FlagSet, command, acceptedAfter string, args []stri
 					name, name)
 			}
 			i++
-			//nolint:gosec // G602: i+1 == len(args) returned above, so i is in range here
 			value = args[i]
 		}
 

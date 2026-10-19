@@ -58,21 +58,6 @@ flag goes before recover.`
 // authority it acts with, so the record says who acted by naming the command itself.
 const recoverActor = "goiabada-authserver recover"
 
-// recoverCommand parses the arguments after `recover`, opens the database they and base describe
-// WITHOUT migrating it, and hands everything to runRecover.
-//
-// Like `migrate`, it is a caller of datafactory.OpenDatabase rather than NewDatabase: recovery is
-// not a schema operation and must not decide one, and the database to recover is one the matching
-// server runs on. Bringing the schema to head, the canary check and the seed are what a start
-// does, and a start is not what an operator locked out of the console needs (#498).
-func recoverCommand(args []string, base config.DatabaseConfig, stdout, stderr io.Writer) int {
-	inv, ok := readRecoverCommand(args, base, stderr)
-	if !ok {
-		return migrateExitUsage
-	}
-	return runRecoverCommand(inv, stdout, stderr)
-}
-
 // readRecoverCommand reads the arguments after `recover` into the invocation it runs, or writes
 // the refusal to stderr and answers false, for an exit with migrateExitUsage. main calls it
 // before the start's first record, so a refusal is the only thing on stderr (#502).
