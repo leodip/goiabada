@@ -92,12 +92,13 @@
   }
 
   // focusLost tells whether an operation's end should place the focus: when it is on nothing, on
-  // Delete, which a deletion disables and its success hides, or in a dialog just closed, where a
-  // browser leaves it until it next tidies up. Focus the person moved elsewhere is not lost, and
-  // stays where they put it.
+  // Delete while a deletion has it disabled or its success has hidden it, or in a dialog just
+  // closed, where a browser leaves it until it next tidies up. Focus the person moved elsewhere is
+  // not lost, Delete usable again included, and stays where they put it.
   function focusLost() {
     const focused = document.activeElement;
-    return !focused || focused === document.body || focused === deleteButton
+    return !focused || focused === document.body
+      || (focused === deleteButton && (deleteButton.disabled || deleteButton.hidden))
       || focused.closest("dialog:not([open])") !== null;
   }
 
