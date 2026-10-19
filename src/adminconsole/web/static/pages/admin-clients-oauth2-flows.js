@@ -29,4 +29,6 @@ function showWarnings() {
 }
 
 flowsForm.addEventListener("change", showWarnings);
+// pageshow comes after the browser restores the form, as on Back, which fires no change.
+window.addEventListener("pageshow", showWarnings);
 showWarnings();

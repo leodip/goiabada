@@ -740,6 +740,9 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   saying, every one in one `modal_dialog` of type `confirm_change`, each from a control marked
   `data-confirm` against the value stored when the page was drawn (`data-stored-value`,
   `data-stored-checked`), as `shell.js` wires them; a form a script saves calls `confirmChanges`.
+  A script that shows something following a control's value shows it again on `pageshow`, since a
+  browser restoring the form, as on Back, fires no change, and a script asking the server about a
+  choice drops an answer to any request but its latest.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

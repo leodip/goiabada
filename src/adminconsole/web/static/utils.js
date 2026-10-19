@@ -644,9 +644,9 @@ function humanSeconds(seconds) {
 }
 
 // setUpDurations writes, under each duration field, the number of seconds typed as a duration a
-// person reads, as the value changes: into each element marked data-duration-for, naming the
-// field, with the sentences describeSeconds takes from the field's form, and the element's own
-// data-duration-global.
+// person reads, as the value changes and as the browser restores it: into each element marked
+// data-duration-for, naming the field, with the sentences describeSeconds takes from the field's
+// form, and the element's own data-duration-global.
 function setUpDurations() {
   document.querySelectorAll("[data-duration-for]").forEach(function (output) {
     const input = document.getElementById(output.dataset.durationFor);
@@ -658,6 +658,8 @@ function setUpDurations() {
       output.textContent = describeSeconds(input.value, messages);
     };
     input.addEventListener("input", debounce(update, 300));
+    // pageshow comes after the browser restores the form, as on Back, which fires no input.
+    window.addEventListener("pageshow", update);
     update();
   });
 }

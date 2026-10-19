@@ -9,7 +9,8 @@
 // which says why; a permission granted or removed is announced, since the change shows only in the
 // list. Save asks first on the admin console's own client, through confirmChanges, then reloads the
 // tab, which says the permissions were saved; a refusal is said in the tab's status region, as is a
-// failure to load a resource's permissions.
+// failure to load a resource's permissions. Choices the browser restores, as on Back, are shown as
+// chosen, with a restored resource's permissions.
 
 const permissionForm = document.getElementById("permissionListForm");
 const resourceSelect = permissionForm.querySelector("[data-resource-select]");
@@ -75,16 +76,17 @@ function showChoiceDescriptions() {
   });
 }
 
-// setPermissions fills the permission field with permissions, after the option asking for one, each
-// labelled with its identifier and its description shortened, and disables it while there are none
-// to choose.
-function setPermissions(permissions) {
+// setPermissions fills the permission field with permissions of the resource resourceIdentifier
+// names, after the option asking for one, each labelled with its identifier and its description
+// shortened and carrying its resource's identifier, and disables it while there are none to choose.
+function setPermissions(permissions, resourceIdentifier) {
   const placeholder = new Option(permissionForm.dataset.choosePermission, "");
   const options = permissions.map(function (permission) {
     const description = (permission.description || "").trim();
     const label = description ? permission.permissionIdentifier + " – " + shorten(description, 50) : permission.permissionIdentifier;
     const option = new Option(label, String(permission.id));
     option.dataset.permissionIdentifier = permission.permissionIdentifier;
+    option.dataset.resourceIdentifier = resourceIdentifier;
     option.dataset.description = description;
     return option;
   });
@@ -93,21 +95,43 @@ function setPermissions(permissions) {
   showChoiceDescriptions();
 }
 
+// The resource the permission field was last asked to show, "" for none, and the number of that
+// request: an answer to an earlier one, which a slow network can deliver last, is dropped, so the
+// field never shows, nor grants, the permissions of a resource no longer chosen.
+let requestedResource = "";
+let permissionsRequest = 0;
+
 function loadPermissions() {
+  const option = resourceSelect.selectedOptions[0];
+  const resource = resourceSelect.value;
+  const resourceIdentifier = option ? option.dataset.resourceIdentifier : "";
+  const request = ++permissionsRequest;
+  requestedResource = resource;
   clearRefusal();
-  setPermissions([]);
-  if (resourceSelect.value === "") {
+  setPermissions([], "");
+  if (resource === "") {
     return;
   }
   sendAjaxRequest({
-    url: "/admin/get-permissions?" + new URLSearchParams({ resourceId: resourceSelect.value }),
+    url: "/admin/get-permissions?" + new URLSearchParams({ resourceId: resource }),
     method: "GET",
     bodyData: null,
     statusRegion: permissionStatus,
     callback: function (result) {
-      setPermissions(result.Permissions);
+      if (request === permissionsRequest && resourceSelect.value === resource) {
+        setPermissions(result.Permissions, resourceIdentifier);
+      }
     }
   });
+}
+
+// showRestoredChoices brings the page in line with choices the browser restored without saying so,
+// as it does on Back: the descriptions, and the permissions of a resource restored chosen.
+function showRestoredChoices() {
+  showChoiceDescriptions();
+  if (resourceSelect.value !== requestedResource) {
+    loadPermissions();
+  }
 }
 
 // The row a permission is drawn in, built with DOM calls, so its scope is shown as text (#120).
@@ -145,8 +169,7 @@ function grant() {
     return;
   }
   clearRefusal();
-  const resource = resourceSelect.selectedOptions[0].dataset.resourceIdentifier;
-  permissionRows.appendChild(rowFor(id, resource + ":" + option.dataset.permissionIdentifier));
+  permissionRows.appendChild(rowFor(id, option.dataset.resourceIdentifier + ":" + option.dataset.permissionIdentifier));
   showEmpty();
   permissionSelect.value = "";
   showChoiceDescriptions();
@@ -205,7 +228,5 @@ permissionForm.addEventListener("submit", function (event) {
   event.preventDefault();
   confirmChanges(permissionForm, save);
 });
-// A page the browser restores with a resource still chosen asks again for its permissions.
-if (resourceSelect.value !== "") {
-  loadPermissions();
-}
+// pageshow comes after the browser restores the form, on the first visit and on Back alike.
+window.addEventListener("pageshow", showRestoredChoices);

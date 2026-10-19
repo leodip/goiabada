@@ -1,8 +1,9 @@
 // admin-clients-authentication.js is the client authentication tab's behaviour. The secret shows
 // only for a confidential client, and choosing confidential for a client with none generates one.
 // Show and Hide reveal the secret, which is drawn hidden, and Generate asks the console for a new
-// one, which the field then shows, saying so in the tab's status region, as it says a failure. The
-// save, which asks first about a change of type and about a new secret, is shell.js's.
+// one, which the field then shows, saying so in the tab's status region, as it says a failure. A
+// type the browser restores, as on Back, is shown as chosen. The save, which asks first about a
+// change of type and about a new secret, is shell.js's.
 
 const secretPanel = document.getElementById("confidentialClientPanel");
 const secretField = document.getElementById("clientSecret");
@@ -44,6 +45,8 @@ function showType() {
 document.querySelectorAll("input[name=publicConfidential]").forEach(function (radio) {
   radio.addEventListener("change", showType);
 });
+// pageshow comes after the browser restores the form, as on Back, which fires no change.
+window.addEventListener("pageshow", showType);
 showButton.addEventListener("click", function () {
   showSecret(secretField.type === "password");
 });
