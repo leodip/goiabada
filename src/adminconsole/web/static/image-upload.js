@@ -24,17 +24,24 @@
 // The crop dialog is the crop_dialog partial: the cropper's canvas in #cropArea, and sliders that
 // do what dragging the crop does, for a keyboard or a single tap: #cropZoom, #cropX and #cropY, and
 // for a free crop #cropWidth and #cropHeight. The crop is kept in the image's own pixels, so the
-// sliders, the drawn selection and the image sent agree whatever size the dialog is drawn at, and
-// it never leaves the image. The dialog is a <dialog>, so Escape cancels it and focus goes back to
-// the button that opened it, and whichever way it closes it lets go of the chosen file. While the
-// crop is being sent it stays open, Cancel disabled and Escape ignored, and the Upload button is
-// disabled, so nothing starts another crop before the server answers.
+// sliders and the drawn selection agree whatever size the dialog is drawn at, and it never leaves
+// the image; what is sent is drawn from the chosen image's own pixels by the same crop. The dialog is a <dialog>, so Escape cancels it and focus goes back to
+// the button that opened it, and whichever way it closes it lets go of the chosen file. One image
+// operation runs at a time: while a crop is being sent its dialog stays open, Cancel disabled,
+// Escape ignored and the cropper locked, and the Upload and Delete buttons are disabled until the
+// server answers, as Upload is while a deletion runs. A browser that closes the dialog anyway, as
+// some do on a repeated Escape, takes nothing with it: the sending carries on, the status region
+// says so, and the buttons stay disabled until it is done.
 
 (function () {
   const maxSize = 3 * 1024 * 1024;
   const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
   // The least of the image a crop covers, as a share of its width or height.
   const minShare = 0.1;
+  // The sides the auth server accepts an image at, imageupload.MinDimension and MaxDimension: a
+  // crop is sent with each side between them, so it is never refused for its size.
+  const outputMin = 10;
+  const outputMax = 512;
 
   const container = document.getElementById("imageUploadContainer");
   if (!container) {
@@ -60,9 +67,11 @@
     height: document.getElementById("cropHeight")
   };
 
-  // The open crop: the cropper, the chosen file's type, the image's own size, the crop in the
-  // image's pixels, and where the image is drawn in the cropper's canvas, set once it is drawn.
+  // The open crop: the cropper, the chosen image and its file's type, the image's own size, the crop
+  // in the image's pixels, and where the image is drawn in the cropper's canvas, set once it is
+  // drawn.
   let cropper = null;
+  let source = null;
   let fileType = null;
   let natural = null;
   let crop = null;
@@ -136,6 +145,7 @@
   // openCrop opens the dialog over image and, once the cropper has drawn it, starts the crop at
   // the whole image, the largest centered square of it for a picture.
   function openCrop(image) {
+    source = image;
     natural = { width: image.naturalWidth, height: image.naturalHeight };
     cropArea.replaceChildren(image);
     cropDialog.showModal();
@@ -194,17 +204,27 @@
     fit();
   }
 
-  // clamp keeps a crop to its shape, at least minShare of the image and at most all of it, and
-  // within the image.
+  // least is the least a side of the crop may be: minShare of the image's side, and no fewer pixels
+  // than the auth server accepts unless the image itself has fewer.
+  function least(side) {
+    return Math.min(side, Math.max(side * minShare, outputMin));
+  }
+
+  // clamp keeps a crop to its shape, at least least() and at most all of the image, a free crop no
+  // longer than outputMax / outputMin times its width or height, the most the auth server's bounds
+  // allow, and within the image.
   function clamp(next) {
     let width;
     let height;
     if (free) {
-      width = Math.min(Math.max(next.width, natural.width * minShare), natural.width);
-      height = Math.min(Math.max(next.height, natural.height * minShare), natural.height);
+      width = Math.min(Math.max(next.width, least(natural.width)), natural.width);
+      height = Math.min(Math.max(next.height, least(natural.height)), natural.height);
+      const ratio = outputMax / outputMin;
+      width = Math.min(width, height * ratio);
+      height = Math.min(height, width * ratio);
     } else {
       const most = Math.min(natural.width, natural.height);
-      width = Math.min(Math.max(next.width, most * minShare), most);
+      width = Math.min(Math.max(next.width, least(most)), most);
       height = width;
     }
     return {
@@ -223,9 +243,10 @@
     update();
   }
 
-  // followSelection has the crop follow a dragged selection, and refuses a move or resize that
-  // would take it off the image or below the least crop. Half a drawn pixel of slack allows for
-  // the rounding of what is drawn.
+  // followSelection has the crop follow a dragged selection. A change that would take it off the
+  // image, beyond what floating point leaves over, is refused, so what is drawn, and so what is
+  // exported, never leaves the image; a move refused that way is drawn at the image's edge instead,
+  // which is where the person was taking it. A change below the least crop is refused too.
   function followSelection(event) {
     const box = event.detail;
     if (!drawn || (box.width === 0 && box.height === 0)) {
@@ -237,12 +258,23 @@
       width: box.width / drawn.scale,
       height: box.height / drawn.scale
     };
-    const slack = 0.5 / drawn.scale;
-    const least = clamp({ x: 0, y: 0, width: 0, height: 0 });
-    if (next.x < -slack || next.y < -slack
-      || next.x + next.width > natural.width + slack || next.y + next.height > natural.height + slack
-      || next.width < least.width - slack || next.height < least.height - slack) {
+    const epsilon = 1e-6;
+    const smallest = clamp({ x: 0, y: 0, width: 0, height: 0 });
+    if (next.width < smallest.width - epsilon || next.height < smallest.height - epsilon) {
       event.preventDefault();
+      return;
+    }
+    if (next.x < -epsilon || next.y < -epsilon
+      || next.x + next.width > natural.width + epsilon || next.y + next.height > natural.height + epsilon) {
+      event.preventDefault();
+      const moved = Math.abs(next.width - crop.width) < 1e-3 && Math.abs(next.height - crop.height) < 1e-3;
+      if (moved) {
+        queueMicrotask(function () {
+          if (drawn && !uploading) {
+            show(next);
+          }
+        });
+      }
       return;
     }
     crop = clamp(next);
@@ -274,6 +306,9 @@
       sliders.height.disabled = !usable;
     }
     confirmButton.disabled = !usable;
+    if (cropper) {
+      cropper.getCropperCanvas().disabled = !usable;
+    }
   }
 
   function setSlider(slider, value) {
@@ -294,6 +329,7 @@
     }
     cropArea.replaceChildren();
     fileInput.value = "";
+    source = null;
     fileType = null;
     natural = null;
     crop = null;
@@ -301,17 +337,37 @@
     update();
   }
 
-  // The size the crop is sent at: 512 by 512 when square, the crop's own size with its longest
-  // side at most 512 when free.
+  // The size the crop is sent at: outputMax square when square, and when free the crop's own size,
+  // shrunk so its longest side is at most outputMax, or grown so its shortest is at least
+  // outputMin, which clamp's bound on its shape keeps from both at once.
   function outputSize() {
     if (!free) {
-      return { width: 512, height: 512 };
+      return { width: outputMax, height: outputMax };
     }
-    const scale = Math.min(1, 512 / Math.max(crop.width, crop.height));
-    return {
-      width: Math.max(1, Math.round(crop.width * scale)),
-      height: Math.max(1, Math.round(crop.height * scale))
+    let scale = Math.min(1, outputMax / Math.max(crop.width, crop.height));
+    scale = Math.max(scale, outputMin / Math.min(crop.width, crop.height));
+    const side = function (length) {
+      return Math.min(outputMax, Math.max(outputMin, Math.round(length * scale)));
     };
+    return { width: side(crop.width), height: side(crop.height) };
+  }
+
+  // exportCrop draws the crop at size from the chosen image's own pixels, the crop being within the
+  // image, so nothing outside it is sampled. JPEG has no transparency: what the image leaves
+  // transparent is sent white.
+  function exportCrop(size, format) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d");
+    if (format.type === "image/jpeg") {
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, size.width, size.height);
+    }
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, crop.x, crop.y, crop.width, crop.height, 0, 0, size.width, size.height);
+    return canvas;
   }
 
   // The format the crop is sent in: the file name, its type and the quality.
@@ -327,46 +383,44 @@
     return { name: "image.jpg", type: "image/jpeg", quality: 0.9 };
   }
 
-  // setUploading holds the dialog open, and every control that could start another crop or change
-  // this one disabled, while the crop is being sent.
+  // setUploading holds the dialog open, and every control that could start another image operation
+  // or change this crop disabled, while the crop is being sent.
   function setUploading(on) {
     uploading = on;
     cancelButton.disabled = on;
     uploadButton.disabled = on;
+    deleteButton.disabled = on;
     confirmButton.textContent = on ? t("js.image_upload.uploading") : confirmLabel;
     update();
+  }
+
+  // settle ends the sending: the controls back, the dialog closed if it is still open, which gives
+  // the focus back to Upload, and the focus put there when a dialog the browser closed left it on
+  // nothing.
+  function settle() {
+    setUploading(false);
+    if (cropDialog.open) {
+      cropDialog.close();
+    }
+    if (!document.activeElement || document.activeElement === document.body) {
+      uploadButton.focus();
+    }
   }
 
   function confirmCrop() {
     if (!drawn || uploading) {
       return;
     }
-    const size = outputSize();
     const format = outputFormat();
+    const canvas = exportCrop(outputSize(), format);
     setUploading(true);
-    cropper.getCropperSelection().$toCanvas({
-      width: size.width,
-      height: size.height,
-      beforeDraw: function (context, canvas) {
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-        // JPEG has no transparency: what the image leaves transparent is sent white.
-        if (format.type === "image/jpeg") {
-          context.fillStyle = "#fff";
-          context.fillRect(0, 0, canvas.width, canvas.height);
-        }
+    canvas.toBlob(function (blob) {
+      if (blob) {
+        upload(blob, format.name);
+      } else {
+        failUpload(t("js.image_upload.upload_failed"));
       }
-    }).then(function (canvas) {
-      canvas.toBlob(function (blob) {
-        if (blob) {
-          upload(blob, format.name);
-        } else {
-          failUpload(t("js.image_upload.upload_failed"));
-        }
-      }, format.type, format.quality);
-    }, function () {
-      failUpload(t("js.image_upload.upload_failed"));
-    });
+    }, format.type, format.quality);
   }
 
   function upload(blob, name) {
@@ -388,10 +442,7 @@
         return data;
       }))
       .then((data) => {
-        // The Upload button is enabled again before the dialog closes, so the focus the dialog
-        // gives back to it is kept.
-        setUploading(false);
-        cropDialog.close();
+        settle();
         showImage(data[config.urlKey]);
         showNotice(status, "positive", config.uploaded);
       })
@@ -401,8 +452,7 @@
   }
 
   function failUpload(message) {
-    setUploading(false);
-    cropDialog.close();
+    settle();
     showNotice(status, "danger", message);
   }
 
@@ -410,13 +460,14 @@
     showModalDialog("deleteImage", config.deleteTitle, config.deleteConfirm, null, deleteImage);
   }
 
-  // deleteImage deletes the image. The Delete button is disabled while it does, which drops its
-  // focus, the focus its dialog gave back to it, so where focus goes is decided from before: to the
-  // Upload button once the image and its Delete button are gone, back to Delete when the deletion
-  // fails.
+  // deleteImage deletes the image. Delete and Upload are disabled while it does, which drops
+  // Delete's focus, the focus its dialog gave back to it, so where focus goes is decided from
+  // before: to the Upload button once the image and its Delete button are gone, back to Delete when
+  // the deletion fails.
   function deleteImage() {
     const hadFocus = document.activeElement === deleteButton;
     deleteButton.disabled = true;
+    uploadButton.disabled = true;
     fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: csrfHeaders() })
       .then((response) => response.json().then((data) => {
         // As the upload does: a refused access token signs out at once.
@@ -430,6 +481,7 @@
         return data;
       }))
       .then(() => {
+        uploadButton.disabled = false;
         showImage(null);
         if (hadFocus) {
           uploadButton.focus();
@@ -440,6 +492,7 @@
         showNotice(status, "danger", error.message);
       })
       .finally(() => {
+        uploadButton.disabled = false;
         deleteButton.disabled = false;
         if (hadFocus && !deleteButton.hidden) {
           deleteButton.focus();
@@ -479,7 +532,12 @@
       event.preventDefault();
     }
   });
-  cropDialog.addEventListener("close", releaseFile);
+  cropDialog.addEventListener("close", function () {
+    if (uploading) {
+      showNotice(status, "note", t("js.image_upload.uploading"));
+    }
+    releaseFile();
+  });
   sliders.zoom.addEventListener("input", function () {
     const share = 1 - Number(sliders.zoom.value) / 100 * (1 - minShare);
     const scale = share / Math.max(crop.width / natural.width, crop.height / natural.height);
