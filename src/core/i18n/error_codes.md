@@ -131,11 +131,7 @@ status it always had (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
 `SECRET_KEY_NOT_ACCEPTED`, `OTP_CODE_REQUIRED`, `INVALID_OTP_CODE`,
 `OTP_ENROLLMENT_NOT_PENDING`, `SEND_FAILED`, `ROTATION_IN_PROGRESS`), so the key is not on the wire: only
 `error_description` comes from here, in the request's language.
-The resource permissions save's description bound reuses
-`handler.admin_resource_permissions.description_too_long` above, a group's and
-a user's attribute key reuses `handler.attribute.key_required`, the user's
-phone country refusal reuses `validator.phone.country_invalid`, and a client's
-identifier refusal reuses `handler.client.identifier_required`. The account API's
+The account API's
 disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
 its wrong code on enabling one `handler.otp.incorrect_code`, its email
 verification send's conflict `handler.email_verification.account_changed`, and
@@ -154,33 +150,8 @@ failures are one key per cause, each a whole sentence.
 | `handler.administrators.last_administrator` | (none) | This change would leave no enabled user holding authserver:manage. Grant it to another user first. |
 | `handler.image_upload.too_large` | (none) | File too large or invalid form data |
 | `handler.image_upload.no_file` | (none) | No picture file provided |
-| `handler.resource.identifier_required` | (none) | Resource identifier is required |
-| `handler.resource.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
-| `handler.resource.identifier_in_use` | (none) | The resource identifier is already in use |
-| `handler.resource.identifier_names_client` | (none) | The resource identifier is already in use by a client |
-| `handler.resource.system_level_identifier_fixed` | (none) | The identifier of a system-level resource cannot be changed. |
-| `handler.resource.system_level_delete_not_allowed` | (none) | Trying to delete a system level resource |
-| `handler.permission.duplicate_ids` | (none) | Duplicate permission IDs in request are not allowed |
-| `handler.permission.identifier_required` | (none) | Permission identifier is required |
-| `handler.permission.duplicated` | `identifier` (string) | Permission {{.identifier}} is duplicated. |
-| `handler.permission.built_in_deleted` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be deleted. |
-| `handler.permission.built_in_renamed` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be renamed. |
-| `handler.permission.identifier_in_use` | `identifier` (string) | Permission identifier {{.identifier}} is already in use. |
-| `handler.group.identifier_required` | (none) | Group identifier is required |
-| `handler.group.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
-| `handler.group.identifier_in_use` | (none) | The group identifier is already in use |
-| `handler.group_member.already_member` | (none) | User is already a member of this group |
-| `handler.group_member.not_member` | (none) | User is not a member of this group |
-| `handler.group_attribute.group_id_required` | (none) | Group ID is required |
-| `handler.attribute.value_too_long` | `max` (int) | The attribute value cannot exceed a maximum length of {{.max}} characters |
-| `handler.user.email_required` | (none) | Email is required |
 | `handler.user.email_too_long` | `max` (int) | The email address cannot exceed a maximum length of {{.max}} characters |
-| `handler.user.set_password_type_invalid` | (none) | setPasswordType must be "now" or "email" |
-| `handler.user.password_required` | (none) | Password is required |
-| `handler.user.new_password_required` | (none) | New password is required |
-| `handler.user.otp_enable_not_supported` | (none) | Enabling OTP is not supported through this endpoint |
 | `handler.user.otp_not_enabled` | (none) | User does not have OTP enabled |
-| `handler.user_groups.too_many` | (none) | Too many group ids |
 | `handler.email_verification.account_changed` | (none) | The account was changed by another request while the code was being sent. Nothing was sent: try again. |
 | `handler.account.current_password_required` | (none) | Current password is required. |
 | `handler.account.new_password_required` | (none) | New password is required. |
@@ -249,12 +220,16 @@ failures are one key per cause, each a whole sentence.
 | `handler.settings_audit_logs.retention_days_negative` | (none) | Audit log retention days cannot be negative. Use 0 for infinite retention. |
 | `handler.settings_audit_logs.retention_days_too_large` | (none) | Audit log retention days cannot exceed 3650 days (10 years). |
 
-## Client refusals the admin API answers by key
+## Refusals the admin API answers by key
 
-The admin API's clients operations write each of these with the key itself as
-the `error_code`, as `validator.*` keys are written, so the admin console marks
-the field a refusal is about (#617). The client identifier left blank is
-`handler.client.identifier_required`, above, written the same way.
+The admin API's operations on clients, users, groups and resources write each
+of these with the key itself as the `error_code`, as `validator.*` keys are
+written, so the admin console marks the field a refusal is about (#617). Some
+reuse a key from above, written the same way: a client's identifier left blank
+`handler.client.identifier_required`, a group's and a user's attribute key
+`handler.attribute.key_required`, the resource permissions save's description
+bound `handler.admin_resource_permissions.description_too_long`, and the user's
+phone country `validator.phone.country_invalid`.
 
 | Code | Args | English message |
 |---|---|---|
@@ -293,6 +268,31 @@ the field a refusal is about (#617). The client identifier left blank is
 | `handler.client_tokens.offline_idle_timeout_above_max_lifetime` | (none) | The offline idle timeout can't be longer than the offline maximum lifetime. |
 | `handler.client_tokens.include_claims_in_access_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInAccessToken. |
 | `handler.client_tokens.include_claims_in_id_token_invalid` | (none) | Invalid value for includeOpenIDConnectClaimsInIdToken. |
+| `handler.resource.identifier_required` | (none) | Resource identifier is required |
+| `handler.resource.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
+| `handler.resource.identifier_in_use` | (none) | The resource identifier is already in use |
+| `handler.resource.identifier_names_client` | (none) | The resource identifier is already in use by a client |
+| `handler.resource.system_level_identifier_fixed` | (none) | The identifier of a system-level resource cannot be changed. |
+| `handler.resource.system_level_delete_not_allowed` | (none) | Trying to delete a system level resource |
+| `handler.permission.duplicate_ids` | (none) | Duplicate permission IDs in request are not allowed |
+| `handler.permission.identifier_required` | (none) | Permission identifier is required |
+| `handler.permission.duplicated` | `identifier` (string) | Permission {{.identifier}} is duplicated. |
+| `handler.permission.built_in_deleted` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be deleted. |
+| `handler.permission.built_in_renamed` | `identifier` (string) | Built-in permission '{{.identifier}}' cannot be renamed. |
+| `handler.permission.identifier_in_use` | `identifier` (string) | Permission identifier {{.identifier}} is already in use. |
+| `handler.group.identifier_required` | (none) | Group identifier is required |
+| `handler.group.description_too_long` | `max` (int) | The description cannot exceed a maximum length of {{.max}} characters |
+| `handler.group.identifier_in_use` | (none) | The group identifier is already in use |
+| `handler.group_member.already_member` | (none) | User is already a member of this group |
+| `handler.group_member.not_member` | (none) | User is not a member of this group |
+| `handler.group_attribute.group_id_required` | (none) | Group ID is required |
+| `handler.attribute.value_too_long` | `max` (int) | The attribute value cannot exceed a maximum length of {{.max}} characters |
+| `handler.user.email_required` | (none) | Email is required |
+| `handler.user.set_password_type_invalid` | (none) | setPasswordType must be "now" or "email" |
+| `handler.user.password_required` | (none) | Password is required |
+| `handler.user.new_password_required` | (none) | New password is required |
+| `handler.user.otp_enable_not_supported` | (none) | Enabling OTP is not supported through this endpoint |
+| `handler.user_groups.too_many` | (none) | Too many group ids |
 
 ## Password validator
 

@@ -67,23 +67,44 @@ servers:
 
 tags:
   - name: Users
-    description: User management (Admin API)
+    description: >-
+      User management (Admin API). A refused value in a request body answers 400 with the refusal's
+      catalog key as its error_code, such as handler.user.email_required; a malformed id and a
+      missing expected list answer VALIDATION_ERROR.
   - name: User Attributes
-    description: Custom user attributes (Admin API)
+    description: >-
+      Custom user attributes (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.attribute.key_required; a malformed
+      id and a missing expected list answer VALIDATION_ERROR.
   - name: User Sessions
     description: User session management (Admin API)
   - name: User Consents
     description: OAuth consent management (Admin API)
   - name: Groups
-    description: Group management (Admin API)
+    description: >-
+      Group management (Admin API). A refused value in a request body answers 400 with the refusal's
+      catalog key as its error_code, such as handler.group.identifier_in_use; a malformed id and a
+      missing expected list answer VALIDATION_ERROR.
   - name: Group Members
-    description: Group membership management (Admin API)
+    description: >-
+      Group membership management (Admin API). Adding a user who is already a member answers 400
+      with error_code handler.group_member.already_member, and removing one who is not with
+      handler.group_member.not_member; a malformed id answers VALIDATION_ERROR.
   - name: Group Attributes
-    description: Custom group attributes (Admin API)
+    description: >-
+      Custom group attributes (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.attribute.value_too_long; a malformed
+      id and a missing expected list answer VALIDATION_ERROR.
   - name: Resources
-    description: Resource management (Admin API)
+    description: >-
+      Resource management (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.resource.identifier_in_use; a
+      malformed id and a missing expected list answer VALIDATION_ERROR.
   - name: Permissions
-    description: Permission management (Admin API)
+    description: >-
+      Permission management (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.permission.identifier_in_use; a
+      malformed id and a missing expected list answer VALIDATION_ERROR.
   - name: Clients
     description: >-
       OAuth client management (Admin API). A refused value in a request body answers 400 with the
@@ -1755,7 +1776,8 @@ paths:
         one without creates it, and a stored permission the list leaves out is deleted.
 
         The built-in permissions of the `authserver` resource cannot be renamed or deleted, by
-        any caller. Changing the description of one of its administrative permissions needs
+        any caller: the save is refused with handler.permission.built_in_renamed or
+        handler.permission.built_in_deleted. Changing the description of one of its administrative permissions needs
         `authserver:manage`, because the admin console shows that description to an operator
         choosing a permission to grant: `authserver:manage-settings` is refused with 403
         MANAGE_SCOPE_REQUIRED.
@@ -4628,8 +4650,8 @@ components:
           maxItems: 1000
           description: >-
             The complete set of groups the user belongs to after the call. An array naming more
-            than 1000 groups is refused with VALIDATION_ERROR before any of them is read back,
-            because every id is validated against the database and the list is read in
+            than 1000 groups is refused with handler.user_groups.too_many before any of them is
+            read back, because every id is validated against the database and the list is read in
             statement-sized batches.
           items:
             type: integer
