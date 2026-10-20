@@ -37,7 +37,18 @@ func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 // core/guard.AssertWellFormedTemplates, which carries each rule and its reasoning (#617). Each page
 // is read as served, in the layouts the handlers under ../internal render it in.
 func TestTemplates_AreWellFormed(t *testing.T) {
-	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates, nil)
+	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates)
+}
+
+// TestPages_NameOnlyClassesMainCSSDraws holds every class a page or a script names to a rule in the
+// served main.css, through core/guard.AssertClassesAreDrawn, so a misspelt or leftover class fails
+// here rather than leaving an element undrawn (#617).
+func TestPages_NameOnlyClassesMainCSSDraws(t *testing.T) {
+	css, err := staticFS.ReadFile("static/main.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard.AssertClassesAreDrawn(t, css, templateFS, staticFS)
 }
 
 // emailTemplates are not pages: no rule reads them.

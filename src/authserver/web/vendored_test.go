@@ -1,8 +1,6 @@
 package web
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,35 +8,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// versionsYAML is the file the vendored web dependencies are pinned in, read from the source tree
-// rather than embedded, since it ships in neither binary.
-const versionsYAML = "../../authserver/versions.yaml"
-
-// vendoredPin reads one key of versions.yaml's vendored section, a quoted string on a line of its
-// own, which is the shape version-manager.sh writes.
-func vendoredPin(t *testing.T, key string) string {
-	t.Helper()
-	content, err := os.ReadFile(versionsYAML)
-	if err != nil {
-		t.Fatalf("reading %s: %v", versionsYAML, err)
-	}
-	section := string(content)
-	at := strings.Index(section, "\nvendored:\n")
-	if at < 0 {
-		t.Fatalf("%s has no vendored section", versionsYAML)
-	}
-	m := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(key) + `: "([^"]*)"$`).FindStringSubmatch(section[at:])
-	if m == nil {
-		t.Fatalf("%s pins no vendored.%s", versionsYAML, key)
-	}
-	return m[1]
-}
-
-func sha256Hex(b []byte) string {
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
-}
 
 // thirdPartyAsset matches a script or stylesheet loaded from another origin: an absolute or
 // protocol-relative URL in a script's src or a link's href. Each page's assets are served from
@@ -103,59 +72,6 @@ func TestMainCSS_HoldsEveryClassTheCatalogsWrite(t *testing.T) {
 	for class := range classes {
 		if !regexp.MustCompile(`\.` + regexp.QuoteMeta(class) + `\b`).Match(css) {
 			t.Errorf("a catalog writes class %q, which main.css lacks: add it to input.css's @source inline and rebuild", class)
-		}
-	}
-}
-
-// daisyUI's standalone-CLI bundle, which this server's main.css is built with, is the file
-// versions.yaml pins, byte for byte, beside input.css (#542). It ships in no binary, so it is
-// read off disk.
-func TestDaisyUIBundle_IsTheFileVersionsYAMLPins(t *testing.T) {
-	const bundle = "tailwindcss/daisyui.mjs"
-	content, err := os.ReadFile(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := sha256Hex(content), vendoredPin(t, "daisyui-sha256"); got != want {
-		t.Errorf("%s has SHA-256 %s, and versions.yaml pins %s: run ./version-manager.sh update", bundle, got, want)
-	}
-	if !strings.Contains(string(content), `"`+vendoredPin(t, "daisyui")+`"`) {
-		t.Errorf("%s does not carry the version versions.yaml pins, %s", bundle, vendoredPin(t, "daisyui"))
-	}
-	if _, err := os.Stat("tailwindcss/daisyui.LICENSE"); err != nil {
-		t.Errorf("%s has no daisyui.LICENSE beside it: %v", bundle, err)
-	}
-}
-
-// classSelector is a class name in a stylesheet or in daisyUI's bundle.
-var classSelector = regexp.MustCompile(`\.([a-z][a-z0-9-]*[a-z0-9])\b`)
-
-// No class ui.css defines is one daisyUI defines too, so a page drawn with ui.css's components
-// cannot pick up a daisyUI rule while both are built into main.css: daisyUI's .stack, which lays
-// its children over each other, did exactly that to a form (#617). The URL inside a data: image is
-// not a class.
-func TestUICSS_SharesNoClassWithDaisyUI(t *testing.T) {
-	ui, err := os.ReadFile("tailwindcss/ui.css")
-	if err != nil {
-		t.Fatal(err)
-	}
-	daisy, err := os.ReadFile("tailwindcss/daisyui.mjs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	theirs := map[string]bool{}
-	for _, m := range classSelector.FindAllStringSubmatch(string(daisy), -1) {
-		theirs[m[1]] = true
-	}
-	css := regexp.MustCompile(`url\("[^"]*"\)`).ReplaceAllString(string(ui), "")
-	ours := classSelector.FindAllStringSubmatch(css, -1)
-	if len(ours) == 0 {
-		t.Fatal("tailwindcss/ui.css defines no class, so this test reads nothing")
-	}
-	for _, m := range ours {
-		if theirs[m[1]] {
-			t.Errorf("ui.css defines .%s, which daisyUI defines too; rename it", m[1])
-			theirs[m[1]] = false
 		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,17 +59,16 @@ import (
 //     twice where both can render.
 //
 // outOfScope names the files no rule reads, a path or a directory ending in "/": the email
-// templates, which are not pages. pending names the pages not yet brought under the rules, which
-// are read and must still fail: one that passes is reported, so the list only shrinks.
-func AssertWellFormedTemplates(t *testing.T, fsys fs.FS, root, handlers string, outOfScope, pending []string) {
+// templates, which are not pages.
+func AssertWellFormedTemplates(t *testing.T, fsys fs.FS, root, handlers string, outOfScope []string) {
 	t.Helper()
 
-	assertWellFormedTemplates(t, fsys, root, os.DirFS(handlers), outOfScope, pending)
+	assertWellFormedTemplates(t, fsys, root, os.DirFS(handlers), outOfScope)
 }
 
 // assertWellFormedTemplates is the reporting half, failing through a Reporter so a rule test can
 // drive it against fixture trees. See Reporter in guard.go.
-func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, handlers fs.FS, outOfScope, pending []string) {
+func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, handlers fs.FS, outOfScope []string) {
 	r.Helper()
 
 	bindings, unresolved, err := findRenderBindings(handlers)
@@ -96,41 +96,24 @@ func assertWellFormedTemplates(r Reporter, fsys fs.FS, root string, handlers fs.
 	set := newTemplateSet(root, files, outOfScope, bindings)
 	checked := 0
 	for _, path := range set.order {
-		rel := set.rel(path)
-		found := set.problems(path)
-		if listsTemplate(rel, pending) {
-			if len(found) == 0 {
-				r.Errorf("%s: listed as pending, and already meets every rule; remove it from the list", path)
-			}
-			continue
-		}
 		checked++
-		for _, f := range found {
+		for _, f := range set.problems(path) {
 			r.Errorf("%s: %s", f.path, f.detail)
 		}
 	}
-	for _, entry := range append(append([]string{}, outOfScope...), pending...) {
+	for _, entry := range outOfScope {
 		if _, ok := files[root+"/"+entry]; !strings.HasSuffix(entry, "/") && !ok {
 			r.Errorf("%s/%s: listed, and no such template exists; remove it from the list", root, entry)
 		}
 	}
 	if checked == 0 {
-		r.Fatalf("every .html file under %s is out of scope or pending; this guard is checking nothing", root)
+		r.Fatalf("every .html file under %s is out of scope; this guard is checking nothing", root)
 	}
 }
 
 func matchesTemplateList(rel string, list []string) bool {
 	for _, entry := range list {
 		if rel == entry || (strings.HasSuffix(entry, "/") && strings.HasPrefix(rel, entry)) {
-			return true
-		}
-	}
-	return false
-}
-
-func listsTemplate(rel string, list []string) bool {
-	for _, entry := range list {
-		if rel == entry {
 			return true
 		}
 	}
@@ -199,7 +182,7 @@ func findRenderBindings(fsys fs.FS) (map[string][]string, []string, error) {
 						for _, layout := range layouts {
 							key := strings.TrimPrefix(page, "/")
 							value := strings.TrimPrefix(layout, "/")
-							if !listsTemplate(value, bindings[key]) {
+							if !slices.Contains(bindings[key], value) {
 								bindings[key] = append(bindings[key], value)
 							}
 						}

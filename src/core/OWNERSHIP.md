@@ -273,6 +273,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertAuditLogContext` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertClassesAreDrawn` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertContextValuesThroughAccessors` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertErrorCodeDoc` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |

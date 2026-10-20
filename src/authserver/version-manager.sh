@@ -18,7 +18,7 @@
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, daisyUI, humanize-duration, cropperjs, acorn). It does NOT
+# images' Alpine base, humanize-duration, cropperjs, acorn). It does NOT
 # manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
@@ -184,7 +184,6 @@ get_all_versions() {
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
-        echo "vendored.daisyui=$(get_version 'vendored.daisyui')"
         echo "vendored.humanize-duration=$(get_version 'vendored."humanize-duration"')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
@@ -278,7 +277,7 @@ get_alpine_latest() {
 }
 
 # Fetch latest version from npm registry
-# Usage: get_npm_latest "daisyui"
+# Usage: get_npm_latest "acorn"
 get_npm_latest() {
     local package="$1"
     local response
@@ -347,7 +346,6 @@ cmd_show() {
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
-    printf "  %-23s ${GREEN}%s${NC}\n" "daisyui" "$(get_version 'vendored.daisyui')"
     printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'vendored."humanize-duration"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "cropperjs" "$(get_version 'vendored.cropperjs')"
     printf "  %-23s ${GREEN}%s${NC}\n" "acorn" "$(get_version 'vendored.acorn')"
@@ -522,21 +520,6 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
-    # --- daisyUI ---
-    echo -n "Checking daisyUI... "
-    local current_daisyui=$(get_version 'vendored.daisyui')
-    local latest_daisyui=$(get_npm_latest "daisyui")
-    if [ -n "$latest_daisyui" ]; then
-        if version_lt "$current_daisyui" "$latest_daisyui"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            updates_available+=("daisyUI|$current_daisyui|$latest_daisyui|https://www.npmjs.com/package/daisyui")
-        else
-            print_success "Up to date ($current_daisyui)"
-        fi
-    else
-        print_warning "Check failed"
-    fi
-
     # --- humanize-duration ---
     echo -n "Checking humanize-duration... "
     local current_humanize=$(get_version 'vendored."humanize-duration"')
@@ -618,7 +601,6 @@ cmd_update() {
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
     local ALPINE_VERSION=$(get_version 'tools.alpine')
-    local DAISYUI_VERSION=$(get_version 'vendored.daisyui')
     local HUMANIZE_VERSION=$(get_version 'vendored."humanize-duration"')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
     local ACORN_VERSION=$(get_version 'vendored.acorn')
@@ -801,23 +783,6 @@ cmd_update() {
     # The pinned version of each, downloaded into the repository with its license and
     # its digest written beside the pin; no page loads them from a CDN (#542).
     echo -e "\n${BOLD}Vendored dependencies${NC}"
-    local daisyui_before
-    daisyui_before=$(get_version 'vendored."daisyui-sha256"')
-    # One bundle, beside each server's input.css, so a copy of either tailwindcss folder builds on
-    # its own, as the customization guide has operators copy it.
-    local daisyui_ok=1
-    for m in authserver adminconsole; do
-        local tw="$BASE_DIR/src/$m/web/tailwindcss"
-        vendor_fetch "https://github.com/saadeghi/daisyui/releases/download/v${DAISYUI_VERSION}/daisyui.mjs" \
-            "$tw/daisyui.mjs" "daisyui-sha256" &&
-            vendor_fetch "https://cdn.jsdelivr.net/npm/daisyui@${DAISYUI_VERSION}/LICENSE" \
-                "$tw/daisyui.LICENSE" || daisyui_ok=0
-    done
-    if [ "$daisyui_ok" -eq 1 ]; then
-        ((success_count++))
-    else
-        ((fail_count++))
-    fi
     local humanize_dir="$BASE_DIR/src/adminconsole/web/static/vendor/humanize-duration"
     if vendor_fetch "https://cdn.jsdelivr.net/npm/humanize-duration@${HUMANIZE_VERSION}/humanize-duration.js" \
             "$humanize_dir/humanize-duration.js" "humanize-duration-sha256" &&
@@ -847,10 +812,6 @@ cmd_update() {
         ((success_count++))
     else
         ((fail_count++))
-    fi
-    if [ "$daisyui_before" != "$(get_version 'vendored."daisyui-sha256"')" ]; then
-        print_warning "daisyUI changed: regenerate main.css with ./build.sh in src/authserver and"
-        echo "  src/adminconsole, inside the dev container, and commit it with the new bundle."
     fi
 
     # -------------------------------------------------------------------------

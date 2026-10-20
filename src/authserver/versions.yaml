@@ -63,9 +63,6 @@ tools:
 # pinned version and records each file's SHA-256 here; no page fetches them from a CDN
 # (#542). The web packages' tests, and core/guard's for acorn, hold the committed files to
 # these digests.
-# daisyui:            daisyUI's standalone-CLI bundle, built into both servers' main.css:
-#                     src/{authserver,adminconsole}/web/tailwindcss/daisyui.mjs, one file
-#                     in two places, from its GitHub release
 # humanize-duration:  duration formatting in the admin console:
 #                     src/adminconsole/web/static/vendor/humanize-duration/, from npm
 # cropperjs:          image cropping in the admin console, its UMD bundle, which defines
@@ -74,8 +71,6 @@ tools:
 # acorn:              the JavaScript parser core/guard's script check runs under Node:
 #                     src/core/guard/scriptcheck/acorn.js, from npm
 vendored:
-  daisyui: "5.7.50"
-  daisyui-sha256: "d69de07c7463bb1f41548e2688f88ee105cdadf9779fce5b3c47b3bfaa6be472"
   humanize-duration: "3.35.0"
   humanize-duration-sha256: "fa557682d97d4cf89e978aa3d32599206e9a6b54651aa05f6b6af84d78edefcc"
   cropperjs: "2.3.1"

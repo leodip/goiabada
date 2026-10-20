@@ -3,8 +3,8 @@ package guard
 // The rule table AssertWellFormedTemplates enforces, each rule over a template it must refuse and one
 // it must admit, read through findMarkupProblems; the page rules over fixture trees of pages, layouts
 // and partials, read as the renderer assembles them; and the reporting half driven through Run over
-// fixture trees: one that breaks a rule, one that breaks none, a pending list in both directions, and
-// the walks that reach nothing.
+// fixture trees: one that breaks a rule, one that breaks none, an out-of-scope entry naming nothing,
+// and the walks that reach nothing.
 
 import (
 	"testing"
@@ -446,7 +446,7 @@ func TestWellFormedTemplates_TheGuardFailsOnATreeThatBreaksARule(t *testing.T) {
 	}
 
 	report := Run(func(r Reporter) {
-		assertWellFormedTemplates(r, fsys, "template", handlerSource("page.html"), nil, nil)
+		assertWellFormedTemplates(r, fsys, "template", handlerSource("page.html"), nil)
 	})
 
 	require.True(t, report.Failed(), "an unlabelled control passed the guard")
@@ -459,31 +459,26 @@ func TestWellFormedTemplates_TheGuardPassesACleanTree(t *testing.T) {
 		"template/page.html": {Data: []byte(`{{define "title"}}Search{{end}}` +
 			`{{define "body"}}<main><h1>Search</h1><form><label for="q">Search</label><input id="q" name="q"></form></main>{{end}}`)},
 		"template/emails/message.html": {Data: []byte(`<p>An email, <br/> unchecked</p>`)},
-		"template/old.html":            {Data: []byte(`{{define "title"}}Old{{end}}{{define "body"}}<button onclick="go()">Go</button>{{end}}`)},
 	}
 
 	report := Run(func(r Reporter) {
-		assertWellFormedTemplates(r, fsys, "template", handlerSource("page.html", "old.html"), []string{"emails/"}, []string{"old.html"})
+		assertWellFormedTemplates(r, fsys, "template", handlerSource("page.html"), []string{"emails/"})
 	})
 
 	assert.False(t, report.Failed(), "a clean tree failed the guard: %s", report.Text())
 }
 
-// The pending list only shrinks: a pending page that already meets every rule, and an entry naming
-// no template, are each reported.
-func TestWellFormedTemplates_ThePendingListOnlyShrinks(t *testing.T) {
+// An out-of-scope entry naming no template is reported, so the list holds only what it exempts.
+func TestWellFormedTemplates_AnOutOfScopeEntryNamingNoTemplateIsReported(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/page.html": {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>Fine</title></head><body><h1>Fine</h1></body></html>`)},
-		"template/done.html": {Data: []byte(`<!DOCTYPE html><html lang="en"><head><title>Done</title></head><body><h1>Fine too</h1></body></html>`)},
 	}
 
 	report := Run(func(r Reporter) {
-		assertWellFormedTemplates(r, fsys, "template", handlerSource("other.html"), []string{"gone/missing.html"}, []string{"done.html", "deleted.html"})
+		assertWellFormedTemplates(r, fsys, "template", handlerSource("other.html"), []string{"gone/missing.html"})
 	})
 
 	require.True(t, report.Failed())
-	assert.Contains(t, report.Text(), "template/done.html: listed as pending, and already meets every rule; remove it from the list")
-	assert.Contains(t, report.Text(), "template/deleted.html: listed, and no such template exists; remove it from the list")
 	assert.Contains(t, report.Text(), "template/gone/missing.html: listed, and no such template exists; remove it from the list")
 	assert.NotContains(t, report.Text(), "template/page.html")
 }
@@ -491,20 +486,20 @@ func TestWellFormedTemplates_ThePendingListOnlyShrinks(t *testing.T) {
 func TestWellFormedTemplates_AWalkThatReachesNothingIsFatal(t *testing.T) {
 	empty := fstest.MapFS{"template/readme.txt": {Data: []byte("no pages here")}}
 	report := Run(func(r Reporter) {
-		assertWellFormedTemplates(r, empty, "template", handlerSource("page.html"), nil, nil)
+		assertWellFormedTemplates(r, empty, "template", handlerSource("page.html"), nil)
 	})
 	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
 	assert.Contains(t, report.Fatal, "walked no .html files under template")
 
 	exempt := fstest.MapFS{"template/emails/a.html": {Data: []byte(`<p>x</p>`)}}
 	report = Run(func(r Reporter) {
-		assertWellFormedTemplates(r, exempt, "template", handlerSource("page.html"), []string{"emails/"}, nil)
+		assertWellFormedTemplates(r, exempt, "template", handlerSource("page.html"), []string{"emails/"})
 	})
 	require.True(t, report.Stopped, "a walk whose every page is exempt checks nothing, and must be fatal")
-	assert.Contains(t, report.Fatal, "every .html file under template is out of scope or pending")
+	assert.Contains(t, report.Fatal, "every .html file under template is out of scope")
 
 	report = Run(func(r Reporter) {
-		assertWellFormedTemplates(r, exempt, "template", fstest.MapFS{"x.go": {Data: []byte("package x\n")}}, nil, nil)
+		assertWellFormedTemplates(r, exempt, "template", fstest.MapFS{"x.go": {Data: []byte("package x\n")}}, nil)
 	})
 	require.True(t, report.Stopped, "handlers naming no page leave every page unread as served, and must be fatal")
 	assert.Contains(t, report.Fatal, "found no RenderTemplate call naming a layout and a page")

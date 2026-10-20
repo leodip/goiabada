@@ -14,8 +14,8 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon/favicon-16x16.png">
   <link rel="manifest" href="/static/favicon/site.webmanifest">
   <script type="application/json" id="js-i18n">{{ JSBootstrap $.ctx }}</script>
-  <script src="{{ asset "/static/vendor/humanize-duration/humanize-duration.js" }}"></script>
-  <script src="{{ asset "/static/utils.js" }}"></script>
+  <script src="{{ asset "/static/vendor/humanize-duration/humanize-duration.js" }}" defer></script>
+  <script src="{{ asset "/static/utils.js" }}" defer></script>
   <script src="{{ asset "/static/shell.js" }}" defer></script>
   {{ template "head" . }}
 </head>
@@ -68,17 +68,7 @@
         <noscript>
           <p class="notice notice-caution mb-6">{{ T $.ctx "adminconsole.layout.noscript" }}</p>
         </noscript>
-        {{ block "page" . }}
-        <div class="page-header">
-          <h1 class="page-title">{{ template "pageTitle" . }}</h1>
-        </div>
-        <div class="w-full p-5 mb-4 shadow-xl card bg-base-100">
-          {{ template "subTitle" . }}
-          <div class="w-full h-full pb-6 bg-base-100">
-            {{ template "body" . }}
-          </div>
-        </div>
-        {{ end }}
+        {{ template "page" . }}
       </main>
     </div>
   </div>

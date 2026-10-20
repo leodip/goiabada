@@ -130,26 +130,6 @@ func TestVendoredLibraries_AreTheFilesVersionsYAMLPins(t *testing.T) {
 	}
 }
 
-// daisyUI's standalone-CLI bundle, which this server's main.css is built with, is the file
-// versions.yaml pins, byte for byte, beside input.css (#542). It ships in no binary, so it is
-// read off disk.
-func TestDaisyUIBundle_IsTheFileVersionsYAMLPins(t *testing.T) {
-	const bundle = "tailwindcss/daisyui.mjs"
-	content, err := os.ReadFile(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := sha256Hex(content), vendoredPin(t, "daisyui-sha256"); got != want {
-		t.Errorf("%s has SHA-256 %s, and versions.yaml pins %s: run ./version-manager.sh update", bundle, got, want)
-	}
-	if !strings.Contains(string(content), `"`+vendoredPin(t, "daisyui")+`"`) {
-		t.Errorf("%s does not carry the version versions.yaml pins, %s", bundle, vendoredPin(t, "daisyui"))
-	}
-	if _, err := os.Stat("tailwindcss/daisyui.LICENSE"); err != nil {
-		t.Errorf("%s has no daisyui.LICENSE beside it: %v", bundle, err)
-	}
-}
-
 // ui.css, the design tokens and components both servers' pages are drawn with, is one file kept
 // in each application's tailwindcss folder, so a copy of either folder builds on its own. This
 // one is the auth server's, byte for byte, so the two servers draw the same components; the auth
@@ -165,38 +145,5 @@ func TestUICSS_IsTheAuthServersCopy(t *testing.T) {
 	}
 	if string(ours) != string(theirs) {
 		t.Error("tailwindcss/ui.css differs from the auth server's copy; edit one, copy it over the other, and regenerate both main.css files")
-	}
-}
-
-// classSelector is a class name in a stylesheet or in daisyUI's bundle.
-var classSelector = regexp.MustCompile(`\.([a-z][a-z0-9-]*[a-z0-9])\b`)
-
-// No class ui.css defines is one daisyUI defines too, so a page drawn with ui.css's components
-// cannot pick up a daisyUI rule while both are built into main.css: daisyUI's .stack, which lays
-// its children over each other, did exactly that to a form (#617). The URL inside a data: image is
-// not a class.
-func TestUICSS_SharesNoClassWithDaisyUI(t *testing.T) {
-	ui, err := os.ReadFile("tailwindcss/ui.css")
-	if err != nil {
-		t.Fatal(err)
-	}
-	daisy, err := os.ReadFile("tailwindcss/daisyui.mjs")
-	if err != nil {
-		t.Fatal(err)
-	}
-	theirs := map[string]bool{}
-	for _, m := range classSelector.FindAllStringSubmatch(string(daisy), -1) {
-		theirs[m[1]] = true
-	}
-	css := regexp.MustCompile(`url\("[^"]*"\)`).ReplaceAllString(string(ui), "")
-	ours := classSelector.FindAllStringSubmatch(css, -1)
-	if len(ours) == 0 {
-		t.Fatal("tailwindcss/ui.css defines no class, so this test reads nothing")
-	}
-	for _, m := range ours {
-		if theirs[m[1]] {
-			t.Errorf("ui.css defines .%s, which daisyUI defines too; rename it", m[1])
-			theirs[m[1]] = false
-		}
 	}
 }

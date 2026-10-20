@@ -8,10 +8,7 @@
    Themes. The settings store one of three values: empty (automatic: follow the device), "light"
    or "dark". The layouts write data-theme only for "light" and "dark", so an empty or unknown value
    follows the device. The dark palette is written once, under the dark variant below, which applies
-   it when data-theme is "dark", or when the device prefers dark and data-theme is not "light".
-
-   Component class names never coincide with a daisyUI class, so a page drawn with these cannot
-   pick up a daisyUI rule while both stylesheets are built together. */
+   it when data-theme is "dark", or when the device prefers dark and data-theme is not "light". */
 
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
@@ -59,19 +56,10 @@
 }
 
 @layer base {
-  /* The page's scrollbar is the browser's own, drawn as the person's system draws it. daisyUI
-     colors it transparent and faint, which some browsers draw as an overlay seen only on hover;
-     the doubled selector outranks its rule for as long as daisyUI is built in (#617). */
-  :root:root {
-    scrollbar-color: auto;
-  }
-
-  /* The root carries the page color too, so an overscroll shows the canvas rather than white.
-     --root-bg is daisyUI's own root color, set here for as long as daisyUI is built in (#617). */
+  /* The root carries the page color too, so an overscroll shows the canvas rather than white. */
   :root {
     color-scheme: light;
     background-color: var(--color-canvas);
-    --root-bg: var(--color-canvas);
 
     @variant dark {
       color-scheme: dark;
@@ -128,18 +116,14 @@
 }
 
 /* The two classes the message catalogs write into their HTML, in dialog sentences, which operators'
-   override catalogs may write too: a value the sentence names, and an error detail. Written under
-   :root so they outrank the color utilities of the same names that daisyUI's themes generate, for
-   as long as daisyUI is built in (#617). */
-@layer utilities {
-  :root .text-accent {
-    color: var(--color-ink);
-    font-weight: 600;
-  }
+   override catalogs may write too: a value the sentence names, and an error detail. */
+@utility text-accent {
+  color: var(--color-ink);
+  font-weight: 600;
+}
 
-  :root .text-error {
-    color: var(--color-danger-ink);
-  }
+@utility text-error {
+  color: var(--color-danger-ink);
 }
 
 @layer components {
