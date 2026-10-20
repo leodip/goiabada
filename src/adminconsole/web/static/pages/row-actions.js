@@ -10,18 +10,27 @@
 // data-row-state element shows while that button is marked data-row-state-shown, so a grant can be
 // removed again, or a removal granted, without a reload. A failure is said in the status region,
 // which also holds the dialog's title, data-confirm-title. What takes the button's place takes the
-// focus, and a failure gives it back to the button, only when the focus was lost; focus the person
-// moved elsewhere meanwhile stays there.
+// focus, and a failure gives it back to the button, only when the focus was lost, and lost by that
+// action rather than one started after it; focus the person moved elsewhere meanwhile stays there.
 
 const rowActionsStatus = document.getElementById("row-actions-status");
 
-// rowFocusLost tells whether a row action's end should place the focus: when it is on nothing, on
-// the action's own button, which its request disabled, or in a dialog just closed, where a browser
+// focusOwner is the button of the row action started last with the focus its own to place, on that
+// button or on nothing: a focus lost to nothing is that action's to place when it ends, not an
+// earlier action's that happens to end first.
+let focusOwner = null;
+
+// focusOnNothing tells whether the focus is on nothing, or in a dialog just closed, where a browser
 // leaves it until it next tidies up.
-function rowFocusLost(button) {
+function focusOnNothing() {
   const focused = document.activeElement;
-  return !focused || focused === document.body || focused === button
-    || focused.closest("dialog:not([open])") !== null;
+  return !focused || focused === document.body || focused.closest("dialog:not([open])") !== null;
+}
+
+// rowFocusLost tells whether a row action's end should place the focus: when it is on the action's
+// own button, which its request disabled, or on nothing while that action owns it.
+function rowFocusLost(button) {
+  return document.activeElement === button || (focusOnNothing() && focusOwner === button);
 }
 
 function showRowActionDone(button) {
@@ -51,6 +60,9 @@ function showRowActionDone(button) {
 }
 
 function runRowAction(button) {
+  if (document.activeElement === button || focusOnNothing()) {
+    focusOwner = button;
+  }
   button.disabled = true;
   sendAjaxRequest({
     url: button.dataset.actionUrl,

@@ -1,8 +1,8 @@
 // user-search.js is the behaviour of a page that finds users to add to something: the search field
-// asks as the person types, after a pause, and Enter asks at once, the form never submitting
-// natively. The answer is drawn in the results table, each user with an Add button posting to the
-// form's data-add-url with the user's id, which row-actions.js runs, or with a tag where the user
-// is in already, which the answer's data-member-key field says.
+// asks as the person types, after a pause, and Enter asks at once instead, the form never
+// submitting natively. The answer is drawn in the results table, each user with an Add button
+// posting to the form's data-add-url with the user's id, which row-actions.js runs, or with a tag
+// where the user is in already, which the answer's data-member-key field says.
 //
 // Only the latest request's answer is drawn, or its failure said, and only while the field still
 // holds the words it asked about: a change to the field ends the search under way at once, not when
@@ -118,7 +118,14 @@ function search() {
   });
 }
 
-const searchSoon = debounce(search, 400);
+// The search the pause after a change asks. Enter and a return to the page ask at once in its
+// place, so no second search follows theirs.
+let searchTimer = 0;
+
+function searchNow() {
+  clearTimeout(searchTimer);
+  search();
+}
 
 searchInput.addEventListener("input", function () {
   searchRequest++;
@@ -126,16 +133,17 @@ searchInput.addEventListener("input", function () {
   if (searchInput.value.trim() === "") {
     showResults([]);
   }
-  searchSoon();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(search, 400);
 });
 searchForm.addEventListener("submit", function (event) {
   event.preventDefault();
-  search();
+  searchNow();
 });
 // pageshow comes after the browser restores the field, on the first visit and on Back alike, so
 // the results follow a search it restored.
 window.addEventListener("pageshow", function () {
   if (searchInput.value.trim() !== "") {
-    search();
+    searchNow();
   }
 });

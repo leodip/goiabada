@@ -125,7 +125,8 @@ func TestRender_AdminClientSettings_TheSwitchShowsTheAllowance(t *testing.T) {
 }
 
 // A refused allowance is said in a notice at the top of the form, which the checkbox it is about
-// names and is marked invalid by, and the settings, written before it, as saved.
+// names and is marked invalid by, the checkbox focused, and the settings, written before it, as
+// saved.
 func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *testing.T) {
 	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}
 
@@ -141,6 +142,7 @@ func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *t
 	toggle := allowanceSwitchRe.FindString(out)
 	assert.Contains(t, toggle, `aria-describedby="administrative-scopes-error administrativeScopesAllowedHint"`)
 	assert.True(t, hasAttr(toggle, `aria-invalid="true"`) || strings.Contains(toggle, ` aria-invalid="true"`))
+	assert.True(t, hasAttr(toggle, "autofocus"), "the refused checkbox takes the focus: %s", toggle)
 	assert.Contains(t, out, "Configurações salvas.")
 }
 

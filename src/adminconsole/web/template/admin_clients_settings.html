@@ -130,7 +130,7 @@
            it, which only authserver:manage may write, when it changed (#499, #542). */}}
       <label class="check-row" for="administrativeScopesAllowed">
         <input type="checkbox" id="administrativeScopesAllowed" name="administrativeScopesAllowed" aria-describedby="{{ if .administrativeScopesError }}administrative-scopes-error {{ end }}administrativeScopesAllowedHint"
-          {{- if .administrativeScopesError }} aria-invalid="true"{{ end }}{{ if .client.AdministrativeScopesAllowed }} checked{{ end }}{{ if or .client.IsSystemLevelClient (not $.isAdmin) }} disabled{{ end }}
+          {{- if .administrativeScopesError }} aria-invalid="true" autofocus{{ end }}{{ if .client.AdministrativeScopesAllowed }} checked{{ end }}{{ if or .client.IsSystemLevelClient (not $.isAdmin) }} disabled{{ end }}
           data-confirm="{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}" data-confirm-when="checked" data-stored-checked="{{ .storedClient.AdministrativeScopesAllowed }}">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" }}</span>
