@@ -85,6 +85,6 @@ func TestRender_AdminSettingsKeysLocalizesTheCreatedAtCell(t *testing.T) {
 		}},
 	})
 
-	assert.Contains(t, out, "<td>16/09/2026 12:00</td>", "the created-at cell is not localized")
+	assert.Contains(t, out, `<td data-label="Criada">16/09/2026 12:00</td>`, "the created-at cell is not localized")
 	assert.NotContains(t, out, "16 Sep 2026", "an English month name is what the old layout produced")
 }

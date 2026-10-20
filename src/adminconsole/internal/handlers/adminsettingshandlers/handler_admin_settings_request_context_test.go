@@ -213,14 +213,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		{
 			name: "HandleKeysGet",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleKeysGet(h, c)
+				return HandleKeysGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/keys", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleKeysRotatePost",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleKeysRotatePost(h, c)
+				return HandleKeysRotatePost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
 				handlertest.WithAccessToken()),

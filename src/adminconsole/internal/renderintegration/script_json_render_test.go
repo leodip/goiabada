@@ -51,8 +51,8 @@ func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	assert.NotContains(t, out, "<svg onload", "a key value reached the page as live markup")
 
 	// Escaped once and no more: the list the script reads decodes back to exactly what was bound.
-	m := regexp.MustCompile(`const keys = (\[.*?\]);`).FindStringSubmatch(out)
-	require.Len(t, m, 2, "the key list is not in the page's script")
+	m := regexp.MustCompile(`<script type="application/json" id="signing-keys">(\[.*?\])</script>`).FindStringSubmatch(out)
+	require.Len(t, m, 2, "the key list is not in the page's signing-keys data block")
 	var decoded []adminsettingshandlers.SettingsKey
 	require.NoError(t, json.Unmarshal([]byte(m[1]), &decoded))
 	require.Len(t, decoded, 1)
