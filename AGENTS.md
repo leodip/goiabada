@@ -690,7 +690,7 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 Both servers draw their pages with `ui.css`, Goiabada's design tokens and components, and Tailwind
 utilities for layout (#617). The file is one copy in each application's `web/tailwindcss/`, which
 `TestUICSS_IsTheAuthServersCopy` holds byte-identical; edit one, copy it over the other, and
-regenerate both `main.css`. Every class a page or a script names has a rule in the served
+regenerate both `main.css`. Every class a page names has a rule in the served
 `main.css` (`core/guard.AssertClassesAreDrawn`), so a misspelt or leftover class fails the unit tier.
 
 - **Themes**: automatic (the settings' empty value: each visitor's device decides), light and

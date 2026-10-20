@@ -12,30 +12,20 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// AssertClassesAreDrawn holds every class a page or a script names to a rule in css, the
-// application's generated main.css (#617). Tailwind writes a rule only for a utility it reads in a
-// template or a script, and ui.css only for the components it defines, so a class that has no rule
-// is a misspelling, a leftover of a stylesheet that is gone, or a utility built where Tailwind
-// cannot read it, and the page is drawn as though it were not there, which nothing else notices.
+// AssertClassesAreDrawn holds every class a page names to a rule in css, the application's
+// generated main.css (#617). A class with no rule is a misspelling or a leftover of a stylesheet
+// that is gone, and the element is drawn as though it were not there, which nothing else notices.
 //
 // Pages are read as AssertWellFormedTemplates reads them, through each template's parse tree: a
-// class attribute's value once per combination of the branches inside it, in either quote style,
-// with HTML and template comments left out. So class="button{{if .Danger}}-danger{{end}}" names
-// button and button-danger. An action that prints a value stands for text the guard cannot read: a
-// class it writes whole is not read, and one it completes, theme-swatch-{{ . }}, is a prefix, held to
-// some class beginning with it. A script's classes are the string literals in what it assigns to
-// className and in its classList calls' class arguments (every argument of add, remove, contains and
-// replace, the first of toggle), a conditional's arms and not its condition; a string a + continues ends
-// in a prefix the same way. The stylesheet's classes are read from its selectors alone, never from a
-// declaration, a string or a comment, with CSS escapes decoded, so .\32 xl\:flex is 2xl:flex. Its
-// boundary: a class a handler hands a template, or a script builds from a variable or a template
-// literal, is beyond it.
+// class attribute's value once per combination of the branches inside it, comments left out, so
+// class="button{{if .Danger}}-danger{{end}}" names button and button-danger. A class an action
+// completes, theme-swatch-{{ . }}, is a prefix, held to some class beginning with it; one an action
+// writes whole is not read. The stylesheet's classes are read from its selectors, CSS escapes
+// decoded. Classes a script sets are not read: the scripts set a few, by hand.
 //
 // outOfScope names the files no rule reads, as the walked FS spells them, a path or a directory
-// ending in "/": the email templates, which main.css does not style. Each tree is walked from its
-// root; both servers pass their //go:embed sets. No tree, a tree that reaches no .html or .js file,
-// and a stylesheet that defines no class are fatal, because every class would pass or fail over
-// nothing.
+// ending in "/": the email templates, which main.css does not style. No tree, a tree that reaches no
+// .html file, and a stylesheet that defines no class are fatal, because nothing would be checked.
 func AssertClassesAreDrawn(t *testing.T, css []byte, outOfScope []string, trees ...fs.FS) {
 	t.Helper()
 
@@ -48,7 +38,7 @@ func assertClassesAreDrawn(r Reporter, css []byte, outOfScope []string, trees ..
 	r.Helper()
 
 	if len(trees) == 0 {
-		r.Fatalf("given no tree of pages and scripts; this guard is checking nothing")
+		r.Fatalf("given no tree of pages; this guard is checking nothing")
 	}
 	drawn := drawnClasses(string(css))
 	if len(drawn) == 0 {
@@ -58,10 +48,10 @@ func assertClassesAreDrawn(r Reporter, css []byte, outOfScope []string, trees ..
 	for _, tree := range trees {
 		named, n, err := findNamedClasses(tree, outOfScope, listed)
 		if err != nil {
-			r.Fatalf("walking for pages and scripts: %v", err)
+			r.Fatalf("walking for pages: %v", err)
 		}
 		if n == 0 {
-			r.Fatalf("reached no .html or .js file in one of the trees; this guard is checking nothing")
+			r.Fatalf("reached no .html file in one of the trees; this guard is checking nothing")
 		}
 		for _, c := range named {
 			switch {
@@ -79,7 +69,7 @@ func assertClassesAreDrawn(r Reporter, css []byte, outOfScope []string, trees ..
 	}
 }
 
-// namedClass is a class a page or a script names, or, with prefix, the start of one it completes
+// namedClass is a class a page names, or, with prefix, the start of one it completes
 // with a value.
 type namedClass struct {
 	path   string
@@ -104,8 +94,7 @@ func findNamedClasses(fsys fs.FS, outOfScope []string, listed map[string]bool) (
 		if err != nil {
 			return err
 		}
-		page := strings.HasSuffix(p, ".html")
-		if d.IsDir() || (!page && !strings.HasSuffix(p, ".js")) {
+		if d.IsDir() || !strings.HasSuffix(p, ".html") {
 			return nil
 		}
 		for _, entry := range outOfScope {
@@ -119,15 +108,11 @@ func findNamedClasses(fsys fs.FS, outOfScope []string, listed map[string]bool) (
 			return err
 		}
 		n++
-		if page {
-			found, err := pageClasses(p, string(b))
-			if err != nil {
-				return err
-			}
-			named = append(named, found...)
-		} else {
-			named = append(named, scriptClasses(p, TokenizeScript(string(b)))...)
+		found, err := pageClasses(p, string(b))
+		if err != nil {
+			return err
 		}
+		named = append(named, found...)
 		return nil
 	})
 	return named, n, err
@@ -192,131 +177,6 @@ func classesIn(text string) []namedClass {
 		}
 	}
 	return named
-}
-
-var classListMethods = map[string]bool{"add": true, "remove": true, "toggle": true, "contains": true, "replace": true}
-
-// scriptClasses reads the classes a script assigns to className or hands to classList.
-func scriptClasses(path string, toks []ScriptToken) []namedClass {
-	toks = memberNames(toks)
-	at := func(i int) ScriptToken {
-		if i < len(toks) {
-			return toks[i]
-		}
-		return ScriptToken{}
-	}
-	var named []namedClass
-	// literals reads every string literal in toks[from:to], the classes each names; in a conditional,
-	// only its value arms, after the ?, since its condition's strings are compared, not classes.
-	literals := func(from, to int) {
-		depth := 0
-		for j := from; j < to; j++ {
-			if t := toks[j]; t.Kind == ScriptPunct {
-				switch t.Text {
-				case "(", "[", "{":
-					depth++
-				case ")", "]", "}":
-					depth--
-				case "?":
-					if depth == 0 {
-						from = j + 1
-					}
-				}
-			}
-			if from > j {
-				break
-			}
-		}
-		for j := from; j < to; j++ {
-			t := toks[j]
-			if t.Kind != ScriptString {
-				continue
-			}
-			fields := strings.Fields(t.Text)
-			continued := !strings.HasSuffix(t.Text, " ") && at(j+1).Is(ScriptPunct, "+")
-			for k, field := range fields {
-				named = append(named, namedClass{path: path, line: t.Line, name: field, prefix: continued && k == len(fields)-1})
-			}
-		}
-	}
-	for i := 0; i+1 < len(toks); i++ {
-		if !toks[i].Is(ScriptPunct, ".") {
-			continue
-		}
-		switch {
-		case toks[i+1].Is(ScriptIdent, "className") && (at(i+2).Is(ScriptPunct, "=") || at(i+2).Is(ScriptPunct, "+=")):
-			literals(i+3, expressionEnd(toks, i+3))
-		case toks[i+1].Is(ScriptIdent, "classList") && at(i+2).Is(ScriptPunct, ".") && classListMethods[at(i+3).Text] &&
-			at(i+4).Is(ScriptPunct, "("):
-			args := callArguments(toks, i+4)
-			if at(i+3).Text == "toggle" && len(args) > 1 {
-				args = args[:1]
-			}
-			for _, arg := range args {
-				literals(arg[0], arg[1])
-			}
-		}
-	}
-	return named
-}
-
-// expressionEnd returns where the expression starting at from ends: a ; or , or a closing bracket
-// at its own depth, or a line break where the expression could end.
-func expressionEnd(toks []ScriptToken, from int) int {
-	depth := 0
-	for j := from; j < len(toks); j++ {
-		t := toks[j]
-		if j > from && depth == 0 && t.Newline && endsOperand(toks[j-1]) && t.Kind != ScriptPunct {
-			return j
-		}
-		if t.Kind != ScriptPunct {
-			continue
-		}
-		switch t.Text {
-		case "(", "[", "{":
-			depth++
-		case ")", "]", "}":
-			if depth == 0 {
-				return j
-			}
-			depth--
-		case ";", ",":
-			if depth == 0 {
-				return j
-			}
-		}
-	}
-	return len(toks)
-}
-
-// callArguments returns each argument of the call whose ( is at open, as a [from, to) span.
-func callArguments(toks []ScriptToken, open int) [][2]int {
-	var args [][2]int
-	depth, start := 0, open+1
-	for j := open; j < len(toks); j++ {
-		t := toks[j]
-		if t.Kind != ScriptPunct {
-			continue
-		}
-		switch t.Text {
-		case "(", "[", "{":
-			depth++
-		case ")", "]", "}":
-			depth--
-			if depth == 0 {
-				if j > start {
-					args = append(args, [2]int{start, j})
-				}
-				return args
-			}
-		case ",":
-			if depth == 1 {
-				args = append(args, [2]int{start, j})
-				start = j + 1
-			}
-		}
-	}
-	return args
 }
 
 // drawnClasses reads the classes a stylesheet's selectors name: the text before each {, outside

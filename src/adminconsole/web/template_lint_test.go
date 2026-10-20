@@ -43,7 +43,7 @@ func TestTemplates_AreWellFormed(t *testing.T) {
 	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates)
 }
 
-// TestPages_NameOnlyClassesMainCSSDraws holds every class a page or a script names to a rule in the
+// TestPages_NameOnlyClassesMainCSSDraws holds every class a page names to a rule in the
 // served main.css, through core/guard.AssertClassesAreDrawn, so a misspelt or leftover class fails
 // here rather than leaving an element undrawn (#617).
 func TestPages_NameOnlyClassesMainCSSDraws(t *testing.T) {
@@ -51,7 +51,7 @@ func TestPages_NameOnlyClassesMainCSSDraws(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	guard.AssertClassesAreDrawn(t, css, emailTemplatesAsWalked(), templateFS, withoutVendored{staticFS})
+	guard.AssertClassesAreDrawn(t, css, emailTemplatesAsWalked(), templateFS)
 }
 
 // emailTemplatesAsWalked is emailTemplates as a walk of templateFS from its root spells them.
