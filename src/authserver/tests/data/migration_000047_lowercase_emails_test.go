@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,6 +108,10 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back to 000046")
+	// The downs from head drop the users columns the ups after 000046 added, and the
+	// read-back below stays the ORM's, so the head-only ones come back as scaffolding
+	// (#510, #489).
+	scaffoldHeadUsersColumns(t, h)
 
 	cases := lowercaseCases000047()
 	ids := make([]int64, len(cases))
@@ -306,14 +310,17 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	m, err := seed.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)
 	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails000047), "step the throwaway database to 000046")
-	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
+	// Seeded in SQL rather than through the ORM, for the reason migration_seed_sql_test.go
+	// states: the record follows the head schema, so a users column a later migration adds
+	// breaks an ORM insert at 000046 (#510, #489).
+	seedUserInto(t, seed.DB, sqlbuilder.SQLite, userSeed{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047101",
 		Username: "mig47start0", Email: "Startup@example.com", PasswordHash: "not-a-real-hash",
-	}))
-	require.NoError(t, seed.CreateUser(context.Background(), nil, &record.User{
+	})
+	seedUserInto(t, seed.DB, sqlbuilder.SQLite, userSeed{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047102",
 		Username: "mig47start1", Email: "startup@example.com", PasswordHash: "not-a-real-hash",
-	}))
+	})
 	require.NoError(t, seed.DB.Close(), "close the seeding handle before the server opens its own")
 
 	opened, err := datafactory.NewDatabase(context.Background(), cfg,

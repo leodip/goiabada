@@ -44,6 +44,10 @@ func TestMigration000021_CountryData(t *testing.T) {
 	// used, so 000021's data transformation is still applied to pre-migration data.
 	// It stops at 000058 rather than head since 000059 dropped two columns 000021 writes.
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 58), "migrate to 000058")
+	// The shape stops at 000058 because 000059 dropped two columns the seed writes, while the
+	// record follows head, so the ORM read below needs the head-only users columns scaffolded
+	// on (#489).
+	scaffoldHeadUsersColumns(t, h)
 	require.NoError(t, h.Migrator.Force(context.Background(), 20), "force marker to 000020")
 
 	fixtures := migration000021Fixtures()

@@ -461,8 +461,14 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// account-wide ceiling RFC 6749 §4.3.2 makes a MUST, and applies whatever the switch
 		// says (#503 decision 1). 100 is the figure NIST SP 800-63B §3.2.2 uses for failed
 		// attempts against one account, applied here as a sliding rate rather than the
-		// consecutive count that section specifies; #489 is where that difference is
-		// decided. Its price is a lockout: a stranger who knows an email can block its
+		// consecutive count that section specifies. #489 decided the difference: the password
+		// keeps the rate, because disabling it at 100 failures would let anyone who knows an
+		// email deny its sign-in indefinitely, the indefinite half of #89, and NIST tolerates
+		// a rate only alongside mitigations Goiabada does not have. The consecutive count that
+		// section does require exists for the OTP, which a stranger cannot reach without the
+		// password: otpcredential.VerifyStored advances it on every code it refuses and
+		// disables the authenticator at 100 until it is rebound. Its price is a lockout: a
+		// stranger who knows an email can block its
 		// password sign-in for up to an hour with 100 wrong passwords, the right password
 		// included, since this is consulted before the password is compared (#89, #503
 		// decision 3). Both count failures only, so a user who signs in spends nothing (#219).
