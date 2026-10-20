@@ -203,16 +203,18 @@ func scriptClasses(path string, toks []ScriptToken) []namedClass {
 		case toks[i+1].Is(ScriptIdent, "classList") && at(i+2).Is(ScriptPunct, ".") && classListMethods[at(i+3).Text] &&
 			at(i+4).Is(ScriptPunct, "("):
 			depth := 0
+		args:
 			for j := i + 4; j < len(toks); j++ {
 				t := toks[j]
-				if t.Kind == ScriptPunct && (t.Text == "(" || t.Text == "[" || t.Text == "{") {
+				switch {
+				case t.Kind == ScriptPunct && (t.Text == "(" || t.Text == "[" || t.Text == "{"):
 					depth++
-				} else if t.Kind == ScriptPunct && (t.Text == ")" || t.Text == "]" || t.Text == "}") {
+				case t.Kind == ScriptPunct && (t.Text == ")" || t.Text == "]" || t.Text == "}"):
 					depth--
 					if depth == 0 {
-						break
+						break args
 					}
-				} else if t.Kind == ScriptString && depth == 1 && (toks[j-1].Is(ScriptPunct, "(") || toks[j-1].Is(ScriptPunct, ",")) {
+				case t.Kind == ScriptString && depth == 1 && (toks[j-1].Is(ScriptPunct, "(") || toks[j-1].Is(ScriptPunct, ",")):
 					read(j)
 				}
 			}
