@@ -103,13 +103,16 @@
     outline-offset: 2px;
   }
 
+  /* No transition at all, rather than a very short one: every element transitions every property
+     by default, so a short duration made a panel's button start one at "hidden" as the panel
+     opened, and the script could not focus it. */
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
     ::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      transition: none !important;
       scroll-behavior: auto !important;
     }
   }
