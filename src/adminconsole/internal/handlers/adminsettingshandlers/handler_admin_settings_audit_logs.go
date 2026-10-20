@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
@@ -103,10 +104,11 @@ func HandleAuditLogsPost(
 			AuditLogRetentionDays:      r.FormValue("auditLogRetentionDays"),
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"error":    message,
+				"settings":   settingsInfo,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_audit_logs.html", bind)
@@ -115,15 +117,10 @@ func HandleAuditLogsPost(
 			}
 		}
 
-		// Parse retention days with validation
-		retentionInt := 0
-		if v := settingsInfo.AuditLogRetentionDays; len(v) > 0 {
-			p, err := strconv.Atoi(v)
-			if err != nil {
-				renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_audit_logs.retention_days_invalid"))
-				return
-			}
-			retentionInt = p
+		retentionInt, err := strconv.Atoi(strings.TrimSpace(settingsInfo.AuditLogRetentionDays))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_audit_logs.retention_days_invalid"), "auditLogRetentionDays")
+			return
 		}
 
 		updateReq := &api.UpdateSettingsAuditLogsRequest{
@@ -132,9 +129,11 @@ func HandleAuditLogsPost(
 			AuditLogRetentionDays:      retentionInt,
 		}
 
-		_, err := apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err = apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, auditLogsErrorFields))
+			})
 			return
 		}
 

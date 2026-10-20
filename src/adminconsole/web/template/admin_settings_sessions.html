@@ -11,10 +11,12 @@
   </div>
 </div>
 
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the notice
+     and focused. */}}
 <form class="panel" method="post" novalidate data-duration-too-long="{{ T $.ctx "adminconsole.admin_settings.common.too_long_warning" }}" data-duration-invalid="{{ T $.ctx "adminconsole.admin_settings.common.invalid_duration" }}">
   <div class="panel-body stacked">
     {{ if .error }}
-    <div class="notice notice-danger" role="alert">
+    <div class="notice notice-danger" role="alert" id="sessions-error">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
       <p>{{ .error }}</p>
     </div>
@@ -29,21 +31,24 @@
     <div class="form-grid">
       <div class="field">
         <label class="field-label" for="userSessionIdleTimeoutInSeconds">{{ T $.ctx "adminconsole.admin_settings.sessions.field.idle_timeout" }}</label>
-        <input class="control" id="userSessionIdleTimeoutInSeconds" type="text" inputmode="numeric" name="userSessionIdleTimeoutInSeconds" value="{{ .settings.UserSessionIdleTimeoutInSeconds }}" autocomplete="off" aria-describedby="idleTimeoutDescription idleTimeoutHint">
+        <input class="control" id="userSessionIdleTimeoutInSeconds" type="text" inputmode="numeric" name="userSessionIdleTimeoutInSeconds" value="{{ .settings.UserSessionIdleTimeoutInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "userSessionIdleTimeoutInSeconds" }}sessions-error {{ end }}{{ end }}idleTimeoutDescription idleTimeoutHint"
+          {{- if .error }}{{ if eq .errorField "userSessionIdleTimeoutInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <p class="field-hint font-semibold" id="idleTimeoutDescription" data-duration-for="userSessionIdleTimeoutInSeconds" aria-live="polite"></p>
         <p class="field-hint" id="idleTimeoutHint">{{ T $.ctx "adminconsole.admin_settings.sessions.idle_timeout_tooltip" }}</p>
       </div>
 
       <div class="field">
         <label class="field-label" for="userSessionMaxLifetimeInSeconds">{{ T $.ctx "adminconsole.admin_settings.sessions.field.max_lifetime" }}</label>
-        <input class="control" id="userSessionMaxLifetimeInSeconds" type="text" inputmode="numeric" name="userSessionMaxLifetimeInSeconds" value="{{ .settings.UserSessionMaxLifetimeInSeconds }}" autocomplete="off" aria-describedby="idleMaxLifetimeDescription maxLifetimeHint">
+        <input class="control" id="userSessionMaxLifetimeInSeconds" type="text" inputmode="numeric" name="userSessionMaxLifetimeInSeconds" value="{{ .settings.UserSessionMaxLifetimeInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "userSessionMaxLifetimeInSeconds" }}sessions-error {{ end }}{{ end }}idleMaxLifetimeDescription maxLifetimeHint"
+          {{- if .error }}{{ if eq .errorField "userSessionMaxLifetimeInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <p class="field-hint font-semibold" id="idleMaxLifetimeDescription" data-duration-for="userSessionMaxLifetimeInSeconds" aria-live="polite"></p>
         <p class="field-hint" id="maxLifetimeHint">{{ T $.ctx "adminconsole.admin_settings.sessions.max_lifetime_tooltip" }}</p>
       </div>
 
       <div class="field">
         <label class="field-label" for="maxUserSessionsPerUser">{{ T $.ctx "adminconsole.admin_settings.sessions.field.max_sessions_per_user" }}</label>
-        <input class="control" id="maxUserSessionsPerUser" type="text" inputmode="numeric" name="maxUserSessionsPerUser" value="{{ .settings.MaxUserSessionsPerUser }}" autocomplete="off" aria-describedby="maxSessionsHint">
+        <input class="control" id="maxUserSessionsPerUser" type="text" inputmode="numeric" name="maxUserSessionsPerUser" value="{{ .settings.MaxUserSessionsPerUser }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "maxUserSessionsPerUser" }}sessions-error {{ end }}{{ end }}maxSessionsHint"
+          {{- if .error }}{{ if eq .errorField "maxUserSessionsPerUser" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <p class="field-hint" id="maxSessionsHint">{{ T $.ctx "adminconsole.admin_settings.sessions.max_sessions_per_user_tooltip" }}</p>
       </div>
     </div>

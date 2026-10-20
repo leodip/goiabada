@@ -4,7 +4,47 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
+
+// generalErrorFields maps the general settings' refusals to the field each is about.
+var generalErrorFields = map[string]string{
+	i18n.ErrCodeSettingsGeneralAppNameTooLong:   "appName",
+	i18n.ErrCodeSettingsAppNameAngleBrackets:    "appName",
+	i18n.ErrCodeSettingsGeneralIssuerURIInvalid: "issuer",
+	i18n.ErrCodeSettingsGeneralIssuerTooLong:    "issuer",
+	i18n.ErrCodeSettingsIssuerAngleBrackets:     "issuer",
+}
+
+// sessionsErrorFields maps the session settings' refusals to the field each is about.
+var sessionsErrorFields = map[string]string{
+	i18n.ErrCodeSettingsSessionsIdleTimeoutNotPositive:       "userSessionIdleTimeoutInSeconds",
+	i18n.ErrCodeSettingsSessionsIdleTimeoutTooLarge:          "userSessionIdleTimeoutInSeconds",
+	i18n.ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime:  "userSessionIdleTimeoutInSeconds",
+	i18n.ErrCodeSettingsSessionsMaxLifetimeNotPositive:       "userSessionMaxLifetimeInSeconds",
+	i18n.ErrCodeSettingsSessionsMaxLifetimeTooLarge:          "userSessionMaxLifetimeInSeconds",
+	i18n.ErrCodeSettingsSessionsMaxSessionsPerUserRequired:   "maxUserSessionsPerUser",
+	i18n.ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange: "maxUserSessionsPerUser",
+}
+
+// auditLogsErrorFields maps the audit logging settings' refusals to the retention, the one field
+// they can be about.
+var auditLogsErrorFields = map[string]string{
+	i18n.ErrCodeSettingsAuditLogsRetentionDaysNegative: "auditLogRetentionDays",
+	i18n.ErrCodeSettingsAuditLogsRetentionDaysTooLarge: "auditLogRetentionDays",
+}
+
+// tokensErrorFields maps the token settings' refusals to the duration each is about. The idle
+// timeout above the maximum lifetime shares the client tokens' key.
+var tokensErrorFields = map[string]string{
+	i18n.ErrCodeSettingsTokensTokenExpirationNotPositive:       "tokenExpirationInSeconds",
+	i18n.ErrCodeSettingsTokensTokenExpirationTooLarge:          "tokenExpirationInSeconds",
+	i18n.ErrCodeSettingsTokensOfflineIdleTimeoutNotPositive:    "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeSettingsTokensOfflineIdleTimeoutTooLarge:       "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime: "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive:    "refreshTokenOfflineMaxLifetimeInSeconds",
+	i18n.ErrCodeSettingsTokensOfflineMaxLifetimeTooLarge:       "refreshTokenOfflineMaxLifetimeInSeconds",
+}
 
 // SettingsEmailGet is the email settings page as loaded. SMTPPassword is always empty: the API never
 // returns the stored password, only HasSMTPPassword, which draws the Saved or Not set badge and

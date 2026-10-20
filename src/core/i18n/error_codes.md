@@ -263,17 +263,17 @@ cause, each a whole sentence.
 | `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
 | `handler.settings_sessions.idle_timeout_not_positive` | (none) | The idle timeout must be greater than zero. |
 | `handler.settings_sessions.max_lifetime_not_positive` | (none) | The maximum lifetime must be greater than zero. |
-| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout cannot be more than {{.max}} seconds. |
-| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | The maximum lifetime cannot be more than {{.max}} seconds. |
-| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | The idle timeout cannot be longer than the maximum lifetime. |
+| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout can't be more than {{.max}} seconds. |
+| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | The maximum lifetime can't be more than {{.max}} seconds. |
+| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | The idle timeout can't be longer than the maximum lifetime. |
 | `handler.settings_sessions.max_sessions_per_user_required` | (none) | Enter the maximum sessions per user. |
 | `handler.settings_sessions.max_sessions_per_user_out_of_range` | `max` (int) | The maximum sessions per user must be between 0 and {{.max}}. |
-| `handler.settings_tokens.token_expiration_not_positive` | (none) | Token expiration in seconds must be greater than zero. |
-| `handler.settings_tokens.token_expiration_too_large` | `max` (int) | Token expiration in seconds cannot be greater than {{.max}}. |
-| `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | Refresh token offline - idle timeout in seconds must be greater than zero. |
-| `handler.settings_tokens.offline_idle_timeout_too_large` | `max` (int) | Refresh token offline - idle timeout in seconds cannot be greater than {{.max}}. |
-| `handler.settings_tokens.offline_max_lifetime_not_positive` | (none) | Refresh token offline - max lifetime in seconds must be greater than zero. |
-| `handler.settings_tokens.offline_max_lifetime_too_large` | `max` (int) | Refresh token offline - max lifetime in seconds cannot be greater than {{.max}}. |
+| `handler.settings_tokens.token_expiration_not_positive` | (none) | The token lifetime must be greater than zero. |
+| `handler.settings_tokens.token_expiration_too_large` | `max` (int) | The token lifetime can't be more than {{.max}} seconds. |
+| `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | The offline idle timeout must be greater than zero. |
+| `handler.settings_tokens.offline_idle_timeout_too_large` | `max` (int) | The offline idle timeout can't be more than {{.max}} seconds. |
+| `handler.settings_tokens.offline_max_lifetime_not_positive` | (none) | The offline maximum lifetime must be greater than zero. |
+| `handler.settings_tokens.offline_max_lifetime_too_large` | `max` (int) | The offline maximum lifetime can't be more than {{.max}} seconds. |
 | `handler.settings_email.smtp_host_required` | (none) | SMTP host is required. |
 | `handler.settings_email.smtp_port_required` | (none) | SMTP port is required. |
 | `handler.settings_email.smtp_from_email_required` | (none) | SMTP from email is required. |
@@ -293,8 +293,8 @@ cause, each a whole sentence.
 | `handler.settings_keys.key_not_found` | (none) | Key not found |
 | `handler.settings_keys.only_previous_revocable` | (none) | Only a previous key can be revoked |
 | `handler.settings_ui_theme.theme_invalid` | (none) | Invalid theme. |
-| `handler.settings_audit_logs.retention_days_negative` | (none) | Audit log retention days cannot be negative. Use 0 for infinite retention. |
-| `handler.settings_audit_logs.retention_days_too_large` | (none) | Audit log retention days cannot exceed 3650 days (10 years). |
+| `handler.settings_audit_logs.retention_days_negative` | (none) | The retention can't be negative. Use 0 to keep stored events forever. |
+| `handler.settings_audit_logs.retention_days_too_large` | (none) | The retention can't be more than 3650 days (10 years). |
 
 ## Password validator
 

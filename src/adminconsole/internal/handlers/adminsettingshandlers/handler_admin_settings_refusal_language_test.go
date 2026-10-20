@@ -79,8 +79,8 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/settings/audit-logs",
 			form:       url.Values{"auditLogRetentionDays": {"ninety"}},
-			english:    "Audit log retention days must be a valid number.",
-			portuguese: "Os dias de retenção de logs de auditoria devem ser um número válido.",
+			english:    "Enter the retention as a whole number of days.",
+			portuguese: "Informe a retenção como um número inteiro de dias.",
 		},
 	}
 

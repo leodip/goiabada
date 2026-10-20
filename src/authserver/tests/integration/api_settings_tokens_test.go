@@ -97,7 +97,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "Token expiration in seconds must be greater than zero.", err1.ErrorDescription)
+	assert.Equal(t, "The token lifetime must be greater than zero.", err1.ErrorDescription)
 
 	// token expiration > max allowed
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{
@@ -111,7 +111,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "Token expiration in seconds cannot be greater than 160000000.", err2.ErrorDescription)
+	assert.Equal(t, "The token lifetime can't be more than 160000000 seconds.", err2.ErrorDescription)
 
 	// idle <= 0
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{
@@ -125,7 +125,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "Refresh token offline - idle timeout in seconds must be greater than zero.", err3.ErrorDescription)
+	assert.Equal(t, "The offline idle timeout must be greater than zero.", err3.ErrorDescription)
 
 	// idle > max allowed
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{
@@ -139,7 +139,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "Refresh token offline - idle timeout in seconds cannot be greater than 160000000.", err4.ErrorDescription)
+	assert.Equal(t, "The offline idle timeout can't be more than 160000000 seconds.", err4.ErrorDescription)
 
 	// max lifetime <= 0
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{
@@ -153,7 +153,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
 	_ = json.NewDecoder(resp5.Body).Decode(&err5)
-	assert.Equal(t, "Refresh token offline - max lifetime in seconds must be greater than zero.", err5.ErrorDescription)
+	assert.Equal(t, "The offline maximum lifetime must be greater than zero.", err5.ErrorDescription)
 
 	// max lifetime > max allowed
 	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{
@@ -167,7 +167,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
 	_ = json.NewDecoder(resp6.Body).Decode(&err6)
-	assert.Equal(t, "Refresh token offline - max lifetime in seconds cannot be greater than 160000000.", err6.ErrorDescription)
+	assert.Equal(t, "The offline maximum lifetime can't be more than 160000000 seconds.", err6.ErrorDescription)
 
 	// idle > max lifetime
 	resp7 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{

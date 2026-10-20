@@ -3790,33 +3790,6 @@
   .bg-warning {
     background-color: var(--color-warning);
   }
-  @layer daisyui.l1 {
-    .alert-soft {
-      color: var(--alert-color, var(--color-base-content));
-      background: var(--alert-color, var(--color-base-content));
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .alert-soft {
-        background: color-mix( in oklab, var(--alert-color, var(--color-base-content)) 8%, var(--color-base-100) );
-      }
-    }
-    .alert-soft {
-      --alert-border-color: var(--alert-color, var(--color-base-content));
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .alert-soft {
-        --alert-border-color: color-mix(
-      in oklab,
-      var(--alert-color, var(--color-base-content)) 10%,
-      var(--color-base-100)
-    );
-      }
-    }
-    .alert-soft {
-      box-shadow: none;
-      background-image: none;
-    }
-  }
   @layer daisyui.l1.l2 {
     .checkbox-sm {
       padding: 0.1875rem;
@@ -3895,15 +3868,6 @@
     white-space: pre-wrap;
   }
   @layer daisyui.l1.l2 {
-    .alert-warning {
-      color: var(--color-warning-content);
-      --alert-border-color: var(--color-warning);
-      --alert-color: var(--color-warning);
-    }
-    .checkbox-primary {
-      color: var(--color-primary-content);
-      --input-color: var(--color-primary);
-    }
     @media (hover: hover) {
       .link-secondary:hover {
         color: var(--color-secondary);

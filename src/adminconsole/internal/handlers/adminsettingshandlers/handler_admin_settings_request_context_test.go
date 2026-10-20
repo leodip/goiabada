@@ -249,6 +249,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
 					"userSessionIdleTimeoutInSeconds": {"900"},
 					"userSessionMaxLifetimeInSeconds": {"86400"},
+					"maxUserSessionsPerUser":          {"20"},
 				})),
 		},
 		{

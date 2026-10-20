@@ -49,6 +49,4 @@ var emailTemplates = []string{"layouts/email_layout.html"}
 // pendingTemplates are the pages not yet brought under the rules (#617). The guard reports one that
 // meets them all, so the list only shrinks, page by page, to nothing.
 var pendingTemplates = []string{"admin_settings_audit_log_viewer.html",
-	"admin_settings_audit_logs.html", "admin_settings_email.html",
-	"admin_settings_email_sendtest.html", "admin_settings_general.html", "admin_settings_keys.html",
-	"admin_settings_tokens.html"}
+	"admin_settings_email.html", "admin_settings_email_sendtest.html", "admin_settings_keys.html"}

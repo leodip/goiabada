@@ -1,372 +1,172 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.general.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.general.subtitle" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.admin_settings.general.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
-        const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
-        const originalIssuerValue = "{{.storedSettings.Issuer}}";
-
-        selfRegistrationEnabled.addEventListener('change', function () {
-            refreshSelfRegistrationEmailVerification();
-            updateSelfRegistrationEmailWarning();
-        });
-        refreshSelfRegistrationEmailVerification();
-
-        // Registration needs email while it requires verification: with both switches on and
-        // email off, the auth server refuses it, so the page says so as the switches change.
-        const smtpEnabled = {{ .smtpEnabled }};
-        const selfRegistrationEmailWarning = document.getElementById('selfRegistrationEmailWarning');
-
-        function updateSelfRegistrationEmailWarning() {
-            if (selfRegistrationEnabled.checked && selfRegistrationRequiresEmailVerification.checked && !smtpEnabled) {
-                selfRegistrationEmailWarning.classList.remove('hidden');
-            } else {
-                selfRegistrationEmailWarning.classList.add('hidden');
-            }
-        }
-
-        selfRegistrationRequiresEmailVerification.addEventListener('change', updateSelfRegistrationEmailWarning);
-        updateSelfRegistrationEmailWarning(); // Initial state
-
-        // PKCE warning handling
-        const pkceRequired = document.getElementById('pkceRequired');
-        const pkceWarning = document.getElementById('pkceWarning');
-
-        function updatePkceWarning() {
-            if (pkceRequired && pkceWarning) {
-                if (!pkceRequired.checked) {
-                    pkceWarning.classList.remove('hidden');
-                } else {
-                    pkceWarning.classList.add('hidden');
-                }
-            }
-        }
-
-        if (pkceRequired) {
-            pkceRequired.addEventListener('change', updatePkceWarning);
-            updatePkceWarning(); // Initial state
-        }
-
-        // Implicit flow warning handling
-        const implicitFlowEnabled = document.getElementById('implicitFlowEnabled');
-        const implicitFlowWarning = document.getElementById('implicitFlowWarning');
-
-        function updateImplicitFlowWarning() {
-            if (implicitFlowEnabled && implicitFlowWarning) {
-                if (implicitFlowEnabled.checked) {
-                    implicitFlowWarning.classList.remove('hidden');
-                } else {
-                    implicitFlowWarning.classList.add('hidden');
-                }
-            }
-        }
-
-        if (implicitFlowEnabled) {
-            implicitFlowEnabled.addEventListener('change', updateImplicitFlowWarning);
-            updateImplicitFlowWarning(); // Initial state
-        }
-
-        // ROPC flow warning handling
-        const ropcFlowEnabled = document.getElementById('ropcFlowEnabled');
-        const ropcFlowWarning = document.getElementById('ropcFlowWarning');
-
-        function updateRopcFlowWarning() {
-            if (ropcFlowEnabled && ropcFlowWarning) {
-                if (ropcFlowEnabled.checked) {
-                    ropcFlowWarning.classList.remove('hidden');
-                } else {
-                    ropcFlowWarning.classList.add('hidden');
-                }
-            }
-        }
-
-        if (ropcFlowEnabled) {
-            ropcFlowEnabled.addEventListener('change', updateRopcFlowWarning);
-            updateRopcFlowWarning(); // Initial state
-        }
-
-        // Add form submission handling
-        const btnSave = document.getElementById("btnSave");
-        if(btnSave) {
-            btnSave.addEventListener("click", function(event) {
-                event.preventDefault();
-
-                const formSettings = document.getElementsByTagName("form")[0];
-                const issuerInput = document.getElementById('issuer');
-
-                // Check if issuer value has changed
-                if (issuerInput.value !== originalIssuerValue) {
-                    showModalDialog(
-                        "modal1",
-                        "{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_title" }}",
-                        dialogMarkup(["<span class='text-accent'>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.general.modal_issuer_suffix" }}"]),
-                        function() {
-                            // Cancel callback - do nothing
-                        },
-                        function() {
-                            // Confirm callback - submit the form
-                            submitSettings(formSettings);
-                        }
-                    );
-                } else {
-                    submitSettings(formSettings);
-                }
-            });
-        }
-    });
-
-    function refreshSelfRegistrationEmailVerification() {
-        const selfRegistrationEnabled = document.getElementById('selfRegistrationEnabled');
-        const selfRegistrationRequiresEmailVerification = document.getElementById('selfRegistrationRequiresEmailVerification');
-
-        // Greyed out while self-registration is off, where it does nothing, but never cleared:
-        // turning self-registration back on brings back the choice made before.
-        selfRegistrationRequiresEmailVerification.disabled = !selfRegistrationEnabled.checked;
-    }
-
-    // A disabled checkbox isn't sent with the form, which would save it as off, so it's
-    // enabled just before the form goes and its value is kept.
-    function submitSettings(formSettings) {
-        document.getElementById('selfRegistrationRequiresEmailVerification').disabled = false;
-        formSettings.submit();
-    }
-</script>
-
+<script src="{{ asset "/static/pages/admin-settings-general.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{- $policy := .settings.PasswordPolicy }}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_settings.general.subtitle" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_settings.general.lead" }}</p>
+  </div>
+</div>
 
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.general.field.app_name" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.app_name_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="appName" type="text" name="appName" value="{{.settings.AppName}}"
-                    class="w-full input input-bordered" autocomplete="off" autofocus />
-            </div>
-
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.general.field.issuer" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.issuer_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="issuer" type="text" name="issuer" value="{{.settings.Issuer}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-
-        </div>
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the notice
+     and focused. A change of issuer asks first, against the issuer as stored, which a refused save
+     keeps while the field shows what was sent (#562 decision 6). The verification row shows only
+     while registration is on, and each caution while what it warns about holds, as
+     admin-settings-general.js decides again as the boxes change; data-smtp-enabled is whether
+     email is set up. */}}
+<form class="panel" method="post" novalidate data-smtp-enabled="{{ .smtpEnabled }}" data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_settings.modal.save_title" }}">
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="general-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_settings.general.field.password_policy" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.password_policy_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <select class="w-full select select-bordered" name="passwordPolicy">
-                    <option value="none" {{if eq .settings.PasswordPolicy "none"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_none" }}</option>
-                    <option value="low" {{if eq .settings.PasswordPolicy "low"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_low" }}</option>
-                    <option value="medium" {{if eq .settings.PasswordPolicy "medium"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_medium" }}</option>
-                    <option value="high" {{if eq .settings.PasswordPolicy "high"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.general.password_policy_high" }}</option>
-                </select>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.self_registration_enabled" }}</span>
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.self_registration_enabled_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="selfRegistrationEnabled" type="checkbox" name="selfRegistrationEnabled"
-                        class="ml-2 toggle" {{if .settings.SelfRegistrationEnabled}}checked{{end}} />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.self_registration_email_verification" }}</span>
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.self_registration_email_verification_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="selfRegistrationRequiresEmailVerification" type="checkbox" name="selfRegistrationRequiresEmailVerification"
-                        class="ml-2 toggle" {{if .settings.SelfRegistrationRequiresEmailVerification}}checked{{end}} />
-                </label>
-            </div>
-            <div id="selfRegistrationEmailWarning" role="alert" class="mt-2 alert alert-warning alert-soft{{if not (and .settings.SelfRegistrationEnabled .settings.SelfRegistrationRequiresEmailVerification (not .smtpEnabled))}} hidden{{end}}">
-                <span>{{ T $.ctx "adminconsole.admin_settings.general.self_registration_email_warning" }}</span>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.dynamic_client_registration" }}</span>
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="dynamicClientRegistrationEnabled" type="checkbox" name="dynamicClientRegistrationEnabled"
-                        class="ml-2 toggle" {{if .settings.DynamicClientRegistrationEnabled}}checked{{end}} />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.pkce_required" }}</span>
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.pkce_required_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="pkceRequired" type="checkbox" name="pkceRequired"
-                        class="ml-2 toggle" {{if .settings.PKCERequired}}checked{{end}} />
-                </label>
-            </div>
-            <div id="pkceWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
-                <span>{{ T $.ctx "adminconsole.admin_settings.general.pkce_warning" }}</span>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.implicit_flow_enabled" }}</span>
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.implicit_flow_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="implicitFlowEnabled" type="checkbox" name="implicitFlowEnabled"
-                        class="ml-2 toggle" {{if .settings.ImplicitFlowEnabled}}checked{{end}} />
-                </label>
-            </div>
-            <div id="implicitFlowWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
-                <span>{{ T $.ctx "adminconsole.admin_settings.general.implicit_flow_warning" }}</span>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.general.field.ropc_flow_enabled" }}</span>
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.general.ropc_flow_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="ropcFlowEnabled" type="checkbox" name="ropcFlowEnabled"
-                        class="ml-2 toggle" {{if .settings.ResourceOwnerPasswordCredentialsEnabled}}checked{{end}} />
-                </label>
-            </div>
-            <div id="ropcFlowWarning" role="alert" class="mt-2 hidden alert alert-warning alert-soft">
-                <span>{{ T $.ctx "adminconsole.admin_settings.general.ropc_flow_warning" }}</span>
-            </div>
-
-        </div>
-
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
-        </div>
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.general.section_identity" }}</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="appName">{{ T $.ctx "adminconsole.admin_settings.general.field.app_name" }}</label>
+        <input class="control" id="appName" type="text" name="appName" value="{{ .settings.AppName }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "appName" }}general-error {{ end }}{{ end }}appNameHint"
+          {{- if .error }}{{ if eq .errorField "appName" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="appNameHint">{{ T $.ctx "adminconsole.admin_settings.general.app_name_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="issuer">{{ T $.ctx "adminconsole.admin_settings.general.field.issuer" }}</label>
+        <input class="control" id="issuer" type="text" inputmode="url" name="issuer" value="{{ .settings.Issuer }}" autocomplete="off" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "issuer" }}general-error {{ end }}{{ end }}issuerHint"
+          {{- if .error }}{{ if eq .errorField "issuer" }} aria-invalid="true" autofocus{{ end }}{{ end }}
+          data-confirm="{{ T $.ctx "adminconsole.admin_settings.general.issuer_change_warning" }}" data-stored-value="{{ .storedSettings.Issuer }}">
+        <p class="field-hint" id="issuerHint">{{ T $.ctx "adminconsole.admin_settings.general.issuer_tooltip" }}</p>
+      </div>
     </div>
+  </div>
 
+  <div class="panel-body stacked">
+    <div>
+      <h2 class="panel-title" id="passwordPolicyTitle">{{ T $.ctx "adminconsole.admin_settings.general.field.password_policy" }}</h2>
+      <p class="field-hint mt-1" id="passwordPolicyHint">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_tooltip" }}</p>
+    </div>
+    <fieldset class="grid gap-3 md:grid-cols-2" aria-labelledby="passwordPolicyTitle" aria-describedby="passwordPolicyHint">
+      <label class="option-card">
+        <input type="radio" name="passwordPolicy" value="none"{{ if eq $policy "none" }} checked{{ end }} aria-labelledby="policy-name-none" aria-describedby="policy-hint-none">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label" id="policy-name-none">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_none" }}</span>
+          <span class="field-hint" id="policy-hint-none">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_none_hint" }}</span>
+        </span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="passwordPolicy" value="low"{{ if eq $policy "low" }} checked{{ end }} aria-labelledby="policy-name-low" aria-describedby="policy-hint-low">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label" id="policy-name-low">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_low" }}</span>
+          <span class="field-hint" id="policy-hint-low">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_low_hint" }}</span>
+        </span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="passwordPolicy" value="medium"{{ if eq $policy "medium" }} checked{{ end }} aria-labelledby="policy-name-medium" aria-describedby="policy-hint-medium">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label" id="policy-name-medium">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_medium" }}</span>
+          <span class="field-hint" id="policy-hint-medium">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_medium_hint" }}</span>
+        </span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="passwordPolicy" value="high"{{ if eq $policy "high" }} checked{{ end }} aria-labelledby="policy-name-high" aria-describedby="policy-hint-high">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label" id="policy-name-high">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_high" }}</span>
+          <span class="field-hint" id="policy-hint-high">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_high_hint" }}</span>
+        </span>
+      </label>
+    </fieldset>
+  </div>
+
+  <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.general.section_registration" }}</h2>
+    <div class="check-list">
+      <label class="check-row" for="selfRegistrationEnabled">
+        <input type="checkbox" id="selfRegistrationEnabled" name="selfRegistrationEnabled" aria-describedby="selfRegistrationHint"{{ if .settings.SelfRegistrationEnabled }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.self_registration_enabled" }}</span>
+          <span class="field-hint" id="selfRegistrationHint">{{ T $.ctx "adminconsole.admin_settings.general.self_registration_enabled_tooltip" }}</span>
+        </span>
+      </label>
+      <label class="check-row" for="selfRegistrationRequiresEmailVerification" id="emailVerificationRow"{{ if not .settings.SelfRegistrationEnabled }} hidden{{ end }}>
+        <input type="checkbox" id="selfRegistrationRequiresEmailVerification" name="selfRegistrationRequiresEmailVerification" aria-describedby="emailVerificationHint"{{ if .settings.SelfRegistrationRequiresEmailVerification }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.self_registration_email_verification" }}</span>
+          <span class="field-hint" id="emailVerificationHint">{{ T $.ctx "adminconsole.admin_settings.general.self_registration_email_verification_tooltip" }}</span>
+        </span>
+      </label>
+      <label class="check-row" for="dynamicClientRegistrationEnabled">
+        <input type="checkbox" id="dynamicClientRegistrationEnabled" name="dynamicClientRegistrationEnabled" aria-describedby="dynamicClientRegistrationHint"{{ if .settings.DynamicClientRegistrationEnabled }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.dynamic_client_registration" }}</span>
+          <span class="field-hint" id="dynamicClientRegistrationHint">{{ T $.ctx "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" }}</span>
+        </span>
+      </label>
+    </div>
+    <div class="notice notice-caution" id="selfRegistrationEmailWarning"{{ if not (and .settings.SelfRegistrationEnabled .settings.SelfRegistrationRequiresEmailVerification (not .smtpEnabled)) }} hidden{{ end }}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.general.self_registration_email_warning" }} <a class="text-link" href="/admin/settings/email">{{ T $.ctx "adminconsole.admin_settings.general.email_settings_link" }}</a></p>
+    </div>
+  </div>
+
+  <div class="panel-body stacked">
+    <div>
+      <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.general.section_flows" }}</h2>
+      <p class="field-hint mt-1">{{ T $.ctx "adminconsole.admin_settings.general.flows_lead" }}</p>
+    </div>
+    <div class="check-list">
+      <label class="check-row" for="pkceRequired">
+        <input type="checkbox" id="pkceRequired" name="pkceRequired" aria-describedby="pkceHint"{{ if .settings.PKCERequired }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.pkce_required" }}</span>
+          <span class="field-hint" id="pkceHint">{{ T $.ctx "adminconsole.admin_settings.general.pkce_required_tooltip" }}</span>
+        </span>
+      </label>
+      <label class="check-row" for="implicitFlowEnabled">
+        <input type="checkbox" id="implicitFlowEnabled" name="implicitFlowEnabled" aria-describedby="implicitFlowHint"{{ if .settings.ImplicitFlowEnabled }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.implicit_flow_enabled" }}</span>
+          <span class="field-hint" id="implicitFlowHint">{{ T $.ctx "adminconsole.admin_settings.general.implicit_flow_tooltip" }}</span>
+        </span>
+      </label>
+      <label class="check-row" for="ropcFlowEnabled">
+        <input type="checkbox" id="ropcFlowEnabled" name="ropcFlowEnabled" aria-describedby="ropcFlowHint"{{ if .settings.ResourceOwnerPasswordCredentialsEnabled }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.general.field.ropc_flow_enabled" }}</span>
+          <span class="field-hint" id="ropcFlowHint">{{ T $.ctx "adminconsole.admin_settings.general.ropc_flow_tooltip" }}</span>
+        </span>
+      </label>
+    </div>
+    <div class="notice notice-caution" id="pkceWarning"{{ if .settings.PKCERequired }} hidden{{ end }}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.general.pkce_warning" }}</p>
+    </div>
+    <div class="notice notice-caution" id="implicitFlowWarning"{{ if not .settings.ImplicitFlowEnabled }} hidden{{ end }}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.general.implicit_flow_warning" }}</p>
+    </div>
+    <div class="notice notice-caution" id="ropcFlowWarning"{{ if not .settings.ResourceOwnerPasswordCredentialsEnabled }} hidden{{ end }}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.general.ropc_flow_warning" }}</p>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
+  </div>
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_settings.common.save_button") (T $.ctx "adminconsole.admin_settings.modal.save_title")) }}
 {{end}}

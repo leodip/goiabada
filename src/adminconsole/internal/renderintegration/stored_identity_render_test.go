@@ -294,10 +294,9 @@ func TestRender_AdminSettingsGeneral_ARefusedSaveKeepsTheStoredIssuer(t *testing
 		url.Values{"appName": {"A name far too long"}, "issuer": {"typedissuer"}, "passwordPolicy": {"low"}})
 
 	assert.Contains(t, out, "The app name is too long.")
-	assert.Contains(t, out, `const originalIssuerValue = "storedissuer";`, "the original issuer is the stored one")
-
 	issuer := inputRe("issuer").FindString(out)
 	require.NotEmpty(t, issuer)
+	assert.Contains(t, issuer, `data-stored-value="storedissuer"`, "the original issuer is the stored one")
 	assert.Contains(t, issuer, `value="typedissuer"`, "the input keeps what was typed")
 	assert.Contains(t, out, `value="A name far too long"`)
 }
@@ -453,7 +452,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&generalSettingsAPI{stored: &api.SettingsGeneralResponse{AppName: "Goiabada", Issuer: "storedissuer",
 					PasswordPolicy: "low"}}),
 			target: "/admin/settings/general",
-			want:   []string{`const originalIssuerValue = "storedissuer";`, `name="issuer" value="storedissuer"`},
+			want:   []string{`data-stored-value="storedissuer"`, `name="issuer" value="storedissuer"`},
 		},
 		{
 			name: "group attribute edit",
