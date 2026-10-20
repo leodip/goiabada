@@ -13,18 +13,18 @@ A client is any application that asks the auth server for tokens: a web app your
 
 <Steps>
 
-1. In the admin console, open **Admin**, **Clients** and click **Create new**.
+1. In the admin console, open **Admin**, **Clients** and click **New client**.
 
 2. Enter a **Client identifier**. It's the `client_id` your app will send, such as `my-web-app`.
 
-3. Turn on the flows your app uses, and turn off the ones it doesn't. **Authorization code flow with PKCE** starts on:
+3. Turn on the flows your app uses, and turn off the ones it doesn't. **Authorization code with PKCE** starts on:
 
-   - **Authorization code flow with PKCE** if users sign in to your app.
-   - **Client credentials flow** if your app is a service that calls an API on its own behalf.
+   - **Authorization code with PKCE** if users sign in to your app.
+   - **Client credentials** if your app is a service that calls an API on its own behalf.
 
-4. Click **Create**. You're back on the list of clients. Click **Manage** next to your new client.
+4. Click **Create client**. You're back on the list of clients. Click your new client's identifier.
 
-5. If your app runs in a browser or on a phone, open **Authentication**, choose **Public client**, click **Save**, and confirm with **Yes**. Otherwise, copy the **Client secret** from there and keep it on your server.
+5. If your app runs in a browser or on a phone, open **Authentication**, choose **Public**, click **Save**, and confirm with **Save**. Otherwise, copy the **Client secret** from there and keep it on your server.
 
 6. If users sign in to your app, open **Redirect URIs**, enter the address your app receives the authorization code at, such as `https://app.example.com/callback`, click **Add**, then click **Save**.
 
@@ -55,15 +55,15 @@ A client you create in the admin console starts:
 
 - confidential, with a generated client secret;
 - enabled;
-- with **Consent required** off;
+- with **Ask users for consent** off;
 - with the default ACR level `urn:goiabada:level2_optional`;
 - not allowed to request the administrative scopes.
 
-The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Web origins**, **User sessions** and **Permissions**.
+The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Web origins**, **Sessions** and **Permissions**.
 
 ## Public and confidential clients
 
-A confidential client proves who it is at the token endpoint with its client secret. The **Authentication** tab shows it behind **Reveal**. Opening the tab reads the secret, and each read leaves a `viewed_client_secret` entry in the audit log, whether or not you click **Reveal**. **Generate new secret** makes a new one, which replaces the old one when you save, so your app needs it straight away.
+A confidential client proves who it is at the token endpoint with its client secret. The **Authentication** tab shows it behind **Show**. Opening the tab reads the secret, and each read leaves a `viewed_client_secret` entry in the audit log, whether or not you click **Show**. **Generate a new secret** makes a new one, which replaces the old one when you save, so your app needs it straight away.
 
 A public client has no secret, so two rules make up for it:
 
@@ -80,7 +80,7 @@ The **OAuth2 flows** tab turns each flow on or off for the client.
 - **Client credentials** lets a confidential client get an access token for itself, with no user involved. See [Protect an API](/guides/protect-an-api/#let-a-service-call-your-api).
 - **Implicit flow** and **Resource Owner Password Credentials (ROPC)** are legacy flows, deprecated in OAuth 2.1. Each one is on for a client or off, or inherits the global setting under **Admin**, **General**, which is off in a new install. Leave them off unless an old app needs one. See [Implicit](/legacy-flows/implicit/) and [ROPC](/legacy-flows/ropc/).
 
-The same tab sets **PKCE requirement for this client?** for a confidential client: **Required**, **Optional (not recommended)**, or inherit **PKCE required for confidential clients using the authorization code flow** under **Admin**, **General**, which is on in a new install. New clients inherit it.
+The same tab sets **PKCE** for a confidential client: **Required**, **Optional (not recommended)**, or inherit **Require PKCE** under **Admin**, **General**, which is on in a new install. New clients inherit it.
 
 ## Redirect URIs
 
@@ -125,7 +125,7 @@ The [discovery document](/reference/endpoints/discovery-and-jwks/#where-the-docu
 
 ## Consent required
 
-Turn **Consent required** on when users should approve what a client can access before it gets a token.
+Turn **Ask users for consent** on when users should approve what a client can access before it gets a token.
 
 You usually don't need it for your own clients. Turn it on for third-party ones, so users can see who's asking for their data. Users see the consent screen anyway when a client asks for `offline_access` or sends `prompt=consent`.
 
@@ -133,9 +133,9 @@ They also see it when a client asks for `authserver:manage-account`, until they'
 
 Clients you create start with consent off. Clients that register themselves start with it on, since nobody has reviewed them yet.
 
-Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before. In the approval column, **Yes** means stored consent covers every requested scope when **Consent required** is on. When it's off, **Yes** means it covers `authserver:manage-account` if the client asks for that scope:
+Whether a sign-in shows the consent screen depends on the setting, the request, and what the user approved before. In the approval column, **Yes** means stored consent covers every requested scope when **Ask users for consent** is on. When it's off, **Yes** means it covers `authserver:manage-account` if the client asks for that scope:
 
-| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |
+| **Ask users for consent** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |
 |---|---|---|---|---|---|
 | Off | No | No | No | Either | Skipped |
 | Off | No | No | Yes | No | Shown |
@@ -145,11 +145,11 @@ Whether a sign-in shows the consent screen depends on the setting, the request, 
 | Either | Yes | Either | Either | Either | Shown |
 | Either | Either | Yes | Either | Either | Shown |
 
-`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Consent required** off, a prior approval for that scope skips the screen even if the user hasn't approved the client's other requested scopes.
+`authserver:manage-account` counts here only when a client other than the admin console's asks for it. With **Ask users for consent** off, a prior approval for that scope skips the screen even if the user hasn't approved the client's other requested scopes.
 
-The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Manage consents**. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
+The scopes are the ones left once the auth server has dropped those the user doesn't hold, as [Tokens](/concepts/tokens/#which-scopes-a-token-gets) describes. On the screen the user can untick scopes, and the tokens carry only those they approved. Their answer is kept, so the next sign-in skips the screen while it covers every scope, and a user can withdraw it under **Account**, **Consents**. A user who unticks `authserver:manage-account` is asked for it again at the client's next sign-in that asks for it.
 
-Choosing **Cancel consent** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
+Choosing **Don't allow** ends the sign-in. A client you created gets `access_denied`, "The user did not provide consent", at its redirect URI. A client that [registered itself](#self-registered-clients) gets nothing: the user sees a page naming the app and the address it asked to send them to, and the request stops there. So does a client whose redirect URI has been removed since the request began.
 
 ## Default ACR level
 
@@ -157,9 +157,9 @@ The ACR level is how strongly a user must sign in to use the client:
 
 | Level | In the admin console | The user signs in with |
 |---|---|---|
-| `urn:goiabada:level1` | ACR level 1 - password only | A password |
-| `urn:goiabada:level2_optional` | ACR level 2 - password + OTP (if enabled by the user) | A password, plus a one-time code if they've set up two-factor authentication |
-| `urn:goiabada:level2_mandatory` | ACR level 3 - password + mandatory OTP | A password and a one-time code, setting up two-factor authentication first if they haven't |
+| `urn:goiabada:level1` | Level 1: password only | A password |
+| `urn:goiabada:level2_optional` | Level 2: password, and a one-time code from users who set up two-factor authentication | A password, plus a one-time code if they've set up two-factor authentication |
+| `urn:goiabada:level2_mandatory` | Level 3: password and a one-time code, always | A password and a one-time code, setting up two-factor authentication first if they haven't |
 
 New clients start at `urn:goiabada:level2_optional`. The field shows only while **Authorization code with PKCE** is on. Change it on the client's **Settings** tab and click **Save**.
 
@@ -170,7 +170,7 @@ The default is a floor. An authorization request can ask for a stronger level wi
 Six permissions on the `authserver` resource let whoever holds them administer Goiabada: `authserver:manage`, `authserver:admin-read`, `authserver:manage-users`, `authserver:manage-clients`, `authserver:manage-settings` and `authserver:browser-sessions`. A token carrying one of them on a user's behalf acts at the Admin API with that user's authority. So **only a client allowed to request the administrative scopes may get one**:
 
 - **The admin console's own client,** always. Its allowance can't be switched off.
-- **Any other client you allow.** Turn on **May request administrative scopes** on the client's **Settings** tab, click **Save**, and confirm with **Yes**, or call [the Admin API](/reference/api/admin/operations/updateclientadministrativescopes/). Only an administrator with `authserver:manage` can switch it, on or off. Any other administrator can still save the tab's other settings: the switch is saved only when it changed, and otherwise the page says the settings were saved and shows the refusal under the switch.
+- **Any other client you allow.** Turn on **May request administrative scopes** on the client's **Settings** tab, click **Save**, and confirm with **Save**, or call [the Admin API](/reference/api/admin/operations/updateclientadministrativescopes/). Only an administrator with `authserver:manage` can switch it, on or off. Any other administrator can still save the tab's other settings: the switch is saved only when it changed, and otherwise the page says the settings were saved and shows the refusal below that.
 
 Every other client starts not allowed, including one that registers itself, which has no way to ask.
 
@@ -194,19 +194,19 @@ The **Permissions** tab grants permissions to the client itself, for the client 
 
 The **Tokens** tab overrides the global token settings for this client:
 
-- **Token expiration in seconds**, for its access and ID tokens.
-- **Offline refresh token - idle timeout in seconds** and **max lifetime in seconds**, for refresh tokens from the `offline_access` scope.
-- **Include OpenID Connect claims in the access token?** and **in the ID token?**, for claims such as `email` or `name`. Each can be on, off, or inherit the global setting, which leaves them out of access tokens and puts them in ID tokens.
+- **Token lifetime, in seconds**, for its access and ID tokens.
+- **Offline idle timeout, in seconds** and **Offline maximum lifetime, in seconds**, for refresh tokens from the `offline_access` scope.
+- **OpenID Connect claims in the access token** and **OpenID Connect claims in the ID token**, for claims such as `email` or `name`. Each can be on, off, or inherit the global setting, which leaves them out of access tokens and puts them in ID tokens.
 
 A value of 0 uses the global setting. See [Tokens](/concepts/tokens/).
 
 ## Display name, description and logo
 
-Users see a client on the password, one-time code and consent screens. By default it's shown by its client identifier, or by the display name you entered when you created it, which turns **Show display name** on. On the **Settings** tab you can give it a **Display name** and a **Description**, up to 100 characters each, and a **Website URL**, which must be `http` or `https`. Each one shows only when its switch is on: **Show display name**, **Show description** and **Show website URL**.
+Users see a client on the password, one-time code and consent screens. By default it's shown by its client identifier, or by the display name you entered when you created it, which turns **Display name** on under **Sign-in and consent pages**. On the **Settings** tab you can give it a **Display name** and a **Description**, up to 100 characters each, and a **Website URL**, which must be `http` or `https`. Each one shows only when its switch under **Sign-in and consent pages** is on: **Display name**, **Description** and **Website URL**.
 
-The **Logo** tab uploads a logo: a JPEG, PNG, GIF or WebP file of up to 3 MiB, which you crop and which is uploaded scaled to at most 512 pixels on its longest side, a GIF as PNG. See [Logo and picture](/reference/endpoints/logo-and-picture/#uploading) for what the Admin API takes. **Show logo** on the **Settings** tab puts it on the screens.
+The **Logo** tab uploads a logo: a JPEG, PNG, GIF or WebP file of up to 3 MiB, which you crop and which is uploaded scaled to at most 512 pixels on its longest side, a GIF as PNG. See [Logo and picture](/reference/endpoints/logo-and-picture/#uploading) for what the Admin API takes. **Logo** under **Sign-in and consent pages**, on the **Settings** tab, puts it on the screens.
 
-The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, even while **Show logo** is off. It answers 404 when the client has no logo, and carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`.
+The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, even while that switch is off. It answers 404 when the client has no logo, and carries an `ETag` and `Cache-Control: public, max-age=300, must-revalidate`.
 
 ## Disabling and deleting a client
 
@@ -222,7 +222,7 @@ The admin console signs administrators in through its own client, `admin-console
 
 With dynamic client registration (DCR) turned on, an app can register itself as a client by calling `POST /connect/register`, as [RFC 7591](https://datatracker.ietf.org/doc/html/rfc7591) describes, with nobody creating it in the admin console. It's how tools like MCP clients get a client of their own.
 
-DCR is off until you turn on **Dynamic client registration enabled** under **Admin**, **General**. Until then, `/connect/register` answers 403 with `access_denied`.
+DCR is off until you turn on **Dynamic client registration** under **Admin**, **General**. Until then, `/connect/register` answers 403 with `access_denied`.
 
 When it's on, anyone who can reach the endpoint can register a client. Limit `/connect/register` at your reverse proxy, or turn on Goiabada's rate limiter with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, which then allows 10 registrations a minute from each IP address. See [rate limits](/reference/environment-variables/#rate-limits).
 
@@ -252,10 +252,10 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 
 - **They're marked.** The list of clients shows a **Self-registered** badge on each one.
 - **Their identifier can't be changed.** It's generated, `dcr_` followed by a UUID.
-- **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Show display name** to replace both.
+- **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both.
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
 
-Once you've reviewed a self-registered client, you can change its settings like any other, **Consent required** included.
+Once you've reviewed a self-registered client, you can change its settings like any other, **Ask users for consent** included.
 
 <Aside type="caution">
 **Building a self-registered client?** You get no error response when a sign-in fails: it just never comes back. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/#the-user-sees-you-have-not-been-sent-anywhere).

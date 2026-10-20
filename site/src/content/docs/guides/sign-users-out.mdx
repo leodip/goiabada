@@ -43,7 +43,7 @@ Ending your app's own session isn't enough. The auth server keeps a [session](/c
 
 With the ID token as its hint, a sign-out ends your app's part of the user's session on the auth server. If other apps signed in with the same session, the user stays signed in to them, and the session ends when the last one signs out. Either way the browser's session cookie is cleared, so the next sign-in in that browser starts with the password.
 
-A sign-out with no hint, or with one the auth server can't confirm, asks the user "Are you sure you want to sign out?" first, and when they click **Yes**, it ends the whole session, every client's part of it. RP-Initiated Logout, the OpenID Connect standard the endpoint follows, asks for that, since anyone can send a browser to `/auth/logout`. [Ending sessions](/concepts/ending-sessions/#signing-out) has the precise rules.
+A sign-out with no hint, or with one the auth server can't confirm, asks the user "Do you want to sign out?" first, and when they click **Sign out**, it ends the whole session, every client's part of it. RP-Initiated Logout, the OpenID Connect standard the endpoint follows, asks for that, since anyone can send a browser to `/auth/logout`. [Ending sessions](/concepts/ending-sessions/#signing-out) has the precise rules.
 
 An ID token that has expired still works as a hint while the session it came from is there, so a user who leaves your app open all day can still sign out without the question.
 

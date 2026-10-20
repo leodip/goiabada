@@ -33,22 +33,22 @@ type defaultsSection struct {
 
 var defaultsSections = []defaultsSection{
 	{"site/src/content/docs/concepts/tokens.mdx", "## How long tokens last", []string{
-		"Token expiration in seconds",
+		"Token lifetime, in seconds",
 		"Include OpenID Connect claims in the access token",
 		"Include OpenID Connect claims in the ID token",
 	}},
 	{"site/src/content/docs/concepts/refresh-tokens.mdx", "## How long a refresh token lasts", []string{
-		"Offline refresh token - idle timeout in seconds",
-		"Offline refresh token - max lifetime in seconds",
+		"Offline idle timeout, in seconds",
+		"Offline maximum lifetime, in seconds",
 	}},
 	{"site/src/content/docs/concepts/sessions.mdx", "## How long a session lasts", []string{
-		"User session - idle timeout in seconds",
-		"User session - max lifetime in seconds",
-		"User session - max sessions per user",
+		"Idle timeout, in seconds",
+		"Maximum lifetime, in seconds",
+		"Maximum sessions per user",
 	}},
 	{"site/src/content/docs/concepts/self-registration.mdx", "## Who can register", []string{
-		"User self registration enabled",
-		"User self registration requires email verification",
+		"User registration",
+		"Require email verification",
 	}},
 }
 
@@ -57,16 +57,16 @@ var defaultsSections = []defaultsSection{
 func seededDefaults(settings *record.Settings) map[string]string {
 	onOff := map[bool]string{false: "Off", true: "On"}
 	return map[string]string{
-		"Token expiration in seconds":                        strconv.Itoa(settings.TokenExpirationInSeconds),
-		"Include OpenID Connect claims in the access token":  onOff[settings.IncludeOpenIDConnectClaimsInAccessToken],
-		"Include OpenID Connect claims in the ID token":      onOff[settings.IncludeOpenIDConnectClaimsInIdToken],
-		"Offline refresh token - idle timeout in seconds":    strconv.Itoa(settings.RefreshTokenOfflineIdleTimeoutInSeconds),
-		"Offline refresh token - max lifetime in seconds":    strconv.Itoa(settings.RefreshTokenOfflineMaxLifetimeInSeconds),
-		"User session - idle timeout in seconds":             strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
-		"User session - max lifetime in seconds":             strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds),
-		"User session - max sessions per user":               strconv.Itoa(settings.MaxUserSessionsPerUser),
-		"User self registration enabled":                     onOff[settings.SelfRegistrationEnabled],
-		"User self registration requires email verification": onOff[settings.SelfRegistrationRequiresEmailVerification],
+		"Token lifetime, in seconds":                        strconv.Itoa(settings.TokenExpirationInSeconds),
+		"Include OpenID Connect claims in the access token": onOff[settings.IncludeOpenIDConnectClaimsInAccessToken],
+		"Include OpenID Connect claims in the ID token":     onOff[settings.IncludeOpenIDConnectClaimsInIdToken],
+		"Offline idle timeout, in seconds":                  strconv.Itoa(settings.RefreshTokenOfflineIdleTimeoutInSeconds),
+		"Offline maximum lifetime, in seconds":              strconv.Itoa(settings.RefreshTokenOfflineMaxLifetimeInSeconds),
+		"Idle timeout, in seconds":                          strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
+		"Maximum lifetime, in seconds":                      strconv.Itoa(settings.UserSessionMaxLifetimeInSeconds),
+		"Maximum sessions per user":                         strconv.Itoa(settings.MaxUserSessionsPerUser),
+		"User registration":                                 onOff[settings.SelfRegistrationEnabled],
+		"Require email verification":                        onOff[settings.SelfRegistrationRequiresEmailVerification],
 	}
 }
 

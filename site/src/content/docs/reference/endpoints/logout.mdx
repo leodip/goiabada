@@ -51,7 +51,7 @@ There's no separate list of post-logout redirect URIs: the client's redirect URI
 
 ## Whether the user is asked
 
-A sign-out the auth server can tie to your app happens at once. Any other asks the user first, with "Are you sure you want to sign out?", as RP-Initiated Logout requires, and happens when they click **Yes**:
+A sign-out the auth server can tie to your app happens at once. Any other asks the user first, with "Do you want to sign out?", as RP-Initiated Logout requires, and happens when they click **Sign out**:
 
 | Request | What happens |
 |---|---|
@@ -60,7 +60,7 @@ A sign-out the auth server can tie to your app happens at once. Any other asks t
 | A POST with a hint it can't confirm | `303 See Other` to `GET /auth/logout`, which asks the user |
 | A POST from another origin with no hint, another site or another host of the same domain | `403 Forbidden`. See [Sign-out answers 403](/troubleshooting/sign-out-answers-403/). |
 
-If the user clicks **No**, nothing ends and your app hears nothing. The browser goes back to the page it came from when it can, and otherwise shows "You are still signed in. You can close this page."
+If the user clicks **Stay signed in**, nothing ends and your app hears nothing. The browser goes back to the page it came from when it can, and otherwise shows "You're still signed in. You can close this page."
 
 A hint that can't be confirmed isn't an error your app sees: it only means the user is asked. The `303` keeps `post_logout_redirect_uri`, `state` and `ui_locales`, and drops `id_token_hint` and `client_id`.
 
@@ -84,7 +84,7 @@ The ID token from a user's sign-in to your app passes all of these while the bro
 
 ## What it ends
 
-**With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it. **Without one,** once the user clicks **Yes**, the browser's whole session ends.
+**With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it. **Without one,** once the user clicks **Sign out**, the browser's whole session ends.
 
 Either way, the browser's session cookie is cleared, so its next sign-in starts with the password.
 

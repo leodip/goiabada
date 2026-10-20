@@ -15,7 +15,7 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's the heading of the sign-in pages and the start of their titles, it signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **UI theme** and choose a color theme under **Theme selection**. It applies to the sign-in pages and the admin console alike. **Default** is the dark theme; the others are [daisyUI](https://daisyui.com/docs/themes/)'s built-in themes, such as `light`, `corporate` and `emerald`.
+2. Open **Admin**, **Theme** and choose a **Color theme**. It applies to the sign-in pages and the admin console alike. **Automatic**, which a new install starts with, is light or dark, following each visitor's device; **Light** and **Dark** always draw that one. To use your own colors, see [Regenerate the CSS](#regenerate-the-css).
 
 3. Give each client a display name and a logo, so users see which app they're signing in to. See [Clients](/concepts/clients/#display-name-description-and-logo).
 
@@ -120,18 +120,20 @@ A directory replaces the built-in set **whole**, so it must hold every file of t
 
 The pages are styled with [Tailwind CSS](https://tailwindcss.com/), and `main.css` holds only the classes the templates used when it was generated. A class you add to a template does nothing until you regenerate it.
 
+The colors are tokens at the top of `tailwindcss/ui.css`: the light palette in its `@theme` block, and the dark one under `@variant dark` just below. Change them there and regenerate, keeping each text color readable on the background it's drawn on, in both palettes. Each server has its own copy of `ui.css`, so change both if you want the sign-in pages and the admin console to match.
+
 <Steps>
 
 1. Download the standalone Tailwind CLI for your platform from [Tailwind's releases](https://github.com/tailwindlabs/tailwindcss/releases), at the version the release you copied pins: `tools.tailwind` in `goiabada-source/src/authserver/versions.yaml`. Rename it to `tailwindcss` and make it executable.
 
-2. Run it in each web directory whose templates you changed. Add `--minify` for a smaller file:
+2. Run it in each web directory whose templates or `ui.css` you changed. Add `--minify` for a smaller file:
 
    ```bash
    cd authserver-web
    tailwindcss -i ./tailwindcss/input.css -o ./static/main.css
    ```
 
-   `input.css` looks for class names in `../template` and in the JavaScript in `../static`, so keep the three folders side by side. It builds daisyUI's components in from `daisyui.mjs`, the bundle beside it, so the pages load nothing from another site.
+   `input.css` looks for class names in `../template` and in the JavaScript in `../static`, so keep the three folders side by side.
 
 3. The new `main.css` is in the static directory you mounted, so the server serves it at once. Browsers may keep the previous one for up to five minutes: reload without the cache to check.
 
@@ -145,13 +147,13 @@ On the auth server's pages, the sign-in, one-time code, consent, sign-out, regis
 2. The browser's `Accept-Language` header.
 3. English.
 
-In the admin console, the user's own choice comes first: the **Locale** they picked under **Account**, **Profile**, which reaches the console as the `locale` claim of their ID token. The console picks a change up the next time it refreshes the user's tokens, within five minutes with the default token lifetime. Without one, the browser's `Accept-Language` decides, then English.
+In the admin console, the user's own choice comes first: the **Language and region** they picked under **Account**, **Profile**, which reaches the console as the `locale` claim of their ID token. The console picks a change up the next time it refreshes the user's tokens, within five minutes with the default token lifetime. Without one, the browser's `Accept-Language` decides, then English.
 
 Whichever of these decides, it gets the first of its languages Goiabada has text for, or English when it has none of them: `ui_locales=fr es` shows Spanish when you've added Spanish but not French, and `ui_locales=fr` alone shows English.
 
 A value an admin console form won't take is refused by the auth server, in the console page's language, which is why both servers need your override catalogs.
 
-An email is written in its recipient's language: the **Locale** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
+An email is written in its recipient's language: the **Language and region** on their profile, or English when they haven't picked one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
 ## Catalogs
 
@@ -159,7 +161,7 @@ The text of every page, message and email subject is in two built-in catalogs, E
 
 `GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 
-The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Locale** list is named in itself and in English, so none of them needs translating.
+The names of countries and phone country codes, and the country in each time zone's label, come from Unicode's CLDR data, in the page's language, and each language on the **Language and region** list is named in itself and in English, so none of them needs translating.
 
 ## Email bodies
 

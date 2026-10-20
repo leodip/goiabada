@@ -47,7 +47,7 @@ Every page under `src/content/docs` follows this guide, and every docs change do
 
 ## Example
 
-The client "Consent required" setting, written in this style:
+The client "Ask users for consent" setting, written in this style:
 
 ```mdx
 ## Consent required
