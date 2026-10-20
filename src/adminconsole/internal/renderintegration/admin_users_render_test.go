@@ -173,8 +173,11 @@ func TestRender_AdminUserDetailsRefusedFocusesEnabled(t *testing.T) {
 
 	start := strings.Index(out, `id="enabledDisabled"`)
 	require.GreaterOrEqual(t, start, 0, "the Enabled checkbox renders")
-	tag := out[strings.LastIndex(out[:start], "<input"):]
-	tag = tag[:strings.Index(tag, ">")]
+	open := strings.LastIndex(out[:start], "<input")
+	require.GreaterOrEqual(t, open, 0, "as an input")
+	end := strings.Index(out[open:], ">")
+	require.Positive(t, end, "whose tag closes")
+	tag := out[open : open+end]
 	assert.Contains(t, tag, `aria-invalid="true"`)
 	assert.Contains(t, tag, " autofocus")
 }
