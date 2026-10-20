@@ -188,7 +188,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "SMTP host must be less than 120 characters.", err4.ErrorDescription)
+	assert.Equal(t, "The SMTP host can't be longer than 120 characters.", err4.ErrorDescription)
 
 	// Invalid encryption
 	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{

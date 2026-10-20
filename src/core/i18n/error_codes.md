@@ -57,7 +57,7 @@ address family's code is in the address table above.
 | `validator.attribute.value_angle_brackets` | (none) | The attribute value cannot contain the characters < or >. |
 | `validator.settings.app_name_angle_brackets` | (none) | The app name cannot contain the characters < or >. |
 | `validator.settings.issuer_angle_brackets` | (none) | The issuer cannot contain the characters < or >. |
-| `validator.settings.smtp_from_name_angle_brackets` | (none) | The from name cannot contain the characters < or >. |
+| `validator.settings.smtp_from_name_angle_brackets` | (none) | The sender name cannot contain the characters < or >. |
 
 ## Identifier validator
 
@@ -119,7 +119,7 @@ when a caller sends the same request without the console's check.
 |---|---|---|
 | `handler.client.identifier_required` | (none) | Client identifier is required. |
 | `handler.attribute.key_required` | (none) | Attribute key is required |
-| `handler.settings_email.destination_required` | (none) | Destination email is required. |
+| `handler.settings_email.destination_required` | (none) | Enter the address to send the test email to. |
 
 ## Admin and account API refusals a person reaches through the console
 
@@ -276,14 +276,14 @@ cause, each a whole sentence.
 | `handler.settings_tokens.offline_max_lifetime_too_large` | `max` (int) | The offline maximum lifetime can't be more than {{.max}} seconds. |
 | `handler.settings_email.smtp_host_required` | (none) | SMTP host is required. |
 | `handler.settings_email.smtp_port_required` | (none) | SMTP port is required. |
-| `handler.settings_email.smtp_from_email_required` | (none) | SMTP from email is required. |
-| `handler.settings_email.smtp_host_too_long` | `max` (int) | SMTP host must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_from_email_required` | (none) | Enter the sender email. |
+| `handler.settings_email.smtp_host_too_long` | `max` (int) | The SMTP host can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_port_out_of_range` | (none) | SMTP port must be between 1 and 65535. |
 | `handler.settings_email.smtp_encryption_invalid` | (none) | Invalid SMTP encryption. |
-| `handler.settings_email.smtp_username_too_long` | `max` (int) | SMTP username must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_username_too_long` | `max` (int) | The SMTP username can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_password_too_long` | `max` (int) | SMTP password must be at most {{.max}} bytes. |
-| `handler.settings_email.smtp_from_name_too_long` | `max` (int) | SMTP from name must be less than {{.max}} characters. |
-| `handler.settings_email.smtp_from_email_too_long` | `max` (int) | SMTP from email must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_from_name_too_long` | `max` (int) | The sender name can't be longer than {{.max}} characters. |
+| `handler.settings_email.smtp_from_email_too_long` | `max` (int) | The sender email can't be longer than {{.max}} characters. |
 | `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |
 | `handler.settings_email.smtp_host_changed` | (none) | The SMTP host has changed: enter the SMTP password again, or remove it. |
 | `handler.settings_email.connect_failed_host_not_found` | (none) | Unable to connect to the SMTP server: host name not found. |

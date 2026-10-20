@@ -68,8 +68,8 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/settings/email/send-test-email",
 			form:       url.Values{"destinationEmail": {""}},
-			english:    "Destination email is required.",
-			portuguese: "O e-mail de destino é obrigatório.",
+			english:    "Enter the address to send the test email to.",
+			portuguese: "Informe o endereço para onde enviar o e-mail de teste.",
 		},
 		{
 			name:     "a retention that is not a number",

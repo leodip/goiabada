@@ -1,20 +1,23 @@
 package renderintegration
 
 import (
+	"io/fs"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
+	"github.com/leodip/goiabada/adminconsole/web"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // passwordInputRe matches the password box, whatever order its attributes come in.
-var passwordInputRe = regexp.MustCompile(`<input id="password"[^>]*>`)
+var passwordInputRe = regexp.MustCompile(`<input[^>]* id="password"[^>]*>`)
 
 // clearCheckboxRe matches the removal checkbox.
-var clearCheckboxRe = regexp.MustCompile(`<input id="clearSmtpPassword"[^>]*>`)
+var clearCheckboxRe = regexp.MustCompile(`<input[^>]* id="clearSmtpPassword"[^>]*>`)
 
 // The email settings page says what will happen to the password before a save: a badge saying
 // whether one is saved, the placeholder saying an empty box keeps it, and the removal checkbox,
@@ -29,9 +32,9 @@ func TestRender_AdminSettingsEmailWithASavedPassword(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, out, ">Salva</span>", "the Saved badge")
+	assert.Contains(t, out, `<span class="tag tag-positive -my-0.5">Salva</span>`, "the Saved tag")
 	assert.NotContains(t, out, ">Não definida</span>")
-	assert.Contains(t, out, "A senha salva nunca é exibida.", "the tooltip")
+	assert.Contains(t, out, "A senha salva nunca é exibida.", "the hint")
 
 	box := passwordInputRe.FindString(out)
 	require.NotEmpty(t, box, "the password box is rendered")
@@ -46,7 +49,8 @@ func TestRender_AdminSettingsEmailWithASavedPassword(t *testing.T) {
 
 	assert.Contains(t, out, `name="hasSmtpPassword" value="true"`)
 	assert.Contains(t, out, `name="savedHostOrIP" value="smtp.example.com"`)
-	assert.Contains(t, out, "O host SMTP foi alterado", "the host-change warning is rendered, hidden until the host changes")
+	assert.Contains(t, out, "O host mudou", "the host-change caution is rendered, hidden until the host changes")
+	assert.Regexp(t, `<div class="notice notice-caution" id="hostChangeWarning" hidden>`, out)
 }
 
 func TestRender_AdminSettingsEmailWithNoSavedPassword(t *testing.T) {
@@ -57,7 +61,7 @@ func TestRender_AdminSettingsEmailWithNoSavedPassword(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, out, ">Não definida</span>", "the Not set badge")
+	assert.Contains(t, out, `<span class="tag -my-0.5">Não definida</span>`, "the Not set tag")
 	assert.NotContains(t, out, ">Salva</span>")
 
 	box := passwordInputRe.FindString(out)
@@ -93,7 +97,50 @@ func TestRender_AdminSettingsEmailScriptWritesNoMarkup(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_email.html", map[string]interface{}{
 		"settings": adminsettingshandlers.SettingsEmailGet{HasSMTPPassword: true, SavedSMTPHost: "smtp.example.com"},
 	})
+	assert.Contains(t, out, `src="/static/pages/admin-settings-email.js`)
 
-	assert.NotContains(t, out, "innerHTML")
-	assert.NotContains(t, out, "insertAdjacentHTML")
+	b, err := fs.ReadFile(web.StaticFS(), "pages/admin-settings-email.js")
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "innerHTML")
+	assert.NotContains(t, string(b), "insertAdjacentHTML")
+	assert.NotContains(t, string(b), "outerHTML")
+}
+
+// With email off, the server's three sections start hidden, and turning email off asks first
+// against email as stored, which the saved host says: on here, so unticking asks.
+func TestRender_AdminSettingsEmailHidesTheServerWhileOffAndAsksBeforeTurningItOff(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		out := renderMenuPage(t, "/admin_settings_email.html", map[string]interface{}{
+			"settings": adminsettingshandlers.SettingsEmailGet{SMTPEnabled: enabled, SMTPHost: "smtp.example.com",
+				SavedSMTPHost: "smtp.example.com", SMTPEncryption: "starttls"},
+		})
+
+		sections := regexp.MustCompile(`<div class="panel-body stacked" data-smtp-section( hidden)?>`).FindAllStringSubmatch(out, -1)
+		require.Len(t, sections, 3, "enabled: %v", enabled)
+		for _, section := range sections {
+			assert.Equal(t, !enabled, section[1] != "", "enabled: %v", enabled)
+		}
+		box := regexp.MustCompile(`<input type="checkbox" id="smtpEnabled"[^>]*>`).FindString(out)
+		require.NotEmpty(t, box)
+		assert.Contains(t, box, `data-confirm-when="unchecked" data-stored-checked="true"`)
+	}
+	assert.Contains(t, renderMenuPage(t, "/admin_settings_email.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsEmailGet{SMTPEncryption: "none"},
+	}), `data-stored-checked="false"`, "with nothing saved, unticking has nothing to clear")
+}
+
+// A refusal marks the field its code names, names the notice in the field's description and gives
+// it the focus.
+func TestRender_AdminSettingsEmailMarksTheRefusedField(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_email.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsEmailPost{SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPPort: "99999",
+			SMTPEncryption: "starttls", SavedSMTPHost: "smtp.example.com"},
+		"error":      "SMTP port must be between 1 and 65535.",
+		"errorField": "port",
+	})
+
+	port := regexp.MustCompile(`<input[^>]* id="port"[^>]*>`).FindString(out)
+	require.NotEmpty(t, port)
+	assert.Contains(t, port, `aria-describedby="email-error" aria-invalid="true" autofocus`)
+	assert.Equal(t, 1, strings.Count(out, `aria-invalid="true"`), "one field is marked")
 }

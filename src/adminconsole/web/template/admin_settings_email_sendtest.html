@@ -1,59 +1,52 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.email.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.email.subtitle" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.email_tabs.send_test" }} – {{ T $.ctx "adminconsole.admin_settings.email.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_settings.email.subtitle" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_settings.email.lead" }}</p>
+  </div>
+</div>
+{{ template "email_settings_tabs" (args "send-test-email" $.ctx) }}
 
-{{end}}
-
-{{define "body"}}
-
-{{template "email_settings_tabs" (args "send-test-email" $.ctx) }}
-
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        {{if .smtpEnabled}}
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">
-                    {{ T $.ctx "adminconsole.admin_settings.email_sendtest.field.destination" }}
-                </span>
-            </label>
-            <input id="destinationEmail" type="text" name="destinationEmail" value="{{.destinationEmail}}"
-                class="w-full input input-bordered" autocomplete="off" autofocus />
-        </div>
-        {{else}}
-        <p>{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled_suffix" }}</p>
-        {{end}}
+{{ if .smtpEnabled }}
+{{/* errorField names the address when a refusal is about it, which is then marked invalid,
+     described by the notice and focused; a failed send is the server's, and marks nothing. */}}
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="sendtest-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.email_sendtest.sent_successfully" }}</p>
-                </div>
-            {{end}}
-            <div class="float-right">
-                {{if .smtpEnabled}}
-                    <button id="btnSend" class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.send_button" }}</button>
-                {{end}}
-            </div>
-        </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.email_sendtest.sent_successfully" }}</p>
     </div>
+    {{ end }}
 
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="destinationEmail">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.field.destination" }}</label>
+        <input class="control" id="destinationEmail" type="email" inputmode="email" name="destinationEmail" value="{{ .destinationEmail }}" autocomplete="email" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "destinationEmail" }}sendtest-error {{ end }}{{ end }}destinationHint"
+          {{- if .error }}{{ if eq .errorField "destinationEmail" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="destinationHint">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.destination_hint" }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <button id="btnSend" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_settings.email_sendtest.send_button" }}</button>
+  </div>
 </form>
-
+{{ else }}
+<div class="notice notice-note">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+  <p>{{ T $.ctx "adminconsole.admin_settings.email_sendtest.smtp_disabled" }} <a class="text-link" href="/admin/settings/email">{{ T $.ctx "adminconsole.email_tabs.configuration" }}</a></p>
+</div>
+{{ end }}
 {{end}}

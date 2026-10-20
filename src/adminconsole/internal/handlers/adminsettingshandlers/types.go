@@ -34,6 +34,41 @@ var auditLogsErrorFields = map[string]string{
 	i18n.ErrCodeSettingsAuditLogsRetentionDaysTooLarge: "auditLogRetentionDays",
 }
 
+// emailErrorFields maps the email settings' refusals to the field each is about. A host changed
+// with a password saved for the old one is the password's to answer, and a connection that fails
+// the host's, which names where it went.
+var emailErrorFields = map[string]string{
+	i18n.ErrCodeSettingsEmailSMTPHostRequired:          "hostOrIP",
+	i18n.ErrCodeSettingsEmailSMTPHostTooLong:           "hostOrIP",
+	i18n.ErrCodeSettingsEmailConnectFailedHostNotFound: "hostOrIP",
+	i18n.ErrCodeSettingsEmailConnectFailedTimedOut:     "hostOrIP",
+	i18n.ErrCodeSettingsEmailConnectFailedRefused:      "hostOrIP",
+	i18n.ErrCodeSettingsEmailConnectFailed:             "hostOrIP",
+	i18n.ErrCodeSettingsEmailSMTPPortRequired:          "port",
+	i18n.ErrCodeSettingsEmailSMTPPortOutOfRange:        "port",
+	i18n.ErrCodeSettingsEmailSMTPEncryptionInvalid:     "smtpEncryption",
+	i18n.ErrCodeSettingsEmailSMTPUsernameTooLong:       "username",
+	i18n.ErrCodeSettingsEmailSMTPPasswordTooLong:       "password",
+	i18n.ErrCodeSettingsEmailSMTPPasswordAndClear:      "password",
+	i18n.ErrCodeSettingsEmailSMTPHostChanged:           "password",
+	i18n.ErrCodeSettingsEmailSMTPFromNameTooLong:       "fromName",
+	i18n.ErrCodeSettingsSmtpFromNameAngleBrackets:      "fromName",
+	i18n.ErrCodeSettingsEmailSMTPFromEmailRequired:     "fromEmail",
+	i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong:      "fromEmail",
+	i18n.ErrCodeEmailRequired:                          "fromEmail",
+	i18n.ErrCodeEmailInvalidFormat:                     "fromEmail",
+	i18n.ErrCodeEmailTooLong:                           "fromEmail",
+}
+
+// sendTestErrorFields maps the test email's refusals about its address to that field. A send that
+// fails is the server's, and names no field.
+var sendTestErrorFields = map[string]string{
+	i18n.ErrCodeSettingsEmailDestinationRequired: "destinationEmail",
+	i18n.ErrCodeEmailRequired:                    "destinationEmail",
+	i18n.ErrCodeEmailInvalidFormat:               "destinationEmail",
+	i18n.ErrCodeEmailTooLong:                     "destinationEmail",
+}
+
 // tokensErrorFields maps the token settings' refusals to the duration each is about. The idle
 // timeout above the maximum lifetime shares the client tokens' key.
 var tokensErrorFields = map[string]string{

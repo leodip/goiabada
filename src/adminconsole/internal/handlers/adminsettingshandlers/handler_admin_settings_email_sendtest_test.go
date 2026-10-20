@@ -56,8 +56,8 @@ func TestHandleEmailSendTestPost_RoutesTheAPIsRefusalsOnStatus(t *testing.T) {
 		},
 		{
 			name:         "a VALIDATION_ERROR 400 still redraws the form",
-			err:          &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Destination email is required.", StatusCode: http.StatusBadRequest},
-			wantRendered: "Destination email is required.",
+			err:          &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Enter the address to send the test email to.", StatusCode: http.StatusBadRequest},
+			wantRendered: "Enter the address to send the test email to.",
 		},
 		{
 			name:         "SMTP_NOT_ENABLED still redraws the form",

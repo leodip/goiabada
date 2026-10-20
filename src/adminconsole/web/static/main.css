@@ -643,168 +643,6 @@
     }
   }
   @layer daisyui.l1.l2.l3 {
-    .tooltip {
-      position: relative;
-      display: inline-block;
-      --tt-bg: var(--color-neutral);
-      --tt-off: calc(100% + 0.5rem);
-      --tt-radius: min(var(--radius-field), 0.8rem);
-      --tt-overlap: clamp(1px, calc(var(--radius-field) / 8), 2px);
-      --tt-tail: calc(100% + var(--tt-overlap) + 0.25rem);
-      --tt-tail-off: max(0.5rem, var(--tt-radius));
-    }
-    .tooltip > .tooltip-content {
-      position: absolute;
-      max-width: 20rem;
-      border-radius: var(--radius-field);
-      padding-inline: calc(0.25rem * 2);
-      padding-block: 0.25rem;
-      text-align: center;
-      white-space: normal;
-      color: var(--color-neutral-content);
-      opacity: 0%;
-      font-size: 0.875rem;
-      font-weight: 400;
-      line-height: 1.25;
-      background-color: var(--tt-bg);
-      width: max-content;
-      pointer-events: none;
-      z-index: 2;
-      --tw-content: attr(data-tip);
-      content: var(--tw-content);
-      transform: translateX(var(--tt-trans, -50%)) translateY(var(--tt-pos, 0.25rem));
-      inset: auto auto var(--tt-off) 50%;
-    }
-    .tooltip[data-tip]:before {
-      position: absolute;
-      max-width: 20rem;
-      border-radius: var(--radius-field);
-      padding-inline: calc(0.25rem * 2);
-      padding-block: 0.25rem;
-      text-align: center;
-      white-space: normal;
-      color: var(--color-neutral-content);
-      opacity: 0%;
-      font-size: 0.875rem;
-      font-weight: 400;
-      line-height: 1.25;
-      background-color: var(--tt-bg);
-      width: max-content;
-      pointer-events: none;
-      z-index: 2;
-      --tw-content: attr(data-tip);
-      content: var(--tw-content);
-      transform: translateX(var(--tt-trans, -50%)) translateY(var(--tt-pos, 0.25rem));
-      inset: auto auto var(--tt-off) 50%;
-    }
-    .tooltip:after {
-      opacity: 0%;
-      background-color: var(--tt-bg);
-      content: "";
-      pointer-events: none;
-      width: 0.625rem;
-      height: 0.25rem;
-      display: block;
-      position: absolute;
-      mask-repeat: no-repeat;
-      mask-position: -1px 0;
-      --mask-tooltip: url("data:image/svg+xml,%3Csvg width='10' height='4' viewBox='0 0 8 4' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0.500009 1C3.5 1 3.00001 4 5.00001 4C7 4 6.5 1 9.5 1C10 1 10 0.499897 10 0H0C-1.99338e-08 0.5 0 1 0.500009 1Z' fill='black'/%3E%3C/svg%3E%0A");
-      mask-image: var(--mask-tooltip);
-      transform: translateX(var(--tt-trans, -50%)) translateY(var(--tt-pos, 0.25rem));
-      inset: auto auto var(--tt-tail) 50%;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      .tooltip > .tooltip-content {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 75ms, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 75ms;
-      }
-      .tooltip[data-tip]:before {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 75ms, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 75ms;
-      }
-      .tooltip:after {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 75ms, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 75ms;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)) > .tooltip-content {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)) > .tooltip-content {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)) > .tooltip-content {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)) > .tooltip-content {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)) > .tooltip-content {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)) > .tooltip-content {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible))[data-tip]:before {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible))[data-tip]:before {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible))[data-tip]:before {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible))[data-tip]:before {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible))[data-tip]:before {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible))[data-tip]:before {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)):after {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)):after {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)):after {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)):after {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
-    :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)):after {
-      opacity: 100%;
-      --tt-pos: 0rem;
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      :is(.tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))).tooltip-open, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):hover, .tooltip:is([data-tip]:not([data-tip=""]), :has(.tooltip-content:not(:empty))):has(:focus-visible)):after {
-        transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
-      }
-    }
     .tabs {
       display: flex;
       flex-wrap: wrap;
@@ -1624,180 +1462,6 @@
     }
   }
   @layer daisyui.l1.l2.l3 {
-    .toggle {
-      border: var(--border) solid currentColor;
-      color: var(--input-color);
-      position: relative;
-      display: inline-grid;
-      flex-shrink: 0;
-      cursor: pointer;
-      appearance: none;
-      place-content: center;
-      vertical-align: middle;
-      webkit-user-select: none;
-      user-select: none;
-      grid-template-columns: 0fr 1fr 1fr;
-      --radius-selector-max: calc(
-      var(--radius-selector) + var(--radius-selector) + var(--radius-selector)
-    );
-      border-radius: calc( var(--radius-selector) + min(var(--toggle-p), var(--radius-selector-max)) + min(var(--border), var(--radius-selector-max)) );
-      padding: var(--toggle-p);
-      box-shadow: 0 1px currentColor inset;
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .toggle {
-        box-shadow: 0 1px color-mix(in oklab, currentColor calc(var(--depth) * 10%), #0000) inset;
-      }
-    }
-    .toggle {
-      transition: color 0.3s, grid-template-columns 0.2s;
-      --input-color: var(--color-base-content);
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .toggle {
-        --input-color: color-mix(in oklab, var(--color-base-content) 50%, #0000);
-      }
-    }
-    .toggle {
-      --toggle-p: calc(var(--size) * 0.125);
-      --size: calc(var(--size-selector, 0.25rem) * 6);
-      width: calc((var(--size) * 2) - (var(--border) + var(--toggle-p)) * 2);
-      height: var(--size);
-    }
-    .toggle > * {
-      z-index: 1;
-      grid-column: span 1 / span 1;
-      grid-column-start: 2;
-      grid-row-start: 1;
-      height: 100%;
-      cursor: pointer;
-      appearance: none;
-      background-color: transparent;
-      padding: calc(0.25rem * 0.5);
-      transition: opacity 0.2s, rotate 0.4s;
-      border: none;
-    }
-    .toggle > *:focus {
-      --tw-outline-style: none;
-      outline-style: none;
-      @media (forced-colors: active) {
-        outline: 2px solid transparent;
-        outline-offset: 2px;
-      }
-    }
-    .toggle > *:nth-child(2) {
-      color: var(--color-base-100);
-      rotate: 0deg;
-    }
-    .toggle > *:nth-child(3) {
-      color: var(--color-base-100);
-      opacity: 0%;
-      rotate: -15deg;
-    }
-    .toggle:has(:checked) > :nth-child(2) {
-      opacity: 0%;
-      rotate: 15deg;
-    }
-    .toggle:has(:checked) > :nth-child(3) {
-      opacity: 100%;
-      rotate: 0deg;
-    }
-    .toggle:before {
-      position: relative;
-      inset-inline-start: calc(0.25rem * 0);
-      grid-column-start: 2;
-      grid-row-start: 1;
-      aspect-ratio: 1 / 1;
-      height: 100%;
-      width: 100%;
-      border-radius: var(--radius-selector);
-      background-color: currentcolor;
-      translate: 0;
-      --tw-content: "";
-      content: var(--tw-content);
-      transition: background-color 0.1s, translate 0.2s, inset-inline-start 0.2s;
-      box-shadow: 0 -1px oklch(0% 0 0 / calc(var(--depth) * 0.1)) inset, 0 8px 0 -4px oklch(100% 0 0 / calc(var(--depth) * 0.1)) inset, 0 1px currentColor;
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .toggle:before {
-        box-shadow: 0 -1px oklch(0% 0 0 / calc(var(--depth) * 0.1)) inset, 0 8px 0 -4px oklch(100% 0 0 / calc(var(--depth) * 0.1)) inset, 0 1px color-mix(in oklab, currentColor calc(var(--depth) * 10%), #0000);
-      }
-    }
-    .toggle:before {
-      background-size: auto, calc(var(--noise) * 100%);
-      background-image: none, var(--fx-noise);
-    }
-    @media (forced-colors: active) {
-      .toggle:before {
-        outline-style: var(--tw-outline-style);
-        outline-width: 1px;
-        outline-offset: calc(1px * -1);
-      }
-    }
-    @media print {
-      .toggle:before {
-        outline: 0.25rem solid;
-        outline-offset: -1rem;
-      }
-    }
-    .toggle:focus-visible {
-      outline: 2px solid currentColor;
-      outline-offset: 2px;
-    }
-    .toggle:has(:focus-visible) {
-      outline: 2px solid currentColor;
-      outline-offset: 2px;
-    }
-    .toggle:checked {
-      grid-template-columns: 1fr 1fr 0fr;
-      background-color: var(--color-base-100);
-      --input-color: var(--color-base-content);
-    }
-    .toggle:checked:before {
-      background-color: currentcolor;
-    }
-    @starting-style {
-      .toggle:checked:before {
-        opacity: 0;
-      }
-    }
-    .toggle[aria-checked="true"] {
-      grid-template-columns: 1fr 1fr 0fr;
-      background-color: var(--color-base-100);
-      --input-color: var(--color-base-content);
-    }
-    .toggle[aria-checked="true"]:before {
-      background-color: currentcolor;
-    }
-    @starting-style {
-      .toggle[aria-checked="true"]:before {
-        opacity: 0;
-      }
-    }
-    .toggle:has( > input:checked) {
-      grid-template-columns: 1fr 1fr 0fr;
-      background-color: var(--color-base-100);
-      --input-color: var(--color-base-content);
-    }
-    .toggle:has( > input:checked):before {
-      background-color: currentcolor;
-    }
-    @starting-style {
-      .toggle:has( > input:checked):before {
-        opacity: 0;
-      }
-    }
-    .toggle:indeterminate {
-      grid-template-columns: 0.5fr 1fr 0.5fr;
-    }
-    .toggle:disabled {
-      cursor: not-allowed;
-      opacity: 30%;
-    }
-    .toggle:disabled:before {
-      background-color: transparent;
-      border: var(--border) solid currentColor;
-    }
     .input {
       position: relative;
       display: inline-flex;
@@ -2828,23 +2492,6 @@
       justify-content: center;
     }
   }
-  @layer daisyui.l1.l2 {
-    .tooltip-top > .tooltip-content {
-      transform: translateX(var(--tt-trans, -50%)) translateY(var(--tt-pos, 0.25rem));
-      inset: auto auto var(--tt-off) 50%;
-    }
-    .tooltip-top[data-tip]:before {
-      transform: translateX(var(--tt-trans, -50%)) translateY(var(--tt-pos, 0.25rem));
-      inset: auto auto var(--tt-off) 50%;
-    }
-    .tooltip-top:after {
-      transform: translateX(var(--tt-trans, -50%)) translateY(var(--tt-pos, 0.25rem));
-      inset: auto auto var(--tt-tail) 50%;
-    }
-  }
-  .float-right {
-    float: right;
-  }
   .container {
     width: 100%;
     @media (width >= 40rem) {
@@ -2934,6 +2581,9 @@
       height: calc(0.25rem * 0.5);
       width: 100%;
     }
+  }
+  .-my-0\.5 {
+    margin-block: calc(var(--spacing) * -0.5);
   }
   @layer daisyui.l1.l2.l3 {
     .\!label {
@@ -3080,9 +2730,6 @@
   }
   .mt-6 {
     margin-top: calc(var(--spacing) * 6);
-  }
-  .mt-8 {
-    margin-top: calc(var(--spacing) * 8);
   }
   .mr-14 {
     margin-right: calc(var(--spacing) * 14);
@@ -3233,9 +2880,6 @@
   .h-4 {
     height: calc(var(--spacing) * 4);
   }
-  .h-6 {
-    height: calc(var(--spacing) * 6);
-  }
   .h-full {
     height: 100%;
   }
@@ -3247,9 +2891,6 @@
   }
   .w-5\/12 {
     width: calc(5 / 12 * 100%);
-  }
-  .w-6 {
-    width: calc(var(--spacing) * 6);
   }
   .w-full {
     width: 100%;
@@ -3307,9 +2948,6 @@
       outline-offset: 2px;
     }
   }
-  .cursor-pointer {
-    cursor: pointer;
-  }
   .resize {
     resize: both;
   }
@@ -3330,9 +2968,6 @@
   }
   .justify-end {
     justify-content: flex-end;
-  }
-  .justify-start {
-    justify-content: flex-start;
   }
   .gap-0\.5 {
     gap: calc(var(--spacing) * 0.5);
@@ -3362,14 +2997,6 @@
     border-style: var(--tw-border-style);
     border-width: 1px;
   }
-  @layer daisyui.l1.l2 {
-    .badge-ghost {
-      border-color: var(--color-base-200);
-      background-color: var(--color-base-200);
-      color: var(--color-base-content);
-      background-image: none;
-    }
-  }
   .border-line {
     border-color: var(--color-line);
   }
@@ -3381,12 +3008,6 @@
   }
   .bg-warning {
     background-color: var(--color-warning);
-  }
-  @layer daisyui.l1.l2 {
-    .checkbox-sm {
-      padding: 0.1875rem;
-      --size: calc(var(--size-selector, 0.25rem) * 5);
-    }
   }
   .p-1 {
     padding: var(--spacing);
@@ -3406,12 +3027,6 @@
   .text-center {
     text-align: center;
   }
-  .text-right {
-    text-align: right;
-  }
-  .align-middle {
-    vertical-align: middle;
-  }
   .font-mono {
     font-family: var(--font-mono);
   }
@@ -3422,12 +3037,6 @@
   .text-xl {
     font-size: var(--text-xl);
     line-height: var(--tw-leading, var(--text-xl--line-height));
-  }
-  @layer daisyui.l1.l2 {
-    .badge-sm {
-      --size: calc(var(--size-selector, 0.25rem) * 5);
-      font-size: 0.75rem;
-    }
   }
   .text-\[0\.8125rem\] {
     font-size: 0.8125rem;
@@ -3470,9 +3079,6 @@
   .text-accent {
     color: var(--color-accent);
   }
-  .text-base-content {
-    color: var(--color-base-content);
-  }
   .text-error {
     color: var(--color-error);
   }
@@ -3481,12 +3087,6 @@
   }
   .text-ink-muted {
     color: var(--color-ink-muted);
-  }
-  .text-success {
-    color: var(--color-success);
-  }
-  .text-warning {
-    color: var(--color-warning);
   }
   .text-warning-content {
     color: var(--color-warning-content);
@@ -3510,11 +3110,6 @@
     filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
   }
   @layer daisyui.l1.l2 {
-    .btn-primary {
-      --btn-color: var(--color-primary);
-      --btn-fg: var(--color-primary-content);
-      --btn-soft-bg: initial;
-    }
     .btn-secondary {
       --btn-color: var(--color-secondary);
       --btn-fg: var(--color-secondary-content);
@@ -3538,10 +3133,6 @@
       --badge-color: var(--color-neutral);
       --badge-fg: var(--color-neutral-content);
     }
-    .badge-success {
-      --badge-color: var(--color-success);
-      --badge-fg: var(--color-success-content);
-    }
   }
   @layer daisyui.l1.l2.l3 {
     .aura:has( > .card,  > .alert) {
@@ -3561,9 +3152,6 @@
     }
     .aura:has( > .btn,  > .input,  > .select) {
       --aura-radius: var(--radius-field);
-    }
-    .aura:has( > .checkbox,  > .toggle,  > .badge) {
-      --aura-radius: var(--radius-selector);
     }
   }
   .not-empty\:mt-2:not(:empty) {

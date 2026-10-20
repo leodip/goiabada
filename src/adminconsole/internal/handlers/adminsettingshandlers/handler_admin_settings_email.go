@@ -133,10 +133,11 @@ func HandleEmailPost(
 			SavedSMTPHost:     r.FormValue("savedHostOrIP"),
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"error":    message,
+				"settings":   settingsInfo,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email.html", bind)
@@ -145,12 +146,17 @@ func HandleEmailPost(
 			}
 		}
 
-		// Convert port to int if possible; on error, set 0 so server validation triggers
+		// An empty port is sent as 0, which the auth server refuses as missing; one that is not a
+		// number is refused here, at its field, rather than refused in the same words. With email
+		// off the port is not saved, so it is not read.
 		smtpPortInt := 0
-		if len(settingsInfo.SMTPPort) > 0 {
-			if p, err := strconv.Atoi(settingsInfo.SMTPPort); err == nil {
-				smtpPortInt = p
+		if port := strings.TrimSpace(settingsInfo.SMTPPort); settingsInfo.SMTPEnabled && port != "" {
+			p, err := strconv.Atoi(port)
+			if err != nil {
+				renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_email.port_invalid"), "port")
+				return
 			}
+			smtpPortInt = p
 		}
 
 		updateReq := &api.UpdateSettingsEmailRequest{
@@ -167,7 +173,9 @@ func HandleEmailPost(
 
 		_, err := apiClient.UpdateSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, emailErrorFields))
+			})
 			return
 		}
 
@@ -258,11 +266,12 @@ func HandleEmailSendTestPost(
 
 		destinationEmail := r.FormValue("destinationEmail")
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"smtpEnabled":      true,
 				"destinationEmail": destinationEmail,
 				"error":            message,
+				"errorField":       errorField,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
@@ -272,7 +281,7 @@ func HandleEmailSendTestPost(
 		}
 
 		if len(destinationEmail) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailDestinationRequired, nil).Localize(r.Context()))
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailDestinationRequired, nil).Localize(r.Context()), "destinationEmail")
 			return
 		}
 
@@ -284,7 +293,9 @@ func HandleEmailSendTestPost(
 			// SMTP_NOT_ENABLED and SEND_FAILED, and sent the API's 400
 			// validator.email.invalid_format for a malformed address, which the free-text field
 			// invites, to the 500 page (#559 decision 5).
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, sendTestErrorFields))
+			})
 			return
 		}
 
