@@ -45,14 +45,14 @@
           <input type="checkbox" id="includeInAccessToken" name="includeInAccessToken" aria-describedby="includeInAccessTokenHint"{{ if .includeInAccessToken }} checked{{ end }}>
           <span class="grid min-w-0 flex-1 gap-0.5">
             <span class="choice-label">{{ T $.ctx "adminconsole.admin_groups.common.include_access" }}</span>
-            <span class="field-hint" id="includeInAccessTokenHint">{{ T $.ctx "adminconsole.admin_groups.common.include_hint" }}</span>
+            <span class="field-hint" id="includeInAccessTokenHint">{{ T $.ctx "adminconsole.admin_groups.common.include_access_hint" }}</span>
           </span>
         </label>
         <label class="check-row" for="includeInIdToken">
           <input type="checkbox" id="includeInIdToken" name="includeInIdToken" aria-describedby="includeInIdTokenHint"{{ if .includeInIdToken }} checked{{ end }}>
           <span class="grid min-w-0 flex-1 gap-0.5">
             <span class="choice-label">{{ T $.ctx "adminconsole.admin_groups.common.include_id" }}</span>
-            <span class="field-hint" id="includeInIdTokenHint">{{ T $.ctx "adminconsole.admin_groups.common.include_hint" }}</span>
+            <span class="field-hint" id="includeInIdTokenHint">{{ T $.ctx "adminconsole.admin_groups.common.include_id_hint" }}</span>
           </span>
         </label>
       </div>

@@ -1060,9 +1060,9 @@
 "adminconsole.admin_users.attributes_form.value_tooltip" = "Free text, up to 250 characters."
 "adminconsole.admin_users.attributes_form.tokens_legend" = "Tokens"
 "adminconsole.admin_users.attributes_form.include_access" = "Include in the access token"
-"adminconsole.admin_users.attributes_form.include_access_hint" = "In the attributes claim, when a client asks for the attributes scope."
+"adminconsole.admin_users.attributes_form.include_access_hint" = "In the attributes claim of the access token, when a client asks for the attributes scope."
 "adminconsole.admin_users.attributes_form.include_id" = "Include in the ID token"
-"adminconsole.admin_users.attributes_form.include_id_hint" = "In the attributes claim, when a client asks for the attributes scope."
+"adminconsole.admin_users.attributes_form.include_id_hint" = "In the attributes claim of the ID token and of /userinfo, when a client asks for the attributes scope."
 
 "adminconsole.admin_users.permissions.field.resource" = "Resource"
 "adminconsole.admin_users.permissions.lead" = "A permission granted here is a scope the user can be issued, when a client they sign in to asks for it."
@@ -1111,7 +1111,8 @@
 "adminconsole.admin_groups.common.tokens_legend" = "Tokens"
 "adminconsole.admin_groups.common.include_access" = "Include in the access token"
 "adminconsole.admin_groups.common.include_id" = "Include in the ID token"
-"adminconsole.admin_groups.common.include_hint" = "In the groups claim of its members' tokens, when a client asks for the groups scope."
+"adminconsole.admin_groups.common.include_access_hint" = "In the groups claim of its members' access tokens, when a client asks for the groups scope."
+"adminconsole.admin_groups.common.include_id_hint" = "In the groups claim of its members' ID tokens and of /userinfo, when a client asks for the groups scope."
 "adminconsole.admin_groups.modal.save_title" = "Save these changes?"
 
 "adminconsole.admin_groups.new.page_title" = "New group"
@@ -1167,9 +1168,9 @@
 "adminconsole.admin_groups.attributes_form.value_tooltip" = "Free text, up to 250 characters."
 "adminconsole.admin_groups.attributes_form.tokens_legend" = "Tokens"
 "adminconsole.admin_groups.attributes_form.include_access" = "Include in the access token"
-"adminconsole.admin_groups.attributes_form.include_access_hint" = "In the attributes claim of its members' tokens, when a client asks for the attributes scope."
+"adminconsole.admin_groups.attributes_form.include_access_hint" = "In the attributes claim of its members' access tokens, when a client asks for the attributes scope."
 "adminconsole.admin_groups.attributes_form.include_id" = "Include in the ID token"
-"adminconsole.admin_groups.attributes_form.include_id_hint" = "In the attributes claim of its members' tokens, when a client asks for the attributes scope."
+"adminconsole.admin_groups.attributes_form.include_id_hint" = "In the attributes claim of its members' ID tokens and of /userinfo, when a client asks for the attributes scope."
 
 "adminconsole.admin_groups.members.modal_remove_title" = "Remove this member?"
 "adminconsole.admin_groups.members.removed_label" = "Removed"

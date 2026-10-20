@@ -1001,9 +1001,9 @@
 "adminconsole.admin_users.attributes_form.value_tooltip" = "Texto livre, de até 250 caracteres."
 "adminconsole.admin_users.attributes_form.tokens_legend" = "Tokens"
 "adminconsole.admin_users.attributes_form.include_access" = "Incluir no token de acesso"
-"adminconsole.admin_users.attributes_form.include_access_hint" = "Na claim attributes, quando um cliente pede o escopo attributes."
+"adminconsole.admin_users.attributes_form.include_access_hint" = "Na claim attributes do token de acesso, quando um cliente pede o escopo attributes."
 "adminconsole.admin_users.attributes_form.include_id" = "Incluir no ID token"
-"adminconsole.admin_users.attributes_form.include_id_hint" = "Na claim attributes, quando um cliente pede o escopo attributes."
+"adminconsole.admin_users.attributes_form.include_id_hint" = "Na claim attributes do ID token e do /userinfo, quando um cliente pede o escopo attributes."
 
 "adminconsole.admin_users.permissions.field.resource" = "Recurso"
 "adminconsole.admin_users.permissions.lead" = "Uma permissão concedida aqui é um escopo que o usuário pode receber, quando um cliente em que ele entra o pede."
@@ -1052,7 +1052,8 @@
 "adminconsole.admin_groups.common.tokens_legend" = "Tokens"
 "adminconsole.admin_groups.common.include_access" = "Incluir no token de acesso"
 "adminconsole.admin_groups.common.include_id" = "Incluir no ID token"
-"adminconsole.admin_groups.common.include_hint" = "Na claim groups dos tokens dos membros, quando um cliente pede o escopo groups."
+"adminconsole.admin_groups.common.include_access_hint" = "Na claim groups dos tokens de acesso dos membros, quando um cliente pede o escopo groups."
+"adminconsole.admin_groups.common.include_id_hint" = "Na claim groups dos ID tokens dos membros e do /userinfo, quando um cliente pede o escopo groups."
 "adminconsole.admin_groups.modal.save_title" = "Salvar estas alterações?"
 
 "adminconsole.admin_groups.new.page_title" = "Novo grupo"
@@ -1106,9 +1107,9 @@
 "adminconsole.admin_groups.attributes_form.value_tooltip" = "Texto livre, de até 250 caracteres."
 "adminconsole.admin_groups.attributes_form.tokens_legend" = "Tokens"
 "adminconsole.admin_groups.attributes_form.include_access" = "Incluir no token de acesso"
-"adminconsole.admin_groups.attributes_form.include_access_hint" = "Na claim attributes dos tokens dos membros, quando um cliente pede o escopo attributes."
+"adminconsole.admin_groups.attributes_form.include_access_hint" = "Na claim attributes dos tokens de acesso dos membros, quando um cliente pede o escopo attributes."
 "adminconsole.admin_groups.attributes_form.include_id" = "Incluir no ID token"
-"adminconsole.admin_groups.attributes_form.include_id_hint" = "Na claim attributes dos tokens dos membros, quando um cliente pede o escopo attributes."
+"adminconsole.admin_groups.attributes_form.include_id_hint" = "Na claim attributes dos ID tokens dos membros e do /userinfo, quando um cliente pede o escopo attributes."
 
 "adminconsole.admin_groups.members.modal_remove_title" = "Remover este membro?"
 "adminconsole.admin_groups.members.removed_label" = "Removido"
