@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/core/api"
@@ -197,6 +198,12 @@ type AuditLogRow struct {
 	api.AuditLogResponse
 	DetailPairs   []AuditLogDetail
 	DetailsParsed bool
+}
+
+// EventSegments is the event's name cut after each underscore, so a phone breaks it between its
+// words rather than inside one.
+func (r AuditLogRow) EventSegments() []string {
+	return strings.SplitAfter(r.AuditEvent, "_")
 }
 
 // AuditLogDetail is one key of an audit log entry's details and its value as text.

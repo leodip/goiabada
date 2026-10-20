@@ -267,7 +267,7 @@
 # --- Sign-out confirmation page (#411) ---------------------------------------
 
 "adminconsole.logout_confirm.heading" = "Sign out"
-"adminconsole.logout_confirm.message" = "Do you want to sign out? This ends your session in the admin console and on the auth server."
+"adminconsole.logout_confirm.message" = "Do you want to sign out? This will end your session in the admin console and on the auth server."
 "adminconsole.logout_confirm.cancel" = "Stay signed in"
 "adminconsole.logout_form_post.title" = "Signing you out"
 "adminconsole.logout_form_post.message" = "If nothing happens, select Continue."
@@ -662,7 +662,7 @@
 # --- Client delete ----------------------------------------------------------
 
 "adminconsole.admin_clients.delete.page_title_prefix" = "Delete client"
-"adminconsole.admin_clients.delete.lead" = "Deleting a client also deletes everything linked to it, including the consents users gave it and the permissions it was granted. Anything that signs in with it stops working."
+"adminconsole.admin_clients.delete.lead" = "Deleting this client will also delete everything linked to it, including the consents users gave it and the permissions it was granted. Anything that signs in with it will stop working."
 "adminconsole.admin_clients.delete.system_cannot_delete" = "This is the admin console's own client, so it can't be deleted."
 "adminconsole.admin_clients.delete.col_client_identifier" = "Client identifier"
 "adminconsole.admin_clients.delete.col_description" = "Description"
@@ -742,9 +742,9 @@
 "adminconsole.admin_clients.settings.screens_hint" = "What these pages show users about the client."
 "adminconsole.admin_clients.settings.access_title" = "Access"
 "adminconsole.admin_clients.settings.saved_successfully" = "Settings saved."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "You've changed the client identifier, so anything that signs in with this client will have to send the new one."
-"adminconsole.admin_clients.settings.modal.disabled_warning" = "You've disabled the client, so nothing can sign in with it or get tokens through it until it's enabled again."
-"adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "You're allowing the client to request the administrative scopes. It will be able to get a token carrying a signed-in administrator's authority, and it becomes an administrator client."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "You're changing the client identifier, so anything that signs in with this client will have to send the new one."
+"adminconsole.admin_clients.settings.modal.disabled_warning" = "You're disabling the client, so nothing will be able to sign in with it or get tokens through it until it's enabled again."
+"adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "You're allowing the client to request the administrative scopes. It will be able to get a token carrying a signed-in administrator's authority, and it will become an administrator client."
 
 # --- Client tokens ---------------------------------------------------------
 
@@ -789,8 +789,8 @@
 "adminconsole.admin_clients.authentication.copy_failed_status" = "Couldn't copy the secret. Show it, then copy it yourself."
 "adminconsole.admin_clients.authentication.secret_generated" = "New secret generated. Save to start using it; until then the current one keeps working."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentication saved."
-"adminconsole.admin_clients.authentication.modal.secret_change" = "You've changed the client secret, so anything still sending the old one will be refused until it's updated."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret is removed, so anything that signs in with it needs updating. Its refresh tokens and authorization codes are revoked; access tokens already issued work until they expire, and users stay signed in to other clients."
+"adminconsole.admin_clients.authentication.modal.secret_change" = "You're changing the client secret, so anything still sending the old one will be refused until it's updated."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked; access tokens already issued will keep working until they expire, and users will stay signed in to other clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "You're making the client confidential. Anything that signs in with it will have to send the client secret."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -914,7 +914,7 @@
 "adminconsole.admin_users.new.create_button" = "Create user"
 
 "adminconsole.admin_users.delete.page_title_prefix" = "Delete user"
-"adminconsole.admin_users.delete.lead" = "Deleting a user also deletes everything linked to them, including their permissions, group memberships, attributes, consents and sessions. They can no longer sign in."
+"adminconsole.admin_users.delete.lead" = "Deleting this user will also delete everything linked to them, including their permissions, group memberships, attributes, consents and sessions. They'll no longer be able to sign in."
 "adminconsole.admin_users.delete.field.subject" = "Subject"
 "adminconsole.admin_users.delete.field.full_name" = "Name"
 "adminconsole.admin_users.delete.field.email" = "Email"
@@ -934,7 +934,7 @@
 "adminconsole.admin_users.details.none" = "Not set"
 "adminconsole.admin_users.details.field.enabled" = "Enabled"
 "adminconsole.admin_users.details.field.enabled_hint" = "A disabled user can't sign in, and clients can't renew their tokens."
-"adminconsole.admin_users.details.disable_warning" = "You're disabling the user, so they can't sign in, and clients can't renew their tokens."
+"adminconsole.admin_users.details.disable_warning" = "You're disabling the user, so they won't be able to sign in, and clients won't be able to renew their tokens."
 "adminconsole.admin_users.details.user_created_message" = "User created."
 
 # --- Admin users (profile, email, phone, address) ---------------------------
@@ -1000,7 +1000,7 @@
 "adminconsole.admin_users.authentication.otp_enabled_label" = "Enabled"
 "adminconsole.admin_users.authentication.otp_title" = "Two-factor authentication"
 "adminconsole.admin_users.authentication.otp_enabled_hint" = "Clear it to turn two-factor authentication off. Only the user can turn it on again, from their account."
-"adminconsole.admin_users.authentication.otp_disable_warning" = "You're turning off the user's two-factor authentication, so their password alone signs them in until they set it up again."
+"adminconsole.admin_users.authentication.otp_disable_warning" = "You're turning off the user's two-factor authentication, so their password alone will sign them in until they set it up again."
 "adminconsole.admin_users.authentication.otp_not_set_up" = "The user hasn't set up two-factor authentication. Only they can, from their account."
 
 "adminconsole.admin_users.consents.modal_confirm_title" = "Revoke this consent?"
@@ -1011,7 +1011,7 @@
 "adminconsole.admin_users.consents.col_granted_at" = "Given"
 "adminconsole.admin_users.consents.col_scope" = "Scopes"
 "adminconsole.admin_users.consents.revoke_button" = "Revoke"
-"adminconsole.admin_users.consents.revoke_confirm" = "Revoke the consent the user gave {{.client}}? They're asked again the next time it asks for those scopes."
+"adminconsole.admin_users.consents.revoke_confirm" = "Revoke the consent the user gave {{.client}}? They'll be asked again the next time it asks for those scopes."
 "adminconsole.admin_users.consents.revoke_dialog_button" = "Revoke consent"
 "adminconsole.admin_users.consents.empty" = "This user hasn't given consent to any client."
 
@@ -1046,7 +1046,7 @@
 "adminconsole.admin_users.attributes.id_token" = "ID token"
 "adminconsole.admin_users.attributes.in_no_token" = "Neither"
 "adminconsole.admin_users.attributes.remove_button" = "Remove"
-"adminconsole.admin_users.attributes.remove_confirm" = "Remove the attribute {{.key}}? Clients stop receiving it in this user's tokens."
+"adminconsole.admin_users.attributes.remove_confirm" = "Remove the attribute {{.key}}? Clients will stop receiving it in this user's tokens."
 "adminconsole.admin_users.attributes.remove_dialog_button" = "Remove attribute"
 "adminconsole.admin_users.attributes.empty" = "No attributes yet."
 
@@ -1123,7 +1123,7 @@
 "adminconsole.admin_groups.new.create_button" = "Create group"
 
 "adminconsole.admin_groups.delete.page_title_prefix" = "Delete group"
-"adminconsole.admin_groups.delete.lead" = "Deleting a group also deletes its attributes and the permissions it was granted, and its members lose what the group gave them. The users themselves aren't deleted."
+"adminconsole.admin_groups.delete.lead" = "Deleting this group will also delete its attributes and the permissions it was granted, and its members will lose what the group gave them. The users themselves won't be deleted."
 "adminconsole.admin_groups.delete.field.identifier" = "Group identifier"
 "adminconsole.admin_groups.delete.field.description" = "Description"
 "adminconsole.admin_groups.delete.field.member_count" = "Members"
@@ -1133,7 +1133,7 @@
 
 "adminconsole.admin_groups.settings.field.identifier" = "Group identifier"
 "adminconsole.admin_groups.settings.identifier_tooltip" = "What clients read in the groups claim. It starts with a letter and holds letters, digits, hyphens and underscores."
-"adminconsole.admin_groups.settings.identifier_change" = "You've changed the group identifier, so clients that read it in the groups claim see the new one."
+"adminconsole.admin_groups.settings.identifier_change" = "You're changing the group identifier, so clients that read it in the groups claim will see the new one."
 "adminconsole.admin_groups.settings.field.description" = "Description"
 "adminconsole.admin_groups.settings.description_tooltip" = "What the group is for, shown in the admin console only."
 "adminconsole.admin_groups.settings.saved_successfully" = "Settings saved."
@@ -1153,7 +1153,7 @@
 "adminconsole.admin_groups.attributes.id_token" = "ID token"
 "adminconsole.admin_groups.attributes.in_no_token" = "Neither"
 "adminconsole.admin_groups.attributes.remove_button" = "Remove"
-"adminconsole.admin_groups.attributes.remove_confirm" = "Remove the attribute {{.key}}? Clients stop receiving it in the tokens of the group's members."
+"adminconsole.admin_groups.attributes.remove_confirm" = "Remove the attribute {{.key}}? Clients will stop receiving it in the tokens of the group's members."
 "adminconsole.admin_groups.attributes.remove_dialog_button" = "Remove attribute"
 "adminconsole.admin_groups.attributes.empty" = "No attributes yet."
 
@@ -1180,7 +1180,7 @@
 "adminconsole.admin_groups.members.col_member" = "Member"
 "adminconsole.admin_groups.members.col_actions" = "Actions"
 "adminconsole.admin_groups.members.remove_button" = "Remove"
-"adminconsole.admin_groups.members.remove_confirm" = "Remove {{.user}} from the group? They lose the permissions and attributes it gave them."
+"adminconsole.admin_groups.members.remove_confirm" = "Remove {{.user}} from the group? They'll lose the permissions and attributes it gave them."
 "adminconsole.admin_groups.members.remove_dialog_button" = "Remove member"
 "adminconsole.admin_groups.members.empty" = "No one is in this group yet."
 
@@ -1238,7 +1238,7 @@
 "adminconsole.admin_resources.new.create_button" = "Create resource"
 
 "adminconsole.admin_resources.delete.page_title_prefix" = "Delete resource"
-"adminconsole.admin_resources.delete.lead" = "Deleting a resource also deletes its permissions, and takes them from every client, group and user they were granted to."
+"adminconsole.admin_resources.delete.lead" = "Deleting this resource will also delete its permissions, and take them from every client, group and user they were granted to."
 "adminconsole.admin_resources.delete.system_level_warning" = "This is the auth server's own resource, so it can't be deleted."
 "adminconsole.admin_resources.delete.field.identifier" = "Resource identifier"
 "adminconsole.admin_resources.delete.field.description" = "Description"
@@ -1249,7 +1249,7 @@
 
 "adminconsole.admin_resources.settings.field.identifier" = "Resource identifier"
 "adminconsole.admin_resources.settings.identifier_tooltip" = "The first part of each of its permissions' scopes, as in resource:permission. It starts with a letter and holds letters, digits, hyphens and underscores."
-"adminconsole.admin_resources.settings.identifier_change" = "You've changed the resource identifier, and every scope naming it changes with it, so clients that request those scopes and APIs that check them must be updated."
+"adminconsole.admin_resources.settings.identifier_change" = "You're changing the resource identifier, and every scope naming it will change with it, so clients that request those scopes and APIs that check them will have to be updated."
 "adminconsole.admin_resources.settings.field.description" = "Description"
 "adminconsole.admin_resources.settings.description_tooltip" = "What the resource is, such as the API it names."
 "adminconsole.admin_resources.settings.saved_successfully" = "Settings saved."
@@ -1287,7 +1287,7 @@
 "adminconsole.admin_resources.groups_with_permission.no" = "No"
 "adminconsole.admin_resources.groups_with_permission.grant_button" = "Grant"
 "adminconsole.admin_resources.groups_with_permission.remove_button" = "Remove"
-"adminconsole.admin_resources.groups_with_permission.remove_confirm" = "Remove {{.scope}} from {{.group}}? Its members lose it, unless they hold it another way."
+"adminconsole.admin_resources.groups_with_permission.remove_confirm" = "Remove {{.scope}} from {{.group}}? Its members will lose it, unless they hold it another way."
 "adminconsole.admin_resources.groups_with_permission.remove_dialog_button" = "Remove permission"
 "adminconsole.admin_resources.groups_with_permission.granted" = "Permission granted to the group."
 "adminconsole.admin_resources.groups_with_permission.removed" = "Permission removed from the group."
@@ -1303,7 +1303,7 @@
 "adminconsole.admin_resources.users_with_permission.col_subject" = "Subject"
 "adminconsole.admin_resources.users_with_permission.col_user" = "User"
 "adminconsole.admin_resources.users_with_permission.remove_button" = "Remove"
-"adminconsole.admin_resources.users_with_permission.remove_confirm" = "Remove {{.scope}} from {{.user}}? They lose it, unless a group gives it to them."
+"adminconsole.admin_resources.users_with_permission.remove_confirm" = "Remove {{.scope}} from {{.user}}? They'll lose it, unless a group gives it to them."
 "adminconsole.admin_resources.users_with_permission.remove_dialog_button" = "Remove permission"
 "adminconsole.admin_resources.users_with_permission.empty" = "No user holds this permission directly."
 "adminconsole.admin_resources.users_with_permission.no_permissions" = "This resource has no permissions yet. Add them on the Permissions tab."
@@ -1339,7 +1339,7 @@
 "adminconsole.admin_settings.general.app_name_tooltip" = "Shown in page titles and in the emails the auth server sends."
 "adminconsole.admin_settings.general.field.issuer" = "Issuer"
 "adminconsole.admin_settings.general.issuer_tooltip" = "The iss claim of every token and the issuer in the discovery document: an https URL with no query, fragment or user info, or the auth server's base URL."
-"adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it must be updated to the new one, tokens issued before keep the old one, and you'll be signed out."
+"adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it will have to be updated to the new one, tokens issued before will keep the old one, and you'll be signed out."
 "adminconsole.admin_settings.general.field.password_policy" = "Password policy"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Applies whenever a password is set or changed. Passwords already set aren't checked again."
 "adminconsole.admin_settings.general.password_policy_none" = "No policy"
@@ -1415,7 +1415,7 @@
 "adminconsole.admin_settings.email.lead" = "The SMTP server the auth server sends its emails through."
 "adminconsole.admin_settings.email.field.smtp_enabled" = "Send email"
 "adminconsole.admin_settings.email.smtp_enabled_tooltip" = "The auth server sends password reset, email verification and registration emails through the SMTP server below."
-"adminconsole.admin_settings.email.disable_warning" = "Turning email off clears every SMTP setting, the saved password included, and stops the password reset, email verification and registration emails."
+"adminconsole.admin_settings.email.disable_warning" = "Turning email off will clear every SMTP setting, the saved password included, and stop the password reset, email verification and registration emails."
 "adminconsole.admin_settings.email.section_server" = "SMTP server"
 "adminconsole.admin_settings.email.field.host_or_ip" = "Host name or IP address"
 "adminconsole.admin_settings.email.field.port" = "Port"
@@ -1435,14 +1435,14 @@
 "adminconsole.admin_settings.email.password_tooltip" = "The saved password is never shown. Leave this empty to keep it, or type a new one to replace it."
 "adminconsole.admin_settings.email.password_keep_placeholder" = "Leave empty to keep the saved password"
 "adminconsole.admin_settings.email.clear_password" = "Remove saved password"
-"adminconsole.admin_settings.email.clear_password_notice" = "The saved password is deleted when you save."
-"adminconsole.admin_settings.email.host_change_warning" = "The host has changed, and the saved password was for the old one: enter the password again, or remove the saved password."
+"adminconsole.admin_settings.email.clear_password_notice" = "The saved password will be deleted when you save."
+"adminconsole.admin_settings.email.host_change_warning" = "You've changed the host, and the saved password is for the old one: enter the password again, or remove the saved password."
 "adminconsole.admin_settings.email.section_sender" = "Sender"
 
 "adminconsole.admin_settings.email_sendtest.field.destination" = "Send to"
 "adminconsole.admin_settings.email_sendtest.destination_hint" = "A short test message is sent there through the SMTP server."
 "adminconsole.admin_settings.email_sendtest.smtp_disabled" = "Email is off. Turn it on and set up the SMTP server to send a test email:"
-"adminconsole.admin_settings.email_sendtest.sent_successfully" = "Test email sent."
+"adminconsole.admin_settings.email_sendtest.sent_successfully" = "Test email sent to {{.address}}."
 "adminconsole.admin_settings.email_sendtest.send_button" = "Send test email"
 
 "adminconsole.admin_settings.keys.page_title" = "Signing keys"
@@ -1466,11 +1466,11 @@
 "adminconsole.admin_settings.keys.revoked_label" = "Revoked"
 "adminconsole.admin_settings.keys.rotate_button" = "Rotate keys"
 "adminconsole.admin_settings.keys.modal_rotate_title" = "Rotate the signing keys?"
-"adminconsole.admin_settings.keys.modal_rotate_body" = "The next key becomes the current key and signs every new token, the current key becomes the previous key, and a new next key is created."
-"adminconsole.admin_settings.keys.modal_rotate_deletes_previous" = "The previous key there is now is deleted, so tokens it signed stop verifying."
+"adminconsole.admin_settings.keys.modal_rotate_body" = "The next key will become the current key and sign every new token, the current key will become the previous key, and a new next key will be created."
+"adminconsole.admin_settings.keys.modal_rotate_deletes_previous" = "The existing previous key will be deleted, so the tokens it signed will stop verifying."
 "adminconsole.admin_settings.keys.modal_rotated_body" = "Keys rotated: the next key is now the current key, and a new next key was created."
 "adminconsole.admin_settings.keys.modal_revoke_title" = "Revoke this key?"
-"adminconsole.admin_settings.keys.modal_revoke_body" = "The key is deleted, and tokens it signed stop verifying. This can't be undone."
+"adminconsole.admin_settings.keys.modal_revoke_body" = "The key will be deleted, and the tokens it signed will stop verifying. This can't be undone."
 "adminconsole.admin_settings.keys.dialog_pem_title" = "Public key in PEM format"
 "adminconsole.admin_settings.keys.dialog_asn1der_title" = "Public key in ASN.1 DER format, base64 encoded"
 "adminconsole.admin_settings.keys.dialog_jwk_title" = "Public key in JWK format"
@@ -1484,8 +1484,8 @@
 "adminconsole.admin_settings.audit_logs.page_title" = "Audit logging settings"
 "adminconsole.admin_settings.audit_logs.subtitle" = "Audit logging"
 "adminconsole.admin_settings.audit_logs.lead" = "Where audit events are written, and how long the database keeps them."
-"adminconsole.admin_settings.audit_logs.field.console_enabled" = "Write audit events to the log"
-"adminconsole.admin_settings.audit_logs.console_enabled_tooltip" = "Each event goes to the auth server's log as a structured record, for log aggregation and monitoring."
+"adminconsole.admin_settings.audit_logs.field.console_enabled" = "Write audit events to the server's output"
+"adminconsole.admin_settings.audit_logs.console_enabled_tooltip" = "Each event is written as a structured record to the auth server's standard error (stderr), with its other log records, where a container runtime or log collector picks it up."
 "adminconsole.admin_settings.audit_logs.field.database_enabled" = "Store audit events in the database"
 "adminconsole.admin_settings.audit_logs.database_enabled_tooltip" = "Each event is saved in the audit_logs table, where the Audit log page shows it."
 "adminconsole.admin_settings.audit_logs.field.retention_days" = "Retention, in days"
@@ -1501,7 +1501,7 @@
 "adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Time"
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Event"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Request id"
-"adminconsole.admin_settings.audit_log_viewer.no_request_id" = "None"
+"adminconsole.admin_settings.audit_log_viewer.request_events_link" = "show every event of this request"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Details"
 "adminconsole.admin_settings.audit_log_viewer.no_details" = "None"
 "adminconsole.admin_settings.audit_log_viewer.empty" = "No audit events yet."

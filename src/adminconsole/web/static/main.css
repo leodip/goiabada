@@ -2344,6 +2344,9 @@
   .-mt-3 {
     margin-top: calc(var(--spacing) * -3);
   }
+  .mt-0\.5 {
+    margin-top: calc(var(--spacing) * 0.5);
+  }
   .mt-1 {
     margin-top: var(--spacing);
   }
@@ -2466,6 +2469,9 @@
   .hidden {
     display: none;
   }
+  .inline {
+    display: inline;
+  }
   .inline-block {
     display: inline-block;
   }
@@ -2489,6 +2495,9 @@
   }
   .max-w-2xl {
     max-width: var(--container-2xl);
+  }
+  .max-w-full {
+    max-width: 100%;
   }
   .max-w-lg {
     max-width: var(--container-lg);
@@ -2543,9 +2552,6 @@
   .resize {
     resize: both;
   }
-  .grid-cols-\[auto_minmax\(0\,1fr\)\] {
-    grid-template-columns: auto minmax(0,1fr);
-  }
   .flex-wrap {
     flex-wrap: wrap;
   }
@@ -2573,11 +2579,11 @@
   .gap-3 {
     gap: calc(var(--spacing) * 3);
   }
-  .gap-x-3 {
-    column-gap: calc(var(--spacing) * 3);
+  .gap-x-2 {
+    column-gap: calc(var(--spacing) * 2);
   }
-  .gap-y-0\.5 {
-    row-gap: calc(var(--spacing) * 0.5);
+  .gap-y-1 {
+    row-gap: var(--spacing);
   }
   .overflow-auto {
     overflow: auto;
@@ -2627,6 +2633,9 @@
   }
   .break-words {
     overflow-wrap: break-word;
+  }
+  .wrap-anywhere {
+    overflow-wrap: anywhere;
   }
   .break-all {
     word-break: break-all;

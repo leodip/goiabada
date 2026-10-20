@@ -2,6 +2,7 @@ package renderintegration
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,11 +15,11 @@ import (
 
 // TestRender_AdminSettingsAuditLogViewer is seam 8's rendering half (#328). The page test
 // above the handler drives a mocked HttpHelper and therefore renders nothing, so the things that
-// can only go wrong in HTML are proved here: the request id column carries each row's id, an entry
-// written off a request says so rather than leaving the cell empty, the details are drawn as keys
-// and values with their markup escaped, and an id echoed back into the filter input is escaped.
-// The id is whatever a client put in X-Request-Id, so the escaping is the one thing on this page
-// standing between a stored id and script in an administrator's browser.
+// can only go wrong in HTML are proved here: each event names its request id and links to that
+// request's events, an entry written off a request names none, the details are drawn as keys and
+// values with their markup escaped, and an id is escaped wherever it is echoed, in a row's link
+// and in the filter input. The id is whatever a client put in X-Request-Id, so the escaping is the
+// one thing on this page standing between a stored id and script in an administrator's browser.
 func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	auditWritten := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
 	logs := []api.AuditLogResponse{
@@ -26,11 +27,14 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 			Details: `{"email":"alice@example.com","name":"<b>x</b>"}`, RequestId: "host/Ppg6bHPK5f-000012"},
 		{Id: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
 			Details: `{}`, RequestId: ""},
+		{Id: 3, CreatedAt: auditWritten.Add(2 * time.Second), AuditEvent: "user_login",
+			Details: `{}`, RequestId: `x"><b>y</b>&page=9`},
 	}
 	rows := []adminsettingshandlers.AuditLogRow{
 		{AuditLogResponse: logs[0], DetailsParsed: true, DetailPairs: []adminsettingshandlers.AuditLogDetail{
 			{Key: "email", Value: "alice@example.com"}, {Key: "name", Value: "<b>x</b>"}}},
 		{AuditLogResponse: logs[1], DetailsParsed: true},
+		{AuditLogResponse: logs[2], DetailsParsed: true},
 	}
 
 	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
@@ -52,17 +56,24 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 		"auditLogsInDatabase": true,
 	})
 
-	// The column exists and is localized: pt-BR, like every other page in this package.
-	assert.Contains(t, out, "Id da requisição")
+	// Each event names its request id, localized: pt-BR, like every other page in this package.
+	// The id links to that request's events, as one query parameter whatever it holds, and an entry
+	// written off a request names none.
+	assert.Contains(t, out, `Id da requisição: <a class="text-link inline-block max-w-full font-mono wrap-anywhere" `+
+		`href="/admin/settings/audit-log-viewer?requestId=host%2fPpg6bHPK5f-000012">host/Ppg6bHPK5f-000012`+
+		`<span class="sr-only"> – mostrar todos os eventos desta requisição</span></a>`)
+	assert.Contains(t, out, `href="/admin/settings/audit-log-viewer?requestId=x%22%3e%3cb%3ey%3c%2fb%3e%26page%3d9">`+
+		`x&#34;&gt;&lt;b&gt;y&lt;/b&gt;&amp;page=9<span`)
+	assert.Equal(t, 2, strings.Count(out, "Id da requisição: <a"), "the entry written off a request names no id")
 
-	// Each row's id, and the word standing for "not written on a request".
-	assert.Contains(t, out, ">host/Ppg6bHPK5f-000012</td>")
-	assert.Contains(t, out, `<span class="text-ink-muted">Nenhum</span>`)
+	// An event's name may break after each underscore, and nowhere else.
+	assert.Contains(t, out, ">revoked_<wbr>user_<wbr>auth_<wbr>state</span>")
 
 	// The details as keys and values, a value's markup escaped; an empty object says so.
-	assert.Contains(t, out, `<dt class="font-semibold">email</dt>`)
-	assert.Contains(t, out, `<dd class="break-words">alice@example.com</dd>`)
-	assert.Contains(t, out, `<dd class="break-words">&lt;b&gt;x&lt;/b&gt;</dd>`)
+	assert.Contains(t, out, `<dt class="shrink-0 font-semibold">email</dt><dd class="min-w-0 wrap-anywhere">alice@example.com</dd>`)
+	assert.Contains(t, out, `<dd class="min-w-0 wrap-anywhere">&lt;b&gt;x&lt;/b&gt;</dd>`)
+	assert.NotContains(t, out, "<b>x</b>")
+	assert.Equal(t, 2, strings.Count(out, `<span class="text-ink-muted">Nenhum</span>`))
 
 	// The id typed into the filter comes back into the input escaped. The raw sequence
 	// would close the value attribute and open a script element; the escaped one cannot.

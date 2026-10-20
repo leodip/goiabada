@@ -219,8 +219,9 @@ func HandleEmailSendTestGet(
 			return
 		}
 
-		_, savedSuccessfully := sess.TakeFlash("savedSuccessfully")
-		if savedSuccessfully {
+		// The address the last test email went to, which the page names in saying it was sent.
+		sentTo, sent := sess.TakeFlash("testEmailSentTo")
+		if sent {
 			err = httpSession.Save(r, w, sess)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -236,8 +237,8 @@ func HandleEmailSendTestGet(
 		}
 
 		bind := map[string]interface{}{
-			"smtpEnabled":       apiResp.SMTPEnabled,
-			"savedSuccessfully": savedSuccessfully,
+			"smtpEnabled": apiResp.SMTPEnabled,
+			"sentTo":      sentTo,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html", bind)
@@ -305,7 +306,7 @@ func HandleEmailSendTestPost(
 			return
 		}
 
-		sess.SetFlash("savedSuccessfully", "true")
+		sess.SetFlash("testEmailSentTo", destinationEmail)
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

@@ -808,7 +808,9 @@ class shares a daisyUI class's name (`TestUICSS_SharesNoClassWithDaisyUI`).
   as it reads. No page calls it both, though a parameter's name, such as `client_id`, stays as it
   is. On an administrator's page "app" names a kind of software, such as a single-page app or a
   mobile app, and never a client: a sentence about what uses a client says that ("anything that
-  signs in with this client"). Sentence case; a
+  signs in with this client"). Every sentence is true when it is read, its tense included: a
+  question asked before an action says what will happen ("The key will be deleted"), a notice after
+  it what was done, and help about standing behaviour the present. Sentence case; a
   button says what it does ("Save", "New user"); a page title reads "Page – app name". Both catalogs
   change together, a message ID is kept, and a renamed one goes in the release notes, since
   operators' override catalogs are keyed by it.

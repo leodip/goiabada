@@ -49,7 +49,7 @@ func TestRender_AdminSettingsEmailWithASavedPassword(t *testing.T) {
 
 	assert.Contains(t, out, `name="hasSmtpPassword" value="true"`)
 	assert.Contains(t, out, `name="savedHostOrIP" value="smtp.example.com"`)
-	assert.Contains(t, out, "O host mudou", "the host-change caution is rendered, hidden until the host changes")
+	assert.Contains(t, out, "Você alterou o host", "the host-change caution is rendered, hidden until the host changes")
 	assert.Regexp(t, `<div class="notice notice-caution" id="hostChangeWarning" hidden>`, out)
 }
 
@@ -143,4 +143,16 @@ func TestRender_AdminSettingsEmailMarksTheRefusedField(t *testing.T) {
 	require.NotEmpty(t, port)
 	assert.Contains(t, port, `aria-describedby="email-error" aria-invalid="true" autofocus`)
 	assert.Equal(t, 1, strings.Count(out, `aria-invalid="true"`), "one field is marked")
+}
+
+// A sent test email is said with the address it went to, which came from the form, so it is
+// escaped like any other value.
+func TestRender_AdminSettingsEmailSendTestNamesTheAddress(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_email_sendtest.html", map[string]interface{}{
+		"smtpEnabled": true,
+		"sentTo":      `ana+"><b>x</b>@example.com`,
+	})
+
+	assert.Contains(t, out, `E-mail de teste enviado para ana&#43;&#34;&gt;&lt;b&gt;x&lt;/b&gt;@example.com.`)
+	assert.NotContains(t, out, "<b>x</b>")
 }

@@ -48,7 +48,6 @@
       <tr>
         <th scope="col">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_timestamp" }}</th>
         <th scope="col">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_event" }}</th>
-        <th scope="col">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_request_id" }}</th>
         <th scope="col">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_details" }}</th>
       </tr>
     </thead>
@@ -59,21 +58,25 @@
              stays RFC3339 under every locale; the text beside it is the one a reader sees, and
              that one is localized (#373). */}}
         <td class="whitespace-nowrap"><time datetime="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ DateTime $.ctx .CreatedAt }}</time></td>
-        <td class="cell-mono cell-wrap sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_event" }}">{{ .AuditEvent }}</td>
-        <td class="cell-mono cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_request_id" }}">
-          {{- if .RequestId }}{{ .RequestId }}{{ else }}<span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.no_request_id" }}</span>{{ end -}}
+        {{/* The request id, on its own line under the event, links to every event of that request. The
+             link is an inline block, so a phone moves it whole below its label rather than breaking it
+             at a hyphen, and breaks it only when it is wider than the card. */}}
+        <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_event" }}">
+          <span class="font-mono text-sm wrap-anywhere sm:whitespace-nowrap">{{ range $i, $s := .EventSegments }}{{ if $i }}<wbr>{{ end }}{{ $s }}{{ end }}</span>
+          {{- if .RequestId }}
+          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_request_id" }}: <a class="text-link inline-block max-w-full font-mono wrap-anywhere" href="/admin/settings/audit-log-viewer?requestId={{ .RequestId }}">{{ .RequestId }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.request_events_link" }}</span></a></span>
+          {{- end }}
         </td>
         <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_details" }}">
           {{- if .DetailsParsed }}
           {{- if .DetailPairs }}
-          <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm">
+          <dl class="grid gap-y-1 text-sm">
             {{- range .DetailPairs }}
-            <dt class="font-semibold">{{ .Key }}</dt>
-            <dd class="break-words">{{ .Value }}</dd>
+            <div class="flex gap-x-2"><dt class="shrink-0 font-semibold">{{ .Key }}</dt><dd class="min-w-0 wrap-anywhere">{{ .Value }}</dd></div>
             {{- end }}
           </dl>
           {{- else }}<span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.no_details" }}</span>{{ end }}
-          {{- else }}<span class="font-mono text-sm break-all">{{ .Details }}</span>{{ end -}}
+          {{- else }}<span class="font-mono text-sm wrap-anywhere">{{ .Details }}</span>{{ end -}}
         </td>
       </tr>
       {{ end }}
