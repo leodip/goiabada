@@ -191,8 +191,23 @@ type SettingsAuditLogsPost struct {
 	AuditLogRetentionDays      string
 }
 
+// AuditLogRow is one audit log entry as the viewer draws it: its details read as keys and values
+// when they parse as a JSON object, DetailsParsed, and shown as written otherwise.
+type AuditLogRow struct {
+	api.AuditLogResponse
+	DetailPairs   []AuditLogDetail
+	DetailsParsed bool
+}
+
+// AuditLogDetail is one key of an audit log entry's details and its value as text.
+type AuditLogDetail struct {
+	Key   string
+	Value string
+}
+
 type AuditLogsPageResult struct {
 	AuditLogs  []api.AuditLogResponse
+	Rows       []AuditLogRow
 	Total      int
 	Page       int
 	PageSize   int

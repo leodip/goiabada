@@ -13,23 +13,30 @@ import (
 )
 
 // TestRender_AdminSettingsAuditLogViewer is seam 8's rendering half (#328). The page test
-// above the handler drives a mocked HttpHelper and therefore renders nothing, so the three
-// things that can only go wrong in HTML are proved here: the fourth column carries each
-// row's request id, an entry written off a request shows a dash rather than an empty cell,
-// and an id echoed back into the filter input is escaped. The id is whatever a client put
-// in X-Request-Id, so the escaping is the one thing on this page standing between a stored
-// id and script in an administrator's browser.
+// above the handler drives a mocked HttpHelper and therefore renders nothing, so the things that
+// can only go wrong in HTML are proved here: the request id column carries each row's id, an entry
+// written off a request says so rather than leaving the cell empty, the details are drawn as keys
+// and values with their markup escaped, and an id echoed back into the filter input is escaped.
+// The id is whatever a client put in X-Request-Id, so the escaping is the one thing on this page
+// standing between a stored id and script in an administrator's browser.
 func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	auditWritten := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	logs := []api.AuditLogResponse{
+		{Id: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
+			Details: `{"email":"alice@example.com","name":"<b>x</b>"}`, RequestId: "host/Ppg6bHPK5f-000012"},
+		{Id: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
+			Details: `{}`, RequestId: ""},
+	}
+	rows := []adminsettingshandlers.AuditLogRow{
+		{AuditLogResponse: logs[0], DetailsParsed: true, DetailPairs: []adminsettingshandlers.AuditLogDetail{
+			{Key: "email", Value: "alice@example.com"}, {Key: "name", Value: "<b>x</b>"}}},
+		{AuditLogResponse: logs[1], DetailsParsed: true},
+	}
 
 	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
 		"pageResult": adminsettingshandlers.AuditLogsPageResult{
-			AuditLogs: []api.AuditLogResponse{
-				{Id: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
-					Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012"},
-				{Id: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
-					Details: `{}`, RequestId: ""},
-			},
+			AuditLogs:  logs,
+			Rows:       rows,
 			Total:      73,
 			Page:       4,
 			PageSize:   20,
@@ -41,15 +48,21 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 		"selectedRequestId": `"><script>alert(1)</script>`,
 		"paginatorLink": "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=" +
 			url.QueryEscape(`"><script>alert(1)</script>`),
-		"auditEventTypes": []string{"user_login", "revoked_user_auth_state"},
+		"auditEventTypes":     []string{"user_login", "revoked_user_auth_state"},
+		"auditLogsInDatabase": true,
 	})
 
 	// The column exists and is localized: pt-BR, like every other page in this package.
 	assert.Contains(t, out, "Id da requisição")
 
-	// Each row's id, and the dash standing for "not written on a request".
-	assert.Contains(t, out, "host/Ppg6bHPK5f-000012")
-	assert.Contains(t, out, ">-</td>")
+	// Each row's id, and the word standing for "not written on a request".
+	assert.Contains(t, out, ">host/Ppg6bHPK5f-000012</td>")
+	assert.Contains(t, out, `<span class="text-ink-muted">Nenhum</span>`)
+
+	// The details as keys and values, a value's markup escaped; an empty object says so.
+	assert.Contains(t, out, `<dt class="font-semibold">email</dt>`)
+	assert.Contains(t, out, `<dd class="break-words">alice@example.com</dd>`)
+	assert.Contains(t, out, `<dd class="break-words">&lt;b&gt;x&lt;/b&gt;</dd>`)
 
 	// The id typed into the filter comes back into the input escaped. The raw sequence
 	// would close the value attribute and open a script element; the escaped one cannot.
@@ -69,6 +82,29 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	assert.Contains(t, out, `<time datetime="2026-09-12T10:00:00Z">12/09/2026 10:00</time>`)
 	assert.NotContains(t, out, ">2026-09-12T10:00:00Z<",
 		"the ISO string is the attribute, never the text the page shows")
+
+	// The event filter is a GET form the browser escapes, and the event list filters as typed.
+	assert.Contains(t, out, `<form class="mb-5 flex flex-wrap items-end gap-3" method="get" action="/admin/settings/audit-log-viewer" role="search">`)
+	assert.Contains(t, out, `<select class="control" id="auditEventFilter" name="auditEvent" data-searchable>`)
+	assert.Contains(t, out, `<option value="user_login" selected>user_login</option>`)
+	assert.NotContains(t, out, "não está guardando eventos", "events are stored, so the page says nothing of it")
+}
+
+// While the auth server stores no events, the page says so, beside the list it still has.
+func TestRender_AdminSettingsAuditLogViewerSaysWhenNothingIsStored(t *testing.T) {
+	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
+		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20},
+		"paginator":           pagination.New(0, 20, 1, 5),
+		"selectedEvent":       "",
+		"selectedRequestId":   "",
+		"paginatorLink":       "/admin/settings/audit-log-viewer",
+		"auditEventTypes":     []string{"user_login"},
+		"auditLogsInDatabase": false,
+	})
+
+	assert.Contains(t, out, "não está guardando eventos de auditoria no banco de dados")
+	assert.Contains(t, out, `<a class="text-link" href="/admin/settings/audit-logs">Registro de auditoria</a>`)
+	assert.Contains(t, out, `<p class="empty-state">Nenhum evento de auditoria ainda.</p>`)
 }
 
 // The signing keys page, the third of the three dates its handler used to format. Its layout was

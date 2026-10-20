@@ -40,12 +40,8 @@ func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 // core/guard.AssertWellFormedTemplates, which carries each rule and its reasoning (#617). Each page
 // is read as served, in the layouts the handlers under ../internal render it in.
 func TestTemplates_AreWellFormed(t *testing.T) {
-	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates, pendingTemplates)
+	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates, nil)
 }
 
 // emailTemplates are not pages: no rule reads them.
 var emailTemplates = []string{"layouts/email_layout.html"}
-
-// pendingTemplates are the pages not yet brought under the rules (#617). The guard reports one that
-// meets them all, so the list only shrinks, page by page, to nothing.
-var pendingTemplates = []string{"admin_settings_audit_log_viewer.html"}

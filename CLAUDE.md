@@ -690,8 +690,8 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 Both servers draw their pages with `ui.css`, Goiabada's design tokens and components, and Tailwind
 utilities for layout (#617). The file is one copy in each application's `web/tailwindcss/`, which
 `TestUICSS_IsTheAuthServersCopy` holds byte-identical; edit one, copy it over the other, and
-regenerate both `main.css`. daisyUI still draws the pages each web package's `pendingTemplates`
-lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoClassWithDaisyUI`).
+regenerate both `main.css`. daisyUI is still built in, though it draws no page, and no `ui.css`
+class shares a daisyUI class's name (`TestUICSS_SharesNoClassWithDaisyUI`).
 
 - **Themes**: automatic (the settings' empty value: each visitor's device decides), light and
   dark. The layouts write `data-theme` for light and dark alone. A color is a token, `bg-surface`,
@@ -718,8 +718,7 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   the accessibility rules readable from a template: every element closed explicitly and in order,
   what a branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for
   every control, alt on every image, a name on every link and button, one `<h1>`, no skipped
-  heading level. A page not yet under it is in its web package's `pendingTemplates`, which only
-  shrinks.
+  heading level.
 - **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. Page
   behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
   `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
@@ -768,7 +767,11 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   for nothing found, and the paginator only past one page. A settings form
   (`admin_settings_sessions.html`): eyebrow, title and lead, one `panel` holding the notices at its
   top and the fields in a `form-grid`, each field's help visible under it, and Save in the
-  `panel-footer`. A choice among a few options (`admin_settings_ui_theme.html`): `option-card`s in
+  `panel-footer`; a longer one (`admin_settings_general.html`) in sections, each a `panel-body`
+  under a `panel-title`, and the settings a switch governs hidden while it is off rather than
+  disabled (`admin_settings_email.html`). An action on the whole page that changes what is stored
+  (`admin_settings_keys.html`, Rotate keys) is a form posted from `page-actions`, asked first in a
+  `confirm_change` dialog, which answers with the page again. A choice among a few options (`admin_settings_ui_theme.html`): `option-card`s in
   a fieldset with a legend; several of many (`consent.html`): a `check-list` of `check-row`s in a
   fieldset with a legend. A confirmation that deletes or removes says so on its buttons: "Cancel",
   and the action in `button-danger`. On the auth server, a form (`auth_pwd.html`): the title, an

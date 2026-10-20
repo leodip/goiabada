@@ -1491,17 +1491,21 @@
 "adminconsole.admin_settings.audit_logs.field.retention_days" = "Retention, in days"
 "adminconsole.admin_settings.audit_logs.retention_days_tooltip" = "Stored events older than this are deleted by the background cleanup, at most 3650 days. 0 keeps them forever."
 
-"adminconsole.admin_settings.audit_log_viewer.page_title" = "Settings - Audit log viewer"
-"adminconsole.admin_settings.audit_log_viewer.subtitle" = "Settings - Audit log viewer"
+"adminconsole.admin_settings.audit_log_viewer.page_title" = "Audit log"
+"adminconsole.admin_settings.audit_log_viewer.subtitle" = "Audit log"
+"adminconsole.admin_settings.audit_log_viewer.lead" = "The audit events the auth server stored in its database, newest first."
+"adminconsole.admin_settings.audit_log_viewer.not_stored" = "The auth server isn't storing audit events in the database, so no new ones appear here. Turn storing on in the audit logging settings:"
 "adminconsole.admin_settings.audit_log_viewer.all_events" = "All events"
 "adminconsole.admin_settings.audit_log_viewer.filter_button" = "Filter"
-"adminconsole.admin_settings.audit_log_viewer.clear_link" = "Clear"
-"adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Timestamp"
+"adminconsole.admin_settings.audit_log_viewer.clear_link" = "Clear filters"
+"adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Time"
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Event"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Request id"
-"adminconsole.admin_settings.audit_log_viewer.request_id_placeholder" = "Filter by request id"
+"adminconsole.admin_settings.audit_log_viewer.no_request_id" = "None"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Details"
-"adminconsole.admin_settings.audit_log_viewer.empty" = "No audit logs found."
+"adminconsole.admin_settings.audit_log_viewer.no_details" = "None"
+"adminconsole.admin_settings.audit_log_viewer.empty" = "No audit events yet."
+"adminconsole.admin_settings.audit_log_viewer.empty_filtered" = "No audit events match these filters."
 
 # --- Login-flow errors (LocalizedError-backed) -------------------------------
 

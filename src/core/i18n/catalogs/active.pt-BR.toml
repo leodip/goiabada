@@ -1426,17 +1426,21 @@
 "adminconsole.admin_settings.audit_logs.field.retention_days" = "Retenção, em dias"
 "adminconsole.admin_settings.audit_logs.retention_days_tooltip" = "Eventos guardados há mais tempo que isso são excluídos pela limpeza em segundo plano, no máximo 3650 dias. 0 os guarda para sempre."
 
-"adminconsole.admin_settings.audit_log_viewer.page_title" = "Configurações - Visualizador de logs de auditoria"
-"adminconsole.admin_settings.audit_log_viewer.subtitle" = "Configurações - Visualizador de logs de auditoria"
+"adminconsole.admin_settings.audit_log_viewer.page_title" = "Log de auditoria"
+"adminconsole.admin_settings.audit_log_viewer.subtitle" = "Log de auditoria"
+"adminconsole.admin_settings.audit_log_viewer.lead" = "Os eventos de auditoria que o servidor de autenticação guardou no banco de dados, do mais recente ao mais antigo."
+"adminconsole.admin_settings.audit_log_viewer.not_stored" = "O servidor de autenticação não está guardando eventos de auditoria no banco de dados, então nenhum novo aparece aqui. Ative o armazenamento nas configurações do registro de auditoria:"
 "adminconsole.admin_settings.audit_log_viewer.all_events" = "Todos os eventos"
 "adminconsole.admin_settings.audit_log_viewer.filter_button" = "Filtrar"
-"adminconsole.admin_settings.audit_log_viewer.clear_link" = "Limpar"
-"adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Carimbo de tempo"
+"adminconsole.admin_settings.audit_log_viewer.clear_link" = "Limpar filtros"
+"adminconsole.admin_settings.audit_log_viewer.col_timestamp" = "Data e hora"
 "adminconsole.admin_settings.audit_log_viewer.col_event" = "Evento"
 "adminconsole.admin_settings.audit_log_viewer.col_request_id" = "Id da requisição"
-"adminconsole.admin_settings.audit_log_viewer.request_id_placeholder" = "Filtrar por id da requisição"
+"adminconsole.admin_settings.audit_log_viewer.no_request_id" = "Nenhum"
 "adminconsole.admin_settings.audit_log_viewer.col_details" = "Detalhes"
-"adminconsole.admin_settings.audit_log_viewer.empty" = "Nenhum log de auditoria encontrado."
+"adminconsole.admin_settings.audit_log_viewer.no_details" = "Nenhum"
+"adminconsole.admin_settings.audit_log_viewer.empty" = "Nenhum evento de auditoria ainda."
+"adminconsole.admin_settings.audit_log_viewer.empty_filtered" = "Nenhum evento de auditoria corresponde a estes filtros."
 
 # === Erros (LocalizedError-backed) ===========================================
 
