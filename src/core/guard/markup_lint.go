@@ -860,6 +860,8 @@ type markupWalk struct {
 	h1       []markupFact
 	// conditions keys each {{if}} condition sameBranch reads to the first {{if}} on it.
 	conditions map[string]int
+	// onElement, when set, sees every element the reading opens, as AssertClassesAreDrawn reads them.
+	onElement func(t *markupTag)
 }
 
 // markupFrame is one template of the calls the reading is inside, and scope the dot it was called
@@ -1533,6 +1535,9 @@ var jsonScriptType = regexp.MustCompile(`^application/(ld\+)?json$`)
 func (w *markupWalk) startElement(s *markupState, t *markupTag, foreign bool) {
 	name, where := t.name, t.where
 	parent := s.top()
+	if w.onElement != nil {
+		w.onElement(t)
+	}
 
 	for _, a := range t.attrs {
 		if strings.HasPrefix(a.name, "on") && len(a.name) > 2 {

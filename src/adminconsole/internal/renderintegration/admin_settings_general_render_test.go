@@ -69,9 +69,10 @@ func TestRender_AdminSettingsGeneralWarnsWhenRegistrationNeedsEmail(t *testing.T
 	}
 }
 
-// The caution belongs to the registration choices: it comes after their list and before the OAuth
-// flows, and links to the email settings it asks for.
-func TestRender_AdminSettingsGeneralPutsTheWarningUnderTheRegistrationChoices(t *testing.T) {
+// The caution is about email verification: it closes the list of the user registration choices,
+// before Dynamic client registration's own list and the OAuth flows, and links to the email settings
+// it asks for.
+func TestRender_AdminSettingsGeneralPutsTheWarningUnderEmailVerification(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
 		"settings": adminsettingshandlers.SettingsGeneral{SelfRegistrationEnabled: true,
 			SelfRegistrationRequiresEmailVerification: true, PasswordPolicy: "low"},
@@ -86,9 +87,11 @@ func TestRender_AdminSettingsGeneralPutsTheWarningUnderTheRegistrationChoices(t 
 	require.NotEqual(t, -1, warning)
 	require.NotEqual(t, -1, flows)
 	assert.Less(t, verification, warning)
-	assert.Less(t, registration, warning)
-	assert.Less(t, warning, flows)
-	assert.Contains(t, out[warning:flows], `<a class="text-link" href="/admin/settings/email">Email settings</a>`)
+	assert.Less(t, warning, registration)
+	assert.Less(t, registration, flows)
+	assert.Contains(t, out[verification:warning], `</div>`, "the warning follows the registration choices' list")
+	assert.Contains(t, out[warning:registration], `<div class="check-list">`, "Dynamic client registration is a list of its own")
+	assert.Contains(t, out[warning:registration], `<a class="text-link" href="/admin/settings/email">Email settings</a>`)
 }
 
 // Email verification governs nothing while registration is off, so its row starts hidden then, and

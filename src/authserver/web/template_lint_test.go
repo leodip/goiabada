@@ -48,7 +48,16 @@ func TestPages_NameOnlyClassesMainCSSDraws(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	guard.AssertClassesAreDrawn(t, css, templateFS, staticFS)
+	guard.AssertClassesAreDrawn(t, css, emailTemplatesAsWalked(), templateFS, staticFS)
+}
+
+// emailTemplatesAsWalked is emailTemplates as a walk of templateFS from its root spells them.
+func emailTemplatesAsWalked() []string {
+	walked := make([]string, 0, len(emailTemplates))
+	for _, entry := range emailTemplates {
+		walked = append(walked, "template/"+entry)
+	}
+	return walked
 }
 
 // emailTemplates are not pages: no rule reads them.
