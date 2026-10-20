@@ -25,7 +25,7 @@ import (
 // class it writes whole is not read, and one it completes, theme-swatch-{{ . }}, is a prefix, held to
 // some class beginning with it. A script's classes are the string literals in what it assigns to
 // className and in its classList calls' class arguments (every argument of add, remove, contains and
-// replace, the first of toggle), each branch of a conditional included; a string a + continues ends
+// replace, the first of toggle), a conditional's arms and not its condition; a string a + continues ends
 // in a prefix the same way. The stylesheet's classes are read from its selectors alone, never from a
 // declaration, a string or a comment, with CSS escapes decoded, so .\32 xl\:flex is 2xl:flex. Its
 // boundary: a class a handler hands a template, or a script builds from a variable or a template
@@ -206,8 +206,27 @@ func scriptClasses(path string, toks []ScriptToken) []namedClass {
 		return ScriptToken{}
 	}
 	var named []namedClass
-	// literals reads every string literal in toks[from:to], the classes each names.
+	// literals reads every string literal in toks[from:to], the classes each names; in a conditional,
+	// only its value arms, after the ?, since its condition's strings are compared, not classes.
 	literals := func(from, to int) {
+		depth := 0
+		for j := from; j < to; j++ {
+			if t := toks[j]; t.Kind == ScriptPunct {
+				switch t.Text {
+				case "(", "[", "{":
+					depth++
+				case ")", "]", "}":
+					depth--
+				case "?":
+					if depth == 0 {
+						from = j + 1
+					}
+				}
+			}
+			if from > j {
+				break
+			}
+		}
 		for j := from; j < to; j++ {
 			t := toks[j]
 			if t.Kind != ScriptString {

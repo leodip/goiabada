@@ -65,6 +65,8 @@ func TestClassesAreDrawn_TheGuardPassesATreeNamingOnlyDrawnClasses(t *testing.T)
 			`notice.className = "notice-" + tone;` + "\n" +
 			`el.classList.toggle("open", items.includes("unrelated"));` + "\n" +
 			`el.className = on ? "button" : "button-danger";` + "\n" +
+			`el.className = kind === "error"` + "\n  ? \"notice-danger\"\n  : \"notice-positive\";\n" +
+			`el.classList.add(kind === "error" ? "notice-danger" : "notice-positive");` + "\n" +
 			`const text = "class nothing";`)},
 	}
 
