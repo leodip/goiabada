@@ -361,7 +361,7 @@ func TestHandleSettingsEmailPut_APasswordTogetherWithItsRemovalIsRefused(t *test
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 			code, description := decodeErrorEnvelope(t, rr)
-			assert.Equal(t, "VALIDATION_ERROR", code)
+			assert.Equal(t, "handler.settings_email.smtp_password_and_clear", code)
 			assert.Equal(t, "Send either a new SMTP password or clearSmtpPassword, not both.", description)
 			assert.Nil(t, written)
 		})
@@ -380,7 +380,7 @@ func TestHandleSettingsEmailPut_AHostChangeWithAStoredPasswordNeedsItAgain(t *te
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 	code, description := decodeErrorEnvelope(t, rr)
-	assert.Equal(t, "VALIDATION_ERROR", code)
+	assert.Equal(t, "handler.settings_email.smtp_host_changed", code)
 	assert.Equal(t, "The SMTP host has changed: enter the SMTP password again, or remove it.", description)
 	assert.Nil(t, written)
 }
@@ -467,7 +467,7 @@ func TestHandleSettingsEmailPut_ARefusedDialAnswersItsCauseAndLogsTheError(t *te
 	assert.NotContains(t, rr.Body.String(), "127.0.0.1", "the answer names no address")
 	assert.NotContains(t, rr.Body.String(), strconv.Itoa(port), "the answer names no port")
 	code, description := decodeErrorEnvelope(t, rr)
-	assert.Equal(t, "VALIDATION_ERROR", code)
+	assert.Equal(t, "handler.settings_email.connect_failed_refused", code)
 	assert.Equal(t, "Unable to connect to the SMTP server: connection refused.", description)
 	assert.Nil(t, written)
 

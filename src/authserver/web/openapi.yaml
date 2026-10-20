@@ -116,7 +116,10 @@ tags:
   - name: Audit Logs
     description: Audit log query (Admin API)
   - name: Settings
-    description: System settings (Admin API)
+    description: >-
+      System settings (Admin API). A refused value in a request body answers 400 with the refusal's
+      catalog key as its error_code, such as handler.settings_general.issuer_uri_invalid, so a
+      caller can tell which field was refused; a malformed key id answers VALIDATION_ERROR.
   - name: Account
     description: Self-service account management (Account API)
   - name: Browser Sessions
@@ -2615,11 +2618,12 @@ paths:
         The stored SMTP password is kept, replaced or removed:
         an absent or empty `smtpPassword` keeps it, a non-empty one replaces it, and
         `clearSmtpPassword: true` removes it. The two together are refused with 400
-        `VALIDATION_ERROR`.
+        `handler.settings_email.smtp_password_and_clear`.
 
         A stored password reaches only the host it was entered for: a save that changes
         `smtpHost` while a password is stored, carrying neither a new `smtpPassword` nor
-        `clearSmtpPassword: true`, is refused with 400 `VALIDATION_ERROR` and writes nothing.
+        `clearSmtpPassword: true`, is refused with 400 `handler.settings_email.smtp_host_changed`
+        and writes nothing.
         The hosts are compared with surrounding space trimmed, one pair of brackets taken off
         an IPv6 literal, and without regard to case. A change of port, username, encryption or
         sender keeps the stored password.
@@ -2645,9 +2649,9 @@ paths:
         '400':
           description: |
             error_code is INVALID_REQUEST_BODY for a body that will not parse; a refused field
-            answers VALIDATION_ERROR, or its catalog key, such as
-            validator.email.invalid_format, when the refusal is localized; and a connection that
-            fails answers VALIDATION_ERROR. Nothing is written.
+            answers its catalog key, such as handler.settings_email.smtp_host_required or
+            validator.email.invalid_format; and a connection that fails answers the key of its
+            cause, such as handler.settings_email.connect_failed_refused. Nothing is written.
 
             A failed connection answers one of these fixed messages, naming at most its coarse
             cause:
@@ -2707,7 +2711,7 @@ paths:
         '400':
           description: |
             error_code is SMTP_NOT_ENABLED while SMTP is disabled, INVALID_REQUEST_BODY for a
-            body that will not parse, VALIDATION_ERROR when `to` is missing,
+            body that will not parse, handler.settings_email.destination_required when `to` is missing,
             validator.email.invalid_format when it is not an email address, and SEND_FAILED when
             the send fails.
 
@@ -3046,10 +3050,12 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
           description: |
-            error_code is VALIDATION_ERROR. The id is malformed, matches no
-            key, or names a key that is not in the previous state, since only a
-            previous key can be revoked. A key that does not exist is answered
-            here rather than with a 404.
+            error_code is VALIDATION_ERROR when the id is malformed,
+            handler.settings_keys.key_not_found when it matches no key, and
+            handler.settings_keys.only_previous_revocable when it names a key that
+            is not in the previous state, since only a previous key can be
+            revoked. A key that does not exist is answered here rather than with
+            a 404.
           content:
             application/json:
               schema:

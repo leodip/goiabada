@@ -217,7 +217,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
 	_ = json.NewDecoder(resp6.Body).Decode(&err6)
-	assert.Equal(t, "VALIDATION_ERROR", err6.ErrorCode)
+	assert.Equal(t, "handler.settings_email.smtp_password_too_long", err6.ErrorCode)
 	assert.Equal(t, "SMTP password must be at most 256 bytes.", err6.ErrorDescription)
 
 	// Oversized password against an unreachable host: the bound is checked before the
@@ -234,7 +234,7 @@ func TestAPISettingsEmailPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp7.StatusCode)
 	var err7 api.ErrorResponse
 	_ = json.NewDecoder(resp7.Body).Decode(&err7)
-	assert.Equal(t, "VALIDATION_ERROR", err7.ErrorCode)
+	assert.Equal(t, "handler.settings_email.smtp_password_too_long", err7.ErrorCode)
 	assert.Equal(t, "SMTP password must be at most 256 bytes.", err7.ErrorDescription)
 }
 
@@ -298,7 +298,7 @@ func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 
 	var errBody api.ErrorResponse
 	require.NoError(t, json.Unmarshal(raw, &errBody))
-	assert.Equal(t, "VALIDATION_ERROR", errBody.ErrorCode)
+	assert.Equal(t, "handler.settings_email.connect_failed_refused", errBody.ErrorCode)
 	assert.Equal(t, "Unable to connect to the SMTP server: connection refused.", errBody.ErrorDescription)
 }
 
@@ -431,7 +431,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, refused.StatusCode)
 	var errBody api.ErrorResponse
 	require.NoError(t, json.NewDecoder(refused.Body).Decode(&errBody))
-	assert.Equal(t, "VALIDATION_ERROR", errBody.ErrorCode)
+	assert.Equal(t, "handler.settings_email.smtp_host_changed", errBody.ErrorCode)
 	assert.Equal(t, "The SMTP host has changed: enter the SMTP password again, or remove it.", errBody.ErrorDescription)
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)

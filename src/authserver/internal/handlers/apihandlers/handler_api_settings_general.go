@@ -68,7 +68,7 @@ func HandleSettingsGeneralPut(
 		// Validation: AppName
 		const appNameMaxLength = 30
 		if inputvalidation.TextLength(req.AppName) > appNameMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralAppNameTooLong, map[string]any{"max": appNameMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralAppNameTooLong, map[string]any{"max": appNameMaxLength}))
 			return
 		}
 
@@ -84,12 +84,12 @@ func HandleSettingsGeneralPut(
 		// decision 4). The length limit and the angle-bracket refusal hold every save, as before it.
 		issuer := strings.TrimSpace(req.Issuer)
 		if issuer != currentSettings.Issuer && !oidc.IssuerIsAcceptable(issuer, baseURL) {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil))
 			return
 		}
 		const issuerMaxLength = 60
 		if inputvalidation.TextLength(issuer) > issuerMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerMaxLength}))
 			return
 		}
 		// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of
@@ -102,7 +102,7 @@ func HandleSettingsGeneralPut(
 		// Validation: Password policy
 		passwordPolicy, err := record.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
 		if err != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralPasswordPolicyInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralPasswordPolicyInvalid, nil))
 			return
 		}
 

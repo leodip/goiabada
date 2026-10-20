@@ -217,16 +217,17 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		body    string
+		code    string
 		message string
 	}{
 		{"absent", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200}`,
-			"Enter the maximum sessions per user."},
+			"handler.settings_sessions.max_sessions_per_user_required", "Enter the maximum sessions per user."},
 		{"null", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null}`,
-			"Enter the maximum sessions per user."},
+			"handler.settings_sessions.max_sessions_per_user_required", "Enter the maximum sessions per user."},
 		{"below 0", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1}`,
-			"The maximum sessions per user must be between 0 and 1000."},
+			"handler.settings_sessions.max_sessions_per_user_out_of_range", "The maximum sessions per user must be between 0 and 1000."},
 		{"above 1000", `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001}`,
-			"The maximum sessions per user must be between 0 and 1000."},
+			"handler.settings_sessions.max_sessions_per_user_out_of_range", "The maximum sessions per user must be between 0 and 1000."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(tc.body))
@@ -240,7 +241,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			var refusal api.ErrorResponse
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
-			assert.Equal(t, "VALIDATION_ERROR", refusal.ErrorCode)
+			assert.Equal(t, tc.code, refusal.ErrorCode)
 			assert.Equal(t, tc.message, refusal.ErrorDescription)
 
 			after, err := database.GetSettingsById(context.Background(), nil, 1)

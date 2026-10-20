@@ -135,12 +135,9 @@ The account API's
 disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
 its wrong code on enabling one `handler.otp.incorrect_code`, its email
 verification send's conflict `handler.email_verification.account_changed`, and
-its phone country refusal `validator.phone.country_invalid`. The token settings'
-offline idle timeout above its max lifetime reuses
-`handler.client_tokens.offline_idle_timeout_above_max_lifetime`, and the test
-email's SMTP being off and missing destination reuse `handler.smtp.not_enabled`
-and `handler.settings_email.destination_required`. The SMTP connection and send
-failures are one key per cause, each a whole sentence.
+its phone country refusal `validator.phone.country_invalid`. The test email's
+SMTP being off reuses `handler.smtp.not_enabled`. The SMTP send failures are one
+key per cause, each a whole sentence.
 
 | Code | Args | English message |
 |---|---|---|
@@ -169,39 +166,6 @@ failures are one key per cause, each a whole sentence.
 | `handler.account_logout.client_identifier_invalid` | (none) | Invalid client identifier |
 | `handler.account_logout.client_unresolved` | (none) | Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier. |
 | `handler.account_logout.post_logout_redirect_uri_not_registered` | (none) | postLogoutRedirectUri is not registered for the client |
-| `handler.settings_general.app_name_too_long` | `max` (int) | App name is too long. The maximum length is {{.max}} characters. |
-| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
-| `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
-| `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
-| `handler.settings_sessions.idle_timeout_not_positive` | (none) | The idle timeout must be greater than zero. |
-| `handler.settings_sessions.max_lifetime_not_positive` | (none) | The maximum lifetime must be greater than zero. |
-| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout cannot be more than {{.max}} seconds. |
-| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | The maximum lifetime cannot be more than {{.max}} seconds. |
-| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | The idle timeout cannot be longer than the maximum lifetime. |
-| `handler.settings_sessions.max_sessions_per_user_required` | (none) | Enter the maximum sessions per user. |
-| `handler.settings_sessions.max_sessions_per_user_out_of_range` | `max` (int) | The maximum sessions per user must be between 0 and {{.max}}. |
-| `handler.settings_tokens.token_expiration_not_positive` | (none) | Token expiration in seconds must be greater than zero. |
-| `handler.settings_tokens.token_expiration_too_large` | `max` (int) | Token expiration in seconds cannot be greater than {{.max}}. |
-| `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | Refresh token offline - idle timeout in seconds must be greater than zero. |
-| `handler.settings_tokens.offline_idle_timeout_too_large` | `max` (int) | Refresh token offline - idle timeout in seconds cannot be greater than {{.max}}. |
-| `handler.settings_tokens.offline_max_lifetime_not_positive` | (none) | Refresh token offline - max lifetime in seconds must be greater than zero. |
-| `handler.settings_tokens.offline_max_lifetime_too_large` | `max` (int) | Refresh token offline - max lifetime in seconds cannot be greater than {{.max}}. |
-| `handler.settings_email.smtp_host_required` | (none) | SMTP host is required. |
-| `handler.settings_email.smtp_port_required` | (none) | SMTP port is required. |
-| `handler.settings_email.smtp_from_email_required` | (none) | SMTP from email is required. |
-| `handler.settings_email.smtp_host_too_long` | `max` (int) | SMTP host must be less than {{.max}} characters. |
-| `handler.settings_email.smtp_port_out_of_range` | (none) | SMTP port must be between 1 and 65535. |
-| `handler.settings_email.smtp_encryption_invalid` | (none) | Invalid SMTP encryption. |
-| `handler.settings_email.smtp_username_too_long` | `max` (int) | SMTP username must be less than {{.max}} characters. |
-| `handler.settings_email.smtp_password_too_long` | `max` (int) | SMTP password must be at most {{.max}} bytes. |
-| `handler.settings_email.smtp_from_name_too_long` | `max` (int) | SMTP from name must be less than {{.max}} characters. |
-| `handler.settings_email.smtp_from_email_too_long` | `max` (int) | SMTP from email must be less than {{.max}} characters. |
-| `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |
-| `handler.settings_email.smtp_host_changed` | (none) | The SMTP host has changed: enter the SMTP password again, or remove it. |
-| `handler.settings_email.connect_failed_host_not_found` | (none) | Unable to connect to the SMTP server: host name not found. |
-| `handler.settings_email.connect_failed_timed_out` | (none) | Unable to connect to the SMTP server: connection timed out. |
-| `handler.settings_email.connect_failed_refused` | (none) | Unable to connect to the SMTP server: connection refused. |
-| `handler.settings_email.connect_failed` | (none) | Unable to connect to the SMTP server. |
 | `handler.settings_email.send_failed_host_not_found` | (none) | Unable to send the test email: host name not found. |
 | `handler.settings_email.send_failed_timed_out` | (none) | Unable to send the test email: connection timed out. |
 | `handler.settings_email.send_failed_refused` | (none) | Unable to send the test email: connection refused. |
@@ -214,22 +178,22 @@ failures are one key per cause, each a whole sentence.
 | `handler.settings_email.authentication_rejected` | (none) | The SMTP server rejected the username or password. |
 | `handler.settings_email.message_refused` | (none) | The SMTP server refused the message. |
 | `handler.settings_keys.rotation_in_progress` | (none) | Another key rotation is in progress |
-| `handler.settings_keys.key_not_found` | (none) | Key not found |
-| `handler.settings_keys.only_previous_revocable` | (none) | Only a previous key can be revoked |
-| `handler.settings_ui_theme.theme_invalid` | (none) | Invalid theme. |
-| `handler.settings_audit_logs.retention_days_negative` | (none) | Audit log retention days cannot be negative. Use 0 for infinite retention. |
-| `handler.settings_audit_logs.retention_days_too_large` | (none) | Audit log retention days cannot exceed 3650 days (10 years). |
 
 ## Refusals the admin API answers by key
 
-The admin API's operations on clients, users, groups and resources write each
-of these with the key itself as the `error_code`, as `validator.*` keys are
-written, so the admin console marks the field a refusal is about (#617). Some
-reuse a key from above, written the same way: a client's identifier left blank
-`handler.client.identifier_required`, a group's and a user's attribute key
-`handler.attribute.key_required`, the resource permissions save's description
-bound `handler.admin_resource_permissions.description_too_long`, and the user's
-phone country `validator.phone.country_invalid`.
+The admin API's operations on clients, users, groups, resources and settings
+write each of these with the key itself as the `error_code`, as `validator.*`
+keys are written, so the admin console marks the field a refusal is about
+(#617). Some reuse a key from above, written the same way: a client's
+identifier left blank `handler.client.identifier_required`, a group's and a
+user's attribute key `handler.attribute.key_required`, the resource permissions
+save's description bound
+`handler.admin_resource_permissions.description_too_long`, the user's phone
+country `validator.phone.country_invalid`, and the test email's missing
+destination `handler.settings_email.destination_required`; the token settings'
+offline idle timeout above its max lifetime reuses the client tokens' key
+below. An email settings save whose connection fails answers one key per
+cause, each a whole sentence.
 
 | Code | Args | English message |
 |---|---|---|
@@ -293,6 +257,44 @@ phone country `validator.phone.country_invalid`.
 | `handler.user.new_password_required` | (none) | New password is required |
 | `handler.user.otp_enable_not_supported` | (none) | Enabling OTP is not supported through this endpoint |
 | `handler.user_groups.too_many` | (none) | Too many group ids |
+| `handler.settings_general.app_name_too_long` | `max` (int) | App name is too long. The maximum length is {{.max}} characters. |
+| `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
+| `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |
+| `handler.settings_general.password_policy_invalid` | (none) | Invalid password policy |
+| `handler.settings_sessions.idle_timeout_not_positive` | (none) | The idle timeout must be greater than zero. |
+| `handler.settings_sessions.max_lifetime_not_positive` | (none) | The maximum lifetime must be greater than zero. |
+| `handler.settings_sessions.idle_timeout_too_large` | `max` (int) | The idle timeout cannot be more than {{.max}} seconds. |
+| `handler.settings_sessions.max_lifetime_too_large` | `max` (int) | The maximum lifetime cannot be more than {{.max}} seconds. |
+| `handler.settings_sessions.idle_timeout_above_max_lifetime` | (none) | The idle timeout cannot be longer than the maximum lifetime. |
+| `handler.settings_sessions.max_sessions_per_user_required` | (none) | Enter the maximum sessions per user. |
+| `handler.settings_sessions.max_sessions_per_user_out_of_range` | `max` (int) | The maximum sessions per user must be between 0 and {{.max}}. |
+| `handler.settings_tokens.token_expiration_not_positive` | (none) | Token expiration in seconds must be greater than zero. |
+| `handler.settings_tokens.token_expiration_too_large` | `max` (int) | Token expiration in seconds cannot be greater than {{.max}}. |
+| `handler.settings_tokens.offline_idle_timeout_not_positive` | (none) | Refresh token offline - idle timeout in seconds must be greater than zero. |
+| `handler.settings_tokens.offline_idle_timeout_too_large` | `max` (int) | Refresh token offline - idle timeout in seconds cannot be greater than {{.max}}. |
+| `handler.settings_tokens.offline_max_lifetime_not_positive` | (none) | Refresh token offline - max lifetime in seconds must be greater than zero. |
+| `handler.settings_tokens.offline_max_lifetime_too_large` | `max` (int) | Refresh token offline - max lifetime in seconds cannot be greater than {{.max}}. |
+| `handler.settings_email.smtp_host_required` | (none) | SMTP host is required. |
+| `handler.settings_email.smtp_port_required` | (none) | SMTP port is required. |
+| `handler.settings_email.smtp_from_email_required` | (none) | SMTP from email is required. |
+| `handler.settings_email.smtp_host_too_long` | `max` (int) | SMTP host must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_port_out_of_range` | (none) | SMTP port must be between 1 and 65535. |
+| `handler.settings_email.smtp_encryption_invalid` | (none) | Invalid SMTP encryption. |
+| `handler.settings_email.smtp_username_too_long` | `max` (int) | SMTP username must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_password_too_long` | `max` (int) | SMTP password must be at most {{.max}} bytes. |
+| `handler.settings_email.smtp_from_name_too_long` | `max` (int) | SMTP from name must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_from_email_too_long` | `max` (int) | SMTP from email must be less than {{.max}} characters. |
+| `handler.settings_email.smtp_password_and_clear` | (none) | Send either a new SMTP password or clearSmtpPassword, not both. |
+| `handler.settings_email.smtp_host_changed` | (none) | The SMTP host has changed: enter the SMTP password again, or remove it. |
+| `handler.settings_email.connect_failed_host_not_found` | (none) | Unable to connect to the SMTP server: host name not found. |
+| `handler.settings_email.connect_failed_timed_out` | (none) | Unable to connect to the SMTP server: connection timed out. |
+| `handler.settings_email.connect_failed_refused` | (none) | Unable to connect to the SMTP server: connection refused. |
+| `handler.settings_email.connect_failed` | (none) | Unable to connect to the SMTP server. |
+| `handler.settings_keys.key_not_found` | (none) | Key not found |
+| `handler.settings_keys.only_previous_revocable` | (none) | Only a previous key can be revoked |
+| `handler.settings_ui_theme.theme_invalid` | (none) | Invalid theme. |
+| `handler.settings_audit_logs.retention_days_negative` | (none) | Audit log retention days cannot be negative. Use 0 for infinite retention. |
+| `handler.settings_audit_logs.retention_days_too_large` | (none) | Audit log retention days cannot exceed 3650 days (10 years). |
 
 ## Password validator
 
