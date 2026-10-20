@@ -657,13 +657,27 @@ function confirmChanges(form, save) {
 // setUpSaveConfirmations makes each form posted by the browser, method="post", that is marked
 // data-confirm-dialog ask through confirmChanges before it is sent. A save with nothing to ask
 // about is sent as it is; one the dialog asks about is sent again from its answer, since a browser
-// ignores requestSubmit while the submit event it would fire is still being handled. A form a
-// script saves calls confirmChanges itself.
+// ignores requestSubmit while the submit event it would fire is still being handled. The answer
+// lets that one submission through, and a form once sent is sent no more, so a second click while
+// the first is under way sends nothing, where it sent a second save nobody was asked about; both
+// start over when the browser shows the page again from its cache, as on Back. A form a script
+// saves calls confirmChanges itself.
 function setUpSaveConfirmations() {
   document.querySelectorAll("form[method=post][data-confirm-dialog]").forEach(function (form) {
     let confirmed = false;
+    let sent = false;
+    window.addEventListener("pageshow", function () {
+      confirmed = false;
+      sent = false;
+    });
     form.addEventListener("submit", function (event) {
+      if (sent) {
+        event.preventDefault();
+        return;
+      }
       if (confirmed || changesToConfirm(form).length === 0) {
+        confirmed = false;
+        sent = true;
         return;
       }
       event.preventDefault();

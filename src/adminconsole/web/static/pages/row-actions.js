@@ -12,6 +12,8 @@
 // which also holds the dialog's title, data-confirm-title. What takes the button's place takes the
 // focus, and a failure gives it back to the button, only when the focus was lost, and lost by that
 // action rather than one started after it; focus the person moved elsewhere meanwhile stays there.
+// A success also fires row-action-done at the button, bubbling, before it gives way, for a page
+// whose other text depends on what the action changed.
 
 const rowActionsStatus = document.getElementById("row-actions-status");
 
@@ -34,6 +36,7 @@ function rowFocusLost(button) {
 }
 
 function showRowActionDone(button) {
+  button.dispatchEvent(new CustomEvent("row-action-done", { bubbles: true }));
   const swap = button.dataset.swap ? document.getElementById(button.dataset.swap) : null;
   const placeFocus = rowFocusLost(button);
   if (swap) {

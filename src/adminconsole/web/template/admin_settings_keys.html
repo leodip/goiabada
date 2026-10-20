@@ -12,9 +12,10 @@
     <h1 class="page-title" id="page-title">{{ T $.ctx "adminconsole.admin_settings.keys.subtitle" }}</h1>
     <p class="page-lead">{{ T $.ctx "adminconsole.admin_settings.keys.lead" }}</p>
   </div>
-  {{/* A rotation asks first, in the confirm_change dialog, saying it deletes the previous key when
-       there is one, and answers with the page again, saying it rotated or why not. */}}
-  <form class="page-actions" method="post" action="/admin/settings/keys/rotate" data-confirm-dialog="confirmRotate" data-confirm-title="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}{{ if .hasPreviousKey }} {{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_deletes_previous" }}{{ end }}">
+  {{/* A rotation asks first, in the confirm_change dialog, saying it will delete the previous key
+       when there is one, which admin-settings-keys.js keeps true after a revocation with
+       data-confirm-without-previous, and answers with the page again, saying it rotated or why not. */}}
+  <form class="page-actions" id="rotateForm" method="post" action="/admin/settings/keys/rotate" data-confirm-dialog="confirmRotate" data-confirm-title="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}{{ if .hasPreviousKey }} {{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_deletes_previous" }}{{ end }}" data-confirm-without-previous="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}">
     <button class="button button-primary" id="btnRotate" type="submit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_settings.keys.rotate_button" }}</button>
   </form>
 </div>
