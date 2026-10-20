@@ -7,7 +7,8 @@
 // answers, naming the field it refuses, which says why. That answer applies the values it was asked
 // about, never the fields as they are when it arrives, and is dropped when the person has typed past
 // them, edited another row or asked again since, so a slow answer never adds or changes a
-// permission no one asked for. An entry added, updated or removed is announced, since the change
+// permission no one asked for. The row the fields edit is marked while the edit lasts, its Edit
+// giving way to a tag saying so. An entry added, updated or removed is announced, since the change
 // shows only in the list. Save asks first where the form says so, through confirmChanges, then
 // reloads the tab, which says the permissions were saved; a refusal is said in the tab's status
 // region. The built-in permissions of the auth server's own resource are drawn without Edit or
@@ -146,7 +147,32 @@ function validate(identifier, description, apply) {
   });
 }
 
+// markEditing draws row as the one the fields edit, or, with on false, as any other row.
+function markEditing(row, on) {
+  const edit = row.querySelector("[data-entry-edit]");
+  const tag = row.querySelector("[data-entry-editing]");
+  edit.hidden = on;
+  if (on) {
+    row.dataset.editing = "";
+    if (!tag) {
+      const editing = document.createElement("span");
+      editing.className = "tag";
+      editing.dataset.entryEditing = "";
+      editing.textContent = permissionsForm.dataset.editingLabel;
+      edit.before(editing);
+    }
+  } else {
+    delete row.dataset.editing;
+    if (tag) {
+      tag.remove();
+    }
+  }
+}
+
 function startAdding() {
+  if (editingRow) {
+    markEditing(editingRow, false);
+  }
   editingRow = null;
   identifierInput.value = "";
   descriptionInput.value = "";
@@ -174,7 +200,11 @@ function addEntry() {
 }
 
 function editEntry(row) {
+  if (editingRow) {
+    markEditing(editingRow, false);
+  }
   editingRow = row;
+  markEditing(row, true);
   identifierInput.value = row.dataset.identifier;
   descriptionInput.value = row.dataset.description;
   addButton.hidden = true;

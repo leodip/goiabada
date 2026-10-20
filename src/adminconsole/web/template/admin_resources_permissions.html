@@ -12,7 +12,7 @@
      (#428). A save asks first on the auth server's own resource. */}}
 <form class="panel" id="resourcePermissionsForm" novalidate data-save-url="/admin/resources/{{ .resourceId }}/permissions" data-resource-id="{{ .resourceId }}" data-validate-url="/admin/resources/validate-permission" data-list-key="permissions" data-expected-key="expectedPermissions"
   data-duplicate="{{ T $.ctx "adminconsole.admin_resources.permissions.error_already_in_list" }}" data-added="{{ T $.ctx "adminconsole.admin_resources.permissions.added" }}" data-updated="{{ T $.ctx "adminconsole.admin_resources.permissions.updated" }}" data-removed="{{ T $.ctx "adminconsole.admin_resources.permissions.removed" }}"
-  data-edit-label="{{ T $.ctx "adminconsole.admin_resources.permissions.edit_label" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_resources.permissions.remove_label" }}" data-description-label="{{ T $.ctx "adminconsole.admin_resources.permissions.col_description" }}"
+  data-edit-label="{{ T $.ctx "adminconsole.admin_resources.permissions.edit_label" }}" data-editing-label="{{ T $.ctx "adminconsole.admin_resources.permissions.editing_tag" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_resources.permissions.remove_label" }}" data-description-label="{{ T $.ctx "adminconsole.admin_resources.permissions.col_description" }}"
   data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_resources.modal.save_title" }}"{{ if .isSystemLevelResource }} data-confirm-always="{{ T $.ctx "adminconsole.admin_resources.modal.system_save_warning" }}"{{ end }}>
   <div class="panel-body stacked">
     {{ if .savedSuccessfully }}

@@ -237,85 +237,16 @@ var templateFuncMap = template.FuncMap{
 		return template.HTML("<!-- version: " + buildinfo.Version + "; build date: " + buildinfo.BuildDate + "; git commit: " + buildinfo.GitCommit + "-->")
 	},
 	"isAdminClientPage": func(urlPath string) bool {
-		if urlPath == "/admin/clients" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/clients/") {
-			if strings.HasSuffix(urlPath, "/settings") ||
-				strings.HasSuffix(urlPath, "/tokens") ||
-				strings.HasSuffix(urlPath, "/authentication") ||
-				strings.HasSuffix(urlPath, "/oauth2-flows") ||
-				strings.HasSuffix(urlPath, "/redirect-uris") ||
-				strings.HasSuffix(urlPath, "/web-origins") ||
-				strings.HasSuffix(urlPath, "/user-sessions") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.HasSuffix(urlPath, "/delete") ||
-				strings.HasSuffix(urlPath, "/new") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/clients")
 	},
 	"isAdminResourcePage": func(urlPath string) bool {
-		if urlPath == "/admin/resources" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/resources/") {
-			if strings.HasSuffix(urlPath, "/settings") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.Contains(urlPath, "/users-with-permission") ||
-				strings.Contains(urlPath, "/groups-with-permission") ||
-				strings.HasSuffix(urlPath, "/delete") ||
-				strings.HasSuffix(urlPath, "/new") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/resources")
 	},
 	"isAdminGroupPage": func(urlPath string) bool {
-		if urlPath == "/admin/groups" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/groups/") {
-			if strings.HasSuffix(urlPath, "/settings") ||
-				strings.HasSuffix(urlPath, "/attributes") ||
-				strings.HasSuffix(urlPath, "/attributes/add") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.Contains(urlPath, "/members") ||
-				strings.HasSuffix(urlPath, "/members/add") ||
-				strings.HasSuffix(urlPath, "/new") ||
-				strings.HasSuffix(urlPath, "/delete") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/groups")
 	},
 	"isAdminUserPage": func(urlPath string) bool {
-		if urlPath == "/admin/users" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/users/") {
-			if strings.HasSuffix(urlPath, "/details") ||
-				strings.HasSuffix(urlPath, "/profile") ||
-				strings.HasSuffix(urlPath, "/email") ||
-				strings.HasSuffix(urlPath, "/phone") ||
-				strings.HasSuffix(urlPath, "/address") ||
-				strings.HasSuffix(urlPath, "/authentication") ||
-				strings.HasSuffix(urlPath, "/consents") ||
-				strings.HasSuffix(urlPath, "/sessions") ||
-				strings.HasSuffix(urlPath, "/attributes") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.HasSuffix(urlPath, "/groups") ||
-				strings.HasSuffix(urlPath, "/new") ||
-				strings.HasSuffix(urlPath, "/delete") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/users")
 	},
 	"isAdminSettingsEmailPage": func(urlPath string) bool {
 		if urlPath == "/admin/settings" {
@@ -330,4 +261,10 @@ var templateFuncMap = template.FuncMap{
 		}
 		return false
 	},
+}
+
+// inSection reports whether urlPath is the list at base or any page under it, so the sidebar marks
+// its section current on every page of one record, a tab added later included.
+func inSection(urlPath, base string) bool {
+	return urlPath == base || strings.HasPrefix(urlPath, base+"/")
 }

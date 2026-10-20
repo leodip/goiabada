@@ -791,8 +791,10 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   `detail-list`, its identifier typed to confirm, and Cancel beside the action in `button-danger`. A
   list edited in the page and saved whole (`admin_clients_redirect_uris.html`): a field and its Add
   in an `input-row`, refused at the field, the rows drawn as stored, each with a Remove naming its
-  row, a change announced, and Save sending the list beside the list as drawn. A new shape gets its
-  reference page and a line here when its first page is built.
+  row, a change announced, and Save sending the list beside the list as drawn; where a row's Edit
+  loads it into those fields (`admin_resources_permissions.html`), the row is marked `data-editing`
+  while the edit lasts, its Edit giving way to a `tag` saying so. A new shape gets its reference page
+  and a line here when its first page is built.
 - **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
   out, client, one-time code, two-factor authentication, auth server. Client and application are one
   thing with a name per reader. Wherever an administrator or a developer reads, the console's admin

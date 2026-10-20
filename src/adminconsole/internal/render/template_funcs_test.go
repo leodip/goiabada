@@ -171,3 +171,27 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyThree(t *testing.T) {
 		t.Errorf("templateFuncMap = %v, want %v", keys, want)
 	}
 }
+
+// The sidebar marks a section current on its list and on every page of one of its records, the tabs
+// its predicate once missed included: the user picture and attribute forms, the client logo and the
+// group attribute edit form. A path that only shares the section's prefix as text is not in it.
+func TestTemplateFuncMap_TheSectionPredicatesCoverEveryPageOfARecord(t *testing.T) {
+	for name, paths := range map[string][]string{
+		"isAdminUserPage":     {"/admin/users", "/admin/users/7/picture", "/admin/users/7/attributes/add", "/admin/users/7/attributes/edit/3", "/admin/users/new"},
+		"isAdminClientPage":   {"/admin/clients", "/admin/clients/7/logo", "/admin/clients/7/settings"},
+		"isAdminGroupPage":    {"/admin/groups", "/admin/groups/4/attributes/edit/11", "/admin/groups/4/members/add"},
+		"isAdminResourcePage": {"/admin/resources", "/admin/resources/3/users-with-permission/add/9"},
+	} {
+		in := templateFuncMap[name].(func(string) bool)
+		for _, path := range paths {
+			if !in(path) {
+				t.Errorf("%s(%q) is false", name, path)
+			}
+		}
+		for _, path := range []string{"/admin/usersx", "/admin/clientsx/7", "/admin/settings/general"} {
+			if in(path) {
+				t.Errorf("%s(%q) is true", name, path)
+			}
+		}
+	}
+}

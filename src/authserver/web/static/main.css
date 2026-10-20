@@ -1450,6 +1450,9 @@
       background-color: color-mix(in srgb, var(--color-subtle) 55%, transparent);
     }
   }
+  .data-table tbody tr[data-editing] {
+    background-color: var(--color-brand-soft);
+  }
   .data-table .cell-actions {
     text-align: end;
     white-space: nowrap;
@@ -1899,6 +1902,7 @@
     .detail-list {
       grid-template-columns: max-content minmax(0, 1fr);
       row-gap: 0.75rem;
+      align-items: baseline;
     }
     .detail-list dd + dt {
       margin-top: 0;

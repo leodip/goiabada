@@ -28,7 +28,7 @@
     <tbody>
       {{ range .attributes }}
       <tr>
-        <td class="cell-mono cell-wrap">{{ .Key }}</td>
+        <td class="cell-mono cell-wrap"><a class="text-link" href="/admin/users/{{ $.user.Id }}/attributes/edit/{{ .Id }}?page={{ $.page }}{{ if $.query }}&query={{ $.query }}{{ end }}">{{ .Key }}</a></td>
         <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_users.attributes.col_value" }}">{{ .Value }}</td>
         <td data-label="{{ T $.ctx "adminconsole.admin_users.attributes.col_tokens" }}">
           {{ if or .IncludeInAccessToken .IncludeInIdToken }}
@@ -41,11 +41,8 @@
           {{ end }}
         </td>
         <td class="cell-actions">
-          <span class="inline-flex flex-wrap items-center justify-end gap-3">
-            <a class="text-link" href="/admin/users/{{ $.user.Id }}/attributes/edit/{{ .Id }}?page={{ $.page }}{{ if $.query }}&query={{ $.query }}{{ end }}">{{ T $.ctx "adminconsole.admin_users.attributes.edit_button" }}<span class="sr-only"> {{ .Key }}</span></a>
-            <button class="button button-sm" type="button" data-action-url="/admin/users/{{ $.user.Id }}/attributes/remove/{{ .Id }}" data-action-body="{}" data-dialog="removeAttribute"
-              data-confirm="{{ T $.ctx "adminconsole.admin_users.attributes.remove_confirm" "key" .Key }}" data-done="{{ T $.ctx "adminconsole.admin_users.attributes.removed" }}" data-done-label="{{ T $.ctx "adminconsole.admin_users.attributes.removed_label" }}">{{ T $.ctx "adminconsole.admin_users.attributes.remove_button" }}<span class="sr-only"> {{ .Key }}</span></button>
-          </span>
+          <button class="button button-sm" type="button" data-action-url="/admin/users/{{ $.user.Id }}/attributes/remove/{{ .Id }}" data-action-body="{}" data-dialog="removeAttribute"
+            data-confirm="{{ T $.ctx "adminconsole.admin_users.attributes.remove_confirm" "key" .Key }}" data-done="{{ T $.ctx "adminconsole.admin_users.attributes.removed" }}" data-done-label="{{ T $.ctx "adminconsole.admin_users.attributes.removed_label" }}">{{ T $.ctx "adminconsole.admin_users.attributes.remove_button" }}<span class="sr-only"> {{ .Key }}</span></button>
         </td>
       </tr>
       {{ end }}
