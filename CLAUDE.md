@@ -778,8 +778,9 @@ lists, and no `ui.css` class shares a daisyUI class's name (`TestUICSS_SharesNoC
   message left-aligned, an address it names in an `auth-address`, and at most one action, a
   `button-block`. A list whose rows a person ends or revokes (`account_user_sessions.html`): each
   row's button asks in a `confirm` dialog with the row's own sentence in `data-confirm`, and on
-  success gives way to a `tag` saying so, which takes its focus, while the page's live region says it
-  too; a row added the same way from a search (`admin_groups_members_add.html`) acts at once, with no
+  success gives way to a `tag` saying so, which takes its focus unless the person moved it elsewhere
+  meanwhile, while the page's live region says it too; a row added the same way from a search
+  (`admin_groups_members_add.html`) acts at once, with no
   dialog, since one Remove undoes it. A home of destinations (the console's `index.html`): a `link-list`. A record with tabs
   (`admin_clients_settings.html`): a header linking back to the list in the eyebrow, the record's
   identifier as the title, the `tab-bar`, one partial per kind of record (`client_header`,

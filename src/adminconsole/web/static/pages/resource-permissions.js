@@ -5,14 +5,14 @@
 //
 // An identifier the list holds already is refused at its field; the rest the console's validation
 // answers, naming the field it refuses, which says why. That answer applies the values it was asked
-// about, never the fields as they are when it arrives, and is dropped when the person has typed past
-// them, edited another row or asked again since, so a slow answer never adds or changes a
-// permission no one asked for. The row the fields edit is marked while the edit lasts, its Edit
-// giving way to a tag saying so. An entry added, updated or removed is announced, since the change
-// shows only in the list. Save asks first where the form says so, through confirmChanges, then
-// reloads the tab, which says the permissions were saved; a refusal is said in the tab's status
-// region. The built-in permissions of the auth server's own resource are drawn without Edit or
-// Remove.
+// about, never the fields as they are when it arrives, and is dropped once anything it was asked
+// about has changed: a field typed in, Cancel, another row's Edit, the edit's end, or another ask,
+// so a slow answer never adds or changes a permission no one asked for. The row the fields edit is
+// marked while the edit lasts, its Edit giving way to a tag saying so. An entry added, updated or
+// removed is announced, since the change shows only in the list. Save asks first where the form
+// says so, through confirmChanges, then reloads the tab, which says the permissions were saved; a
+// refusal is said in the tab's status region. The built-in permissions of the auth server's own
+// resource are drawn without Edit or Remove.
 
 const permissionsForm = document.getElementById("resourcePermissionsForm");
 const identifierInput = document.getElementById("permissionIdentifier");
@@ -45,7 +45,8 @@ const loadedEntries = entries();
 let nextNewId = 0;
 // editingRow is the row the fields edit, null while they add one.
 let editingRow = null;
-// The number of the latest validation asked for; an answer to an earlier one is dropped.
+// Advanced by every validation asked for and by every change to what the fields hold or edit; an
+// answer to a validation asked before the latest advance is dropped.
 let validation = 0;
 
 function showEntriesEmpty() {
@@ -123,19 +124,16 @@ function takenByAnother(identifier) {
 }
 
 // validate asks the console whether identifier and description may be saved, and runs apply with
-// them when they may, unless the person has since changed either field, started editing another
-// row, or asked again.
+// them when they may, unless validation has advanced since.
 function validate(identifier, description, apply) {
   const request = ++validation;
-  const row = editingRow;
   sendAjaxRequest({
     url: permissionsForm.dataset.validateUrl,
     method: "POST",
     bodyData: JSON.stringify({ permissionIdentifier: identifier, description: description }),
     statusRegion: entryStatus,
     current: function () {
-      return request === validation && editingRow === row &&
-        identifierInput.value.trim() === identifier && descriptionInput.value.trim() === description;
+      return request === validation;
     },
     callback: function (result) {
       if (!result.Valid) {
@@ -170,6 +168,7 @@ function markEditing(row, on) {
 }
 
 function startAdding() {
+  validation++;
   if (editingRow) {
     markEditing(editingRow, false);
   }
@@ -200,6 +199,7 @@ function addEntry() {
 }
 
 function editEntry(row) {
+  validation++;
   if (editingRow) {
     markEditing(editingRow, false);
   }
@@ -277,7 +277,10 @@ addButton.addEventListener("click", addEntry);
 updateButton.addEventListener("click", updateEntry);
 cancelButton.addEventListener("click", cancelEdit);
 [identifierInput, descriptionInput].forEach(function (input) {
-  input.addEventListener("input", clearRefusals);
+  input.addEventListener("input", function () {
+    validation++;
+    clearRefusals();
+  });
   input.addEventListener("keydown", function (event) {
     if (event.key === "Enter") {
       event.preventDefault();

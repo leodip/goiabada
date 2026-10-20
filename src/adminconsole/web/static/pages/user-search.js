@@ -4,9 +4,12 @@
 // form's data-add-url with the user's id, which row-actions.js runs, or with a tag where the user
 // is in already, which the answer's data-member-key field says.
 //
-// Only the latest request's answer is drawn, or its failure said, so a slow answer to an earlier
-// search never replaces a later one. At most data-max-rows users are drawn, and a note,
-// data-truncated, says when the search found more.
+// Only the latest request's answer is drawn, or its failure said, and only while the field still
+// holds the words it asked about: a change to the field ends the search under way at once, not when
+// the pause runs out and the next one starts, so a slow answer never draws users for words the field
+// no longer holds. The change also clears the status region, whose last word was about the results
+// it replaces. At most data-max-rows users are drawn, and a note, data-truncated, says when the
+// search found more.
 
 const searchForm = document.getElementById("userSearchForm");
 const searchInput = searchForm.querySelector("input[type=search]");
@@ -107,7 +110,7 @@ function search() {
     bodyData: null,
     statusRegion: searchStatus,
     current: function () {
-      return request === searchRequest;
+      return request === searchRequest && searchInput.value.trim() === query;
     },
     callback: function (result) {
       showResults(result.Users || []);
@@ -117,7 +120,14 @@ function search() {
 
 const searchSoon = debounce(search, 400);
 
-searchInput.addEventListener("input", searchSoon);
+searchInput.addEventListener("input", function () {
+  searchRequest++;
+  searchStatus.replaceChildren();
+  if (searchInput.value.trim() === "") {
+    showResults([]);
+  }
+  searchSoon();
+});
 searchForm.addEventListener("submit", function (event) {
   event.preventDefault();
   search();

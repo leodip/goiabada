@@ -69,13 +69,15 @@ tags:
   - name: Users
     description: >-
       User management (Admin API). A refused value in a request body answers 400 with the refusal's
-      catalog key as its error_code, such as handler.user.email_required; a malformed id and a
-      missing expected list answer VALIDATION_ERROR.
+      catalog key as its error_code, such as handler.user.email_required, except a new user's email
+      that is too long, EMAIL_TOO_LONG, and an email another user has, 409 EMAIL_ALREADY_EXISTS; a
+      malformed id and a missing expected list answer VALIDATION_ERROR.
   - name: User Attributes
     description: >-
       Custom user attributes (Admin API). A refused value in a request body answers 400 with the
-      refusal's catalog key as its error_code, such as handler.attribute.key_required; a malformed
-      id and a missing expected list answer VALIDATION_ERROR.
+      refusal's catalog key as its error_code, such as handler.attribute.key_required, except a value
+      that is too long, VALUE_TOO_LONG; a malformed id and a missing expected list answer
+      VALIDATION_ERROR.
   - name: User Sessions
     description: User session management (Admin API)
   - name: User Consents

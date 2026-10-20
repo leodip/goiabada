@@ -45,7 +45,7 @@
 
     <div class="check-list">
       <label class="check-row" for="enabledDisabled">
-        <input type="checkbox" id="enabledDisabled" name="enabled" aria-describedby="{{ if .error }}details-error {{ end }}enabledHint"{{ if .error }} aria-invalid="true"{{ end }}{{ if .user.Enabled }} checked{{ end }}
+        <input type="checkbox" id="enabledDisabled" name="enabled" aria-describedby="{{ if .error }}details-error {{ end }}enabledHint"{{ if .error }} aria-invalid="true" autofocus{{ end }}{{ if .user.Enabled }} checked{{ end }}
           data-confirm="{{ T $.ctx "adminconsole.admin_users.details.disable_warning" }}" data-confirm-when="unchecked" data-stored-checked="{{ .user.Enabled }}">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label">{{ T $.ctx "adminconsole.admin_users.details.field.enabled" }}</span>

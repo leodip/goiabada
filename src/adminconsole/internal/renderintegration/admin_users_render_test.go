@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The user permissions page draws the grants it loaded as rows, which permission-list.js reads
@@ -154,6 +155,28 @@ func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
 	})
 
 	assert.NotContains(t, out, "0001", "an absent timestamp must render as nothing, not as the zero time")
+}
+
+// A refused disable, such as the last administrator's, marks Enabled, the page's one field, and
+// gives it the focus, as every other refused field does, so the keyboard resumes there rather than
+// at the top of the page (#617).
+func TestRender_AdminUserDetailsRefusedFocusesEnabled(t *testing.T) {
+	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"userFullName":      "",
+		"page":              "1",
+		"query":             "",
+		"savedSuccessfully": false,
+		"userCreated":       false,
+		"error":             "The last administrator can't be disabled.",
+	})
+
+	start := strings.Index(out, `id="enabledDisabled"`)
+	require.GreaterOrEqual(t, start, 0, "the Enabled checkbox renders")
+	tag := out[strings.LastIndex(out[:start], "<input"):]
+	tag = tag[:strings.Index(tag, ">")]
+	assert.Contains(t, tag, `aria-invalid="true"`)
+	assert.Contains(t, tag, " autofocus")
 }
 
 // The delete confirmation, which is the one page in this change whose output moves for a real
