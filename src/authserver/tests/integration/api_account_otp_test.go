@@ -335,7 +335,7 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
 	_ = json.NewDecoder(resp1.Body).Decode(&err1)
-	assert.Equal(t, "Invalid OTP code.", err1.ErrorDescription)
+	assert.Equal(t, "The code is 6 digits. Enter the one your authenticator app shows.", err1.ErrorDescription)
 
 	// There is no secret-format row any more. The caller no longer supplies a secret, so
 	// INVALID_OTP_SECRET became unreachable and was retired with the field (#247 decision 13).

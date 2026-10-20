@@ -1285,7 +1285,6 @@
 "adminconsole.admin_resources.groups_with_permission.col_identifier" = "Group"
 "adminconsole.admin_resources.groups_with_permission.col_has_permission" = "Permission"
 "adminconsole.admin_resources.groups_with_permission.yes" = "Granted"
-"adminconsole.admin_resources.groups_with_permission.no" = "No"
 "adminconsole.admin_resources.groups_with_permission.grant_button" = "Grant"
 "adminconsole.admin_resources.groups_with_permission.remove_button" = "Remove"
 "adminconsole.admin_resources.groups_with_permission.remove_confirm" = "Remove {{.scope}} from {{.group}}? Its members will lose it, unless they hold it another way."
@@ -1554,7 +1553,7 @@
 # --- Phone validator (LocalizedError-backed) ---------------------------------
 
 "validator.phone.country_invalid" = "Phone country is invalid."
-"validator.phone.number_required" = "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty."
+"validator.phone.number_required" = "Enter the phone number. To remove it, set the country to Not set."
 "validator.phone.number_too_short" = "The phone number must be at least {{.min}} digits long."
 "validator.phone.simple_pattern" = "The phone number appears to be a simple pattern. Please enter a valid phone number."
 "validator.phone.invalid_format" = "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators."
@@ -1674,8 +1673,8 @@
 "handler.email_verification.code_invalid_or_expired" = "That code isn't right, or it has expired. Send a new one if you need to."
 "handler.account_otp.already_enabled" = "OTP is already enabled"
 "handler.account_otp.secret_key_not_accepted" = "This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app."
-"handler.account_otp.code_required" = "OTP code is required to enable."
-"handler.account_otp.code_invalid" = "Invalid OTP code."
+"handler.account_otp.code_required" = "Enter the 6-digit code from your authenticator app."
+"handler.account_otp.code_invalid" = "The code is 6 digits. Enter the one your authenticator app shows."
 "handler.account_otp.enrollment_not_pending" = "No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again."
 "handler.account_logout.post_logout_redirect_uri_required" = "postLogoutRedirectUri is required"
 "handler.account_logout.client_identifier_invalid" = "Invalid client identifier"
@@ -1761,8 +1760,8 @@
 "validator.profile.gender_invalid" = "Gender is invalid."
 "validator.profile.dob_invalid_format" = "The date of birth is invalid. Please use the format YYYY-MM-DD."
 "validator.profile.dob_in_future" = "The date of birth can't be in the future."
-"validator.profile.zone_info_invalid" = "The zone info is invalid."
-"validator.profile.locale_invalid" = "The locale is invalid."
+"validator.profile.zone_info_invalid" = "Unknown time zone."
+"validator.profile.locale_invalid" = "Unknown language and region."
 
 # --- Image validator (LocalizedError-backed) ---------------------------------
 

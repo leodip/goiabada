@@ -280,8 +280,8 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	const alreadyEnabledPortuguese = "O OTP já está habilitado"
 	const notEnabledEnglish = "User does not have OTP enabled"
 	const notEnabledPortuguese = "O usuário não tem o OTP habilitado"
-	const invalidCodeEnglish = "Invalid OTP code."
-	const invalidCodePortuguese = "Código OTP inválido."
+	const invalidCodeEnglish = "The code is 6 digits. Enter the one your authenticator app shows."
+	const invalidCodePortuguese = "O código tem 6 dígitos. Digite o que o seu aplicativo autenticador mostra."
 
 	assertRefusalLanguages(t, []refusalCase{
 		{
@@ -330,8 +330,8 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve:      put(map[string]interface{}{"enabled": true, "password": password, "otpCode": " "}, enrolling),
 			status:     http.StatusBadRequest,
 			code:       "OTP_CODE_REQUIRED",
-			english:    "OTP code is required to enable.",
-			portuguese: "O código OTP é obrigatório para habilitar.",
+			english:    "Enter the 6-digit code from your authenticator app.",
+			portuguese: "Digite o código de 6 dígitos do seu aplicativo autenticador.",
 		},
 		{
 			name:       "an enable with a code of five digits",

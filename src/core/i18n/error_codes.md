@@ -72,7 +72,7 @@ address family's code is in the address table above.
 | Code | Args | English message |
 |---|---|---|
 | `validator.phone.country_invalid` | (none) | Phone country is invalid. |
-| `validator.phone.number_required` | (none) | The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty. |
+| `validator.phone.number_required` | (none) | Enter the phone number. To remove it, set the country to Not set. |
 | `validator.phone.number_too_short` | `min` (int) | The phone number must be at least {{.min}} digits long. |
 | `validator.phone.simple_pattern` | (none) | The phone number appears to be a simple pattern. Please enter a valid phone number. |
 | `validator.phone.invalid_format` | (none) | Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators. |
@@ -159,8 +159,8 @@ key per cause, each a whole sentence.
 | `handler.email_verification.code_invalid_or_expired` | (none) | That code isn't right, or it has expired. Send a new one if you need to. |
 | `handler.account_otp.already_enabled` | (none) | OTP is already enabled |
 | `handler.account_otp.secret_key_not_accepted` | (none) | This endpoint no longer accepts a secretKey. Start an enrollment with GET /api/v1/account/otp/enrollment and submit only the code from your authenticator app. |
-| `handler.account_otp.code_required` | (none) | OTP code is required to enable. |
-| `handler.account_otp.code_invalid` | (none) | Invalid OTP code. |
+| `handler.account_otp.code_required` | (none) | Enter the 6-digit code from your authenticator app. |
+| `handler.account_otp.code_invalid` | (none) | The code is 6 digits. Enter the one your authenticator app shows. |
 | `handler.account_otp.enrollment_not_pending` | (none) | No OTP enrollment is pending, or the one you started has expired. Request a new one with GET /api/v1/account/otp/enrollment and try again. |
 | `handler.account_logout.post_logout_redirect_uri_required` | (none) | postLogoutRedirectUri is required |
 | `handler.account_logout.client_identifier_invalid` | (none) | Invalid client identifier |
@@ -322,8 +322,8 @@ cause, each a whole sentence.
 | `validator.profile.gender_invalid` | (none) | Gender is invalid. |
 | `validator.profile.dob_invalid_format` | (none) | The date of birth is invalid. Please use the format YYYY-MM-DD. |
 | `validator.profile.dob_in_future` | (none) | The date of birth can't be in the future. |
-| `validator.profile.zone_info_invalid` | (none) | The zone info is invalid. |
-| `validator.profile.locale_invalid` | (none) | The locale is invalid. |
+| `validator.profile.zone_info_invalid` | (none) | Unknown time zone. |
+| `validator.profile.locale_invalid` | (none) | Unknown language and region. |
 
 ## Image validator
 

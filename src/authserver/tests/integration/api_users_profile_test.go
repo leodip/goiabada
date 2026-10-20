@@ -349,7 +349,7 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-	assert.Equal(t, "The zone info is invalid.", errResp.ErrorDescription)
+	assert.Equal(t, "Unknown time zone.", errResp.ErrorDescription)
 
 	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	require.NoError(t, err)
