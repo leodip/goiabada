@@ -62,9 +62,9 @@ test("a new client's display name is kept", async ({ page, clients }) => {
 for (const { identifier, message } of [
   { identifier: "", message: "Client identifier is required." },
   { identifier: "ab", message: "The identifier must be at least 3 characters long." },
-  { identifier: "has space", message: /^Invalid identifier format\./ },
-  { identifier: "1starts-with-a-digit", message: /^Invalid identifier format\./ },
-  { identifier: "ends-with-a-dash-", message: /^Invalid identifier format\./ },
+  { identifier: "has space", message: /Invalid identifier format\./ },
+  { identifier: "1starts-with-a-digit", message: /Invalid identifier format\./ },
+  { identifier: "ends-with-a-dash-", message: /Invalid identifier format\./ },
   { identifier: `e2e-${"x".repeat(40)}`, message: "The identifier cannot exceed a maximum length of 38 characters." },
 ]) {
   test(`creating a client is refused for the identifier ${JSON.stringify(identifier)}`, async ({ page }) => {

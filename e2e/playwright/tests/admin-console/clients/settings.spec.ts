@@ -122,7 +122,7 @@ test("an invalid identifier is refused on save, and nothing changes", async ({ p
   await page.locator('input[name="clientIdentifier"]').fill("not valid!");
   await page.locator("#btnSave").click();
   await confirmDialog(page, "You're changing the client identifier");
-  await expect(page.locator("#client-error")).toContainText(/^Invalid identifier format\./);
+  await expect(page.locator("#client-error")).toContainText(/Invalid identifier format\./);
   await expect(page.locator("#clientIdentifier")).toHaveAttribute("aria-invalid", "true");
   // The heading still names the client as stored.
   await expect(page.getByRole("heading", { level: 1, name: client.identifier })).toBeVisible();

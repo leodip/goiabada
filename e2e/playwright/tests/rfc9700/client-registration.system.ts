@@ -67,7 +67,8 @@ test("a registration cannot choose its client_id: the server assigns one (sectio
 
 // RFC 9700 4.11.2's second attack: a client registered to point at its own host gets a user to
 // decline it, and the error redirect would deliver the browser there. The consent screen says the
-// client registered itself, and declining it ends on the auth server's page.
+// client registered itself, and declining it ends on the auth server's page. The client is
+// confidential: one registered as public may not use an https redirect URI at all.
 test("declining a client that registered itself sends the user nowhere: the page names where it asked to send them (section 4.11.2 MUST)", async ({
   page,
   browser,
@@ -76,7 +77,7 @@ test("declining a client that registered itself sends the user nowhere: the page
 }) => {
   const user = await users.create();
   await withRegistration(page, async (registered) => {
-    const answer = await register(request, { redirect_uris: [testRedirectUri], token_endpoint_auth_method: "none" });
+    const answer = await register(request, { redirect_uris: [testRedirectUri], token_endpoint_auth_method: "client_secret_basic" });
     expect(answer.status, answer.text).toBe(201);
     const clientId = answer.body.client_id as string;
     registered.push(clientId);

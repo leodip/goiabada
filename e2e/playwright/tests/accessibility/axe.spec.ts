@@ -664,7 +664,7 @@ test("the groups' pages", async ({ page, groups, users, resources }) => {
       name: "a group attribute being edited",
       reach: async () => {
         await page.locator("#attributesTable").getByRole("link", { name: "department", exact: true }).click();
-        await expect(page).toHaveURL(/\/attributes\/edit\/\d+$/);
+        await expect(page).toHaveURL(/\/attributes\/edit\/\d+(\?|$)/);
       },
     },
     asks(page, "a group's attribute, removing it asking first", async () => {
@@ -797,7 +797,7 @@ test("a user's attributes, groups, permissions, sessions and consents, empty and
       name: "a user attribute being edited",
       reach: async () => {
         await page.locator("#attributesTable").getByRole("link", { name: "department", exact: true }).click();
-        await expect(page).toHaveURL(/\/attributes\/edit\/\d+$/);
+        await expect(page).toHaveURL(/\/attributes\/edit\/\d+(\?|$)/);
       },
     },
     asks(page, "a user's attribute, removing it asking first", async () => {

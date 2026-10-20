@@ -110,11 +110,14 @@ test("rotating signs new tokens with the next key; revoking the previous one ref
   await expect(page.locator("dialog[open]")).not.toContainText("The existing previous key will be deleted");
   await cancelDialog(page, "Rotate the signing keys?");
 
-  // The administrator's console session holds an access token the revoked key signed. The auth server
-  // refuses it now, and the console renews it behind the scenes: the next page just works, and no
-  // longer lists the revoked key.
-  const next = await page.goto(keysPage);
-  expect(next?.status()).toBe(200);
+  // The administrator's console session holds an ID token the revoked key signed, which can no longer
+  // be verified, so the console signs that session out rather than refresh it (#427): the next page
+  // is the home page, saying so. The auth server's own session is still good, so signing in again
+  // asks for nothing, and the keys page no longer lists the revoked key.
+  await page.goto(keysPage);
+  await expect(page.getByText("Your sign-in has ended. Sign in again.")).toBeVisible();
+  await page.goto(keysPage);
+  await expect(page).toHaveURL(keysPage);
   await expect(page.getByRole("button", { name: "Rotate keys", exact: true })).toBeVisible();
   await expect(page.getByRole("row").filter({ hasText: rotated.previous })).toHaveCount(0);
 });

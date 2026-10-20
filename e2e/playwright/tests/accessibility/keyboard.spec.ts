@@ -95,7 +95,10 @@ test("the skip link leads past the menu to a client's tabs, which Tab moves thro
   await expectFocused(page.getByRole("link", { name: "Skip to main content" }));
   await page.keyboard.press("Enter");
 
+  // The page begins with the link back to the list, above its heading, then the tabs.
   const tabs = page.getByRole("navigation", { name: "Sections" });
+  await page.keyboard.press("Tab");
+  await expectFocused(page.locator("#main").getByRole("link", { name: "Clients", exact: true }));
   await page.keyboard.press("Tab");
   await expectFocused(tabs.getByRole("link", { name: "Settings", exact: true }));
   await expect(tabs.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("aria-current", "page");

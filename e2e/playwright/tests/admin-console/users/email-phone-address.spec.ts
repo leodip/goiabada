@@ -122,7 +122,7 @@ test("a phone number is removed by choosing no country and leaving the number em
 for (const { name, country, number, field, message } of [
   { name: "a number with letters", country: true, number: "91x 345 678", field: "phoneNumber", message: "Please enter a valid number." },
   { name: "a number with no country", country: false, number: "912 345 678", field: "phoneCountryUniqueId", message: "You must select a country for your phone number." },
-  { name: "a country with no number", country: true, number: "", field: "phoneNumber", message: "The phone number field must contain a valid phone number." },
+  { name: "a country with no number", country: true, number: "", field: "phoneNumber", message: "Enter the phone number. To remove it, set the country to Not set." },
 ]) {
   test(`${name} is refused`, async ({ page, users }) => {
     const user = await users.create();

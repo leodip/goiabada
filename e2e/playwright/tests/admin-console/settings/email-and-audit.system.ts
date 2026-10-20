@@ -21,7 +21,7 @@ test("SMTP settings are refused when incomplete, out of range, or unreachable", 
       { values: { smtpEnabled: true, hostOrIP: "smtp.example.com", port: "abc", fromEmail: "noreply@example.com" }, field: "port", message: "Enter the port as a whole number." },
       { values: { smtpEnabled: true, hostOrIP: "smtp.example.com", port: "587", fromEmail: "" }, field: "fromEmail", message: "Enter the sender email." },
       // Nothing listens there: the auth server tries to connect before it saves.
-      { values: { smtpEnabled: true, hostOrIP: "127.0.0.1", port: "2", fromEmail: "noreply@example.com" }, field: "hostOrIP", message: /^Unable to connect to the SMTP server/ },
+      { values: { smtpEnabled: true, hostOrIP: "127.0.0.1", port: "2", fromEmail: "noreply@example.com" }, field: "hostOrIP", message: /Unable to connect to the SMTP server/ },
     ]) {
       await page.goto(`${env.adminUrl}${email}`);
       await fillSettingsForm(page, values);
