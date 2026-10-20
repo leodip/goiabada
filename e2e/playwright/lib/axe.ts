@@ -1,10 +1,10 @@
 // axe-core over a page in each of its states, in the light and the dark scheme, against the WCAG 2.2
-// A and AA rules. axe.spec.ts and axe.system.ts walk their pages through it, their states built from
-// the shapes at the end of this file.
+// A and AA rules. tests/accessibility walks every page through it, its states built from the shapes at
+// the end of this file.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { cancelDialog } from "../../lib/admin-console";
-import { expect, test } from "../../lib/fixtures";
+import { cancelDialog } from "./admin-console";
+import { expect, test } from "./fixtures";
 
 const wcagTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 

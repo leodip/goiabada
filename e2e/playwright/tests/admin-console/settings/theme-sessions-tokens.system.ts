@@ -16,12 +16,25 @@ const tokensPath = "/admin/settings/tokens";
 type Theme = "" | "light" | "dark";
 
 // What a page's root element says about its theme: Light and Dark name themselves, and Automatic
-// names none, leaving it to the device, as the color-scheme meta's "light dark" says.
+// names none, leaving it to the device, as the color-scheme meta's "light dark" says. And what the
+// page draws: its background under a device asking for light and for dark, which Light and Dark keep
+// whatever the device asks, and Automatic follows.
 async function expectTheme(page: Page, theme: Theme) {
   const html = page.locator("html");
   if (theme) await expect(html).toHaveAttribute("data-theme", theme);
   else await expect(html).not.toHaveAttribute("data-theme");
   await expect(page.locator('meta[name="color-scheme"]')).toHaveAttribute("content", theme || "light dark");
+
+  const background = async (colorScheme: "light" | "dark") => {
+    // Reduced motion, so no transition is caught half way between the two.
+    await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+    return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  };
+  const onLight = await background("light");
+  const onDark = await background("dark");
+  await page.emulateMedia({ colorScheme: null, reducedMotion: null });
+  if (theme) expect(onDark, `${themeLabels[theme]} keeps its background on a dark device`).toBe(onLight);
+  else expect(onDark, "Automatic draws a dark device's page darker").not.toBe(onLight);
 }
 
 const themeLabels: Record<Theme, string> = { "": "Automatic", light: "Light", dark: "Dark" };

@@ -2,6 +2,7 @@
 // JWKS. Runs alone.
 import type { APIRequestContext, Page } from "@playwright/test";
 import { cancelDialog, confirmDialog } from "../../../lib/admin-console";
+import { asks, checkStates } from "../../../lib/axe";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { userTokens, userinfo } from "../../../lib/oauth";
@@ -94,6 +95,8 @@ test("rotating signs new tokens with the next key; revoking the previous one ref
   await page.goto(keysPage);
   const previous = page.getByRole("row").filter({ hasText: rotated.previous });
   const revoke = previous.getByRole("button", { name: `Revoke ${rotated.previous}`, exact: true });
+  // Its confirmation is checked by axe here, the one moment a previous key surely exists.
+  await checkStates(page, [asks(page, "signing keys, revoking the previous key asking first", () => revoke.click())]);
   await revoke.click();
   await cancelDialog(page, "Revoke this key?");
   expect(await jwksKids(request)).toContain(rotated.previous);

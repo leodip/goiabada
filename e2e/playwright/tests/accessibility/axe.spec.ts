@@ -31,7 +31,7 @@ import { linksIn, waitForMail } from "../../lib/mailpit";
 import { browserSignInClient } from "../../lib/test-clients";
 import { freshTotp } from "../../lib/totp";
 import { uniqueIdentifier } from "../../lib/unique";
-import { asks, at, checkStates, refused, saved, says, titled, type State } from "./axe-check";
+import { asks, at, checkStates, refused, saved, says, titled, type State } from "../../lib/axe";
 
 // Every state is checked twice, and a test walks a whole area.
 test.describe.configure({ timeout: 300_000 });
@@ -409,7 +409,7 @@ test("a user's account pages", async ({ page, browser, clients, users }) => {
     {
       name: "two-factor authentication on",
       reach: async () => {
-        // The page draws a new key each time.
+        // The key the page shows is the pending enrolment's, which the refusals above kept.
         const secret = (await own.locator("#otp-secret").innerText()).trim();
         await own.locator("#password").fill(user.password);
         await own.locator("#otp").fill(await freshTotp(secret));

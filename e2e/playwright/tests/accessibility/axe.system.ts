@@ -8,7 +8,7 @@ import { expect, test } from "../../lib/fixtures";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { uniqueIdentifier } from "../../lib/unique";
-import { asks, checkStates, refused, saved, titled, type State } from "./axe-check";
+import { asks, checkStates, refused, saved, titled, type State } from "../../lib/axe";
 
 test.describe.configure({ timeout: 300_000 });
 
@@ -83,16 +83,10 @@ test("the settings pages saved, refused, and asking first", async ({ page }) => 
     await withSettingsRestored(page, `/admin/settings/${path}`, () => checkStates(page, states));
   }
 
-  // A previous key, which Revoke is offered for, exists once the keys have been rotated, as
-  // keys.system.ts does; a freshly built environment has none yet.
+  // Revoking the previous key, which a freshly built environment has none of, is checked in
+  // keys.system.ts, once its rotation has made one.
   await page.goto(settings("keys"));
-  const revocable = (await page.locator('button[data-dialog="revokeKey"]').count()) > 0;
-  await checkStates(page, [
-    asks(page, "signing keys, a rotation asking first", () => page.locator("#btnRotate").click()),
-    ...(revocable
-      ? [asks(page, "signing keys, revoking the previous key asking first", () => page.locator('button[data-dialog="revokeKey"]').click())]
-      : []),
-  ]);
+  await checkStates(page, [asks(page, "signing keys, a rotation asking first", () => page.locator("#btnRotate").click())]);
 });
 
 test("the audit log while no event is stored", async ({ page }) => {

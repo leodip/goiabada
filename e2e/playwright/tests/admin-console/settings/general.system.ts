@@ -309,17 +309,21 @@ test("dynamic client registration opens the registration endpoint, and closes it
     const { client_id } = (await response.json()) as { client_id: string };
 
     // The registered client is listed as self-registered, read-only identifier and all, and removed
-    // again here.
+    // again here, pass or fail: its identifier is the server's, which the next run's sweep would not
+    // know for a test's.
     const id = await idFromListLink(page, `${env.adminUrl}/admin/clients`, client_id);
-    await expect(clientRow(page, client_id).getByText("Self-registered", { exact: true })).toBeVisible();
-    await page.goto(clientUrl(id, "settings"));
-    await expect(page.locator("#clientIdentifier")).toHaveAttribute("readonly", "");
-    // Registered with the global setting for the ID token, as a client created here is, so its Tokens
-    // tab has a choice checked and saves as loaded.
-    await page.goto(clientUrl(id, "tokens"));
-    await expect(page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]')).toBeChecked();
-    await saveAndExpectSaved(page, "Token settings saved.");
-    await deleteClient(page, id);
+    try {
+      await expect(clientRow(page, client_id).getByText("Self-registered", { exact: true })).toBeVisible();
+      await page.goto(clientUrl(id, "settings"));
+      await expect(page.locator("#clientIdentifier")).toHaveAttribute("readonly", "");
+      // Registered with the global setting for the ID token, as a client created here is, so its Tokens
+      // tab has a choice checked and saves as loaded.
+      await page.goto(clientUrl(id, "tokens"));
+      await expect(page.locator('input[name="includeOpenIDConnectClaimsInIdToken"][value="default"]')).toBeChecked();
+      await saveAndExpectSaved(page, "Token settings saved.");
+    } finally {
+      await deleteClient(page, id);
+    }
   });
   expect((await discovery()).registration_endpoint).toBeUndefined();
 });
