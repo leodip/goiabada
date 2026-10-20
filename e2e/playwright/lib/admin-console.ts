@@ -19,21 +19,46 @@ export function clientUrl(id: number, tab: ClientTab): string {
   return `${env.adminUrl}/admin/clients/${id}/${tab}`;
 }
 
-// The admin console's confirmation dialog: a <dialog> with No and Yes, or Cancel and OK.
+// The admin console's confirmation dialog: Cancel, then the action it asks about ("Save", "Revoke
+// consent", "End session" and so on), which this presses.
 export async function confirmDialog(page: Page, expectedText?: string | RegExp) {
   const dialog = page.locator("dialog[open]");
   await expect(dialog).toBeVisible();
   if (expectedText) await expect(dialog).toContainText(expectedText);
-  await dialog.getByRole("button", { name: /^(Yes|OK)$/ }).click();
+  await dialog.locator('[id$="_btnModal2"]').click();
+  await expect(dialog).toBeHidden();
 }
 
-// The admin console's error dialog: a <dialog> with a single Close button.
-export async function expectErrorDialog(page: Page, expectedText: string | RegExp) {
+// The same dialog, answered with Cancel.
+export async function cancelDialog(page: Page, expectedText?: string | RegExp) {
   const dialog = page.locator("dialog[open]");
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText(expectedText);
-  await dialog.getByRole("button", { name: "Close" }).click();
+  if (expectedText) await expect(dialog).toContainText(expectedText);
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toBeHidden();
+}
+
+// A refusal a form is drawn again with: the message in the form's notice (#<noticeId>), and the field
+// it is about marked invalid and focused. A form whose refusal leaves every password to be typed again
+// focuses the first password field instead, so its caller says focused: false.
+export async function expectRefusal(
+  page: Page,
+  noticeId: string,
+  fieldId: string,
+  expectedText: string | RegExp,
+  { focused = true }: { focused?: boolean } = {},
+) {
+  await expect(page.locator(`#${noticeId}`)).toContainText(expectedText);
+  await expect(page.locator(`#${fieldId}`)).toHaveAttribute("aria-invalid", "true");
+  if (focused) await expect(page.locator(`#${fieldId}`)).toBeFocused();
+}
+
+// A refusal the page shows at the field it is about: the message under the field (#<id>-error), and
+// the field marked invalid.
+export async function expectFieldError(page: Page, fieldId: string, expectedText: string | RegExp) {
+  await expect(page.locator(`#${fieldId}-error`)).toBeVisible();
+  await expect(page.locator(`#${fieldId}-error`)).toContainText(expectedText);
+  await expect(page.locator(`#${fieldId}`)).toHaveAttribute("aria-invalid", "true");
 }
 
 export interface NewClient {
@@ -53,9 +78,23 @@ export async function submitNewClient(page: Page, client: NewClient) {
   await page.locator("#btnCreate").click();
 }
 
-// A table row holding a cell with exactly this text: a list's row for an identifier.
+// The value a page's record (a dl.detail-list, as on the delete pages and a user's details) lists
+// under this term.
+export function detail(page: Page, term: string) {
+  return page.locator(`dl.detail-list > dt:text-is("${term}") + dd`);
+}
+
+// Chooses an entry of a searchable list (time zone, language, country), a field with role combobox
+// over #<id>-options: types to narrow the list, then picks the entry.
+export async function choose(page: Page, id: string, typed: string, entry: string | RegExp) {
+  await page.locator(`#${id}`).fill(typed);
+  await page.locator(`#${id}-options`).getByRole("option", { name: entry, exact: typeof entry === "string" }).click();
+}
+
+// A table row naming exactly this text, in a cell of its own or as a line of one (a link, with a
+// description or a name beneath it): a list's row for an identifier or an email.
 export function rowWithCell(page: Page, text: string) {
-  return page.getByRole("row").filter({ has: page.getByRole("cell", { name: text, exact: true }) });
+  return page.getByRole("row").filter({ has: page.getByText(text, { exact: true }) });
 }
 
 // The client list's row for an identifier.
@@ -63,13 +102,9 @@ export function clientRow(page: Page, identifier: string) {
   return rowWithCell(page, identifier);
 }
 
-// The database id of a client, read from its Manage link on the list.
+// The database id of a client, read from the link its identifier is on the list.
 export async function clientIdFromList(page: Page, identifier: string): Promise<number> {
-  await page.goto(`${env.adminUrl}/admin/clients`);
-  const href = await clientRow(page, identifier).getByRole("link", { name: "Manage" }).getAttribute("href");
-  const match = href?.match(/\/admin\/clients\/(\d+)\//);
-  if (!match) throw new Error(`no Manage link for client ${identifier}`);
-  return Number(match[1]);
+  return idFromListLink(page, `${env.adminUrl}/admin/clients`, identifier);
 }
 
 // Signs the administrator in from the admin console, in a page with no session.
@@ -79,42 +114,41 @@ export async function signInAsAdmin(page: Page) {
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
 }
 
-// Deletes something the way an administrator does on a delete page that asks for its identifier:
-// type it, press Delete. The identifier is read from the page's own table (the row labelled
-// rowLabel), so something a test renamed is deleted all the same.
-async function deleteTypingIdentifier(page: Page, deleteUrl: string, rowLabel: string, inputName: string, listUrl: string) {
+// Deletes something the way an administrator does on a delete page: type what the page asks for,
+// press the delete button. Every delete page lists the record first, its identifier (a user's email)
+// the first entry, which is what is typed, so something a test renamed is deleted all the same.
+async function deleteTyping(page: Page, deleteUrl: string, inputId: string, listUrl: string | RegExp) {
   await page.goto(deleteUrl);
-  const identifier = await rowWithCell(page, rowLabel).getByRole("cell").nth(1).innerText();
-  await page.locator(`input[name="${inputName}"]`).fill(identifier.trim());
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  const identifier = await page.locator("dl.detail-list dd").first().innerText();
+  await page.locator(`#${inputId}`).fill(identifier.trim());
+  await page.locator("#btnDelete").click();
   await expect(page).toHaveURL(listUrl);
 }
 
 export async function deleteClient(page: Page, id: number) {
-  await deleteTypingIdentifier(page, clientUrl(id, "delete"), "Client identifier", "clientIdentifier", `${env.adminUrl}/admin/clients`);
+  await deleteTyping(page, clientUrl(id, "delete"), "clientIdentifier", `${env.adminUrl}/admin/clients`);
 }
 
 export async function deleteResource(page: Page, id: number) {
-  await deleteTypingIdentifier(page, resourceUrl(id, "delete"), "Resource identifier", "resourceIdentifier", `${env.adminUrl}/admin/resources`);
+  await deleteTyping(page, resourceUrl(id, "delete"), "resourceIdentifier", `${env.adminUrl}/admin/resources`);
 }
 
 export async function deleteGroup(page: Page, id: number) {
-  await deleteTypingIdentifier(page, `${env.adminUrl}/admin/groups/${id}/delete`, "Group identifier", "groupIdentifier", `${env.adminUrl}/admin/groups`);
+  await deleteTyping(page, `${env.adminUrl}/admin/groups/${id}/delete`, "groupIdentifier", `${env.adminUrl}/admin/groups`);
 }
 
-// A user's delete page asks for no identifier.
+// A user's delete page asks for the user's email.
 export async function deleteUser(page: Page, id: number) {
-  await page.goto(`${env.adminUrl}/admin/users/${id}/delete`);
-  await page.getByRole("button", { name: "Delete user" }).click();
-  await expect(page).toHaveURL(new RegExp(`^${env.adminUrl}/admin/users/?(\\?|$)`));
+  await deleteTyping(page, `${env.adminUrl}/admin/users/${id}/delete`, "email", new RegExp(`^${env.adminUrl}/admin/users/?(\\?|$)`));
 }
 
-// The database id in a list row's link, such as /admin/resources/7/settings.
-export async function idFromListLink(page: Page, listUrl: string, text: string, linkName: string): Promise<number> {
+// The database id in the link a list names a row by, its identifier or email, such as
+// /admin/resources/7/settings.
+export async function idFromListLink(page: Page, listUrl: string, text: string): Promise<number> {
   await page.goto(listUrl);
-  const href = await rowWithCell(page, text).getByRole("link", { name: linkName }).getAttribute("href");
+  const href = await page.getByRole("table").getByRole("link", { name: text, exact: true }).getAttribute("href");
   const match = href?.match(/\/admin\/\w+\/(\d+)\//);
-  if (!match) throw new Error(`no ${linkName} link for ${text} on ${listUrl}`);
+  if (!match) throw new Error(`no link for ${text} on ${listUrl}`);
   return Number(match[1]);
 }
 
@@ -178,9 +212,9 @@ export async function submitNewUser(page: Page, user: NewUser) {
 export async function addRedirectUri(page: Page, id: number, uri: string) {
   await page.goto(clientUrl(id, "redirect-uris"));
   await page.locator("#redirectURI").fill(uri);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator("#addURIBtn").click();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client redirect uris saved successfully")).toBeVisible();
+  await expect(page.getByText("Redirect URIs saved.")).toBeVisible();
 }
 
 export type GroupTab = "settings" | "attributes" | "members" | "permissions" | "delete";
@@ -230,39 +264,40 @@ export async function addGroupAttribute(page: Page, groupId: number, attribute: 
   await expect(page).toHaveURL(groupUrl(groupId, "attributes"));
 }
 
-// Adds a user to a group the way the Members tab does: search, Add to group, confirm.
+// Adds a user to a group the way the Members tab does: search, then Add to group, which acts at once.
 export async function addGroupMember(page: Page, groupId: number, email: string) {
   await page.goto(`${env.adminUrl}/admin/groups/${groupId}/members/add`);
   await page.locator("#search").pressSequentially(email.split("@")[0]);
   const row = rowWithCell(page, email);
   await row.getByRole("button", { name: "Add to group" }).click();
-  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
   await expect(row.getByText("In group")).toBeVisible();
 }
 
 // The Permissions tab's table row for a permission identifier.
 export function resourcePermissionRow(page: Page, identifier: string) {
-  return page.locator("#permissionsTable tbody tr").filter({ has: page.getByRole("cell", { name: identifier, exact: true }) });
+  return page.locator(`#permissionsTable tbody tr[data-identifier="${identifier}"]`);
 }
 
 // Adds a permission to the Permissions tab's table, without saving. The console validates it on the
 // server first (by path: the console adds the page's ui_locales to the address), then adds the row and
-// empties the form once it has read the answer, or opens a dialog with the refusal: wait for one or the
-// other, since a next permission filled in before the form is emptied would be emptied with it.
+// empties the form once it has read the answer, or shows the refusal under its field: wait for one or
+// the other, since a next permission filled in before the form is emptied would be emptied with it.
 export async function addResourcePermission(page: Page, identifier: string, description = "") {
   await page.locator("#permissionIdentifier").fill(identifier);
   await page.locator("#permissionDescription").fill(description);
   const validated = page.waitForResponse((r) => new URL(r.url()).pathname === "/admin/resources/validate-permission");
-  await page.getByRole("button", { name: "Create permission" }).click();
+  await page.locator("#addPermissionBtn").click();
   await validated;
   await page.waitForFunction(
-    () => (document.getElementById("permissionIdentifier") as HTMLInputElement).value === "" || document.querySelector("dialog[open]") !== null,
+    () =>
+      (document.getElementById("permissionIdentifier") as HTMLInputElement).value === "" ||
+      document.querySelector("#permissionIdentifier-error:not([hidden]), #permissionDescription-error:not([hidden])") !== null,
   );
 }
 
 export async function saveResourcePermissions(page: Page) {
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Resource permissions saved successfully")).toBeVisible();
+  await expect(page.getByText("Permissions saved.")).toBeVisible();
 }
 
 // The confidential client's secret, as the Authentication tab holds it.
@@ -285,7 +320,7 @@ export async function grantClientPermission(page: Page, id: number, resource: st
   await page.goto(clientUrl(id, "permissions"));
   await addPermissionRow(page, resource, permission);
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client permissions saved successfully")).toBeVisible();
+  await expect(page.getByText("Permissions saved.")).toBeVisible();
 }
 
 // The same on a group's Permissions tab, which shares the client tab's controls.
@@ -293,7 +328,7 @@ export async function grantGroupPermission(page: Page, id: number, resource: str
   await page.goto(groupUrl(id, "permissions"));
   await addPermissionRow(page, resource, permission);
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Group permissions saved successfully")).toBeVisible();
+  await expect(page.getByText("Permissions saved.")).toBeVisible();
 }
 
 // Sets the client's resource owner password credentials grant to on, whatever the global setting.
@@ -301,7 +336,7 @@ export async function enablePasswordGrant(page: Page, id: number) {
   await page.goto(clientUrl(id, "oauth2-flows"));
   await page.locator('input[name="ropcEnabled"][value="on"]').check();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
+  await expect(page.getByText("OAuth2 flows saved.")).toBeVisible();
 }
 
 // Sets the client's implicit grant to on or off, whatever the global setting.
@@ -309,7 +344,7 @@ export async function setImplicitGrant(page: Page, id: number, value: "on" | "of
   await page.goto(clientUrl(id, "oauth2-flows"));
   await page.locator(`input[name="implicitGrantEnabled"][value="${value}"]`).check();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
+  await expect(page.getByText("OAuth2 flows saved.")).toBeVisible();
 }
 
 // Sets whether the client must use PKCE: on, off, or as the global setting says.
@@ -317,18 +352,16 @@ export async function setPkceRequired(page: Page, id: number, value: "global" | 
   await page.goto(clientUrl(id, "oauth2-flows"));
   await page.locator(`input[name="pkceRequired"][value="${value}"]`).check();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
+  await expect(page.getByText("OAuth2 flows saved.")).toBeVisible();
 }
 
 // Adds resource:permission to the Permissions tab's table, without saving. Choosing a resource
 // reloads the permission list from /admin/get-permissions, and that reload resets the choice, so the
-// permission is picked only once the list has arrived.
+// permission is picked only once the list has arrived. Each option carries its identifier, its label
+// the identifier and a shortened description.
 export async function addPermissionRow(page: Page, resource: string, permission: string) {
   const resources = page.locator("#resourcesSelect");
-  const resourceValue = (await resources
-    .locator("option")
-    .filter({ hasText: new RegExp(`^${resource}\\b`) })
-    .getAttribute("value"))!;
+  const resourceValue = (await resources.locator(`option[data-resource-identifier="${resource}"]`).getAttribute("value"))!;
   // The page loads the list for whatever is selected when it opens; let that land first.
   await page.waitForLoadState("networkidle");
   if ((await resources.inputValue()) === resourceValue) await resources.selectOption("");
@@ -336,11 +369,10 @@ export async function addPermissionRow(page: Page, resource: string, permission:
   await resources.selectOption(resourceValue);
   await loaded;
   const permissions = page.locator("#permissionsSelect");
-  // The label is the identifier, then the description in parentheses when there is one.
-  const option = permissions.locator("option").filter({ hasText: new RegExp(`^${permission}( \\(|$)`) });
+  const option = permissions.locator(`option[data-permission-identifier="${permission}"]`);
   await expect(option).toHaveCount(1);
   await permissions.selectOption((await option.getAttribute("value"))!);
-  await page.getByRole("button", { name: "Grant permission" }).click();
+  await page.locator("#grantPermissionBtn").click();
 }
 
 // Grants a resource's permission on a user's Permissions tab and saves.
@@ -348,5 +380,5 @@ export async function grantUserPermission(page: Page, id: number, resource: stri
   await page.goto(userUrl(id, "permissions"));
   await addPermissionRow(page, resource, permission);
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Permissions saved successfully")).toBeVisible();
+  await expect(page.getByText("Permissions saved.")).toBeVisible();
 }

@@ -2,10 +2,11 @@
 // the consent screen shows of it, the ACR level it asks for, and the administrative scopes allowance.
 import { createHash, randomBytes } from "node:crypto";
 import type { Page } from "@playwright/test";
-import { clientUrl, enablePasswordGrant, readClientSecret } from "../../../lib/admin-console";
+import { clientUrl, confirmDialog, enablePasswordGrant, readClientSecret, saveAndExpectSaved, userUrl } from "../../../lib/admin-console";
 import { authorizeAndLand, openSignIn, redirectParams, submitPassword, testRedirectUri } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
+import { solidPng } from "../../../lib/images";
 import { codeToken, jwtClaims, passwordToken } from "../../../lib/oauth";
 import { browserSignInClient } from "../../../lib/test-clients";
 import { freshTotp } from "../../../lib/totp";
@@ -13,17 +14,14 @@ import { freshTotp } from "../../../lib/totp";
 async function setFlow(page: Page, clientId: number, name: "ropcEnabled" | "implicitGrantEnabled" | "pkceRequired", value: "on" | "off" | "global") {
   await page.goto(clientUrl(clientId, "oauth2-flows"));
   await page.locator(`input[name="${name}"][value="${value}"]`).check();
-  await page.locator("#btnSave").click();
-  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
+  await saveAndExpectSaved(page, "OAuth2 flows saved.");
 }
 
+// Saves the client's settings after edit, whose changes the page saves without asking first.
 async function saveClientSettings(page: Page, clientId: number, edit: () => Promise<void>) {
   await page.goto(clientUrl(clientId, "settings"));
   await edit();
-  await page.locator("#btnSave").click();
-  const dialog = page.locator("dialog[open]");
-  if (await dialog.isVisible()) await dialog.getByRole("button", { name: "Yes" }).click();
-  await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+  await saveAndExpectSaved(page, "Settings saved.");
 }
 
 test("the client's own password grant switch wins over the global one, both ways", async ({ page, request, clients, users }) => {
@@ -78,7 +76,7 @@ test("the client's own PKCE switch lets it leave PKCE out while the global setti
   expect(response.status(), await response.text()).toBe(200);
 });
 
-test("the consent screen shows the client's name, description and website only where told to", async ({ page, browser, clients, users }) => {
+test("the consent screen shows the client's logo, name, description and website only where told to", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
   const consentPage = async () => {
@@ -87,23 +85,32 @@ test("the consent screen shows the client's name, description and website only w
     await expect(attempt.page).toHaveURL(/\/auth\/consent/);
     return attempt;
   };
+  const shown = ["showLogo", "showDisplayName", "showDescription", "showWebsiteUrl"];
+
+  // A logo to show, uploaded on the Logo tab.
+  await page.goto(clientUrl(client.id, "logo"));
+  await page.locator("#imageUploadInput").setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: solidPng(64, 64, [30, 120, 200]) });
+  await page.getByRole("button", { name: "Save logo" }).click();
+  await expect(page.locator("#imageUploadStatus")).toContainText("Logo saved.");
 
   await saveClientSettings(page, client.id, async () => {
     await page.locator('input[name="displayName"]').fill("Acme Reports");
     await page.locator('input[name="description"]').fill("Monthly sales reports");
     await page.locator('input[name="websiteUrl"]').fill("https://reports.example.com");
-    for (const name of ["showDisplayName", "showDescription", "showWebsiteUrl"]) await page.locator(`input[name="${name}"]`).check();
+    for (const name of shown) await page.locator(`input[name="${name}"]`).check();
   });
   let attempt = await consentPage();
+  await expect(attempt.page.locator("img.auth-client-logo")).toBeVisible();
   await expect(attempt.page.getByText("Acme Reports")).toBeVisible();
   await expect(attempt.page.getByText("Monthly sales reports")).toBeVisible();
   await expect(attempt.page.getByRole("link", { name: "https://reports.example.com" })).toBeVisible();
   await attempt.context.close();
 
   await saveClientSettings(page, client.id, async () => {
-    for (const name of ["showDisplayName", "showDescription", "showWebsiteUrl"]) await page.locator(`input[name="${name}"]`).uncheck();
+    for (const name of shown) await page.locator(`input[name="${name}"]`).uncheck();
   });
   attempt = await consentPage();
+  await expect(attempt.page.locator("img.auth-client-logo")).toHaveCount(0);
   await expect(attempt.page.getByText("Acme Reports")).toHaveCount(0);
   await expect(attempt.page.getByText("Monthly sales reports")).toHaveCount(0);
   await expect(attempt.page.getByRole("link", { name: "https://reports.example.com" })).toHaveCount(0);
@@ -140,7 +147,7 @@ test("a client requiring ACR level 2 mandatory makes a user without an authentic
   await submitPassword(signIn, user.email, user.password);
   // The enrolment page: a QR code and the secret, then a code from it.
   await expect(signIn).toHaveURL(/\/auth\/otp/);
-  const secretKey = (await signIn.locator("pre").innerText()).trim();
+  const secretKey = (await signIn.locator("#otp-secret").innerText()).trim();
   await signIn.locator('input[name="otp"]').fill(await freshTotp(secretKey));
   await signIn.getByRole("button", { name: "Verify" }).click();
   await signIn.waitForURL((url) => url.href.startsWith(testRedirectUri));
@@ -154,7 +161,7 @@ test("a client requiring ACR level 2 mandatory makes a user without an authentic
   expect(id.amr).toEqual(["pwd", "otp"]);
 
   // The administrator sees the authenticator the user just enrolled.
-  await page.goto(`${env.adminUrl}/admin/users/${user.id}/authentication`);
+  await page.goto(userUrl(user.id, "authentication"));
   await expect(page.locator('input[name="otpEnabled"]')).toBeChecked();
 });
 
@@ -174,10 +181,8 @@ test("allowing the administrative scopes asks first, and lets the client take th
   await page.goto(clientUrl(client.id, "settings"));
   await page.locator("#administrativeScopesAllowed").check();
   await page.locator("#btnSave").click();
-  const dialog = page.locator("dialog[open]");
-  await expect(dialog).toContainText("You are allowing this client to request the administrative scopes");
-  await dialog.getByRole("button", { name: "Yes" }).click();
-  await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're allowing the client to request the administrative scopes");
+  await expect(page.getByText("Settings saved.")).toBeVisible();
   await expect(page.locator("#administrativeScopesAllowed")).toBeChecked();
 
   answer = await adminGrant();

@@ -10,20 +10,30 @@ test.use({ storageState: { cookies: [], origins: [] } });
 async function startSignIn(page: Page) {
   await page.goto(`${env.adminUrl}/admin/clients`);
   await expect(page).toHaveURL(new RegExp(`^${env.authUrl}/auth/pwd\\?`));
+  await expect(page).toHaveTitle(/^Sign in – /);
 }
 
 async function expectSignedIn(page: Page) {
   // Back on the admin console, on the page asked for, signed in.
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
-  await expect(page).toHaveTitle(/Admin - Clients/);
-  await expect(page.getByText(env.adminEmail, { exact: true })).toBeVisible();
+  await expect(page).toHaveTitle(/^Clients – /);
+  // The user menu, in the header, names who is signed in.
+  await expect(page.locator("[data-user-menu-button]")).toContainText(env.adminEmail);
 }
 
 async function expectRefused(page: Page, message: string) {
-  // The password page again, with the message, and still no session at the admin console.
+  // The password page again, with the message above the fields, and still no session at the admin
+  // console.
   await expect(page).toHaveURL(new RegExp(`^${env.authUrl}/auth/pwd\\?`));
-  await expect(page.getByText(message, { exact: true })).toBeVisible();
-  await expect(page.locator('input[name="password"]')).toHaveValue("");
+  await expect(page.locator("#pwd-error")).toHaveText(message);
+  await expect(page.locator("#password")).toHaveValue("");
+}
+
+// The field a refusal is about: marked invalid, described by the message, and focused.
+async function expectFieldRefused(page: Page, fieldId: string) {
+  await expect(page.locator(`#${fieldId}`)).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator(`#${fieldId}`)).toHaveAttribute("aria-describedby", "pwd-error");
+  await expect(page.locator(`#${fieldId}`)).toBeFocused();
 }
 
 test("the administrator signs in to the admin console through the auth server", async ({ page }) => {
@@ -33,7 +43,7 @@ test("the administrator signs in to the admin console through the auth server", 
 
   // The list comes from the auth server's admin API with the administrator's token: the admin
   // console's own client, which the first start seeded, is in it.
-  await expect(page.getByRole("cell", { name: "admin-console-client", exact: true })).toBeVisible();
+  await expect(page.locator("#clientsTable").getByRole("link", { name: "admin-console-client", exact: true })).toBeVisible();
 });
 
 // No negative test here uses a wrong password for the administrator: every one counts against the
@@ -75,8 +85,12 @@ test("an address that names no account is refused, and the same sign-in then suc
   await submitPassword(page, nobody, "not-a-password-anyone-has");
 
   await expectRefused(page, "Authentication failed.");
-  // The address typed stays in the form for the retry.
-  await expect(page.locator('input[name="email"]')).toHaveValue(nobody);
+  // The address typed stays in the form for the retry. A refusal of the pair names neither field, and
+  // the focus is where typing starts again, the password.
+  await expect(page.locator("#email")).toHaveValue(nobody);
+  await expect(page.locator("#email")).not.toHaveAttribute("aria-invalid");
+  await expect(page.locator("#password")).not.toHaveAttribute("aria-invalid");
+  await expect(page.locator("#password")).toBeFocused();
 
   // A mistake does not end the sign-in: the re-rendered form carries it on.
   await submitPassword(page, env.adminEmail, env.adminPassword);
@@ -87,13 +101,15 @@ test("an empty email is refused before any password is checked", async ({ page }
   await startSignIn(page);
   await submitPassword(page, "", "anything");
   await expectRefused(page, "Email is required.");
+  await expectFieldRefused(page, "email");
 });
 
 test("an empty password is refused before it is checked", async ({ page }) => {
   await startSignIn(page);
   await submitPassword(page, env.adminEmail, "");
   await expectRefused(page, "Password is required.");
-  await expect(page.locator('input[name="email"]')).toHaveValue(env.adminEmail);
+  await expectFieldRefused(page, "password");
+  await expect(page.locator("#email")).toHaveValue(env.adminEmail);
 });
 
 test("without signing in, the admin console's pages stay out of reach", async ({ page }) => {

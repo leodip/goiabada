@@ -5,7 +5,7 @@
 // may be revoked at logout or a password change. A confidential client's rotation and replay, and a
 // refresh token presented by another client, are in ../oauth/refresh-tokens.spec.ts.
 import type { APIRequestContext, Browser } from "@playwright/test";
-import { clientUrl, grantUserPermission, userUrl } from "../../lib/admin-console";
+import { clientUrl, confirmDialog, grantUserPermission, rowWithCell, userUrl } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -81,10 +81,10 @@ test("a refresh token ends when the user's consent to the client, or the user's 
     const refreshed = await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token as string });
     expectTokenResponse(refreshed);
     await page.goto(userUrl(user.id, "consents"));
-    const row = page.getByRole("row").filter({ hasText: client.identifier });
-    await row.getByRole("button", { name: "Revoke" }).click();
-    await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-    await expect(row.getByText("Removed")).toBeVisible();
+    const row = rowWithCell(page, client.identifier);
+    await row.getByRole("button", { name: `Revoke ${client.identifier}`, exact: true }).click();
+    await confirmDialog(page, `Revoke the consent the user gave ${client.identifier}?`);
+    await expect(row.getByText("Revoked", { exact: true })).toBeVisible();
     expectTokenError(await token({ grant_type: "refresh_token", refresh_token: refreshed.body.refresh_token as string }), "invalid_grant");
   });
 
@@ -92,9 +92,9 @@ test("a refresh token ends when the user's consent to the client, or the user's 
     const { context, tokens } = await signInForTokens(browser, request, { identifier: client.identifier, secret }, user, `openid ${resource.identifier}:read`);
     await context.close();
     await page.goto(userUrl(user.id, "permissions"));
-    await page.locator("#permissionsTable").getByRole("button", { name: `Remove permission ${resource.identifier}:read`, exact: true }).click();
+    await page.locator("#permissionsTable").getByRole("button", { name: `Remove ${resource.identifier}:read`, exact: true }).click();
     await page.locator("#btnSave").click();
-    await expect(page.getByText("Permissions saved successfully")).toBeVisible();
+    await expect(page.getByText("Permissions saved.")).toBeVisible();
     expectTokenError(await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token as string }), "invalid_grant");
   });
 });
@@ -113,7 +113,7 @@ test("an offline refresh token unused for longer than the client's idle timeout 
   await page.locator("#refreshTokenOfflineIdleTimeoutInSeconds").fill("20");
   await page.locator("#refreshTokenOfflineMaxLifetimeInSeconds").fill("3600");
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+  await expect(page.getByText("Token settings saved.")).toBeVisible();
   const token = asClient(request, { identifier: client.identifier, secret });
 
   const { context, tokens } = await signInForTokens(browser, request, { identifier: client.identifier, secret }, user, "openid offline_access");
@@ -152,7 +152,7 @@ test("signing out at the auth server, or a new password, ends the user's refresh
     await page.goto(userUrl(user.id, "authentication"));
     await page.locator('input[name="newPassword"]').fill("a-brand-new-password");
     await page.locator("#btnSave").click();
-    await expect(page.getByText("Saved successfully")).toBeVisible();
+    await expect(page.getByText("Changes saved.")).toBeVisible();
     expectTokenError(await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token as string }), "invalid_grant");
   });
 });

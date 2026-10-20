@@ -9,7 +9,7 @@
 import type { Page } from "@playwright/test";
 import {
   addResourcePermission,
-  expectErrorDialog,
+  confirmDialog,
   idFromListLink,
   resourcePermissionRow,
   resourceUrl,
@@ -22,18 +22,11 @@ test.describe.configure({ mode: "serial" });
 
 const list = `${env.adminUrl}/admin/resources`;
 const builtIn = "admin-read";
-
-// The Permissions tab's list as the page script holds it, which is what its Save sends.
-type PagePermission = { id: number; permissionIdentifier: string; description: string };
-declare global {
-  interface Window {
-    availablePermissions: PagePermission[];
-    refreshPermissionsTable(): void;
-  }
-}
+// What every save of the system resource asks first.
+const systemSave = "This is the auth server's own resource: a wrong change can stop administrators from managing Goiabada.";
 
 // Submits the system resource's settings form with this identifier, past the read-only field and the
-// page's own Save handler, as a crafted request would.
+// page's own confirmation, as a crafted request would.
 async function submitIdentifier(page: Page, id: number, identifier: string) {
   await page.goto(resourceUrl(id, "settings"));
   const input = page.locator("#resourceIdentifier");
@@ -44,31 +37,25 @@ async function submitIdentifier(page: Page, id: number, identifier: string) {
 }
 
 // Saves the system resource's permissions with one of them renamed to `to`, or removed when `to` is
-// null, past the hidden buttons, by changing the list the page's Save sends; then confirms the
-// system-level warning.
+// null, past the hidden buttons, by changing the row the page's Save reads it from; then answers the
+// confirmation every save of the system resource asks with Save.
 async function savePermissionChange(page: Page, id: number, from: string, to: string | null) {
   await page.goto(resourceUrl(id, "permissions"));
-  await page.evaluate(
-    ([from, to]) => {
-      window.availablePermissions = window.availablePermissions
-        .filter((p) => to !== null || p.permissionIdentifier !== from)
-        .map((p) => (p.permissionIdentifier === from ? { ...p, permissionIdentifier: to! } : p));
-      window.refreshPermissionsTable();
-    },
-    [from, to] as const,
-  );
+  await resourcePermissionRow(page, from).evaluate((row: HTMLTableRowElement, to) => {
+    if (to === null) row.remove();
+    else row.dataset.identifier = to;
+  }, to);
   await page.locator("#btnSave").click();
-  const dialog = page.locator("dialog[open]");
-  await expect(dialog).toContainText("You are about to modify a system-level resource.");
-  await dialog.getByRole("button", { name: "Yes" }).click();
+  await confirmDialog(page, systemSave);
 }
 
 test("the system resource's identifier cannot be changed, even past the read-only field", async ({ page }) => {
-  const id = await idFromListLink(page, list, "authserver", "Manage");
+  const id = await idFromListLink(page, list, "authserver");
   const attempted = "authserver-renamed";
   try {
     await submitIdentifier(page, id, attempted);
-    await expect(page.getByText("The identifier of a system-level resource cannot be changed.")).toBeVisible();
+    await expect(page.locator("#resource-error")).toContainText("The identifier of a system-level resource cannot be changed.");
+    await expect(page.locator("#resourceIdentifier")).toHaveAttribute("aria-invalid", "true");
     await page.goto(list);
     await expect(rowWithCell(page, "authserver")).toHaveCount(1);
     await expect(rowWithCell(page, attempted)).toHaveCount(0);
@@ -79,11 +66,11 @@ test("the system resource's identifier cannot be changed, even past the read-onl
 });
 
 test("a built-in permission cannot be renamed, even past the hidden edit button", async ({ page }) => {
-  const id = await idFromListLink(page, list, "authserver", "Manage");
+  const id = await idFromListLink(page, list, "authserver");
   const attempted = `${builtIn}-renamed`;
   try {
     await savePermissionChange(page, id, builtIn, attempted);
-    await expectErrorDialog(page, `Built-in permission '${builtIn}' cannot be renamed.`);
+    await expect(page.locator("#resourcePermissionsStatus")).toContainText(`Built-in permission '${builtIn}' cannot be renamed.`);
     await page.reload();
     await expect(resourcePermissionRow(page, builtIn)).toHaveCount(1);
     await expect(resourcePermissionRow(page, attempted)).toHaveCount(0);
@@ -96,10 +83,10 @@ test("a built-in permission cannot be renamed, even past the hidden edit button"
 });
 
 test("a built-in permission cannot be removed, even past the hidden remove button", async ({ page }) => {
-  const id = await idFromListLink(page, list, "authserver", "Manage");
+  const id = await idFromListLink(page, list, "authserver");
   try {
     await savePermissionChange(page, id, builtIn, null);
-    await expectErrorDialog(page, `Built-in permission '${builtIn}' cannot be deleted.`);
+    await expect(page.locator("#resourcePermissionsStatus")).toContainText(`Built-in permission '${builtIn}' cannot be deleted.`);
     await page.reload();
     await expect(resourcePermissionRow(page, builtIn)).toHaveCount(1);
   } finally {
@@ -107,7 +94,8 @@ test("a built-in permission cannot be removed, even past the hidden remove butto
     if ((await resourcePermissionRow(page, builtIn).count()) === 0) {
       await addResourcePermission(page, builtIn, "Read-only access to all admin API endpoints");
       await page.locator("#btnSave").click();
-      await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
+      await confirmDialog(page, systemSave);
+      await expect(page.getByText("Permissions saved.")).toBeVisible();
     }
   }
 });

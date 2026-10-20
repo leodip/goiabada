@@ -2,7 +2,7 @@ import { clientUrl, grantClientPermission, readClientSecret, saveAndExpectSaved 
 import { expect, test } from "../../../lib/fixtures";
 import { clientCredentialsToken } from "../../../lib/oauth";
 
-const saved = "Client settings saved successfully";
+const saved = "Token settings saved.";
 
 test("token durations and the OIDC claim options are saved", async ({ page, clients }) => {
   const client = await clients.create();
@@ -31,6 +31,18 @@ test("a new client's Tokens tab shows an ID token choice, and saves as loaded", 
   await saveAndExpectSaved(page, saved);
 });
 
+// Under each duration the page says what was typed as a duration, and what 0 stands for.
+test("each duration is read back in words as it is typed", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "tokens"));
+  const readout = page.locator('[data-duration-for="tokenExpirationInSeconds"]');
+  await expect(readout).toHaveText(/^Uses the global setting \(.+\)$/);
+  await page.locator("#tokenExpirationInSeconds").fill("600");
+  await expect(readout).toHaveText("10 minutes");
+  await page.locator("#tokenExpirationInSeconds").fill("ten");
+  await expect(readout).toHaveText("Enter a whole number of seconds.");
+});
+
 test("the token expiration set here is the lifetime the token endpoint gives", async ({ page, clients, request }) => {
   const client = await clients.create({ authorizationCode: false, clientCredentials: true });
   await grantClientPermission(page, client.id, "authserver", "manage-account");
@@ -46,19 +58,30 @@ test("the token expiration set here is the lifetime the token endpoint gives", a
 });
 
 for (const { value, message } of [
-  { value: "-5", message: "Token expiration in seconds must be between 0 and 160000000." },
-  { value: "abc", message: "Invalid value for token expiration in seconds." },
+  { value: "-5", message: "Token lifetime must be between 0 and 160000000 seconds." },
+  { value: "abc", message: "Enter the token lifetime as a whole number of seconds." },
 ]) {
-  test(`a token expiration of ${JSON.stringify(value)} is refused`, async ({ page, clients }) => {
+  test(`a token expiration of ${JSON.stringify(value)} is refused at its field`, async ({ page, clients }) => {
     const client = await clients.create();
     await page.goto(clientUrl(client.id, "tokens"));
     await page.locator("#tokenExpirationInSeconds").fill(value);
     await page.locator("#btnSave").click();
-    await expect(page.getByText(message)).toBeVisible();
+    await expect(page.locator("#tokens-error")).toContainText(message);
+    await expect(page.locator("#tokenExpirationInSeconds")).toHaveAttribute("aria-invalid", "true");
     await page.goto(clientUrl(client.id, "tokens"));
     await expect(page.locator("#tokenExpirationInSeconds")).toHaveValue("0");
   });
 }
+
+test("an offline idle timeout longer than the offline maximum lifetime is refused at the idle timeout", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "tokens"));
+  await page.locator("#refreshTokenOfflineIdleTimeoutInSeconds").fill("7200");
+  await page.locator("#refreshTokenOfflineMaxLifetimeInSeconds").fill("3600");
+  await page.locator("#btnSave").click();
+  await expect(page.locator("#tokens-error")).toContainText("The offline idle timeout can't be longer than the offline maximum lifetime.");
+  await expect(page.locator("#refreshTokenOfflineIdleTimeoutInSeconds")).toHaveAttribute("aria-invalid", "true");
+});
 
 test("a refused save keeps what was typed, both claim choices included", async ({ page, clients }) => {
   const client = await clients.create();
@@ -69,7 +92,7 @@ test("a refused save keeps what was typed, both claim choices included", async (
   await idOn.check();
   await page.locator("#tokenExpirationInSeconds").fill("abc");
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Invalid value for token expiration in seconds.")).toBeVisible();
+  await expect(page.locator("#tokens-error")).toContainText("Enter the token lifetime as a whole number of seconds.");
   await expect(page.locator("#tokenExpirationInSeconds")).toHaveValue("abc");
   await expect(accessOff).toBeChecked();
   await expect(idOn).toBeChecked();

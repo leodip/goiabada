@@ -36,15 +36,15 @@ test("a disabled client is refused at the token endpoint, and works again once e
   await page.goto(clientUrl(client.id, "settings"));
   await page.locator('input[name="enabled"]').uncheck();
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You've disabled the client");
-  await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're disabling the client");
+  await expect(page.getByText("Settings saved.")).toBeVisible();
   const refused = await clientCredentialsToken(request, client.identifier, secret, "authserver:manage-account");
   expect(refused.status).toBeGreaterThanOrEqual(400);
   expect(refused.body.access_token).toBeUndefined();
 
   await page.goto(clientUrl(client.id, "settings"));
   await page.locator('input[name="enabled"]').check();
-  await saveAndExpectSaved(page, "Client settings saved successfully");
+  await saveAndExpectSaved(page, "Settings saved.");
   const again = await clientCredentialsToken(request, client.identifier, secret, "authserver:manage-account");
   expect(again.status, JSON.stringify(again.body)).toBe(200);
 });

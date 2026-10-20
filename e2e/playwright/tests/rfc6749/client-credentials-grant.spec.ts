@@ -34,10 +34,10 @@ test("a public client cannot use the client credentials grant (section 4.4 MUST)
   const client = await clients.create({ authorizationCode: true, clientCredentials: true });
   await grantClientPermission(page, client.id, "authserver", "manage-account");
   await page.goto(clientUrl(client.id, "authentication"));
-  await page.getByRole("radio", { name: "Public client" }).check();
+  await page.getByRole("radio", { name: "Public", exact: true }).check();
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You are switching from confidential to public client");
-  await expect(page.getByText("Client authentication saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're making the client public");
+  await expect(page.getByText("Authentication saved.")).toBeVisible();
 
   const answer = await postToken(request, { grant_type: "client_credentials", scope: "authserver:manage-account", client_id: client.identifier });
   expectTokenError(answer, ["unauthorized_client", "invalid_client"], answer.status === 401 ? 401 : 400);
