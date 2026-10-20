@@ -62,11 +62,7 @@
 </div>
 {{ if or .paginator.HasPrevious .paginator.HasNext }}
 <div class="mt-4 flex justify-end">
-  {{ if $query }}
-  {{ template "paginator" (args .paginator (printf "/admin/users?query=%v" $query) $.ctx) }}
-  {{ else }}
-  {{ template "paginator" (args .paginator "/admin/users" $.ctx) }}
-  {{ end }}
+  {{ template "paginator" (args .paginator .paginatorLink $.ctx) }}
 </div>
 {{ end }}
 {{ else }}

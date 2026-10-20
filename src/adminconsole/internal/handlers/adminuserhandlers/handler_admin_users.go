@@ -3,6 +3,7 @@ package adminuserhandlers
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
@@ -68,8 +69,9 @@ func HandleListGet(
 		p := pagination.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"pageResult": pageResult,
-			"paginator":  p,
+			"pageResult":    pageResult,
+			"paginator":     p,
+			"paginatorLink": usersListLink(query),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users.html", bind)
@@ -78,4 +80,16 @@ func HandleListGet(
 			return
 		}
 	}
+}
+
+// usersListLink is the list's address for a search, the base the paginator adds each page to. The
+// search is encoded here, as a query value: written into the address as typed, a plus-addressed
+// email (ana+test@example.com) was read back as a space from the second page on, and an ampersand
+// or a hash cut the search short.
+func usersListLink(query string) string {
+	const path = "/admin/users"
+	if query == "" {
+		return path
+	}
+	return path + "?" + url.Values{"query": {query}}.Encode()
 }

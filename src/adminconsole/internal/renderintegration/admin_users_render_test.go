@@ -79,7 +79,8 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 			Page:     4,
 			PageSize: 10,
 		},
-		"paginator": pagination.New(73, 10, 4, 5),
+		"paginator":     pagination.New(73, 10, 4, 5),
+		"paginatorLink": "/admin/users",
 	})
 
 	// Page 1 is a link, not dots. Reverting the rule renders "..." here instead.
@@ -103,6 +104,21 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 
 	// The -1 sentinel must never reach addUrlParam: it means "ellipsis", not a page.
 	assert.NotContains(t, out, "page=-1")
+
+	// A search's pages carry the search as the handler encoded it, a plus-addressed email's "+" as
+	// %2B, so the next page searches for the same address rather than for one with a space in it.
+	searched := renderMenuPage(t, "/admin_users.html", map[string]interface{}{
+		"pageResult": adminuserhandlers.PageResult{
+			Users:    []api.UserResponse{{Id: 1, Username: "ana", Email: "ana+test@example.com"}},
+			Total:    23,
+			Query:    "ana+test@example.com",
+			Page:     1,
+			PageSize: 10,
+		},
+		"paginator":     pagination.New(23, 10, 1, 5),
+		"paginatorLink": "/admin/users?query=ana%2Btest%40example.com",
+	})
+	assert.Contains(t, searched, `href="/admin/users?page=2&amp;query=ana%2Btest%40example.com"`)
 }
 
 // The two admin user pages that read a timestamp and a full name off the bind. Neither was covered
