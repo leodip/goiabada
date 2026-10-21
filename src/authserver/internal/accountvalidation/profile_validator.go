@@ -6,7 +6,9 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -62,8 +64,7 @@ var (
 	// nameHasLetter requires at least one letter, so a value made up entirely of
 	// spaces, apostrophes or hyphens is rejected.
 	nameHasLetter = regexp.MustCompile(`\p{L}`)
-	// usernameShape is a letter, then 1 to 23 letters, digits or underscores. The nickname is held
-	// to the same shape.
+	// usernameShape is a letter, then 1 to 23 letters, digits or underscores.
 	usernameShape = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{1,23}$`)
 	// websiteShape is an optional http or https scheme, a host of dot-separated labels ending in
 	// two or more letters, and an optional path.
@@ -169,9 +170,25 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		return err
 	}
 
-	if len(input.Nickname) > 0 {
-		if !usernameShape.MatchString(input.Nickname) {
+	// The nickname is the OIDC nickname claim, a casual name that may or may not be the
+	// given name's: "Amazing Grace", "Dr. G", "Jean-Luc". So it is free text rather than
+	// a username's shape, whose claim is preferred_username, and which the username field
+	// fills (#632 item 4). Free text still refuses what no field a person types takes: a
+	// bound, here the name fields' own, in the UTF-16 code units every text bound measures
+	// in; the control characters that would put a line break in a single-line value; and
+	// the angle brackets decision 3 of #275 refuses rather than strips, since nothing
+	// sanitizes and an accepted nickname is stored exactly as it was sent.
+	if input.Nickname != "" {
+		if inputvalidation.TextLength(input.Nickname) > nameMaxLength {
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileNicknameTooLong, map[string]any{"max": nameMaxLength})
+		}
+
+		if strings.ContainsFunc(input.Nickname, unicode.IsControl) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileNicknameInvalid, nil)
+		}
+
+		if err := ValidateNoAngleBrackets(input.Nickname, i18n.ErrCodeProfileNicknameAngleBrackets); err != nil {
+			return err
 		}
 	}
 

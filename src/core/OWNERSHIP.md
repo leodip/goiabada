@@ -466,7 +466,9 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeProfileGivenNameInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileLocaleInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileMiddleNameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileNicknameAngleBrackets` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileNicknameInvalid` | both-apps | — |
+| `core/i18n` | `ErrCodeProfileNicknameTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileUsernameInvalid` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileUsernameTaken` | both-apps | — |
 | `core/i18n` | `ErrCodeProfileWebsiteInvalid` | both-apps | — |

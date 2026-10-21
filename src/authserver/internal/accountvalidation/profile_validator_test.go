@@ -45,9 +45,9 @@ func assertLocalizedError(t *testing.T, err error, expectedCode string, expected
 // repeated on every row; a code reaching a table without an entry here asserts
 // against the empty string and fails.
 //
-// validator.profile.website_too_long is absent deliberately: it is the one
-// profile message carrying an argument, so its sentence is asserted at the call
-// site that knows the limit.
+// validator.profile.website_too_long and validator.profile.nickname_too_long are absent
+// deliberately: they are the profile messages carrying an argument, so their sentences
+// are asserted at the call site that knows the limit.
 var profileErrorMessages = map[string]string{
 	i18n.ErrCodeProfileGivenNameInvalid: "Please enter a valid given name. It should contain only letters, " +
 		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
@@ -57,15 +57,16 @@ var profileErrorMessages = map[string]string{
 		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
 	i18n.ErrCodeProfileUsernameInvalid: "Usernames must start with a letter and consist only of letters, " +
 		"numbers, and underscores. They must be between 2 and 24 characters long.",
-	i18n.ErrCodeProfileNicknameInvalid: "Nicknames must start with a letter and consist only of letters, " +
-		"numbers, and underscores. They must be between 2 and 24 characters long.",
-	i18n.ErrCodeProfileUsernameTaken:    "Sorry, this username is already taken.",
-	i18n.ErrCodeProfileWebsiteInvalid:   "Please enter a valid website URL.",
-	i18n.ErrCodeProfileGenderInvalid:    "Gender is invalid.",
-	i18n.ErrCodeProfileDobInvalidFormat: "The date of birth is invalid. Please use the format YYYY-MM-DD.",
-	i18n.ErrCodeProfileDobInFuture:      "The date of birth can't be in the future.",
-	i18n.ErrCodeProfileZoneInfoInvalid:  "Unknown time zone.",
-	i18n.ErrCodeProfileLocaleInvalid:    "Unknown language and region.",
+	i18n.ErrCodeProfileNicknameInvalid: "Nicknames cannot contain control characters, such as " +
+		"tabs or line breaks.",
+	i18n.ErrCodeProfileNicknameAngleBrackets: "The nickname cannot contain the characters < or >.",
+	i18n.ErrCodeProfileUsernameTaken:         "Sorry, this username is already taken.",
+	i18n.ErrCodeProfileWebsiteInvalid:        "Please enter a valid website URL.",
+	i18n.ErrCodeProfileGenderInvalid:         "Gender is invalid.",
+	i18n.ErrCodeProfileDobInvalidFormat:      "The date of birth is invalid. Please use the format YYYY-MM-DD.",
+	i18n.ErrCodeProfileDobInFuture:           "The date of birth can't be in the future.",
+	i18n.ErrCodeProfileZoneInfoInvalid:       "Unknown time zone.",
+	i18n.ErrCodeProfileLocaleInvalid:         "Unknown language and region.",
 }
 
 // =============================================================================
@@ -464,7 +465,11 @@ func TestValidateProfile_ValidNamesPass(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// The nickname uses the same pattern as the username.
+// The nickname is the OIDC nickname claim, a casual name that may or may not be the
+// given name's (#632 item 4), so the value it stores is free text — "Amazing Grace",
+// "Dr. G", "Jean-Luc", "D'Arcy", letters of any script — rather than a username's
+// shape: preferred_username is the claim with a username's shape, and the username
+// field fills it.
 func TestValidateProfile_Nickname(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -473,17 +478,22 @@ func TestValidateProfile_Nickname(t *testing.T) {
 	}{
 		{"valid", "jd", ""},
 		{"with digits and underscore", "jd_2", ""},
-		{"24 characters", "j" + strings.Repeat("a", 23), ""},
-		{"too short", "j", i18n.ErrCodeProfileNicknameInvalid},
-		{"too long", "j" + strings.Repeat("a", 24), i18n.ErrCodeProfileNicknameInvalid},
-		{"leading digit", "2jd", i18n.ErrCodeProfileNicknameInvalid},
-		{"hyphen", "j-d", i18n.ErrCodeProfileNicknameInvalid},
-		{"space", "j d", i18n.ErrCodeProfileNicknameInvalid},
+		{"one character", "j", ""},
+		{"leading digit", "2jd", ""},
+		{"a space", "Amazing Grace", ""},
+		{"a dot", "Dr. G", ""},
+		{"a hyphen", "Jean-Luc", ""},
+		{"an apostrophe", "D'Arcy", ""},
+		{"letters beyond ASCII", "미키", ""},
+		{"48 characters", "j" + strings.Repeat("a", 47), ""},
+		{"the bound in UTF-16 code units, not characters", strings.Repeat("🙂", 24), ""},
 		{"empty is allowed", "", ""},
-		// Decision 3 of #275: the nickname pattern is the only guard against
-		// markup here once nothing sanitizes.
-		{"pins decision 3 of #275: no less-than", "ni<ck", i18n.ErrCodeProfileNicknameInvalid},
-		{"pins decision 3 of #275: no greater-than", "ni>ck", i18n.ErrCodeProfileNicknameInvalid},
+		{"a control character: a tab", "ni	ck", i18n.ErrCodeProfileNicknameInvalid},
+		{"a control character: a line break", "ni\nck", i18n.ErrCodeProfileNicknameInvalid},
+		// Decision 3 of #275: with the username's pattern gone, the angle-bracket
+		// rule is the only guard against markup here once nothing sanitizes.
+		{"pins decision 3 of #275: no less-than", "ni<ck", i18n.ErrCodeProfileNicknameAngleBrackets},
+		{"pins decision 3 of #275: no greater-than", "ni>ck", i18n.ErrCodeProfileNicknameAngleBrackets},
 	}
 
 	for _, tc := range testCases {
@@ -499,6 +509,29 @@ func TestValidateProfile_Nickname(t *testing.T) {
 			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
+}
+
+// The nickname shares the name fields' bound, 48, measured in the UTF-16 code units
+// every text bound uses, so a character outside the Basic Multilingual Plane counts
+// two and reaches the bound in half as many characters.
+func TestValidateProfile_NicknameTooLong(t *testing.T) {
+	validator := NewProfileValidator(datamocks.NewDatabase(t))
+
+	// 49 characters.
+	longNickname := "j" + strings.Repeat("a", 48)
+
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Nickname: longNickname})
+
+	assertLocalizedError(t, err, i18n.ErrCodeProfileNicknameTooLong,
+		"Please ensure the nickname is no longer than 48 characters.")
+
+	// 25 characters, 50 UTF-16 code units.
+	longNickname = strings.Repeat("🙂", 25)
+
+	err = validator.ValidateProfile(context.Background(), &ValidateProfileInput{Nickname: longNickname})
+
+	assertLocalizedError(t, err, i18n.ErrCodeProfileNicknameTooLong,
+		"Please ensure the nickname is no longer than 48 characters.")
 }
 
 func TestValidateProfile_Website(t *testing.T) {
