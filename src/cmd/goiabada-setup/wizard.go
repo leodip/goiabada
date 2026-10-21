@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/issuerlength"
 )
 
 // wizard fills a Config one step at a time, from the prompts or, when --type was given, from the
@@ -280,7 +281,7 @@ func (w *wizard) askURLs() error {
 	if !w.interactive {
 		return w.urlsFromFlags()
 	}
-	authServerURL, err := w.askURL("Auth server URL (e.g., https://auth.example.com)", "https://auth.example.com")
+	authServerURL, err := w.askURL("Auth server URL (e.g., https://auth.example.com)", "https://auth.example.com", w.checkAuthURL)
 	if err != nil {
 		return err
 	}
@@ -303,7 +304,7 @@ func (w *wizard) askURLs() error {
 		if !keep {
 			w.out.println()
 			w.out.println("Please re-enter the URLs:")
-			if authServerURL, err = w.askURL("Auth server URL", authServerURL); err != nil {
+			if authServerURL, err = w.askURL("Auth server URL", authServerURL, w.checkAuthURL); err != nil {
 				return err
 			}
 			if adminConsoleURL, err = w.askAdminURL("Admin console URL", authServerURL); err != nil {
@@ -329,6 +330,16 @@ func (w *wizard) checkURL(value string) error {
 	return nil
 }
 
+// checkAuthURL is checkURL, and the issuer's length as well: the first start seeds the auth server
+// URL as the issuer, and the auth server refuses to start on one longer than the issuer allows, so
+// the wizard writes none (#615).
+func (w *wizard) checkAuthURL(value string) error {
+	if err := w.checkURL(value); err != nil {
+		return err
+	}
+	return issuerlength.Check(value)
+}
+
 // checkDistinctHosts refuses, for a deployment that routes by host, an admin console URL on the
 // auth server's host. Two Gateway listeners on one port and hostname are indistinct, and "ALL
 // indistinct Listeners must not be accepted for processing" (Gateway API v1.6.1,
@@ -340,11 +351,11 @@ func (w *wizard) checkDistinctHosts(authServerURL, adminConsoleURL string) error
 	return nil
 }
 
-// askURL asks until the answer passes checkURL, and asks again when a plain-HTTP URL other than
+// askURL asks until the answer passes check, and asks again when a plain-HTTP URL other than
 // localhost is not confirmed.
-func (w *wizard) askURL(prompt, defaultValue string) (string, error) {
+func (w *wizard) askURL(prompt, defaultValue string, check func(string) error) (string, error) {
 	for {
-		value, err := w.validated(prompt, defaultValue, "URL", w.checkURL)
+		value, err := w.validated(prompt, defaultValue, "URL", check)
 		if err != nil || !strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "http://localhost") {
 			return value, err
 		}
@@ -361,7 +372,7 @@ func (w *wizard) askURL(prompt, defaultValue string) (string, error) {
 func (w *wizard) askAdminURL(prompt, authServerURL string) (string, error) {
 	defaultURL, _ := defaultAdminURL(authServerURL)
 	for {
-		adminConsoleURL, err := w.askURL(prompt, defaultURL)
+		adminConsoleURL, err := w.askURL(prompt, defaultURL, w.checkURL)
 		if err != nil {
 			return "", err
 		}
@@ -379,7 +390,7 @@ func (w *wizard) urlsFromFlags() error {
 	if authServerURL == "" {
 		return errs.New("--auth-url is required for production/kubernetes/native deployments")
 	}
-	if err := w.checkURL(authServerURL); err != nil {
+	if err := w.checkAuthURL(authServerURL); err != nil {
 		return errs.Wrap(err, "invalid auth URL")
 	}
 	if strings.HasPrefix(authServerURL, "http://") {

@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/issuerlength"
 )
 
 // HandleSettingsGeneralGet - GET /api/v1/admin/settings/general
@@ -87,8 +88,8 @@ func HandleSettingsGeneralPut(
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerURIInvalid, nil))
 			return
 		}
-		if inputvalidation.TextLength(issuer) > oidc.IssuerMaxLength {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": oidc.IssuerMaxLength}))
+		if issuerlength.Check(issuer) != nil {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralIssuerTooLong, map[string]any{"max": issuerlength.Max}))
 			return
 		}
 		// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of

@@ -108,6 +108,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/httpmw` | kernel | — |
 | `core/i18n` | kernel | — |
 | `core/inputvalidation` | kernel | — |
+| `core/issuerlength` | kernel | — |
 | `core/internal` | kernel | — |
 | `core/locales` | kernel | — |
 | `core/localzone` | kernel | — |
@@ -175,6 +176,12 @@ Notes on rows that are not self-evident:
   tests of every package the wizard imports, and a test in `core/adminpassword` importing
   `core/guard` put chi and TOML in the wizard's `go.sum`. `AssertNoGuardInTestsReachedFrom` refuses
   any test the wizard reaches that does so (#500).
+- `core/issuerlength` is kernel for `core/adminpassword`'s reason: the auth server's start holds the
+  base URL to the issuer's length, since the first start seeds it as the issuer, the general settings
+  save holds every issuer to it, and the setup wizard holds the auth server URL it writes to it, so a
+  URL the wizard writes is one the start accepts and the save keeps. `inputvalidation.TextLength`
+  counts the same unit, but the wizard cannot link that package, so the leaf counts it itself, and
+  `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs` and the standard library (#615).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are

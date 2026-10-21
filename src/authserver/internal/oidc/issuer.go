@@ -6,13 +6,6 @@ import (
 	"unicode"
 )
 
-// IssuerMaxLength is the longest issuer, in the UTF-16 code units inputvalidation.TextLength
-// counts: the length the general settings save holds every issuer to, the stored one included,
-// and the start holds the base URL to, since the first start seeds the base URL as the issuer and
-// no General setting could then be saved around a longer one (#615). It sits under the 64 of the
-// settings row's issuer column, VARCHAR(64) on every engine, which stores what passes.
-const IssuerMaxLength = 60
-
 // IssuerIsAcceptable is the issuer rule, the one the general settings save applies to a changed
 // issuer and the start applies to the stored one (#576 decisions 3 and 4). It accepts an https URL
 // naming a host, with no query or fragment, which is what RFC 8414 section 2, RFC 9207 section 2

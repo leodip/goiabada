@@ -134,7 +134,7 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 |---|---|
 | `--type` | The deployment: `local`, `production`, `kubernetes` or `native`. Giving it turns off the questions. |
 | `--db` | The database: `mysql`, `postgres`, `mssql` or `sqlite`. Required with `--type`. |
-| `--auth-url` | The auth server's URL. Required with `--type`, except for `local`. |
+| `--auth-url` | The auth server's URL, at most 60 characters, since the first start makes it the issuer and the auth server refuses to start on a longer one. Required with `--type`, except for `local`. |
 | `--admin-url` | The admin console's URL. Default: `https://admin.` and the auth server's domain, so `https://admin.example.com` for `https://auth.example.com`. Required when the auth server's host is an IP address or a single word. |
 | `--namespace` | Kubernetes: the namespace. Default: `goiabada`. |
 | `--admin-email` | The first administrator's email. Default: `admin@example.com` for `local`, otherwise `admin@` and the auth server's domain. Required when the auth server's host is an IP address or a single word. |

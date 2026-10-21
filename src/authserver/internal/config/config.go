@@ -22,10 +22,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/httpmw"
-	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/issuerlength"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -341,9 +340,9 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	// the parse left whichever side supplied it: the general settings save holds every issuer to
 	// the limit, the stored one included, so a base URL past it would leave an installation whose
 	// General settings can never be saved (#615).
-	if inputvalidation.TextLength(c.AuthServer.BaseURL) > oidc.IssuerMaxLength {
+	if issuerlength.Check(c.AuthServer.BaseURL) != nil {
 		malformed.addLine("GOIABADA_AUTHSERVER_BASEURL (--authserver-baseurl) is " + strconv.Quote(c.AuthServer.BaseURL) +
-			", longer than the issuer allows: at most " + strconv.Itoa(oidc.IssuerMaxLength) + " characters")
+			", longer than the issuer allows: at most " + strconv.Itoa(issuerlength.Max) + " characters")
 	}
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag

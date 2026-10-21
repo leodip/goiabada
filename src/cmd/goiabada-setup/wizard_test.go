@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -662,6 +663,73 @@ func TestWizard_OnlyKubernetesHoldsTheHostsToTheListenerRule(t *testing.T) {
 	}
 }
 
+// The first start seeds the auth server URL as the issuer and refuses to start on one longer than
+// the issuer allows, so the wizard writes one at the limit, 60 characters, as it writes any other
+// (#615). The refusal past it is in TestWizard_NonInteractiveRefusals and
+// TestWizard_InteractiveAuthURLPastTheIssuersLengthIsAskedAgain.
+func TestWizard_AnAuthURLAtTheIssuersLengthIsWritten(t *testing.T) {
+	for name, url := range map[string]string{
+		"60 ASCII characters":       "https://auth.example.org/" + strings.Repeat("a", 35),
+		"60 code units in 64 bytes": "https://auth.example.org/" + strings.Repeat("a", 31) + "\U0001F600\U0001F600",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if n := len(utf16.Encode([]rune(url))); n != 60 {
+				t.Fatalf("the URL is %d UTF-16 code units, want 60", n)
+			}
+			flags := CLIFlags{DeploymentType: "native", DBType: "sqlite", AuthServerURL: url}
+			w, _, out, _ := testWizard(t, &flags, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			written, err := os.ReadFile(w.paths.description)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(written), url) {
+				t.Errorf("%s does not carry the auth URL %q:\n%s", w.paths.description, url, written)
+			}
+		})
+	}
+}
+
+// Only the auth server URL becomes the issuer, so the admin console URL is not held to its length.
+func TestWizard_TheAdminURLIsNotHeldToTheIssuersLength(t *testing.T) {
+	admin := "https://admin.example.org/" + strings.Repeat("a", 54)
+	flags := CLIFlags{DeploymentType: "native", DBType: "sqlite", AuthServerURL: "https://auth.example.org", AdminConsoleURL: admin}
+	w, _, out, _ := testWizard(t, &flags, nil)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if w.config.AdminConsoleURL != admin {
+		t.Errorf("admin URL %q, want %q", w.config.AdminConsoleURL, admin)
+	}
+}
+
+// At the prompt, an auth server URL longer than the issuer allows is named and asked for again,
+// rather than written for a first start that would refuse it (#615).
+func TestWizard_InteractiveAuthURLPastTheIssuersLengthIsAskedAgain(t *testing.T) {
+	d, e := deployments[deploymentProduction], testEngine("sqlite")
+	authPrompt := "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: "
+	steps := replaceURLSteps(t, interactiveScript(d, e),
+		scriptedStep{prompt: authPrompt, answer: "https://auth.example.org/" + strings.Repeat("a", 36)},
+		scriptedStep{prompt: authPrompt, answer: "https://auth.example.org/" + strings.Repeat("a", 34) + "\U0001F600"},
+		scriptedStep{prompt: authPrompt, answer: "https://auth.example.org"},
+		scriptedStep{prompt: "Admin console URL (e.g., https://admin.example.com) [https://admin.example.org]: ", answer: ""},
+	)
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if c := w.config; c.AuthServerURL != "https://auth.example.org" {
+		t.Errorf("auth URL %q", c.AuthServerURL)
+	}
+	line := "Invalid URL: it is 61 characters long, and the issuer allows at most 60 characters. Please try again."
+	if got := strings.Count(out.String(), line); got != 2 {
+		t.Errorf("output names the refusal %d times, want 2:\n%s", got, out)
+	}
+}
+
 // replaceURLSteps swaps the two URL reads of an interactive script for the ones given.
 func replaceURLSteps(t *testing.T, steps []scriptedStep, urlSteps ...scriptedStep) []scriptedStep {
 	t.Helper()
@@ -844,6 +912,12 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"no admin email for a single-label host": {native(func(f *CLIFlags) {
 			f.AuthServerURL, f.AdminConsoleURL = "https://goiabada:9090", "https://goiabada:9091"
 		}), "--admin-email is required"},
+		// The first start seeds the auth server URL as the issuer and refuses to start on one longer
+		// than the issuer allows, 60 UTF-16 code units, so the wizard writes none (#615).
+		"an auth URL longer than the issuer allows": {native(func(f *CLIFlags) { f.AuthServerURL = "https://auth.example.org/" + strings.Repeat("a", 36) }), "invalid auth URL: it is 61 characters long, and the issuer allows at most 60 characters"},
+		"an auth URL past the issuer's length in code units": {native(func(f *CLIFlags) {
+			f.AuthServerURL = "https://auth.example.org/" + strings.Repeat("a", 34) + "\U0001F600"
+		}), "invalid auth URL: it is 61 characters long"},
 		"an auth URL carrying userinfo": {native(func(f *CLIFlags) { f.AuthServerURL = "https://auth.example.org:x@evil.com/" }), "invalid auth URL: URL cannot carry a user name or password"},
 		// Kubernetes routes and certifies each URL by its host, which a Gateway listener must be able
 		// to carry, one host per listener (#430).

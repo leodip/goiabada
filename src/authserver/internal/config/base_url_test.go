@@ -8,6 +8,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func baseURLOf(n int) string {
 	return "https://auth." + strings.Repeat("a", n-len("https://auth.")-len(".example.com")) + ".example.com"
 }
 
-func TestLoad_ABASURLongerThanTheIssuerAllowsIsRefused(t *testing.T) {
+func TestLoad_ABaseURLLongerThanTheIssuerAllowsIsRefused(t *testing.T) {
 	// An astral character counts two in the length the save measures and four in bytes, so this
 	// URL is exactly the limit the way the save counts it and past it in bytes: verified here, so
 	// the literals cannot drift from the divergence the case exists for.
@@ -29,6 +30,12 @@ func TestLoad_ABASURLongerThanTheIssuerAllowsIsRefused(t *testing.T) {
 		"\U0001F600\U0001F600.example.com"
 	require.Equal(t, 60, inputvalidation.TextLength(astral))
 	require.Len(t, astral, 64)
+	// And this one is one unit past the limit while at it in code points, so a start counting code
+	// points would accept a URL whose seeded issuer the save refuses on every save (#615).
+	astralPast := "https://auth.example.com/" + strings.Repeat("a", 34) + "\U0001F600"
+	require.Equal(t, 61, inputvalidation.TextLength(astralPast))
+	require.Equal(t, 60, utf8.RuneCountInString(astralPast))
+	require.Len(t, astralPast, 63)
 
 	tests := []struct {
 		name  string
@@ -54,6 +61,12 @@ func TestLoad_ABASURLongerThanTheIssuerAllowsIsRefused(t *testing.T) {
 			value: baseURLOf(61),
 			args:  []string{"migrate", "to"},
 			want: `malformed configuration: GOIABADA_AUTHSERVER_BASEURL (--authserver-baseurl) is "` + baseURLOf(61) +
+				`", longer than the issuer allows: at most 60 characters`,
+		},
+		{
+			name:  "one unit past the limit in sixty code points, an astral character counting two",
+			value: astralPast,
+			want: `malformed configuration: GOIABADA_AUTHSERVER_BASEURL (--authserver-baseurl) is "` + astralPast +
 				`", longer than the issuer allows: at most 60 characters`,
 		},
 		{
