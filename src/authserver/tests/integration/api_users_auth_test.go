@@ -93,7 +93,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 	}{
 		{"empty password", ""},
 		{"too short password", "123"},
-		{"too long password", strings.Repeat("a", 65)}, // Over 64 char limit
+		{"too long password", strings.Repeat("a", passwordhash.MaxPasswordBytes+1)}, // One past bcrypt's bound, the cap every password form applies
 	}
 
 	for _, tc := range testCases {
