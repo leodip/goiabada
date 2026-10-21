@@ -577,6 +577,8 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `SelectedNames` | kernel | — |
 | `core/internal/refgraph` | `TableUnder` | kernel | — |
 | `core/internal/refgraph` | `Unparen` | kernel | — |
+| `core/issuerlength` | `Check` | contract | The one bound on an issuer's length. The setup wizard, which is not one of the two applications, writes the auth server URL the first start seeds as the issuer, and the auth server refuses to start on one longer than the general settings save would keep, so the bound is defined once here for the start, the save and the wizard rather than copied into each (#615). |
+| `core/issuerlength` | `Max` | contract | The bound `Check` holds an issuer to, which the start's refusal and the general settings save's message name to the operator, so each says the number the bound holds rather than a copy of it (#615). |
 | `core/locales` | `All` | contract | The list half of the locale table whose lookup the auth server validates against. Moving it would put one locale list in two places. |
 | `core/locales` | `ByID` | contract | The lookup half of the locale table whose list the admin console renders. Moving it would put one locale list in two places. |
 | `core/locales` | `Locale` | contract | The row type both halves of the table share. |
