@@ -67,7 +67,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				store := new(sessionstoremocks.Store)
 				store.On("Get", mock.Anything, sessionName).Return(nil, assert.AnError)
 
-				m := NewJWT(store, sessionName, new(middlewaremocks.TokenParser), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, nil, sessionName, new(middlewaremocks.TokenParser), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.SessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -81,7 +81,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 					Values: map[string]any{sessionkeys.JWT: "not a token response"},
 				}, nil)
 
-				m := NewJWT(store, sessionName, new(middlewaremocks.TokenParser), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, nil, sessionName, new(middlewaremocks.TokenParser), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.SessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -100,7 +100,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-				m := NewJWT(store, sessionName, middlewaremocks.NewTokenParser(t), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, nil, sessionName, middlewaremocks.NewTokenParser(t), nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				return m.SessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
@@ -122,7 +122,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				parser.On("DecodeAndValidateStoredIDToken", mock.Anything, "foreign").
 					Return(nil, errs.Wrap(oauthclient.ErrForeignToken, "the id token's iss is another"))
 
-				m := NewJWT(store, sessionName, parser, nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
+				m := NewJWT(store, nil, sessionName, parser, nil, new(middlewaremocks.AuthHelper), rec, "http://localhost:9091", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -142,7 +142,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 					builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
-				m := NewJWT(new(sessionstoremocks.Store), sessionName, new(middlewaremocks.TokenParser), nil, helper, rec, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+				m := NewJWT(new(sessionstoremocks.Store), nil, sessionName, new(middlewaremocks.TokenParser), nil, helper, rec, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
