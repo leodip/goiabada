@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -52,7 +53,9 @@ const (
 //
 // inOrder, when set, answers the first calls one scripted grant each, in order, and the single
 // answer and error after them — the auth server's strict rotation as the #621 tests present it,
-// where the first presentation of a refresh token claims it and the second is refused.
+// where the first presentation of a refresh token claims it and the second is refused. The fake
+// holds its own lock only to record and to pick the answer, never across during, so two grants
+// can be in flight at once: whatever serializes them is the middleware's (#621).
 type fakeRefresher struct {
 	answer  *oauth.TokenResponse
 	err     error
@@ -74,13 +77,16 @@ type scriptedGrant struct {
 
 func (f *fakeRefresher) Refresh(ctx context.Context, refreshToken string) (*oauth.TokenResponse, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.calls++
 	f.refreshToken = refreshToken
 	f.requestID = chimiddleware.GetReqID(ctx)
-	if f.during != nil {
-		f.during()
+	during := f.during
+	f.mu.Unlock()
+	if during != nil {
+		during()
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.returnedAt = time.Now()
 	if len(f.inOrder) > 0 {
 		next := f.inOrder[0]
@@ -106,14 +112,18 @@ func (f *fakeRefresher) sent() (int, string) {
 
 // contextHonouringBackend is the memory backend refusing a call on a context that is done, which is
 // what the console's real backend, an HTTP call to the auth server, does. It records the context of
-// every write, so a case can read what the write was handed, and counts every load, which the #621
-// race test holds a grant on until both requests have read the session.
+// every load and every write, so a case can read what each was handed. loadFault, when set, is
+// asked before each load with its number, counting from 1, and a non-nil answer fails that load,
+// a lookup that could not be performed; beforeUpdate, when set, runs before each update, which is
+// where a case holds a save (#621).
 type contextHonouringBackend struct {
 	*sessiontest.MemoryBackend
 
-	mu     sync.Mutex
-	writes []observedContext
-	loads  int
+	mu           sync.Mutex
+	writes       []observedContext
+	loads        []observedContext
+	loadFault    func(n int) error
+	beforeUpdate func()
 }
 
 // observedContext is what a context looked like at the moment it was handed over.
@@ -131,20 +141,26 @@ func observe(ctx context.Context) observedContext {
 }
 
 func (b *contextHonouringBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	b.mu.Lock()
+	b.loads = append(b.loads, observe(ctx))
+	n, fault := len(b.loads), b.loadFault
+	b.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	b.mu.Lock()
-	b.loads++
-	b.mu.Unlock()
+	if fault != nil {
+		if err := fault(n); err != nil {
+			return nil, err
+		}
+	}
 	return b.MemoryBackend.Load(ctx, id)
 }
 
-// loadsCount is how many loads the backend has answered.
-func (b *contextHonouringBackend) loadsCount() int {
+// recordedLoads is the context of every load the backend was asked for, in order.
+func (b *contextHonouringBackend) recordedLoads() []observedContext {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.loads
+	return append([]observedContext(nil), b.loads...)
 }
 
 func (b *contextHonouringBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
@@ -156,6 +172,12 @@ func (b *contextHonouringBackend) Create(ctx context.Context, id string, data []
 }
 
 func (b *contextHonouringBackend) Update(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.mu.Lock()
+	before := b.beforeUpdate
+	b.mu.Unlock()
+	if before != nil {
+		before()
+	}
 	b.record(ctx)
 	if err := ctx.Err(); err != nil {
 		return time.Time{}, err
@@ -195,6 +217,7 @@ type sessionHarness struct {
 	backend   *contextHonouringBackend
 	parser    *middlewaremocks.TokenParser
 	refresher *fakeRefresher
+	errorPage *recordingErrorRenderer
 	logs      *logtest.SlogCapture
 }
 
@@ -214,6 +237,7 @@ func newSessionHarness(t *testing.T) *sessionHarness {
 		backend:   backend,
 		parser:    middlewaremocks.NewTokenParser(t),
 		refresher: &fakeRefresher{},
+		errorPage: &recordingErrorRenderer{},
 		logs:      logtest.CaptureSlog(t),
 	}
 }
@@ -270,12 +294,22 @@ func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookie
 // per-session refresh lock it holds is the serialization under test.
 func (h *sessionHarness) middleware(parser tokenParser) *JWT {
 	h.t.Helper()
-	return NewJWT(h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
-		stubErrorRenderer{}, "http://console.example", "admin-console-client")
+	return NewJWT(h.store, h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
+		h.errorPage, "http://console.example", "admin-console-client")
 }
 
 // serveThrough sends one request carrying cookies through m, on ctx, the browser's own context.
 func (h *sessionHarness) serveThrough(ctx context.Context, m *JWT, cookies []*http.Cookie) served {
+	h.t.Helper()
+	return h.serveChain(ctx, m, cookies, nil)
+}
+
+// serveChain sends one request carrying cookies through m as the console mounts it, below
+// CookieReset, whose Get loads the session the whole request then shares (#269), and on to a
+// page that, when then is set, runs it after recording what reached it: what a handler further
+// down does with the session, such as saving a flash.
+func (h *sessionHarness) serveChain(ctx context.Context, m *JWT, cookies []*http.Cookie,
+	then func(w http.ResponseWriter, r *http.Request)) served {
 	h.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil).WithContext(ctx)
 	for _, c := range cookies {
@@ -283,12 +317,16 @@ func (h *sessionHarness) serveThrough(ctx context.Context, m *JWT, cookies []*ht
 	}
 	var out served
 	out.recorder = httptest.NewRecorder()
-	m.SessionHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	page := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out.reached = true
 		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 			out.jwtInfo = &jwtInfo
 		}
-	})).ServeHTTP(out.recorder, req)
+		if then != nil {
+			then(w, r)
+		}
+	})
+	httpmw.CookieReset(h.store, sessionTestName)(m.SessionHandler()(page)).ServeHTTP(out.recorder, req)
 	return out
 }
 

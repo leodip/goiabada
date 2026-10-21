@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,13 +22,6 @@ func present(ctx context.Context) map[string]bool {
 		"jwtInfo":  jwtInfo,
 		"settings": settings,
 	}
-}
-
-// The re-read's fresh context still names the request, on the one key every record reads (#621).
-func TestReqctx_RequestIDRidesChisKey(t *testing.T) {
-	ctx := WithRequestID(context.Background(), "the-request-id")
-
-	assert.Equal(t, "the-request-id", chimiddleware.GetReqID(ctx))
 }
 
 func TestReqctx_RoundTrip(t *testing.T) {

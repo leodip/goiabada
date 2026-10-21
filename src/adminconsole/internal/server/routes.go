@@ -45,6 +45,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// Initialize middleware
 	middlewareJwt := middleware.NewJWT(
 		s.sessionStore,
+		s.sessionStore,
 		builtin.AdminConsoleSessionName,
 		tokenParser,
 		tokenClient,
