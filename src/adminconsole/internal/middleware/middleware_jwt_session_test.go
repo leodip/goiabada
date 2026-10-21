@@ -628,6 +628,41 @@ func TestSessionHandler_UsesTheStoredTokensUntilTheyAreDue(t *testing.T) {
 	}
 }
 
+// Step 4 reads the stored set's own lifetime, as the check under the lock does: a set of 20
+// seconds with 15 left is inside the flat 30-second margin but not half its lifetime, so it is not
+// due, and the request takes no lock, re-reads nothing and verifies the ID token once. Read with
+// the flat margin, every request in the second half of a short-lived set's life would queue on the
+// session's lock for a re-read the check under it then answers by carrying the set.
+func TestSessionHandler_AShortLivedSetIsNotDueBeforeHalfItsLifetime(t *testing.T) {
+	h := newSessionHarness(t)
+	shortLived := storedResponse()
+	shortLived.ExpiresIn = 20
+	expiresAt := time.Now().Add(15 * time.Second).Unix()
+	cookies := h.seed(map[string]any{
+		sessionkeys.JWT:          shortLived,
+		sessionkeys.JWTExpiresAt: expiresAt,
+		"unrelated":              "kept",
+	})
+	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil).Once()
+	loadsBefore, writesBefore := len(h.backend.recordedLoads()), len(h.backend.recordedWrites())
+
+	out := h.serve(h.parser, cookies)
+
+	assert.True(t, out.reached)
+	require.NotNil(t, out.jwtInfo, "the administrator is signed in")
+	assert.Equal(t, shortLived, out.jwtInfo.TokenResponse)
+	assert.Same(t, verifiedStored, out.jwtInfo.IdToken, "the ID token the parser verified")
+	h.assertNoRefreshSent()
+	assert.Empty(t, h.backend.recordedWrites()[writesBefore:], "the session is not written")
+	assert.Empty(t, out.recorder.Result().Cookies(), "nor its cookie")
+	assert.Len(t, h.backend.recordedLoads()[loadsBefore:], 1, "the request's own load, and no re-read under the lock")
+	assert.Empty(t, h.logs.Records(), h.logs.Text())
+
+	sess := h.readBack(cookies)
+	assert.Equal(t, shortLived, sess.Values[sessionkeys.JWT])
+	assert.Equal(t, expiresAt, sess.Values[sessionkeys.JWTExpiresAt])
+}
+
 // expectRefreshValidation answers the refresh response's validation with accepted or refused and
 // records, at the moment the parser is asked, what the session held: anything the middleware
 // stored before validating would show there.
