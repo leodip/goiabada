@@ -98,7 +98,8 @@ func HandleUserSessionsGet(
 		}
 
 		sort.Slice(sessionInfoArr, func(i, j int) bool {
-			return sessionInfoArr[i].UserSessionId > sessionInfoArr[j].UserSessionId
+			a, b := sessionInfoArr[i], sessionInfoArr[j]
+			return render.SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionId, b.IsCurrent, b.LastAccessed, b.UserSessionId)
 		})
 
 		bind := map[string]interface{}{

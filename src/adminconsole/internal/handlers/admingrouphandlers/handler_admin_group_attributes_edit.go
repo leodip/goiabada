@@ -169,12 +169,13 @@ func HandleAttributesEditPost(
 		tempAttribute.IncludeInAccessToken = includeInAccessToken
 		tempAttribute.IncludeInIdToken = includeInIdToken
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"group":           group,
 				"attribute":       &tempAttribute,
 				"storedAttribute": currentAttribute,
 				"error":           message,
+				"errorField":      errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_edit.html", bind)
@@ -193,7 +194,9 @@ func HandleAttributesEditPost(
 
 		_, err = apiClient.UpdateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, render.AttributeErrorFields))
+			})
 			return
 		}
 

@@ -1,369 +1,151 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}{{.storedClient.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.settings.page_title_prefix" }}<span class="text-accent">{{.storedClient.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.settings" }} – {{ .storedClient.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+{{ template "client_header" (args "settings" .client.ClientId .storedClient.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
 
-<script>
-
-    var originalClientIdentifier = "{{.storedClient.ClientIdentifier}}";
-    var originallyEnabled = {{if .storedClient.Enabled}}true{{else}}false{{end}};
-    var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
-    var originallyAllowedAdministrativeScopes = {{if .storedClient.AdministrativeScopesAllowed}}true{{else}}false{{end}};
-
-    document.addEventListener("DOMContentLoaded", function() {
-        const btnSave = document.getElementById("btnSave");
-        const clientIdentifier = document.getElementById("clientIdentifier");
-        const formClientSettings = document.getElementById("formClientSettings");
-        const enabledDisabled = document.getElementById("enabledDisabled");
-
-        function submitForm() {
-            if (isSystemLevel) {
-                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
-                    function() { /* cancel */ },
-                    function() { formClientSettings.submit(); }
-                );
-            } else {
-                formClientSettings.submit();
-            }
-        }
-
-        // Allowing a client makes it an administrator client, so a save that switches the allowance
-        // on asks first; one that switches it off, or leaves it, does not.
-        const administrativeScopesAllowed = document.getElementById("administrativeScopesAllowed");
-        function confirmAllowanceThenSubmit() {
-            if (!originallyAllowedAdministrativeScopes && administrativeScopesAllowed && administrativeScopesAllowed.checked) {
-                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}"]),
-                    function() { /* cancel */ },
-                    function() { submitForm(); }
-                );
-            } else {
-                submitForm();
-            }
-        }
-
-        if(btnSave) {
-            btnSave.addEventListener("click", function(event) {
-                event.preventDefault();
-                clientIdentifier.value = clientIdentifier.value.trim();
-                if (clientIdentifier.value !== originalClientIdentifier) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.identifier_change" }}"]),
-                    function() {
-                    },
-                    function() {
-                        confirmAllowanceThenSubmit();
-                    });
-                } else if(originallyEnabled && enabledDisabled.checked === false) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.settings.modal.disabled_warning" }}"]),
-                    function() {
-                    },
-                    function() {
-                        confirmAllowanceThenSubmit();
-                    });
-                } else {
-                    confirmAllowanceThenSubmit();
-                }
-            });
-        }
-    });
-
-
-</script>
-
-{{end}}
-
-{{define "body"}}
-
-{{template "manage_clients_tabs" (args "settings" .client.ClientId $.ctx) }}
-
-<form id="formClientSettings" method="post">
-
-    {{if .client.IsSystemLevelClient}}
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div role="alert" class="alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
-                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
-        </div>
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the
+     notice and focused. A save asks first, in one dialog, about each change below marked
+     data-confirm against the client as stored, and always on the admin console's own client. */}}
+<form id="formClientSettings" class="panel" method="post" novalidate data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}"{{ if .client.IsSystemLevelClient }} data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="client-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-    {{end}}
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.identifier" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="clientIdentifier" type="text" name="clientIdentifier" value="{{.client.ClientIdentifier}}"
-                    class="w-full input input-bordered " autocomplete="off" {{if or .client.IsSystemLevelClient .client.CreatedViaDCR}}readonly{{end}} />
-                {{if .client.CreatedViaDCR}}
-                <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier_self_registered" }}</p>
-                {{end}}
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.description" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.description_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input type="text" name="description" value="{{.client.Description}}"
-                    class="w-full input input-bordered " autocomplete="off" />
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.website_url" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input type="text" name="websiteUrl" value="{{.client.WebsiteURL}}" placeholder="https://example.com"
-                    class="w-full input input-bordered " autocomplete="off" />
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.display_name" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.display_name_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input type="text" name="displayName" value="{{.client.DisplayName}}"
-                    class="w-full input input-bordered " autocomplete="off" />
-            </div>
-
-            {{if .client.AuthorizationCodeEnabled}}
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <select class="w-full select select-bordered" name="defaultAcrLevel" >
-                    <option value="urn:goiabada:level1" {{if eq .client.DefaultAcrLevel "urn:goiabada:level1"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level1" }}</option>
-                    <option value="urn:goiabada:level2_optional" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_optional" }}</option>
-                    <option value="urn:goiabada:level2_mandatory" {{if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_mandatory" }}</option>
-                </select>
-            </div>
-            {{end}}
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.settings.field.enabled" }}</span>
-                    <input id="enabledDisabled" type="checkbox" name="enabled"
-                        class="ml-2 toggle" {{if .client.Enabled}}checked{{end}}  />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.consent_required" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.consent_required_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input type="checkbox" name="consentRequired" class="ml-2 toggle"
-                        {{if .client.ConsentRequired}}checked{{end}}  />
-                </label>
-            </div>
-
-            <!-- Saved by the form's one Save: the console writes it to the auth server's own route for
-                 it, which only authserver:manage may write, when it changed (#499, #542). -->
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input id="administrativeScopesAllowed" type="checkbox" name="administrativeScopesAllowed"
-                        class="ml-2 toggle"
-                        {{if .client.AdministrativeScopesAllowed}}checked{{end}} {{if or .client.IsSystemLevelClient (not $.isAdmin)}}disabled{{end}} />
-                </label>
-                {{if .client.IsSystemLevelClient}}
-                <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" }}</p>
-                {{else if not $.isAdmin}}
-                <p class="mt-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_manage_only" }}</p>
-                {{end}}
-                {{if .administrativeScopesError}}
-                <p class="mt-2 text-right text-error">{{.administrativeScopesError}}</p>
-                {{end}}
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_logo" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_logo_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l-.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input type="checkbox" name="showLogo" class="ml-2 toggle"
-                        {{if .client.ShowLogo}}checked{{end}}  />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_display_name" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_display_name_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l-.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input type="checkbox" name="showDisplayName" class="ml-2 toggle"
-                        {{if .client.ShowDisplayName}}checked{{end}}  />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_description" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_description_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l-.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input type="checkbox" name="showDescription" class="ml-2 toggle"
-                        {{if .client.ShowDescription}}checked{{end}}  />
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="cursor-pointer label">
-                    <span class="label-text">
-                        {{ T $.ctx "adminconsole.admin_clients.settings.field.show_website_url" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.settings.field.show_website_url_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l-.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                    <input type="checkbox" name="showWebsiteUrl" class="ml-2 toggle"
-                        {{if .client.ShowWebsiteURL}}checked{{end}}  />
-                </label>
-            </div>
-
-        </div>
-
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.settings.saved_successfully" }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.settings.saved_successfully" }}</p>
-                </div>
-            {{end}}
-                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-        </div>
+    {{ end }}
+    {{ if .administrativeScopesError }}
+    <div class="notice notice-danger" role="alert" id="administrative-scopes-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .administrativeScopesError }}</p>
     </div>
+    {{ end }}
 
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="clientIdentifier">{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier" }}</label>
+        <input class="control control-mono" id="clientIdentifier" type="text" name="clientIdentifier" value="{{ .client.ClientIdentifier }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "clientIdentifier" }}client-error {{ end }}{{ end }}clientIdentifierHint"
+          data-confirm="{{ T $.ctx "adminconsole.admin_clients.settings.modal.identifier_change" }}" data-stored-value="{{ .storedClient.ClientIdentifier }}"
+          {{- if or .client.IsSystemLevelClient .client.CreatedViaDCR }} readonly{{ end }}
+          {{- if .error }}{{ if eq .errorField "clientIdentifier" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="clientIdentifierHint">{{ if .client.CreatedViaDCR }}{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier_self_registered" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.settings.field.identifier_tooltip" }}{{ end }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="displayName">{{ T $.ctx "adminconsole.admin_clients.settings.field.display_name" }}</label>
+        <input class="control" id="displayName" type="text" name="displayName" value="{{ .client.DisplayName }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "displayName" }}client-error {{ end }}{{ end }}displayNameHint"
+          {{- if .error }}{{ if eq .errorField "displayName" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="displayNameHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.display_name_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="description">{{ T $.ctx "adminconsole.admin_clients.settings.field.description" }}</label>
+        <input class="control" id="description" type="text" name="description" value="{{ .client.Description }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "description" }}client-error {{ end }}{{ end }}descriptionHint"
+          {{- if .error }}{{ if eq .errorField "description" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="descriptionHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.description_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="websiteUrl">{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url" }}</label>
+        <input class="control" id="websiteUrl" type="url" name="websiteUrl" value="{{ .client.WebsiteURL }}" placeholder="https://example.com" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "websiteUrl" }}client-error {{ end }}{{ end }}websiteUrlHint"
+          {{- if .error }}{{ if eq .errorField "websiteUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint" id="websiteUrlHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.website_url_tooltip" }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-body">
+    <fieldset>
+      <legend class="panel-title">{{ T $.ctx "adminconsole.admin_clients.settings.screens_legend" }}</legend>
+      <p class="field-hint mb-3">{{ T $.ctx "adminconsole.admin_clients.settings.screens_hint" }}</p>
+      <div class="check-list">
+        <label class="check-row" for="showDisplayName">
+          <input type="checkbox" id="showDisplayName" name="showDisplayName" aria-describedby="showDisplayNameHint"{{ if .client.ShowDisplayName }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_display_name" }}</span>
+            <span class="field-hint" id="showDisplayNameHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_display_name_tooltip" }}</span>
+          </span>
+        </label>
+        <label class="check-row" for="showLogo">
+          <input type="checkbox" id="showLogo" name="showLogo" aria-describedby="showLogoHint"{{ if .client.ShowLogo }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_logo" }}</span>
+            <span class="field-hint" id="showLogoHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_logo_tooltip" }}</span>
+          </span>
+        </label>
+        <label class="check-row" for="showDescription">
+          <input type="checkbox" id="showDescription" name="showDescription" aria-describedby="showDescriptionHint"{{ if .client.ShowDescription }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_description" }}</span>
+            <span class="field-hint" id="showDescriptionHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_description_tooltip" }}</span>
+          </span>
+        </label>
+        <label class="check-row" for="showWebsiteUrl">
+          <input type="checkbox" id="showWebsiteUrl" name="showWebsiteUrl" aria-describedby="showWebsiteUrlHint"{{ if .client.ShowWebsiteURL }} checked{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_website_url" }}</span>
+            <span class="field-hint" id="showWebsiteUrlHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.show_website_url_tooltip" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_clients.settings.access_title" }}</h2>
+    {{ if .client.AuthorizationCodeEnabled }}
+    <div class="field">
+      <label class="field-label" for="defaultAcrLevel">{{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr" }}</label>
+      <select class="control" id="defaultAcrLevel" name="defaultAcrLevel" aria-describedby="{{ if .error }}{{ if eq .errorField "defaultAcrLevel" }}client-error {{ end }}{{ end }}defaultAcrLevelHint"
+        {{- if .error }}{{ if eq .errorField "defaultAcrLevel" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <option value="urn:goiabada:level1"{{ if eq .client.DefaultAcrLevel "urn:goiabada:level1" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level1" }}</option>
+        <option value="urn:goiabada:level2_optional"{{ if eq .client.DefaultAcrLevel "urn:goiabada:level2_optional" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_optional" }}</option>
+        <option value="urn:goiabada:level2_mandatory"{{ if eq .client.DefaultAcrLevel "urn:goiabada:level2_mandatory" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_clients.settings.acr_level2_mandatory" }}</option>
+      </select>
+      <p class="field-hint" id="defaultAcrLevelHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.default_acr_tooltip" }}</p>
+    </div>
+    {{ end }}
+    <div class="check-list">
+      <label class="check-row" for="enabledDisabled">
+        <input type="checkbox" id="enabledDisabled" name="enabled" aria-describedby="enabledHint"{{ if .client.Enabled }} checked{{ end }}
+          data-confirm="{{ T $.ctx "adminconsole.admin_clients.settings.modal.disabled_warning" }}" data-confirm-when="unchecked" data-stored-checked="{{ .storedClient.Enabled }}">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.enabled" }}</span>
+          <span class="field-hint" id="enabledHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.enabled_hint" }}</span>
+        </span>
+      </label>
+      <label class="check-row" for="consentRequired">
+        <input type="checkbox" id="consentRequired" name="consentRequired" aria-describedby="consentRequiredHint"{{ if .client.ConsentRequired }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.consent_required" }}</span>
+          <span class="field-hint" id="consentRequiredHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.consent_required_tooltip" }}</span>
+        </span>
+      </label>
+      {{/* Saved by the form's one Save: the console writes it to the auth server's own route for
+           it, which only authserver:manage may write, when it changed (#499, #542). */}}
+      <label class="check-row" for="administrativeScopesAllowed">
+        <input type="checkbox" id="administrativeScopesAllowed" name="administrativeScopesAllowed" aria-describedby="{{ if .administrativeScopesError }}administrative-scopes-error {{ end }}administrativeScopesAllowedHint"
+          {{- if .administrativeScopesError }} aria-invalid="true" autofocus{{ end }}{{ if .client.AdministrativeScopesAllowed }} checked{{ end }}{{ if or .client.IsSystemLevelClient (not $.isAdmin) }} disabled{{ end }}
+          data-confirm="{{ T $.ctx "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" }}" data-confirm-when="checked" data-stored-checked="{{ .storedClient.AdministrativeScopesAllowed }}">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed" }}</span>
+          <span class="field-hint" id="administrativeScopesAllowedHint">{{ T $.ctx "adminconsole.admin_clients.settings.field.administrative_scopes_allowed_tooltip" }}
+            {{- if .client.IsSystemLevelClient }} <span class="block font-semibold">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_always_allowed" }}</span>
+            {{- else if not $.isAdmin }} <span class="block font-semibold">{{ T $.ctx "adminconsole.admin_clients.settings.administrative_scopes_manage_only" }}</span>{{ end }}</span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}
 {{end}}

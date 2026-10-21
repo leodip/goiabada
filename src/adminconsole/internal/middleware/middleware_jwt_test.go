@@ -27,7 +27,7 @@ func TestSessionHandler_InvalidSession(t *testing.T) {
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
 	mockSessionStore := new(sessionstoremocks.Store)
 
-	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
+	middleware := NewJWT(mockSessionStore, nil, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -51,7 +51,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
 	mockSessionStore := new(sessionstoremocks.Store)
 
-	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
+	middleware := NewJWT(mockSessionStore, nil, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -84,7 +84,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
 	mockSessionStore := new(sessionstoremocks.Store)
 
-	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
+	middleware := NewJWT(mockSessionStore, nil, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -122,7 +122,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
 	mockSessionStore := new(sessionstoremocks.Store)
 
-	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+	middleware := NewJWT(mockSessionStore, nil, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
 	mockSessionStore := new(sessionstoremocks.Store)
 
-	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+	middleware := NewJWT(mockSessionStore, nil, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
 	mockSessionStore := new(sessionstoremocks.Store)
 
-	middleware := NewJWT(mockSessionStore, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+	middleware := NewJWT(mockSessionStore, nil, testSessionName, mockTokenParser, nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -217,7 +217,7 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockAuthHelper := new(middlewaremocks.AuthHelper)
-			middleware := NewJWT(new(sessionstoremocks.Store), "test-session", new(middlewaremocks.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+			middleware := NewJWT(new(sessionstoremocks.Store), nil, "test-session", new(middlewaremocks.TokenParser), nil, mockAuthHelper, stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 			req := httptest.NewRequest("GET", testCase.requestLine, nil)
 			require.Equal(t, testCase.requestLine, req.RequestURI, "the request line did not reach the request as sent")

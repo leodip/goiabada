@@ -12,19 +12,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// registrationEmailWarningRe matches the opening tag of the warning under the verification switch.
-var registrationEmailWarningRe = regexp.MustCompile(`<div id="selfRegistrationEmailWarning"[^>]*>`)
+// registrationEmailWarningRe matches the opening tag of the caution under the registration choices.
+var registrationEmailWarningRe = regexp.MustCompile(`<div class="notice notice-caution" id="selfRegistrationEmailWarning"[^>]*>`)
 
-// hiddenClassRe matches a class attribute naming hidden as one of its classes.
-var hiddenClassRe = regexp.MustCompile(`class="(?:[^"]*\s)?hidden(?:\s[^"]*)?"`)
+// emailVerificationRowRe matches the opening tag of the email verification row.
+var emailVerificationRowRe = regexp.MustCompile(`<label class="check-row" for="selfRegistrationRequiresEmailVerification" id="emailVerificationRow"[^>]*>`)
 
-const registrationEmailWarningEn = "Email isn't set up, so registration is unavailable. " +
-	"Set it up under Email - SMTP, or turn off email verification."
+const registrationEmailWarningEn = "Email isn't set up, so nobody can register: set it up, or stop requiring email verification."
 
-// The General page warns, under the verification switch, that registration is unavailable while both
+// The General page warns, under the registration choices, that nobody can register while both
 // registration switches are on and email is off, which is when the auth server refuses it (#526
-// decision 4). The page script toggles it as the switches change; what the HTML decides is that it is
-// there and whether it starts shown, for each pair of switches and email state.
+// decision 4). The page script shows it again as the switches change; what the HTML decides is that
+// it is there and whether it starts shown, for each pair of switches and email state, and that the
+// script reads email's state from the same value the template did.
 func TestRender_AdminSettingsGeneralWarnsWhenRegistrationNeedsEmail(t *testing.T) {
 	cases := []struct {
 		name                 string
@@ -51,63 +51,142 @@ func TestRender_AdminSettingsGeneralWarnsWhenRegistrationNeedsEmail(t *testing.T
 			}, "en", tc.smtpEnabled)
 
 			warning := registrationEmailWarningRe.FindString(out)
-			require.NotEmpty(t, warning, "the warning is rendered whatever the switches, for the script to toggle")
+			require.NotEmpty(t, warning, "the caution is rendered whatever the switches, for the script to show")
 			assert.Contains(t, html.UnescapeString(out), registrationEmailWarningEn)
 			if tc.shown {
-				assert.NotRegexp(t, hiddenClassRe, warning, "the warning starts shown")
+				assert.NotContains(t, warning, " hidden", "the caution starts shown")
 			} else {
-				assert.Regexp(t, hiddenClassRe, warning, "the warning starts hidden")
+				assert.Contains(t, warning, " hidden", "the caution starts hidden")
 			}
 
-			// The script reads email's state from the same value the template did, and follows both
-			// switches.
 			if tc.smtpEnabled {
-				assert.Regexp(t, `const smtpEnabled =\s*true\s*;`, out)
+				assert.Contains(t, out, `data-smtp-enabled="true"`)
 			} else {
-				assert.Regexp(t, `const smtpEnabled =\s*false\s*;`, out)
+				assert.Contains(t, out, `data-smtp-enabled="false"`)
 			}
-			assert.Contains(t, out, "selfRegistrationRequiresEmailVerification.addEventListener('change'")
+			assert.Contains(t, out, `src="/static/pages/admin-settings-general.js`)
 		})
 	}
 }
 
-// The warning comes after the verification switch and before the next one, so it reads as that
-// switch's.
-func TestRender_AdminSettingsGeneralPutsTheWarningUnderTheVerificationSwitch(t *testing.T) {
+// The caution is about email verification: it closes the list of the user registration choices,
+// before Dynamic client registration's own list and the OAuth flows, and links to the email settings
+// it asks for.
+func TestRender_AdminSettingsGeneralPutsTheWarningUnderEmailVerification(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
 		"settings": adminsettingshandlers.SettingsGeneral{SelfRegistrationEnabled: true,
 			SelfRegistrationRequiresEmailVerification: true, PasswordPolicy: "low"},
 	}, "en", false)
 
-	verification := strings.Index(out, `<input id="selfRegistrationRequiresEmailVerification"`)
-	warning := strings.Index(out, `<div id="selfRegistrationEmailWarning"`)
-	next := strings.Index(out, `<input id="dynamicClientRegistrationEnabled"`)
+	verification := strings.Index(out, `<input type="checkbox" id="selfRegistrationRequiresEmailVerification"`)
+	registration := strings.Index(out, `<input type="checkbox" id="dynamicClientRegistrationEnabled"`)
+	warning := strings.Index(out, `id="selfRegistrationEmailWarning"`)
+	flows := strings.Index(out, `<input type="checkbox" id="pkceRequired"`)
 	require.NotEqual(t, -1, verification)
+	require.NotEqual(t, -1, registration)
 	require.NotEqual(t, -1, warning)
-	require.NotEqual(t, -1, next)
+	require.NotEqual(t, -1, flows)
 	assert.Less(t, verification, warning)
-	assert.Less(t, warning, next)
+	assert.Less(t, warning, registration)
+	assert.Less(t, registration, flows)
+	assert.Contains(t, out[verification:warning], `</div>`, "the warning follows the registration choices' list")
+	assert.Contains(t, out[warning:registration], `<div class="check-list">`, "Dynamic client registration is a list of its own")
+	assert.Contains(t, out[warning:registration], `<a class="text-link" href="/admin/settings/email">Email settings</a>`)
 }
 
-// The verification switch's tooltip no longer promises a confirmation link either way: it says the
-// switch needs email set up and that registration is unavailable without it (#526 decision 4).
-func TestRender_AdminSettingsGeneralVerificationTooltipSaysItNeedsEmail(t *testing.T) {
+// Email verification governs nothing while registration is off, so its row starts hidden then, and
+// is hidden rather than disabled, so the choice made before is still sent and kept.
+func TestRender_AdminSettingsGeneralShowsVerificationOnlyWithRegistration(t *testing.T) {
+	for _, registration := range []bool{true, false} {
+		out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+			"settings": adminsettingshandlers.SettingsGeneral{SelfRegistrationEnabled: registration,
+				SelfRegistrationRequiresEmailVerification: true, PasswordPolicy: "low"},
+		}, "en", true)
+
+		row := emailVerificationRowRe.FindString(out)
+		require.NotEmpty(t, row)
+		assert.Equal(t, !registration, strings.Contains(row, " hidden"), "registration on: %v", registration)
+		box := regexp.MustCompile(`<input type="checkbox" id="selfRegistrationRequiresEmailVerification"[^>]*>`).FindString(out)
+		require.NotEmpty(t, box)
+		assert.NotContains(t, box, "disabled")
+		assert.Contains(t, box, " checked")
+	}
+}
+
+// The verification hint says the choice needs email set up (#526 decision 4).
+func TestRender_AdminSettingsGeneralVerificationHintSaysItNeedsEmail(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
 		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "low"},
 	}, "en", true)
 
-	assert.Contains(t, html.UnescapeString(out), "This needs email set up under Email - SMTP: while it isn't, registration is unavailable.")
-	assert.NotContains(t, html.UnescapeString(out), "If enabled, self-registered users will need to activate their accounts via a confirmation link sent to their email.")
+	assert.Contains(t, html.UnescapeString(out), "A new account is activated through a link sent to its email address. This needs email set up.")
+}
+
+// The password policy is four option cards, each saying what its policy asks, the stored one chosen.
+func TestRender_AdminSettingsGeneralOffersEachPasswordPolicy(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "medium"},
+	}, "en", true)
+
+	checked := regexp.MustCompile(`<input type="radio" name="passwordPolicy" value="([a-z]+)" checked`).FindAllStringSubmatch(out, -1)
+	require.Len(t, checked, 1, "one policy is chosen")
+	assert.Equal(t, "medium", checked[0][1])
+	for _, policy := range []string{"none", "low", "medium", "high"} {
+		assert.Contains(t, out, `<input type="radio" name="passwordPolicy" value="`+policy+`"`)
+	}
+	assert.Contains(t, out, "At least 10 characters, with a lowercase letter, an uppercase letter, a number and a symbol.")
+}
+
+// A change of issuer asks first, against the issuer the auth server holds: after a refused save the
+// field shows what was sent and the comparison is still with the stored one, so saving the same
+// issuer again asks again (#562 decision 6).
+func TestRender_AdminSettingsGeneralAsksBeforeChangingTheIssuer(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings":       adminsettingshandlers.SettingsGeneral{Issuer: "https://new.example", PasswordPolicy: "low"},
+		"storedSettings": adminsettingshandlers.SettingsGeneral{Issuer: "https://auth.example", PasswordPolicy: "low"},
+		"error":          "App name is too long.",
+		"errorField":     "appName",
+	}, "en", true)
+
+	issuer := regexp.MustCompile(`<input class="control" id="issuer"[^>]*>`).FindString(out)
+	require.NotEmpty(t, issuer)
+	assert.Contains(t, issuer, `value="https://new.example"`)
+	assert.Contains(t, issuer, `data-stored-value="https://auth.example"`)
+	assert.Contains(t, html.UnescapeString(issuer), `data-confirm="You're changing the issuer.`)
+	assert.Contains(t, out, `data-confirm-dialog="confirmSave"`)
+	assert.Contains(t, out, `id="confirmSave_modalDialog"`)
+}
+
+// A refusal marks the field it is about, names the notice in the field's description and gives it
+// the focus; the other field is left alone.
+func TestRender_AdminSettingsGeneralMarksTheRefusedField(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings":       adminsettingshandlers.SettingsGeneral{Issuer: "goiabada", PasswordPolicy: "low"},
+		"storedSettings": adminsettingshandlers.SettingsGeneral{Issuer: "https://auth.example", PasswordPolicy: "low"},
+		"error":          "Invalid issuer.",
+		"errorField":     "issuer",
+	}, "en", true)
+
+	issuer := regexp.MustCompile(`<input class="control" id="issuer"[^>]*>`).FindString(out)
+	appName := regexp.MustCompile(`<input class="control" id="appName"[^>]*>`).FindString(out)
+	require.NotEmpty(t, issuer)
+	require.NotEmpty(t, appName)
+	assert.Contains(t, issuer, `aria-describedby="general-error issuerHint"`)
+	assert.Contains(t, issuer, ` aria-invalid="true" autofocus`)
+	assert.NotContains(t, appName, "aria-invalid")
+	assert.NotContains(t, appName, "autofocus")
+	assert.Contains(t, out, `<div class="notice notice-danger" role="alert" id="general-error">`)
 }
 
 // The same page in Brazilian Portuguese, the locale every other page in this package renders in: the
-// warning and the tooltip come from that catalog, and no raw key leaks.
+// caution and the hint come from that catalog, and no raw key leaks.
 func TestRender_AdminSettingsGeneralRegistrationEmailStringsInPtBR(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
 		"settings": adminsettingshandlers.SettingsGeneral{SelfRegistrationEnabled: true,
 			SelfRegistrationRequiresEmailVerification: true, PasswordPolicy: "low"},
 	}, "pt-BR", false)
 
-	assert.Contains(t, html.UnescapeString(out), "O e-mail não está configurado, então o cadastro está indisponível.")
-	assert.Contains(t, html.UnescapeString(out), "Isso exige o e-mail configurado em E-mail - SMTP")
+	assert.Contains(t, html.UnescapeString(out), "O e-mail não está configurado, então ninguém consegue se cadastrar")
+	assert.Contains(t, html.UnescapeString(out), "Isso exige o e-mail configurado.")
+	assert.NotContains(t, out, "adminconsole.admin_settings.general.")
 }

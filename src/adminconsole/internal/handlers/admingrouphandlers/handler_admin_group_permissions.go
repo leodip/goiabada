@@ -65,16 +65,22 @@ func HandlePermissionsGet(
 		groupPermsDisplay := struct {
 			GroupId         int64
 			GroupIdentifier string
-			Permissions     map[int64]string
 		}{
 			GroupId:         group.Id,
 			GroupIdentifier: group.GroupIdentifier,
-			Permissions:     make(map[int64]string),
 		}
 
+		// The permissions the group holds, in the order the tab lists them: by scope.
+		granted := make([]grantedPermission, 0, len(groupPermissions))
 		for _, permission := range groupPermissions {
-			groupPermsDisplay.Permissions[permission.Id] = permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			granted = append(granted, grantedPermission{
+				Id:    permission.Id,
+				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
+			})
 		}
+		sort.Slice(granted, func(i, j int) bool {
+			return granted[i].Scope < granted[j].Scope
+		})
 
 		// Get all resources via API
 		resources, err := apiClient.GetAllResources(r.Context(), jwtInfo.TokenResponse.AccessToken)
@@ -104,7 +110,8 @@ func HandlePermissionsGet(
 
 		bind := map[string]interface{}{
 			"group":             groupPermsDisplay,
-			"resources":         resources,
+			"granted":           granted,
+			"resources":         render.ResourceChoices(resources),
 			"savedSuccessfully": savedSuccessfully,
 		}
 

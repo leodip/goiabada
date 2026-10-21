@@ -35,12 +35,12 @@ func (s *groupNewAPI) CreateGroup(_ context.Context, _ string, _ *api.CreateGrou
 
 // groupSwitchRe matches the include switch named, whatever order its attributes come in.
 func groupSwitchRe(name string) *regexp.Regexp {
-	return regexp.MustCompile(`<input type="checkbox" name="` + name + `"[^>]*>`)
+	return regexp.MustCompile(`<input type="checkbox" id="` + name + `" name="` + name + `"[^>]*>`)
 }
 
 // The new group form opens with both include switches on.
 func TestRender_AdminGroupNew_AFirstDrawHasBothSwitchesOn(t *testing.T) {
-	out := servePage(t, admingrouphandlers.HandleNewGet(render.New(web.TemplateFS())), http.MethodGet, "/admin/groups/new")
+	out := servePage(t, admingrouphandlers.HandleNewGet(render.New(web.TemplateFS(), web.StaticFS())), http.MethodGet, "/admin/groups/new")
 
 	for _, name := range []string{"includeInAccessToken", "includeInIdToken"} {
 		toggle := groupSwitchRe(name).FindString(out)
@@ -72,7 +72,7 @@ func TestRender_AdminGroupNew_ARefusalKeepsTheSwitchesAsSubmitted(t *testing.T) 
 			tc.form.Set("groupIdentifier", "sales")
 			tc.form.Set("description", "Sales team")
 
-			out := serveRefusal(t, admingrouphandlers.HandleNewPost(render.New(web.TemplateFS()),
+			out := serveRefusal(t, admingrouphandlers.HandleNewPost(render.New(web.TemplateFS(), web.StaticFS()),
 				&groupNewAPI{refusal: refusal}, "https://console.example"), "/admin/groups/new", tc.form)
 
 			assert.Contains(t, out, `<p>`+refusal+`</p>`)
@@ -119,7 +119,7 @@ func (s *profilePageAPI) UpdateAccountProfile(_ context.Context, _ string,
 }
 
 // dateOfBirthRe matches the date-of-birth input, whatever order its attributes come in.
-var dateOfBirthRe = regexp.MustCompile(`<input type="text" name="dateOfBirth"[^>]*>`)
+var dateOfBirthRe = regexp.MustCompile(`<input[^>]* name="dateOfBirth"[^>]*>`)
 
 // profilePages are the two pages that share the profile form, each served for a refused save.
 func profilePages(apiClient *profilePageAPI) []struct {
@@ -128,7 +128,7 @@ func profilePages(apiClient *profilePageAPI) []struct {
 	target  string
 	options []handlertest.Option
 } {
-	renderer := render.New(web.TemplateFS())
+	renderer := render.New(web.TemplateFS(), web.StaticFS())
 	return []struct {
 		name    string
 		handler http.HandlerFunc

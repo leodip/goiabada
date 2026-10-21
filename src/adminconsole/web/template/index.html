@@ -1,85 +1,91 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.welcome.page_title" }}{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.welcome.subtitle" }} – {{ .appName }}{{end}}
 {{define "head"}}{{end}}
 
 {{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "adminconsole.welcome.subtitle" }}</h1>
 
-<main>
+<div class="stacked">
+  {{ if .SessionEnded }}
+  <div class="notice notice-caution" role="status">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ T $.ctx "adminconsole.session_ended.message" }}</p>
+  </div>
+  {{ end }}
 
-    <div class="w-full min-h-screen">
-        <div class="pt-10 text-center">
-            <h1 class="font-bold text-7xl">{{ .appName }}</h1>
-            <h3>{{ T $.ctx "adminconsole.welcome.subtitle" }}</h3>
+  {{ if .IsAuthenticated }}
+  <div class="identity-row">
+    <span class="user-menu-avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z"/></svg></span>
+    <p class="identity-row-who">
+      {{ if .LoggedInUser }}
+      <span class="text-ink-muted">{{ T $.ctx "adminconsole.welcome.signed_in_as" }}</span>
+      <span>{{ .LoggedInUser }}</span>
+      {{ else }}
+      <span>{{ T $.ctx "adminconsole.welcome.authenticated_label" }}</span>
+      {{ end }}
+    </p>
+    <a class="button button-sm" href="{{ .LogoutLink }}">{{ T $.ctx "adminconsole.welcome.logout_label" }}</a>
+  </div>
+  {{ end }}
 
-            {{if .SessionEnded}}
-            <div class="w-full mt-6 text-center">
-                <p class="text-warning">{{ T $.ctx "adminconsole.session_ended.message" }}</p>
-            </div>
-            {{end}}
+  {{/* Administration is offered to whoever might have it: anyone not yet signed in, since signing
+       in decides, and an administrator. */}}
+  <ul class="link-list">
+    <li>
+      <a class="link-row" href="/account/profile">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-5.5-2.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM10 12a5.99 5.99 0 0 0-4.793 2.39A6.483 6.483 0 0 0 10 16.5a6.483 6.483 0 0 0 4.793-2.11A5.99 5.99 0 0 0 10 12Z" clip-rule="evenodd"/></svg>
+        <span class="link-row-text">
+          <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.account_card_title" }}</span>
+          <span class="link-row-hint">{{ T $.ctx "adminconsole.welcome.account_card_body" }}</span>
+        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+      </a>
+    </li>
+    {{ if or (not .IsAuthenticated) .isAdmin }}
+    <li>
+      <a class="link-row" href="/admin/clients">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M14.5 10a4.5 4.5 0 0 0 4.284-5.882c-.105-.324-.51-.391-.752-.15L15.34 6.66a.454.454 0 0 1-.493.11 3.01 3.01 0 0 1-1.618-1.616.455.455 0 0 1 .11-.494l2.694-2.692c.24-.241.174-.647-.15-.752a4.5 4.5 0 0 0-5.873 4.575c.055.873-.128 1.808-.8 2.368l-7.23 6.024a2.724 2.724 0 1 0 3.837 3.837l6.024-7.23c.56-.672 1.495-.855 2.368-.8.096.007.193.01.291.01ZM5 16a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clip-rule="evenodd"/><path d="M14.5 11.5c.173 0 .345-.007.514-.022l3.754 3.754a2.5 2.5 0 0 1-3.536 3.536l-4.41-4.41 2.172-2.607c.052-.063.147-.138.342-.196.202-.06.469-.087.777-.067.128.008.257.012.387.012ZM6 4.586l2.33 2.33a.452.452 0 0 1-.08.09L6.8 8.214 4.586 6H3.309a.5.5 0 0 1-.447-.276l-1.7-3.402a.5.5 0 0 1 .093-.577l.49-.49a.5.5 0 0 1 .577-.094l3.402 1.7A.5.5 0 0 1 6 3.31v1.277Z"/></svg>
+        <span class="link-row-text">
+          <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.admin_card_title" }}</span>
+          <span class="link-row-hint">{{ T $.ctx "adminconsole.welcome.admin_card_body" }}</span>
+        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+      </a>
+    </li>
+    {{ end }}
+  </ul>
+</div>
 
-            {{if .IsAuthenticated}}
-            <div class="w-full mt-6 mb-4 text-center">
-                <span class="px-4 py-2 rounded-full bg-neutral text-neutral-content">
-                    {{if .LoggedInUser}}
-                        <span class="">{{.LoggedInUser}}</span>
-                    {{else}}
-                        <span class="">{{ T $.ctx "adminconsole.welcome.authenticated_label" }}</span>
-                    {{end}}
-                    <a href="{{.LogoutLink}}" class="bg-neutral text-accent">{{ T $.ctx "adminconsole.welcome.logout_label" }}</a>
-                </span>
-            </div>
-            {{end}}
-        </div>
-
-        <div class="grid grid-cols-1 gap-6 px-4 mt-10 lg:grid-cols-4 justify-items-center">
-            <div class="shadow-xl card w-full max-w-96 bg-neutral text-neutral-content">
-                <div class="card-body">
-                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.discovery_card_title" }}</h2>
-                    <p>{{ T $.ctx "adminconsole.welcome.discovery_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.discovery_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.discovery_card_body_suffix" }}</p>
-                    <div class="justify-center card-actions">
-                        <a href="{{ .AuthServerBaseUrl }}/.well-known/openid-configuration" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.discovery_card_button" }}</a>
-                    </div>
-                </div>
-            </div>
-            <div class="shadow-xl card w-full max-w-96 bg-neutral text-neutral-content">
-                <div class="card-body">
-                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.account_card_title" }}</h2>
-                    <p>{{ T $.ctx "adminconsole.welcome.account_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.account_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.account_card_body_suffix" }}</p>
-                    <div class="justify-center card-actions">
-                        <a href="/account/profile" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.account_card_button" }}</a>
-                    </div>
-                </div>
-            </div>
-            <div class="shadow-xl card w-full max-w-96 bg-neutral text-neutral-content">
-                <div class="card-body">
-                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.admin_card_title" }}</h2>
-                    <p>{{ T $.ctx "adminconsole.welcome.admin_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.admin_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.admin_card_body_suffix" }}</p>
-                    <div class="justify-center card-actions">
-                        <a href="/admin/clients" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.admin_card_button" }}</a>
-                    </div>
-                </div>
-            </div>
-            <div class="shadow-xl card w-full max-w-96 bg-neutral text-neutral-content">
-                <div class="card-body">
-                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.docs_card_title" }}</h2>
-                    <p>{{ T $.ctx "adminconsole.welcome.docs_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.docs_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.docs_card_body_suffix" }}</p>
-                    <div class="justify-center card-actions">
-                        <a href="https://goiabada.dev" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.docs_card_button" }}</a>
-                    </div>
-                </div>
-            </div>
-            <div class="shadow-xl card w-full max-w-96 bg-neutral text-neutral-content">
-                <div class="card-body">
-                    <h2 class="card-title">{{ T $.ctx "adminconsole.welcome.api_card_title" }}</h2>
-                    <p>{{ T $.ctx "adminconsole.welcome.api_card_body_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.welcome.api_card_body_em" }}</span>{{ T $.ctx "adminconsole.welcome.api_card_body_suffix" }}</p>
-                    <div class="justify-center card-actions">
-                        <a href="{{ .AuthServerBaseUrl }}/openapi.yaml" class="btn btn-primary">{{ T $.ctx "adminconsole.welcome.api_card_button" }}</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-</main>
-
+<h2 class="auth-section-title">{{ T $.ctx "adminconsole.welcome.developers_heading" }}</h2>
+<ul class="link-list">
+  <li>
+    <a class="link-row" href="{{ .AuthServerBaseUrl }}/.well-known/openid-configuration">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v11.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75V4.25A2.25 2.25 0 0 0 15.75 2H4.25Zm4.03 6.28a.75.75 0 0 0-1.06-1.06L4.97 9.47a.75.75 0 0 0 0 1.06l2.25 2.25a.75.75 0 0 0 1.06-1.06L6.56 10l1.72-1.72Zm4.5-1.06a.75.75 0 1 0-1.06 1.06L13.44 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25Z" clip-rule="evenodd"/></svg>
+      <span class="link-row-text">
+        <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.discovery_card_title" }}</span>
+        <span class="link-row-hint">{{ T $.ctx "adminconsole.welcome.discovery_card_body" }}</span>
+      </span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+    </a>
+  </li>
+  <li>
+    <a class="link-row" href="{{ .AuthServerBaseUrl }}/openapi.yaml">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
+      <span class="link-row-text">
+        <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.api_card_title" }}</span>
+        <span class="link-row-hint">{{ T $.ctx "adminconsole.welcome.api_card_body" }}</span>
+      </span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+    </a>
+  </li>
+  <li>
+    <a class="link-row" href="https://goiabada.dev">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 16.82A7.462 7.462 0 0 1 15 15.5c.71 0 1.396.098 2.046.282A.75.75 0 0 0 18 15.06v-11a.75.75 0 0 0-.546-.721A9.006 9.006 0 0 0 15 3a8.963 8.963 0 0 0-4.25 1.065V16.82ZM9.25 4.065A8.963 8.963 0 0 0 5 3c-.85 0-1.673.118-2.454.339A.75.75 0 0 0 2 4.06v11a.75.75 0 0 0 .954.721A7.506 7.506 0 0 1 5 15.5c1.579 0 3.042.487 4.25 1.32V4.065Z"/></svg>
+      <span class="link-row-text">
+        <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.docs_card_title" }}</span>
+        <span class="link-row-hint">{{ T $.ctx "adminconsole.welcome.docs_card_body" }}</span>
+      </span>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+    </a>
+  </li>
+</ul>
 {{end}}

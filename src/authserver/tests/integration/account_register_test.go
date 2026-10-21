@@ -190,7 +190,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
-	assert.Contains(t, body, "Your account has been created.")
+	assert.Contains(t, body, "Your account is ready.")
 	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 	// Regression guard: the old broken behavior was a 302 to /auth/pwd.
 	assert.NotEqual(t, http.StatusFound, resp.StatusCode)
@@ -223,7 +223,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
-	assert.Contains(t, body, "Your account has been created.")
+	assert.Contains(t, body, "Your account is ready.")
 	assert.Contains(t, body, appConfig.AdminConsole.BaseURL+"/account/profile")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
@@ -307,8 +307,8 @@ func followActivationLink(t *testing.T, client *http.Client, link string) string
 	return appConfig.AuthServer.BaseURL + location.Path
 }
 
-const activationSucceededText = "Congratulations! Your account has been activated."
-const activationExpiredText = "Unable to activate the account. The verification code appears to be expired."
+const activationSucceededText = "Your account is ready."
+const activationExpiredText = "An activation link works once and expires after 5 minutes, and a browser can have only one emailed link in progress at a time."
 const activationFormTitle = "Choose your password"
 
 // loadActivationForm fetches the clean URL the first hop redirected to, which renders the
@@ -324,7 +324,8 @@ func loadActivationForm(t *testing.T, client *http.Client, cleanURL string, emai
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Contains(t, body, activationFormTitle)
 	// Unescaped, because html/template writes the '+' of these addresses as &#43;.
-	assert.Contains(t, html.UnescapeString(body), "Choose a password for "+email+" to finish creating your account.")
+	assert.Contains(t, html.UnescapeString(body), "Choose a password for your new account:")
+	assert.Contains(t, html.UnescapeString(body), `<code class="auth-address">`+email+`</code>`)
 	assert.Contains(t, body, `name="password"`)
 	assert.Contains(t, body, `name="passwordConfirmation"`)
 	assert.Contains(t, body, "Create account")
@@ -514,7 +515,7 @@ func TestSelfRegister_ActivationRedrawsTheFormForAMismatchedConfirmation(t *test
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, body, activationFormTitle)
-	assert.Contains(t, body, "password confirmation does not match")
+	assert.Contains(t, html.UnescapeString(body), "The passwords don't match.")
 	assert.Equal(t, continuationId, continuationIdIn(t, body), "the redraw must carry the continuation back")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
@@ -849,7 +850,7 @@ func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	body := bodyString(t, resp)
-	assert.Contains(t, body, "password confirmation does not match")
+	assert.Contains(t, html.UnescapeString(body), "The passwords don't match.")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)

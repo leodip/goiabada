@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -584,7 +585,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 			stored:          stored,
 			body:            resourcePermsBody(t, withEntry(0, "admin")[:1], loaded),
 			wantStatus:      http.StatusBadRequest,
-			wantCode:        "VALIDATION_ERROR",
+			wantCode:        i18n.ErrCodePermissionIdentifierInUse,
 			wantDescription: "Permission identifier admin is already in use.",
 		},
 		{
@@ -595,7 +596,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 				{Id: 32, PermissionIdentifier: "read", Description: "Write"},
 			}, loaded),
 			wantStatus:      http.StatusBadRequest,
-			wantCode:        "VALIDATION_ERROR",
+			wantCode:        i18n.ErrCodePermissionIdentifierInUse,
 			wantDescription: "Permission identifier write is already in use.",
 		},
 		{
@@ -603,7 +604,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 			stored:          stored,
 			body:            resourcePermsBody(t, []api.ResourcePermissionUpsert{{PermissionIdentifier: "read", Description: "Read again"}}, loaded),
 			wantStatus:      http.StatusBadRequest,
-			wantCode:        "VALIDATION_ERROR",
+			wantCode:        i18n.ErrCodePermissionIdentifierInUse,
 			wantDescription: "Permission identifier read is already in use.",
 		},
 	}
@@ -615,7 +616,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 				stored:             builtIns,
 				body:               resourcePermsBody(t, without(i), loadedEntries(builtIns)),
 				wantStatus:         http.StatusBadRequest,
-				wantCode:           "VALIDATION_ERROR",
+				wantCode:           i18n.ErrCodePermissionBuiltInDeleted,
 				wantDescription:    "Built-in permission '" + identifier + "' cannot be deleted.",
 			},
 			refusedSave{
@@ -624,7 +625,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 				stored:             builtIns,
 				body:               resourcePermsBody(t, renamed(i), loadedEntries(builtIns)),
 				wantStatus:         http.StatusBadRequest,
-				wantCode:           "VALIDATION_ERROR",
+				wantCode:           i18n.ErrCodePermissionBuiltInRenamed,
 				wantDescription:    "Built-in permission '" + identifier + "' cannot be renamed.",
 			},
 		)

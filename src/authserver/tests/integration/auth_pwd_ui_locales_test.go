@@ -80,8 +80,8 @@ func TestAuthPwd_UILocales_EnglishSaysSignIn(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
-	assert.Equal(t, "Sign in", strings.TrimSpace(doc.Find("h2").Text()))
-	assert.Equal(t, "Sign in", strings.TrimSpace(doc.Find("form button.btn-primary").Text()))
+	assert.Equal(t, "Sign in", strings.TrimSpace(doc.Find("h1").Text()))
+	assert.Equal(t, "Sign in", strings.TrimSpace(doc.Find(`form button[type="submit"]`).Text()))
 	assert.NotContains(t, doc.Find("body").Text(), "Login",
 		"expected no 'Login' on the English /auth/pwd page")
 }

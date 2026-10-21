@@ -1,0 +1,1990 @@
+/* Goiabada's design tokens and components, shared by the auth server and the admin console.
+
+   This file is identical in both applications' web/tailwindcss folders, so a copy of either folder
+   builds on its own; a test in each web package holds the two copies to each other, and another
+   holds every text and background pair below to WCAG AA contrast in both themes. Edit one copy,
+   copy it over the other, and regenerate both main.css files.
+
+   Themes. The settings store one of three values: empty (automatic: follow the device), "light"
+   or "dark". The layouts write data-theme only for "light" and "dark", so an empty or unknown value
+   follows the device. The dark palette is written once, under the dark variant below, which applies
+   it when data-theme is "dark", or when the device prefers dark and data-theme is not "light". */
+
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}
+
+/* The light palette, and every token's name. A color token is a text, background or border
+   utility too: bg-surface, text-ink-muted, border-line. */
+@theme {
+  --color-canvas: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-subtle: #eef0f3;
+  --color-line: #d8dce3;
+  --color-line-strong: #737d8c;
+  --color-ink: #1a1f29;
+  --color-ink-muted: #535c6c;
+  --color-brand: #2456c4;
+  --color-brand-strong: #1c4399;
+  --color-on-brand: #ffffff;
+  --color-brand-soft: #e6edfb;
+  --color-danger: #b42318;
+  --color-danger-strong: #8f1c13;
+  --color-on-danger: #ffffff;
+  --color-danger-soft: #fdeceb;
+  --color-danger-ink: #8f1c13;
+  --color-positive-soft: #e3f3e8;
+  --color-positive-ink: #17612f;
+  --color-caution-soft: #fdf2d6;
+  --color-caution-ink: #6b4400;
+  --color-note-soft: #e6edfb;
+  --color-note-ink: #1d4796;
+  --color-focus: #2456c4;
+
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
+
+  --shadow-panel: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.08);
+  --shadow-overlay: 0 12px 32px rgb(16 24 40 / 0.18), 0 2px 6px rgb(16 24 40 / 0.08);
+}
+
+@layer base {
+  /* The root carries the page color too, so an overscroll shows the canvas rather than white. */
+  :root {
+    color-scheme: light;
+    background-color: var(--color-canvas);
+
+    @variant dark {
+      color-scheme: dark;
+      --color-canvas: #0f1217;
+      --color-surface: #171b22;
+      --color-subtle: #1f242d;
+      --color-line: #2f3541;
+      --color-line-strong: #6f7889;
+      --color-ink: #e6e8ec;
+      --color-ink-muted: #a0a8b6;
+      --color-brand: #8ab4ff;
+      --color-brand-strong: #a9c7ff;
+      --color-on-brand: #0b1a33;
+      --color-brand-soft: #1c2a44;
+      --color-danger: #ff8f85;
+      --color-danger-strong: #ffb0a8;
+      --color-on-danger: #330b07;
+      --color-danger-soft: #3a1714;
+      --color-danger-ink: #ffb4ab;
+      --color-positive-soft: #11291a;
+      --color-positive-ink: #8fd6a5;
+      --color-caution-soft: #2e2410;
+      --color-caution-ink: #f0c96a;
+      --color-note-soft: #142340;
+      --color-note-ink: #a8c7ff;
+      --color-focus: #8ab4ff;
+      --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.4);
+      --shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.4);
+    }
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* No transition at all, rather than a very short one: every element transitions every property
+     by default, so a short duration made a panel's button start one at "hidden" as the panel
+     opened, and the script could not focus it. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* The two classes the message catalogs write into their HTML, in dialog sentences, which operators'
+   override catalogs may write too: a value the sentence names, and an error detail. */
+@utility text-accent {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+@utility text-error {
+  color: var(--color-danger-ink);
+}
+
+@layer components {
+  /* Page structure */
+
+  .page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .page-eyebrow {
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    color: var(--color-ink-muted);
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+
+  .page-lead {
+    margin-top: 0.25rem;
+    color: var(--color-ink-muted);
+    max-width: 65ch;
+    overflow-wrap: anywhere;
+  }
+
+  .page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* One column no wider than its container, as a field's, so a table wider than the page scrolls
+     inside its .table-scroll rather than widening the page. */
+  .stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .form-grid {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 48rem) {
+    .form-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  /* Panel: a surface holding a form, a list or a section of a page. */
+
+  .panel {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .panel-body {
+    padding: 1.25rem;
+  }
+
+  .panel-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--color-line);
+  }
+
+  @media (min-width: 40rem) {
+    .panel-body {
+      padding: 1.5rem;
+    }
+
+    .panel-footer {
+      padding: 1rem 1.5rem;
+    }
+  }
+
+  .panel-title {
+    font-size: 1.0625rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+
+  /* A panel in sections: each a .panel-body, under its own .panel-title, ruled off from the one
+     before. */
+  .panel-body + .panel-body {
+    border-top: 1px solid var(--color-line);
+  }
+
+  /* Buttons. A button names what it does; .button-primary is the one main action of its form. */
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0.4375rem 1rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    line-height: 1.5rem;
+    font-weight: 550;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+
+  .button:where(:not(:disabled, [aria-disabled="true"])):hover {
+    background-color: var(--color-subtle);
+  }
+
+  .button:disabled,
+  .button[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .button > svg {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .button-primary {
+    border-color: var(--color-brand);
+    background-color: var(--color-brand);
+    color: var(--color-on-brand);
+  }
+
+  .button-primary:where(:not(:disabled, [aria-disabled="true"])):hover {
+    border-color: var(--color-brand-strong);
+    background-color: var(--color-brand-strong);
+  }
+
+  .button-danger {
+    border-color: var(--color-danger);
+    background-color: var(--color-danger);
+    color: var(--color-on-danger);
+  }
+
+  .button-danger:where(:not(:disabled, [aria-disabled="true"])):hover {
+    border-color: var(--color-danger-strong);
+    background-color: var(--color-danger-strong);
+  }
+
+  .button-quiet {
+    border-color: transparent;
+    background-color: transparent;
+  }
+
+  .button-sm {
+    min-height: 2rem;
+    padding: 0.1875rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+  }
+
+  .button-icon {
+    width: 2.5rem;
+    padding: 0;
+  }
+
+  .button-sm.button-icon {
+    width: 2rem;
+  }
+
+  .button-block {
+    width: 100%;
+  }
+
+  /* Links inside text. Navigation links are styled by their own component. */
+
+  .text-link {
+    color: var(--color-brand);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  .text-link:hover {
+    color: var(--color-brand-strong);
+    text-decoration-thickness: 2px;
+  }
+
+  .text-link-danger {
+    color: var(--color-danger-ink);
+  }
+
+  .text-link-danger:hover {
+    color: var(--color-danger-ink);
+  }
+
+  /* Fields: a label, a control, an optional hint and an optional error, in that order. */
+
+  /* One column no wider than the field, so a control whose content is wider, such as a select
+     whose longest option is, shrinks to it rather than widening the page. */
+  .field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 0.375rem;
+  }
+
+  .field-label {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+  }
+
+  /* A hint and a refusal wrap anywhere, since a refusal can quote a long value back, such as a
+     URL. */
+  .field-hint {
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--color-ink-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .field-error {
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--color-danger-ink);
+    overflow-wrap: anywhere;
+  }
+
+  .control {
+    display: block;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.4375rem 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .control::placeholder {
+    color: var(--color-ink-muted);
+    opacity: 1;
+  }
+
+  .control:focus-visible {
+    border-color: var(--color-focus);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 0;
+  }
+
+  .control[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+
+  /* An invalid field keeps saying so while it has focus: its ring is drawn in the danger color
+     rather than a blue ring around a red border. */
+  .control[aria-invalid="true"]:focus-visible {
+    outline-color: var(--color-danger);
+  }
+
+  .control:disabled,
+  .control[readonly] {
+    background-color: var(--color-subtle);
+    color: var(--color-ink-muted);
+  }
+
+  .control:disabled {
+    cursor: not-allowed;
+  }
+
+  textarea.control {
+    min-height: 6rem;
+    resize: vertical;
+  }
+
+  select.control,
+  .control.combobox-input {
+    appearance: none;
+    padding-right: 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23535c6c'%3E%3Cpath fill-rule='evenodd' d='M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25rem;
+
+    @variant dark {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23a0a8b6'%3E%3Cpath fill-rule='evenodd' d='M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    }
+  }
+
+  .control-mono {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+  }
+
+  /* A control and the button that acts on it, side by side while both fit. */
+  .input-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .input-row > .control {
+    flex: 1 1 16rem;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* A checkbox or radio with its label beside it. */
+
+  .choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+  }
+
+  .choice > input {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.1875rem;
+    accent-color: var(--color-brand);
+  }
+
+  .choice-label {
+    font-weight: 500;
+  }
+
+  /* A switch: a checkbox carrying role="switch". */
+
+  .switch {
+    position: relative;
+    flex: none;
+    width: 2.75rem;
+    height: 1.5rem;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    background-color: var(--color-line-strong);
+    appearance: none;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .switch::before {
+    content: "";
+    position: absolute;
+    top: 0.125rem;
+    left: 0.125rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background-color: var(--color-surface);
+    transition: transform 0.15s;
+  }
+
+  .switch:checked {
+    background-color: var(--color-brand);
+  }
+
+  .switch:checked::before {
+    transform: translateX(1.25rem);
+  }
+
+  .switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /* An option card: a radio and its label and description, laid out as one large target. */
+
+  .option-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    cursor: pointer;
+  }
+
+  .option-card:hover {
+    border-color: var(--color-line-strong);
+  }
+
+  .option-card:has(input:checked) {
+    border-color: var(--color-brand);
+    background-color: var(--color-brand-soft);
+    box-shadow: inset 0 0 0 1px var(--color-brand);
+  }
+
+  .option-card > input {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.1875rem;
+    accent-color: var(--color-brand);
+  }
+
+  /* A checklist: several of many, each a checkbox row with its description, in one box. An
+     unticked row's text is dimmed, so what is left out shows at a glance. */
+
+  .check-list {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    overflow: hidden;
+  }
+
+  .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    cursor: pointer;
+  }
+
+  .check-row + .check-row {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .check-row:hover {
+    background-color: var(--color-subtle);
+  }
+
+  .check-row > input {
+    flex: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.1875rem;
+    accent-color: var(--color-brand);
+  }
+
+  .check-row:has(> input:not(:checked)) .choice-label {
+    color: var(--color-ink-muted);
+  }
+
+  .check-row:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+
+  .check-row:has(> input:disabled):hover {
+    background-color: transparent;
+  }
+
+  /* Notices: a message about the page or the last action. */
+
+  .notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    line-height: 1.5rem;
+  }
+
+  .notice > svg {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.125rem;
+  }
+
+  .notice > :not(svg) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .notice-danger {
+    background-color: var(--color-danger-soft);
+    color: var(--color-danger-ink);
+  }
+
+  .notice-positive {
+    background-color: var(--color-positive-soft);
+    color: var(--color-positive-ink);
+  }
+
+  .notice-caution {
+    background-color: var(--color-caution-soft);
+    color: var(--color-caution-ink);
+  }
+
+  .notice-note {
+    background-color: var(--color-note-soft);
+    color: var(--color-note-ink);
+  }
+
+  /* Tags: a short status beside a value. */
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.0625rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    background-color: var(--color-subtle);
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .tag-positive {
+    background-color: var(--color-positive-soft);
+    color: var(--color-positive-ink);
+  }
+
+  .tag-danger {
+    background-color: var(--color-danger-soft);
+    color: var(--color-danger-ink);
+  }
+
+  .tag-caution {
+    background-color: var(--color-caution-soft);
+    color: var(--color-caution-ink);
+  }
+
+  .tag-note {
+    background-color: var(--color-note-soft);
+    color: var(--color-note-ink);
+  }
+
+  /* Tables. A table wider than its place scrolls inside .table-scroll, never the page. */
+
+  /* Positioned, so the visually hidden text in its cells is placed within it and scrolls with
+     the table, rather than widening the page from where the table overflows. */
+  .table-scroll {
+    position: relative;
+    overflow-x: auto;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .data-table th {
+    padding: 0.625rem 1rem;
+    background-color: var(--color-subtle);
+    color: var(--color-ink-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--color-line);
+    vertical-align: top;
+  }
+
+  .data-table tbody tr:hover {
+    background-color: color-mix(in srgb, var(--color-subtle) 55%, transparent);
+  }
+
+  /* The row an editor above the table is changing, marked while the edit lasts. */
+  .data-table tbody tr[data-editing] {
+    background-color: var(--color-brand-soft);
+  }
+
+  .data-table .cell-actions {
+    text-align: end;
+    white-space: nowrap;
+  }
+
+  .data-table .cell-mono {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+
+  .data-table .text-link {
+    text-decoration: none;
+  }
+
+  .data-table .text-link:hover {
+    text-decoration: underline;
+  }
+
+  .cell-wrap {
+    overflow-wrap: anywhere;
+  }
+
+  /* A monospace cell marked cell-wrap wraps too, as a long URI or scope in a list must, rather than
+     widen the table. */
+  .data-table .cell-mono.cell-wrap {
+    white-space: normal;
+  }
+
+  /* A list table that stacks on narrow screens: each row becomes a card, its first cell the
+     card's title and every other cell a line labelled with its column's name, from the cell's
+     data-label. The labels are text a screen reader reads too, so a cell keeps its meaning where
+     a browser stops treating the restyled table as a table, as Safari can; explicit table roles
+     would avoid that, but HTML forbids them on a table's rows and cells. */
+  @media (max-width: 39.99rem) {
+    .data-table-stack,
+    .data-table-stack tbody,
+    .data-table-stack tr,
+    .data-table-stack td {
+      display: block;
+    }
+
+    /* A block, so its overflow is hidden: a table header group ignores overflow, and its cells
+       would widen the page by their text. */
+    .data-table-stack thead {
+      display: block;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .data-table-stack tr {
+      padding: 0.875rem 1rem;
+      border-top: 1px solid var(--color-line);
+    }
+
+    .data-table-stack tbody tr:first-child {
+      border-top: 0;
+    }
+
+    .data-table-stack td {
+      padding: 0.125rem 0;
+      border-top: 0;
+    }
+
+    .data-table-stack td:first-child {
+      padding-bottom: 0.375rem;
+      font-weight: 600;
+    }
+
+    .data-table-stack td[data-label]::before {
+      content: attr(data-label) ": ";
+      color: var(--color-ink-muted);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .data-table-stack .cell-actions {
+      padding-top: 0.5rem;
+      text-align: start;
+    }
+
+    .data-table-stack .cell-mono {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table-stack .cell-secondary {
+      display: inline;
+    }
+
+    .data-table-stack .cell-secondary::before {
+      content: " · ";
+    }
+  }
+
+  .cell-secondary {
+    display: block;
+    color: var(--color-ink-muted);
+  }
+
+  /* Tabs: links between the sections of one record, one row of underlined tabs while they fit.
+     Where they do not, the console's shell script marks the bar data-wrapped and the tabs wrap
+     into rows of pills, the current one filled, so the bar never scrolls; without a script they
+     wrap as they are. */
+
+  /* The bar's baseline is an inset shadow rather than a border, so the current tab's underline
+     sits on it. */
+  .tab-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: inset 0 -1px 0 var(--color-line);
+  }
+
+  .tab-bar[data-wrapped] {
+    gap: 0.5rem;
+    box-shadow: none;
+  }
+
+  .tab-bar[data-wrapped] .tab-item {
+    padding: 0.375rem 0.875rem;
+    border: 1px solid var(--color-line);
+    border-radius: 9999px;
+  }
+
+  .tab-bar[data-wrapped] .tab-item:hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-subtle);
+  }
+
+  .tab-bar[data-wrapped] .tab-item[aria-current="page"] {
+    border-color: var(--color-brand);
+    background-color: var(--color-brand-soft);
+  }
+
+  .tab-item {
+    flex: none;
+    padding: 0.625rem;
+    border-bottom: 2px solid transparent;
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 550;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .tab-item:hover {
+    border-bottom-color: var(--color-line-strong);
+    color: var(--color-ink);
+  }
+
+  .tab-item[aria-current="page"] {
+    border-bottom-color: var(--color-brand);
+    color: var(--color-ink);
+    font-weight: 650;
+  }
+
+  /* The paginator. */
+
+  .pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .pager-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    color: var(--color-ink);
+    font-size: 0.875rem;
+    font-weight: 550;
+    text-decoration: none;
+  }
+
+  a.pager-item:hover {
+    border-color: var(--color-line);
+    background-color: var(--color-subtle);
+  }
+
+  .pager-item[aria-current="page"] {
+    border-color: var(--color-brand);
+    background-color: var(--color-brand);
+    color: var(--color-on-brand);
+  }
+
+  .pager-item[aria-disabled="true"] {
+    color: var(--color-ink-muted);
+    opacity: 0.6;
+  }
+
+  .pager-item > svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* Dialogs: a <dialog> opened with showModal(). */
+
+  .dialog {
+    width: min(32rem, calc(100% - 2rem));
+    max-height: calc(100% - 2rem);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .dialog::backdrop {
+    background-color: rgb(10 14 20 / 0.55);
+  }
+
+  .dialog-panel {
+    display: grid;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+
+  .dialog-title {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 650;
+  }
+
+  .dialog-message {
+    color: var(--color-ink);
+    overflow-wrap: anywhere;
+  }
+
+  .dialog-message > ul {
+    display: grid;
+    gap: 0.5rem;
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
+  .dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .dialog-wide {
+    width: min(42rem, calc(100% - 2rem));
+  }
+
+  /* An empty list or a search with no result. */
+
+  .empty-state {
+    padding: 2.5rem 1.5rem;
+    color: var(--color-ink-muted);
+    text-align: center;
+  }
+
+  /* A busy indicator, beside a button whose action is in progress. */
+
+  .spinner {
+    display: inline-block;
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: spinner-turn 0.75s linear infinite;
+  }
+
+  @keyframes spinner-turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* A skip link, shown when it takes focus. */
+
+  .skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 60;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-brand);
+    color: var(--color-on-brand);
+    font-weight: 600;
+    transform: translateY(-200%);
+  }
+
+  .skip-link:focus {
+    transform: none;
+  }
+
+  /* The auth server's pages: one centered card. */
+
+  .auth-page {
+    display: flex;
+    min-height: 100vh;
+    min-height: 100dvh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 26.5rem;
+  }
+
+  .auth-card > .panel-body {
+    padding: 1.75rem 1.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 30rem) {
+    .auth-card > .panel-body {
+      padding: 2.25rem 2.25rem 2rem;
+    }
+  }
+
+  .auth-brand {
+    margin-bottom: 1.5rem;
+    color: var(--color-ink-muted);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .auth-client {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .auth-client-logo {
+    width: 4.5rem;
+    height: 4.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: var(--radius-control);
+    object-fit: contain;
+  }
+
+  .auth-client-name {
+    font-weight: 600;
+  }
+
+  .auth-client-description {
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+  }
+
+  .auth-title {
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    text-align: center;
+  }
+
+  .auth-footer {
+    margin-top: 1.5rem;
+    color: var(--color-ink-muted);
+    font-size: 0.9375rem;
+    text-align: center;
+  }
+
+  /* A sentence under the title saying what the page asks for. */
+
+  .auth-title:has(+ .auth-lead) {
+    margin-bottom: 0.5rem;
+  }
+
+  .auth-lead {
+    margin-bottom: 1.5rem;
+    color: var(--color-ink-muted);
+    text-align: center;
+  }
+
+  /* An address the lead names, such as the account a password is for, centered under it. */
+
+  .auth-lead:has(+ .auth-address) {
+    margin-bottom: 0;
+  }
+
+  .auth-lead + .auth-address {
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+
+  /* A page that reports rather than asks: an icon over the title, both centered as its headline,
+     and the message under them, read left to right as the forms' fields are. */
+
+  .auth-status > .auth-title {
+    margin-bottom: 0.75rem;
+  }
+
+  .auth-status > * + p {
+    margin-top: 0.75rem;
+  }
+
+  .auth-status > * + .button {
+    margin-top: 1.5rem;
+  }
+
+  /* An address the page names, on a line of its own so it is read rather than skimmed: where a
+     client asked to send the person, or where a message was sent. */
+
+  .auth-address {
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .status-icon {
+    display: flex;
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 1rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background-color: var(--color-subtle);
+    color: var(--color-ink-muted);
+  }
+
+  .status-icon > svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .status-icon-danger {
+    background-color: var(--color-danger-soft);
+    color: var(--color-danger-ink);
+  }
+
+  .status-icon-positive {
+    background-color: var(--color-positive-soft);
+    color: var(--color-positive-ink);
+  }
+
+  .status-icon-caution {
+    background-color: var(--color-caution-soft);
+    color: var(--color-caution-ink);
+  }
+
+  .status-icon-note {
+    background-color: var(--color-note-soft);
+    color: var(--color-note-ink);
+  }
+
+  /* Two answers side by side, the decline first and the main action last; stacked when narrow. */
+
+  .auth-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+    gap: 0.75rem;
+  }
+
+  /* Numbered steps: a quiet number beside each, as a plain numbered list draws it. */
+
+  .auth-steps {
+    display: grid;
+    gap: 1rem;
+    counter-reset: step;
+  }
+
+  .auth-steps > li {
+    position: relative;
+    padding-left: 1.5rem;
+    counter-increment: step;
+  }
+
+  .auth-steps > li::before {
+    content: counter(step) ".";
+    position: absolute;
+    top: 0;
+    left: 0;
+    color: var(--color-ink-muted);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A QR code, which keeps its own light background in either theme so any camera reads it. */
+
+  .auth-qr {
+    display: block;
+    width: 12rem;
+    height: 12rem;
+    margin: 0.75rem auto 0;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+  }
+
+  /* A secret a person copies by hand, such as an authenticator key, and the button that copies it
+     where the browser can. */
+
+  .secret-key-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .secret-key-row > .secret-key {
+    flex: 1 1 14rem;
+    margin-top: 0;
+  }
+
+  .secret-key {
+    display: block;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  /* An identifier shown beside its description, such as a scope's name. */
+
+  .code-hint {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--color-ink-muted);
+    overflow-wrap: anywhere;
+  }
+
+  /* A record's facts, each a term and its value, such as what deleting the record takes with it.
+     The terms sit above their values on a narrow screen and beside them on a wide one. */
+  .detail-list {
+    display: grid;
+    gap: 0.125rem 1.5rem;
+  }
+
+  .detail-list dt {
+    color: var(--color-ink-muted);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+
+  .detail-list dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .detail-list dd + dt {
+    margin-top: 0.75rem;
+  }
+
+  /* Side by side, a label and its value share a baseline, whatever the value's font and size. */
+  @media (min-width: 40rem) {
+    .detail-list {
+      grid-template-columns: max-content minmax(0, 1fr);
+      row-gap: 0.75rem;
+      align-items: baseline;
+    }
+
+    .detail-list dd + dt {
+      margin-top: 0;
+    }
+  }
+
+  /* The person signed in, with what they can do about it, such as sign out. */
+
+  .identity-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: var(--radius-control);
+    background-color: var(--color-subtle);
+  }
+
+  .identity-row-who {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .identity-row-who > :last-child {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  /* A list of destinations: each row one link, with an icon, a title and a line saying what is
+     there. */
+
+  .link-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    text-decoration: none;
+  }
+
+  .link-row:hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-subtle);
+  }
+
+  .link-row > svg {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-brand);
+  }
+
+  .link-row > svg:last-child {
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-ink-muted);
+  }
+
+  .link-row-text {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 0.125rem;
+  }
+
+  .link-row-title {
+    font-weight: 600;
+  }
+
+  .link-row-hint {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--color-ink-muted);
+  }
+
+  /* A heading between two groups of a card's content. */
+
+  .auth-section-title {
+    margin-top: 1.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  /* A searchable list: a field that filters a select's options by any part of their text as a
+     person types, and the matches below it, which the console's script builds over a select
+     marked data-searchable. The option the arrow keys are on is aria-selected; the one chosen is bold. */
+
+  .combobox {
+    position: relative;
+  }
+
+  .combobox-popup {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: 16rem;
+    padding: 0.25rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  /* The list scrolls, not the popup around it, so what scrolls is the listbox the field controls,
+     which is what a combobox's popup is to assistive technology, and to axe. */
+  .combobox-popup > [role="listbox"] {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .combobox-popup-up {
+    top: auto;
+    bottom: calc(100% + 0.25rem);
+  }
+
+  .combobox-option {
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+
+  .combobox-option:hover {
+    background-color: var(--color-subtle);
+  }
+
+  .combobox-option[aria-selected="true"] {
+    outline: 2px solid transparent;
+    background-color: var(--color-brand-soft);
+  }
+
+  .combobox-option-chosen {
+    font-weight: 600;
+  }
+
+  .combobox-empty {
+    padding: 0.375rem 0.625rem;
+    color: var(--color-ink-muted);
+  }
+
+  /* An image a page lets a person upload, crop and delete: its preview, round for a picture and
+     square for a logo, beside its buttons and help. The preview shows its placeholder icon only
+     while it holds no image. */
+
+  .image-upload {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem 1.5rem;
+  }
+
+  .image-preview {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 8rem;
+    height: 8rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background-color: var(--color-subtle);
+    color: var(--color-ink-muted);
+  }
+
+  .image-preview-square {
+    border-radius: var(--radius-panel);
+  }
+
+  .image-preview > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .image-preview-square > img {
+    object-fit: contain;
+  }
+
+  .image-preview > svg {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .image-preview:has(img) > svg {
+    display: none;
+  }
+
+  /* The area an image is cropped in, which the cropper's canvas fills, and below it the sliders
+     that do what dragging the crop does, each a label beside its slider. */
+
+  .crop-area {
+    height: min(24rem, 55vh);
+  }
+
+  .crop-area cropper-canvas {
+    height: 100%;
+  }
+
+  .crop-controls {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+  }
+
+  .crop-slider {
+    width: 100%;
+    accent-color: var(--color-brand);
+  }
+
+  /* The admin console's shell: a sidebar beside the page on wide screens, and a panel the menu
+     button opens on narrow ones. */
+
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    display: flex;
+    width: min(18rem, 85vw);
+    flex-direction: column;
+    border-right: 1px solid var(--color-line);
+    background-color: var(--color-surface);
+    transform: translateX(-100%);
+    visibility: hidden;
+  }
+
+  /* The panel slides only while the menu button opens or closes it, never when the window crosses
+     the width where the sidebar becomes a panel. Opening shows it at once, so focus can move into
+     it in the same moment; closing hides it once it has slid away. */
+  .app-sidebar[data-open] {
+    transition:
+      transform 0.2s,
+      visibility 0s linear 0.2s;
+  }
+
+  .app-sidebar[data-open="true"] {
+    box-shadow: var(--shadow-overlay);
+    transform: none;
+    visibility: visible;
+    transition: transform 0.2s;
+  }
+
+  .app-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background-color: rgb(10 14 20 / 0.55);
+  }
+
+  .app-body {
+    display: flex;
+    min-height: 100vh;
+    min-height: 100dvh;
+    flex-direction: column;
+  }
+
+  /* The header and the sidebar's head are one height, so their lower borders meet where the
+     sidebar's border crosses them. */
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 4rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--color-line);
+    background-color: var(--color-surface);
+  }
+
+  .app-header-brand {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .app-header-end {
+    margin-left: auto;
+  }
+
+  .app-main {
+    flex: 1;
+    width: 100%;
+    max-width: 80rem;
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .app-main:focus {
+    outline: none;
+  }
+
+  @media (min-width: 40rem) {
+    .app-main {
+      padding: 2rem 1.5rem 3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .app-sidebar {
+      width: 17rem;
+      transform: none;
+      visibility: visible;
+    }
+
+    .app-sidebar[data-open="true"] {
+      box-shadow: none;
+    }
+
+    .app-backdrop,
+    .app-menu-button,
+    .app-sidebar-close {
+      display: none;
+    }
+
+    .app-body {
+      margin-left: 17rem;
+    }
+
+    .app-header-brand {
+      visibility: hidden;
+    }
+
+    .app-main {
+      padding: 2rem 2.5rem 3rem;
+    }
+  }
+
+  .sidebar {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .sidebar-head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 4rem;
+    padding: 0.5rem 0.75rem 0.5rem 1.25rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .sidebar-brand {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+  }
+
+  .sidebar-foot {
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--color-line);
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+  }
+
+  .nav-list {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .nav-section {
+    margin: 1.25rem 0 0.375rem;
+    padding: 0 0.75rem;
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-control);
+    color: var(--color-ink-muted);
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    font-weight: 550;
+    text-decoration: none;
+  }
+
+  .nav-link:hover {
+    background-color: var(--color-subtle);
+    color: var(--color-ink);
+  }
+
+  .nav-link[aria-current="page"] {
+    border-left-color: var(--color-brand);
+    background-color: var(--color-brand-soft);
+    color: var(--color-ink);
+    font-weight: 650;
+  }
+
+  .nav-link > svg {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* The user menu in the header: a button that shows and hides a list of links. */
+
+  .user-menu {
+    position: relative;
+  }
+
+  .user-menu-button {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    max-width: 18rem;
+    min-height: 2.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-control);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .user-menu-button:hover,
+  .user-menu-button[aria-expanded="true"] {
+    background-color: var(--color-subtle);
+  }
+
+  .user-menu-avatar {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    background-color: var(--color-brand-soft);
+    color: var(--color-ink);
+  }
+
+  .user-menu-avatar > svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .user-menu-who {
+    display: none;
+    min-width: 0;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  @media (min-width: 40rem) {
+    .user-menu-who {
+      display: block;
+    }
+  }
+
+  .user-menu-name,
+  .user-menu-email {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-menu-name {
+    font-weight: 600;
+  }
+
+  .user-menu-email {
+    color: var(--color-ink-muted);
+  }
+
+  .user-menu-panel {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    right: 0;
+    z-index: 45;
+    width: max-content;
+    min-width: 13rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.375rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    background-color: var(--color-surface);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .user-menu-identity {
+    padding: 0.5rem 0.625rem 0.625rem;
+    border-bottom: 1px solid var(--color-line);
+    margin-bottom: 0.375rem;
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 40rem) {
+    .user-menu-identity {
+      display: none;
+    }
+  }
+
+  .user-menu-link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius-control);
+    font-size: 0.9375rem;
+    text-decoration: none;
+  }
+
+  .user-menu-link:hover {
+    background-color: var(--color-subtle);
+  }
+
+  .user-menu-link > svg {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-ink-muted);
+  }
+
+  .user-menu-separated {
+    margin-top: 0.375rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid var(--color-line);
+  }
+
+  /* A theme's picture on the theme settings page: its page, a card, two lines of text and a
+     button, in the theme's own colors whatever theme the page is drawn in. The automatic theme's
+     is the two side by side. */
+
+  .theme-swatch {
+    display: block;
+    width: 100%;
+    height: 4rem;
+    margin-bottom: 0.375rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.375rem;
+    background-repeat: no-repeat;
+  }
+
+  .theme-swatch-light {
+    background-image:
+      linear-gradient(#1a1f29, #1a1f29), linear-gradient(#535c6c, #535c6c),
+      linear-gradient(#2456c4, #2456c4), linear-gradient(#ffffff, #ffffff);
+    background-position: 1rem 1rem, 1rem 1.75rem, 1rem 2.5rem, 0.5rem 0.5rem;
+    background-size: 55% 0.375rem, 35% 0.375rem, 2.75rem 0.625rem, calc(100% - 1rem) calc(100% - 1rem);
+    background-color: #f4f5f7;
+  }
+
+  .theme-swatch-dark {
+    background-image:
+      linear-gradient(#e6e8ec, #e6e8ec), linear-gradient(#a0a8b6, #a0a8b6),
+      linear-gradient(#8ab4ff, #8ab4ff), linear-gradient(#171b22, #171b22);
+    background-position: 1rem 1rem, 1rem 1.75rem, 1rem 2.5rem, 0.5rem 0.5rem;
+    background-size: 55% 0.375rem, 35% 0.375rem, 2.75rem 0.625rem, calc(100% - 1rem) calc(100% - 1rem);
+    background-color: #0f1217;
+  }
+
+  .theme-swatch-auto {
+    display: flex;
+    overflow: hidden;
+  }
+
+  .theme-swatch-auto > span {
+    flex: 1;
+    background-repeat: no-repeat;
+  }
+
+  /* Windows high-contrast mode, and any other forced palette: draw with the system's colors where
+     a component's state was shown by its own colors alone. */
+
+  @media (forced-colors: active) {
+    .switch {
+      border-color: CanvasText;
+      background-color: Canvas;
+      forced-color-adjust: none;
+    }
+
+    .switch::before {
+      background-color: CanvasText;
+    }
+
+    .switch:checked {
+      background-color: Highlight;
+    }
+
+    .switch:checked::before {
+      background-color: HighlightText;
+    }
+
+    .option-card:has(input:checked),
+    .pager-item[aria-current="page"] {
+      border-color: Highlight;
+    }
+
+    /* A forced palette paints the transparent left border every link keeps for the current
+       page's marker, so the marker is drawn on the current link alone. */
+    .nav-link {
+      border-left-style: none;
+      padding-left: calc(0.75rem + 3px);
+    }
+
+    .nav-link[aria-current="page"] {
+      border-left-style: solid;
+      border-left-color: Highlight;
+      padding-left: 0.75rem;
+    }
+
+    /* A theme's picture shows the theme's own colors, which is all it is for. */
+    .theme-swatch,
+    .theme-swatch-light,
+    .theme-swatch-dark {
+      forced-color-adjust: none;
+    }
+
+    .tab-item[aria-current="page"],
+    .tab-bar[data-wrapped] .tab-item[aria-current="page"] {
+      border-color: Highlight;
+    }
+
+    .combobox-option[aria-selected="true"] {
+      outline-color: Highlight;
+    }
+  }
+}

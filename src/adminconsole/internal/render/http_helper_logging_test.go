@@ -76,7 +76,8 @@ func errorPageHelper() *Renderer {
 	return New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	})
+	}, nil)
+
 }
 
 func notFoundPageHelper() *Renderer {
@@ -84,7 +85,8 @@ func notFoundPageHelper() *Renderer {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	})
+	}, nil)
+
 }
 
 // Decision 11's other half, and the half no status assertion can see. The console reaches NotFound
@@ -232,7 +234,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 
 func TestJSONError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{})
+	httpHelper := New(fstest.MapFS{}, nil)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JSONError(w, r, errs.New("not a wire error"))
@@ -270,7 +272,7 @@ func TestJSONError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJSONError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{})
+	httpHelper := New(fstest.MapFS{}, nil)
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JSONError(w, r, oauth.NewErrorDetail("server_error", "The operation failed."))
@@ -310,7 +312,7 @@ func TestJSONError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // and the id on the wire have to be the same string (#279 decision 9, #435).
 func TestJSONError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{})
+	httpHelper := New(fstest.MapFS{}, nil)
 
 	detail := oauth.NewErrorDetailWithHTTPStatus("server_error", "The operation failed.",
 		http.StatusInternalServerError)
@@ -349,7 +351,7 @@ func TestJSONError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 // of to the client.
 func TestJSONError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	httpHelper := New(fstest.MapFS{})
+	httpHelper := New(fstest.MapFS{}, nil)
 
 	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
@@ -379,7 +381,7 @@ func TestJSONError_ReadsAWrappedErrorDetail(t *testing.T) {
 // decides the answer through a wrapper, which is the half of this row decision 6 is about (#279,
 // #440).
 func TestJSONError_SendsNoWWWAuthenticateChallenge(t *testing.T) {
-	httpHelper := New(fstest.MapFS{})
+	httpHelper := New(fstest.MapFS{}, nil)
 
 	detail := oauth.NewErrorDetailWithHTTPStatus("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized).

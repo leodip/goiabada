@@ -86,20 +86,19 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 		req        api.UpdateResourcePermissionsRequest
 		wantStatus int
 		wantMsg    string
-		// wantCode is asserted only when set: most of these refusals are literal strings under
-		// the generic VALIDATION_ERROR code, and only the ones going through a localized
-		// validator carry a catalog key.
+		// wantCode is the refusal's catalog key, which every one of these answers as its
+		// error_code (#617).
 		wantCode string
 	}{
-		{"empty identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "", Description: "x"}}}, http.StatusBadRequest, "Permission identifier is required", ""},
-		{"invalid format", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "__bad", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", ""},
+		{"empty identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "", Description: "x"}}}, http.StatusBadRequest, "Permission identifier is required", "handler.permission.identifier_required"},
+		{"invalid format", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "__bad", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", "validator.identifier.invalid_format"},
 		// The identifier reaches IdentifierValidator.Validate as it was sent. It used to be run through the
 		// HTML sanitizer first, which turned "valid<b" into "valid" and created a permission under
 		// a name the caller never asked for (#275).
-		{"html in identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "valid<b", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", ""},
+		{"html in identifier", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "valid<b", Description: "x"}}}, http.StatusBadRequest, "Invalid identifier format", "validator.identifier.invalid_format"},
 		{"html in description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: "<b>x</b>"}}}, http.StatusBadRequest, "The description contains invalid characters, as we do not permit the use of HTML in the description.", "handler.admin_resource_permissions.description_html_not_allowed"},
-		{"too long description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: strings.Repeat("a", 101)}}}, http.StatusBadRequest, "The description cannot exceed a maximum length of 100 characters.", ""},
-		{"duplicate identifiers", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "dup", Description: "x"}, {PermissionIdentifier: "dup", Description: "y"}}}, http.StatusBadRequest, "Permission dup is duplicated.", ""},
+		{"too long description", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "good", Description: strings.Repeat("a", 101)}}}, http.StatusBadRequest, "The description cannot exceed a maximum length of 100 characters.", "handler.admin_resource_permissions.description_too_long"},
+		{"duplicate identifiers", api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{{PermissionIdentifier: "dup", Description: "x"}, {PermissionIdentifier: "dup", Description: "y"}}}, http.StatusBadRequest, "Permission dup is duplicated.", "handler.permission.duplicated"},
 	}
 
 	for _, tc := range cases {
@@ -112,9 +111,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 			var errResp api.ErrorResponse
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			assert.Contains(t, errResp.ErrorDescription, tc.wantMsg)
-			if tc.wantCode != "" {
-				assert.Equal(t, tc.wantCode, errResp.ErrorCode)
-			}
+			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
 		})
 	}
 
@@ -744,9 +741,10 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 
 	for _, identifier := range builtin.AuthServerPermissionIdentifiers() {
 		for _, change := range []struct {
-			name    string
-			apply   func([]api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert
-			wantEnd string
+			name     string
+			apply    func([]api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert
+			wantEnd  string
+			wantCode string
 		}{
 			{"deleted", func(entries []api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert {
 				kept := make([]api.ResourcePermissionUpsert, 0, len(entries))
@@ -756,7 +754,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 					}
 				}
 				return kept
-			}, "cannot be deleted."},
+			}, "cannot be deleted.", "handler.permission.built_in_deleted"},
 			{"renamed", func(entries []api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert {
 				renamed := make([]api.ResourcePermissionUpsert, len(entries))
 				copy(renamed, entries)
@@ -766,7 +764,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 					}
 				}
 				return renamed
-			}, "cannot be renamed."},
+			}, "cannot be renamed.", "handler.permission.built_in_renamed"},
 		} {
 			t.Run(identifier+" "+change.name, func(t *testing.T) {
 				read := readResourcePermissions(t, url, accessToken)
@@ -780,7 +778,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 				var errResp api.ErrorResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-				assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+				assert.Equal(t, change.wantCode, errResp.ErrorCode)
 				assert.Equal(t, "Built-in permission '"+identifier+"' "+change.wantEnd, errResp.ErrorDescription)
 				assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.Id), "a refused save writes nothing")
 			})

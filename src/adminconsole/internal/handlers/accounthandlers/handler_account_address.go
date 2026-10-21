@@ -149,10 +149,11 @@ func HandleAddressPost(
 				}
 
 				bind := map[string]interface{}{
-					"user":      user,
-					"address":   address,
-					"countries": countries,
-					"error":     errorMessage,
+					"user":       user,
+					"address":    address,
+					"countries":  countries,
+					"error":      errorMessage,
+					"errorField": render.ErrorField(err, render.AddressErrorFields),
 				}
 				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind); renderErr != nil {
 					httpHelper.InternalServerError(w, r, renderErr)

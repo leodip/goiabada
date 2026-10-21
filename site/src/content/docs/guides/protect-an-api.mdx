@@ -13,9 +13,9 @@ Callers show what they may do with an [access token](/concepts/tokens/): a signe
 
 <Steps>
 
-1. Describe your API. In the admin console, open **Admin**, **Resources and permissions** and click **Create new**. Enter a **Resource identifier**, such as `product-api`, and a **Description**, and click **Create**.
+1. Describe your API. In the admin console, open **Admin**, **Resources and permissions** and click **New resource**. Enter a **Resource identifier**, such as `product-api`, and a **Description**, and click **Create resource**.
 
-2. Click **Manage** beside it and open **Permissions**. For each thing your API lets callers do, enter a **Permission identifier**, such as `read` or `write`, and click **Create permission**. Click **Save** when the list is done. Each one is a scope your app can ask for, `product-api:read` and `product-api:write`. See [Resources and permissions](/concepts/resources-and-permissions/).
+2. Click its identifier and open **Permissions**. For each thing your API lets callers do, enter a **Permission identifier**, such as `read` or `write`, and click **Add permission**. Click **Save** when the list is done. Each one is a scope your app can ask for, `product-api:read` and `product-api:write`. See [Resources and permissions](/concepts/resources-and-permissions/).
 
 3. Give the permissions to the users who need them, on each user's **Permissions** tab, or to a group, on the group's **Permissions** tab, so every member gets them. Choose the **Resource** and the **Permission**, click **Grant permission**, and click **Save**: until you save, nothing is granted.
 
@@ -45,9 +45,9 @@ A service that calls your API on its own, with no user, such as a nightly job, g
 
 <Steps>
 
-1. Register the service. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `billing-service`, turn on **Client credentials flow**, turn off **Authorization code flow with PKCE**, and click **Create**.
+1. Register the service. In the admin console, open **Admin**, **Clients** and click **New client**. Enter a **Client identifier**, such as `billing-service`, turn on **Client credentials**, turn off **Authorization code with PKCE**, and click **Create client**.
 
-2. Click **Manage** beside it. On **Permissions**, choose the **Resource** and the **Permission** the service needs, click **Grant permission**, and click **Save**. On **Authentication**, click **Reveal** and copy the **Client secret** to the service's configuration.
+2. Click its identifier. On **Permissions**, choose the **Resource** and the **Permission** the service needs, click **Grant permission**, and click **Save**. On **Authentication**, click **Show** and copy the **Client secret** to the service's configuration.
 
 3. From the service, ask the token endpoint for a token:
 
@@ -116,7 +116,7 @@ If an operation must stop the moment a user is disabled or their session is ende
 ## When something goes wrong
 
 - The app gets `error=invalid_scope`, or a token without the permission: see [invalid_scope](/troubleshooting/invalid-scope/).
-- The service gets `unauthorized_client`: **Client credentials flow** is off for its client, or the client is public.
+- The service gets `unauthorized_client`: **Client credentials** is off for its client, or the client is public.
 - The service gets `invalid_client`: the client identifier or secret is wrong, or the client is disabled.
 
 ## Next steps

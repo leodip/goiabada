@@ -177,6 +177,7 @@ func HandleGroupsWithPermissionGet(
 			"description":                  resource.Description,
 			"isSystemLevelResource":        resource.IsSystemLevelResource,
 			"permissions":                  permissions,
+			"permissionChoices":            render.PermissionChoices(permissions),
 			"selectedPermission":           selectedPermission,
 			"selectedPermissionIdentifier": selectedPermissionIdentifier,
 			"pageResult":                   pageResult,

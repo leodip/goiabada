@@ -33,3 +33,14 @@ func TestDocsReader_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) {
 		"the tests of every package a module imports, so a dependency reached from here lands in "+
 		"the wizard's go.sum (#500, #536).")
 }
+
+// TestIssuerLength_ImportsNothingButErrsAndTheStandardLibrary holds core/issuerlength to being a
+// leaf, for core/adminpassword's reason: the setup wizard calls its one function on the auth server
+// URL it writes, and links whatever it imports (#615).
+func TestIssuerLength_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) {
+	AssertImportsOnly(t, "core/issuerlength", map[string]string{
+		"github.com/leodip/goiabada/core/errs": "the error constructor pattern 7 requires",
+	}, "The setup wizard links whatever this package imports, and it calls one function there. "+
+		"A refusal message that needs localizing, or anything else that needs a dependency, belongs "+
+		"with the caller that renders it, not in the bound the start, the save and the wizard share (#615).")
+}

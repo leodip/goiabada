@@ -45,9 +45,10 @@ func HandleNewPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// A refused group is drawn with every input as submitted, both switches included.
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"error":                message,
+				"errorField":           errorField,
 				"groupIdentifier":      r.FormValue("groupIdentifier"),
 				"description":          r.FormValue("description"),
 				"includeInAccessToken": r.FormValue("includeInAccessToken") == "on",
@@ -84,7 +85,9 @@ func HandleNewPost(
 		// Call API to create group
 		_, err := apiClient.CreateGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, groupErrorFields))
+			})
 			return
 		}
 

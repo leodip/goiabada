@@ -8,8 +8,7 @@ import (
 
 // The one reader of the code a server serves, shared by AssertNoHTMLSinks and the admin console's
 // rule for its dialog builder, so the two read the same code the same way (#120). The reading is
-// lexical, over a small JavaScript tokenizer: no JavaScript runs in any tier, and a parser is a
-// dependency neither module carries.
+// lexical, over a small JavaScript tokenizer.
 //
 // It reads every place a page hands text to the JavaScript parser: a .js file whole; in a .html
 // file every <script> element's body, every on... attribute's value and every javascript: URL, an

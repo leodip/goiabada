@@ -24,11 +24,16 @@ const (
 	SessionIdBytes = 32
 
 	// PreAuthLifetime is how long a browser session that has not yet authenticated
-	// lives. It is short on purpose: /auth/authorize is not rate limited and writes a
-	// session before it validates anything, so every unauthenticated caller costs a row,
-	// and this constant is what bounds how many of them can be alive at once. Generous
-	// for a first sign-in that includes installing an authenticator app and scanning a
-	// code, and far shorter than the day an authenticated session may run for (#266).
+	// lives. It is short on purpose: the auth server's /auth/authorize is not rate
+	// limited and writes a session before it validates anything, so every
+	// unauthenticated caller costs a row, and this constant is what bounds how many of
+	// them can be alive at once (#504). Generous for a first sign-in that includes
+	// installing an authenticator app and scanning a code, and far shorter than the day
+	// an authenticated session may run for (#266).
+	//
+	// The admin console writes no such row: its sign-in handshake rides in a sealed
+	// cookie, which lives this long too, until the callback creates the authenticated
+	// session (#620).
 	PreAuthLifetime = 30 * time.Minute
 
 	// TouchThreshold is how stale last_accessed may get before a read writes it back.
@@ -455,50 +460,10 @@ func (s *ServerSideStore) Get(r *http.Request, name string) (*Session, error) {
 //     session in flight during any database interruption, and would hand anyone who can
 //     briefly disrupt the database a way to sign everybody out
 func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
-	session := s.freshSession(name)
-
-	cookie, err := r.Cookie(s.CookieName(name))
-	if err != nil {
-		return session, nil
+	session, record, err := s.load(r, name)
+	if err != nil || record == nil {
+		return session, err
 	}
-
-	id, err := s.OpenCookie(name, cookie.Value)
-	if err != nil {
-		slog.DebugContext(requestContext(r), "browser session cookie did not decode, starting a fresh session",
-			"session_name", name)
-		return session, nil
-	}
-
-	record, err := s.backend.Load(requestContext(r), id)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return session, nil
-		}
-		// The session goes back beside the error, and it must not be nil. That is this
-		// store's own rule now rather than an interface's: New is not on Store any more
-		// (#269), and Get memoises whatever New returns, so a nil session here would be
-		// handed to every middleware that asks and dereferenced by whichever one looks
-		// at Values before it looks at the error -- on the one path that exists to make
-		// a storage fault diagnosable.
-		//
-		// Nothing fails open as a result. The cookie-reset middleware passes a non-decode
-		// error along, and because Get memoises the (session, error) pair the next
-		// middleware to ask receives the same error and answers 500 with the cause
-		// logged, which is the refusal this store owes a lookup it could not perform
-		// (#266).
-		return session, errs.Wrap(err, "unable to load the browser session")
-	}
-
-	values, err := s.openSessionData(name, record.Data)
-	if err != nil {
-		slog.WarnContext(requestContext(r), "stored browser session data did not decode, starting a fresh session",
-			"error", err, "session_name", name)
-		return session, nil
-	}
-	session.Values = values
-
-	session.ID = id
-	session.IsNew = false
 
 	if err := s.touchIfStale(requestContext(r), session, record); err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -516,6 +481,71 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 	}
 
 	return session, nil
+}
+
+// GetFresh loads the session the request's cookie names as the backend holds it now, past the
+// request's memo: Get answers every later caller on a request from the session it loaded first
+// (#269), which is the copy the request began with and not the row another request may have
+// written since. It neither consults nor fills that memo, so the request's own session, the one
+// a later Save writes, is untouched, and it never writes, not even a touch: Get has touched the
+// session already on this request. Its outcomes are New's: no cookie, a cookie that does not
+// decode and a row gone are a fresh session; a lookup that failed is the error, beside a
+// non-nil session, and never a fresh session on its own (#266). The load runs on the request's
+// context, so a caller bounds it by handing in a request carrying its own deadline (#621).
+func (s *ServerSideStore) GetFresh(r *http.Request, name string) (*Session, error) {
+	session, _, err := s.load(r, name)
+	return session, err
+}
+
+// load is New without the touch: the session the cookie names and the record it was opened
+// from, which is nil whenever the session is a fresh one.
+func (s *ServerSideStore) load(r *http.Request, name string) (*Session, *Record, error) {
+	session := s.freshSession(name)
+
+	cookie, err := r.Cookie(s.CookieName(name))
+	if err != nil {
+		return session, nil, nil
+	}
+
+	id, err := s.OpenCookie(name, cookie.Value)
+	if err != nil {
+		slog.DebugContext(requestContext(r), "browser session cookie did not decode, starting a fresh session",
+			"session_name", name)
+		return session, nil, nil
+	}
+
+	record, err := s.backend.Load(requestContext(r), id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return session, nil, nil
+		}
+		// The session goes back beside the error, and it must not be nil. That is this
+		// store's own rule now rather than an interface's: New is not on Store any more
+		// (#269), and Get memoises whatever New returns, so a nil session here would be
+		// handed to every middleware that asks and dereferenced by whichever one looks
+		// at Values before it looks at the error -- on the one path that exists to make
+		// a storage fault diagnosable.
+		//
+		// Nothing fails open as a result. The cookie-reset middleware passes a non-decode
+		// error along, and because Get memoises the (session, error) pair the next
+		// middleware to ask receives the same error and answers 500 with the cause
+		// logged, which is the refusal this store owes a lookup it could not perform
+		// (#266).
+		return session, nil, errs.Wrap(err, "unable to load the browser session")
+	}
+
+	values, err := s.openSessionData(name, record.Data)
+	if err != nil {
+		slog.WarnContext(requestContext(r), "stored browser session data did not decode, starting a fresh session",
+			"error", err, "session_name", name)
+		return session, nil, nil
+	}
+	session.Values = values
+
+	session.ID = id
+	session.IsNew = false
+
+	return session, record, nil
 }
 
 // freshSession is a session nobody has stored yet: no identifier, no contents, and the

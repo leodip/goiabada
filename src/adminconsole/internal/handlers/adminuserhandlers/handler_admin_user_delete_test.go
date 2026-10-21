@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,6 +110,34 @@ func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bind := renderUserDelete(t, &deleteUserApiClient{user: tc.user})
 			assert.Equal(t, tc.wants, bind["userFullName"])
+		})
+	}
+}
+
+// The deletion asks for the user's email typed, as the client, group and resource deletions ask for
+// the identifier: a blank field and another address are each refused on the page, with nothing
+// deleted, which deleteUserApiClient's DeleteUser would panic on (#617).
+func TestHandleDeletePost_RefusesAnEmailThatIsNotTheUsers(t *testing.T) {
+	for _, typed := range []string{"", "  ", "someone-else@example.com"} {
+		t.Run(typed, func(t *testing.T) {
+			client := &deleteUserApiClient{user: &api.UserResponse{Id: 7, Email: "someone@example.com"}}
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Once()
+
+			req := handlertest.Request(http.MethodPost, "/admin/users/7/delete",
+				handlertest.WithAccessToken(),
+				handlertest.WithRouteParam("userId", "7"),
+				handlertest.WithForm(url.Values{"email": {typed}}),
+			)
+			rec := httptest.NewRecorder()
+
+			HandleDeletePost(httpHelper, client, "https://console.example.com").ServeHTTP(rec, req)
+
+			assert.Empty(t, rec.Header().Get("Location"), "no redirect to the list: the user was not deleted")
+			bind := handlertest.Bind(t, httpHelper)
+			assert.NotEmpty(t, bind["error"])
+			assert.Equal(t, client.user, bind["user"])
 		})
 	}
 }

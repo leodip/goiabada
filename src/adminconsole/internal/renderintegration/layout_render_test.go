@@ -32,7 +32,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 	w := httptest.NewRecorder()
-	render.New(web.TemplateFS()).NotFound(w, req)
+	render.New(web.TemplateFS(), web.StaticFS()).NotFound(w, req)
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
@@ -42,7 +42,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 
 	out := w.Body.String()
 	assert.Containsf(t, out, `lang="pt-BR"`, "the 404 page's <html lang> is not localized")
-	assert.Contains(t, out, "Não encontrado (404)")
+	assert.Contains(t, out, "Página não encontrada")
 
 	visible := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(out, "")
 	if leak := rawKeyRe.FindString(visible); leak != "" {
@@ -54,8 +54,8 @@ func TestRender_NotFoundPage(t *testing.T) {
 	assert.NotContains(t, out, "not-a-number")
 }
 
-// TestRender_JSBootstrapNoKeyLeak guards the window.i18n bootstrap: every value
-// must be a real string, never its own key. A value == key means JSBootstrap
+// TestRender_JSBootstrapNoKeyLeak guards the client-side strings, the layout's #js-i18n JSON data
+// block: every value must be a real string, never its own key. A value == key means JSBootstrap
 // failed to resolve a message (the {{param}}-placeholder bug where T executed
 // the string as a template and leaked the key).
 func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
@@ -67,8 +67,8 @@ func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
 	}
 	out := renderMenuPage(t, "/account_phone.html", bind)
 
-	m := regexp.MustCompile(`window\.i18n=(\{.*?\});`).FindStringSubmatch(out)
-	require.Len(t, m, 2, "window.i18n bootstrap script not found in output")
+	m := jsI18nBlockRe.FindStringSubmatch(out)
+	require.Len(t, m, 2, "the #js-i18n data block is not in the page")
 	var kv map[string]string
 	require.NoError(t, json.Unmarshal([]byte(m[1]), &kv))
 	require.NotEmpty(t, kv)
@@ -76,19 +76,25 @@ func TestRender_JSBootstrapNoKeyLeak(t *testing.T) {
 	for k, v := range kv {
 		assert.NotEqualf(t, k, v, "js bootstrap key %q leaked (value == key): JSBootstrap could not resolve it", k)
 	}
+	// And a client-side placeholder reaches the browser for tFormat to fill, rather than being
+	// executed as a Go template on the way.
+	assert.Contains(t, kv["js.error.unexpected"], "{{detail}}")
 }
 
-// menuLabelRe captures the dropdown label in menu_layout.html: everything between the opening
-// <span class="inline-block text-sm align-middle"> and the chevron <svg> that closes it. That is
-// the whole of what a signed-in administrator reads at the top right of every admin and account
-// page, and reading it back off a rendered page is the only way to see it, because the layout is a
-// file no handler test ever executes.
-var menuLabelRe = regexp.MustCompile(`(?s)<span class="inline-block text-sm align-middle">(.*?)<svg`)
+// jsI18nBlockRe captures the client-side strings both console layouts write: a JSON data block,
+// which the browser never executes, read by utils.js's t().
+var jsI18nBlockRe = regexp.MustCompile(`<script type="application/json" id="js-i18n">(.*?)</script>`)
+
+// menuLabelRe captures the user menu button's label in menu_layout.html: the name and email in the
+// header's button. That is what a signed-in administrator reads at the top right of every admin
+// and account page, and reading it back off a rendered page is the only way to see it, because the
+// layout is a file no handler test ever executes.
+var menuLabelRe = regexp.MustCompile(`(?s)<span class="user-menu-who">(.*?)</span>\s*<span class="sr-only">`)
 
 func menuLabel(t *testing.T, out string) string {
 	t.Helper()
 	m := menuLabelRe.FindStringSubmatch(out)
-	require.Lenf(t, m, 2, "the dropdown label span is not in the rendered page at all")
+	require.Lenf(t, m, 2, "the user menu label is not in the rendered page at all")
 	return strings.TrimSpace(m[1])
 }
 
@@ -139,7 +145,7 @@ func TestRender_MenuLabelWithNoNameClaimsShowsTheEmailAlone(t *testing.T) {
 
 	label := menuLabel(t, out)
 	assert.Contains(t, label, "bob@example.com")
-	assert.NotContains(t, label, "<br />", "with no name there is no line to break")
+	assert.NotContains(t, label, "user-menu-name", "with no name there is no name line")
 }
 
 // The ID token carries the name and email claims only when IncludeOpenIDConnectClaimsInIdToken is
@@ -159,10 +165,10 @@ func TestRender_MenuLabelWithSubjectOnlyIsBlankNotNoValue(t *testing.T) {
 }
 
 // The anonymous request, stated rather than left implicit: with no ID token on the context nothing
-// is bound, the outer guard is false, and the label is blank. This is the shape every other render
+// is bound, the outer guard is false, and there is no user menu. This is the shape every other render
 // in this package has, and saying so here is what keeps the next reader from reading those blanks
 // as a defect in the page.
 func TestRender_MenuLabelWithNoTokenIsBlank(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{"groups": []api.GroupResponse{}})
-	assert.Empty(t, menuLabel(t, out), "an anonymous render binds no user, so not even the span is emitted")
+	assert.NotContains(t, out, "user-menu-who", "an anonymous render binds no user, so the user menu is not emitted")
 }

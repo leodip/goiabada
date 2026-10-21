@@ -39,9 +39,10 @@ func HandleNewPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"error":              message,
+				"errorField":         errorField,
 				"resourceIdentifier": r.FormValue("resourceIdentifier"),
 				"description":        r.FormValue("description"),
 			}
@@ -71,7 +72,9 @@ func HandleNewPost(
 
 		_, err := apiClient.CreateResource(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, resourceErrorFields))
+			})
 			return
 		}
 

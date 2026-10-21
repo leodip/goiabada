@@ -65,11 +65,13 @@ func (c *auditPagingApiClient) GetAuditEventTypes(_ context.Context, accessToken
 	return &api.GetAuditEventTypesResponse{AuditEventTypes: c.eventTypes}, nil
 }
 
-// The rest of the ports auditPagingApiClient is passed to, which no test here reaches.
-
+// GetSettingsAuditLogs answers that events are stored, which the viewer asks to say when they are
+// not.
 func (*auditPagingApiClient) GetSettingsAuditLogs(context.Context, string) (*api.SettingsAuditLogsResponse, error) {
-	panic("unexpected call to GetSettingsAuditLogs")
+	return &api.SettingsAuditLogsResponse{AuditLogsInDatabaseEnabled: true}, nil
 }
+
+// The rest of the ports auditPagingApiClient is passed to, which no test here reaches.
 
 func (*auditPagingApiClient) UpdateSettingsAuditLogs(context.Context, string, *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
 	panic("unexpected call to UpdateSettingsAuditLogs")
@@ -449,5 +451,37 @@ func TestHandleAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdown(t *testing.
 	for _, call := range httpHelper.Calls {
 		assert.NotEqual(t, "RenderTemplate", call.Method,
 			"the viewer rendered a page over a catalog it never got")
+	}
+}
+
+// An entry's details are read as keys and values in the order they were written, a string as it is
+// and any other value as its JSON; details that are no JSON object are shown as written.
+func TestAuditLogDetails(t *testing.T) {
+	testCases := []struct {
+		name    string
+		details string
+		pairs   []AuditLogDetail
+		ok      bool
+	}{
+		{"strings, in written order", `{"zeta":"z","alpha":"a"}`,
+			[]AuditLogDetail{{"zeta", "z"}, {"alpha", "a"}}, true},
+		{"numbers, booleans and null as their JSON", `{"user_id":12,"ratio":0.5,"enabled":true,"gone":null}`,
+			[]AuditLogDetail{{"user_id", "12"}, {"ratio", "0.5"}, {"enabled", "true"}, {"gone", "null"}}, true},
+		{"a nested value as its JSON, where the script showed [object Object]", `{"scopes":["openid","email"],"client":{"id":3}}`,
+			[]AuditLogDetail{{"scopes", `["openid","email"]`}, {"client", `{"id":3}`}}, true},
+		{"markup stays text for the template to escape", `{"name":"<b>x</b>"}`,
+			[]AuditLogDetail{{"name", "<b>x</b>"}}, true},
+		{"an empty object", `{}`, nil, true},
+		{"not JSON", `user logged in`, nil, false},
+		{"an array", `["a"]`, nil, false},
+		{"an object with trailing text", `{"a":"b"} more`, nil, false},
+		{"empty", ``, nil, false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pairs, ok := auditLogDetails(tc.details)
+			assert.Equal(t, tc.ok, ok)
+			assert.Equal(t, tc.pairs, pairs)
+		})
 	}
 }

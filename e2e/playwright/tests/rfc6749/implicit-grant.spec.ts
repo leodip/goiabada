@@ -131,7 +131,7 @@ test("an error comes back in the fragment with the state, and a redirect URI not
   const anonymous = await emptyBrowser(browser);
   expectRefusedOnPage(
     await getAuthorize(anonymous.request, tokenRequest(client.identifier, { redirect_uri: `${testRedirectUri}/` })),
-    /The client does not have this redirect URI registered/,
+    /The application does not have this redirect URI registered/,
   );
   await anonymous.close();
   await context.close();

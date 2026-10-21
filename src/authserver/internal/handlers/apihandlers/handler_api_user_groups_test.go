@@ -500,7 +500,7 @@ func TestHandleUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) 
 		{
 			name:            "more group ids than one request may name",
 			body:            string(tooManyBody),
-			wantCode:        "VALIDATION_ERROR",
+			wantCode:        i18n.ErrCodeUserGroupsTooMany,
 			wantDescription: "Too many group ids",
 		},
 		{

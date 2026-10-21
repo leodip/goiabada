@@ -1,6 +1,53 @@
 package adminclienthandlers
 
-import "time"
+import (
+	"time"
+
+	"github.com/leodip/goiabada/core/i18n"
+)
+
+// clientErrorFields maps the refusals of the new client and client settings forms to the field
+// each is about. The admin API answers a client's refusals by their catalog key, which names the
+// field (#617); the blank identifier the console refuses itself.
+var clientErrorFields = map[string]string{
+	i18n.ErrCodeClientIdentifierRequired:            "clientIdentifier",
+	i18n.ErrCodeIdentifierTooLong:                   "clientIdentifier",
+	i18n.ErrCodeIdentifierTooShort:                  "clientIdentifier",
+	i18n.ErrCodeIdentifierInvalidFormat:             "clientIdentifier",
+	i18n.ErrCodeClientIdentifierInUse:               "clientIdentifier",
+	i18n.ErrCodeClientIdentifierNamesResource:       "clientIdentifier",
+	i18n.ErrCodeClientSystemLevelIdentifierFixed:    "clientIdentifier",
+	i18n.ErrCodeClientSelfRegisteredIdentifierFixed: "clientIdentifier",
+	i18n.ErrCodeClientDescriptionTooLong:            "description",
+	i18n.ErrCodeDescriptionAngleBrackets:            "description",
+	i18n.ErrCodeClientDisplayNameTooLong:            "displayName",
+	i18n.ErrCodeDisplayNameAngleBrackets:            "displayName",
+	i18n.ErrCodeClientWebsiteURLTooLong:             "websiteUrl",
+	i18n.ErrCodeClientWebsiteURLInvalid:             "websiteUrl",
+	i18n.ErrCodeClientWebsiteURLSchemeInvalid:       "websiteUrl",
+	i18n.ErrCodeClientDefaultAcrNotApplicable:       "defaultAcrLevel",
+	i18n.ErrCodeClientDefaultAcrInvalid:             "defaultAcrLevel",
+}
+
+// clientTokensErrorFields maps the token tab's refusals to the duration each is about.
+var clientTokensErrorFields = map[string]string{
+	i18n.ErrCodeClientTokensTokenExpirationOutOfRange:          "tokenExpirationInSeconds",
+	i18n.ErrCodeClientTokensOfflineIdleTimeoutOutOfRange:       "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime: "refreshTokenOfflineIdleTimeoutInSeconds",
+	i18n.ErrCodeClientTokensOfflineMaxLifetimeOutOfRange:       "refreshTokenOfflineMaxLifetimeInSeconds",
+}
+
+// clientAuthenticationErrorFields maps the authentication tab's refusals to the field each is about.
+var clientAuthenticationErrorFields = map[string]string{
+	i18n.ErrCodeClientSecretInvalid: "clientSecret",
+}
+
+// grantedPermission is a permission a client holds, as its permissions tab lists it: the
+// permission's id, which the save sends, and its scope, resource:permission, which the row shows.
+type grantedPermission struct {
+	Id    int64
+	Scope string
+}
 
 type PermissionsPostInput struct {
 	ClientId               int64   `json:"clientId"`
@@ -16,7 +63,6 @@ type RedirectURIsPostInput struct {
 	// ExpectedRedirectURIs is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
 	ExpectedRedirectURIs []string `json:"expectedRedirectURIs"`
-	Ids                  []int64  `json:"ids"`
 }
 
 type WebOriginsPostInput struct {
@@ -25,7 +71,6 @@ type WebOriginsPostInput struct {
 	// ExpectedWebOrigins is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
 	ExpectedWebOrigins []string `json:"expectedWebOrigins"`
-	Ids                []int64  `json:"ids"`
 }
 
 type SessionInfo struct {

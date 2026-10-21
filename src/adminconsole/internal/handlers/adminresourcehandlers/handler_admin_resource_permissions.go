@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -84,22 +85,28 @@ func HandlePermissionsGet(
 			return
 		}
 
-		// Prepare built-in permission identifiers for the authserver resource
+		// The authserver resource's built-in permissions, which no caller may rename or delete, are
+		// drawn without Edit or Remove.
 		var builtInPermissionIdentifiers []string
 		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier {
 			builtInPermissionIdentifiers = builtin.AuthServerPermissionIdentifiers()
-		} else {
-			builtInPermissionIdentifiers = []string{}
+		}
+		entries := make([]permissionEntry, 0, len(permissions))
+		for _, permission := range permissions {
+			entries = append(entries, permissionEntry{
+				Id:          permission.Id,
+				Identifier:  permission.PermissionIdentifier,
+				Description: permission.Description,
+				BuiltIn:     slices.Contains(builtInPermissionIdentifiers, permission.PermissionIdentifier),
+			})
 		}
 
 		bind := map[string]interface{}{
-			"resourceId":                   resource.Id,
-			"resourceIdentifier":           resource.ResourceIdentifier,
-			"resourceDescription":          resource.Description,
-			"isSystemLevelResource":        resource.IsSystemLevelResource,
-			"builtInPermissionIdentifiers": builtInPermissionIdentifiers,
-			"savedSuccessfully":            savedSuccessfully,
-			"permissions":                  permissions,
+			"resourceId":            resource.Id,
+			"resourceIdentifier":    resource.ResourceIdentifier,
+			"isSystemLevelResource": resource.IsSystemLevelResource,
+			"savedSuccessfully":     savedSuccessfully,
+			"entries":               entries,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_permissions.html", bind)
@@ -249,12 +256,14 @@ func HandleValidatePermissionPost(
 		// i18n surface: A — admin browser-flow, JSON to in-page handler.
 		if inputvalidation.ContainsAngleBrackets(description) {
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).Localize(r.Context())
+			result.Field = "description"
 			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
 
 		if len(permissionIdentifier) == 0 {
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsIdentifierRequired, nil).Localize(r.Context())
+			result.Field = "permissionIdentifier"
 			httpHelper.EncodeJSON(w, r, result)
 			return
 		}
@@ -271,9 +280,11 @@ func HandleValidatePermissionPost(
 			switch {
 			case errors.As(err, &localizedErr):
 				result.Error = localizedErr.Localize(r.Context())
+				result.Field = "permissionIdentifier"
 				httpHelper.EncodeJSON(w, r, result)
 			case errors.As(err, &errorDetail):
 				result.Error = errorDetail.Description()
+				result.Field = "permissionIdentifier"
 				httpHelper.EncodeJSON(w, r, result)
 			default:
 				httpHelper.JSONError(w, r, err)
@@ -285,6 +296,7 @@ func HandleValidatePermissionPost(
 		if inputvalidation.TextLength(description) > maxLengthDescription {
 			// i18n surface: A — admin browser-flow, JSON to in-page handler.
 			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}).Localize(r.Context())
+			result.Field = "description"
 			httpHelper.EncodeJSON(w, r, result)
 			return
 		}

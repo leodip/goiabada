@@ -150,7 +150,7 @@ func HandleGroupMemberAddPost(
 			return
 		}
 		if existingUserGroup != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupMemberAlreadyMember, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupMemberAlreadyMember, nil))
 			return
 		}
 
@@ -254,7 +254,7 @@ func HandleGroupMemberDelete(
 			return
 		}
 		if userGroup == nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupMemberNotMember, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupMemberNotMember, nil))
 			return
 		}
 

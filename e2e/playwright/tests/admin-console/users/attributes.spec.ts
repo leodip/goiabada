@@ -1,11 +1,11 @@
-import { addGroupAttribute, addGroupMember, rowWithCell, userUrl } from "../../../lib/admin-console";
+import { addGroupAttribute, addGroupMember, cancelDialog, confirmDialog, expectRefusal, rowWithCell, userUrl } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { userTokens } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
 import type { Page } from "@playwright/test";
 
-const attributeRows = "#attributesTable tbody tr";
+const empty = "No attributes yet.";
 
 async function submitAttribute(page: Page, a: { key: string; value: string; accessToken?: boolean; idToken?: boolean }) {
   await page.locator("#attributeKey").fill(a.key);
@@ -18,41 +18,49 @@ async function submitAttribute(page: Page, a: { key: string; value: string; acce
 async function addAttribute(page: Page, userId: number, a: Parameters<typeof submitAttribute>[1]) {
   await page.goto(`${env.adminUrl}/admin/users/${userId}/attributes/add`);
   await submitAttribute(page, a);
-  await expect(page).toHaveURL(new RegExp(`/admin/users/${userId}/attributes`));
+  // The list, not the form it was added from.
+  await expect(page).toHaveURL(new RegExp(`/admin/users/${userId}/attributes(\\?|$)`));
 }
 
 test("an attribute is added, edited and removed", async ({ page, users }) => {
   const user = await users.create();
   await page.goto(userUrl(user.id, "attributes"));
-  await expect(page.locator(attributeRows)).toHaveText(["No attributes attached to user."]);
+  await expect(page.getByText(empty)).toBeVisible();
 
   await addAttribute(page, user.id, { key: "employee_id", value: "E-1001", idToken: false });
   let row = rowWithCell(page, "employee_id");
   await expect(row.getByRole("cell").nth(1)).toHaveText("E-1001");
-  await expect(row.getByRole("cell").nth(2)).toHaveText("Yes");
-  await expect(row.getByRole("cell").nth(3)).toHaveText("No");
+  await expect(row.getByRole("cell").nth(2)).toHaveText("Access token");
 
-  await row.getByRole("button", { name: "Edit" }).click();
+  // The key is the link to its edit form.
+  await row.getByRole("link", { name: "employee_id", exact: true }).click();
   await expect(page.locator("#attributeKey")).toHaveValue("employee_id");
   await submitAttribute(page, { key: "employee_number", value: "1001", accessToken: false });
   row = rowWithCell(page, "employee_number");
   await expect(row.getByRole("cell").nth(1)).toHaveText("1001");
-  await expect(row.getByRole("cell").nth(2)).toHaveText("No");
-  await expect(row.getByRole("cell").nth(3)).toHaveText("Yes");
+  await expect(row.getByRole("cell").nth(2)).toHaveText("ID token");
 
-  await row.getByRole("button", { name: "Remove" }).click();
-  await expect(page.locator("dialog[open]")).toContainText("employee_number");
-  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-  await expect(row.getByText("Removed")).toBeVisible();
+  // Remove asks first, and Cancel keeps the attribute.
+  const remove = row.getByRole("button", { name: "Remove employee_number", exact: true });
+  await remove.click();
+  await cancelDialog(page, "Remove the attribute employee_number?");
   await page.reload();
-  await expect(page.locator(attributeRows)).toHaveText(["No attributes attached to user."]);
+  await expect(remove).toBeVisible();
+
+  await remove.click();
+  await confirmDialog(page, "Remove the attribute employee_number?");
+  // The row stays until the page is drawn again, its button giving way to a tag.
+  await expect(row.getByText("Removed", { exact: true })).toBeVisible();
+  await expect(page.locator("#row-actions-status")).toContainText("Attribute removed.");
+  await page.reload();
+  await expect(page.getByText(empty)).toBeVisible();
 });
 
-for (const { key, value, message } of [
-  { key: "", value: "x", message: "Attribute key is required" },
-  { key: "not valid", value: "x", message: "Invalid identifier format." },
-  { key: "employee_id", value: "x".repeat(251), message: "The attribute value cannot exceed a maximum length of 250 characters" },
-  { key: "employee_id", value: "<i>x</i>", message: "The attribute value cannot contain the characters < or >." },
+for (const { key, value, field, message } of [
+  { key: "", value: "x", field: "attributeKey", message: "Attribute key is required" },
+  { key: "not valid", value: "x", field: "attributeKey", message: "Invalid identifier format." },
+  { key: "employee_id", value: "x".repeat(251), field: "attributeValue", message: "The attribute value cannot exceed a maximum length of 250 characters" },
+  { key: "employee_id", value: "<i>x</i>", field: "attributeValue", message: "The attribute value cannot contain the characters < or >." },
 ]) {
   test(`the attribute ${JSON.stringify(key)} = ${JSON.stringify(value.slice(0, 10))}… is refused, and the form keeps it`, async ({
     page,
@@ -61,7 +69,7 @@ for (const { key, value, message } of [
     const user = await users.create();
     await page.goto(`${env.adminUrl}/admin/users/${user.id}/attributes/add`);
     await submitAttribute(page, { key, value, idToken: false });
-    await expect(page.getByText(message)).toBeVisible();
+    await expectRefusal(page, "attribute-error", field, message);
     await expect(page.locator("#attributeKey")).toHaveValue(key);
     await expect(page.locator('input[name="attributeValue"]')).toHaveValue(value);
     await expect(page.locator('input[name="includeInIdToken"]')).not.toBeChecked();
@@ -71,10 +79,10 @@ for (const { key, value, message } of [
 test("a refused edit keeps the typed key, and the title names the stored one", async ({ page, users }) => {
   const user = await users.create();
   await addAttribute(page, user.id, { key: "employee_id", value: "E-1001" });
-  await rowWithCell(page, "employee_id").getByRole("button", { name: "Edit" }).click();
+  await rowWithCell(page, "employee_id").getByRole("link", { name: "employee_id", exact: true }).click();
   await submitAttribute(page, { key: "not valid", value: "E-1001" });
-  await expect(page.getByText("Invalid identifier format.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Edit user attribute - employee_id", exact: true })).toBeVisible();
+  await expectRefusal(page, "attribute-error", "attributeKey", "Invalid identifier format.");
+  await expect(page.getByRole("heading", { name: "Edit attribute employee_id", exact: true })).toBeVisible();
   await expect(page.locator("#attributeKey")).toHaveValue("not valid");
   await page.goto(userUrl(user.id, "attributes"));
   await expect(rowWithCell(page, "employee_id")).toHaveCount(1);

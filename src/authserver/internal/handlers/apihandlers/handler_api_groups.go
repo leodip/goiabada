@@ -85,14 +85,14 @@ func HandleGroupCreatePost(
 
 		// Validate group identifier
 		if strings.TrimSpace(createReq.GroupIdentifier) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierRequired, nil))
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(createReq.Description) > maxLengthDescription {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupDescriptionTooLong, map[string]any{"max": maxLengthDescription}))
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleGroupCreatePost(
 			return
 		}
 		if existingGroup != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil))
 			return
 		}
 
@@ -230,14 +230,14 @@ func HandleGroupUpdatePut(
 
 		// Validate group identifier
 		if strings.TrimSpace(updateReq.GroupIdentifier) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierRequired, nil))
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupDescriptionTooLong, map[string]any{"max": maxLengthDescription}))
 			return
 		}
 
@@ -260,7 +260,7 @@ func HandleGroupUpdatePut(
 			return
 		}
 		if existingGroup != nil && existingGroup.Id != group.Id {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil))
 			return
 		}
 

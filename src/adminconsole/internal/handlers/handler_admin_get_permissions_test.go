@@ -52,7 +52,7 @@ func permissionRecords(t *testing.T, client *permissionsByResourceClient, query 
 
 	capture := logtest.CaptureSlog(t)
 
-	httpHelper := render.New(fstest.MapFS{})
+	httpHelper := render.New(fstest.MapFS{}, nil)
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -184,7 +184,7 @@ func TestAdminGetPermissions_WithoutATokenSetAnswersTheSentinel(t *testing.T) {
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
-	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(render.New(fstest.MapFS{}), client))
+	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(render.New(fstest.MapFS{}, nil), client))
 
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/permissions?resourceId=7", nil))

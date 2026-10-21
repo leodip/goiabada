@@ -44,9 +44,9 @@ RUN curl -sfL --retry 3 --retry-delay 5 https://github.com/mikefarah/yq/releases
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install Go
-RUN wget https://go.dev/dl/go1.27.2.linux-amd64.tar.gz -O /tmp/go1.27.2.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf /tmp/go1.27.2.linux-amd64.tar.gz
-RUN rm -f /tmp/go1.27.2.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.27.3.linux-amd64.tar.gz -O /tmp/go1.27.3.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf /tmp/go1.27.3.linux-amd64.tar.gz
+RUN rm -f /tmp/go1.27.3.linux-amd64.tar.gz
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install Go development tools to system-wide location
@@ -73,6 +73,11 @@ ENV PATH="/usr/local/go-tools/bin:${PATH}"
 RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
+
+# Install Node.js, the binary alone, which core/guard's script check runs acorn under
+RUN curl -sfL --retry 3 --retry-delay 5 https://nodejs.org/dist/v26.12.0/node-v26.12.0-linux-x64.tar.gz | \
+    tar -xz -C /usr/local --strip-components=1 --no-same-owner node-v26.12.0-linux-x64/bin/node && \
+    node --version
 
 RUN mkdir -p /var/lib/sqlite
 

@@ -1,14 +1,11 @@
 {{define "manage_groups_tabs"}}
-
-{{ $type := index . 0 }}
-{{ $id := index . 1 }}
-{{ $ctx := index . 2 }}
-
-<div class="mt-2 tabs tabs-bordered">
-    <a href="/admin/groups/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">{{ T $ctx "adminconsole.group_tabs.settings" }}</a>
-    <a href="/admin/groups/{{$id}}/attributes" class="tab tab-bordered {{if eq $type "attributes"}}tab-active{{end}}">{{ T $ctx "adminconsole.group_tabs.attributes" }}</a>
-    <a href="/admin/groups/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">{{ T $ctx "adminconsole.group_tabs.permissions" }}</a>
-    <a href="/admin/groups/{{$id}}/members" class="tab tab-bordered {{if eq $type "members"}}tab-active{{end}}">{{ T $ctx "adminconsole.group_tabs.members" }}</a>
-</div>
-
+{{- $type := index . 0 }}
+{{- $id := index . 1 }}
+{{- $ctx := index . 2 }}
+<nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
+  <a class="tab-item" href="/admin/groups/{{$id}}/settings"{{ if eq $type "settings" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.group_tabs.settings" }}</a>
+  <a class="tab-item" href="/admin/groups/{{$id}}/attributes"{{ if eq $type "attributes" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.group_tabs.attributes" }}</a>
+  <a class="tab-item" href="/admin/groups/{{$id}}/permissions"{{ if eq $type "permissions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.group_tabs.permissions" }}</a>
+  <a class="tab-item" href="/admin/groups/{{$id}}/members"{{ if eq $type "members" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.group_tabs.members" }}</a>
+</nav>
 {{end}}

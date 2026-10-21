@@ -14,9 +14,7 @@ import (
 // Asserting the code alone cannot tell a correct sentence from one that
 // describes a different rule (#230).
 const (
-	phoneNumberRequiredMessage = "The phone number field must contain a valid phone number. To remove the " +
-		"phone number information, please select the (blank) option from the dropdown menu for the phone " +
-		"country and leave the phone number field empty."
+	phoneNumberRequiredMessage = "Enter the phone number. To remove it, set the country to Not set."
 
 	phoneInvalidFormatMessage = "Please enter a valid number. Phone numbers can contain only digits, and " +
 		"may include single spaces or hyphens as separators."

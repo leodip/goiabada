@@ -57,7 +57,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotExist(t *testing.T)
 	}
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", errorMsg)
+	assert.Equal(t, "Invalid client_id parameter. The application does not exist.", errorMsg)
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
@@ -89,7 +89,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 	}
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", errorMsg)
+	assert.Equal(t, "Invalid client_id parameter. The application is disabled.", errorMsg)
 }
 
 // #573 item 3 turned this refusal around: a client whose code flow is off is no longer answered
@@ -194,7 +194,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *
 	}
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", errorMsg)
+	assert.Equal(t, "Invalid redirect_uri parameter. The application does not have this redirect URI registered.", errorMsg)
 }
 
 // TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute owns the RFC 6749
@@ -294,7 +294,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *t
 		"the refusal page title is still the English literal")
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Parâmetro client_id inválido. O cliente não existe.", errorMsg,
+	assert.Equal(t, "Parâmetro client_id inválido. O aplicativo não existe.", errorMsg,
 		"the refusal page message did not render in pt-BR; the handler is rendering the English fallback rather than the request locale")
 }
 

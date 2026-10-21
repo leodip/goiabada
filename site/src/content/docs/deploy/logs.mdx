@@ -45,7 +45,7 @@ The level says who should look: `ERROR` means someone must act, `WARN` a request
 
 ## The audit log
 
-The security events are in the [audit log](/concepts/audit-log/), not the metrics: every sign-in, failed password, token issued, rate-limit refusal and administrative change, each with who did it. It goes to standard error as the `audit event` records above, to the database, where the admin console browses it, or to both, as the **Audit log settings** page in the admin console says. New installations start with both.
+The security events are in the [audit log](/concepts/audit-log/), not the metrics: every sign-in, failed password, token issued, rate-limit refusal and administrative change, each with who did it. It goes to standard error as the `audit event` records above, to the database, where the admin console browses it, or to both, as the **Audit logging** page in the admin console says. New installations start with both.
 
 Watch for a run of `auth_failed_pwd` or `ropc_auth_failed` events against one account, and for `rate_limit_exceeded`, which each pod writes at most once per key and window, so it shows which accounts and addresses the rate limiter's refusals were about.
 

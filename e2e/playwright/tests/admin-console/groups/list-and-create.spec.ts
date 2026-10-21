@@ -1,17 +1,16 @@
-import { deleteGroup, idFromListLink, rowWithCell, submitNewGroup } from "../../../lib/admin-console";
+import { deleteGroup, expectRefusal, idFromListLink, rowWithCell, submitNewGroup } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { uniqueIdentifier } from "../../../lib/unique";
 
 const list = `${env.adminUrl}/admin/groups`;
 
-// A list row's cells, in the list's column order.
+// A list row's cells after the first, which holds the identifier with the description beneath it,
+// in the list's column order.
 function cells(row: ReturnType<typeof rowWithCell>) {
   return {
-    description: row.getByRole("cell").nth(1),
-    inAccessToken: row.getByRole("cell").nth(2),
-    inIdToken: row.getByRole("cell").nth(3),
-    members: row.getByRole("cell").nth(4),
+    members: row.getByRole("cell").nth(1),
+    inTokens: row.getByRole("cell").nth(2),
   };
 }
 
@@ -19,18 +18,21 @@ test("a group is created with its description and include switches, and listed",
   const identifier = uniqueIdentifier("g");
   await submitNewGroup(page, { identifier: `  ${identifier}  `, description: "  Editors  ", includeInAccessToken: false });
   await expect(page).toHaveURL(list);
-  const row = cells(rowWithCell(page, identifier));
-  await expect(row.description).toHaveText("Editors");
-  await expect(row.inAccessToken).toHaveText("No");
-  await expect(row.inIdToken).toHaveText("Yes");
-  await expect(row.members).toHaveText("0");
+  const row = rowWithCell(page, identifier);
+  await expect(row.getByText("Editors", { exact: true })).toBeVisible();
+  await expect(cells(row).members).toHaveText("0");
+  await expect(cells(row).inTokens).toHaveText("ID token");
+  await expect(row.getByRole("link", { name: `Delete ${identifier}`, exact: true })).toBeVisible();
 
-  await deleteGroup(page, await idFromListLink(page, list, identifier, "Manage"));
+  await deleteGroup(page, await idFromListLink(page, list, identifier));
   await expect(rowWithCell(page, identifier)).toHaveCount(0);
 });
 
 test("the new group form starts with both include switches on", async ({ page }) => {
-  await page.goto(`${list}/new`);
+  await page.goto(list);
+  await page.getByRole("link", { name: "New group", exact: true }).click();
+  await expect(page).toHaveURL(`${list}/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "New group", exact: true })).toBeVisible();
   await expect(page.locator('input[name="includeInAccessToken"]')).toBeChecked();
   await expect(page.locator('input[name="includeInIdToken"]')).toBeChecked();
 });
@@ -47,17 +49,17 @@ for (const { identifier, message } of [
   test(`the identifier ${JSON.stringify(identifier)} is refused, and the form keeps what was typed`, async ({ page }) => {
     await submitNewGroup(page, { identifier, description: "kept" });
     await expect(page).toHaveURL(`${list}/new`);
-    await expect(page.getByText(message)).toBeVisible();
+    await expectRefusal(page, "group-error", "groupIdentifier", message);
     await expect(page.locator("#groupIdentifier")).toHaveValue(identifier);
     await expect(page.locator('input[name="description"]')).toHaveValue("kept");
   });
 }
 
-// Were the switches to come back on, fixing the identifier and pressing Create again would create a
-// group the administrator had kept out of the tokens.
+// Were the switches to come back on, fixing the identifier and pressing Create group again would
+// create a group the administrator had kept out of the tokens.
 test("a refused group keeps the include switches as they were set", async ({ page }) => {
   await submitNewGroup(page, { identifier: "1abc", includeInAccessToken: false, includeInIdToken: false });
-  await expect(page.getByText(badFormat)).toBeVisible();
+  await expectRefusal(page, "group-error", "groupIdentifier", badFormat);
   await expect(page.locator('input[name="includeInAccessToken"]')).not.toBeChecked();
   await expect(page.locator('input[name="includeInIdToken"]')).not.toBeChecked();
 });
@@ -66,7 +68,7 @@ test("an identifier already in use is refused", async ({ page, groups }) => {
   const existing = await groups.create();
   await submitNewGroup(page, { identifier: existing.identifier });
   await expect(page).toHaveURL(`${list}/new`);
-  await expect(page.getByText("The group identifier is already in use")).toBeVisible();
+  await expectRefusal(page, "group-error", "groupIdentifier", "The group identifier is already in use");
   await page.goto(list);
   await expect(rowWithCell(page, existing.identifier)).toHaveCount(1);
 });
@@ -79,7 +81,7 @@ for (const { description, message } of [
     const identifier = uniqueIdentifier("g");
     await submitNewGroup(page, { identifier, description });
     await expect(page).toHaveURL(`${list}/new`);
-    await expect(page.getByText(message)).toBeVisible();
+    await expectRefusal(page, "group-error", "description", message);
     await page.goto(list);
     await expect(rowWithCell(page, identifier)).toHaveCount(0);
   });

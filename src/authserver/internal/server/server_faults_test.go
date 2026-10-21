@@ -69,6 +69,7 @@ func registeredRoutes(t *testing.T, s *Server) []string {
 func newFaultsTestServer(database *datamocks.Database) *Server {
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
+	s.staticFS = web.StaticFS()
 	s.initRoutes(s.initMiddleware())
 	return s
 }

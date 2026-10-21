@@ -43,7 +43,7 @@ func TestInternalServerError(t *testing.T) {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -87,7 +87,7 @@ func TestNotFound(t *testing.T) {
 	httpHelper := New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
-	})
+	}, nil)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -120,7 +120,7 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 	httpHelper := New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	})
+	}, nil)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -143,7 +143,7 @@ func TestRenderTemplate(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
 		req := newRequest("GET", "/", nil)
@@ -195,7 +195,7 @@ func TestRenderTemplate(t *testing.T) {
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
 		emptyFS := fstest.MapFS{}
-		failing := New(emptyFS)
+		failing := New(emptyFS, nil)
 
 		req := newRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
@@ -218,7 +218,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	// This renderer binds no loggedInUser and no isAdmin. Both were admin console page data
 	// living in the one core renderer both binaries used, and no auth server template binds
@@ -241,7 +241,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
 		}
-		layoutHelper := New(layoutFS)
+		layoutHelper := New(layoutFS, nil)
 		req := httptest.NewRequest("GET", "/", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
 			AppName:     "sentinel app",
@@ -280,7 +280,7 @@ func TestRenderTemplateToBuffer_NilDataMap(t *testing.T) {
 	req := httptest.NewRequest("GET", "/some/page", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "sentinel app"}))
 
-	buf, err := New(templateFS).RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", nil)
+	buf, err := New(templateFS, nil).RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, "<html>sentinel app|/some/page</html>", buf.String())
@@ -293,7 +293,7 @@ func TestRenderTemplateToBuffer_Partials(t *testing.T) {
 	layout := []byte(`<html>{{template "content" .}}</html>`)
 	page := []byte(`{{define "content"}}[{{template "badge" .}}]{{end}}`)
 	render := func(templateFS fstest.MapFS) (*bytes.Buffer, error) {
-		return New(templateFS).RenderTemplateToBuffer(
+		return New(templateFS, nil).RenderTemplateToBuffer(
 			newRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 	}
 
@@ -332,7 +332,7 @@ func TestRenderTemplateToBuffer_Partials(t *testing.T) {
 
 func TestJSONError(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -357,7 +357,7 @@ func TestJSONError(t *testing.T) {
 
 func TestEncodeJSON(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()

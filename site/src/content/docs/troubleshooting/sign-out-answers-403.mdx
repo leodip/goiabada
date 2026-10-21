@@ -21,7 +21,7 @@ The user stays signed in. The auth server's log has a `cross-origin request refu
 
 The auth server refuses a POST that comes from another site, unless it can tell the request is safe. That's what stops any web page from submitting forms to the auth server on a user's behalf.
 
-For `/auth/logout`, a POST is safe when it carries an `id_token_hint`. A POST **without** one is exactly what the auth server's own "Are you sure you want to sign out?" screen submits when the user clicks **Yes**. Accepting it from another site would let any page sign your users out without asking them, so the auth server refuses it.
+For `/auth/logout`, a POST is safe when it carries an `id_token_hint`. A POST **without** one is exactly what the auth server's own "Do you want to sign out?" screen submits when the user clicks **Sign out**. Accepting it from another site would let any page sign your users out without asking them, so the auth server refuses it.
 
 So the usual cause is a self-submitting form on your app's page that posts to `/auth/logout` without an `id_token_hint`. Your app's origin differs from the auth server's, whether it's another site or another host on the same domain, such as `app.example.com` beside `auth.example.com`.
 
@@ -38,7 +38,7 @@ POST is worth it when you have an `id_token_hint`, because it keeps the ID token
 
 ## When the confirmation screen itself answers 403
 
-If clicking **Yes** on the auth server's own "Are you sure you want to sign out?" screen answers 403, the form and the auth server look like two different sites to the browser, though they're the same. The same refusal then hits every form the auth server serves, the sign-in page included. The warning's `explanation` names one of these:
+If clicking **Sign out** on the auth server's own "Do you want to sign out?" screen answers 403, the form and the auth server look like two different sites to the browser, though they're the same. The same refusal then hits every form the auth server serves, the sign-in page included. The warning's `explanation` names one of these:
 
 - **The browser reached the auth server on another hostname, port or scheme** than the one it's configured with, such as a bare domain beside a `www` host, or `http` beside `https`. Use exactly `GOIABADA_AUTHSERVER_BASEURL`.
 - **A proxy rewrote the `Host` header**, so it no longer matches the `Origin` the browser sent. Configure the proxy to pass the original `Host` on, such as `proxy_set_header Host $host;` in Nginx.

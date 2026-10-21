@@ -64,18 +64,24 @@ func HandlePermissionsGet(
 			ClientId                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
-			Permissions              map[int64]string
+			Permissions              []grantedPermission
 			IsSystemLevelClient      bool
 		}{
 			ClientId:                 clientResp.Id,
 			ClientIdentifier:         clientResp.ClientIdentifier,
 			ClientCredentialsEnabled: clientResp.ClientCredentialsEnabled,
-			Permissions:              make(map[int64]string),
+			Permissions:              make([]grantedPermission, 0, len(perms)),
 			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
 		}
 		for _, permission := range perms {
-			adminClientPermissions.Permissions[permission.Id] = permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			adminClientPermissions.Permissions = append(adminClientPermissions.Permissions, grantedPermission{
+				Id:    permission.Id,
+				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
+			})
 		}
+		sort.Slice(adminClientPermissions.Permissions, func(i, j int) bool {
+			return adminClientPermissions.Permissions[i].Scope < adminClientPermissions.Permissions[j].Scope
+		})
 
 		resources, err := apiClient.GetAllResources(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
@@ -104,7 +110,7 @@ func HandlePermissionsGet(
 
 		bind := map[string]interface{}{
 			"client":            adminClientPermissions,
-			"resources":         resources,
+			"resources":         render.ResourceChoices(resources),
 			"savedSuccessfully": savedSuccessfully,
 		}
 

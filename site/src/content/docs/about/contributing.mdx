@@ -152,7 +152,7 @@ Much of what a reviewer would otherwise check is a test that fails: the architec
 
 The dev container runs MySQL, PostgreSQL and SQL Server beside it, and `make serve` uses SQL Server. The tests leave that database alone: each data and integration run starts from an empty database of its own. `./run-tests.sh` does stop a running `make serve`, though: it frees ports 19090, 19091 and 19190 before the data and integration tiers and again when it exits, so start `make serve` again afterwards.
 
-Mailpit runs beside them too. Under **Email - SMTP** in the admin console's settings, turn on **SMTP enabled** and set the host to `mailpit`, the port to 1025, the encryption to **None**, and **From email** to any address, such as `noreply@example.com`. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
+Mailpit runs beside them too. Under **Email** in the admin console's settings, turn on **Send email** and set the host to `mailpit`, the port to 1025, the encryption to **None**, and **Sender email** to any address, such as `noreply@example.com`. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
 
 ## CI
 

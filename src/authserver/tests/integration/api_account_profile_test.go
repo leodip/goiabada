@@ -166,7 +166,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The zone info is invalid.", err3.ErrorDescription)
+	assert.Equal(t, "Unknown time zone.", err3.ErrorDescription)
 
 	// Invalid locale
 	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{GivenName: "Aaa", FamilyName: "Bbb", Locale: "xx-INVALID"})
@@ -174,7 +174,7 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
-	assert.Equal(t, "The locale is invalid.", err4.ErrorDescription)
+	assert.Equal(t, "Unknown language and region.", err4.ErrorDescription)
 }
 
 // A zone and a country name are saved as a pair, and the pair must be a row of the timezones
@@ -199,7 +199,7 @@ func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
-	assert.Equal(t, "The zone info is invalid.", errResp.ErrorDescription)
+	assert.Equal(t, "Unknown time zone.", errResp.ErrorDescription)
 
 	stored, err := database.GetUserById(context.Background(), nil, u.Id)
 	require.NoError(t, err)

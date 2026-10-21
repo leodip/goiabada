@@ -30,7 +30,7 @@ func HandleAuthPwdGet(
 			return
 		}
 
-		renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo, nil, "")
+		renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo, nil, "", "")
 	}
 }
 
@@ -70,26 +70,27 @@ func HandleAuthPwdPost(
 		// renderRefusal reads r when it is called, so a refusal after the password was verified is
 		// worded in the locale the user switched r to. It loads the client block then and only then:
 		// an accepted submission redirects, and has no form to show it in. A failed read, or a client
-		// not found, answers 500, as it does on the GET.
-		renderRefusal := func(code string) {
+		// not found, answers 500, as it does on the GET. field names the one field the refusal is
+		// about, by its form name, and is empty for a refusal of the pair.
+		renderRefusal := func(code, field string) {
 			displayInfo, err := prompt.Run(r.Context(), authContext)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
 			}
 			renderPasswordForm(w, r, pageRenderer, settings, authContext, displayInfo,
-				i18n.NewLocalizedError(code, nil), email)
+				i18n.NewLocalizedError(code, nil), field, email)
 		}
 
 		// Refused before any lookup, and never charged to the rate limiter: a form that verifies
 		// nothing must not spend an account's failure budget (#219). A space can be part of a
 		// password, so only one made of nothing else counts as missing.
 		if len(email) == 0 {
-			renderRefusal(i18n.ErrCodeLoginEmailRequired)
+			renderRefusal(i18n.ErrCodeLoginEmailRequired, "email")
 			return
 		}
 		if len(strings.TrimSpace(password)) == 0 {
-			renderRefusal(i18n.ErrCodeLoginPasswordRequired)
+			renderRefusal(i18n.ErrCodeLoginPasswordRequired, "password")
 			return
 		}
 
@@ -102,7 +103,7 @@ func HandleAuthPwdPost(
 		}
 
 		if result.Answer == authflow.PasswordRefused {
-			renderRefusal(i18n.ErrCodeLoginAuthFailed)
+			renderRefusal(i18n.ErrCodeLoginAuthFailed, "")
 			return
 		}
 
@@ -110,19 +111,19 @@ func HandleAuthPwdPost(
 		r = r.WithContext(i18n.WithLocale(r.Context(), false, result.UserLocale))
 
 		if result.Answer == authflow.PasswordAccountDisabled {
-			renderRefusal(i18n.ErrCodeLoginAccountDisabled)
+			renderRefusal(i18n.ErrCodeLoginAccountDisabled, "")
 			return
 		}
 		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 	}
 }
 
-// renderPasswordForm renders the password form for the ceremony, with a refusal and the address the
-// user typed when it is shown again. The form names its ceremony, so the boundary can refuse a
-// submission of a form another /auth/authorize has replaced since (#79).
+// renderPasswordForm renders the password form for the ceremony, with a refusal, the field it is
+// about, and the address the user typed when it is shown again. The form names its ceremony, so the
+// boundary can refuse a submission of a form another /auth/authorize has replaced since (#79).
 func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
 	settings *record.Settings, authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,
-	refusal *i18n.LocalizedError, email string) {
+	refusal *i18n.LocalizedError, errorField, email string) {
 
 	bind := map[string]interface{}{
 		"error":       nil,
@@ -140,6 +141,7 @@ func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 	}
 	if refusal != nil {
 		bind["error"] = refusal.Localize(r.Context())
+		bind["errorField"] = errorField
 		bind["email"] = email
 	}
 

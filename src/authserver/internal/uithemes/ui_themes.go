@@ -1,40 +1,10 @@
 package uithemes
 
-// Get returns the list of supported DaisyUI themes.
-// Reference: https://daisyui.com/docs/themes/
+// Get returns the themes an administrator can choose besides the automatic one, which the settings
+// store as the empty value. Each is a data-theme value the layouts write and ui.css draws.
 func Get() []string {
 	return []string{
 		"light",
 		"dark",
-		"cupcake",
-		"bumblebee",
-		"emerald",
-		"corporate",
-		"synthwave",
-		"retro",
-		"cyberpunk",
-		"valentine",
-		"halloween",
-		"garden",
-		"forest",
-		"aqua",
-		"lofi",
-		"pastel",
-		"fantasy",
-		"wireframe",
-		"black",
-		"luxury",
-		"dracula",
-		"cmyk",
-		"autumn",
-		"business",
-		"acid",
-		"lemonade",
-		"night",
-		"coffee",
-		"winter",
-		"dim",
-		"nord",
-		"sunset",
 	}
 }

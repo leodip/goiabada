@@ -37,9 +37,9 @@ func NewConsentPrompt(database consentPromptDatabase) *ConsentPrompt {
 
 // ConsentScreen is what the consent screen shows, for the handler to render.
 type ConsentScreen struct {
-	// ClientName is ConsentClientName's, not ClientDisplayInfo.ClientName, which falls back to the
-	// raw identifier and would show a self-registered client as dcr_<uuid>. A prompt nobody can
-	// evaluate defeats the point of prompting (#108).
+	// ClientName is record.Client's NameForUsers, not ClientDisplayInfo.ClientName, which falls
+	// back to the raw identifier and would show a self-registered client as dcr_<uuid>. A prompt
+	// nobody can evaluate defeats the point of prompting (#108).
 	ClientName string
 	// ClientNameUnverified is whether ClientName is the client's own claim about itself; the screen
 	// then shows the unverified notice under it.
@@ -104,17 +104,12 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 
 	if consentScreenOwed(scopes, authContext.Scope, authContext.HasPromptValue("consent")) {
 		displayInfo := getClientDisplayInfo(ctx, o.database, client)
-		clientName, clientNameUnverified := ConsentClientName(client)
-
-		clientDescription := displayInfo.Description
-		if clientNameUnverified {
-			clientDescription = ""
-		}
+		clientName, clientNameUnverified := client.NameForUsers()
 
 		return ConsentPromptResult{Screen: &ConsentScreen{
 			ClientName:           clientName,
 			ClientNameUnverified: clientNameUnverified,
-			ClientDescription:    clientDescription,
+			ClientDescription:    client.DescriptionForUsers(),
 			ShowClientSection:    displayInfo.ShowSection,
 			HasLogo:              displayInfo.HasLogo,
 			LogoURL:              displayInfo.LogoURL,

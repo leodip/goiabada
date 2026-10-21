@@ -55,12 +55,12 @@ func HandleSettingsAuditLogsPut(
 
 		// Validation
 		if req.AuditLogRetentionDays < 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsAuditLogsRetentionDaysNegative, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsAuditLogsRetentionDaysNegative, nil))
 			return
 		}
 		const maxRetentionDays = 3650 // 10 years
 		if req.AuditLogRetentionDays > maxRetentionDays {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsAuditLogsRetentionDaysTooLarge, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsAuditLogsRetentionDaysTooLarge, nil))
 			return
 		}
 

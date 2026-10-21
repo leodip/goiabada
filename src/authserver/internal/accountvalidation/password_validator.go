@@ -21,30 +21,37 @@ func NewPasswordValidator() *PasswordValidator {
 	return &PasswordValidator{}
 }
 
-// ValidatePassword checks password against policy. The caller reads the policy off its settings,
-// so this reads nothing from the request (#433).
-func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string) error {
-	minLength := 1
-	mustIncludeLowerCase := false
-	mustIncludeUpperCase := false
-	mustIncludeANumber := false
-	mustIncludeASpecialChar := false
+// PasswordRules is what a password policy asks of a new password. MinLength counts characters and
+// MaxBytes bytes.
+type PasswordRules struct {
+	MinLength        int
+	MaxBytes         int
+	LowerCase        bool
+	UpperCase        bool
+	Number           bool
+	SpecialCharacter bool
+}
 
+// PasswordRulesFor answers the rules policy holds a new password to: what ValidatePassword checks,
+// and what DescribePasswordRules tells the person choosing one, so the form never states a rule
+// the server does not apply, nor applies one it does not state (#617).
+func PasswordRulesFor(policy record.PasswordPolicy) PasswordRules {
 	switch policy {
 	case record.PasswordPolicyLow:
-		minLength = 6
+		return PasswordRules{MinLength: 6, MaxBytes: maxPasswordBytes}
 	case record.PasswordPolicyMedium:
-		minLength = 8
-		mustIncludeLowerCase = true
-		mustIncludeUpperCase = true
-		mustIncludeANumber = true
+		return PasswordRules{MinLength: 8, MaxBytes: maxPasswordBytes, LowerCase: true, UpperCase: true, Number: true}
 	case record.PasswordPolicyHigh:
-		minLength = 10
-		mustIncludeLowerCase = true
-		mustIncludeUpperCase = true
-		mustIncludeANumber = true
-		mustIncludeASpecialChar = true
+		return PasswordRules{MinLength: 10, MaxBytes: maxPasswordBytes, LowerCase: true, UpperCase: true, Number: true, SpecialCharacter: true}
+	default:
+		return PasswordRules{MinLength: 1, MaxBytes: maxPasswordBytes}
 	}
+}
+
+// ValidatePassword checks password against policy's rules. The caller reads the policy off its
+// settings, so this reads nothing from the request (#433).
+func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string) error {
+	rules := PasswordRulesFor(policy)
 
 	// i18n surface: A | C — registration, reset-password, account API,
 	// admin user CRUD.
@@ -52,27 +59,27 @@ func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, pas
 	// The minimum counts characters, which is what its message says and what a user counts; the
 	// maximum counts bytes, because it guards bcrypt's bound, and its message says bytes. Counting
 	// the minimum in bytes let three accented characters pass a six-character policy (#409).
-	if utf8.RuneCountInString(password) < minLength {
-		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": minLength})
+	if utf8.RuneCountInString(password) < rules.MinLength {
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": rules.MinLength})
 	}
 
-	if len(password) > maxPasswordBytes {
-		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": maxPasswordBytes})
+	if len(password) > rules.MaxBytes {
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": rules.MaxBytes})
 	}
 
-	if mustIncludeLowerCase && !val.containsLowerCase(password) {
+	if rules.LowerCase && !val.containsLowerCase(password) {
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordLowercaseRequired, nil)
 	}
 
-	if mustIncludeUpperCase && !val.containsUpperCase(password) {
+	if rules.UpperCase && !val.containsUpperCase(password) {
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordUppercaseRequired, nil)
 	}
 
-	if mustIncludeANumber && !val.containsNumber(password) {
+	if rules.Number && !val.containsNumber(password) {
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordNumberRequired, nil)
 	}
 
-	if mustIncludeASpecialChar && !val.containsSpecialChar(password) {
+	if rules.SpecialCharacter && !val.containsSpecialChar(password) {
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordSpecialCharRequired, nil)
 	}
 

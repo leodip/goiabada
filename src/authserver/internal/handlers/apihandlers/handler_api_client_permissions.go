@@ -125,7 +125,7 @@ func HandleClientPermissionsPut(
 
 		// Enforce that client credentials flow must be enabled
 		if !client.ClientCredentialsEnabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientPermissionsClientCredentialsDisabled, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientPermissionsClientCredentialsDisabled, nil))
 			return
 		}
 

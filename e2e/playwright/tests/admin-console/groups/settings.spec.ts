@@ -1,18 +1,22 @@
-import { groupUrl, idFromListLink, rowWithCell, saveAndExpectSaved } from "../../../lib/admin-console";
+import { cancelDialog, confirmDialog, expectRefusal, groupUrl, idFromListLink, rowWithCell, saveAndExpectSaved } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { uniqueIdentifier } from "../../../lib/unique";
 
 const list = `${env.adminUrl}/admin/groups`;
-const saved = "Group settings saved successfully";
+const saved = "Settings saved.";
+// What the one confirmation says about a rename.
+const renaming = "You're changing the group identifier";
 
 test("the description and include switches are saved, and show on the list", async ({ page, groups }) => {
   const group = await groups.create({ description: "before" });
   await page.goto(groupUrl(group.id, "settings"));
+  await expect(page).toHaveTitle(new RegExp(`^Settings – ${group.identifier} – `));
   await expect(page.locator('input[name="description"]')).toHaveValue("before");
   await page.locator('input[name="description"]').fill("after");
   await page.locator('input[name="includeInAccessToken"]').uncheck();
   await page.locator('input[name="includeInIdToken"]').uncheck();
+  // Nothing renamed, so nothing to ask.
   await saveAndExpectSaved(page, saved);
 
   await page.reload();
@@ -23,32 +27,31 @@ test("the description and include switches are saved, and show on the list", asy
 
   await page.goto(list);
   const row = rowWithCell(page, group.identifier);
-  await expect(row.getByRole("cell").nth(1)).toHaveText("after");
-  await expect(row.getByRole("cell").nth(2)).toHaveText("No");
-  await expect(row.getByRole("cell").nth(3)).toHaveText("No");
+  await expect(row.getByText("after", { exact: true })).toBeVisible();
+  // In neither token.
+  await expect(row.getByRole("cell").nth(2)).toHaveText("Neither");
 });
 
-test("renaming asks first: No keeps the old identifier, Yes saves the new one", async ({ page, groups }) => {
+test("renaming asks first: Cancel keeps the old identifier, Save saves the new one", async ({ page, groups }) => {
   const group = await groups.create();
   const renamed = uniqueIdentifier("g");
-  const dialog = page.locator("dialog[open]");
   await page.goto(groupUrl(group.id, "settings"));
   await page.locator("#groupIdentifier").fill(renamed);
   await page.locator("#btnSave").click();
-  await expect(dialog).toContainText("You've modified the group identifier");
-  await dialog.getByRole("button", { name: "No" }).click();
+  await cancelDialog(page, renaming);
   await page.goto(groupUrl(group.id, "settings"));
   await expect(page.locator("#groupIdentifier")).toHaveValue(group.identifier);
 
   await page.locator("#groupIdentifier").fill(renamed);
   await page.locator("#btnSave").click();
-  await dialog.getByRole("button", { name: "Yes" }).click();
+  await confirmDialog(page, renaming);
   await expect(page.getByText(saved)).toBeVisible();
   await expect(page.locator("#groupIdentifier")).toHaveValue(renamed);
+  await expect(page.getByRole("heading", { level: 1, name: renamed, exact: true })).toBeVisible();
 
   await page.goto(list);
   await expect(rowWithCell(page, group.identifier)).toHaveCount(0);
-  expect(await idFromListLink(page, list, renamed, "Manage")).toBe(group.id);
+  expect(await idFromListLink(page, list, renamed)).toBe(group.id);
 });
 
 test("renaming to an identifier in use, or an invalid one, is refused", async ({ page, groups }) => {
@@ -61,8 +64,8 @@ test("renaming to an identifier in use, or an invalid one, is refused", async ({
     await page.goto(groupUrl(second.id, "settings"));
     await page.locator("#groupIdentifier").fill(identifier);
     await page.locator("#btnSave").click();
-    await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-    await expect(page.getByText(message)).toBeVisible();
+    await confirmDialog(page, renaming);
+    await expectRefusal(page, "group-error", "groupIdentifier", message);
   }
   await page.goto(groupUrl(second.id, "settings"));
   await expect(page.locator("#groupIdentifier")).toHaveValue(second.identifier);
@@ -71,21 +74,19 @@ test("renaming to an identifier in use, or an invalid one, is refused", async ({
 test("a refused rename is drawn with the stored identifier, and the same rename asks again", async ({ page, groups }) => {
   const group = await groups.create();
   const renamed = uniqueIdentifier("g");
-  const dialog = page.locator("dialog[open]");
   await page.goto(groupUrl(group.id, "settings"));
   await page.locator("#groupIdentifier").fill(renamed);
   await page.locator('input[name="description"]').fill("a <b> tag");
   await page.locator("#btnSave").click();
-  await expect(dialog).toContainText("You've modified the group identifier");
-  await dialog.getByRole("button", { name: "Yes" }).click();
-  await expect(page.getByText("The description cannot contain the characters < or >.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: `Group settings - ${group.identifier}`, exact: true })).toBeVisible();
+  await confirmDialog(page, renaming);
+  await expectRefusal(page, "group-error", "description", "The description cannot contain the characters < or >.");
+  await expect(page.getByRole("heading", { level: 1, name: group.identifier, exact: true })).toBeVisible();
+  await expect(page).toHaveTitle(new RegExp(`^Settings – ${group.identifier} – `));
   await expect(page.locator("#groupIdentifier")).toHaveValue(renamed);
 
   // Still a rename of the stored group, so Save asks again.
   await page.locator("#btnSave").click();
-  await expect(dialog).toContainText("You've modified the group identifier");
-  await dialog.getByRole("button", { name: "No" }).click();
+  await cancelDialog(page, renaming);
   await page.goto(groupUrl(group.id, "settings"));
   await expect(page.locator("#groupIdentifier")).toHaveValue(group.identifier);
 });

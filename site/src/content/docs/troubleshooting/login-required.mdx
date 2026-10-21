@@ -25,7 +25,7 @@ Your app sent an authorization request, usually with `prompt=none` to check for 
 
 It's surprising when you expected a session. The common reasons:
 
-- **The session timed out.** A session ends after 2 hours without activity, or 24 hours after sign-in, unless an administrator changed **User session - idle timeout in seconds** or **User session - max lifetime in seconds** under **Admin**, **Sessions**.
+- **The session timed out.** A session ends after 2 hours without activity, or 24 hours after sign-in, unless an administrator changed **Idle timeout, in seconds** or **Maximum lifetime, in seconds** under **Admin**, **Sessions**.
 - **The session was ended,** by the user signing out, by an administrator, by another user signing in on the same browser, because the user's password was changed or reset, or because the user was disabled.
 - **The browser didn't send the session cookie.** The auth server's session cookie is `SameSite=Lax`, so a browser never sends it to a hidden iframe on a page of another site, whatever its third-party cookie setting. A silent request in an iframe works only when your app and the auth server are on the same site, such as `app.example.com` and `auth.example.com`.
 - **The hint names another user.** Your app sent the `id_token_hint` of a user who has since signed out, and someone else signed in on that browser.

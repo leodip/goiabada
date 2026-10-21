@@ -150,7 +150,7 @@ func HandlePhonePost(
 		}
 
 		// Render error function for form validation errors
-		renderError := func(errorMessage string) {
+		renderError := func(errorMessage, errorField string) {
 			bind := map[string]interface{}{
 				"user":                         user,
 				"selectedPhoneCountryUniqueId": phoneCountryUniqueId,
@@ -160,6 +160,7 @@ func HandlePhonePost(
 				"page":                         r.URL.Query().Get("page"),
 				"query":                        r.URL.Query().Get("query"),
 				"error":                        errorMessage,
+				"errorField":                   errorField,
 			}
 
 			err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_phone.html", bind)
@@ -171,7 +172,9 @@ func HandlePhonePost(
 		// Update user phone via API
 		_, err = apiClient.UpdateUserPhone(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, render.PhoneErrorFields))
+			})
 			return
 		}
 
