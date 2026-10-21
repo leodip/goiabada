@@ -28,7 +28,7 @@ func TestLoad_ABASURLongerThanTheIssuerAllowsIsRefused(t *testing.T) {
 	astral := "https://auth." + strings.Repeat("a", 60-len("https://auth.")-len(".example.com")-4) +
 		"\U0001F600\U0001F600.example.com"
 	require.Equal(t, 60, inputvalidation.TextLength(astral))
-	require.Equal(t, 64, len(astral))
+	require.Len(t, astral, 64)
 
 	tests := []struct {
 		name  string
