@@ -5,10 +5,14 @@
 //
 // They name entries in the admin console's own browser session, written and read by
 // this process alone: the authenticated-session key with the access token's recorded
-// expiry beside it, and the six the OAuth ceremony parks between the authorize redirect
-// and the callback. The auth server stores that session server-side but never opens it,
+// expiry beside it. The auth server stores that session server-side but never opens it,
 // so there is nothing for the two binaries to agree on beyond the session's name, which
 // core/builtin declares (#385).
+//
+// The other six name the values the OAuth ceremony carries between the authorize redirect
+// and the callback. Since #620 they ride in the sealed handshake cookie rather than the
+// session, and they stay declared here because a sign-in in flight across a deploy reads
+// them back at the callback.
 package sessionkeys
 
 // JWT is the authenticated-session key. Its string value, like every one here, is the

@@ -34,10 +34,11 @@ import (
 
 // Seam 4 of #427: HandleAuthCallbackPost over HTTP, one row per branch. Everything below the
 // handler is real except the code exchange: the session store is the production ServerSideStore
-// over an in-memory backend, so "nothing was written" and "the identifier rotated" are read back
-// through the store's own Get with the cookies a browser would hold; and the parser is the
-// production JWKSTokenParser verifying real RS256 tokens, so a token row proves the refusal the
-// parser owes reaches the page, not merely that a stubbed error propagates.
+// over an in-memory backend, so "nothing was written" is counted at the backend and "the
+// identifier rotated" is read back through the store's own Get with the cookies a browser would
+// hold; the handshake is sealed into its cookie by that store, as RedirToAuthorize seals it (#620);
+// and the parser is the production JWKSTokenParser verifying real RS256 tokens, so a token row
+// proves the refusal the parser owes reaches the page, not merely that a stubbed error propagates.
 
 const (
 	callbackKid            = "callback-kid"
@@ -53,12 +54,14 @@ const (
 )
 
 // armableBackend is the in-memory backend with a Load and a Create that can be made to fail once
-// the handshake has been seeded, which is how a session that cannot be read and a rotation that
-// cannot write its new row are reached.
+// the browser's state has been seeded, which is how a session that cannot be read and a rotation
+// that cannot write its new row are reached. It counts the rows created, which is what a sign-in
+// is measured in: one, the signed-in administrator's, and none for a refusal (#620).
 type armableBackend struct {
 	*sessiontest.MemoryBackend
 	failLoad   bool
 	failCreate bool
+	creates    int
 }
 
 func (b *armableBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
@@ -72,6 +75,7 @@ func (b *armableBackend) Create(ctx context.Context, id string, data []byte, aut
 	if b.failCreate {
 		return time.Time{}, errs.New("the backend refused the write")
 	}
+	b.creates++
 	return b.MemoryBackend.Create(ctx, id, data, authenticated)
 }
 
@@ -131,9 +135,9 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 	}
 }
 
-// handshake is the six values RedirToAuthorize parks, as it parks them.
-func handshake() map[string]any {
-	return map[string]any{
+// handshake is the six values RedirToAuthorize seals, as it seals them.
+func handshake() map[string]string {
+	return map[string]string{
 		sessionkeys.State:          callbackState,
 		sessionkeys.CodeVerifier:   callbackVerifier,
 		sessionkeys.RedirectURI:    callbackRedirectURI,
@@ -143,8 +147,17 @@ func handshake() map[string]any {
 	}
 }
 
-// seed stores values as a browser's session and returns the cookies that name it.
-func (h *callbackHarness) seed(values map[string]any) []*http.Cookie {
+// handshakeCookie seals values into the cookie RedirToAuthorize sets.
+func (h *callbackHarness) handshakeCookie(values map[string]string) *http.Cookie {
+	h.t.Helper()
+	sealed, err := h.store.SealCookieValues(oauthclient.SignInHandshakeCookie, values)
+	require.NoError(h.t, err)
+	return h.store.ValuesCookie(oauthclient.SignInHandshakeCookie, sealed)
+}
+
+// seedSession stores values as a browser's session, as one planted before the sign-in would be,
+// and returns the cookie that names it. The row it writes is not counted against the callback.
+func (h *callbackHarness) seedSession(values map[string]any) *http.Cookie {
 	h.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	sess, err := h.store.Get(req, builtin.AdminConsoleSessionName)
@@ -155,8 +168,37 @@ func (h *callbackHarness) seed(values map[string]any) []*http.Cookie {
 	w := httptest.NewRecorder()
 	require.NoError(h.t, h.store.Save(req, w, sess))
 	cookies := w.Result().Cookies()
-	require.NotEmpty(h.t, cookies)
-	return cookies
+	require.Len(h.t, cookies, 1)
+	h.backend.creates = 0
+	return cookies[0]
+}
+
+// assertHandshakeRemoved asserts the answer's cookies: the handshake's removal when the browser
+// brought one, nothing when it did not, and the new session's cookie beside it when wantSession.
+func (h *callbackHarness) assertHandshakeRemoved(w *httptest.ResponseRecorder, brought, wantSession bool) []*http.Cookie {
+	h.t.Helper()
+	handshakeName := h.store.CookieName(oauthclient.SignInHandshakeCookie)
+	var removals, others []*http.Cookie
+	for _, c := range w.Result().Cookies() {
+		if c.Name == handshakeName {
+			removals = append(removals, c)
+		} else {
+			others = append(others, c)
+		}
+	}
+	if brought {
+		require.Len(h.t, removals, 1, "the handshake is removed")
+		assert.Equal(h.t, -1, removals[0].MaxAge)
+		assert.Empty(h.t, removals[0].Value)
+	} else {
+		assert.Empty(h.t, removals, "no removal of a handshake the browser did not bring")
+	}
+	if wantSession {
+		require.Len(h.t, others, 1, "the signed-in session's cookie")
+	} else {
+		assert.Empty(h.t, others, "no session cookie")
+	}
+	return others
 }
 
 // readBack loads the session the cookies name, through the store's own Get, as the browser's next
@@ -215,10 +257,9 @@ func callbackForm() url.Values {
 }
 
 // assertRefused asserts the page a refusal rendered, the one record it logged, and that it wrote
-// nothing: no cookie in the answer, and, when the browser brought a session, that session reads
-// back exactly as it was seeded.
-func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, cookies []*http.Cookie,
-	seeded map[string]any, want signInRefusal, wantLevel slog.Level) map[string]interface{} {
+// nothing: no row, and no cookie in the answer but the removal of the handshake it was brought.
+func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, brought bool,
+	want signInRefusal, wantLevel slog.Level) map[string]interface{} {
 	h.t.Helper()
 
 	bind := handlertest.Bind(h.t, h.httpHelper)
@@ -245,26 +286,21 @@ func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, cookies []
 		}
 	}
 
-	assert.Empty(h.t, w.Result().Cookies(), "a refusal sets no cookie")
-	if cookies != nil {
-		readBack := h.readBack(cookies)
-		assert.False(h.t, readBack.IsNew, "the browser's session is still there")
-		assert.Equal(h.t, seeded, readBack.Values, "and unchanged")
-	}
+	h.assertHandshakeRemoved(w, brought, false)
+	assert.Zero(h.t, h.backend.creates, "a refusal writes no row")
 	return bind
 }
 
-// A handshake value that is absent, not a string, or empty is refused before the code is spent,
-// whichever of the six it is. The nonce row is the one #412 found: a session with no nonce used to
-// skip the nonce check and sign the administrator in (#427 decision 5).
+// A handshake value that is absent or empty is refused before the code is spent, whichever of
+// the six it is. The nonce row is the one #412 found: a session with no nonce used to skip the
+// nonce check and sign the administrator in (#427 decision 5).
 func TestHandleAuthCallbackPost_RefusesAMalformedHandshakeBeforeTheExchange(t *testing.T) {
 	malformations := []struct {
 		name  string
-		apply func(values map[string]any, key string)
+		apply func(values map[string]string, key string)
 	}{
-		{"missing", func(values map[string]any, key string) { delete(values, key) }},
-		{"not a string", func(values map[string]any, key string) { values[key] = 42 }},
-		{"empty", func(values map[string]any, key string) { values[key] = "" }},
+		{"missing", func(values map[string]string, key string) { delete(values, key) }},
+		{"empty", func(values map[string]string, key string) { values[key] = "" }},
 	}
 
 	for _, key := range signInHandshakeKeys {
@@ -276,41 +312,89 @@ func TestHandleAuthCallbackPost_RefusesAMalformedHandshakeBeforeTheExchange(t *t
 
 				seeded := handshake()
 				m.apply(seeded, key)
-				cookies := h.seed(seeded)
 				exchanger := &recordingExchanger{response: h.tokenResponse()}
 
-				w := h.serve(exchanger, cookies, callbackForm())
+				w := h.serve(exchanger, []*http.Cookie{h.handshakeCookie(seeded)}, callbackForm())
 
-				h.assertRefused(w, cookies, seeded, refusalSession, slog.LevelWarn)
+				h.assertRefused(w, true, refusalSession, slog.LevelWarn)
 				assert.False(t, exchanger.called, "refused before the code is spent")
 			})
 		}
 	}
 }
 
-// The refusals decided from the browser's request and session alone, before the exchange.
+// The refusals decided from the browser's request and handshake alone, before the exchange.
 func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testing.T) {
 	testCases := []struct {
 		name string
-		// cookies builds what the browser brings; nil seeds the whole handshake.
-		cookies         func(h *callbackHarness) []*http.Cookie
+		// cookies builds what the browser brings; nil brings the whole handshake.
+		cookies func(h *callbackHarness) []*http.Cookie
+		// brought is whether cookies brings a handshake cookie, which the answer removes.
+		brought         bool
 		form            url.Values
 		want            signInRefusal
 		wantCode        string
 		wantDescription string
 	}{
 		{
-			// Decision 11: the store made a session up on this request, so the browser brought
-			// none back, which has causes worth naming.
-			name:    "no session cookie",
+			// Decision 11: the browser brought no handshake back, which has causes worth naming.
+			// A cross-site post brings none either, and is answered with no removal, so another
+			// site cannot end a sign-in in flight.
+			name:    "no handshake cookie",
 			cookies: func(*callbackHarness) []*http.Cookie { return []*http.Cookie{} },
 			form:    callbackForm(),
 			want:    refusalNoSession,
 		},
 		{
-			name: "a session cookie that does not decode",
+			name: "a handshake cookie that does not open",
 			cookies: func(h *callbackHarness) []*http.Cookie {
-				return []*http.Cookie{{Name: h.store.CookieName(builtin.AdminConsoleSessionName), Value: "garbage"}}
+				return []*http.Cookie{{Name: h.store.CookieName(oauthclient.SignInHandshakeCookie), Value: "garbage"}}
+			},
+			brought: true,
+			form:    callbackForm(),
+			want:    refusalNoSession,
+		},
+		{
+			name: "a tampered handshake cookie",
+			cookies: func(h *callbackHarness) []*http.Cookie {
+				c := h.handshakeCookie(handshake())
+				// One base64url character inside the ciphertext, swapped for another, so the
+				// value still decodes and only the AEAD tag refuses it.
+				b := []byte(c.Value)
+				if b[len(b)/2] == 'A' {
+					b[len(b)/2] = 'B'
+				} else {
+					b[len(b)/2] = 'A'
+				}
+				c.Value = string(b)
+				return []*http.Cookie{c}
+			},
+			brought: true,
+			form:    callbackForm(),
+			want:    refusalNoSession,
+		},
+		{
+			// The session cookie is sealed by the same store, so this row is the one that shows
+			// a session identifier is never read as a handshake.
+			name: "a session cookie value presented as the handshake",
+			cookies: func(h *callbackHarness) []*http.Cookie {
+				session := h.seedSession(map[string]any{})
+				return []*http.Cookie{{Name: h.store.CookieName(oauthclient.SignInHandshakeCookie), Value: session.Value}}
+			},
+			brought: true,
+			form:    callbackForm(),
+			want:    refusalNoSession,
+		},
+		{
+			// The handshake used to live in the session, so a sign-in started before #620 comes
+			// back with a session holding it and no handshake cookie.
+			name: "a handshake in the session rather than its cookie",
+			cookies: func(h *callbackHarness) []*http.Cookie {
+				values := map[string]any{}
+				for k, v := range handshake() {
+					values[k] = v
+				}
+				return []*http.Cookie{h.seedSession(values)}
 			},
 			form: callbackForm(),
 			want: refusalNoSession,
@@ -373,23 +457,17 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 			handlertest.RefuseInternalServerError(t, h.httpHelper)
 			handlertest.ExpectRender(h.httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 
-			var cookies []*http.Cookie
-			var seeded map[string]any
+			cookies := []*http.Cookie{h.handshakeCookie(handshake())}
+			brought := true
 			if tc.cookies != nil {
 				cookies = tc.cookies(h)
-			} else {
-				seeded = handshake()
-				cookies = h.seed(seeded)
+				brought = tc.brought
 			}
 			exchanger := &recordingExchanger{response: h.tokenResponse()}
 
 			w := h.serve(exchanger, cookies, tc.form)
 
-			readBackCookies := cookies
-			if seeded == nil {
-				readBackCookies = nil
-			}
-			bind := h.assertRefused(w, readBackCookies, seeded, tc.want, slog.LevelWarn)
+			bind := h.assertRefused(w, brought, tc.want, slog.LevelWarn)
 			assert.False(t, exchanger.called, "refused before the code is spent")
 			assert.Equal(t, tc.wantCode, bind["code"])
 			assert.Equal(t, tc.wantDescription, bind["description"])
@@ -475,14 +553,12 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			handlertest.RefuseInternalServerError(t, h.httpHelper)
 			handlertest.ExpectRender(h.httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 
-			seeded := handshake()
-			cookies := h.seed(seeded)
 			response, err := tc.exchange(h)
 			exchanger := &recordingExchanger{response: response, err: err}
 
-			w := h.serve(exchanger, cookies, callbackForm())
+			w := h.serve(exchanger, []*http.Cookie{h.handshakeCookie(handshake())}, callbackForm())
 
-			bind := h.assertRefused(w, cookies, seeded, tc.want, slog.LevelError)
+			bind := h.assertRefused(w, true, tc.want, slog.LevelError)
 			assert.True(t, exchanger.called)
 			assert.Empty(t, bind["code"])
 			assert.Empty(t, bind["description"])
@@ -491,45 +567,42 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 }
 
 // A session store that cannot be read answers the generic 500 page, as it did, before the code is
-// spent and without writing anything.
+// spent and without writing anything. The browser brings a session for the store to read, since
+// one that brings none is never read at all.
 func TestHandleAuthCallbackPost_ASessionThatCannotBeRead(t *testing.T) {
 	h := newCallbackHarness(t)
 	h.httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-	seeded := handshake()
-	cookies := h.seed(seeded)
+	seeded := map[string]any{"a-value": "the browser had"}
+	session := h.seedSession(seeded)
 	h.backend.failLoad = true
 	exchanger := &recordingExchanger{}
 
-	w := h.serve(exchanger, cookies, callbackForm())
+	w := h.serve(exchanger, []*http.Cookie{session, h.handshakeCookie(handshake())}, callbackForm())
 
 	assert.False(t, exchanger.called)
-	assert.Empty(t, w.Result().Cookies())
+	h.assertHandshakeRemoved(w, true, false)
+	assert.Zero(t, h.backend.creates)
 	h.backend.failLoad = false
-	readBack := h.readBack(cookies)
+	readBack := h.readBack([]*http.Cookie{session})
 	assert.False(t, readBack.IsNew)
 	assert.Equal(t, seeded, readBack.Values)
 }
 
-// A rotation that cannot write the new row answers the generic 500 page and leaves the browser's
-// session as it was: Regenerate writes nothing and sets no cookie until every step has succeeded.
+// A rotation that cannot write the new row answers the generic 500 page and stores nothing:
+// Regenerate writes nothing and sets no cookie until every step has succeeded.
 func TestHandleAuthCallbackPost_ARotationThatFails(t *testing.T) {
 	h := newCallbackHarness(t)
 	h.httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
-	seeded := handshake()
-	cookies := h.seed(seeded)
 	h.backend.failCreate = true
 	exchanger := &recordingExchanger{response: h.tokenResponse()}
 
-	w := h.serve(exchanger, cookies, callbackForm())
+	w := h.serve(exchanger, []*http.Cookie{h.handshakeCookie(handshake())}, callbackForm())
 
 	assert.True(t, exchanger.called)
-	assert.Empty(t, w.Result().Cookies())
-	h.backend.failCreate = false
-	readBack := h.readBack(cookies)
-	assert.False(t, readBack.IsNew)
-	assert.Equal(t, seeded, readBack.Values)
+	h.assertHandshakeRemoved(w, true, false)
+	assert.Zero(t, h.backend.creates)
 }
 
 // assertSignedIn asserts what a completed sign-in stores: the token response with the effective
@@ -552,18 +625,30 @@ func assertSignedIn(t *testing.T, sess *sessionstore.Session, want oauth.TokenRe
 	assert.Len(t, sess.Values, 2, "the token response and its expiry, and nothing else")
 }
 
-// A sign-in that passes every check is stored under a new identifier, and the identifier the
-// browser brought reads back as nothing: this is the rotation #266 requires at the console's one
-// privilege transition, observed through the store rather than lexically.
+// A sign-in that passes every check is stored in one row, the console's first for this browser,
+// and the handshake cookie is removed (#620). A browser that brought a session, planted before
+// the sign-in, has it stored under a new identifier, and the identifier it brought reads back as
+// nothing: this is the rotation #266 requires at the console's one privilege transition, observed
+// through the store rather than lexically.
 func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
+	staleHandshake := map[string]any{}
+	for k, v := range handshake() {
+		staleHandshake[k] = v
+	}
 	testCases := []struct {
 		name      string
 		scope     string
 		wantScope string
+		// planted is the session the browser brings beside the handshake, nil for none.
+		planted map[string]any
 	}{
-		{"the response names its grant", callbackGrantedScope, callbackGrantedScope},
+		{"the response names its grant", callbackGrantedScope, callbackGrantedScope, nil},
 		// RFC 6749 section 3.3: an omitted scope means the grant is the request.
-		{"the response names no scope", "", callbackRequestedScope},
+		{"the response names no scope", "", callbackRequestedScope, nil},
+		{"over a session planted before the sign-in", callbackGrantedScope, callbackGrantedScope, map[string]any{}},
+		// A session written before #620 can still hold a handshake of its own; it is not
+		// carried into the signed-in session.
+		{"over a session holding a handshake of its own", callbackGrantedScope, callbackGrantedScope, staleHandshake},
 	}
 
 	for _, tc := range testCases {
@@ -571,7 +656,12 @@ func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
 			h := newCallbackHarness(t)
 			handlertest.RefuseInternalServerError(t, h.httpHelper)
 
-			cookies := h.seed(handshake())
+			cookies := []*http.Cookie{h.handshakeCookie(handshake())}
+			var planted *http.Cookie
+			if tc.planted != nil {
+				planted = h.seedSession(tc.planted)
+				cookies = append(cookies, planted)
+			}
 			response := h.tokenResponse()
 			response.Scope = tc.scope
 			exchanger := &recordingExchanger{response: response}
@@ -592,11 +682,14 @@ func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
 
 			want := *response
 			want.Scope = tc.wantScope
-			newCookies := w.Result().Cookies()
-			require.NotEmpty(t, newCookies, "the new identifier is sent")
+			newCookies := h.assertHandshakeRemoved(w, true, true)
+			assert.Equal(t, 1, h.backend.creates, "one row, the signed-in administrator's")
 			assertSignedIn(t, h.readBack(newCookies), want, before, after)
 
-			assert.True(t, h.readBack(cookies).IsNew, "the identifier the browser brought names nothing any more")
+			if planted != nil {
+				assert.True(t, h.readBack([]*http.Cookie{planted}).IsNew,
+					"the identifier the browser brought names nothing any more")
+			}
 		})
 	}
 }

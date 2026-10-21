@@ -633,6 +633,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
 | `core/sessionstore` | `KeyPair` | both-apps | — |
+| `core/sessionstore` | `MaxCookieValuesBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionDataBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionWireBytes` | both-apps | — |
 | `core/sessionstore` | `NewConditionalStore` | contract | The constructor of `ConditionalStore`, beside it for the same reason. Only the auth server builds it; it stays because its two writes seal, open, mint identifiers and set cookies with the keys and codec this package keeps private, which is where #579 decision 1 puts the conditional capability, so the admin console's store never carries it. |
@@ -641,7 +642,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `Options` | own-package | — |
 | `core/sessionstore` | `ParseKeys` | both-apps | — |
 | `core/sessionstore` | `PersistentCookie` | own-package | — |
-| `core/sessionstore` | `PreAuthLifetime` | contract | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
+| `core/sessionstore` | `PreAuthLifetime` | own-package | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
 | `core/sessionstore` | `PreviousKeysError` | both-apps | — |
 | `core/sessionstore` | `Record` | kernel | — |
 | `core/sessionstore` | `ServerSideStore` | own-package | — |

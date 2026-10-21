@@ -88,17 +88,18 @@ type JWT struct {
 	refreshLocks *sessionRefreshLocks
 	// refreshWait bounds how long a request waits for another request's refresh of its session.
 	refreshWait time.Duration
-	// preAuthBudget bounds the anonymous session rows the sign-in arm writes, and is
-	// constructed with the default tier rather than passed in: a console that admits
-	// unbounded anonymous rows must be a decision, not a forgotten argument. The
-	// session-ended route mounts the same instance, which PreAuthBudget hands it (#620).
-	preAuthBudget *PreAuthBudget
 }
+
+// redirectBackMaxLen bounds the path and query the sign-in arm hands RedirToAuthorize as its
+// return target. The request line is bounded only by the console's 64 KiB header limit, and the
+// handshake cookie the target is sealed into is bounded far below that, so a target past this
+// would fail the seal and answer 500; no return target a page of this console produces approaches
+// the bound (#620).
+const redirectBackMaxLen = 512
 
 // NewJWT constructs a DB-free JWT middleware. freshSessions re-reads the session under the
 // refresh lock, and is the store sessionStore is; tokenRefresher sends the refresh grant;
-// clientID is the client the sign-in redirect names. The sign-in arm admits its
-// anonymous session writes through the default per-address budget (#620).
+// clientID is the client the sign-in redirect names.
 func NewJWT(
 	sessionStore sessionstore.Store,
 	freshSessions freshSessionReader,
@@ -122,15 +123,7 @@ func NewJWT(
 		clientID:       clientID,
 		refreshLocks:   newSessionRefreshLocks(),
 		refreshWait:    refreshWaitTimeout,
-		preAuthBudget:  NewPreAuthBudget(DefaultPreAuthBudgetPerAddress, DefaultPreAuthBudgetWindow),
 	}
-}
-
-// PreAuthBudget is the budget the sign-in arm admits anonymous session writes through,
-// handed to initRoutes so the session-ended route can mount the same one: the two arms
-// that write the console's anonymous rows answer to one rate (#620).
-func (m *JWT) PreAuthBudget() *PreAuthBudget {
-	return m.preAuthBudget
 }
 
 // SessionHandler puts the signed-in administrator's verified ID token and token response on the
@@ -561,23 +554,16 @@ func (m *JWT) RequiresScope(
 					// (GET http://elsewhere/x HTTP/1.1) put a whole second URL after the
 					// base URL (#426).
 					//
-					// The redirect below is also the one write an anonymous request can
-					// reach on this console: RedirToAuthorize parks the handshake in a
-					// fresh session and saves it, which inserts a row on the auth server
-					// for every request that gets this far, cookie or none, at no limit
-					// (#620). The per-address budget admits the write, and the return URL
-					// is bounded so the row it is sealed into no longer tracks the request
-					// line's length.
-					if !m.preAuthBudget.Allow(r) {
-						m.preAuthBudget.Refuse(w, r)
-						return
-					}
+					// RedirToAuthorize seals the handshake into a cookie of its own and
+					// writes no session row, so an anonymous request costs the auth server
+					// nothing here (#620). The return URL is bounded so the cookie it is
+					// sealed into no longer tracks the request line's length.
 					redirectBack := m.baseURL + r.URL.RequestURI()
 					if len(r.URL.RequestURI()) > redirectBackMaxLen {
 						// No page this console renders approaches the bound in path and
-						// query, so a line past it is a row sized at the request rather
-						// than a return target, and the home page — the one destination
-						// that requires no sign-in — takes the browser instead (#620).
+						// query, so a line past it is not a return target, and the home
+						// page — the one destination that requires no sign-in — takes the
+						// browser instead (#620).
 						redirectBack = m.baseURL + "/"
 					}
 					err := m.authHelper.RedirToAuthorize(w, r, m.clientID,

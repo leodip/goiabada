@@ -179,7 +179,7 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 	store := sessionstoremocks.NewStore(t)
 	store.On("Get", mock.Anything, builtin.AdminConsoleSessionName).
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
-	authHelper := oauthclient.NewAuthHelper(store, builtin.AdminConsoleSessionName, "", "")
+	authHelper := oauthclient.NewAuthHelper(nil, "", "")
 
 	serve := func(opts ...handlertest.Option) map[string]interface{} {
 		httpHelper := handlersmocks.NewHttpHelper(t)
