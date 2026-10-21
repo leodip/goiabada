@@ -60,8 +60,12 @@ type ServerErrorRenderer interface {
 }
 
 // refreshWaitTimeout bounds how long a request waits for another request's refresh of its
-// session before it carries on without one: see refreshUnderLock.
+// session before it gives up and answers the error page: see refreshUnderLock.
 const refreshWaitTimeout = 5 * time.Second
+
+// errSessionEndedMeanwhile is refreshToken's answer when the re-read under the lock finds the
+// token set gone: another request ended the session while this one waited for the lock.
+var errSessionEndedMeanwhile = errors.New("the session was signed out while the request waited for its refresh lock")
 
 // freshSessionReader is the part of sessionstore.ServerSideStore the refresh re-reads through:
 // the session as stored now, past the request's memo of it (#269), without writing that memo
@@ -186,9 +190,8 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 			}
 
 			// Steps 4 and 5.
-			if oauthclient.RefreshDue(expiresAt, time.Now()) {
-				refreshed, answered := m.refreshUnderLock(w, r, sess,
-					oauthclient.JwtInfo{TokenResponse: tokenResponse, IdToken: idToken}, expiresAt)
+			if oauthclient.RefreshDue(&tokenResponse, expiresAt, time.Now()) {
+				refreshed, answered := m.refreshUnderLock(w, r, sess)
 				if answered {
 					return
 				}
@@ -210,8 +213,7 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 // clearTokens deletes the token values from the session and saves it, answering the error page
 // when the save fails. It reports whether the session was saved.
 func (m *JWT) clearTokens(w http.ResponseWriter, r *http.Request, sess *sessionstore.Session) bool {
-	delete(sess.Values, sessionkeys.JWT)
-	delete(sess.Values, sessionkeys.JWTExpiresAt)
+	forget(sess)
 	if err := m.sessionStore.Save(r, w, sess); err != nil {
 		m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
 		return false
@@ -258,23 +260,24 @@ func (m *JWT) endForeignSession(w http.ResponseWriter, r *http.Request, sess *se
 // redirect to the root, and the chain stops.
 //
 // The wait for the lock is bounded at refreshWaitTimeout and ends with the browser's departure. A
-// request that waited that long carries the access token it holds while that has not expired,
-// since a refresh is due 30 seconds before it does, and otherwise answers the error page
-// without touching the session: the request holding the lock still owns the stored set.
+// request whose wait ends without the lock answers the error page, whatever its access token,
+// sending no grant and writing nothing: the request holding the lock still owns the stored set.
+// It runs no page either, even on an access token that has not expired: its session holds the set
+// the holder is rotating, and a page that saved it, for a flash, would write that set back over
+// the holder's answer once stored, since the console's store is last-writer-wins (#579), and the
+// next request would present the refresh token the auth server had rotated away.
 //
 // That bound is what keeps the time budget. Against a hung auth server the request holding the
 // lock spends at most the re-read, the grant, and then either the check and the write or the
 // second re-read and the clear, each bounded at TokenExchangeTimeout or the session backend's
-// own 10 seconds an attempt: 40 seconds. A request that waited spends refreshWaitTimeout more,
-// 45 in all, which leaves the listener's 60 second write timeout room for the request's first
-// load of the session and its page. An unbounded wait added a holder's 40 to every request
-// queued behind it.
+// own 10 seconds an attempt: 40 seconds. A request that waited and then took the lock spends
+// up to refreshWaitTimeout more, 45 in all, which leaves the listener's 60 second write timeout
+// room for the request's first load of the session and its page; one that gave up answers at
+// refreshWaitTimeout. An unbounded wait added a holder's 40 to every request queued behind it.
 func (m *JWT) refreshUnderLock(
 	w http.ResponseWriter,
 	r *http.Request,
 	sess *sessionstore.Session,
-	held oauthclient.JwtInfo,
-	heldExpiresAt int64,
 ) (refreshed *oauthclient.JwtInfo, answered bool) {
 	ctx := r.Context()
 
@@ -282,12 +285,6 @@ func (m *JWT) refreshUnderLock(
 	release, err := m.refreshLocks.Lock(waitCtx, sess.ID)
 	cancel()
 	if err != nil {
-		if time.Now().Unix() < heldExpiresAt {
-			slog.WarnContext(ctx,
-				"another request's refresh of the session outlasted the wait, carrying the access token the request holds",
-				"error", err)
-			return &held, false
-		}
 		m.errorRenderer.InternalServerError(w, r,
 			errs.Wrap(err, "unable to wait for another request's refresh of the session"))
 		return nil, true
@@ -316,6 +313,14 @@ func (m *JWT) refreshUnderLock(
 		m.endSession(w, r, sess)
 		return nil, true
 	}
+	if errors.Is(err, errSessionEndedMeanwhile) {
+		// The stored session holds no tokens already, so nothing is saved: a save would write the
+		// copy this request began with over whatever the ending request stored beside the clear,
+		// the notice /auth/session-ended sets among them. The tokens leave the request's own
+		// session, so a page that saves it later writes it signed out too.
+		forget(sess)
+		return nil, false
+	}
 	if err != nil {
 		slog.WarnContext(ctx, "unable to refresh the access token, signing the session out", "error", err)
 	}
@@ -333,8 +338,9 @@ func (m *JWT) refreshUnderLock(
 // verified, before anything reaches the session. It returns the refreshed JwtInfo once it is
 // stored; refused is a token set the parser will not trust, which ends the session; lookupErr
 // is a re-read of the session that could not be performed, which refuses the request and
-// clears nothing; err is a grant that could not be completed, which signs it out. With no
-// refresh token all four are nil.
+// clears nothing; err is a grant that could not be completed, which signs it out, or
+// errSessionEndedMeanwhile, a session another request signed out while this one waited, which
+// signs it out with nothing saved. With no refresh token all four are nil.
 //
 // The whole of it runs under the session's lock (#621). The auth server rotates refresh tokens
 // strictly, so two grants for one session would present the same refresh token twice and the
@@ -367,9 +373,8 @@ func (m *JWT) refreshToken(
 	expiresAt, hasExpiry := current.Values[sessionkeys.JWTExpiresAt].(int64)
 	if !hasStored || !hasExpiry || stored.IdToken == "" {
 		// Another request ended this session while this one waited for the lock; this
-		// request ends it the same way, and the sign-out's clear finds nothing newer to
-		// save over.
-		return nil, nil, nil, nil
+		// request ends it the same way, presenting nothing.
+		return nil, nil, nil, errSessionEndedMeanwhile
 	}
 	// Step 3's check, restated under the lock for the set this request may not have read
 	// itself: carried or refreshed, the ID token that reaches the context is verified. Its
@@ -379,7 +384,7 @@ func (m *JWT) refreshToken(
 	if err != nil {
 		return nil, err, nil, nil
 	}
-	if !oauthclient.RefreshDue(expiresAt, time.Now()) {
+	if !oauthclient.RefreshDue(&stored, expiresAt, time.Now()) {
 		carry(sess, stored, expiresAt)
 		return &oauthclient.JwtInfo{TokenResponse: stored, IdToken: previous}, nil, nil, nil
 	}
@@ -456,6 +461,13 @@ func (m *JWT) refreshToken(
 func carry(sess *sessionstore.Session, stored oauth.TokenResponse, expiresAt int64) {
 	sess.Values[sessionkeys.JWT] = stored
 	sess.Values[sessionkeys.JWTExpiresAt] = expiresAt
+}
+
+// forget deletes the token values from the request's own session without saving it: see
+// refreshUnderLock.
+func forget(sess *sessionstore.Session) {
+	delete(sess.Values, sessionkeys.JWT)
+	delete(sess.Values, sessionkeys.JWTExpiresAt)
 }
 
 // reReadSession loads the session as the backend holds it now, past the store's per-request

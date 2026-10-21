@@ -346,31 +346,76 @@ func TestSessionHandler_AWaiterCarriesTheStoredSetIntoItsOwnSession(t *testing.T
 	h.assertTheNextRequestSendsNoGrant(cookies, winner)
 }
 
-// A request that waited while another signed the session out finds the token set gone when it
-// re-reads, and signs out the same way, presenting nothing.
+// A request that waited while another ended the session finds the token set gone when it
+// re-reads, and signs out the same way, presenting nothing. It saves nothing either: the stored
+// session holds no tokens already, and the copy this request began with would write back over
+// whatever the ending request stored beside the clear, the notice /auth/session-ended sets for
+// the home page among them. The tokens leave the request's own session in memory, so a page that
+// saves it later writes the session signed out and not the due set the request began with.
 func TestSessionHandler_AWaiterWhoseSessionWasSignedOutMeanwhileSendsNoGrant(t *testing.T) {
-	h := newSessionHarness(t)
-	cookies := h.seed(signedIn(due()))
-	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil).Once()
+	const endedFlash = "sessionEnded"
 
-	m := h.middleware(h.parser)
-	queued := queuedSignal(m.refreshLocks)
-	holder, err := m.refreshLocks.Lock(context.Background(), h.sessionIDOf(cookies))
-	require.NoError(t, err)
+	testCases := []struct {
+		name string
+		page func(h *sessionHarness) func(w http.ResponseWriter, r *http.Request)
+	}{
+		{"a page that saves nothing", func(*sessionHarness) func(w http.ResponseWriter, r *http.Request) { return nil }},
+		{"a page that saves a flash", (*sessionHarness).savingAFlash},
+	}
 
-	done := h.inBackground(context.Background(), m, cookies, nil)
-	awaitQueued(t, queued)
-	h.writeAsAnotherRequest(cookies, func(values map[string]any) {
-		delete(values, sessionkeys.JWT)
-		delete(values, sessionkeys.JWTExpiresAt)
-	})
-	holder()
-	out := awaitServed(t, done)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newSessionHarness(t)
+			cookies := h.seed(signedIn(due()))
+			h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil).Once()
+			page := tc.page(h)
 
-	h.assertContinuedUnauthenticated(out)
-	h.assertNoRefreshSent()
-	h.assertSignedOut(cookies)
-	assert.Empty(t, h.logs.Records(), h.logs.Text())
+			m := h.middleware(h.parser)
+			queued := queuedSignal(m.refreshLocks)
+			holder, err := m.refreshLocks.Lock(context.Background(), h.sessionIDOf(cookies))
+			require.NoError(t, err)
+
+			done := h.inBackground(context.Background(), m, cookies, page)
+			awaitQueued(t, queued)
+			h.endAsAnotherRequest(cookies, endedFlash)
+			h.forgetWrites()
+			holder()
+			out := awaitServed(t, done)
+
+			h.assertContinuedUnauthenticated(out)
+			h.assertNoRefreshSent()
+			h.assertSignedOut(cookies)
+			assert.Empty(t, h.logs.Records(), h.logs.Text())
+			if page == nil {
+				assert.Empty(t, h.backend.recordedWrites(), "the waiter writes nothing")
+				_, kept := h.readBack(cookies).TakeFlash(endedFlash)
+				assert.True(t, kept, "the ending request's notice survives")
+			} else {
+				_, flashed := h.readBack(cookies).TakeFlash(flashKey)
+				assert.True(t, flashed, "the page's save landed, with the tokens gone")
+			}
+		})
+	}
+}
+
+// endAsAnotherRequest ends the session the cookies name the way /auth/session-ended does, through a
+// request, and a load, of its own: the token values deleted and a notice set as a flash.
+func (h *sessionHarness) endAsAnotherRequest(cookies []*http.Cookie, flash string) {
+	req := httptest.NewRequest(http.MethodGet, "/auth/session-ended", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	sess, err := h.store.Get(req, sessionTestName)
+	if err != nil {
+		h.t.Errorf("unable to get the session: %v", err)
+		return
+	}
+	delete(sess.Values, sessionkeys.JWT)
+	delete(sess.Values, sessionkeys.JWTExpiresAt)
+	sess.SetFlash(flash, "true")
+	if err := h.store.Save(req, httptest.NewRecorder(), sess); err != nil {
+		h.t.Errorf("unable to save the session: %v", err)
+	}
 }
 
 // A failed refresh's clear is saved before the session's lock is released. The waiter then
@@ -532,64 +577,121 @@ func TestSessionHandler_AnIDTokenThatNoLongerVerifiesUnderTheLockEndsTheSession(
 }
 
 // A wait for the lock ends at its bound, so a refresh that hangs holds no other request of the
-// session past the listener's write timeout. The request that gave up sends nothing and writes
-// nothing: it carries the access token it holds while that has not expired, and answers the
-// error page once it has.
+// session past the listener's write timeout. The request that gave up answers the error page,
+// whatever its access token, and sends and writes nothing: its page would run on the token set it
+// began with, the one the holder is rotating, and a save there, for a flash, would write that set
+// back over the holder's answer once it is stored, since the console's store is last-writer-wins
+// (#579). The next request would present the rotated-away refresh token, read as a replay. The
+// holder here is a real request, its grant held until the waiter has given up, and the token the
+// waiter holds has not expired, which is the case that used to carry it on to its page.
 func TestSessionHandler_AWaitForTheRefreshLockEndsAtItsBound(t *testing.T) {
-	t.Run("the access token held has not expired", func(t *testing.T) {
-		h := newSessionHarness(t)
-		expiresAt := due()
-		cookies := h.seed(signedIn(expiresAt))
-		h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil).Once()
-		m := h.middleware(h.parser)
-		m.refreshWait = 20 * time.Millisecond
-		holder, err := m.refreshLocks.Lock(context.Background(), h.sessionIDOf(cookies))
-		require.NoError(t, err)
-		defer holder()
+	h := newSessionHarness(t)
+	cookies := h.seed(signedIn(due()))
+	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
+	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, refreshedIDTokenRaw).Return(verifiedRefreshed, nil)
+	winner := winnerSet()
+	h.refresher.answer = &winner
+	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
+		Return(&oauthclient.JwtInfo{TokenResponse: winner, IdToken: verifiedRefreshed}, nil)
 
-		h.forgetWrites()
-		started := time.Now()
-		out := h.serveThrough(context.Background(), m, cookies)
+	inGrant, finishGrant := make(chan struct{}), make(chan struct{})
+	var first sync.Once
+	h.refresher.during = func() {
+		first.Do(func() {
+			close(inGrant)
+			<-finishGrant
+		})
+	}
+	m := h.middleware(h.parser)
+	m.refreshWait = 20 * time.Millisecond
+	holderDone := h.inBackground(context.Background(), m, cookies, nil)
+	<-inGrant
 
-		assert.Less(t, time.Since(started), 5*time.Second, "the request returned at the bound")
-		assert.True(t, out.reached, "the chain continues")
-		require.NotNil(t, out.jwtInfo, "signed in")
-		assert.Equal(t, storedResponse(), out.jwtInfo.TokenResponse, "on the token set it holds")
-		assert.Same(t, verifiedStored, out.jwtInfo.IdToken)
-		h.assertNoRefreshSent()
-		assert.Empty(t, h.backend.recordedWrites(), "nothing is saved")
-		h.assertHolds(cookies, storedResponse(), expiresAt)
-		h.assertOneRecord(slog.LevelWarn,
-			"another request's refresh of the session outlasted the wait, carrying the access token the request holds",
-			"context deadline exceeded")
+	h.forgetWrites()
+	started := time.Now()
+	waiter := h.serveChain(context.Background(), m, cookies, h.savingAFlash())
+
+	assert.Less(t, time.Since(started), 5*time.Second, "the request returned at the bound")
+	assert.False(t, waiter.reached, "the page asked for is not served")
+	assert.Equal(t, http.StatusInternalServerError, waiter.recorder.Code)
+	require.Error(t, h.errorPage.err)
+	require.ErrorIs(t, h.errorPage.err, context.DeadlineExceeded)
+	assert.Contains(t, h.errorPage.err.Error(), "unable to wait for another request's refresh of the session")
+	calls, _ := h.refresher.sent()
+	assert.Equal(t, 1, calls, "the waiter sends no grant of its own")
+	assert.Empty(t, h.backend.recordedWrites(), "nor writes anything")
+	assert.Empty(t, h.logs.Records(), h.logs.Text())
+
+	close(finishGrant)
+	holder := awaitServed(t, holderDone)
+	require.NotNil(t, holder.jwtInfo, "the holder is signed in")
+	sess := h.readBack(cookies)
+	assert.Equal(t, winner, sess.Values[sessionkeys.JWT], "the holder's answer is stored")
+	assert.Equal(t, "kept", sess.Values["unrelated"], "the session itself survives")
+
+	h.assertTheNextRequestSendsNoGrant(cookies, winner)
+}
+
+// A freshly rotated token set is never due, whatever the access token's lifetime, so the request
+// that waited for the lock carries the first request's answer rather than rotating it again. With
+// the margin a flat 30 seconds, a lifetime of 30 seconds or less made every answer due at once:
+// the waiter rotated the first request's answer while the first request, already past the lock,
+// held that answer in its own session, and its page's save, for a flash, put it back over the
+// waiter's, retiring the refresh token now stored. The margin is half the lifetime when that is
+// shorter (oauthclient.RefreshDue). The first request's page is held until the waiter is done, so
+// its save is the late one.
+func TestSessionHandler_AShortLivedAnswerIsCarriedNotRotatedAgain(t *testing.T) {
+	h := newSessionHarness(t)
+	cookies := h.seed(signedIn(due()))
+	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)
+	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, refreshedIDTokenRaw).Return(verifiedRefreshed, nil)
+	answer, again := winnerSet(), winnerSet()
+	answer.ExpiresIn, again.ExpiresIn = 20, 20
+	again.AccessToken, again.RefreshToken = "a-second-access-token", "a-second-refresh-token"
+	// A grant after these two presents a retired refresh token, which the auth server refuses.
+	h.refresher.inOrder = []scriptedGrant{{answer: &answer}, {answer: &again}}
+	h.refresher.err = invalidGrant()
+	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, mock.Anything).
+		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
+			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: verifiedRefreshed}, nil
+		})
+
+	m := h.middleware(h.parser)
+	queued := queuedSignal(m.refreshLocks)
+	inGrant := make(chan struct{})
+	var first sync.Once
+	h.refresher.during = func() {
+		first.Do(func() {
+			close(inGrant)
+			waitForQueued(t, queued)
+		})
+	}
+	inPage, finishPage := make(chan struct{}), make(chan struct{})
+	firstDone := h.inBackground(context.Background(), m, cookies, func(w http.ResponseWriter, r *http.Request) {
+		close(inPage)
+		<-finishPage
+		h.savingAFlash()(w, r)
 	})
+	<-inGrant
+	secondDone := h.inBackground(context.Background(), m, cookies, nil)
+	<-inPage
+	second := awaitServed(t, secondDone)
+	close(finishPage)
+	firstOut := awaitServed(t, firstDone)
 
-	t.Run("the access token held has expired", func(t *testing.T) {
-		h := newSessionHarness(t)
-		expiresAt := time.Now().Add(-time.Second).Unix()
-		cookies := h.seed(signedIn(expiresAt))
-		h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil).Once()
-		m := h.middleware(h.parser)
-		m.refreshWait = 20 * time.Millisecond
-		holder, err := m.refreshLocks.Lock(context.Background(), h.sessionIDOf(cookies))
-		require.NoError(t, err)
-		defer holder()
+	calls, _ := h.refresher.sent()
+	assert.Equal(t, 1, calls, "one refresh grant for the whole session")
+	for name, out := range map[string]served{"the first request": firstOut, "the waiter": second} {
+		require.NotNil(t, out.jwtInfo, "%s is signed in", name)
+		assert.Equal(t, answer, out.jwtInfo.TokenResponse, "%s carries the one answer", name)
+	}
 
-		h.forgetWrites()
-		started := time.Now()
-		out := h.serveThrough(context.Background(), m, cookies)
+	sess := h.readBack(cookies)
+	assert.Equal(t, answer, sess.Values[sessionkeys.JWT], "the session still holds the set granted")
+	_, flashed := sess.TakeFlash(flashKey)
+	assert.True(t, flashed, "after the first request's late save")
 
-		assert.Less(t, time.Since(started), 5*time.Second, "the request returned at the bound")
-		assert.False(t, out.reached, "the page asked for is not served")
-		assert.Equal(t, http.StatusInternalServerError, out.recorder.Code)
-		require.Error(t, h.errorPage.err)
-		require.ErrorIs(t, h.errorPage.err, context.DeadlineExceeded)
-		assert.Contains(t, h.errorPage.err.Error(), "unable to wait for another request's refresh of the session")
-		h.assertNoRefreshSent()
-		assert.Empty(t, h.backend.recordedWrites(), "nothing is saved")
-		h.assertHolds(cookies, storedResponse(), expiresAt)
-		assert.Empty(t, h.logs.Records(), h.logs.Text())
-	})
+	h.assertTheNextRequestSendsNoGrant(cookies, answer)
 }
 
 // The re-read is a load of its own past the request's memo, and runs as the check and the write
