@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	accounthandlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
@@ -318,6 +320,36 @@ func TestSettingsKeysRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			code:       "ROTATION_IN_PROGRESS",
 			english:    "Another key rotation is in progress",
 			portuguese: "Outra rotação de chave está em andamento",
+		},
+		{
+			name: "a rotation whose commit's outcome is unknown",
+			serve: func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
+				database := datamocks.NewDatabase(t)
+				// The rotation's body runs in full; only the commit fails, carrying the sentinel
+				// the data layer tags such a failure with.
+				datamocks.ExpectRunInTransactionThenFail(database, rotateTx,
+					errs.Errorf("%w: %w", data.ErrCommitOutcomeUnknown,
+						errs.Wrap(errors.New("connection reset by peer"), "unable to commit transaction")))
+				database.On("GetAllSigningKeys", mock.Anything, rotateTx).Return([]record.KeyPair{
+					signingKey(1, record.KeyStatePrevious),
+					signingKey(2, record.KeyStateCurrent),
+					signingKey(3, record.KeyStateNext),
+				}, nil).Once()
+				database.On("DeleteKeyPair", mock.Anything, rotateTx, int64(1)).Return(nil).Once()
+				database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(2),
+					record.KeyStateCurrent.String(), record.KeyStatePrevious.String()).Return(true, nil).Once()
+				database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(3),
+					record.KeyStateNext.String(), record.KeyStateCurrent.String()).Return(true, nil).Once()
+				database.On("CreateKeyPair", mock.Anything, rotateTx, mock.Anything).Return(nil).Once()
+				rr := httptest.NewRecorder()
+				HandleSettingsKeysRotatePost(database, handlersmocks.NewAuditLogger(t), testDataCipher).
+					ServeHTTP(rr, inRequestLanguage(rotateRequest(), acceptLanguage))
+				return rr
+			},
+			status:     http.StatusConflict,
+			code:       "ROTATION_OUTCOME_UNKNOWN",
+			english:    "The commit's outcome is unknown. Inspect the signing keys before rotating again",
+			portuguese: "O resultado da transação é desconhecido. Verifique as chaves de assinatura antes de rotacionar novamente",
 		},
 		{
 			name:       "a key another administrator revoked",

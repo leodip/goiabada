@@ -1642,6 +1642,7 @@
 "handler.settings_email.message_refused" = "O servidor SMTP recusou a mensagem."
 
 "handler.settings_keys.rotation_in_progress" = "Outra rotação de chave está em andamento"
+"handler.settings_keys.commit_outcome_unknown" = "O resultado da transação é desconhecido. Verifique as chaves de assinatura antes de rotacionar novamente"
 "handler.settings_keys.key_not_found" = "Chave não encontrada"
 "handler.settings_keys.only_previous_revocable" = "Apenas uma chave anterior pode ser revogada"
 

@@ -180,7 +180,8 @@ func waitOrCancel(ctx context.Context, d time.Duration) error {
 // other error fn returns, or any other commit failure, is returned unchanged after one attempt.
 // A commit that fails for a reason other than a deadlock has an outcome the client cannot know,
 // since the server may have committed before the failure reached it, and replaying it would
-// apply the body twice.
+// apply the body twice: such a failure carries data.ErrCommitOutcomeUnknown, so a caller can
+// match what the text of the error cannot say (#371).
 //
 // WHY IT HOLDS. No order in which transactions take their rows is imposed anywhere in the
 // repository, so two transactions on the same account can take the same rows in opposite orders
@@ -328,7 +329,14 @@ func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) e
 	}
 
 	committing = true
-	return d.CommitTransaction(ctx, tx)
+	commitErr := d.CommitTransaction(ctx, tx)
+	// A deadlock at the commit returns unchanged, so RunInTransaction reruns the whole body; any
+	// other commit failure is tagged with the sentinel that says its outcome is unknown, the one
+	// fact the driver's own text never carries (#371).
+	if commitErr != nil && !d.deadlock(commitErr) {
+		return errs.Errorf("%w: %w", data.ErrCommitOutcomeUnknown, commitErr)
+	}
+	return commitErr
 }
 
 // deadlock consults the dialect's classifier, treating none as "nothing is a deadlock".

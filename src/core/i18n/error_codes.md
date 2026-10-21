@@ -178,6 +178,7 @@ key per cause, each a whole sentence.
 | `handler.settings_email.authentication_rejected` | (none) | The SMTP server rejected the username or password. |
 | `handler.settings_email.message_refused` | (none) | The SMTP server refused the message. |
 | `handler.settings_keys.rotation_in_progress` | (none) | Another key rotation is in progress |
+| `handler.settings_keys.commit_outcome_unknown` | (none) | The commit's outcome is unknown. Inspect the signing keys before rotating again |
 
 ## Refusals the admin API answers by key
 

@@ -3009,7 +3009,11 @@ paths:
           description: |
             Another rotation won the race and this call rotated nothing.
             error_code is ROTATION_IN_PROGRESS. Do not retry: the rotation
-            it conflicted with already happened.
+            it conflicted with already happened. error_code is
+            ROTATION_OUTCOME_UNKNOWN when the commit that would end the
+            rotation failed for a reason other than a deadlock: its outcome
+            is unknown and the rotation may have happened, so inspect the
+            key set before retrying.
           content:
             application/json:
               schema:

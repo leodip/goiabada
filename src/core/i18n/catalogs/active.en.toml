@@ -1731,6 +1731,7 @@
 "handler.settings_email.message_refused" = "The SMTP server refused the message."
 
 "handler.settings_keys.rotation_in_progress" = "Another key rotation is in progress"
+"handler.settings_keys.commit_outcome_unknown" = "The commit's outcome is unknown. Inspect the signing keys before rotating again"
 "handler.settings_keys.key_not_found" = "Key not found"
 "handler.settings_keys.only_previous_revocable" = "Only a previous key can be revoked"
 
