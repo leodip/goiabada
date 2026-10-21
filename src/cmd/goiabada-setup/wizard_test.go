@@ -730,6 +730,66 @@ func TestWizard_InteractiveAuthURLPastTheIssuersLengthIsAskedAgain(t *testing.T)
 	}
 }
 
+// The auth server URL asked for again after a declined domain mismatch is held to the issuer's
+// length as the first one is, so the wizard writes no URL the first start would refuse (#615).
+func TestWizard_InteractiveReEnteredAuthURLPastTheIssuersLengthIsAskedAgain(t *testing.T) {
+	d, e := deployments[deploymentProduction], testEngine("sqlite")
+	reEnteredPrompt := "Auth server URL [https://auth.example.co.uk]: "
+	steps := replaceURLSteps(t, interactiveScript(d, e),
+		scriptedStep{prompt: "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: ", answer: "https://auth.example.co.uk"},
+		scriptedStep{prompt: "Admin console URL (e.g., https://admin.example.com) [https://admin.example.co.uk]: ", answer: "https://admin.other.co.uk"},
+		scriptedStep{prompt: "Continue with different domains? [y/N]: ", answer: ""},
+		scriptedStep{prompt: reEnteredPrompt, answer: "https://auth.example.co.uk/" + strings.Repeat("a", 34)},
+		scriptedStep{prompt: reEnteredPrompt, answer: ""},
+		scriptedStep{prompt: "Admin console URL [https://admin.example.co.uk]: ", answer: ""},
+	)
+	for i := range steps {
+		if strings.HasPrefix(steps[i].prompt, "Admin email") {
+			steps[i].prompt = "Admin email [admin@example.co.uk]: "
+		}
+	}
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if c := w.config; c.AuthServerURL != "https://auth.example.co.uk" || c.AdminConsoleURL != "https://admin.example.co.uk" {
+		t.Errorf("URLs %q, %q", c.AuthServerURL, c.AdminConsoleURL)
+	}
+	line := "Invalid URL: it is 61 characters long, and the issuer allows at most 60 characters. Please try again."
+	if got := strings.Count(out.String(), line); got != 1 {
+		t.Errorf("output names the refusal %d times, want 1:\n%s", got, out)
+	}
+}
+
+// At the prompt, as on --admin-url, the admin console URL is not held to the issuer's length.
+func TestWizard_InteractiveAdminURLIsNotHeldToTheIssuersLength(t *testing.T) {
+	d, e := deployments[deploymentProduction], testEngine("sqlite")
+	admin := "https://admin.example.org/" + strings.Repeat("a", 54)
+	steps := replaceURLSteps(t, interactiveScript(d, e),
+		scriptedStep{prompt: "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: ", answer: "https://auth.example.org"},
+		scriptedStep{prompt: "Admin console URL (e.g., https://admin.example.com) [https://admin.example.org]: ", answer: admin},
+	)
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if w.config.AdminConsoleURL != admin {
+		t.Errorf("admin URL %q, want %q", w.config.AdminConsoleURL, admin)
+	}
+	if strings.Contains(out.String(), "Invalid URL") {
+		t.Errorf("the admin URL was refused:\n%s", out)
+	}
+	written, err := os.ReadFile(w.paths.description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), admin) {
+		t.Errorf("%s does not carry the admin URL %q:\n%s", w.paths.description, admin, written)
+	}
+}
+
 // replaceURLSteps swaps the two URL reads of an interactive script for the ones given.
 func replaceURLSteps(t *testing.T, steps []scriptedStep, urlSteps ...scriptedStep) []scriptedStep {
 	t.Helper()

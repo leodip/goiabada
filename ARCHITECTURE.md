@@ -108,8 +108,8 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/httpmw` | kernel | — |
 | `core/i18n` | kernel | — |
 | `core/inputvalidation` | kernel | — |
-| `core/issuerlength` | kernel | — |
 | `core/internal` | kernel | — |
+| `core/issuerlength` | kernel | — |
 | `core/locales` | kernel | — |
 | `core/localzone` | kernel | — |
 | `core/logging` | kernel | — |
