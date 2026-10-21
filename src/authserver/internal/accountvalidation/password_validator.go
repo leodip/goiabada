@@ -4,15 +4,19 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// maxPasswordBytes is the longest password any form or API accepts. It counts bytes, the unit
-// bcrypt counts, and must stay at or below passwordhash.MaxPasswordBytes, where bcrypt refuses to
-// hash at all: a raise past it turns a validation message into a failed hash on every path that
-// sets a password (#409). The test file holds it there.
-const maxPasswordBytes = 64
+// maxPasswordBytes is the longest password any form or API accepts: passwordhash.MaxPasswordBytes
+// itself, bcrypt's bound, counted in the unit bcrypt counts. The first administrator's password is
+// held to the same bound, which core/adminpassword states in bytes, so a password the first start
+// seeds is accepted on every later path too rather than refused as too long (#550). A lower
+// constant makes the two disagree; a higher one turns a validation message into a failed hash on
+// every path that sets a password, because past passwordhash.MaxPasswordBytes bcrypt refuses to
+// hash at all (#409). The test file holds it there.
+const maxPasswordBytes = passwordhash.MaxPasswordBytes
 
 type PasswordValidator struct {
 }
