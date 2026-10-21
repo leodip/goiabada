@@ -106,7 +106,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/delete",
 		handlertest.WithAccessToken(),
 		handlertest.WithRouteParam("userId", "7"),
-		handlertest.WithForm(url.Values{}),
+		handlertest.WithForm(url.Values{"email": {"admin@example.com"}}),
 	)
 	rec := httptest.NewRecorder()
 
@@ -131,7 +131,7 @@ func TestHandlePermissionsPost_TheLastAdministratorRefusalReachesTheBrowser(t *t
 	)
 	rec := httptest.NewRecorder()
 
-	HandlePermissionsPost(render.New(nil), nil, &lastAdministratorUserApiClient{}).ServeHTTP(rec, req)
+	HandlePermissionsPost(render.New(nil, nil), nil, &lastAdministratorUserApiClient{}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }
@@ -145,7 +145,7 @@ func TestHandleGroupsPost_TheLastAdministratorRefusalReachesTheBrowser(t *testin
 	)
 	rec := httptest.NewRecorder()
 
-	HandleGroupsPost(render.New(nil), nil, &userGroupsSaveApiClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
+	HandleGroupsPost(render.New(nil, nil), nil, &userGroupsSaveApiClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }

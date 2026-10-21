@@ -107,7 +107,7 @@ func TestHandleSettingsGeneralPut_TheIssuerRule(t *testing.T) {
 
 			require.Equal(t, http.StatusBadRequest, rr.Code)
 			code, description := decodeErrorEnvelope(t, rr)
-			assert.Equal(t, "VALIDATION_ERROR", code)
+			assert.Equal(t, "handler.settings_general.issuer_uri_invalid", code)
 			assert.Equal(t, issuerRuleRefusal, description)
 			assert.Nil(t, saved, "a refused save writes nothing")
 		})
@@ -142,7 +142,7 @@ func TestHandleSettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(
 func TestHandleSettingsGeneralPut_AnUnchangedIssuerIsStillHeldToItsBounds(t *testing.T) {
 	cases := []struct{ name, stored, code, description string }{
 		{"longer than 60 characters", "https://auth.example.com/" + strings.Repeat("a", 36),
-			"VALIDATION_ERROR", "Issuer is too long. The maximum length is 60 characters."},
+			"handler.settings_general.issuer_too_long", "Issuer is too long. The maximum length is 60 characters."},
 		{"holding an angle bracket", "https://example.org/<b>",
 			"validator.settings.issuer_angle_brackets", "The issuer cannot contain the characters < or >."},
 	}

@@ -191,6 +191,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
 				return HandleDeletePost(helper, stub, consoleBaseURL)
 			},
+			form:     url.Values{"email": {"Someone@Example.com"}},
 			wantPath: "/admin/users/",
 		},
 		{

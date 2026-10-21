@@ -433,7 +433,7 @@ func HandleX(field string) { _ = map[string]interface{}{"error": "Invalid value 
 		{
 			name: "a package-level string constant",
 			src: `package p
-const refusal = "Destination email is required."
+const refusal = "Enter the address to send the test email to."
 func HandleX() { _ = map[string]interface{}{"error": refusal} }`,
 			found: []string{`the "error" entry is a string constant`},
 		},

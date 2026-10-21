@@ -863,7 +863,13 @@ func TestHandleClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *testi
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			code, description := decodeErrorEnvelope(t, rr)
-			assert.Equal(t, "VALIDATION_ERROR", code)
+			// A refusal of a value answers its catalog key; the loaded list missing is an
+			// integrator's mistake, answered in English with VALIDATION_ERROR.
+			if strings.HasPrefix(test.wantDescription, "expected") {
+				assert.Equal(t, "VALIDATION_ERROR", code)
+			} else {
+				assert.Regexp(t, `^handler\.client_web_origins\.[a-z_]+$`, code, "the refusal answers its catalog key")
+			}
 			assert.Contains(t, description, test.wantDescription)
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, "RunInTransaction")
@@ -1298,7 +1304,13 @@ func TestHandleClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *tes
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			code, description := decodeErrorEnvelope(t, rr)
-			assert.Equal(t, "VALIDATION_ERROR", code)
+			// A refusal of a value answers its catalog key; the loaded list missing is an
+			// integrator's mistake, answered in English with VALIDATION_ERROR.
+			if strings.HasPrefix(test.wantDescription, "expected") {
+				assert.Equal(t, "VALIDATION_ERROR", code)
+			} else {
+				assert.Regexp(t, `^handler\.client_redirect_uris\.[a-z_]+$`, code, "the refusal answers its catalog key")
+			}
 			assert.Contains(t, description, test.wantDescription)
 			assert.Less(t, len(description), 400, "the refusal names an overlong value by its beginning, not whole")
 			database.AssertExpectations(t)

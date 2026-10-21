@@ -846,7 +846,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
 				return bind["ceremonyId"] == testCeremonyId &&
-					bind["error"] == "OTP code is required."
+					bind["error"] == "Enter the 6-digit code from your authenticator app."
 			})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

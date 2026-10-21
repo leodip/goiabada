@@ -11,7 +11,7 @@ Every error comes back as a JSON body with the same two fields:
 
 ```json
 {
-  "error_code": "VALIDATION_ERROR",
+  "error_code": "handler.settings_email.smtp_host_required",
   "error_description": "SMTP host is required."
 }
 ```
@@ -20,14 +20,14 @@ Decide what to do from the HTTP status first: a `4xx` is something your request 
 
 ## The fields
 
-- **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the table below, or, for some refused fields, the key of the sentence in the auth server's text catalogs, in dotted lowercase, such as `validator.email.invalid_format`. It's never translated.
+- **`error_code`** is a stable identifier for the failure. It's either an `UPPER_SNAKE` code from the table below, or, for some refused fields, the key of the sentence in the auth server's text catalogs, in dotted lowercase, such as `validator.email.invalid_format`. The operations on clients, users, groups, resources and settings answer a refused value this way, such as `handler.client.identifier_in_use` or `handler.settings_general.issuer_uri_invalid`, so you can tell which field to fix; the exceptions are the three refusals with a code of their own in the table below, `EMAIL_TOO_LONG`, `VALUE_TOO_LONG` and `EMAIL_ALREADY_EXISTS`. It's never translated.
 - **`error_description`** is a sentence for people. Don't match on it: the wording and the language can change, the code won't.
 
 A refusal of a value you sent, a `400` or `409` such as `VALIDATION_ERROR`, comes in the request's language: the `ui_locales` query parameter, or else the `Accept-Language` header, when the auth server has the sentence in that language. The rest are in English: a refused access token, a body that doesn't parse, a malformed id, and every other status. The refusal at the top of this page, sent with `Accept-Language: pt-BR`:
 
 ```json
 {
-  "error_code": "VALIDATION_ERROR",
+  "error_code": "handler.settings_email.smtp_host_required",
   "error_description": "O host SMTP é obrigatório."
 }
 ```

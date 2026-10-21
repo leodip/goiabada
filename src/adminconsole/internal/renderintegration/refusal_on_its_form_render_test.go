@@ -54,7 +54,7 @@ func TestRender_AdminSettingsEmailSendTest_AMalformedAddressIsDrawnOnTheForm(t *
 		Code: "validator.email.invalid_format", Message: refusal, StatusCode: http.StatusBadRequest}}
 
 	out := serveRefusal(t,
-		adminsettingshandlers.HandleEmailSendTestPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		adminsettingshandlers.HandleEmailSendTestPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/settings/email/send-test-email", url.Values{"destinationEmail": {"someone@@example"}},
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}))
 
@@ -117,7 +117,7 @@ func TestRender_AccountEmailVerification_ARefusalIsDrawnWhateverEmailsState(t *t
 			}
 
 			out := serveRefusal(t,
-				accounthandlers.HandleEmailVerificationPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+				accounthandlers.HandleEmailVerificationPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 				"/account/email-verification", url.Values{"verificationCode": {"ABC123"}},
 				handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: tc.smtpEnabled}))
 
@@ -126,7 +126,7 @@ func TestRender_AccountEmailVerification_ARefusalIsDrawnWhateverEmailsState(t *t
 				want = tc.refusal.Message
 			}
 			assert.Contains(t, out, `<p>`+want+`</p>`, "the refusal's sentence is drawn")
-			assert.Contains(t, out, `value="someone@example.com"`, "the address the page is about")
+			assert.Contains(t, out, `>someone@example.com</span>`, "the address the page is about")
 			code := inputRe("verificationCode").FindString(out)
 			if tc.wantCodeForm {
 				assert.Contains(t, code, `value="ABC123"`, "the code as typed")

@@ -1,211 +1,67 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.groups.page_title_prefix" }}{{.user.Email}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.groups.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.user_tabs.groups" }} – {{ .user.Email }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    var assignedGroups = [];
-    {{range $key, $value := .userGroups }}
-    assignedGroups.push({
-        "id": "{{- $key -}}",
-        "groupIdentifier": "{{- $value -}}"
-    });
-    {{ end }}
-    // The set as loaded, never edited: the save sends it so the server can refuse a save from an
-    // outdated page rather than undo another administrator's change (#428).
-    const loadedGroupIds = assignedGroups.map(function(assignedGroup) { return parseInt(assignedGroup.id, 10); });
-
-    document.addEventListener("DOMContentLoaded", function () {
-        refreshGroupsTable();
-
-        const btnSave = document.getElementById("btnSave");
-        btnSave.addEventListener("click", function (evt) {
-            btnSaveClick(evt);
-        });
-    });
-
-    function btnSaveClick(evt) {
-        evt.preventDefault();
-
-        const loadingIcon = document.getElementById("loadingIcon");
-
-        let assignedGroupsIds = [];
-        assignedGroups.forEach(function (assignedGroup) {
-            assignedGroupsIds.push(parseInt(assignedGroup.id, 10));
-        });
-
-        sendAjaxRequest({
-            "url": "/admin/users/{{.user.Id}}/groups",
-            "method": "POST",
-            "bodyData": JSON.stringify({
-                "assignedGroupsIds": assignedGroupsIds,
-                "expectedGroupIds": loadedGroupIds
-            }),
-            "loadingElement": loadingIcon,
-            "loadingClasses": ["loading", "loading-xs"],
-            "modalId": "modal0",
-            "callback": function (result) {
-
-                if (result.Success) {
-                    window.location.href = "/admin/users/{{.user.Id}}/groups?page={{.page}}&query={{.query}}";
-                } else {
-                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_users.groups.error_title" }}", "{{ T $.ctx "adminconsole.admin_users.groups.error_unexpected" }}");
-                }
-            }
-        });
-    }
-
-    function grantMembership(evt, elem) {
-        evt.preventDefault();
-
-        const groupsTable = document.getElementById("groupsTable");
-        const groupsSelect = document.getElementById("groupsSelect");
-
-        const groupId = groupsSelect.value;
-        if (groupId.length == 0) {
-            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_users.groups.error_title" }}", "{{ T $.ctx "adminconsole.admin_users.groups.error_select_group" }}");
-            return;
-        } else {
-            const isGroupAssigned = assignedGroups.some((group) => group.id === groupId);
-            if (isGroupAssigned) {
-                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_users.groups.error_title" }}", "{{ T $.ctx "adminconsole.admin_users.groups.error_already_in_list" }}");
-                return;
-            }
-
-            assignedGroups.push({
-                "id": groupId,
-                "groupIdentifier": groupsSelect.options[groupsSelect.selectedIndex].dataset.groupidentifier
-            });
-            refreshGroupsTable();
-            groupsSelect.value = "";
-        }
-    }
-
-    function refreshGroupsTable() {
-        const groupsTable = document.getElementById("groupsTable");
-        const tbody = groupsTable.getElementsByTagName("tbody")[0];
-        tbody.innerHTML = "";
-
-        if (assignedGroups.length == 0) {
-            const row = tbody.insertRow();
-            const cell1 = row.insertCell(0);
-            const cell2 = row.insertCell(1);
-            cell1.className = "p-1 font-mono text-sm align-middle";
-            cell1.innerHTML = "{{ T $.ctx "adminconsole.admin_users.groups.none_yet" }}"
-
-            cell2.className = "p-1 text-right";
-            cell2.innerHTML = "&nbsp;";
-        } else {
-            assignedGroups.forEach(function (assignedGroup) {
-                const row = tbody.insertRow();
-                const cell1 = row.insertCell(0);
-                const cell2 = row.insertCell(1);
-                cell1.className = "p-1 font-mono text-sm align-middle";
-                const groupLink = document.createElement("a");
-                groupLink.className = "link link-hover";
-                groupLink.href = "/admin/groups/" + parseInt(assignedGroup.id, 10) + "/settings";
-                groupLink.textContent = assignedGroup.groupIdentifier;
-                cell1.replaceChildren(groupLink);
-
-                cell2.className = "p-1 text-right";
-                cell2.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_users.groups.remove_label" }} " + assignedGroup.groupIdentifier, deleteGroupMembership, { groupid: assignedGroup.id }));
-            });
-        }
-    }
-
-    function deleteGroupMembership(evt, elem) {
-        evt.preventDefault();
-
-        const groupId = elem.dataset.groupid;
-
-        assignedGroups = assignedGroups.filter(function (assignedGroup) {
-            return assignedGroup.id != groupId;
-        });
-
-        refreshGroupsTable();
-    }
-</script>
-
+<script src="{{ asset "/static/pages/user-groups.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{ template "user_header" (args "groups" .user.Id .user.Email .page .query $.ctx) }}
 
-{{template "manage_users_tabs" (args "groups" .user.Id .page .query $.ctx) }}
+{{/* The groups are drawn as stored; user-groups.js edits them in the page and saves the set
+     whole, with the set as drawn, so the server refuses a save from an outdated page (#428). */}}
+<form class="panel" id="groupListForm" novalidate data-save-url="/admin/users/{{ .user.Id }}/groups" data-reload-url="/admin/users/{{ .user.Id }}/groups?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}" data-list-key="assignedGroupsIds" data-expected-key="expectedGroupIds"
+  data-unchosen="{{ T $.ctx "adminconsole.admin_users.groups.error_select_group" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_users.groups.error_already_in_list" }}"
+  data-added="{{ T $.ctx "adminconsole.admin_users.groups.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_users.groups.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_users.groups.remove_label" }}">
+  <div class="panel-body stacked">
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_users.groups.saved_successfully" }}</p>
+    </div>
+    {{ end }}
+    <div class="not-empty:block hidden" id="groupListStatus" role="status"></div>
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_users.groups.lead" }}</p>
 
-<form method="post">
-
-   <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-      <div class="w-full h-full pb-6 bg-base-100">
-
-        <div class="w-full form-control">
-            <label class="label">
-                  <span class="label-text text-base-content">{{ T $.ctx "adminconsole.admin_users.groups.field.group" }}</span>
-            </label>
-            <select id="groupsSelect" class="w-full select select-bordered" name="resource">
-                  <option value="">{{ T $.ctx "adminconsole.admin_users.groups.select_group" }}</option>
-                  {{range .allGroups}}
-                      <option value="{{.Id}}" data-groupidentifier="{{.GroupIdentifier}}">{{.GroupIdentifier}}{{if .Description}} - {{.Description}}{{end}}</option>
-                  {{end}}
-            </select>
-         </div>
-
-         <div class="flex w-full mt-6 form-control">
-            <button onclick="grantMembership(event, this);" class="ml-auto w-fit btn btn-secondary btn-sm">{{ T $.ctx "adminconsole.admin_users.groups.grant_button" }}</button>
-         </div>
-
-         <div class="w-full mt-5">
-            <table id="groupsTable" class="table">
-                  <thead>
-                     <tr>
-                         <th class="p-1 text-lg">{{ T $.ctx "adminconsole.admin_users.groups.col_membership" }}</th>
-                         <th></th>
-                     </tr>
-                  </thead>
-                  <tbody>
-                  </tbody>
-            </table>
-         </div>
-
+    <div class="field max-w-2xl">
+      <label class="field-label" for="groupsSelect">{{ T $.ctx "adminconsole.admin_users.groups.field.group" }}</label>
+      <div class="input-row">
+        <select class="control" id="groupsSelect" data-group-select aria-describedby="groupsSelect-description groupsSelect-error">
+          <option value="">{{ T $.ctx "adminconsole.admin_users.groups.select_group" }}</option>
+          {{ range .groupChoices }}
+          <option value="{{ .Id }}" data-group-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
+          {{ end }}
+        </select>
+        <button class="button" type="button" id="addGroupBtn" data-group-add>{{ T $.ctx "adminconsole.admin_users.groups.grant_button" }}</button>
       </div>
-
-   </div>
-
-   <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-      <div>
-          {{if .error}}
-              <div class="mb-4 text-right text-error">
-                  <p>{{.error}}</p>
-              </div>
-          {{end}}
-
-          <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
-                </a>
-            </div>
-          {{if .savedSuccessfully}}
-              <div class="mb-4 text-right text-success">
-                  <p>&#10004; {{ T $.ctx "adminconsole.admin_users.groups.saved_successfully" }}</p>
-              </div>
-          {{end}}
-          <span id="loadingIcon" class="hidden float-right w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-          <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
-
-        </div>
-
+      <p class="field-hint" id="groupsSelect-description" data-group-description aria-live="polite"></p>
+      <p class="field-error" id="groupsSelect-error" data-group-error hidden></p>
     </div>
 
+    <div>
+      <div class="table-scroll" role="region" aria-labelledby="groupListTitle" tabindex="0"{{ if not .memberships }} hidden{{ end }} data-list-region>
+        <table class="data-table" id="groupsTable">
+          <thead>
+            <tr>
+              <th scope="col" id="groupListTitle">{{ T $.ctx "adminconsole.admin_users.groups.col_membership" }}</th>
+              <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_users.attributes.col_actions" }}</span></th>
+            </tr>
+          </thead>
+          <tbody data-list-rows>
+            {{ range .memberships }}
+            <tr data-id="{{ .Id }}">
+              <td class="cell-mono cell-wrap"><a class="text-link" href="/admin/groups/{{ .Id }}/settings">{{ .GroupIdentifier }}</a></td>
+              <td class="cell-actions"><button class="button button-sm" type="button" data-list-remove>{{ T $.ctx "adminconsole.admin_users.groups.remove_label" }}<span class="sr-only"> {{ .GroupIdentifier }}</span></button></td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel empty-state" data-list-empty{{ if .memberships }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_users.groups.none_yet" }}</p>
+    </div>
+    <p class="sr-only" role="status" data-list-announce></p>
+  </div>
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
+  </div>
 </form>
-
-{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
-
 {{end}}

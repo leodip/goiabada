@@ -447,7 +447,7 @@ func TestHandleAuthOtpPost_AFormThatCannotRenderAnswers500(t *testing.T) {
 	m.armClient()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
-			return bind["error"] == "OTP code is required." && bind["ceremonyId"] == testCeremonyId
+			return bind["error"] == "Enter the 6-digit code from your authenticator app." && bind["ceremonyId"] == testCeremonyId
 		})).Return(assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
 

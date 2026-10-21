@@ -134,7 +134,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 			apiClient := &grantOneApiClient{current: tc.current}
 			router := chi.NewRouter()
 			router.Post(tc.route, tc.build(httpHelper, apiClient))

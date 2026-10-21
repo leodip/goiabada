@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +13,9 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -76,7 +79,8 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	// decision 2).
 	chimiddleware.RequestID(
 		i18n.Locale(nil)(
-			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()))(next),
+			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
+				render.New(web.TemplateFS(), web.StaticFS()))(next),
 		),
 	).ServeHTTP(recorder, req)
 
@@ -131,7 +135,7 @@ func TestSettingsCache_AbsentIssuerIsRefused(t *testing.T) {
 	recorder, settings := runSettingsChain(t, server.URL)
 
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	assert.Equal(t, wantBody(t, "en", "adminconsole.error.issuer_missing"), strings.TrimSpace(recorder.Body.String()))
+	assert.Contains(t, recorder.Body.String(), "<p>"+html.EscapeString(wantBody(t, "en", "adminconsole.error.issuer_missing"))+"</p>")
 	assert.Nil(t, settings, "the next handler must not run with no issuer to validate against")
 }
 
@@ -141,7 +145,7 @@ func TestSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
 	recorder, settings := runSettingsChain(t, server.URL)
 
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	assert.Equal(t, wantBody(t, "en", "adminconsole.error.issuer_missing"), strings.TrimSpace(recorder.Body.String()))
+	assert.Contains(t, recorder.Body.String(), "<p>"+html.EscapeString(wantBody(t, "en", "adminconsole.error.issuer_missing"))+"</p>")
 	assert.Nil(t, settings, "the next handler must not run with no issuer to validate against")
 }
 
@@ -156,7 +160,7 @@ func TestSettingsCache_AnUnreachableAuthServerIsRefused(t *testing.T) {
 	recorder, settings := runSettingsChain(t, baseURL)
 
 	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-	assert.Equal(t, wantBody(t, "en", "adminconsole.error.settings_unavailable"), strings.TrimSpace(recorder.Body.String()))
+	assert.Contains(t, recorder.Body.String(), "<p>"+html.EscapeString(wantBody(t, "en", "adminconsole.error.settings_unavailable"))+"</p>")
 	assert.Nil(t, settings, "the next handler must not run without settings")
 }
 
@@ -203,7 +207,7 @@ func TestSettingsCache_RefusalsAreLocalized(t *testing.T) {
 					"localized refusal from an unlocalized one; pick another key or reword one entry")
 
 			assert.Equal(t, http.StatusInternalServerError, recorder.Code)
-			assert.Equal(t, ptBR, strings.TrimSpace(recorder.Body.String()))
+			assert.Contains(t, recorder.Body.String(), "<p>"+html.EscapeString(ptBR)+"</p>")
 			assert.Nil(t, settings)
 		})
 	}
@@ -228,8 +232,9 @@ func TestSettingsCache_TheFetchErrorStaysOutOfTheResponse(t *testing.T) {
 
 // ---- decision 17's other half: what these two 500s put in the log ----------------------------
 //
-// Both refusals answer in plain text rather than through the console's error page, which decision
-// 17 keeps: the page reads settings off the context, and settings are the thing that is missing.
+// Both refusals answer with a page of their own rather than through the console's error page, which
+// decision 17 keeps: the page reads settings off the context, and settings are the thing that is
+// missing.
 // What it does not excuse is a 500 nobody can locate. The fetch arm logged err.Error(), so slog
 // received a string and the core/errs stack the API client had already captured went nowhere; the
 // issuer arm logged no error value at all. Both are one defect, a record that says a request failed

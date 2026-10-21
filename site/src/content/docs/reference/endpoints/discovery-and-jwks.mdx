@@ -112,7 +112,7 @@ Each endpoint is the auth server's base URL, `GOIABADA_AUTHSERVER_BASEURL`, foll
 
 Each key is a 4096-bit RSA key with `alg` `RS256`, `use` `sig`, and a `kid` that the header of every token it signs carries.
 
-To rotate, choose **Rotate key** under **Admin**, **Keys** in the admin console. The next key becomes the current one, the current one becomes the previous one, the old previous key is deleted, and a new next key is created. A token signed by the deleted key no longer verifies, refresh tokens included, so don't rotate twice within the lifetime of your longest-lived token.
+To rotate, choose **Rotate keys** under **Admin**, **Signing keys** in the admin console. The next key becomes the current one, the current one becomes the previous one, the old previous key is deleted, and a new next key is created. A token signed by the deleted key no longer verifies, refresh tokens included, so don't rotate twice within the lifetime of your longest-lived token.
 
 ## Calling them from a browser
 

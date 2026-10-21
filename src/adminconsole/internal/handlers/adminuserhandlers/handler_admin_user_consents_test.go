@@ -48,7 +48,7 @@ func revokeConsent(t *testing.T, apiClient *consentsApiClient, consentId string)
 
 	// The real writer, because what is under test is the answer on the wire and the log it does
 	// or does not leave, and both are the writer's.
-	HandleConsentsPost(render.New(fstest.MapFS{}), apiClient).ServeHTTP(recorder, req)
+	HandleConsentsPost(render.New(fstest.MapFS{}, nil), apiClient).ServeHTTP(recorder, req)
 	return recorder
 }
 

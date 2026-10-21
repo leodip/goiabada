@@ -43,9 +43,10 @@ func HandleNewPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"error":                    message,
+				"errorField":               errorField,
 				"clientIdentifier":         r.FormValue("clientIdentifier"),
 				"displayName":              r.FormValue("displayName"),
 				"authorizationCodeEnabled": r.FormValue("authorizationCodeEnabled") == "on",
@@ -69,7 +70,7 @@ func HandleNewPost(
 		displayName := r.FormValue("displayName")
 
 		if strings.TrimSpace(clientIdentifier) == "" {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil).Localize(r.Context()))
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil).Localize(r.Context()), "clientIdentifier")
 			return
 		}
 
@@ -84,7 +85,9 @@ func HandleNewPost(
 			ClientCredentialsEnabled: clientCredentialsEnabled,
 		})
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, clientErrorFields))
+			})
 			return
 		}
 

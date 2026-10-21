@@ -533,8 +533,8 @@ func (s *Server) initMiddleware() appBranches {
 
 	branches := appBranches{
 		pages:    s.applicationBranch(middleware.PageFaults(), i18nCeremonyStore),
-		protocol: s.applicationBranch(middleware.ProtocolFaults(render.New(s.templateFS)), i18nCeremonyStore),
-		token:    s.applicationBranch(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS))), i18nCeremonyStore),
+		protocol: s.applicationBranch(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)), i18nCeremonyStore),
+		token:    s.applicationBranch(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))), i18nCeremonyStore),
 		api:      s.applicationBranch(middleware.APIFaults(), i18nCeremonyStore),
 	}
 

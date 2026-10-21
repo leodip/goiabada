@@ -50,7 +50,7 @@ func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body s
 	rec := httptest.NewRecorder()
 	router := chi.NewRouter()
 	router.Post("/admin/resources/{resourceId}/permissions",
-		HandlePermissionsPost(render.New(nil), nil, stub))
+		HandlePermissionsPost(render.New(nil, nil), nil, stub))
 	router.ServeHTTP(rec, req)
 	return rec
 }

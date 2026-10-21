@@ -1,19 +1,30 @@
-import { clientRow, clientUrl, confirmDialog, readClientSecret } from "../../../lib/admin-console";
+import { cancelDialog, clientRow, clientUrl, confirmDialog, readClientSecret } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { clientCredentialsToken } from "../../../lib/oauth";
 
-const saved = "Client authentication saved successfully";
+const saved = "Authentication saved.";
 
-test("a confidential client's secret is hidden until revealed", async ({ page, clients }) => {
+test("a confidential client's secret is hidden until shown", async ({ page, clients }) => {
   const client = await clients.create();
   await page.goto(clientUrl(client.id, "authentication"));
   const secret = page.locator("#clientSecret");
   await expect(secret).toHaveAttribute("type", "password");
-  await page.locator("#revealLink").click();
+  await page.getByRole("button", { name: "Show", exact: true }).click();
   await expect(secret).toHaveAttribute("type", "text");
-  await page.locator("#hideLink").click();
+  await page.getByRole("button", { name: "Hide", exact: true }).click();
   await expect(secret).toHaveAttribute("type", "password");
+  await expect(page.getByRole("button", { name: "Show", exact: true })).toBeVisible();
+});
+
+test("Copy puts the secret on the clipboard", async ({ page, context, clients }) => {
+  const client = await clients.create();
+  const secret = await readClientSecret(page, client.id);
+  // The page may write to the clipboard, and the test read it back.
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: env.adminUrl });
+  await page.getByRole("button", { name: "Copy", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(secret);
 });
 
 test("a new secret replaces the old one: the old is refused at the token endpoint, the new works", async ({
@@ -27,11 +38,14 @@ test("a new secret replaces the old one: the old is refused at the token endpoin
   expect((await clientCredentialsToken(request, client.identifier, oldSecret)).body.error).toBe("invalid_scope");
 
   await page.goto(clientUrl(client.id, "authentication"));
-  await page.locator("#generateNewSecretLink").click();
+  await page.getByRole("button", { name: "Generate a new secret" }).click();
+  await expect(page.locator("#secret-status")).toContainText("New secret generated. Save to start using it; until then the current one keeps working.");
+  // The new secret is shown, to be copied before it is saved.
+  await expect(page.locator("#clientSecret")).toHaveAttribute("type", "text");
   await expect(page.locator("#clientSecret")).not.toHaveValue(oldSecret);
   const newSecret = await page.locator("#clientSecret").inputValue();
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You are changing the client secret");
+  await confirmDialog(page, "You're changing the client secret");
   await expect(page.getByText(saved)).toBeVisible();
 
   expect(await readClientSecret(page, client.id)).toBe(newSecret);
@@ -45,7 +59,7 @@ test("generating a secret and leaving without saving keeps the old one", async (
   const client = await clients.create();
   const secret = await readClientSecret(page, client.id);
   await page.goto(clientUrl(client.id, "authentication"));
-  await page.locator("#generateNewSecretLink").click();
+  await page.getByRole("button", { name: "Generate a new secret" }).click();
   await expect(page.locator("#clientSecret")).not.toHaveValue(secret);
   expect(await readClientSecret(page, client.id)).toBe(secret);
 });
@@ -55,22 +69,37 @@ test("a client switched to public loses its secret, and switched back gets a new
   const original = await readClientSecret(page, client.id);
 
   await page.goto(clientUrl(client.id, "authentication"));
-  await page.getByRole("radio", { name: "Public client" }).check();
+  await page.getByRole("radio", { name: "Public", exact: true }).check();
+  // A public client has no secret to show.
+  await expect(page.locator("#clientSecret")).toBeHidden();
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You are switching from confidential to public client");
+  await confirmDialog(page, "You're making the client public");
   await expect(page.getByText(saved)).toBeVisible();
   await page.goto(`${env.adminUrl}/admin/clients`);
   await expect(clientRow(page, client.identifier).getByRole("cell", { name: "Public", exact: true })).toBeVisible();
 
   await page.goto(clientUrl(client.id, "authentication"));
-  await expect(page.getByRole("radio", { name: "Public client" })).toBeChecked();
-  await page.getByRole("radio", { name: "Confidential client" }).check();
+  await expect(page.getByRole("radio", { name: "Public", exact: true })).toBeChecked();
+  await page.getByRole("radio", { name: "Confidential", exact: true }).check();
   // Switching to confidential fills in a fresh secret.
   await expect(page.locator("#clientSecret")).not.toHaveValue("");
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You are switching from public to confidential client");
+  await confirmDialog(page, "You're making the client confidential");
   await expect(page.getByText(saved)).toBeVisible();
 
   const restored = await readClientSecret(page, client.id);
   expect(restored).not.toBe(original);
+});
+
+test("making a client public asks first, and Cancel keeps it confidential with its secret", async ({ page, clients }) => {
+  const client = await clients.create();
+  const secret = await readClientSecret(page, client.id);
+  await page.goto(clientUrl(client.id, "authentication"));
+  await page.getByRole("radio", { name: "Public", exact: true }).check();
+  await page.locator("#btnSave").click();
+  await cancelDialog(page, "Its secret will be removed");
+  await expect(page.getByText(saved)).toHaveCount(0);
+
+  expect(await readClientSecret(page, client.id)).toBe(secret);
+  await expect(page.getByRole("radio", { name: "Confidential", exact: true })).toBeChecked();
 });

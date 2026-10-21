@@ -92,7 +92,7 @@ func (s *authenticationTabAPI) UpdateClientAuthentication(_ context.Context, _ s
 func postClientAuthentication(t *testing.T, apiClient *authenticationTabAPI, form url.Values) string {
 	t.Helper()
 	return serveRefusal(t,
-		adminclienthandlers.HandleAuthenticationPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		adminclienthandlers.HandleAuthenticationPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/clients/7/authentication", form, handlertest.WithRouteParam("clientId", "7"))
 }
 
@@ -152,23 +152,27 @@ func TestRender_AdminClientAuthentication_ARefusedSaveKeepsTheStoredClient(t *te
 			out := postClientAuthentication(t, apiClient, tc.form)
 
 			assert.Contains(t, out, "The client secret is invalid.")
-			assert.Contains(t, out, `<span class="text-accent">portal</span>`, "the page title names the stored client")
-			assert.Contains(t, out, `var isPublic = `+tc.wantIsPublic+`;`, "the original state is the stored one")
-			assert.Contains(t, out, `var originalClientSecret = "`+tc.wantOriginal+`";`, "the original secret is the stored one")
+			assert.Contains(t, out, `<h1 class="page-title" id="page-title">portal</h1>`, "the page heading names the stored client")
 			assert.Equal(t, tc.wantSecretReads, apiClient.secretReads, "a public client holds no secret to read")
 
 			publicRadio := inputRe("publicClientRadio").FindString(out)
 			confidentialRadio := inputRe("confidentialClientRadio").FindString(out)
 			require.NotEmpty(t, publicRadio)
 			require.NotEmpty(t, confidentialRadio)
-			assert.Equal(t, tc.wantPublicRadio, regexp.MustCompile(`\bchecked\b`).MatchString(publicRadio),
+			checked := regexp.MustCompile(`\schecked(?:\s|>|$)`)
+			assert.Equal(t, tc.wantPublicRadio, checked.MatchString(publicRadio),
 				"the choice as submitted: %s", publicRadio)
-			assert.Equal(t, !tc.wantPublicRadio, regexp.MustCompile(`\bchecked\b`).MatchString(confidentialRadio),
+			assert.Equal(t, !tc.wantPublicRadio, checked.MatchString(confidentialRadio),
 				"the choice as submitted: %s", confidentialRadio)
+			// The questions compare with the client as stored: its type, on each radio, and its secret.
+			wantConfidential := map[string]string{"true": "false", "false": "true"}[tc.wantIsPublic]
+			assert.Contains(t, publicRadio, `data-stored-checked="`+tc.wantIsPublic+`"`, "the original state is the stored one")
+			assert.Contains(t, confidentialRadio, `data-stored-checked="`+wantConfidential+`"`)
 
 			secret := inputRe("clientSecret").FindString(out)
 			require.NotEmpty(t, secret)
 			assert.Contains(t, secret, `value="`+tc.wantSecretTyped+`"`, "the secret input keeps what was submitted")
+			assert.Contains(t, secret, `data-stored-value="`+tc.wantOriginal+`"`, "the original secret is the stored one")
 		})
 	}
 }
@@ -196,16 +200,16 @@ func TestRender_AdminGroupSettings_ARefusedSaveKeepsTheStoredGroup(t *testing.T)
 		Description: "Sales team", IncludeInIdToken: true, IncludeInAccessToken: true}}
 
 	out := serveRefusal(t,
-		admingrouphandlers.HandleSettingsPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		admingrouphandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/groups/4/settings",
 		url.Values{"groupIdentifier": {"marketing"}, "description": {"Marketing team"}, "includeInIdToken": {"on"}},
 		handlertest.WithRouteParam("groupId", "4"))
 
 	assert.Contains(t, out, "The group identifier is already in use.")
-	assert.Contains(t, out, `<title>Test - Configurações do grupo - sales</title>`)
-	assert.Contains(t, out, `<span class="text-accent">sales</span>`, "the page title names the stored group")
-	assert.NotContains(t, out, `<span class="text-accent">marketing</span>`)
-	assert.Contains(t, out, `var originalGroupIdentifier = "sales";`)
+	assert.Contains(t, out, `<title>Configurações – sales – Test</title>`)
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">sales</h1>`, "the heading names the stored group")
+	assert.NotContains(t, out, `id="page-title">marketing</h1>`)
+	assert.Contains(t, out, `data-stored-value="sales"`, "the rename question compares against the stored identifier")
 
 	identifier := inputRe("groupIdentifier").FindString(out)
 	require.NotEmpty(t, identifier)
@@ -236,16 +240,16 @@ func TestRender_AdminResourceSettings_ARefusedSaveKeepsTheStoredResource(t *test
 		Description: "Billing"}}
 
 	out := serveRefusal(t,
-		adminresourcehandlers.HandleSettingsPost(render.New(web.TemplateFS()), nil, apiClient, "https://console.example"),
+		adminresourcehandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/resources/3/settings",
 		url.Values{"resourceIdentifier": {"invoices-api"}, "description": {"Invoices"}},
 		handlertest.WithRouteParam("resourceId", "3"))
 
 	assert.Contains(t, out, "The resource identifier is already in use.")
-	assert.Contains(t, out, `<title>Test - Configurações do recurso - billing-api</title>`)
-	assert.Contains(t, out, `<span class="text-accent">billing-api</span>`, "the page title names the stored resource")
-	assert.NotContains(t, out, `<span class="text-accent">invoices-api</span>`)
-	assert.Contains(t, out, `var originalResourceIdentifier = "billing-api";`)
+	assert.Contains(t, out, `<title>Configurações – billing-api – Test</title>`)
+	assert.Contains(t, out, `<h1 class="page-title" id="page-title">billing-api</h1>`, "the heading names the stored resource")
+	assert.NotContains(t, out, `id="page-title">invoices-api</h1>`)
+	assert.Contains(t, out, `data-stored-value="billing-api"`, "the rename question compares against the stored identifier")
 
 	identifier := inputRe("resourceIdentifier").FindString(out)
 	require.NotEmpty(t, identifier)
@@ -284,16 +288,15 @@ func TestRender_AdminSettingsGeneral_ARefusedSaveKeepsTheStoredIssuer(t *testing
 		Issuer: "storedissuer", PasswordPolicy: "low"}}
 
 	out := serveRefusal(t,
-		adminsettingshandlers.HandleGeneralPost(render.New(web.TemplateFS()), nil, apiClient,
+		adminsettingshandlers.HandleGeneralPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient,
 			noInvalidation{t}, "https://console.example"),
 		"/admin/settings/general",
 		url.Values{"appName": {"A name far too long"}, "issuer": {"typedissuer"}, "passwordPolicy": {"low"}})
 
 	assert.Contains(t, out, "The app name is too long.")
-	assert.Contains(t, out, `const originalIssuerValue = "storedissuer";`, "the original issuer is the stored one")
-
 	issuer := inputRe("issuer").FindString(out)
 	require.NotEmpty(t, issuer)
+	assert.Contains(t, issuer, `data-stored-value="storedissuer"`, "the original issuer is the stored one")
 	assert.Contains(t, issuer, `value="typedissuer"`, "the input keeps what was typed")
 	assert.Contains(t, out, `value="A name far too long"`)
 }
@@ -331,14 +334,14 @@ func TestRender_AdminGroupAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing
 			}
 
 			out := serveRefusal(t,
-				admingrouphandlers.HandleAttributesEditPost(render.New(web.TemplateFS()), apiClient),
+				admingrouphandlers.HandleAttributesEditPost(render.New(web.TemplateFS(), web.StaticFS()), apiClient),
 				"/admin/groups/4/attributes/edit/11",
 				url.Values{"attributeKey": {typedKey}, "attributeValue": {"Retail"}},
 				handlertest.WithRouteParam("groupId", "4"), handlertest.WithRouteParam("attributeId", "11"))
 
 			assert.Contains(t, out, "The attribute key is invalid.")
-			assert.Contains(t, out, `<title>Test - Editar atributo do grupo - department</title>`)
-			assert.Contains(t, out, `<span class="text-accent">department</span>`, "the page title names the stored key")
+			assert.Contains(t, out, `<title>Editar atributo department – sales – Test</title>`)
+			assert.Contains(t, out, `<h2 class="panel-title">Editar atributo <span class="font-mono">department</span></h2>`, "the heading names the stored key")
 
 			key := inputRe("attributeKey").FindString(out)
 			require.NotEmpty(t, key)
@@ -388,14 +391,14 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 			}
 
 			out := serveRefusal(t,
-				adminuserhandlers.HandleAttributesEditPost(render.New(web.TemplateFS()), apiClient, "https://console.example"),
+				adminuserhandlers.HandleAttributesEditPost(render.New(web.TemplateFS(), web.StaticFS()), apiClient, "https://console.example"),
 				"/admin/users/9/attributes/edit/12",
 				url.Values{"attributeKey": {tc.typedKey}, "attributeValue": {"E-200"}},
 				handlertest.WithRouteParam("userId", "9"), handlertest.WithRouteParam("attributeId", "12"))
 
 			assert.Contains(t, out, tc.wantRefusal)
-			assert.Contains(t, out, `<title>Test - Editar atributo do usuário - employee-id</title>`)
-			assert.Contains(t, out, `<span class="text-accent">employee-id</span>`, "the page title names the stored key")
+			assert.Contains(t, out, `<title>Editar atributo employee-id – ana@example.com – Test</title>`)
+			assert.Contains(t, out, `<h2 class="panel-title">Editar atributo <span class="font-mono">employee-id</span></h2>`, "the heading names the stored key")
 
 			key := inputRe("attributeKey").FindString(out)
 			require.NotEmpty(t, key)
@@ -408,7 +411,7 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 // The first draw of each page binds the stored record both ways: the inputs and the title and
 // original values agree, so a save of the page as loaded asks nothing.
 func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
-	renderer := render.New(web.TemplateFS())
+	renderer := render.New(web.TemplateFS(), web.StaticFS())
 	testCases := []struct {
 		name    string
 		handler http.HandlerFunc
@@ -422,8 +425,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&authenticationTabAPI{stored: &api.ClientResponse{Id: 7, ClientIdentifier: "portal"}, storedSecret: "s3cret"}),
 			target:  "/admin/clients/7/authentication",
 			options: []handlertest.Option{handlertest.WithRouteParam("clientId", "7")},
-			want: []string{`<span class="text-accent">portal</span>`, `var isPublic = false;`,
-				`var originalClientSecret = "s3cret";`, `value="s3cret"`},
+			want: []string{`<h1 class="page-title" id="page-title">portal</h1>`, `data-stored-checked="false"`,
+				`data-stored-value="s3cret"`, `value="s3cret"`},
 		},
 		{
 			name: "group settings",
@@ -431,7 +434,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&groupSettingsTabAPI{stored: &api.GroupResponse{Id: 4, GroupIdentifier: "sales"}}),
 			target:  "/admin/groups/4/settings",
 			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4")},
-			want: []string{`<span class="text-accent">sales</span>`, `var originalGroupIdentifier = "sales";`,
+			want: []string{`<h1 class="page-title" id="page-title">sales</h1>`, `data-stored-value="sales"`,
 				`name="groupIdentifier" value="sales"`},
 		},
 		{
@@ -440,8 +443,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&resourceSettingsTabAPI{stored: &api.ResourceResponse{Id: 3, ResourceIdentifier: "billing-api"}}),
 			target:  "/admin/resources/3/settings",
 			options: []handlertest.Option{handlertest.WithRouteParam("resourceId", "3")},
-			want: []string{`<span class="text-accent">billing-api</span>`,
-				`var originalResourceIdentifier = "billing-api";`, `name="resourceIdentifier" value="billing-api"`},
+			want: []string{`<h1 class="page-title" id="page-title">billing-api</h1>`,
+				`data-stored-value="billing-api"`, `name="resourceIdentifier" value="billing-api"`},
 		},
 		{
 			name: "general settings",
@@ -449,7 +452,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				&generalSettingsAPI{stored: &api.SettingsGeneralResponse{AppName: "Goiabada", Issuer: "storedissuer",
 					PasswordPolicy: "low"}}),
 			target: "/admin/settings/general",
-			want:   []string{`const originalIssuerValue = "storedissuer";`, `name="issuer" value="storedissuer"`},
+			want:   []string{`data-stored-value="storedissuer"`, `name="issuer" value="storedissuer"`},
 		},
 		{
 			name: "group attribute edit",
@@ -459,7 +462,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			target: "/admin/groups/4/attributes/edit/11",
 			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4"),
 				handlertest.WithRouteParam("attributeId", "11")},
-			want: []string{`<span class="text-accent">department</span>`, `name="attributeKey" value="department"`},
+			want: []string{`Editar atributo <span class="font-mono">department</span></h2>`, `name="attributeKey" value="department"`},
 		},
 		{
 			name: "user attribute edit",
@@ -469,7 +472,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			target: "/admin/users/9/attributes/edit/12",
 			options: []handlertest.Option{handlertest.WithRouteParam("userId", "9"),
 				handlertest.WithRouteParam("attributeId", "12")},
-			want: []string{`<span class="text-accent">employee-id</span>`, `name="attributeKey" value="employee-id"`},
+			want: []string{`Editar atributo <span class="font-mono">employee-id</span></h2>`, `name="attributeKey" value="employee-id"`},
 		},
 	}
 

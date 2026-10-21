@@ -277,7 +277,7 @@ func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt
 
 			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 			assert.Equal(t, "AUTHENTICATION_FAILED", errorCodeOf(t, rr))
-			assert.Equal(t, "Authentication failed. Check your current password and try again.", descriptionOf(t, rr))
+			assert.Equal(t, "That password isn't right. Try again.", descriptionOf(t, rr))
 			assert.Equal(t, 1, credentials.failures, "a wrong password is charged exactly once")
 			database.AssertNotCalled(t, "TrySetUserEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

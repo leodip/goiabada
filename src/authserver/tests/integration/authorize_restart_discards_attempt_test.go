@@ -301,7 +301,7 @@ func TestRestartRoute2_TheSecondPassEarnsOnlyWhatItVerified(t *testing.T) {
 func consentScopes(t *testing.T, consentPage *http.Response) []string {
 	t.Helper()
 	var scopes []string
-	parseHTMLResponse(t, consentPage).Find(`label[for^="consent"]`).Each(func(_ int, label *goquery.Selection) {
+	parseHTMLResponse(t, consentPage).Find(`label[for^="consent"] .code-hint`).Each(func(_ int, label *goquery.Selection) {
 		scopes = append(scopes, strings.TrimSpace(label.Text()))
 	})
 	return scopes

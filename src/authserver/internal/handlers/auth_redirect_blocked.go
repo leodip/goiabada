@@ -3,8 +3,6 @@ package handlers
 import (
 	"net/http"
 	"net/url"
-
-	"github.com/leodip/goiabada/authserver/internal/authflow"
 )
 
 // This file is the refusal interstitial: the page a user is shown instead of being redirected to a
@@ -64,7 +62,7 @@ func (rsp *ClientErrorResponder) renderRedirectBlocked(w http.ResponseWriter, r 
 	// longer exists: the untrusted case rather than an exempt one. There is then no name to show and no marking to make: saying the
 	// application registered itself would be a claim this server cannot back.
 	if input.client != nil {
-		name, unverified := authflow.ConsentClientName(input.client)
+		name, unverified := input.client.NameForUsers()
 		bind["clientName"] = name
 		bind["clientNameUnverified"] = unverified
 	}

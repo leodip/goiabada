@@ -36,6 +36,11 @@ func (*refusingClientApiClient) CreateClient(context.Context, string, *api.Creat
 	panic("unexpected call to CreateClient")
 }
 
+// GetSettingsTokens answers the global token settings, which the refused tokens tab names.
+func (*refusingClientApiClient) GetSettingsTokens(context.Context, string) (*api.SettingsTokensResponse, error) {
+	return &api.SettingsTokensResponse{TokenExpirationInSeconds: 300}, nil
+}
+
 func (*refusingClientApiClient) UpdateClientTokens(context.Context, string, int64, *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientTokens")
 }
@@ -98,8 +103,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/clients/3/delete",
 			form:       url.Values{"clientIdentifier": {"shipping-app"}},
-			english:    "Client identifier does not match the client being deleted.",
-			portuguese: "O identificador do cliente não corresponde ao cliente que está sendo excluído.",
+			english:    "That isn't this client's identifier. Type it as shown above.",
+			portuguese: "Esse não é o identificador deste cliente. Digite-o como aparece acima.",
 		},
 		{
 			name:     "a token expiration that is not a number",
@@ -109,8 +114,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/clients/3/tokens",
 			form:       tokensWith("tokenExpirationInSeconds", "soon"),
-			english:    "Invalid value for token expiration in seconds.",
-			portuguese: "Valor inválido para a expiração do token em segundos.",
+			english:    "Enter the token lifetime as a whole number of seconds.",
+			portuguese: "Informe a duração do token como um número inteiro de segundos.",
 		},
 		{
 			name:     "an offline idle timeout that is not a number",
@@ -120,8 +125,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/clients/3/tokens",
 			form:       tokensWith("refreshTokenOfflineIdleTimeoutInSeconds", "soon"),
-			english:    "Invalid value for refresh token offline - idle timeout in seconds.",
-			portuguese: "Valor inválido para o refresh token offline - timeout por inatividade em segundos.",
+			english:    "Enter the offline idle timeout as a whole number of seconds.",
+			portuguese: "Informe o tempo ocioso offline como um número inteiro de segundos.",
 		},
 		{
 			name:     "an offline max lifetime that is not a number",
@@ -131,8 +136,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/clients/3/tokens",
 			form:       tokensWith("refreshTokenOfflineMaxLifetimeInSeconds", "soon"),
-			english:    "Invalid value for refresh token offline - max lifetime in seconds.",
-			portuguese: "Valor inválido para o refresh token offline - tempo máximo de vida em segundos.",
+			english:    "Enter the offline maximum lifetime as a whole number of seconds.",
+			portuguese: "Informe a duração máxima offline como um número inteiro de segundos.",
 		},
 	}
 

@@ -210,7 +210,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 		assert.Len(t, result, 1)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "openid",
-			Description:      "Authenticate your user and identify you via a unique ID",
+			Description:      "Identify you by an ID unique to your account",
 			AlreadyConsented: false,
 		}, result[0])
 	})
@@ -220,17 +220,17 @@ func TestBuildScopeInfoArray(t *testing.T) {
 		assert.Len(t, result, 3)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "openid",
-			Description:      "Authenticate your user and identify you via a unique ID",
+			Description:      "Identify you by an ID unique to your account",
 			AlreadyConsented: false,
 		}, result[0])
 		assert.Equal(t, ScopeInfo{
 			Scope:            "profile",
-			Description:      "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at",
+			Description:      "Your profile: name, nickname, username, picture, website, gender, birth date, time zone and language",
 			AlreadyConsented: false,
 		}, result[1])
 		assert.Equal(t, ScopeInfo{
 			Scope:            "email",
-			Description:      "Access to claims: email, email_verified",
+			Description:      "Your email address, and whether it's verified",
 			AlreadyConsented: false,
 		}, result[2])
 	})
@@ -240,7 +240,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 		assert.Len(t, result, 2)
 		assert.Equal(t, ScopeInfo{
 			Scope:            "offline_access",
-			Description:      "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction",
+			Description:      "Keep access while you're away, without asking you again",
 			AlreadyConsented: false,
 		}, result[1])
 	})
@@ -287,8 +287,8 @@ func TestBuildScopeInfoArray(t *testing.T) {
 
 		result := buildScopeInfoArray(req.Context(), "openid offline_access custom:read", nil)
 		assert.Len(t, result, 3)
-		assert.Equal(t, "Autenticar seu usuário e identificá-lo por um ID único", result[0].Description)
-		assert.Contains(t, result[1].Description, "token de atualização offline")
+		assert.Equal(t, "Identificar você por um ID exclusivo da sua conta", result[0].Description)
+		assert.Equal(t, "Manter o acesso enquanto você estiver ausente, sem pedir de novo", result[1].Description)
 		assert.Equal(t, "Permissão read no recurso custom", result[2].Description)
 	})
 }

@@ -301,7 +301,7 @@ func HandleClientDelete(
 		}
 
 		if client.IsSystemLevelClient() {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSystemLevelDeleteNotAllowed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSystemLevelDeleteNotAllowed, nil))
 			return
 		}
 
@@ -344,14 +344,14 @@ func HandleClientCreatePost(
 
 		// Validate client identifier present
 		if strings.TrimSpace(req.ClientIdentifier) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil))
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(req.Description) > maxLengthDescription {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDescriptionTooLong, map[string]any{"max": maxLengthDescription}))
 			return
 		}
 
@@ -364,7 +364,7 @@ func HandleClientCreatePost(
 		trimmedDisplayName := strings.TrimSpace(req.DisplayName)
 		const maxLengthDisplayName = 100
 		if inputvalidation.TextLength(trimmedDisplayName) > maxLengthDisplayName {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDisplayNameTooLong, map[string]any{"max": maxLengthDisplayName}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDisplayNameTooLong, map[string]any{"max": maxLengthDisplayName}))
 			return
 		}
 
@@ -386,7 +386,7 @@ func HandleClientCreatePost(
 			return
 		}
 		if existingClient != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil))
 			return
 		}
 
@@ -402,7 +402,7 @@ func HandleClientCreatePost(
 			return
 		}
 		if clashingResource != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil))
 			return
 		}
 
@@ -499,14 +499,14 @@ func HandleClientUpdatePut(
 
 		// Validate client identifier
 		if strings.TrimSpace(updateReq.ClientIdentifier) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierRequired, nil))
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDescriptionTooLong, map[string]any{"max": maxLengthDescription}))
 			return
 		}
 
@@ -524,7 +524,7 @@ func HandleClientUpdatePut(
 		//
 		// System-level client protection: block identifier changes
 		if client.IsSystemLevelClient() && trimmedClientIdentifier != client.ClientIdentifier {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSystemLevelIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSystemLevelIdentifierFixed, nil))
 			return
 		}
 
@@ -542,7 +542,7 @@ func HandleClientUpdatePut(
 		// escape hatch this whole change rests on, so a guard that refused the update outright
 		// would take away the remedy along with the risk.
 		if client.CreatedViaDCR && trimmedClientIdentifier != client.ClientIdentifier {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSelfRegisteredIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSelfRegisteredIdentifierFixed, nil))
 			return
 		}
 
@@ -577,7 +577,7 @@ func HandleClientUpdatePut(
 				return
 			}
 			if existingClient != nil && existingClient.Id != client.Id {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil))
 				return
 			}
 
@@ -590,14 +590,14 @@ func HandleClientUpdatePut(
 				return
 			}
 			if clashingResource != nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil))
 				return
 			}
 		}
 
 		// ACR level validation depending on AuthorizationCodeEnabled
 		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrNotApplicable, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrNotApplicable, nil))
 			return
 		}
 
@@ -606,16 +606,16 @@ func HandleClientUpdatePut(
 		if websiteURL != "" {
 			const maxLengthWebsiteURL = 256
 			if inputvalidation.TextLength(websiteURL) > maxLengthWebsiteURL {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLTooLong, map[string]any{"max": maxLengthWebsiteURL}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLTooLong, map[string]any{"max": maxLengthWebsiteURL}))
 				return
 			}
 			parsed, err := url.ParseRequestURI(websiteURL)
 			if err != nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLInvalid, nil))
 				return
 			}
 			if parsed.Scheme != "http" && parsed.Scheme != "https" {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLSchemeInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebsiteURLSchemeInvalid, nil))
 				return
 			}
 		}
@@ -628,7 +628,7 @@ func HandleClientUpdatePut(
 		// Validate display name length
 		const maxLengthDisplayName = 100
 		if inputvalidation.TextLength(client.DisplayName) > maxLengthDisplayName {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDisplayNameTooLong, map[string]any{"max": maxLengthDisplayName}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDisplayNameTooLong, map[string]any{"max": maxLengthDisplayName}))
 			return
 		}
 
@@ -647,7 +647,7 @@ func HandleClientUpdatePut(
 		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
 			acrLevel, err := record.AcrLevelFromString(updateReq.DefaultAcrLevel)
 			if err != nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrInvalid, nil))
 				return
 			}
 			client.DefaultAcrLevel = acrLevel
@@ -734,7 +734,7 @@ func HandleClientAuthenticationPut(
 		} else {
 			// Confidential: require strong secret
 			if err := validateClientSecret(req.ClientSecret); err != nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSecretInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientSecretInvalid, nil))
 				return
 			}
 
@@ -863,13 +863,13 @@ func HandleClientAdministrativeScopesPut(
 		// Absent or null is refused rather than read as false: a body that says nothing must not
 		// switch the allowance off.
 		if req.Allowed == nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientAdministrativeScopesAllowedRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientAdministrativeScopesAllowedRequired, nil))
 			return
 		}
 		allowed := *req.Allowed
 
 		if client.IsSystemLevelClient() && !allowed {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed, nil))
 			return
 		}
 
@@ -1060,7 +1060,7 @@ func HandleClientRedirectURIsPut(
 			return
 		}
 		if !client.AuthorizationCodeEnabled && !client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled) {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsNoRedirectFlow, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsNoRedirectFlow, nil))
 			return
 		}
 
@@ -1091,7 +1091,7 @@ func HandleClientRedirectURIsPut(
 		// bound cannot be saved until the administrator trims it in the same save, which is #122's
 		// precedent for a legacy row below (#428).
 		if len(req.RedirectURIs) > record.RedirectURIsMaxPerClient {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsTooMany, map[string]any{"max": record.RedirectURIsMaxPerClient, "count": len(req.RedirectURIs)}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsTooMany, map[string]any{"max": record.RedirectURIsMaxPerClient, "count": len(req.RedirectURIs)}))
 			return
 		}
 
@@ -1101,17 +1101,17 @@ func HandleClientRedirectURIsPut(
 		for _, raw := range req.RedirectURIs {
 			uri := strings.TrimSpace(raw)
 			if uri == "" {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIEmpty, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIEmpty, nil))
 				return
 			}
 			// Before the parse, so an overlong value is never parsed. The message names the
 			// value by its beginning rather than echoing up to the whole body back.
 			if len(uri) > record.RedirectURIMaxBytes {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURITooLong, map[string]any{"length": len(uri), "max": record.RedirectURIMaxBytes, "prefix": strings.ToValidUTF8(uri[:80], "")}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURITooLong, map[string]any{"length": len(uri), "max": record.RedirectURIMaxBytes, "prefix": strings.ToValidUTF8(uri[:80], "")}))
 				return
 			}
 			if _, parseErr := url.ParseRequestURI(uri); parseErr != nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInvalid, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInvalid, map[string]any{"uri": uri}))
 				return
 			}
 			// url.ParseRequestURI above accepts "//evil.example/cb", "/relative/cb",
@@ -1132,7 +1132,7 @@ func HandleClientRedirectURIsPut(
 			// that URI from the list. The message names the offending value, and taking that
 			// remediation also deletes the row.
 			if !urlmatch.IsAbsoluteRedirectURI(uri) {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURINotAbsolute, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURINotAbsolute, map[string]any{"uri": uri}))
 				return
 			}
 			// RFC 9700 section 2.6: an authorization response MUST NOT travel over an
@@ -1157,11 +1157,11 @@ func HandleClientRedirectURIsPut(
 			// checked: the transaction below answers 409 when the stored rows differ from it,
 			// so naming a new http URI there writes nothing (#575).
 			if _, wasLoaded := loaded[uri]; !wasLoaded && urlmatch.IsInsecureHTTPRedirectURI(uri) {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInsecureHTTP, map[string]any{"uri": uri}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIInsecureHTTP, map[string]any{"uri": uri}))
 				return
 			}
 			if _, exists := seen[uri]; exists {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsDuplicate, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientRedirectURIsDuplicate, nil))
 				return
 			}
 			seen[uri] = struct{}{}
@@ -1303,22 +1303,22 @@ func HandleClientWebOriginsPut(
 		for _, raw := range req.WebOrigins {
 			val := strings.TrimSpace(raw)
 			if val == "" {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginEmpty, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginEmpty, nil))
 				return
 			}
 			origin, ok := urlmatch.CanonicalOrigin(val)
 			if !ok {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginInvalid, map[string]any{"origin": val}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginInvalid, map[string]any{"origin": val}))
 				return
 			}
 			// The column's width, record.WebOriginMaxBytes; its comment says why the bound is
 			// here rather than in CanonicalOrigin.
 			if len(origin) > record.WebOriginMaxBytes {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginTooLong, map[string]any{"length": len(origin), "max": record.WebOriginMaxBytes, "origin": origin}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginTooLong, map[string]any{"length": len(origin), "max": record.WebOriginMaxBytes, "origin": origin}))
 				return
 			}
 			if _, exists := seen[origin]; exists {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginsDuplicate, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginsDuplicate, nil))
 				return
 			}
 			seen[origin] = struct{}{}
@@ -1332,7 +1332,7 @@ func HandleClientWebOriginsPut(
 		for _, raw := range req.ExpectedWebOrigins {
 			origin, ok := urlmatch.CanonicalOrigin(strings.TrimSpace(raw))
 			if !ok {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginsExpectedInvalid, map[string]any{"origin": raw}), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientWebOriginsExpectedInvalid, map[string]any{"origin": raw}))
 				return
 			}
 			expected = append(expected, origin)
@@ -1446,19 +1446,19 @@ func HandleClientTokensPut(
 		// Validate numbers: >= 0 and <= 160000000
 		const maxValue = 160000000
 		if req.TokenExpirationInSeconds < 0 || req.TokenExpirationInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensTokenExpirationOutOfRange, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensTokenExpirationOutOfRange, map[string]any{"max": maxValue}))
 			return
 		}
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds < 0 || req.RefreshTokenOfflineIdleTimeoutInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutOutOfRange, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutOutOfRange, map[string]any{"max": maxValue}))
 			return
 		}
 		if req.RefreshTokenOfflineMaxLifetimeInSeconds < 0 || req.RefreshTokenOfflineMaxLifetimeInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineMaxLifetimeOutOfRange, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineMaxLifetimeOutOfRange, map[string]any{"max": maxValue}))
 			return
 		}
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds > req.RefreshTokenOfflineMaxLifetimeInSeconds {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime, nil))
 			return
 		}
 
@@ -1469,12 +1469,12 @@ func HandleClientTokensPut(
 		// (#385).
 		includeClaimsInAccessToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken))
 		if err != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid, nil))
 			return
 		}
 		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
 		if err != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIdTokenInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIdTokenInvalid, nil))
 			return
 		}
 

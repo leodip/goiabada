@@ -139,7 +139,8 @@ func TestSelfRegister_WithVerificationEveryAddressGetsTheSamePage(t *testing.T) 
 	for _, email := range []string{newAddress, verifiedEmail, unverifiedEmail, disabledEmail, pendingEmail} {
 		page := registerPage(t, client, email)
 		assert.Contains(t, page, checkYourEmailTitle)
-		assert.Contains(t, page, "We&#39;ve sent a message to "+email+" with the next step.")
+		assert.Contains(t, page, "We&#39;ve sent a message to:")
+		assert.Contains(t, page, `<code class="auth-address">`+email+`</code>`)
 		assert.Contains(t, page, "register again in 10 minutes to get a new link.")
 		pages[email] = strings.ReplaceAll(page, email, "{email}")
 	}

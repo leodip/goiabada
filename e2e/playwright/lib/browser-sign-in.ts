@@ -56,7 +56,7 @@ export async function signInThroughClient(
   await submitPassword(page, options.email, options.password);
 
   await page.waitForURL((url) => url.href.startsWith(testRedirectUri) || url.pathname === "/auth/consent");
-  if (new URL(page.url()).pathname === "/auth/consent") await page.getByRole("button", { name: "Give consent" }).click();
+  if (new URL(page.url()).pathname === "/auth/consent") await page.getByRole("button", { name: "Allow", exact: true }).click();
   await page.waitForURL((url) => url.href.startsWith(testRedirectUri));
 
   const code = new URL(page.url()).searchParams.get("code");

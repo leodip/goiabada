@@ -382,7 +382,8 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 				`"acrLevel":"urn:goiabada:level2_optional","authTime":"2026-09-16T09:00:00Z",` +
 				`"ipAddress":"203.0.113.7","deviceName":"Firefox","deviceType":"Desktop","deviceOS":"Linux",` +
 				`"userAgent":"Mozilla/5.0","userId":7,"isCurrent":false,` +
-				`"clientIdentifiers":["admin-console-client"]}`,
+				`"clientIdentifiers":["admin-console-client"],` +
+				`"clients":[{"clientIdentifier":"admin-console-client","name":"admin-console-client","nameUnverified":false}]}`,
 		},
 		{
 			// isCurrent true, which no other row here carries, and the empty
@@ -392,19 +393,19 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"b1c2d3","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
-				`"isCurrent":true,"clientIdentifiers":[]}`,
+				`"isCurrent":true,"clientIdentifiers":[],"clients":[]}`,
 		},
 		{
 			// The declared struct with nothing built it: a nil ClientIdentifiers
-			// reaches the wire as null, which is why the mapper never leaves it
-			// nil. Kept so the difference between the two is visible here rather
+			// or Clients reaches the wire as null, which is why the mapper never
+			// leaves either nil. Kept so the difference between the two is visible here rather
 			// than asserted only in the mapper's own table.
 			name:  "UserSessionDetailResponse, a nil client list is null",
 			value: api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 21, UserId: 7}},
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
-				`"isCurrent":false,"clientIdentifiers":null}`,
+				`"isCurrent":false,"clientIdentifiers":null,"clients":null}`,
 		},
 	})
 }
@@ -431,7 +432,8 @@ func TestWireJSON_UserConsentFamily(t *testing.T) {
 			value: ToUserConsentResponse(withClient),
 			literal: `{"id":31,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				`"clientId":3,"userId":7,"scope":"openid profile","grantedAt":"2026-09-16T12:00:00Z",` +
-				`"clientIdentifier":"web-app","clientDescription":"the web app"}`,
+				`"clientIdentifier":"web-app","clientName":"web-app","clientNameUnverified":false,` +
+				`"clientDescription":"the web app"}`,
 		},
 		{
 			// The consent rows a list endpoint returns without joining the
@@ -441,7 +443,7 @@ func TestWireJSON_UserConsentFamily(t *testing.T) {
 			value: ToUserConsentResponse(consent()),
 			literal: `{"id":31,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				`"clientId":3,"userId":7,"scope":"openid profile","grantedAt":"2026-09-16T12:00:00Z",` +
-				`"clientIdentifier":"","clientDescription":""}`,
+				`"clientIdentifier":"","clientName":"","clientNameUnverified":false,"clientDescription":""}`,
 		},
 	})
 }
@@ -678,7 +680,7 @@ func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 	sessionFields := `"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"b1c2d3",` +
 		`"started":null,"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,` +
 		`"ipAddress":"","deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
-		`"isCurrent":false,"clientIdentifiers":[]`
+		`"isCurrent":false,"clientIdentifiers":[],"clients":[]`
 
 	runWireCases(t, []wireCase{
 		{

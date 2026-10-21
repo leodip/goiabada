@@ -27,11 +27,22 @@ type SessionInfo struct {
 	// UserAgent is the raw header, shown as the Device cell's tooltip so two sessions
 	// whose labels read alike can still be told apart (#281).
 	UserAgent string
-	Clients   []string
+	// Clients are the identifiers, which the admin page shows; ClientNames the same clients as
+	// their user is shown them, which the account page shows.
+	Clients     []string
+	ClientNames []ClientName
 }
 
-// SessionInfos maps the API's sessions to the rows both session pages render, newest id first.
-// IsCurrent is the response's: the auth server computes it from the sid of the very token the
+// ClientName is a client as its user is shown it, by the consent screen: the name, and whether
+// that name is the client's own claim about itself, which a page marks as unverified (#108).
+type ClientName struct {
+	Name       string
+	Unverified bool
+}
+
+// SessionInfos maps the API's sessions to the rows both session pages render: the session of the
+// device in use first, then the others by when each was last active, the most recent first, a
+// newer session first between two last active at once. IsCurrent is the response's: the auth server computes it from the sid of the very token the
 // console forwards, so there is one place that decides it (#373).
 func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 	infos := make([]SessionInfo, 0, len(sessions))
@@ -47,21 +58,58 @@ func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 			DeviceOS:      s.DeviceOS,
 			UserAgent:     s.UserAgent,
 			Clients:       s.ClientIdentifiers,
+			ClientNames:   clientNames(s.Clients),
 		})
 	}
 
 	sort.Slice(infos, func(i, j int) bool {
-		return infos[i].UserSessionId > infos[j].UserSessionId
+		a, b := infos[i], infos[j]
+		return SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionId, b.IsCurrent, b.LastAccessed, b.UserSessionId)
 	})
 
 	return infos
 }
 
-// ConsentInfo is one row of the account consents page and of the admin user consents page.
+// SessionListedBefore says whether session a goes before session b in a list of sessions, as every
+// session page lists them: the session of the device in use first, then the others by when each was
+// last active, the most recent first, a newer session first between two last active at once.
+func SessionListedBefore(aCurrent bool, aLastAccessed *time.Time, aId int64, bCurrent bool, bLastAccessed *time.Time, bId int64) bool {
+	if aCurrent != bCurrent {
+		return aCurrent
+	}
+	if !lastAccessed(aLastAccessed).Equal(lastAccessed(bLastAccessed)) {
+		return lastAccessed(aLastAccessed).After(lastAccessed(bLastAccessed))
+	}
+	return aId > bId
+}
+
+// lastAccessed is when a session was last active, the zero instant when the response did not say,
+// which sorts it last.
+func lastAccessed(t *time.Time) time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return *t
+}
+
+// clientNames maps a session's clients to the names their user is shown for them.
+func clientNames(clients []api.SessionClientResponse) []ClientName {
+	names := make([]ClientName, 0, len(clients))
+	for _, c := range clients {
+		names = append(names, ClientName{Name: c.Name, Unverified: c.NameUnverified})
+	}
+	return names
+}
+
+// ConsentInfo is one row of the account consents page and of the admin user consents page. Client
+// is the identifier, which the admin page shows; ClientName and ClientNameUnverified are the name
+// the consent screen showed the user, which the account page shows.
 type ConsentInfo struct {
-	ConsentId         int64
-	Client            string
-	ClientDescription string
+	ConsentId            int64
+	Client               string
+	ClientName           string
+	ClientNameUnverified bool
+	ClientDescription    string
 	// GrantedAt is the instant rather than pre-rendered text, for the reason SessionInfo's
 	// two carry theirs: formatting here produced an English RFC1123 date under every
 	// locale, because Go's time.Format has no locale of its own (#373).
@@ -74,10 +122,12 @@ func ConsentInfos(consents []api.UserConsentResponse) []ConsentInfo {
 	infos := make([]ConsentInfo, 0, len(consents))
 	for _, c := range consents {
 		infos = append(infos, ConsentInfo{
-			ConsentId:         c.Id,
-			Client:            c.ClientIdentifier,
-			ClientDescription: c.ClientDescription,
-			Scope:             c.Scope,
+			ConsentId:            c.Id,
+			Client:               c.ClientIdentifier,
+			ClientName:           c.ClientName,
+			ClientNameUnverified: c.ClientNameUnverified,
+			ClientDescription:    c.ClientDescription,
+			Scope:                c.Scope,
 			// grantedAt is nullable on the wire, where the column it comes from is not:
 			// a consent row always records when it was granted, so an absent value is a
 			// response this console cannot date rather than an ungranted consent (#350).

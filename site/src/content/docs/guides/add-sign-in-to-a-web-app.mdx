@@ -15,9 +15,9 @@ Most OpenID Connect libraries do every step below once you give them the discove
 
 <Steps>
 
-1. Register your app. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `my-web-app`, leave **Authorization code flow with PKCE** on, and click **Create**.
+1. Register your app. In the admin console, open **Admin**, **Clients** and click **New client**. Enter a **Client identifier**, such as `my-web-app`, leave **Authorization code with PKCE** on, and click **Create client**.
 
-2. Click **Manage** beside your new client. On **Authentication**, click **Reveal** and copy the **Client secret** to your server's configuration. On **Redirect URIs**, add the address your app receives the code at, such as `https://app.example.com/callback`, and click **Save**.
+2. Click your new client's identifier. On **Authentication**, click **Show** and copy the **Client secret** to your server's configuration. On **Redirect URIs**, add the address your app receives the code at, such as `https://app.example.com/callback`, and click **Save**.
 
 3. When a user clicks your app's sign-in button, make three random values: a `state`, a `nonce` and a PKCE code verifier, with the challenge made from it. Keep all three in the user's session on your server, then send the browser to the auth server:
 
@@ -89,7 +89,7 @@ Each of the three values you made in step 3 guards against something different, 
 - **`nonce`** comes back inside the ID token. Checking it tells your app the ID token was issued for this sign-in, not replayed from an earlier one.
 - **PKCE**: the auth server redeems the code only with the verifier the challenge was made from, and only your server has it.
 
-The auth server requires PKCE from a confidential client while **PKCE required for confidential clients using the authorization code flow** is on, under **Admin**, **General**, as it is in a new install. Send it anyway: [PKCE](/concepts/pkce/) explains why, and how to make the challenge.
+The auth server requires PKCE from a confidential client while **Require PKCE** is on, under **Admin**, **General**, as it is in a new install. Send it anyway: [PKCE](/concepts/pkce/) explains why, and how to make the challenge.
 
 ## The client secret
 

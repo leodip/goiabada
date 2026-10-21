@@ -38,8 +38,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 			target: "/account/email",
 			form: url.Values{"email": {"new@example.com"}, "emailConfirmation": {"other@example.com"},
 				"currentPassword": {accountEmailFormPassword}},
-			english:    "The email and email confirmation entries must be identical.",
-			portuguese: "Os campos de e-mail e de confirmação de e-mail devem ser idênticos.",
+			english:    "The email addresses don't match.",
+			portuguese: "Os endereços de e-mail não conferem.",
 		},
 		{
 			name:     "a password change whose confirmation differs",
@@ -50,8 +50,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 			target: "/account/change-password",
 			form: url.Values{"currentPassword": {accountPasswordFormCurrent},
 				"newPassword": {accountPasswordFormNew}, "newPasswordConfirmation": {"something-else"}},
-			english:    "The password confirmation does not match the password.",
-			portuguese: "A confirmação da senha não confere com a senha.",
+			english:    "The passwords don't match.",
+			portuguese: "As senhas não conferem.",
 		},
 		{
 			name:     "a two-factor enrolment with no code",
@@ -61,8 +61,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     accountOTPPath,
 			form:       url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {""}},
-			english:    "OTP code is required.",
-			portuguese: "O código OTP é obrigatório.",
+			english:    "Enter the 6-digit code from your authenticator app.",
+			portuguese: "Digite o código de 6 dígitos do seu aplicativo autenticador.",
 		},
 	}
 

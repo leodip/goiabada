@@ -25,7 +25,7 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		t.Run("TooShort", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "12345")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
-				"The minimum length for the password is 6 characters")
+				"Use at least 6 characters for the password.")
 		})
 
 		t.Run("TooLong", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		t.Run("AccentedBelowMinimum", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, strings.Repeat("é", 5))
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
-				"The minimum length for the password is 6 characters")
+				"Use at least 6 characters for the password.")
 		})
 
 		t.Run("AccentedAtMinimum", func(t *testing.T) {
@@ -70,19 +70,19 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		t.Run("MissingUppercase", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "passw0rd")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordUppercaseRequired,
-				"As per our policy, an uppercase character is required in the password.")
+				"Add an uppercase letter to the password.")
 		})
 
 		t.Run("MissingLowercase", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "PASSW0RD")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordLowercaseRequired,
-				"As per our policy, a lowercase character is required in the password.")
+				"Add a lowercase letter to the password.")
 		})
 
 		t.Run("MissingNumber", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "Password")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordNumberRequired,
-				"As per our policy, your password must contain a numerical digit.")
+				"Add a number to the password.")
 		})
 	})
 
@@ -97,13 +97,13 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		t.Run("MissingSpecialChar", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "Passw0rd123")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordSpecialCharRequired,
-				"As per our policy, a special character/symbol is required in the password.")
+				"Add a symbol to the password.")
 		})
 
 		t.Run("TooShort", func(t *testing.T) {
 			err := validator.ValidatePassword(policy, "P@ss1")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
-				"The minimum length for the password is 10 characters")
+				"Use at least 10 characters for the password.")
 		})
 	})
 }
@@ -131,7 +131,7 @@ func TestPasswordValidator_MaximumIsWithinBcrypt(t *testing.T) {
 
 // tooLongSentence is the English catalog's too-long message at the validator's maximum. It says
 // bytes, because the maximum counts them.
-const tooLongSentence = "The password can be at most 64 bytes long. " +
+const tooLongSentence = "Use at most 64 bytes for the password. " +
 	"Accented and other non-English characters count as two or more bytes each."
 
 func TestPasswordValidator_ContainsLowerCase(t *testing.T) {

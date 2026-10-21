@@ -1,24 +1,21 @@
 {{define "manage_users_tabs"}}
-
-{{ $type := index . 0 }}
-{{ $id := index . 1 }}
-{{ $page := index . 2 }}
-{{ $query := index . 3 }}
-{{ $ctx := index . 4 }}
-
-<div class="mt-2 tabs tabs-bordered">
-    <a href="/admin/users/{{$id}}/details?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "details"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.details" }}</a>
-    <a href="/admin/users/{{$id}}/profile?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "profile"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.profile" }}</a>
-    <a href="/admin/users/{{$id}}/picture?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "picture"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.picture" }}</a>
-    <a href="/admin/users/{{$id}}/email?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "email"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.email" }}</a>
-    <a href="/admin/users/{{$id}}/phone?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "phone"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.phone" }}</a>
-    <a href="/admin/users/{{$id}}/address?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "address"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.address" }}</a>
-    <a href="/admin/users/{{$id}}/authentication?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "authentication"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.authentication" }}</a>
-    <a href="/admin/users/{{$id}}/consents?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "consents"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.consents" }}</a>
-    <a href="/admin/users/{{$id}}/sessions?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "sessions"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.sessions" }}</a>
-    <a href="/admin/users/{{$id}}/attributes?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "attributes"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.attributes" }}</a>
-    <a href="/admin/users/{{$id}}/permissions?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.permissions" }}</a>
-    <a href="/admin/users/{{$id}}/groups?page={{$page}}&query={{$query}}" class="tab tab-bordered {{if eq $type "groups"}}tab-active{{end}}">{{ T $ctx "adminconsole.user_tabs.groups" }}</a>
-</div>
-
+{{- $type := index . 0 }}
+{{- $id := index . 1 }}
+{{- $page := index . 2 }}
+{{- $query := index . 3 }}
+{{- $ctx := index . 4 }}
+<nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
+  <a class="tab-item" href="/admin/users/{{$id}}/details?page={{$page}}&query={{$query}}"{{ if eq $type "details" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.details" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/profile?page={{$page}}&query={{$query}}"{{ if eq $type "profile" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.profile" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/picture?page={{$page}}&query={{$query}}"{{ if eq $type "picture" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.picture" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/email?page={{$page}}&query={{$query}}"{{ if eq $type "email" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.email" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/phone?page={{$page}}&query={{$query}}"{{ if eq $type "phone" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.phone" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/address?page={{$page}}&query={{$query}}"{{ if eq $type "address" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.address" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/authentication?page={{$page}}&query={{$query}}"{{ if eq $type "authentication" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.authentication" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/consents?page={{$page}}&query={{$query}}"{{ if eq $type "consents" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.consents" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/sessions?page={{$page}}&query={{$query}}"{{ if eq $type "sessions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.sessions" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/attributes?page={{$page}}&query={{$query}}"{{ if eq $type "attributes" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.attributes" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/permissions?page={{$page}}&query={{$query}}"{{ if eq $type "permissions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.permissions" }}</a>
+  <a class="tab-item" href="/admin/users/{{$id}}/groups?page={{$page}}&query={{$query}}"{{ if eq $type "groups" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.user_tabs.groups" }}</a>
+</nav>
 {{end}}

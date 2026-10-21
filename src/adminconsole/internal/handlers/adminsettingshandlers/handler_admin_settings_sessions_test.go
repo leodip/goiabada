@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
@@ -59,27 +60,13 @@ func TestHandleSessionsGet_ShowsTheCapBesideTheLifetimes(t *testing.T) {
 	}, bind["settings"])
 }
 
-// The save always sends the cap, as entered. 0 is a cap, no limit, so it is sent as 0; a value that
-// is not a number is never sent as 0, which would turn the cap off, but as one the auth server
-// refuses, so the page shows its refusal.
+// The save always sends the cap, as entered. 0 is a cap, no limit, so it is sent as 0.
 func TestHandleSessionsPost_AlwaysSendsTheCap(t *testing.T) {
-	testCases := []struct {
-		name    string
-		entered string
-		check   func(t *testing.T, sent *int)
-	}{
-		{"a number", "5", func(t *testing.T, sent *int) { assert.Equal(t, 5, *sent) }},
-		{"0, no limit", "0", func(t *testing.T, sent *int) { assert.Equal(t, 0, *sent) }},
-		{"not a number", "abc", func(t *testing.T, sent *int) {
-			assert.True(t, *sent < 0 || *sent > 1000, "sent as a cap the auth server refuses, not %v", *sent)
-		}},
-		{"empty", "", func(t *testing.T, sent *int) {
-			assert.True(t, *sent < 0 || *sent > 1000, "sent as a cap the auth server refuses, not %v", *sent)
-		}},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, entered := range []struct {
+		value string
+		sent  int
+	}{{"5", 5}, {"0", 0}, {" 12 ", 12}} {
+		t.Run(entered.value, func(t *testing.T) {
 			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &sessionsAPI{}
@@ -88,7 +75,7 @@ func TestHandleSessionsPost_AlwaysSendsTheCap(t *testing.T) {
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
 					"userSessionIdleTimeoutInSeconds": {"3600"},
 					"userSessionMaxLifetimeInSeconds": {"43200"},
-					"maxUserSessionsPerUser":          {tc.entered},
+					"maxUserSessionsPerUser":          {entered.value},
 				}))
 			w := httptest.NewRecorder()
 			HandleSessionsPost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(w, req)
@@ -98,12 +85,50 @@ func TestHandleSessionsPost_AlwaysSendsTheCap(t *testing.T) {
 			assert.Equal(t, 3600, apiClient.sent.UserSessionIdleTimeoutInSeconds)
 			assert.Equal(t, 43200, apiClient.sent.UserSessionMaxLifetimeInSeconds)
 			require.NotNil(t, apiClient.sent.MaxUserSessionsPerUser, "the cap is always sent")
-			tc.check(t, apiClient.sent.MaxUserSessionsPerUser)
+			assert.Equal(t, entered.sent, *apiClient.sent.MaxUserSessionsPerUser)
 		})
 	}
 }
 
-// A refused save redraws the form with the cap as it was entered, beside the auth server's refusal.
+// A value that is not a whole number is refused in the console, at its field, and nothing is sent:
+// sent as 0, a lifetime would be refused as not greater than zero, and the cap would be off.
+func TestHandleSessionsPost_RefusesAValueThatIsNotAWholeNumberAtItsField(t *testing.T) {
+	testCases := []struct {
+		name, field, message string
+	}{
+		{"userSessionIdleTimeoutInSeconds", "userSessionIdleTimeoutInSeconds", "Enter the idle timeout as a whole number of seconds."},
+		{"userSessionMaxLifetimeInSeconds", "userSessionMaxLifetimeInSeconds", "Enter the maximum lifetime as a whole number of seconds."},
+		{"maxUserSessionsPerUser", "maxUserSessionsPerUser", "Enter the maximum sessions per user as a whole number, from 0 to 1000."},
+	}
+	for _, tc := range testCases {
+		for _, entered := range []string{"abc", ""} {
+			t.Run(tc.name+" "+entered, func(t *testing.T) {
+				httpHelper := handlersmocks.NewHttpHelper(t)
+				handlertest.RefuseInternalServerError(t, httpHelper)
+				handlertest.ExpectRender(httpHelper, mock.Anything, "/admin_settings_sessions.html").Once()
+				apiClient := &sessionsAPI{}
+				form := url.Values{
+					"userSessionIdleTimeoutInSeconds": {"3600"},
+					"userSessionMaxLifetimeInSeconds": {"43200"},
+					"maxUserSessionsPerUser":          {"20"},
+				}
+				form.Set(tc.field, entered)
+
+				req := handlertest.Request(http.MethodPost, "/admin/settings/sessions",
+					handlertest.WithAccessToken(), handlertest.WithForm(form))
+				HandleSessionsPost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+
+				assert.Nil(t, apiClient.sent, "nothing is sent")
+				bind := handlertest.Bind(t, httpHelper)
+				assert.Equal(t, tc.message, bind["error"])
+				assert.Equal(t, tc.field, bind["errorField"])
+			})
+		}
+	}
+}
+
+// A refused save redraws the form with the cap as it was entered, beside the auth server's refusal,
+// which marks the field its code names.
 func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
@@ -112,8 +137,9 @@ func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 		"/admin_settings_sessions.html", mock.Anything).
 		Run(func(args mock.Arguments) { bind = args.Get(4).(map[string]interface{}) }).
 		Return(nil).Once()
-	refusal := "User session - max sessions per user must be between 0 and 1000."
-	apiClient := &sessionsAPI{updateErr: apiStatus(http.StatusBadRequest, refusal)}
+	refusal := "The maximum sessions per user must be between 0 and 1000."
+	apiClient := &sessionsAPI{updateErr: &apiclient.APIError{Code: "handler.settings_sessions.max_sessions_per_user_out_of_range",
+		Message: refusal, StatusCode: http.StatusBadRequest}}
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/sessions",
 		handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
@@ -125,6 +151,7 @@ func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 
 	require.NotNil(t, bind)
 	assert.Equal(t, refusal, bind["error"])
+	assert.Equal(t, "maxUserSessionsPerUser", bind["errorField"], "the refusal's code names its field")
 	assert.Equal(t, SettingsSessionPost{
 		UserSessionIdleTimeoutInSeconds: "3600",
 		UserSessionMaxLifetimeInSeconds: "43200",

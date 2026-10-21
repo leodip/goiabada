@@ -190,7 +190,7 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-		handler := HandleTokenPost(render.New(nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
+		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t),
 			protocolvalidation.NewTokenValidator(database, nil, fixedPermissionChecker{held: false}, testDataCipher),
 			auditLogger, noCredentialFailures{}, testTokenMetrics())
 

@@ -1,32 +1,15 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.sign_in_error.page_title" }}{{end}}
+{{define "title"}}{{ T $.ctx .titleKey }} – {{ .appName }}{{end}}
 {{define "head"}}{{end}}
 
 {{define "body"}}
-<main>
-
-<div class="flex items-center justify-center h-screen p-8">
-    <div class="hero h-4/5">
-        <div class="text-center hero-content">
-            <div class="max-w-md">
-
-                <h1 class="mt-5 text-[36px] font-bold lg:text-[50px]">{{ T $.ctx .titleKey }}</h1>
-
-                <p class="mt-4 text-xl">{{ T $.ctx .messageKey "description" .description "code" .code }}</p>
-
-                {{if .serverFault}}
-                <p class="mt-4 text-lg">{{ T $.ctx "adminconsole.sign_in_error.log_line" }}</p>
-                <pre>{{.requestId}}</pre>
-                {{else}}
-                <div class="justify-center mt-4 card-actions">
-                    <a href="/" class="btn btn-primary">{{ T $.ctx "adminconsole.sign_in_error.start_again" }}</a>
-                </div>
-                {{end}}
-
-            </div>
-        </div>
-    </div>
+<div class="auth-status">
+  <span class="status-icon status-icon-danger"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg></span>
+  <h1 class="auth-title">{{ T $.ctx .titleKey }}</h1>
+  <p>{{ T $.ctx .messageKey "description" .description "code" .code }}</p>
+  {{ if .serverFault }}
+  <p class="text-sm text-ink-muted">{{ T $.ctx "adminconsole.sign_in_error.log_line" }} <code class="break-all font-mono text-ink">{{ .requestId }}</code></p>
+  {{ else }}
+  <a class="button button-primary button-block" href="/">{{ T $.ctx "adminconsole.sign_in_error.start_again" }}</a>
+  {{ end }}
 </div>
-
-</main>
-
 {{end}}

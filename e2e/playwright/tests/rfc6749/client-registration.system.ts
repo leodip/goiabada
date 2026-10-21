@@ -3,7 +3,7 @@
 // answer never cached (5.1), and a redirect URI must be absolute with no fragment (3.1.2). A system test
 // because registration is a global switch, put back afterwards. Clients made in the admin console are
 // covered by ../admin-console/clients/: a duplicate identifier, a new secret, a switch to public.
-import { idFromListLink } from "../../lib/admin-console";
+import { clientIdFromList, deleteClient } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { expectNoStore, readAnswer } from "../../lib/rfc6749";
@@ -44,12 +44,6 @@ test("a public client is registered with no secret, a confidential one with a lo
       }
     });
   } finally {
-    for (const identifier of registered) {
-      const id = await idFromListLink(page, `${env.adminUrl}/admin/clients`, identifier, "Manage");
-      await page.goto(`${env.adminUrl}/admin/clients/${id}/delete`);
-      await page.locator('input[name="clientIdentifier"]').fill(identifier);
-      await page.getByRole("button", { name: "Delete", exact: true }).click();
-      await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
-    }
+    for (const identifier of registered) await deleteClient(page, await clientIdFromList(page, identifier));
   }
 });

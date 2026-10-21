@@ -16,11 +16,12 @@ import (
 // after its own modal confirmed ending the current session asks the administrator a second time,
 // against the modal's "immediate sign-out". The three pages that can end the current session post
 // the sign-out instead, through utils.js's submitSignOut, which builds the same form the
-// confirmation page's button submits.
+// confirmation page's button submits: the account's and a client's sessions through
+// pages/user-sessions.js, a user's through its template's script.
 //
 // Lexical, like its neighbours, because no tier runs JavaScript: it holds utils.js to building a
-// POST to /auth/logout, the three pages to calling it, and every template and script to navigating
-// to /auth/logout nowhere.
+// POST to /auth/logout, the scripts of the three pages to calling it, and every template and
+// script to navigating to /auth/logout nowhere.
 
 // signOutNavigation is a script navigating to the console's sign-out route, by assignment or by
 // assign or replace, in either quote style.
@@ -45,11 +46,13 @@ func TestUtilsJS_SubmitSignOutPostsTheSignOutForm(t *testing.T) {
 
 func TestTemplates_TheSessionsPagesPostTheSignOutRatherThanNavigateToIt(t *testing.T) {
 	for _, name := range []string{
-		"template/account_user_sessions.html",
-		"template/admin_users_sessions.html",
-		"template/admin_clients_usersessions.html",
+		"static/pages/user-sessions.js",
 	} {
-		b, err := templateFS.ReadFile(name)
+		read := templateFS.ReadFile
+		if strings.HasPrefix(name, "static/") {
+			read = staticFS.ReadFile
+		}
+		b, err := read(name)
 		require.NoError(t, err)
 		source := string(b)
 

@@ -79,7 +79,7 @@ func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {
 
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Authentication failed. Check your current password and try again.", errResp.ErrorDescription)
+	assert.Equal(t, "That password isn't right. Try again.", errResp.ErrorDescription)
 }
 
 func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
@@ -110,7 +110,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The minimum length for the password is 6 characters", err3.ErrorDescription)
+	assert.Equal(t, "Use at least 6 characters for the password.", err3.ErrorDescription)
 }
 
 func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {

@@ -81,7 +81,7 @@ func HandleRedirectURIsGet(
 			ClientId              int64
 			ClientIdentifier      string
 			CanManageRedirectURIs bool
-			RedirectURIs          map[int64]string
+			RedirectURIs          []string
 			IsSystemLevelClient   bool
 		}{
 			ClientId:              clientResp.Id,
@@ -94,9 +94,11 @@ func HandleRedirectURIsGet(
 			return clientResp.RedirectURIs[i].URI < clientResp.RedirectURIs[j].URI
 		})
 
-		adminClientRedirectURIs.RedirectURIs = make(map[int64]string)
+		// A slice, in the order just sorted: the page lists them alphabetically, which a map keyed by
+		// the row ids, which the template ranged in id order, did not.
+		adminClientRedirectURIs.RedirectURIs = make([]string, 0, len(clientResp.RedirectURIs))
 		for _, redirectURI := range clientResp.RedirectURIs {
-			adminClientRedirectURIs.RedirectURIs[redirectURI.Id] = redirectURI.URI
+			adminClientRedirectURIs.RedirectURIs = append(adminClientRedirectURIs.RedirectURIs, redirectURI.URI)
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)

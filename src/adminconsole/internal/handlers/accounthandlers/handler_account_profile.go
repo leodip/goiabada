@@ -120,6 +120,7 @@ func HandleProfilePost(
 					"timezones":            timezones,
 					"locales":              locales,
 					"error":                errorMessage,
+					"errorField":           render.ErrorField(err, render.ProfileErrorFields),
 				}
 
 				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_profile.html", bind); renderErr != nil {

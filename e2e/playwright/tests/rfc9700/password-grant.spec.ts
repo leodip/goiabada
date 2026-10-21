@@ -38,13 +38,13 @@ test("a user with an authenticator is refused the password grant, which cannot a
   await page.goto(clientUrl(strict.id, "settings"));
   await page.locator('select[name="defaultAcrLevel"]').selectOption("urn:goiabada:level2_mandatory");
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
   const context = await emptyBrowser(browser);
   const tab = await context.newPage();
   await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(strict.identifier).params)}`);
   await submitPassword(tab, withAuthenticator.email, withAuthenticator.password);
   await expect(tab).toHaveURL(/\/auth\/otp/);
-  await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("pre").innerText()).trim()));
+  await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("#otp-secret").innerText()).trim()));
   await tab.getByRole("button", { name: "Verify" }).click();
   await tab.waitForURL((url) => url.searchParams.has("code"));
   await context.close();

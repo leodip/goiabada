@@ -92,13 +92,14 @@ func HandlePhonePost(
 			PhoneNumber:          strings.TrimSpace(r.FormValue("phoneNumber")),
 		}
 
-		// On validation error, re-render with submitted values
-		renderError := func(errorMessage string) {
+		// On validation error, re-render with submitted values, the refused field marked.
+		renderError := func(errorMessage, errorField string) {
 			bind := map[string]interface{}{
 				"selectedPhoneCountryUniqueId": req.PhoneCountryUniqueId,
 				"phoneNumber":                  req.PhoneNumber,
 				"phoneCountries":               phoneCountries,
 				"error":                        errorMessage,
+				"errorField":                   errorField,
 			}
 			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind); renderErr != nil {
 				httpHelper.InternalServerError(w, r, renderErr)
@@ -108,7 +109,9 @@ func HandlePhonePost(
 		// Call API
 		_, err := apiClient.UpdateAccountPhone(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+				renderError(errorMessage, render.ErrorField(err, render.PhoneErrorFields))
+			})
 			return
 		}
 

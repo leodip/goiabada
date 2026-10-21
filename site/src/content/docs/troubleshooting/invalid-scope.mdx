@@ -53,7 +53,7 @@ The [password grant](/legacy-flows/ropc/) is the exception: it refuses a permiss
 
 ### A refresh asked for more
 
-A refresh can ask for the same scope as the original grant or less, never more: "Scope '...' is not recognized. The original access token does not grant the '...' permission." A refresh also checks again that the user still holds each permission and, for a client that requires consent or an `offline_access` token, still consents to it, and answers `invalid_grant` when they don't. `authserver:manage-account` is checked against the user's consent for every client but the admin console's, whatever **Consent required** says.
+A refresh can ask for the same scope as the original grant or less, never more: "Scope '...' is not recognized. The original access token does not grant the '...' permission." A refresh also checks again that the user still holds each permission and, for a client that requires consent or an `offline_access` token, still consents to it, and answers `invalid_grant` when they don't. `authserver:manage-account` is checked against the user's consent for every client but the admin console's, whatever **Ask users for consent** says.
 
 **Fix it:** send the user through the authorization request again with the wider scope.
 

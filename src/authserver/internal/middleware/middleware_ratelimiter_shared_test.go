@@ -108,7 +108,7 @@ func sharedKey(tier, key string) string {
 // credential tiers count in store, everything else in memory.
 func newSharedTestMiddleware(store credentialCounter) (*RateLimiter, *stubAuditLogger) {
 	auditLog := &stubAuditLogger{}
-	httpHelper := render.New(testTemplateFS)
+	httpHelper := render.New(testTemplateFS, nil)
 	return NewRateLimiter(stubCeremonyStore{}, httpHelper, httpHelper, auditLog, true, store, metrics.NewRegistry()), auditLog
 }
 

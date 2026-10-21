@@ -153,6 +153,7 @@ func HandleProfilePost(
 					"page":                 r.URL.Query().Get("page"),
 					"query":                r.URL.Query().Get("query"),
 					"error":                errorMessage,
+					"errorField":           render.ErrorField(err, render.ProfileErrorFields),
 				}
 
 				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_profile.html", bind)

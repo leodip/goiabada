@@ -41,7 +41,7 @@ test("a confidential client must authenticate, and a client without the grant en
   await page.goto(clientUrl(client.id, "oauth2-flows"));
   await page.locator('input[name="ropcEnabled"][value="off"]').check();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client OAuth2 flows saved successfully")).toBeVisible();
+  await expect(page.getByText("OAuth2 flows saved.")).toBeVisible();
   expectTokenError(await postToken(request, form, { headers: { Authorization: basicAuth(client.identifier, secret) } }), "unauthorized_client");
 });
 

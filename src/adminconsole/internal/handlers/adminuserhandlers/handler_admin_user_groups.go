@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -57,11 +58,14 @@ func HandleGroupsGet(
 			return
 		}
 
-		// Convert groups to map for template
-		userGroupsMap := make(map[int64]string)
+		// The groups the user belongs to, in the order the tab lists them: by identifier.
+		memberships := make([]groupMembership, 0, len(userGroups))
 		for _, grp := range userGroups {
-			userGroupsMap[grp.Id] = grp.GroupIdentifier
+			memberships = append(memberships, groupMembership{Id: grp.Id, GroupIdentifier: grp.GroupIdentifier})
 		}
+		sort.Slice(memberships, func(i, j int) bool {
+			return memberships[i].GroupIdentifier < memberships[j].GroupIdentifier
+		})
 
 		// Get all available groups
 		allGroups, err := apiClient.GetAllGroups(r.Context(), jwtInfo.TokenResponse.AccessToken)
@@ -87,8 +91,8 @@ func HandleGroupsGet(
 
 		bind := map[string]interface{}{
 			"user":              user,
-			"userGroups":        userGroupsMap,
-			"allGroups":         allGroups,
+			"memberships":       memberships,
+			"groupChoices":      render.GroupChoices(allGroups),
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,

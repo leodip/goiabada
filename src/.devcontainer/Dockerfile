@@ -74,6 +74,11 @@ RUN curl -sfLO --retry 3 --retry-delay 5 https://github.com/tailwindlabs/tailwin
 RUN chmod +x tailwindcss-linux-x64
 RUN mv tailwindcss-linux-x64 /usr/local/bin/tailwindcss
 
+# Install Node.js, the binary alone, which core/guard's script check runs acorn under
+RUN curl -sfL --retry 3 --retry-delay 5 https://nodejs.org/dist/v26.12.0/node-v26.12.0-linux-x64.tar.gz | \
+    tar -xz -C /usr/local --strip-components=1 --no-same-owner node-v26.12.0-linux-x64/bin/node && \
+    node --version
+
 RUN mkdir -p /var/lib/sqlite
 
 # Create vscode user with sudo access

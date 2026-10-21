@@ -595,7 +595,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Email is required." &&
+			return data["error"] == "Email is required." && data["errorField"] == "email" &&
 				data["layoutShowClientSection"] == true &&
 				data["layoutClientName"] == "my-app" && data["layoutHasClientLogo"] == false
 		})).Return(nil)
@@ -648,7 +648,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// ceremony id: without it a single mistyped password would end the ceremony, because the
 		// retry would name no ceremony and be refused (#79 seam 4).
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Password is required." &&
+			return data["error"] == "Password is required." && data["errorField"] == "password" &&
 				data["ceremonyId"] == testCeremonyId
 		})).Return(nil)
 
@@ -707,7 +707,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Password is required." &&
+			return data["error"] == "Password is required." && data["errorField"] == "password" &&
 				data["ceremonyId"] == testCeremonyId
 		})).Return(nil)
 
@@ -777,7 +777,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}).Return()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Authentication failed."
+			// A refusal of the pair marks neither field: which of the two was wrong is not said.
+			return data["error"] == "Authentication failed." && data["errorField"] == ""
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

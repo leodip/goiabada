@@ -19,6 +19,8 @@
 # -----------------------------------------------------------------------------
 # go:             Go language version (used in go.mod, Dockerfiles, GitHub Actions)
 # tailwind:       Tailwind CSS CLI version (devcontainer)
+# node:           Node.js, which core/guard's script check runs acorn under (devcontainer, the
+#                 test jobs' setup action)
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
 # staticcheck:    Static analyzer (devcontainer, make check)
@@ -46,6 +48,7 @@
 tools:
   go: "1.27.2"
   tailwind: "4.3.3"
+  node: "26.12.0"
   golangci-lint: "2.15.0"
   mockery: "3.8.1"
   staticcheck: "0.8.2"
@@ -54,23 +57,23 @@ tools:
   alpine: "3.24"
 
 # -----------------------------------------------------------------------------
-# Vendored web dependencies
+# Vendored dependencies
 # -----------------------------------------------------------------------------
 # Committed into the repository by ./version-manager.sh update, which downloads the
 # pinned version and records each file's SHA-256 here; no page fetches them from a CDN
-# (#542). The web packages' tests hold the committed files to these digests.
-# daisyui:            daisyUI's standalone-CLI bundle, built into both servers' main.css:
-#                     src/{authserver,adminconsole}/web/tailwindcss/daisyui.mjs, one file
-#                     in two places, from its GitHub release
+# (#542). The web packages' tests, and core/guard's for acorn, hold the committed files to
+# these digests.
 # humanize-duration:  duration formatting in the admin console:
 #                     src/adminconsole/web/static/vendor/humanize-duration/, from npm
-# cropperjs:          image cropping in the admin console, 1.x (2.x is another API):
+# cropperjs:          image cropping in the admin console, its UMD bundle, which defines
+#                     the cropper's custom elements and carries their styles:
 #                     src/adminconsole/web/static/vendor/cropperjs/, from npm
+# acorn:              the JavaScript parser core/guard's script check runs under Node:
+#                     src/core/guard/scriptcheck/acorn.js, from npm
 vendored:
-  daisyui: "5.7.50"
-  daisyui-sha256: "d69de07c7463bb1f41548e2688f88ee105cdadf9779fce5b3c47b3bfaa6be472"
   humanize-duration: "3.35.0"
   humanize-duration-sha256: "fa557682d97d4cf89e978aa3d32599206e9a6b54651aa05f6b6af84d78edefcc"
-  cropperjs: "1.6.2"
-  cropperjs-js-sha256: "6290a3fa581b17ccf4692cf3ec617a74ae65de88d9140c72d492ae9b47707efb"
-  cropperjs-css-sha256: "23679f552ce73499f817de22b5dcdd9e1e5a1e50cd9d77e34bbd31bf65a85186"
+  cropperjs: "2.3.1"
+  cropperjs-js-sha256: "f47f299818c2a37dc797dceceeb1ba4f78dc1eae7d7f8406b6256d5e53406276"
+  acorn: "8.19.0"
+  acorn-sha256: "b95392d79457d0357555c5ed3e56302d074b92dff119bcf3b44179500b10e9df"

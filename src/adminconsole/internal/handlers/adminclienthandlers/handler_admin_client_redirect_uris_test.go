@@ -186,7 +186,7 @@ func TestHandleRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.T) {
 			// templateFS is nil because JSONError renders no template. This is the real
 			// helper rather than a mock so the assertions below are on the bytes the
 			// browser receives.
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 
 			body := `{"clientId":1,"redirectURIs":["https:///evil.example/cb"]}`
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/redirect-uris",
@@ -254,7 +254,7 @@ func TestHandleRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/1/redirect-uris",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),

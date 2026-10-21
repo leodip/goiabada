@@ -38,7 +38,7 @@ type faultFormat struct {
 func faultFormats() []faultFormat {
 	return []faultFormat{
 		{name: "page", faults: PageFaults},
-		{name: "protocol", faults: func() ServerFaults { return ProtocolFaults(render.New(nil)) },
+		{name: "protocol", faults: func() ServerFaults { return ProtocolFaults(render.New(nil, nil)) },
 			body: `{"error":"server_error","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestId + `"}`},
 		{name: "api", faults: APIFaults,
 			body: `{"error_code":"INTERNAL_SERVER_ERROR","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestId + `"}`},

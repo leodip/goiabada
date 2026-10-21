@@ -146,17 +146,17 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 		{
 			name:    "negative retention",
 			days:    -1,
-			wantMsg: "Audit log retention days cannot be negative. Use 0 for infinite retention.",
+			wantMsg: "The retention can't be negative. Use 0 to keep stored events forever.",
 		},
 		{
 			name:    "retention just above the maximum",
 			days:    3651,
-			wantMsg: "Audit log retention days cannot exceed 3650 days (10 years).",
+			wantMsg: "The retention can't be more than 3650 days (10 years).",
 		},
 		{
 			name:    "retention far above the maximum",
 			days:    100000,
-			wantMsg: "Audit log retention days cannot exceed 3650 days (10 years).",
+			wantMsg: "The retention can't be more than 3650 days (10 years).",
 		},
 	}
 

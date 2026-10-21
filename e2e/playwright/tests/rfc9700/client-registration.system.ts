@@ -1,13 +1,15 @@
 // RFC 9700 at dynamic client registration (RFC 7591). Section 2.6: no http redirect URI but on
 // loopback, for any client. Section 4.15.1: a client does not choose its own client_id, which could
-// pass for a user's subject in a client credentials token. A system test because registration is a
-// global switch, put back afterwards; the clients it registers are deleted.
+// pass for a user's subject in a client credentials token. Section 4.11.2: a client anyone could
+// register is not where a declined authorization sends the user. A system test because registration
+// is a global switch, put back afterwards; the clients it registers are deleted.
 import { randomUUID } from "node:crypto";
 import type { APIRequestContext, Page } from "@playwright/test";
-import { idFromListLink } from "../../lib/admin-console";
+import { clientIdFromList, deleteClient } from "../../lib/admin-console";
+import { submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
-import { readAnswer } from "../../lib/rfc6749";
+import { authorizeEndpoint, codeRequest, emptyBrowser, readAnswer } from "../../lib/rfc6749";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 
 async function register(request: APIRequestContext, metadata: Record<string, unknown>) {
@@ -24,13 +26,7 @@ async function withRegistration(page: Page, body: (registered: string[]) => Prom
       await body(registered);
     });
   } finally {
-    for (const identifier of registered) {
-      const id = await idFromListLink(page, `${env.adminUrl}/admin/clients`, identifier, "Manage");
-      await page.goto(`${env.adminUrl}/admin/clients/${id}/delete`);
-      await page.locator('input[name="clientIdentifier"]').fill(identifier);
-      await page.getByRole("button", { name: "Delete", exact: true }).click();
-      await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
-    }
+    for (const identifier of registered) await deleteClient(page, await clientIdFromList(page, identifier));
   }
 }
 
@@ -66,5 +62,39 @@ test("a registration cannot choose its client_id: the server assigns one (sectio
     expect(answer.status, answer.text).toBe(201);
     registered.push(answer.body.client_id as string);
     expect(answer.body.client_id).not.toBe(chosen);
+  });
+});
+
+// RFC 9700 4.11.2's second attack: a client registered to point at its own host gets a user to
+// decline it, and the error redirect would deliver the browser there. The consent screen says the
+// client registered itself, and declining it ends on the auth server's page. The client is
+// confidential: one registered as public may not use an https redirect URI at all.
+test("declining a client that registered itself sends the user nowhere: the page names where it asked to send them (section 4.11.2 MUST)", async ({
+  page,
+  browser,
+  request,
+  users,
+}) => {
+  const user = await users.create();
+  await withRegistration(page, async (registered) => {
+    const answer = await register(request, { redirect_uris: [testRedirectUri], token_endpoint_auth_method: "client_secret_basic" });
+    expect(answer.status, answer.text).toBe(201);
+    const clientId = answer.body.client_id as string;
+    registered.push(clientId);
+
+    const context = await emptyBrowser(browser);
+    const tab = await context.newPage();
+    await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(clientId).params)}`);
+    await submitPassword(tab, user.email, user.password);
+    await expect(tab).toHaveURL(/\/auth\/consent/);
+    await expect(tab.getByText("This application registered itself and has not been verified.")).toBeVisible();
+    await tab.getByRole("button", { name: "Don't allow" }).click();
+
+    await expect(tab.getByRole("heading", { name: "You have not been sent anywhere" })).toBeVisible();
+    await expect(tab.getByText("e2e rfc9700", { exact: true })).toBeVisible();
+    await expect(tab.getByText(new URL(testRedirectUri).host, { exact: true })).toBeVisible();
+    await expect(tab.getByText("It registered itself with this server, so nobody here has checked who it is or where it wants to send you.")).toBeVisible();
+    expect(new URL(tab.url()).origin).toBe(env.authUrl);
+    await context.close();
   });
 });

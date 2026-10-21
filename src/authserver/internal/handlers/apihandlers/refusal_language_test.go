@@ -198,7 +198,8 @@ func TestSharedRefusals_AreInTheRequestsLanguage(t *testing.T) {
 
 // TestResourceRefusals_AreInTheRequestsLanguage covers every refusal of the resource endpoints a
 // person can reach; the missing or malformed resource id and the body that does not parse are an
-// integrator's, and stay English.
+// integrator's, and stay English. Every other refusal answers its catalog key as its error_code,
+// which the console reads the field off (#617).
 func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	system := func() *record.Resource {
 		return &record.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
@@ -244,7 +245,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "create with no identifier",
 			serve:      create(`{"resourceIdentifier":"  ","description":"d"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_required",
 			english:    "Resource identifier is required",
 			portuguese: "O identificador do recurso é obrigatório",
 		},
@@ -252,7 +253,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "create with a description past the bound",
 			serve:      create(`{"resourceIdentifier":"a-resource","description":"`+longDescription+`"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.description_too_long",
 			english:    "The description cannot exceed a maximum length of 100 characters",
 			portuguese: "A descrição não pode ter mais que 100 caracteres",
 		},
@@ -260,7 +261,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "create with an identifier in use",
 			serve:      create(`{"resourceIdentifier":"a-resource","description":"d"}`, identifierHeldBy("a-resource", ordinary())),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_in_use",
 			english:    "The resource identifier is already in use",
 			portuguese: "O identificador do recurso já está em uso",
 		},
@@ -271,7 +272,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "a-resource").Return(&record.Client{Id: 8, ClientIdentifier: "a-resource"}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_names_client",
 			english:    "The resource identifier is already in use by a client",
 			portuguese: "O identificador do recurso já está em uso por um cliente",
 		},
@@ -279,7 +280,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "update with no identifier",
 			serve:      update(ordinary(), `{"resourceIdentifier":"","description":"d"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_required",
 			english:    "Resource identifier is required",
 			portuguese: "O identificador do recurso é obrigatório",
 		},
@@ -287,7 +288,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "update with a description past the bound",
 			serve:      update(ordinary(), `{"resourceIdentifier":"a-resource","description":"`+longDescription+`"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.description_too_long",
 			english:    "The description cannot exceed a maximum length of 100 characters",
 			portuguese: "A descrição não pode ter mais que 100 caracteres",
 		},
@@ -296,7 +297,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve: update(ordinary(), `{"resourceIdentifier":"other-resource","description":"d"}`,
 				identifierHeldBy("other-resource", &record.Resource{Id: 6, ResourceIdentifier: "other-resource"})),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_in_use",
 			english:    "The resource identifier is already in use",
 			portuguese: "O identificador do recurso já está em uso",
 		},
@@ -307,7 +308,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-client").Return(&record.Client{Id: 8, ClientIdentifier: "named-like-a-client"}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_names_client",
 			english:    "The resource identifier is already in use by a client",
 			portuguese: "O identificador do recurso já está em uso por um cliente",
 		},
@@ -315,7 +316,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "update renaming the system resource",
 			serve:      update(system(), `{"resourceIdentifier":"renamed-system","description":"d"}`, identifierHeldBy("renamed-system", nil)),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.system_level_identifier_fixed",
 			english:    "The identifier of a system-level resource cannot be changed.",
 			portuguese: "O identificador de um recurso em nível de sistema não pode ser alterado.",
 		},
@@ -331,7 +332,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				return rr
 			},
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.system_level_delete_not_allowed",
 			english:    "Trying to delete a system level resource",
 			portuguese: "Tentativa de excluir um recurso em nível de sistema",
 		},
@@ -340,7 +341,8 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 
 // TestResourcePermissionRefusals_AreInTheRequestsLanguage covers every refusal of the resource
 // permissions save a person can reach; the resource id, the body and the missing
-// expectedPermissions are an integrator's, and stay English.
+// expectedPermissions are an integrator's, and stay English. Every other refusal answers its
+// catalog key as its error_code (#617).
 func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	stored := resourcePermsStored()
 	loaded := loadedEntries(stored)
@@ -383,7 +385,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				{Id: 31, PermissionIdentifier: "read-again", Description: "Read"},
 			}, loaded),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.permission.duplicate_ids",
 			english:    "Duplicate permission IDs in request are not allowed",
 			portuguese: "IDs de permissão duplicados não são permitidos na requisição",
 		},
@@ -391,7 +393,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "an entry with no identifier",
 			serve:      save("a-resource", nil, []api.ResourcePermissionUpsert{{PermissionIdentifier: " ", Description: "d"}}, loaded),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.permission.identifier_required",
 			english:    "Permission identifier is required",
 			portuguese: "O identificador da permissão é obrigatório",
 		},
@@ -399,7 +401,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "an entry with a description past the bound",
 			serve:      save("a-resource", nil, []api.ResourcePermissionUpsert{{PermissionIdentifier: "read", Description: strings.Repeat("a", 101)}}, loaded),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.admin_resource_permissions.description_too_long",
 			english:    "The description cannot exceed a maximum length of 100 characters.",
 			portuguese: "A descrição não pode ter mais que 100 caracteres.",
 		},
@@ -410,7 +412,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				{PermissionIdentifier: "audit", Description: "Audit again"},
 			}, loaded),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.permission.duplicated",
 			english:    "Permission audit is duplicated.",
 			portuguese: "A permissão audit está duplicada.",
 		},
@@ -418,7 +420,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "the system resource's list without manage",
 			serve:      save(builtin.AuthServerResourceIdentifier, builtIns, withoutManage, loadedEntries(builtIns)),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.permission.built_in_deleted",
 			english:    "Built-in permission 'manage' cannot be deleted.",
 			portuguese: "A permissão nativa 'manage' não pode ser excluída.",
 		},
@@ -426,7 +428,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "the system resource's list with manage renamed",
 			serve:      save(builtin.AuthServerResourceIdentifier, builtIns, manageRenamed, loadedEntries(builtIns)),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.permission.built_in_renamed",
 			english:    "Built-in permission 'manage' cannot be renamed.",
 			portuguese: "A permissão nativa 'manage' não pode ser renomeada.",
 		},
@@ -434,7 +436,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "a new permission reusing a stored identifier",
 			serve:      save("a-resource", stored, []api.ResourcePermissionUpsert{{PermissionIdentifier: "read", Description: "Read again"}}, loaded),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.permission.identifier_in_use",
 			english:    "Permission identifier read is already in use.",
 			portuguese: "O identificador de permissão read já está em uso.",
 		},
