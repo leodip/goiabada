@@ -96,6 +96,10 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	// Auth routes
 	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
+		// A browser that reaches the callback by GET -- a bookmark, the history, a pasted address --
+		// gets the sign-in error page at the 405 it arrives with, rather than the empty body the
+		// POST-only registration answered every other method with (#632 item 3).
+		r.Get("/callback", handlers.HandleAuthCallbackGet(httpHelper))
 		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient))
 		// The confirmation page is the GET the menu's link arrives at; the issuer-change redirect
 		// arrives with its tokens already cleared and is sent home. The POST answers the page,
