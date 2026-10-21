@@ -166,8 +166,8 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		// enrollment and whose clear is therefore a no-op. Putting it here rather than at the account
 		// API's own enable branch is what makes "an enabled authenticator has no pending seed behind
 		// it" a property of the transaction rather than of one caller (#247).
-		if err := db.ClearPendingOTPEnrollment(ctx, tx, user.Id); err != nil {
-			return err
+		if clearErr := db.ClearPendingOTPEnrollment(ctx, tx, user.Id); clearErr != nil {
+			return clearErr
 		}
 		// The rebind clears the consecutive-failure count, in the same transaction as the
 		// establish: the count disables the authenticator at
