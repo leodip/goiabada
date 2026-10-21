@@ -61,7 +61,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	// user page both route the deletion through revocation.RevokeOnConsentWithdrawalTx;
 	// calling it here runs the identical transaction those handlers do, without minting
 	// the Account API token the endpoint itself would ask for.
-	_, err := revocation.RevokeOnConsentWithdrawalTx(context.Background(), database, consent.UserId, consent.ClientId,
+	err := revocation.RevokeOnConsentWithdrawalTx(context.Background(), database, consent.UserId, consent.ClientId,
 		func(tx *sql.Tx) error {
 			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
 		})

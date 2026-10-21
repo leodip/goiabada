@@ -117,7 +117,7 @@ func HandleUserConsentDelete(
 		// The refresh arm consults a stored consent only when the client has Consent required
 		// on or the grant is an offline one, so deleting the row alone would leave a
 		// once-consented client's grant standing (#622).
-		_, err = revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
+		err = revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
 			func(tx *sql.Tx) error {
 				return database.DeleteUserConsent(r.Context(), tx, consentId)
 			})

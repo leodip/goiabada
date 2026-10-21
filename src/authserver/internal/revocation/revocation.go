@@ -645,21 +645,16 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // family records are written or found already written, and the sweep reads its rows
 // afresh on each attempt.
 //
-// The returned JTIs are the ones this call TRANSITIONED from live to revoked, per
-// RevokeRefreshTokens. An empty list means there was nothing live to revoke, which is
-// what a second withdrawal of the same consent finds.
-//
 // The audit events are the CALLER's, unchanged: EventDeletedOwnUserConsent and
 // EventDeletedUserConsent keep their payloads, following decision 9, which left
 // EventDeletedUserSession alone when TerminateUserSessionTx was added beside it.
 func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64, clientId int64,
-	withdraw func(tx *sql.Tx) error) ([]string, error) {
+	withdraw func(tx *sql.Tx) error) error {
 
 	if withdraw == nil {
-		return nil, errs.New("revoking on a consent withdrawal requires the withdrawal's own write")
+		return errs.New("revoking on a consent withdrawal requires the withdrawal's own write")
 	}
 
-	var revokedJtis []string
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := withdraw(tx); err != nil {
 			return err
@@ -674,17 +669,10 @@ func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64,
 			return err
 		}
 
-		jtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
-		if err != nil {
-			return err
-		}
-		revokedJtis = jtis
-		return nil
+		_, err = RevokeRefreshTokens(ctx, db, tx, tokens)
+		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	return revokedJtis, nil
+	return err
 }
 
 // ClientGrantResult reports what revoking one client's grants actually did. It is
