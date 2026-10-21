@@ -222,8 +222,8 @@ func TestInternalCAFile_KeepsTheSystemRootsBesideTheNamedCA(t *testing.T) {
 // that only GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE names, with no SSL_CERT_FILE in the child's
 // environment. main's own token grant must reach it, or the console never listens; and a page
 // that reads the settings and loads a session, a returning browser's sign-in redirect, must reach
-// the settings endpoint and the session endpoint. A main handing any of the three clients nil instead of the
-// pool sends that request under the system roots alone, and the peer never sees it.
+// the settings endpoint and the session endpoint. A main handing any of the three clients nil
+// instead of the pool sends that request under the system roots alone, and the peer never sees it.
 func TestMain_HandsTheInternalRootsToEveryClientItBuilds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
 	defer cancel()

@@ -227,8 +227,9 @@ func (w *Worker) reapAuthorizeRequests(ctx context.Context) {
 // produce rows as fast as it can send requests (#504). The admin console writes none of
 // these: its sign-in handshake rides in a sealed cookie until the callback creates the
 // authenticated session (#620). A pre-authentication session stops being usable after
-// thirty minutes, but on the twelve hour claim it would go on EXISTING for up to twelve, and a sustained hundred requests a second would leave about 4.3 million rows
-// waiting for one enormous DELETE. Every five minutes puts the physical bound below the
+// thirty minutes, but on the twelve hour claim it would go on EXISTING for up to twelve,
+// and a sustained hundred requests a second would leave about 4.3 million rows waiting for
+// one enormous DELETE. Every five minutes puts the physical bound below the
 // logical one, which is the relationship the thirty minute lifetime was argued on, and
 // each sweep then deletes five minutes of accumulation rather than half a day's.
 //

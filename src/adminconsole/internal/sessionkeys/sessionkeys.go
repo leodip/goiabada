@@ -1,18 +1,18 @@
-// Package sessionkeys names the keys of the admin console's browser session. Every value here is
-// stored data: a live session carries these spellings, so renaming one signs every administrator
-// out at deploy, and a sign-in in flight across it fails at the callback. Request-scoped values are
-// not session keys and live in reqctx (#440).
+// Package sessionkeys names the keys of the admin console's browser session and of its sealed
+// sign-in handshake. Every value here is stored data. Request-scoped values are not session keys
+// and live in reqctx (#440).
 //
-// They name entries in the admin console's own browser session, written and read by
-// this process alone: the authenticated-session key with the access token's recorded
-// expiry beside it. The auth server stores that session server-side but never opens it,
-// so there is nothing for the two binaries to agree on beyond the session's name, which
-// core/builtin declares (#385).
+// Two name entries in the admin console's own browser session, written and read by this process
+// alone: the authenticated-session key with the access token's recorded expiry beside it. A live
+// session carries these spellings, so renaming one signs every administrator out at deploy. The
+// auth server stores that session server-side but never opens it, so there is nothing for the two
+// binaries to agree on beyond the session's name, which core/builtin declares (#385).
 //
-// The other six name the values the OAuth ceremony carries between the authorize redirect
-// and the callback. Since #620 they ride in the sealed handshake cookie rather than the
-// session, and they stay declared here because a sign-in in flight across a deploy reads
-// them back at the callback.
+// The other six name the values the OAuth ceremony carries between the authorize redirect and the
+// callback. Since #620 they ride in the sealed handshake cookie rather than the session, so
+// renaming one fails only the sign-ins in flight at the deploy. They stay declared here because
+// they key the sealed map, and because the callback deletes the stale copies a session written
+// before #620 can still hold.
 package sessionkeys
 
 // JWT is the authenticated-session key. Its string value, like every one here, is the

@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	sessionstoremocks "github.com/leodip/goiabada/core/sessionstore/mocks"
@@ -42,7 +43,8 @@ func (c *createCountingBackend) Create(ctx context.Context, id string, data []by
 }
 
 // The real AuthHelper over the real store: anonymous requests to the console's pages each start a
-// sign-in and set the handshake cookie, and not one of them creates a row. The cookie opens to the handshake the redirect sent.
+// sign-in and set the handshake cookie, and not one of them creates a row. The cookie opens to the
+// handshake the redirect sent.
 func TestRequiresScope_AnAnonymousRequestWritesNoRow(t *testing.T) {
 	gob.Register(oauth.TokenResponse{})
 	backend := &createCountingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
@@ -153,6 +155,113 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 			// The redirect itself is the mock's to answer, so the recorded target is the
 			// assertion: what the sign-in was handed to seal for the callback.
 			mockAuthHelper.AssertExpectations(t)
+		})
+	}
+}
+
+// Through the real AuthHelper and store: a target of exactly the bound never fails the sign-in,
+// whatever bytes fill it. '&' and '<', which an HTML-escaping encoder widened to six bytes each and
+// so past the cookie's bound, pass through whole; invalid UTF-8 costs three, its replacement rune,
+// which is what the callback then redirects to. Each answers the redirect with a handshake cookie
+// that opens (#620).
+func TestRequiresScope_ATargetWithinTheBoundAlwaysSeals(t *testing.T) {
+	gob.Register(oauth.TokenResponse{})
+	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.JWT, true,
+		sessionstore.BrowserSessionCookie, sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		}, nil)
+	require.NoError(t, err)
+	const baseURL = "https://console.example"
+	mw := NewJWT(store, nil, builtin.AdminConsoleSessionName, nil, nil,
+		oauthclient.NewAuthHelper(store, baseURL, "https://auth.example"),
+		stubErrorRenderer{}, baseURL, builtin.AdminConsoleClientIdentifier)
+	handler := mw.RequiresScope([]string{"required:scope"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("an anonymous request never reaches the page it asked for")
+	}))
+
+	padWith := func(pad string) string {
+		prefix := "/admin/clients?pad="
+		return prefix + strings.Repeat(pad, redirectBackMaxLen-len(prefix))
+	}
+	testCases := []struct {
+		name         string
+		requestURI   string
+		redirectBack string
+	}{
+		{"padded with '&'", padWith("&"), baseURL + padWith("&")},
+		{"padded with '<'", padWith("<"), baseURL + padWith("<")},
+		{"padded with invalid UTF-8", padWith("\xff"), baseURL + strings.ReplaceAll(padWith("\xff"), "\xff", "\uFFFD")},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.requestURI, nil)
+			require.Len(t, req.URL.RequestURI(), redirectBackMaxLen, "the target is exactly the bound")
+
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusFound, w.Code)
+			assert.True(t, strings.HasPrefix(w.Header().Get("Location"), "https://auth.example/auth/authorize?"))
+			cookies := w.Result().Cookies()
+			require.Len(t, cookies, 1, "one handshake cookie, from the seal that succeeded")
+			handshake, err := store.OpenCookieValues(oauthclient.SignInHandshakeCookie, cookies[0].Value)
+			require.NoError(t, err)
+			assert.Equal(t, tc.redirectBack, handshake[sessionkeys.RedirectBack])
+		})
+	}
+}
+
+// The fallback's branches, with the helper mocked: a seal refused for its length is tried once
+// more with the home page's target; any other refusal, and a refusal of the home page's target
+// itself, is the 500 it was.
+func TestRequiresScope_FallsBackToTheHomePageWhenTheSealIsTooLong(t *testing.T) {
+	tooLong := errs.Wrap(sessionstore.ErrCookieValuesTooLong, "unable to seal the cookie values")
+	testCases := []struct {
+		name       string
+		requestURI string
+		first      error
+		retried    bool
+		retry      error
+		wantStatus int
+	}{
+		{"too long: the home page's target is sealed instead", "/admin/clients", tooLong, true, nil, http.StatusOK},
+		{"too long again for the home page: 500", "/admin/clients", tooLong, true, tooLong, http.StatusInternalServerError},
+		{"the home page's own target too long: no second try", "/", tooLong, false, nil, http.StatusInternalServerError},
+		{"any other refusal: no second try", "/admin/clients", assert.AnError, false, nil, http.StatusInternalServerError},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockAuthHelper := new(middlewaremocks.AuthHelper)
+			mw := NewJWT(new(sessionstoremocks.Store), nil, "test-session", nil, nil, mockAuthHelper,
+				stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
+
+			jwtInfo := oauthclient.JwtInfo{}
+			mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
+			mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
+			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier,
+				mock.AnythingOfType("string"), "http://localhost:9091"+tc.requestURI).Return(tc.first).Once()
+			if tc.retried {
+				mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier,
+					mock.AnythingOfType("string"), "http://localhost:9091/").Return(tc.retry).Once()
+			}
+
+			req := httptest.NewRequest(http.MethodGet, tc.requestURI, nil)
+			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+			rr := httptest.NewRecorder()
+			mw.RequiresScope([]string{"required:scope"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Error("an anonymous request never reaches the page it asked for")
+			})).ServeHTTP(rr, req)
+
+			// The mocked helper writes nothing, so a recorder left at 200 is a sign-in that
+			// went ahead, and 500 is the error renderer's.
+			assert.Equal(t, tc.wantStatus, rr.Code)
+			mockAuthHelper.AssertExpectations(t)
+			calls := 1
+			if tc.retried {
+				calls = 2
+			}
+			mockAuthHelper.AssertNumberOfCalls(t, "RedirToAuthorize", calls)
 		})
 	}
 }

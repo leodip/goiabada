@@ -91,10 +91,12 @@ type JWT struct {
 }
 
 // redirectBackMaxLen bounds the path and query the sign-in arm hands RedirToAuthorize as its
-// return target. The request line is bounded only by the console's 64 KiB header limit, and the
-// handshake cookie the target is sealed into is bounded far below that, so a target past this
-// would fail the seal and answer 500; no return target a page of this console produces approaches
-// the bound (#620).
+// return target. The request line is bounded only by the console's 64 KiB header limit and the
+// handshake cookie the target is sealed into far below that, so a target past this is not sealed
+// at all; no return target a page of this console produces approaches the bound. Within it, every
+// byte a request target can carry costs at most three in the sealed encoding, so the target fits
+// the cookie; a seal refused for its length all the same, as under a long enough base URL, falls
+// back to the home page too (#620).
 const redirectBackMaxLen = 512
 
 // NewJWT constructs a DB-free JWT middleware. freshSessions re-reads the session under the
@@ -558,17 +560,23 @@ func (m *JWT) RequiresScope(
 					// writes no session row, so an anonymous request costs the auth server
 					// nothing here (#620). The return URL is bounded so the cookie it is
 					// sealed into no longer tracks the request line's length.
+					home := m.baseURL + "/"
 					redirectBack := m.baseURL + r.URL.RequestURI()
 					if len(r.URL.RequestURI()) > redirectBackMaxLen {
 						// No page this console renders approaches the bound in path and
 						// query, so a line past it is not a return target, and the home
 						// page — the one destination that requires no sign-in — takes the
 						// browser instead (#620).
-						redirectBack = m.baseURL + "/"
+						redirectBack = home
 					}
-					err := m.authHelper.RedirToAuthorize(w, r, m.clientID,
-						m.buildScopeString(scopesAnyOf),
-						redirectBack)
+					scope := m.buildScopeString(scopesAnyOf)
+					err := m.authHelper.RedirToAuthorize(w, r, m.clientID, scope, redirectBack)
+					if errors.Is(err, sessionstore.ErrCookieValuesTooLong) && redirectBack != home {
+						// A target within the bound that still did not fit the cookie is not a
+						// page's either, so the home page again. A refused seal has written
+						// neither the cookie nor the redirect (#620).
+						err = m.authHelper.RedirToAuthorize(w, r, m.clientID, scope, home)
+					}
 					if err != nil {
 						m.errorRenderer.InternalServerError(w, r,
 							errs.Wrap(err, "unable to redirect to authorize in RequiresScope middleware"))

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -173,9 +174,10 @@ func (h *callbackHarness) seedSession(values map[string]any) *http.Cookie {
 	return cookies[0]
 }
 
-// assertHandshakeRemoved asserts the answer's cookies: the handshake's removal when the browser
-// brought one, nothing when it did not, and the new session's cookie beside it when wantSession.
-func (h *callbackHarness) assertHandshakeRemoved(w *httptest.ResponseRecorder, brought, wantSession bool) []*http.Cookie {
+// assertHandshakeRemoved asserts the answer's cookies: the handshake's removal when removed, which
+// is never when the browser brought none, nothing for it when not, and the new session's cookie
+// beside it when wantSession.
+func (h *callbackHarness) assertHandshakeRemoved(w *httptest.ResponseRecorder, removed, wantSession bool) []*http.Cookie {
 	h.t.Helper()
 	handshakeName := h.store.CookieName(oauthclient.SignInHandshakeCookie)
 	var removals, others []*http.Cookie
@@ -186,12 +188,12 @@ func (h *callbackHarness) assertHandshakeRemoved(w *httptest.ResponseRecorder, b
 			others = append(others, c)
 		}
 	}
-	if brought {
+	if removed {
 		require.Len(h.t, removals, 1, "the handshake is removed")
 		assert.Equal(h.t, -1, removals[0].MaxAge)
 		assert.Empty(h.t, removals[0].Value)
 	} else {
-		assert.Empty(h.t, removals, "no removal of a handshake the browser did not bring")
+		assert.Empty(h.t, removals, "the handshake is left as the browser holds it")
 	}
 	if wantSession {
 		require.Len(h.t, others, 1, "the signed-in session's cookie")
@@ -257,8 +259,8 @@ func callbackForm() url.Values {
 }
 
 // assertRefused asserts the page a refusal rendered, the one record it logged, and that it wrote
-// nothing: no row, and no cookie in the answer but the removal of the handshake it was brought.
-func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, brought bool,
+// nothing: no row, and no cookie in the answer but the handshake's removal when removed.
+func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, removed bool,
 	want signInRefusal, wantLevel slog.Level) map[string]interface{} {
 	h.t.Helper()
 
@@ -286,7 +288,7 @@ func (h *callbackHarness) assertRefused(w *httptest.ResponseRecorder, brought bo
 		}
 	}
 
-	h.assertHandshakeRemoved(w, brought, false)
+	h.assertHandshakeRemoved(w, removed, false)
 	assert.Zero(h.t, h.backend.creates, "a refusal writes no row")
 	return bind
 }
@@ -329,8 +331,12 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 		name string
 		// cookies builds what the browser brings; nil brings the whole handshake.
 		cookies func(h *callbackHarness) []*http.Cookie
-		// brought is whether cookies brings a handshake cookie, which the answer removes.
-		brought         bool
+		// brought is whether cookies brings a handshake cookie, which the answer removes unless
+		// keepsHandshake.
+		brought bool
+		// keepsHandshake is a posted state absent or another, which leaves the handshake: it may be
+		// a newer sign-in's, which would still finish.
+		keepsHandshake  bool
 		form            url.Values
 		want            signInRefusal
 		wantCode        string
@@ -400,14 +406,16 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 			want: refusalNoSession,
 		},
 		{
-			name: "the posted state is another",
-			form: url.Values{"state": {"another-state"}, "code": {callbackCode}},
-			want: refusalSession,
+			name:           "the posted state is another",
+			form:           url.Values{"state": {"another-state"}, "code": {callbackCode}},
+			want:           refusalSession,
+			keepsHandshake: true,
 		},
 		{
-			name: "no posted state",
-			form: url.Values{"code": {callbackCode}},
-			want: refusalSession,
+			name:           "no posted state",
+			form:           url.Values{"code": {callbackCode}},
+			want:           refusalSession,
+			keepsHandshake: true,
 		},
 		{
 			name: "neither a code nor an error",
@@ -447,7 +455,8 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 			name: "an error the state does not vouch for is not shown",
 			form: url.Values{"state": {"another-state"}, "error": {"access_denied"},
 				"error_description": {"Planted text."}},
-			want: refusalSession,
+			want:           refusalSession,
+			keepsHandshake: true,
 		},
 	}
 
@@ -467,7 +476,7 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 
 			w := h.serve(exchanger, cookies, tc.form)
 
-			bind := h.assertRefused(w, brought, tc.want, slog.LevelWarn)
+			bind := h.assertRefused(w, brought && !tc.keepsHandshake, tc.want, slog.LevelWarn)
 			assert.False(t, exchanger.called, "refused before the code is spent")
 			assert.Equal(t, tc.wantCode, bind["code"])
 			assert.Equal(t, tc.wantDescription, bind["description"])
@@ -692,4 +701,55 @@ func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Two tabs signing in at once share the browser's one handshake cookie: tab B's redirect
+// overwrites tab A's. Tab A's callback, arriving first, is refused for the mismatch and leaves the
+// cookie, so tab B's callback still signs in, in the one row a sign-in writes. Played through the
+// real AuthHelper and a cookie jar, as the browser would hold the cookie (#620).
+func TestHandleAuthCallbackPost_ARefusedTabLeavesAnotherTabsSignIn(t *testing.T) {
+	h := newCallbackHarness(t)
+	handlertest.RefuseInternalServerError(t, h.httpHelper)
+	handlertest.ExpectRender(h.httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
+
+	console, err := url.Parse("http://console.example")
+	require.NoError(t, err)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	helper := oauthclient.NewAuthHelper(h.store, console.String(), "http://auth.example")
+
+	// startSignIn runs RedirToAuthorize into the jar and returns the state it sent.
+	startSignIn := func(redirectBack string) string {
+		w := httptest.NewRecorder()
+		require.NoError(t, helper.RedirToAuthorize(w, httptest.NewRequest(http.MethodGet, "/admin", nil),
+			builtin.AdminConsoleClientIdentifier, callbackRequestedScope, redirectBack))
+		jar.SetCookies(console, w.Result().Cookies())
+		location, parseErr := url.Parse(w.Header().Get("Location"))
+		require.NoError(t, parseErr)
+		return location.Query().Get("state")
+	}
+	stateA := startSignIn(console.String() + "/admin/clients")
+	stateB := startSignIn(console.String() + "/admin/users")
+	require.NotEqual(t, stateA, stateB)
+
+	handshakeB, err := h.store.OpenCookieValues(oauthclient.SignInHandshakeCookie, jar.Cookies(console)[0].Value)
+	require.NoError(t, err)
+	sentB := sha256.Sum256([]byte(handshakeB[sessionkeys.Nonce]))
+	response := h.tokenResponse()
+	response.IdToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(sentB[:]) })
+	exchanger := &recordingExchanger{response: response}
+
+	wA := h.serve(exchanger, jar.Cookies(console), url.Values{"state": {stateA}, "code": {"tab-a-code"}})
+	jar.SetCookies(console, wA.Result().Cookies())
+	h.assertRefused(wA, false, refusalSession, slog.LevelWarn)
+	assert.False(t, exchanger.called, "tab A's code is not spent")
+
+	wB := h.serve(exchanger, jar.Cookies(console), url.Values{"state": {stateB}, "code": {"tab-b-code"}})
+
+	require.Equal(t, http.StatusFound, wB.Code)
+	assert.Equal(t, console.String()+"/admin/users", wB.Header().Get("Location"))
+	assert.Equal(t, "tab-b-code", exchanger.code)
+	assert.Equal(t, handshakeB[sessionkeys.CodeVerifier], exchanger.codeVerifier)
+	h.assertHandshakeRemoved(wB, true, true)
+	assert.Equal(t, 1, h.backend.creates, "one row, tab B's signed-in administrator's")
 }

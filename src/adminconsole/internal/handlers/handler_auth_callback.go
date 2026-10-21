@@ -84,11 +84,14 @@ type codeExchanger interface {
 //
 // The handshake arrives in its own sealed cookie rather than in the session, so the session row
 // this handler writes is the console's first, created when there is a signed-in administrator to
-// store in it (#620). Every answer to a request that brought that cookie removes it, a refusal's
-// too: a handshake is good for one callback, and one that was refused would only be refused again.
-// A request that did not bring it is not answered with a removal, because this route is
-// CSRF-exempt and a cross-site post never carries the Lax cookie, so a removal there would let
-// any other site end a sign-in in flight.
+// store in it (#620). The answer removes that cookie when it is spent: when it does not open or
+// does not hold every value, since it would only be refused again, and once the posted state has
+// matched it, whatever follows, since a handshake is good for one callback. A posted state that is
+// absent or another leaves it, because the browser holds one handshake cookie and a second sign-in
+// overwrites the first's: the callback of the sign-in it overwrote is refused for the mismatch, and
+// the cookie is the newer sign-in's, which would still finish. A request that did not bring it is
+// not answered with a removal either, because this route is CSRF-exempt and a cross-site post never
+// carries the Lax cookie, so a removal there would let any other site end a sign-in in flight.
 func HandleAuthCallbackPost(
 	httpHelper HttpHelper,
 	httpSession callbackSessionStore,
@@ -98,15 +101,7 @@ func HandleAuthCallbackPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		handshakeCookieName := httpSession.CookieName(oauthclient.SignInHandshakeCookie)
 		handshakeCookie, noCookieErr := r.Cookie(handshakeCookieName)
-		if noCookieErr == nil {
-			http.SetCookie(w, httpSession.DeletionCookie(handshakeCookieName))
-		}
-
-		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
-			return
-		}
+		removeHandshake := func() { http.SetCookie(w, httpSession.DeletionCookie(handshakeCookieName)) }
 
 		// A browser that did not bring the sign-in's handshake back -- no cookie, or one that
 		// did not open -- has causes the administrator can act on and an operator can fix: a
@@ -120,6 +115,7 @@ func HandleAuthCallbackPost(
 		}
 		handshake, err := httpSession.OpenCookieValues(oauthclient.SignInHandshakeCookie, handshakeCookie.Value)
 		if err != nil {
+			removeHandshake()
 			refuseSignIn(httpHelper, w, r, refusalNoSession, errs.Wrap(err, "the sign-in handshake cookie did not open"))
 			return
 		}
@@ -127,6 +123,7 @@ func HandleAuthCallbackPost(
 			if handshake[key] == "" {
 				// A handshake that came back but does not hold every value is the ordinary
 				// stale case (#427 decision 11).
+				removeHandshake()
 				refuseSignIn(httpHelper, w, r, refusalSession, errs.Errorf("the handshake holds no %s", key))
 				return
 			}
@@ -144,6 +141,15 @@ func HandleAuthCallbackPost(
 		if r.PostFormValue("state") != handshake[sessionkeys.State] {
 			refuseSignIn(httpHelper, w, r, refusalSession,
 				errs.New("the posted state is not the one this sign-in sent"))
+			return
+		}
+		removeHandshake()
+
+		// Read once the state has matched, so a session that cannot be read spends the handshake
+		// too, and still before the code is.
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 

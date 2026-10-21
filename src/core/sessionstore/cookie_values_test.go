@@ -1,6 +1,9 @@
 package sessionstore
 
 import (
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -83,6 +86,25 @@ func TestCookieValues_OpensNothingElse(t *testing.T) {
 		assert.True(t, session.IsNew)
 		assert.Equal(t, loadsBefore, backend.loads, "it never names a row")
 	})
+
+	// The rows above that refuse a session cookie or a stored blob would refuse it at the JSON
+	// decode as well, so they cannot see the values key collapsing onto either of the other two.
+	// These open and seal under the other keys directly, under the same name, so only the key
+	// separates them.
+	t.Run("the values key is neither the cookie key nor the data key", func(t *testing.T) {
+		for purpose, aead := range map[string]cipher.AEAD{"cookie": store.current.cookie, "data": store.current.data} {
+			_, err := open(aead, valuesTestName, sealed)
+			require.Error(t, err, "a values cookie opens under the %s key", purpose)
+
+			plaintext, err := json.Marshal(valuesTestValues())
+			require.NoError(t, err)
+			forged, err := seal(rand.Reader, aead, valuesTestName, plaintext)
+			require.NoError(t, err)
+			opened, err := store.OpenCookieValues(valuesTestName, forged)
+			require.Error(t, err, "what the %s key seals opens as values", purpose)
+			assert.Nil(t, opened)
+		}
+	})
 }
 
 // saveNewNamed stores an empty session under name and returns its cookie.
@@ -116,7 +138,7 @@ func TestCookieValues_RefusesAValuePastTheBound(t *testing.T) {
 	store := newTestStore(newFakeBackend(), false)
 
 	_, err := store.SealCookieValues(valuesTestName, map[string]string{"RedirectBack": strings.Repeat("a", MaxCookieValuesBytes)})
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrCookieValuesTooLong, "a caller can tell a seal refused for its length")
 	assert.Contains(t, err.Error(), "too long")
 
 	// The largest value that fits opens, and one byte more does not, even though it would
@@ -128,6 +150,26 @@ func TestCookieValues_RefusesAValuePastTheBound(t *testing.T) {
 	_, err = store.OpenCookieValues(valuesTestName, atBound+"A")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "too long")
+}
+
+// The encoding does not HTML-escape: <, > and & cost a byte each, as a letter does, rather than
+// json.Marshal's six, so a caller bounding a value in bytes bounds what it seals. They still round
+// trip.
+func TestCookieValues_EncodesWithoutHTMLEscaping(t *testing.T) {
+	store := newTestStore(newFakeBackend(), false)
+	sealedLength := func(value string) int {
+		sealed, err := store.SealCookieValues(valuesTestName, map[string]string{"RedirectBack": value})
+		require.NoError(t, err)
+		opened, err := store.OpenCookieValues(valuesTestName, sealed)
+		require.NoError(t, err)
+		assert.Equal(t, value, opened["RedirectBack"])
+		return len(sealed)
+	}
+
+	letters := sealedLength(strings.Repeat("a", 300))
+	for _, c := range []string{"<", ">", "&"} {
+		assert.Equal(t, letters, sealedLength(strings.Repeat(c, 300)), "%q costs what a letter does", c)
+	}
 }
 
 // sealOfLength seals a value whose sealed form is exactly n bytes, by growing the plaintext one

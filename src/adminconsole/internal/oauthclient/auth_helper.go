@@ -15,9 +15,9 @@ import (
 // the authorize redirect to the callback: the six values RedirToAuthorize mints, sealed by the
 // session store under keys of their own. The handshake used to be parked in a fresh browser
 // session, which cost the auth server a row for every anonymous request to /admin or /account,
-// at no limit; it is a kilobyte or so sealed, written once and read once, and its safety rests on the posted state
-// matching it and the code being bound to its verifier, not on where it is kept. So the console
-// writes no row until the callback has a signed-in administrator to store (#620).
+// at no limit; it is a kilobyte or so sealed, written once and read once, and its safety rests on
+// the posted state matching it and the code being bound to its verifier, not on where it is kept.
+// So the console writes no row until the callback has a signed-in administrator to store (#620).
 const SignInHandshakeCookie = "adminconsole-signin"
 
 // handshakeSealer is what RedirToAuthorize calls on the session store: seal the handshake and
