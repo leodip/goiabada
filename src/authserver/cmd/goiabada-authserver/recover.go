@@ -7,10 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -46,10 +48,15 @@ is a database whose schema is not the one this binary carries.
 
 Connection details come from the GOIABADA_DB_* environment variables or the --db-* flags
 (--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create,
-which recover reads as false whatever it is given, since it never creates a database, the pool's
---db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and --db-conn-max-idle-time, and the connection's --db-tls-mode, --db-tls-ca-file,
---db-tls-client-cert-file, --db-tls-client-key-file and --db-tls-server-name), given before or after recover. A flag after recover overrides the same flag before it. Every other
-flag goes before recover.`
+the pool's --db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and
+--db-conn-max-idle-time, and the connection's --db-tls-mode, --db-tls-ca-file,
+--db-tls-client-cert-file, --db-tls-client-key-file and --db-tls-server-name), given before or
+after recover. A flag after recover overrides the same flag before it. Every other flag goes
+before recover.
+
+On MySQL, PostgreSQL and SQL Server, recover reads --db-create and GOIABADA_DB_CREATE as false,
+so a database that does not exist is refused as missing. SQLite follows its DSN, which creates a
+missing file unless it is a file: URI with mode=rw.`
 
 // readRecoverCommand reads the arguments after `recover` into the invocation it runs, and the new
 // password from stdin when --password-stdin asks for it, or writes the refusal to stderr and
@@ -115,10 +122,17 @@ func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, stdout
 	// (#386).
 	ctx := context.Background()
 
-	// A recovery never creates the database it names, whatever --db-create or GOIABADA_DB_CREATE
-	// say, which default to creating it: a new database holds no user to recover, so a mistyped
-	// name would leave an empty database on the server behind a refusal saying only that it was
-	// never migrated. Not created, it is refused as missing. SQLite reads no such setting.
+	// A recovery never creates a server database, whatever --db-create or GOIABADA_DB_CREATE say,
+	// which default to creating it: a new database holds no user to recover, so a mistyped name
+	// would leave an empty database on the server behind a refusal saying only that it was never
+	// migrated. Not created, it is refused as missing. SQLite reads no such setting: its DSN
+	// decides whether a missing file is created. The engine records that creation is disabled,
+	// naming the setting, so the command says first that it turned creation off, and what the
+	// setting was, so that record is not read as the operator's choice.
+	if dialect, dialectErr := data.ParseDialect(inv.database.Type); dialectErr == nil && dialect != data.SQLite {
+		slog.InfoContext(ctx, "recover never creates a server database, so it must already exist",
+			"setting", "GOIABADA_DB_CREATE", "configured", inv.database.Create)
+	}
 	inv.database.Create = false
 	database, err := open(ctx, &inv.database, false)
 	if err != nil {

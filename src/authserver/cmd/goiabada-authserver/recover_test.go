@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/recovery"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
 // recoverAuditRecorder is runRecover's audit logger in these tests: the events and payloads are
@@ -337,46 +339,80 @@ func TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened(t *testing.T) 
 	assert.Equal(t, manage.Id, grants[0].PermissionId)
 }
 
-// TestRecoverCommand_NeverCreatesTheDatabase: the opener is handed a configuration that does not
-// create the database, whether the base asks to, as GOIABADA_DB_CREATE's default does, or a
-// --db-create after recover does, so a mistyped name is refused as missing rather than created
-// empty on the server (#498 review round 10 F2). SQLite creates a missing file whatever this says,
-// which is why a server engine is named here.
+// TestRecoverCommand_NeverCreatesTheDatabase: on every server engine the opener is handed a
+// configuration that does not create the database, whether the base asks to, as
+// GOIABADA_DB_CREATE's default does, or a --db-create after recover does, so a mistyped name is
+// refused as missing rather than created empty on the server (#498 review round 10 F2). The
+// command says so in a record of its own, with what was configured, so the engine's record that
+// creation is disabled is not read as the operator's setting (#498 review round 11 F2).
 func TestRecoverCommand_NeverCreatesTheDatabase(t *testing.T) {
-	for _, tc := range []struct {
-		name       string
-		baseCreate bool
-		args       []string
-	}{
-		{"the base creates", true, nil},
-		{"the base creates and --db-create=true follows recover", true, []string{"--db-create=true"}},
-		{"--db-create follows recover", false, []string{"--db-create"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			base := config.DatabaseConfig{Type: "postgres", Host: "localhost", Port: 5432,
-				Name: "goiabada_typo", Create: tc.baseCreate}
-			args := append([]string{"--email", "admin@example.com", "--grant-manage"}, tc.args...)
+	for _, engine := range []string{"mysql", "postgres", "mssql"} {
+		for _, tc := range []struct {
+			name       string
+			baseCreate bool
+			args       []string
+			configured bool
+		}{
+			{"the base creates", true, nil, true},
+			{"the base creates and --db-create=true follows recover", true, []string{"--db-create=true"}, true},
+			{"--db-create follows recover", false, []string{"--db-create"}, true},
+			{"nothing creates", false, nil, false},
+		} {
+			t.Run(engine+"/"+tc.name, func(t *testing.T) {
+				logs := logtest.CaptureSlog(t)
+				base := config.DatabaseConfig{Type: engine, Host: "localhost", Port: 5432,
+					Name: "goiabada_typo", Create: tc.baseCreate}
+				args := append([]string{"--email", "admin@example.com", "--grant-manage"}, tc.args...)
 
-			var stdout, stderr bytes.Buffer
-			inv, ok := readRecoverCommand(args, base, strings.NewReader(""), &stderr)
-			require.True(t, ok, "stderr: %s", stderr.String())
-			require.True(t, inv.database.Create, "the invocation read asks to create the database")
+				var stdout, stderr bytes.Buffer
+				inv, ok := readRecoverCommand(args, base, strings.NewReader(""), &stderr)
+				require.True(t, ok, "stderr: %s", stderr.String())
+				require.Equal(t, tc.configured, inv.database.Create)
 
-			var opened []config.DatabaseConfig
-			open := func(_ context.Context, c *config.DatabaseConfig, _ bool) (datafactory.Migratable, error) {
-				opened = append(opened, *c)
-				return nil, errors.New(`database "goiabada_typo" does not exist`)
-			}
-			code := runRecoverCommand(inv, open, &stdout, &stderr)
+				var opened []config.DatabaseConfig
+				open := func(_ context.Context, c *config.DatabaseConfig, _ bool) (datafactory.Migratable, error) {
+					opened = append(opened, *c)
+					return nil, errors.New(`database "goiabada_typo" does not exist`)
+				}
+				code := runRecoverCommand(inv, open, &stdout, &stderr)
 
-			require.Equal(t, migrateExitError, code)
-			require.Len(t, opened, 1)
-			assert.False(t, opened[0].Create, "the recovery asked the opener to create the database")
-			assert.Equal(t, "goiabada_typo", opened[0].Name)
-			assert.Contains(t, stderr.String(), `unable to open the database: database "goiabada_typo" does not exist`)
-			assert.Empty(t, stdout.String())
-		})
+				require.Equal(t, migrateExitError, code)
+				require.Len(t, opened, 1)
+				assert.False(t, opened[0].Create, "the recovery asked the opener to create the database")
+				assert.Equal(t, "goiabada_typo", opened[0].Name)
+				assert.Contains(t, stderr.String(), `unable to open the database: database "goiabada_typo" does not exist`)
+				assert.Empty(t, stdout.String())
+
+				records := logs.Records()
+				require.Len(t, records, 1, "logs: %s", logs.Text())
+				assert.Equal(t, slog.LevelInfo, records[0].Level)
+				assert.Equal(t, "recover never creates a server database, so it must already exist", records[0].Message)
+				assert.Equal(t, "GOIABADA_DB_CREATE", records[0].Attrs["setting"])
+				assert.Equal(t, tc.configured, records[0].Attrs["configured"])
+			})
+		}
 	}
+}
+
+// TestRecoverCommand_SQLiteWritesNoCreationRecord: SQLite reads no GOIABADA_DB_CREATE, since its
+// DSN decides whether a missing file is created, so the command's record about creation is the
+// server engines' alone.
+func TestRecoverCommand_SQLiteWritesNoCreationRecord(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	base := sqliteBase(filepath.Join(t.TempDir(), "a.db"))
+	base.Create = true
+
+	var stdout, stderr bytes.Buffer
+	inv, ok := readRecoverCommand([]string{"--email", "admin@example.com", "--grant-manage"}, base,
+		strings.NewReader(""), &stderr)
+	require.True(t, ok, "stderr: %s", stderr.String())
+	open := func(_ context.Context, _ *config.DatabaseConfig, _ bool) (datafactory.Migratable, error) {
+		return nil, errors.New("not opened")
+	}
+	code := runRecoverCommand(inv, open, &stdout, &stderr)
+
+	require.Equal(t, migrateExitError, code)
+	assert.Empty(t, logs.Records(), "logs: %s", logs.Text())
 }
 
 // TestRecoverUsage_NamesEveryDatabaseFlag: every flag config.RegisterDatabaseFlags registers can
