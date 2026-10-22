@@ -470,8 +470,8 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// passwords, the right password included, since this is consulted before the password
 		// is compared (#89, #503 decision 3). #489 decided the difference from NIST: the
 		// password keeps the rate, because disabling it at 100 failures would let anyone who
-		// knows an email deny its sign-in indefinitely, the indefinite half of #89, and NIST
-		// tolerates a rate only alongside mitigations Goiabada does not have. The consecutive
+		// knows an email deny its sign-in indefinitely, the indefinite half of #89. That is a
+		// deliberate departure from the section, which has no exception for a rate. The consecutive
 		// count that section does require exists for the OTP, which a stranger cannot reach
 		// without the password: otpcredential.VerifyStored advances it on every code it
 		// refuses and disables the authenticator at 100 until a new one is set up. Both tiers
