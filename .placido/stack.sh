@@ -129,6 +129,21 @@ case "${1:-}" in
         # .env (#627) refuse to start without one: write it first, when the worktree has
         # the script. It keeps a .env already there.
         if [[ -f "$DC/generate-env.sh" ]]; then sh "$DC/generate-env.sh"; fi
+        # Each database keeps the password its volume was first started with. A volume older
+        # than .env was started with another, such as the literal main had before #627, so
+        # the stack starts over without its volumes (#628). Their data are the tests', which
+        # make their own.
+        if [[ -f "$DC/.env" ]]; then
+            written=$(stat -c %Y "$DC/.env")
+            for volume in mysql-data postgres-data mssql-data; do
+                created=$(docker volume inspect -f '{{.CreatedAt}}' "${NAME}_$volume" 2>/dev/null) || continue
+                if (( $(date -d "$created" +%s) < written )); then
+                    echo "stack.sh: ${NAME}_$volume predates $DC/.env, so it holds another password; removing the stack's volumes"
+                    compose down -v --remove-orphans
+                    break
+                fi
+            done
+        fi
         # --build: an image left from an earlier run, or built before placido merged main
         # in, lacks what src/.devcontainer has since added, such as Node for #626's unit
         # gate. Docker's layer cache makes the build quick when nothing changed.
