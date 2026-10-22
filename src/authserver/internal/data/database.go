@@ -318,6 +318,12 @@ type Database interface {
 	// already rejected. The count is what this call transitioned and not what the
 	// client has, so a second flip reports 0 (see #245).
 	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
+	// RevokeUnusedCodesByUserIdAndClientId marks every unused, not-yet-revoked code one
+	// user holds with one client revoked and reports how many rows it transitioned. A
+	// consent withdrawal marks them, so a code issued before it cannot be redeemed after
+	// it for a grant the withdrawal's sweep never saw. Used codes are left alone: their
+	// grants are the refresh tokens the same withdrawal sweeps (see #622).
+	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
 	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
 	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error
@@ -724,6 +730,14 @@ type Database interface {
 	// substitute for it, because that query joins through codes and so excludes ROPC
 	// rows, and because it needs a live session row to supply the identifier (#106).
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds
+	// with one client, through either linkage shape: codes.user_id with codes.client_id
+	// for the authorization code flow, refresh_tokens.user_id with
+	// refresh_tokens.client_id for ROPC. It is what a consent withdrawal sweeps, and
+	// GetRefreshTokensByUserId plus a client filter cannot substitute for it, because
+	// an auth-code token's row carries no client to filter on (#622). Revoked rows are
+	// returned too, on purpose: the withdrawal records the family of every row it reads.
+	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,
 	// where refresh_tokens.client_id is null, and refresh_tokens.client_id for ROPC,

@@ -254,6 +254,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and, if there were any, the session ended. |
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
+| `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
 
 ### Registration and emailed links

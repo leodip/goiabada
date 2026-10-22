@@ -1467,10 +1467,11 @@ func TestLogRevokedUserAuthStateByCommand_Payload(t *testing.T) {
 	}, recorder.details)
 }
 
-// TestReasons_AreStoredData holds the six reason spellings. Each is written into the reason of
-// an audit record, and ReasonClientBecamePublic also into a rotation family's revocation record,
-// so a spelling changed here leaves every row already stored unmatched by a consumer filtering
-// on the new one. Only the Go names are free to change.
+// TestReasons_AreStoredData holds the seven reason spellings. The first six are written into the
+// reason of an audit record, ReasonClientBecamePublic also into a rotation family's revocation
+// record, and ReasonConsentWithdrawn into that family record alone, so a spelling changed here
+// leaves every row already stored unmatched by a consumer filtering on the new one. Only the Go
+// names are free to change.
 func TestReasons_AreStoredData(t *testing.T) {
 	assert.Equal(t, "password_reset", ReasonPasswordReset)
 	assert.Equal(t, "password_change", ReasonPasswordChange)
@@ -1478,4 +1479,5 @@ func TestReasons_AreStoredData(t *testing.T) {
 	assert.Equal(t, "recovery_command", ReasonRecoveryCommand)
 	assert.Equal(t, "account_disabled", ReasonAccountDisabled)
 	assert.Equal(t, "client_became_public", ReasonClientBecamePublic)
+	assert.Equal(t, "consent_withdrawn", ReasonConsentWithdrawn)
 }
