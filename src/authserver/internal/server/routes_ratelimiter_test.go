@@ -29,6 +29,7 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,7 @@ import (
 //
 // Both of those tiers compose a limiter around a handler by hand, which is exactly the
 // arrangement that keeps passing when the registration in initRoutes loses its wrapper.
-// Removing any one of the fourteen wrappers from routes.go left the whole module suite green,
+// Removing any one of the twelve wrappers from routes.go left the whole module suite green,
 // so an endpoint could be shipped unprotected with every limiter and handler test still
 // passing. One case per registration, so a wrapper cannot be dropped in silence (#219).
 //
@@ -149,6 +150,12 @@ func newRoutesTestServer(t *testing.T) *Server {
 // initRoutes reads, after the limiter is switched on.
 func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Server {
 	t.Helper()
+	return newRoutesTestServerOver(t, configure, newTestSessionStore())
+}
+
+// newRoutesTestServerOver is newRoutesTestServerWith over a session store the caller holds.
+func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore) *Server {
+	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
 	require.NoError(t, err)
@@ -195,7 +202,7 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
-		sessionStore: newTestSessionStore(),
+		sessionStore: sessionStore,
 		templateFS:   web.TemplateFS(),
 		staticFS:     web.StaticFS(),
 		cfg:          cfg,

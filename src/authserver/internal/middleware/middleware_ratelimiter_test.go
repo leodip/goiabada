@@ -1183,8 +1183,9 @@ func TestLimitActivate_PerIP(t *testing.T) {
 // GET writes and the parked-request row a POST writes, bounded per client block, from one bucket
 // the two methods share (#504).
 //
-// The budget is exact because it is published policy: 120 requests per minute, the admin console's
-// own admission bound (#620), and the shared bucket is the point: a flood split across the two
+// The budget is exact because it is published policy: 120 requests per minute, sized for an office
+// behind one address rather than one browser, since a sign-in, an SSO hop and a silent renew each
+// reach the endpoint once or twice. The shared bucket is the point: a flood split across the two
 // routes is still one flood, which is what a tier per method would miss.
 //
 // The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing

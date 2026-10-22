@@ -572,8 +572,11 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// validation, so an unauthenticated holder of one public client_id and its registered
 		// redirect URI, both visible in any sign-in link, could otherwise write rows as fast as
 		// it could send requests and drop the cookie (#504). Every request counts, refused ones
-		// included, and 120 a minute is the console's own admission bound: an office behind one
-		// address, not one browser, where a real sign-in costs a handful of requests (#620).
+		// included, and those that write nothing too: an SSO hop over a stored session and a
+		// silent renew. A sign-in reaches the endpoint once, or twice when its client posts, and
+		// an SSO hop or a silent renew once each, so 120 a minute is two a second sustained from
+		// one client block: an office of people signing in, moving between clients and renewing
+		// in the same minute, where one browser never comes near it.
 		// Off by default with every tier that reads the client's address (#219); PreAuthLifetime
 		// and the reaper bound how long a row lives, never how many arrive.
 		authorize: request("authorize", countedByIP, "ip", 120, time.Minute),

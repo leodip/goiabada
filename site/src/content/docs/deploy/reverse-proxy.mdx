@@ -186,7 +186,10 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
 - **Each server sees the client's address,** from the `X-Forwarded-For` entry Nginx appends: see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#reverse-proxy).
 - **The admin console reaches the auth server inside the Compose network,** not through Nginx: see [The hop to the auth server](/deploy/docker-compose/#the-hop-to-the-auth-server).
 - **Goiabada sets its own security headers,** `Strict-Transport-Security` included once its URLs are `https://`, so Nginx adds none. A header Nginx added as well would reach the browser twice.
-- **`/auth/authorize` is a write, so give it an edge budget.** Every request that passes its first validation costs a row, a browser session on a GET and a parked request on a POST, which an unauthenticated flood can spend as fast as it likes. The built-in `authorize` limit applies only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on; with the switch off, which is the default, rate-limit the location in Nginx. See [Rate limits](/reference/environment-variables/#rate-limits).
+
+## The authorization endpoint's budget
+
+`/auth/authorize` is a write: every request that passes its first validation costs a row, a browser session on a GET and a parked request on a POST. The built-in `authorize` limit bounds how fast one IP address spends them while `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` is on, which the wizard's production setup turns on unless you answered no. If you turned it off, rate-limit `/auth/authorize` in Nginx instead, so an unauthenticated flood can't grow the database as fast as it can send requests. See [Rate limits](/reference/environment-variables/#rate-limits).
 
 ## Next steps
 

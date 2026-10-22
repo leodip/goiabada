@@ -11,7 +11,7 @@ This page helps you when Goiabada's rate limiter refuses a request, and especial
 
 The limits counted by a user or an email always apply: wrong passwords for one account, one-time codes, the Account pages' password checks, email verification, and password-reset and registration mails to one address. The limits counted by an IP address apply once you set `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` to `true`. A refused request gets `429 Too Many Requests` with a `Retry-After` header, in the format the endpoint usually answers with:
 
-- **A sign-in, two-factor, registration, activation or password reset page** shows "Too many attempts" and "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again."
+- **The authorization endpoint, `/auth/authorize`, and a sign-in, two-factor, registration, activation or password reset page** show "Too many attempts" and "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again." The authorization endpoint answers so even a request with `prompt=none`, and sends no error to the redirect URI, so an app renewing silently in a hidden iframe sees no answer at all.
 - **The token endpoint's password grant and `POST /connect/register`** answer `{"error": "invalid_request", "error_description": "Too many requests. Please wait and try again later."}`.
 - **The Account API** answers the error code `TOO_MANY_REQUESTS`.
 
@@ -55,7 +55,7 @@ Trust forwarded headers only when the proxy is the **only** way to reach the aut
 
 ## How the limits count
 
-A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up, even for many people behind one office or mobile network. A limit that counts every request is spent by every request, successful or not. The ones on sign-in, `pwd_ip_requests` and `ropc_ip_requests`, allow 120 a minute from one IP address, which only something signing in over and over reaches.
+A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up, even for many people behind one office or mobile network. A limit that counts every request is spent by every request, successful or not. The ones on sign-in, `pwd_ip_requests` and `ropc_ip_requests`, allow 120 a minute from one IP address, which only something signing in over and over reaches. So does `authorize`, on the authorization endpoint, which every sign-in, single sign-on and silent renew reaches once or twice.
 
 Limits on failures against an account or a user are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. The others, `pwd_ip`, `ropc_ip` and every limit on every request, are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, all of them are kept in the process.
 
