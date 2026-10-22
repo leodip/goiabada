@@ -116,7 +116,7 @@ func HandleUserPhonePut(
 		// (#559).
 		phoneCountry, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
 		if !found && len(input.PhoneCountryUniqueId) > 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil))
 			return
 		}
 

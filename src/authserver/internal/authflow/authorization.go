@@ -722,9 +722,9 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser id
 
 // warnAdministrativeScopeRefused is what a refusal at /auth/authorize leaves when no valid session
 // names a user, signed out or parked behind the sign-in: a Warn record and no audit row, because
-// that endpoint is unauthenticated and not rate limited, so a row per request would be audit rows
-// anyone can write at will (#499 decision 9). The client identifier and the scopes are bounded
-// stored values, safe to log.
+// that endpoint is unauthenticated and its admission tier bounds one address only while the rate
+// limiter switch is on (#504), so a row per request would be audit rows anyone can write at will
+// (#499 decision 9). The client identifier and the scopes are bounded stored values, safe to log.
 func warnAdministrativeScopeRefused(ctx context.Context, client *record.Client, scopes []string) {
 	slog.WarnContext(ctx, "refused an administrative scope the client may not request, with no signed-in user to record it against",
 		"client_identifier", client.ClientIdentifier, "scopes", scopes)

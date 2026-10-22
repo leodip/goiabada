@@ -84,7 +84,7 @@ func TestHandleMembersRemoveUserPost_TheLastAdministratorRefusalReachesTheBrowse
 	)
 	rec := httptest.NewRecorder()
 
-	HandleMembersRemoveUserPost(render.New(nil), &lastAdministratorGroupApiClient{}).ServeHTTP(rec, req)
+	HandleMembersRemoveUserPost(render.New(nil, nil), &lastAdministratorGroupApiClient{}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }
@@ -97,7 +97,7 @@ func TestHandlePermissionsPost_TheLastAdministratorRefusalReachesTheBrowser(t *t
 	)
 	rec := httptest.NewRecorder()
 
-	HandlePermissionsPost(render.New(nil), nil, &groupPermissionsSaveApiClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
+	HandlePermissionsPost(render.New(nil, nil), nil, &groupPermissionsSaveApiClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }

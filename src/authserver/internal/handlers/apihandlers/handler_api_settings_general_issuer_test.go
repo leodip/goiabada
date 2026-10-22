@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -107,7 +108,7 @@ func TestHandleSettingsGeneralPut_TheIssuerRule(t *testing.T) {
 
 			require.Equal(t, http.StatusBadRequest, rr.Code)
 			code, description := decodeErrorEnvelope(t, rr)
-			assert.Equal(t, "VALIDATION_ERROR", code)
+			assert.Equal(t, "handler.settings_general.issuer_uri_invalid", code)
 			assert.Equal(t, issuerRuleRefusal, description)
 			assert.Nil(t, saved, "a refused save writes nothing")
 		})
@@ -142,7 +143,10 @@ func TestHandleSettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(
 func TestHandleSettingsGeneralPut_AnUnchangedIssuerIsStillHeldToItsBounds(t *testing.T) {
 	cases := []struct{ name, stored, code, description string }{
 		{"longer than 60 characters", "https://auth.example.com/" + strings.Repeat("a", 36),
-			"VALIDATION_ERROR", "Issuer is too long. The maximum length is 60 characters."},
+			"handler.settings_general.issuer_too_long", "Issuer is too long. The maximum length is 60 characters."},
+		// 61 UTF-16 code units in 60 code points, as the start refuses it (#615).
+		{"one code unit past 60 in 60 code points", "https://auth.example.com/" + strings.Repeat("a", 34) + "\U0001F600",
+			"handler.settings_general.issuer_too_long", "Issuer is too long. The maximum length is 60 characters."},
 		{"holding an angle bracket", "https://example.org/<b>",
 			"validator.settings.issuer_angle_brackets", "The issuer cannot contain the characters < or >."},
 	}
@@ -155,6 +159,32 @@ func TestHandleSettingsGeneralPut_AnUnchangedIssuerIsStillHeldToItsBounds(t *tes
 			assert.Equal(t, c.code, code)
 			assert.Equal(t, c.description, description)
 			assert.Nil(t, saved, "a refused save writes nothing")
+		})
+	}
+}
+
+// An issuer at the limit saves, as the start accepts a base URL at it, so whatever the start lets
+// through the first start seeds and every later save keeps (#615). The limit is counted in UTF-16
+// code units, as the start counts it: two astral characters, two units and four bytes each, make an
+// issuer of 60 units and 64 bytes that saves. The strings are the start's own cases in
+// config/base_url_test.go, and the counts are checked here so they cannot drift from what each case
+// is for.
+func TestHandleSettingsGeneralPut_AnIssuerAtTheLimitSaves(t *testing.T) {
+	ascii := "https://auth." + strings.Repeat("a", 60-len("https://auth.")-len(".example.com")) + ".example.com"
+	astral := "https://auth." + strings.Repeat("a", 60-len("https://auth.")-len(".example.com")-4) +
+		"\U0001F600\U0001F600.example.com"
+	require.Equal(t, 60, inputvalidation.TextLength(ascii))
+	require.Len(t, ascii, 60)
+	require.Equal(t, 60, inputvalidation.TextLength(astral))
+	require.Len(t, astral, 64)
+
+	for name, issuer := range map[string]string{"60 ASCII characters": ascii, "60 code units in 64 bytes": astral} {
+		t.Run(name, func(t *testing.T) {
+			rr, saved := putGeneralIssuer(t, issuer, issuer)
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, saved)
+			assert.Equal(t, issuer, saved.Issuer, "the issuer is kept")
 		})
 	}
 }

@@ -9,7 +9,7 @@ This page helps you get back into the admin console when signing in to it stops 
 
 Find your case first:
 
-- **Signing in fails for every administrator** with **Sign-in failed** or **Server error**: [the admin console's client secret changed](#the-admin-consoles-client-secret-changed).
+- **Signing in fails for every administrator** with **Sign-in failed** or **Something went wrong**: [the admin console's client secret changed](#the-admin-consoles-client-secret-changed).
 - **The password you set in `GOIABADA_ADMIN_PASSWORD` is refused:** [you changed it after the first start](#you-changed-goiabada_admin_password).
 - **The only administrator can't sign in**, because they forgot their password or lost their authenticator: [the last administrator can't sign in](#the-last-administrator-cant-sign-in).
 
@@ -19,7 +19,7 @@ The admin console signs administrators in as a client of the auth server, `admin
 
 - a sign-in fails after the password, on **Sign-in failed**: "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong.";
 - an administrator already signed in is signed out once their access token falls due;
-- once the token the admin console holds for its sessions expires, within the access token lifetime, 5 minutes unless you changed it, every page that needs a session answers `500` on **Server error**, starting a sign-in included;
+- once the token the admin console holds for its sessions expires, within the access token lifetime, 5 minutes unless you changed it, every page that needs a session answers `500` on **Something went wrong**, starting a sign-in included;
 - an admin console that starts, or restarts, doesn't start at all. It asks the auth server for that token before it listens, and stops when it's refused: on Kubernetes its pod never becomes ready, so a rollout waits with the earlier pods still serving, and under Docker Compose its container keeps restarting.
 
 The admin console's log has the cause: `the auth server's token endpoint answered 401 (invalid_client: Client authentication failed. Please review your client_secret.)`. When it refused to start, the record is `the auth server does not accept the admin console's client secret, so the admin console cannot start`, with that cause as its `error`.
@@ -35,7 +35,7 @@ If you know the secret the database holds, put it back in the admin console's co
 It has to be `manage`. The admin console's client is an [administrator](/reference/api/administrators/), and only a token with `authserver:manage` writes to one, so a `manage-clients` token is refused `403 MANAGE_SCOPE_REQUIRED`. Holding `manage` makes your client an administrator too, so keep its secret with the care you give the admin console's own.
 
 <Aside type="caution">
-Create that client **before** you need it: a client with the **Client credentials flow** on, and the `authserver` resource's `manage` permission granted on its **Permissions** tab. Once the admin console is locked out, it's the only way back in.
+Create that client **before** you need it: a client with **Client credentials** on, and the `authserver` resource's `manage` permission granted on its **Permissions** tab. Once the admin console is locked out, it's the only way back in.
 </Aside>
 
 <Steps>
@@ -117,7 +117,7 @@ Sign in with the password the administrator had, and change it under **Account**
 
 The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck. When nobody can let them back in, the auth server's `recover` command can.
 
-**Another administrator can let them back in.** Any user with `authserver:manage` can open **Admin**, **Users**, the user, and their **Authentication** tab, then use **Set password**, or turn off **Two-factor authentication enabled**. So the best fix comes before the problem: give `authserver:manage` to a second person.
+**Another administrator can let them back in.** Any user with `authserver:manage` can open **Admin**, **Users**, the user, and their **Authentication** tab, then use **New password**, or turn off **Enabled** under **Two-factor authentication**. So the best fix comes before the problem: give `authserver:manage` to a second person.
 
 **A forgotten password can be reset by email**, when SMTP is set up, the administrator's email address is verified, and their mailbox still exists. [A user cannot reset their password](/troubleshooting/a-user-cannot-reset-their-password/) covers what stops it.
 

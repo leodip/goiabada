@@ -25,7 +25,8 @@ import (
 // The refusals of groups, their attributes and members, and of users, their attributes, groups and
 // email verification code, served once with no language and once in pt-BR through
 // assertRefusalLanguages (#559 decisions 1 and 2). The missing or malformed ids, the body that does
-// not parse and the missing expectedGroupIds are an integrator's, and stay English.
+// not parse and the missing expectedGroupIds are an integrator's, and stay English. Every other
+// refusal answers its catalog key as its error_code, which the console reads the field off (#617).
 
 // TestGroupRefusals_AreInTheRequestsLanguage covers the group endpoints' refusals.
 func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
@@ -68,7 +69,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "create with no identifier",
 			serve:      create(`{"groupIdentifier":" ","description":"d"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group.identifier_required",
 			english:    "Group identifier is required",
 			portuguese: "O identificador do grupo é obrigatório",
 		},
@@ -76,7 +77,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "create with a description past the bound",
 			serve:      create(`{"groupIdentifier":"a-group","description":"`+longDescription+`"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group.description_too_long",
 			english:    "The description cannot exceed a maximum length of 100 characters",
 			portuguese: "A descrição não pode ter mais que 100 caracteres",
 		},
@@ -84,7 +85,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "create with an identifier in use",
 			serve:      create(`{"groupIdentifier":"a-group","description":"d"}`, identifierHeldBy("a-group", stored())),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group.identifier_in_use",
 			english:    "The group identifier is already in use",
 			portuguese: "O identificador do grupo já está em uso",
 		},
@@ -92,7 +93,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "update with no identifier",
 			serve:      update(`{"groupIdentifier":"","description":"d"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group.identifier_required",
 			english:    "Group identifier is required",
 			portuguese: "O identificador do grupo é obrigatório",
 		},
@@ -100,7 +101,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "update with a description past the bound",
 			serve:      update(`{"groupIdentifier":"a-group","description":"`+longDescription+`"}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group.description_too_long",
 			english:    "The description cannot exceed a maximum length of 100 characters",
 			portuguese: "A descrição não pode ter mais que 100 caracteres",
 		},
@@ -109,7 +110,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve: update(`{"groupIdentifier":"other-group","description":"d"}`,
 				identifierHeldBy("other-group", &record.Group{Id: 6, GroupIdentifier: "other-group"})),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group.identifier_in_use",
 			english:    "The group identifier is already in use",
 			portuguese: "O identificador do grupo já está em uso",
 		},
@@ -149,7 +150,7 @@ func TestGroupMemberRefusals_AreInTheRequestsLanguage(t *testing.T) {
 					return HandleGroupMemberAddPost(database, handlersmocks.NewAuditLogger(t))
 				}),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group_member.already_member",
 			english:    "User is already a member of this group",
 			portuguese: "O usuário já é membro deste grupo",
 		},
@@ -161,7 +162,7 @@ func TestGroupMemberRefusals_AreInTheRequestsLanguage(t *testing.T) {
 					return HandleGroupMemberDelete(database, handlersmocks.NewAuditLogger(t))
 				}),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.group_member.not_member",
 			english:    "User is not a member of this group",
 			portuguese: "O usuário não é membro deste grupo",
 		},
@@ -229,29 +230,29 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	assertRefusalLanguages(t, []refusalCase{
 		{
 			name: "a group attribute created with no key", serve: groupCreate(`{"groupId":5,"key":"","value":"v"}`),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: keyEnglish, portuguese: keyPortuguese,
+			status: http.StatusBadRequest, code: "handler.attribute.key_required", english: keyEnglish, portuguese: keyPortuguese,
 		},
 		{
 			// The group's id rides in the body here, not in the path, so it is no integrator's
 			// malformed target and is translated (#559 decision 1).
 			name: "a group attribute created with no group id", serve: groupCreate(`{"key":"tier","value":"gold"}`),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: "Group ID is required", portuguese: "O ID do grupo é obrigatório",
+			status: http.StatusBadRequest, code: "handler.group_attribute.group_id_required", english: "Group ID is required", portuguese: "O ID do grupo é obrigatório",
 		},
 		{
 			name: "a group attribute created with a value past the bound", serve: groupCreate(`{"groupId":5,"key":"k","value":"` + longValue + `"}`),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: valueEnglish, portuguese: valuePortuguese,
+			status: http.StatusBadRequest, code: "handler.attribute.value_too_long", english: valueEnglish, portuguese: valuePortuguese,
 		},
 		{
 			name: "a group attribute updated with no key", serve: groupUpdate(`{"key":"","value":"v"}`),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: keyEnglish, portuguese: keyPortuguese,
+			status: http.StatusBadRequest, code: "handler.attribute.key_required", english: keyEnglish, portuguese: keyPortuguese,
 		},
 		{
 			name: "a group attribute updated with a value past the bound", serve: groupUpdate(`{"key":"k","value":"` + longValue + `"}`),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: valueEnglish, portuguese: valuePortuguese,
+			status: http.StatusBadRequest, code: "handler.attribute.value_too_long", english: valueEnglish, portuguese: valuePortuguese,
 		},
 		{
 			name: "a user attribute created with no key", serve: userCreate(`{"userId":7,"key":"","value":"v"}`, false),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: keyEnglish, portuguese: keyPortuguese,
+			status: http.StatusBadRequest, code: "handler.attribute.key_required", english: keyEnglish, portuguese: keyPortuguese,
 		},
 		{
 			name: "a user attribute created with a value past the bound", serve: userCreate(`{"userId":7,"key":"k","value":"`+longValue+`"}`, true),
@@ -259,7 +260,7 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "a user attribute updated with no key", serve: userUpdate(`{"key":"","value":"v"}`),
-			status: http.StatusBadRequest, code: "VALIDATION_ERROR", english: keyEnglish, portuguese: keyPortuguese,
+			status: http.StatusBadRequest, code: "handler.attribute.key_required", english: keyEnglish, portuguese: keyPortuguese,
 		},
 		{
 			name: "a user attribute updated with a value past the bound", serve: userUpdate(`{"key":"k","value":"` + longValue + `"}`),
@@ -322,7 +323,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "a user created with no email",
 			serve:      createUser(map[string]any{"email": "", "setPasswordType": "now", "password": "a-long-enough-password-1"}, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.user.email_required",
 			english:    "Email is required",
 			portuguese: "O e-mail é obrigatório",
 		},
@@ -338,7 +339,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "a user created with an unknown setPasswordType",
 			serve:      createUser(map[string]any{"email": "new@example.com", "setPasswordType": "later"}, noUserHolds("new@example.com")),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.user.set_password_type_invalid",
 			english:    `setPasswordType must be "now" or "email"`,
 			portuguese: `setPasswordType deve ser "now" ou "email"`,
 		},
@@ -346,7 +347,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "a user created with no password",
 			serve:      createUser(map[string]any{"email": "new@example.com", "setPasswordType": "now"}, noUserHolds("new@example.com")),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.user.password_required",
 			english:    "Password is required",
 			portuguese: "A senha é obrigatória",
 		},
@@ -359,7 +360,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				return rr
 			},
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.user.new_password_required",
 			english:    "New password is required",
 			portuguese: "A nova senha é obrigatória",
 		},
@@ -367,7 +368,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name:       "two-factor authentication enabled by an administrator",
 			serve:      disableOTP(`{"enabled":true}`, nil),
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.user.otp_enable_not_supported",
 			english:    "Enabling OTP is not supported through this endpoint",
 			portuguese: "Não é possível habilitar o OTP por este endpoint",
 		},
@@ -389,7 +390,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				return rr
 			},
 			status:     http.StatusBadRequest,
-			code:       "VALIDATION_ERROR",
+			code:       "handler.user_groups.too_many",
 			english:    "Too many group ids",
 			portuguese: "Há IDs de grupo demais na requisição",
 		},

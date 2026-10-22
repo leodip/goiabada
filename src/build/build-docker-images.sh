@@ -110,13 +110,23 @@ echo "Working directory: $(pwd)"
 echo ""
 
 # Setup buildx builder
+#
+# Each build names the builder (--builder) instead of `docker buildx use` making
+# it the machine's default: as the default it took over every other build there,
+# the devcontainer's and placido's stacks included, and its container cannot start
+# again once Docker Desktop restarts (it mounts a path the restart removes). A
+# builder that no longer starts is made anew.
 echo "=== Setting up buildx builder ==="
+if docker buildx inspect "$BUILDER_NAME" &> /dev/null \
+    && ! docker buildx inspect --bootstrap "$BUILDER_NAME" &> /dev/null; then
+    echo "Removing buildx builder $BUILDER_NAME, which no longer starts"
+    docker buildx rm "$BUILDER_NAME"
+fi
 if ! docker buildx inspect "$BUILDER_NAME" &> /dev/null; then
     echo "Creating new buildx builder: $BUILDER_NAME"
-    docker buildx create --name "$BUILDER_NAME" --driver docker-container --bootstrap --use
+    docker buildx create --name "$BUILDER_NAME" --driver docker-container --bootstrap
 else
     echo "Using existing buildx builder: $BUILDER_NAME"
-    docker buildx use "$BUILDER_NAME"
 fi
 echo ""
 
@@ -135,7 +145,7 @@ if [[ "$PUSH" == true ]]; then
     # moved by publish.yml when a release is deliberately published, so that the
     # tag every unpinned deployment follows changes at that moment rather than
     # whenever CI happens to go green.
-    docker buildx build --progress=plain \
+    docker buildx build --progress=plain --builder "$BUILDER_NAME" \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-authserver \
       $(tags_for authserver) \
@@ -150,7 +160,7 @@ if [[ "$PUSH" == true ]]; then
 
     # Build and push adminconsole (multi-platform)
     echo "=== Building and pushing adminconsole image (multi-platform) ==="
-    docker buildx build --progress=plain \
+    docker buildx build --progress=plain --builder "$BUILDER_NAME" \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-adminconsole \
       $(tags_for adminconsole) \
@@ -176,7 +186,7 @@ else
     # moved by publish.yml when a release is deliberately published, so that the
     # tag every unpinned deployment follows changes at that moment rather than
     # whenever CI happens to go green.
-    docker buildx build --progress=plain \
+    docker buildx build --progress=plain --builder "$BUILDER_NAME" \
       --platform linux/amd64 \
       -f ./build/Dockerfile-authserver \
       $(tags_for authserver) \
@@ -190,7 +200,7 @@ else
 
     # Build adminconsole (local only, single platform)
     echo "=== Building adminconsole image (local) ==="
-    docker buildx build --progress=plain \
+    docker buildx build --progress=plain --builder "$BUILDER_NAME" \
       --platform linux/amd64 \
       -f ./build/Dockerfile-adminconsole \
       $(tags_for adminconsole) \

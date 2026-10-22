@@ -129,11 +129,12 @@ func HandleGeneralPost(
 			ResourceOwnerPasswordCredentialsEnabled:   r.FormValue("ropcFlowEnabled") == "on",
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"settings":       settingsInfo,
 				"storedSettings": settingsGeneralFrom(currentSettingsResp),
 				"error":          message,
+				"errorField":     errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
@@ -157,7 +158,9 @@ func HandleGeneralPost(
 
 		updatedResp, err := apiClient.UpdateSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, generalErrorFields))
+			})
 			return
 		}
 

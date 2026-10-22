@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
+	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
 )
@@ -40,6 +42,8 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},
 			metrics:       metrics.NewRegistry(),
+			templateFS:    web.TemplateFS(),
+			staticFS:      web.StaticFS(),
 		}
 		app := s.initMiddleware()
 		app.Get("/admin/clients", func(w http.ResponseWriter, _ *http.Request) {
@@ -149,8 +153,9 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 			if rr.Code != tt.status {
 				t.Fatalf("got status %d, want %d (body %q)", rr.Code, tt.status, rr.Body.String())
 			}
-			if body := strings.TrimSpace(rr.Body.String()); body != want {
-				t.Errorf("body = %q, want %q", body, want)
+			// The settings refusal is a page, the CSRF one plain text; each holds the sentence.
+			if body := rr.Body.String(); !strings.Contains(body, html.EscapeString(want)) {
+				t.Errorf("body = %q, want it to hold %q", body, want)
 			}
 		})
 	}

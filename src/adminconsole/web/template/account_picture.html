@@ -1,99 +1,45 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.picture.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.picture.page_title" }}{{end}}
-
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.picture.section_title" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-
-{{define "menu"}}
-    {{template "account_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.account.picture.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
 {{define "head"}}
-<link rel="stylesheet" href="/static/vendor/cropperjs/cropper.min.css">
-<script src="/static/vendor/cropperjs/cropper.min.js"></script>
-<script src="/static/image-upload.js"></script>
+<script src="{{ asset "/static/vendor/cropperjs/cropper.min.js" }}" defer></script>
+<script src="{{ asset "/static/image-upload.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
-
-<div id="imageUploadContainer"
-     class="flex items-center gap-6"
-     data-upload-url="/account/picture"
-     data-delete-url="/account/picture"
-     data-field-name="picture"
-     data-url-key="pictureUrl"
-     data-entity-label="{{ T $.ctx "adminconsole.account.picture.entity_label" }}"
-     data-crop-mode="square"
-     data-output-format="jpeg">
-
-    <!-- Picture Preview -->
-    <div class="avatar">
-        <div class="flex items-center justify-center w-32 h-32 overflow-hidden rounded-full bg-base-300">
-            {{if .profilePictureUrl}}
-            <img id="imagePreview" src="{{.profilePictureUrl}}" alt="{{ T $.ctx "adminconsole.account.picture.alt_text" }}" class="object-cover w-full h-full" />
-            <div id="imagePlaceholder" class="hidden w-full h-full items-center justify-center">
-                <svg class="w-16 h-16 text-base-content/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
-            </div>
-            {{else}}
-            <img id="imagePreview" src="" alt="{{ T $.ctx "adminconsole.account.picture.alt_text" }}" class="hidden object-cover w-full h-full" />
-            <div id="imagePlaceholder" class="flex items-center justify-center w-full h-full">
-                <svg class="w-16 h-16 text-base-content/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                </svg>
-            </div>
-            {{end}}
-        </div>
-    </div>
-
-    <!-- Upload/Delete Buttons and Messages -->
-    <div class="flex flex-col gap-4">
-        <div class="flex gap-2">
-            <input type="file" id="imageUploadInput" class="hidden" accept="image/jpeg,image/png,image/gif,image/webp" />
-            <button type="button" id="uploadImageBtn" class="btn btn-outline">
-                <svg class="w-5 h-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                </svg>
-                {{ T $.ctx "adminconsole.account.picture.upload_button" }}
-            </button>
-            <button type="button" id="deleteImageBtn" class="btn btn-outline btn-error {{if not .profilePictureUrl}}hidden{{end}}">
-                <svg class="w-5 h-5 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                </svg>
-                {{ T $.ctx "adminconsole.account.picture.delete_button" }}
-            </button>
-        </div>
-
-        <!-- Messages -->
-        <div>
-            <div id="imageUploadError" class="hidden text-sm text-error"></div>
-            <div id="imageUploadSuccess" class="hidden text-sm text-success"></div>
-            <div class="text-sm text-base-content/60">
-                {{ T $.ctx "adminconsole.account.picture.format_help" }}
-            </div>
-        </div>
-    </div>
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.account.picture.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.picture.lead" }}</p>
+  </div>
 </div>
 
-<!-- Crop Modal -->
-<div id="cropModal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black/50">
-    <div class="w-full max-w-2xl mx-4 rounded-lg shadow-xl bg-base-100">
-        <div class="p-4 border-b border-base-300">
-            <h3 class="text-lg font-semibold">{{ T $.ctx "adminconsole.account.picture.crop_modal_title" }}</h3>
+<div class="panel">
+  <div class="panel-body">
+    <div class="image-upload" id="imageUploadContainer"
+      data-upload-url="/account/picture" data-delete-url="/account/picture" data-field-name="picture" data-url-key="pictureUrl"
+      data-crop-mode="square" data-output-format="preserve"
+      data-alt="{{ T $.ctx "adminconsole.account.picture.alt_text" }}" data-crop-alt="{{ T $.ctx "adminconsole.account.picture.crop_alt" }}"
+      data-uploaded="{{ T $.ctx "adminconsole.account.picture.uploaded" }}" data-deleted="{{ T $.ctx "adminconsole.account.picture.deleted" }}"
+      data-delete-title="{{ T $.ctx "adminconsole.account.picture.delete_title" }}" data-delete-confirm="{{ T $.ctx "adminconsole.account.picture.delete_confirm" }}">
+      <div class="image-preview" id="imagePreview">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z"/></svg>
+        {{ with .profilePictureUrl }}<img src="{{ . }}" alt="{{ T $.ctx "adminconsole.account.picture.alt_text" }}">{{ end }}
+      </div>
+      <div class="grid min-w-0 flex-1 basis-64 gap-3">
+        <div class="flex flex-wrap gap-2">
+          <input id="imageUploadInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" aria-label="{{ T $.ctx "adminconsole.account.picture.upload_button" }}" hidden>
+          <button class="button" id="uploadImageBtn" type="button">{{ T $.ctx "adminconsole.account.picture.upload_button" }}</button>
+          <button class="button button-danger" id="deleteImageBtn" type="button"{{ if not .profilePictureUrl }} hidden{{ end }}>{{ T $.ctx "adminconsole.account.picture.delete_button" }}</button>
         </div>
-        <div class="p-4">
-            <div class="overflow-hidden max-h-96">
-                <img id="cropImage" src="" alt="{{ T $.ctx "adminconsole.account.picture.crop_alt" }}" class="max-w-full" />
-            </div>
-        </div>
-        <div class="flex justify-end gap-2 p-4 border-t border-base-300">
-            <button type="button" id="cancelCropBtn" class="btn btn-ghost">{{ T $.ctx "adminconsole.account.picture.crop_cancel" }}</button>
-            <button type="button" id="confirmCropBtn" class="btn btn-primary">{{ T $.ctx "adminconsole.account.picture.crop_confirm" }}</button>
-        </div>
+        <p class="field-hint">{{ T $.ctx "adminconsole.account.picture.format_help" }}</p>
+      </div>
     </div>
+    <div class="not-empty:mt-4" id="imageUploadStatus" role="status"></div>
+  </div>
 </div>
 
+{{ template "crop_dialog" (args $.ctx (T $.ctx "adminconsole.account.picture.crop_modal_title") (T $.ctx "adminconsole.account.picture.crop_cancel") (T $.ctx "adminconsole.account.picture.crop_confirm") false) }}
+
+{{ template "modal_dialog" (args "deleteImage" "confirm" $.ctx (T $.ctx "adminconsole.account.picture.delete_button") (T $.ctx "adminconsole.account.picture.delete_title")) }}
 {{end}}

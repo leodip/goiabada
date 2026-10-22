@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // settingsTokensAPI is what the token settings page needs: the settings, and the write.
@@ -102,10 +104,11 @@ func HandleTokensPost(
 			IncludeOpenIDConnectClaimsInIdToken:     r.FormValue("includeOpenIDConnectClaimsInIdToken") == "on",
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"error":    message,
+				"settings":   settingsInfo,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_tokens.html", bind)
@@ -114,24 +117,22 @@ func HandleTokensPost(
 			}
 		}
 
-		// Prepare request with ints; invalid input becomes 0 to trigger server-side validation
-		tokenExp := 0
-		if v := settingsInfo.TokenExpirationInSeconds; len(v) > 0 {
-			if p, err := strconv.Atoi(v); err == nil {
-				tokenExp = p
-			}
+		// A duration that is not a whole number is refused here, at its field, rather than sent as
+		// 0, which the auth server would refuse as not greater than zero.
+		tokenExp, err := strconv.Atoi(strings.TrimSpace(settingsInfo.TokenExpirationInSeconds))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_tokens.token_expiration_invalid"), "tokenExpirationInSeconds")
+			return
 		}
-		idle := 0
-		if v := settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds; len(v) > 0 {
-			if p, err := strconv.Atoi(v); err == nil {
-				idle = p
-			}
+		idle, err := strconv.Atoi(strings.TrimSpace(settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_tokens.offline_idle_timeout_invalid"), "refreshTokenOfflineIdleTimeoutInSeconds")
+			return
 		}
-		maxlife := 0
-		if v := settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds; len(v) > 0 {
-			if p, err := strconv.Atoi(v); err == nil {
-				maxlife = p
-			}
+		maxlife, err := strconv.Atoi(strings.TrimSpace(settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_tokens.offline_max_lifetime_invalid"), "refreshTokenOfflineMaxLifetimeInSeconds")
+			return
 		}
 
 		updateReq := &api.UpdateSettingsTokensRequest{
@@ -142,9 +143,11 @@ func HandleTokensPost(
 			IncludeOpenIDConnectClaimsInIdToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
-		_, err := apiClient.UpdateSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err = apiClient.UpdateSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, tokensErrorFields))
+			})
 			return
 		}
 

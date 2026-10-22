@@ -18,6 +18,8 @@ Every page under `src/content/docs` follows this guide, and every docs change do
   "log in".
 - "Your app" is allowed, but only for the software the reader is building, which they register as
   a client.
+- The auth server's pages and the console's account pages call a client an application, since the
+  person signing in never registered one. A quote of those pages keeps their word.
 
 ## Structure
 
@@ -45,7 +47,7 @@ Every page under `src/content/docs` follows this guide, and every docs change do
 
 ## Example
 
-The client "Consent required" setting, written in this style:
+The client "Ask users for consent" setting, written in this style:
 
 ```mdx
 ## Consent required

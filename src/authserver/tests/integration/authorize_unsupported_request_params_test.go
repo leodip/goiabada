@@ -202,7 +202,7 @@ func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUi(t *testing.T) {
 	}
 
 	errorMsg := doc.Find("p#errorMsg").Text()
-	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", errorMsg)
+	assert.Equal(t, "Invalid client_id parameter. The application does not exist.", errorMsg)
 }
 
 func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {

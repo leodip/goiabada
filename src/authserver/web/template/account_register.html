@@ -1,56 +1,51 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "account.register.page_title" }}{{end}}
-{{define "head"}}
-
-{{end}}
+{{define "title"}}{{ T $.ctx "account.register.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "account.register.title" }}</h1>
+{{/* With email verification the password is chosen on the form the emailed link leads to, so
+     this form asks for the address alone (#207). */}}
+{{ if .requiresEmailVerification }}
+<p class="auth-lead">{{ T $.ctx "account.register.verification_hint" }}</p>
+{{ end }}
 
-    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "account.register.title" }}</h2>
-    <form action="" method="post">
+<form method="post" class="stacked" novalidate>
+  {{/* errorField names the field a refusal is about, which is marked invalid and described by
+       the notice. Focus goes where typing starts again: the address, or the password, since both
+       password fields come back empty. */}}
+  {{ if .error }}
+  <div class="notice notice-danger" role="alert" id="register-error">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ .error }}</p>
+  </div>
+  {{ end }}
 
-        <div class="mb-3">
+  <div class="field">
+    <label class="field-label" for="email">{{ T $.ctx "common.field.email" }}</label>
+    <input class="control" id="email" type="email" name="email" value="{{ .email }}" autocomplete="username" autocapitalize="none" spellcheck="false"{{ if .error }}{{ if eq .errorField "email" }} aria-invalid="true" aria-describedby="register-error" autofocus{{ end }}{{ else }} autofocus{{ end }}>
+  </div>
 
-            <div class="w-full mt-4 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "common.field.email" }}</span>
-                </label>
-                <input type="text" name="email" value="{{.email}}" placeholder="{{ T $.ctx "common.field.email_placeholder" }}"
-                    class="w-full input input-bordered" autocomplete="username" autofocus />
-            </div>
+  {{ if not .requiresEmailVerification }}
+  <div class="field">
+    <label class="field-label" for="password">{{ T $.ctx "common.field.password" }}</label>
+    <input class="control" id="password" type="password" name="password" autocomplete="new-password"
+      {{- if .error }}{{ if eq .errorField "password" }} aria-invalid="true"{{ end }}{{ if ne .errorField "email" }} autofocus{{ end }}{{ end }}
+      {{- if .passwordRules }} aria-describedby="{{ if .error }}{{ if eq .errorField "password" }}register-error {{ end }}{{ end }}password-rules"
+      {{- else if .error }}{{ if eq .errorField "password" }} aria-describedby="register-error"{{ end }}{{ end }}>
+    {{ if .passwordRules }}<p class="field-hint" id="password-rules">{{ .passwordRules }}</p>{{ end }}
+  </div>
 
-            {{/* With email verification the password is chosen on the form the emailed link
-                 leads to, so this form asks for the address alone (#207). */}}
-            {{if .requiresEmailVerification}}
-                <p class="mt-4">{{ T $.ctx "account.register.verification_hint" }}</p>
-            {{else}}
-                <div class="w-full mt-4 form-control">
-                    <label class="label">
-                        <span class="label-text text-base-content">{{ T $.ctx "common.field.password" }}</span>
-                    </label>
-                    <input type="password" name="password" autocomplete="new-password" value="" placeholder="" class="w-full input input-bordered" />
-                </div>
+  <div class="field">
+    <label class="field-label" for="passwordConfirmation">{{ T $.ctx "common.field.password_confirmation" }}</label>
+    <input class="control" id="passwordConfirmation" type="password" name="passwordConfirmation" autocomplete="new-password"{{ if .error }}{{ if eq .errorField "passwordConfirmation" }} aria-invalid="true" aria-describedby="register-error"{{ end }}{{ end }}>
+  </div>
+  {{ end }}
 
-                <div class="w-full mt-4 form-control">
-                    <label class="label">
-                        <span class="label-text text-base-content">{{ T $.ctx "common.field.password_confirmation" }}</span>
-                    </label>
-                    <input type="password" name="passwordConfirmation" autocomplete="new-password" value="" placeholder="" class="w-full input input-bordered" />
-                </div>
-            {{end}}
+  <button class="button button-primary button-block" type="submit">{{ T $.ctx "account.register.button" }}</button>
+</form>
 
-        </div>
-
-        {{if .error}}
-            <p class="mt-8 text-center text-error">{{.error}}</p>
-        {{else}}
-            <p class="mt-6">&nbsp;</p>
-        {{end}}
-
-        <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "account.register.button" }}</button>
-        <div class='mt-4 text-center'>{{ T $.ctx "account.register.have_account_prompt" }} <a href="/auth/pwd{{if .ceremonyId}}?ceremony={{.ceremonyId}}{{end}}"><span
-            class="inline-block transition duration-200 text-primary hover:text-primary hover:underline hover:cursor-pointer">{{ T $.ctx "account.register.login_link" }}</span></a>
-        </div>
-
-    </form>
-
+<p class="auth-footer">
+  {{ T $.ctx "account.register.have_account_prompt" }}
+  <a class="text-link" href="/auth/pwd{{ if .ceremonyId }}?ceremony={{ .ceremonyId }}{{ end }}">{{ T $.ctx "account.register.login_link" }}</a>
+</p>
 {{end}}

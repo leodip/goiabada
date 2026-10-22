@@ -64,8 +64,8 @@ var profileErrorMessages = map[string]string{
 	i18n.ErrCodeProfileGenderInvalid:    "Gender is invalid.",
 	i18n.ErrCodeProfileDobInvalidFormat: "The date of birth is invalid. Please use the format YYYY-MM-DD.",
 	i18n.ErrCodeProfileDobInFuture:      "The date of birth can't be in the future.",
-	i18n.ErrCodeProfileZoneInfoInvalid:  "The zone info is invalid.",
-	i18n.ErrCodeProfileLocaleInvalid:    "The locale is invalid.",
+	i18n.ErrCodeProfileZoneInfoInvalid:  "Unknown time zone.",
+	i18n.ErrCodeProfileLocaleInvalid:    "Unknown language and region.",
 }
 
 // =============================================================================

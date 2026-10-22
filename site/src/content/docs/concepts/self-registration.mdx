@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you decide whether people can create their own accounts, and how they prove their email address when they do.
 
-Self-registration is a user creating their own account, from the **Register** link on the sign-in page, instead of an administrator creating it. It's off in a new installation, so only your administrators create users until you turn it on.
+Self-registration is a user creating their own account, from the **Create an account** link on the sign-in page, instead of an administrator creating it. It's off in a new installation, so only your administrators create users until you turn it on.
 
 ## Turn on self-registration
 
@@ -15,32 +15,32 @@ Email verification is on in a new installation, so a new account's address is pr
 
 <Steps>
 
-1. Set up email under **Admin**, **Email - SMTP**, and send yourself a test message from the **Send test email** tab.
+1. Set up email under **Admin**, **Email**, and send yourself a test message from the **Send test email** tab.
 
 2. Open **Admin**, **General**.
 
-3. Turn on **User self registration enabled**, leave **User self registration requires email verification** on, and click **Save**.
+3. Turn on **User registration**, leave **Require email verification** on, and click **Save**.
 
 </Steps>
 
-The sign-in page now shows a **Register** link. If it doesn't, email isn't set up yet, and **Admin**, **General** shows a warning under **User self registration requires email verification** saying registration is unavailable. To turn self-registration off again, turn off **User self registration enabled** on the same page. Only administrators can then create users. **User self registration requires email verification** keeps its value meanwhile, greyed out, so turning self-registration back on brings back the choice you made.
+The sign-in page now shows a **Create an account** link. If it doesn't, email isn't set up yet, and **Admin**, **General** shows a warning in its **Registration** section saying registration is unavailable. To turn self-registration off again, turn off **User registration** on the same page. Only administrators can then create users. **Require email verification** keeps its value meanwhile, hidden, so turning self-registration back on brings back the choice you made.
 
 ## Who can register
 
 | Setting | Default |
 |---|---|
-| **User self registration enabled** | Off |
-| **User self registration requires email verification** | On |
+| **User registration** | Off |
+| **Require email verification** | On |
 
-While **User self registration enabled** is off, the sign-in page shows no **Register** link and the registration pages lead to a not-found page. Turning it on opens registration when email is set up or email verification is off.
+While **User registration** is off, the sign-in page shows no **Create an account** link and the registration pages lead to a not-found page. Turning it on opens registration when email is set up or email verification is off.
 
-With **User self registration requires email verification** on, people prove their address first, as [With email verification](#with-email-verification) describes. With it off, they don't, as [Without email verification](#without-email-verification) describes.
+With **Require email verification** on, people prove their address first, as [With email verification](#with-email-verification) describes. With it off, they don't, as [Without email verification](#without-email-verification) describes.
 
-Email verification needs email. While it's on and email isn't set up, nobody can register: the sign-in page shows no **Register** link and the registration form leads to a not-found page, just as the forgot-password page does without email. Meanwhile **Admin**, **General** shows a warning saying so, under **User self registration requires email verification**. Set up email, or turn email verification off, to open registration.
+Email verification needs email. While it's on and email isn't set up, nobody can register: the sign-in page shows no **Create an account** link and the registration form leads to a not-found page, just as the forgot-password page does without email. Meanwhile **Admin**, **General** shows a warning saying so, in its **Registration** section. Set up email, or turn email verification off, to open registration.
 
 ## Without email verification
 
-The registration form asks for an email address and a password, twice. The password must meet the **Password policy** on **Admin**, **General**. When the form is sent, the account is created at once, with its address not verified, and the page says "Your account has been created." When email is set up, the user also gets a "Welcome!" email.
+The registration form asks for an email address and a password, twice. The password must meet the **Password policy** on **Admin**, **General**. When the form is sent, the account is created at once, with its address not verified, and the page says "Account created". When email is set up, the user also gets a "Welcome!" email.
 
 An address that already has an account is refused with "Apologies, but this email address is already registered."
 
@@ -62,7 +62,7 @@ Following the link creates nothing by itself. Only sending the form does, so a m
 
 If the address gains an account before the form is sent, because an administrator created one, the registration is refused and discarded. While self-registration is off, the registration page and every link already sent lead to a not-found page. Turning email off doesn't stop a link already sent: following it needs no email, so it still creates the account.
 
-An expired or used link shows "Unable to activate the account. The verification code appears to be expired." The person registers again to get a new one. While registration is unavailable because email isn't set up, the page leaves out its link to the registration form.
+An expired or used link shows "This link can't be used". The person registers again to get a new one. While registration is unavailable because email isn't set up, the page leaves out its link to the registration form.
 
 ## What a new account has
 

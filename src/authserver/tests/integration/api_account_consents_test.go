@@ -69,7 +69,64 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	assert.Equal(t, client.Id, found.ClientId)
 	assert.Equal(t, consent.Scope, found.Scope)
 	assert.Equal(t, client.ClientIdentifier, found.ClientIdentifier)
-	assert.Equal(t, client.Description, found.ClientDescription)
+	assert.Equal(t, client.ClientIdentifier, found.ClientName, "a client with no display name shown is named by its identifier")
+	assert.False(t, found.ClientNameUnverified)
+	assert.Empty(t, found.ClientDescription, "a description the sign-in screens do not show does not reach the user here either")
+}
+
+// The account endpoint names each client as the consent screen did, and carries a description only
+// when that screen shows it: an administrator's name and description shown, and a self-registered
+// client's own name, marked unverified and not repeated as its description.
+func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+
+	named := &record.Client{
+		ClientIdentifier: "acct-consents-named-" + fake.UUID()[:8],
+		DisplayName:      "Customer portal",
+		ShowDisplayName:  true,
+		Description:      "Orders and invoices",
+		ShowDescription:  true,
+		Enabled:          true,
+		IsPublic:         true,
+	}
+	selfRegistered := &record.Client{
+		ClientIdentifier: "dcr_" + fake.UUID()[:8],
+		Description:      "Payroll Portal",
+		ShowDescription:  true,
+		CreatedViaDCR:    true,
+		Enabled:          true,
+		IsPublic:         true,
+	}
+	consentIds := map[int64]*record.Client{}
+	for _, client := range []*record.Client{named, selfRegistered} {
+		require.NoError(t, database.CreateClient(context.Background(), nil, client))
+		defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+		consent := &record.UserConsent{UserId: u.Id, ClientId: client.Id, Scope: "openid",
+			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
+		require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
+		defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+		consentIds[consent.Id] = client
+	}
+
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/account/consents", accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var getResp api.GetUserConsentsResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&getResp))
+
+	got := map[string]api.UserConsentResponse{}
+	for _, c := range getResp.Consents {
+		if client, ok := consentIds[c.Id]; ok {
+			got[client.ClientIdentifier] = c
+		}
+	}
+	require.Len(t, got, 2)
+	assert.Equal(t, "Customer portal", got[named.ClientIdentifier].ClientName)
+	assert.False(t, got[named.ClientIdentifier].ClientNameUnverified)
+	assert.Equal(t, "Orders and invoices", got[named.ClientIdentifier].ClientDescription)
+	assert.Equal(t, "Payroll Portal", got[selfRegistered.ClientIdentifier].ClientName)
+	assert.True(t, got[selfRegistered.ClientIdentifier].ClientNameUnverified)
+	assert.Empty(t, got[selfRegistered.ClientIdentifier].ClientDescription)
 }
 
 func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {

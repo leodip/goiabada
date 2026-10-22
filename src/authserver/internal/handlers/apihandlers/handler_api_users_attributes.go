@@ -139,7 +139,7 @@ func HandleUserAttributeCreatePost(
 
 		// Validate required fields
 		if req.Key == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil))
 			return
 		}
 
@@ -259,7 +259,7 @@ func HandleUserAttributeUpdatePut(
 
 		// Validate required fields
 		if req.Key == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil))
 			return
 		}
 

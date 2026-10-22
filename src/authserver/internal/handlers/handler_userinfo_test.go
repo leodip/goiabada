@@ -546,7 +546,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 
 			// templateFS is nil because JSONError renders no template; a 500 through the
 			// page writer would panic here, which is the fail-loud direction.
-			handler := HandleUserInfoGetPost(render.New(nil), database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
+			handler := HandleUserInfoGetPost(render.New(nil, nil), database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 			req, _ := http.NewRequest("GET", "/userinfo", nil)
 			jwtToken := oauth.JwtToken{

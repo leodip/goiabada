@@ -108,11 +108,15 @@ The auth server never sends a browser to a client's redirect URI with an error b
 | When | What happens |
 |---|---|
 | The client [registered itself](/concepts/clients/#self-registered-clients) | No error is sent, ever. The user sees a page naming the address the client asked to send them to, and the request stops there. |
-| The request has `prompt=none` | The error is sent at once, since a [silent request](/concepts/glossary/#silent-request) must never show a page |
+| The request has `prompt=none` | The error is sent at once, since a [silent request](/concepts/glossary/#silent-request) must never show a page. A request past the [rate limit](#rate-limit) is the one exception: it gets a page, and no error is sent. |
 | The browser has a valid session, and the request doesn't have `prompt=login` | The error is sent at once |
 | Anything else, `prompt=login` included | The user is asked for their password, and the error is sent once they've entered it, before any one-time code. That sign-in creates no session. |
 
 The error, its description, the response mode, `state` and `iss` are the same whichever way it's sent. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/) for what each case looks like.
+
+## Rate limit
+
+With the rate limiter on, the GET and the POST share one budget, the `authorize` limit: 120 requests a minute from one IP address, counting every request, valid or not, silent or not. A request past it is answered `429 Too Many Requests` with a `Retry-After` header and the "Too many attempts" page, before anything in it is checked, so no error reaches the redirect URI. That holds for a request with `prompt=none` too: a silent request in a hidden iframe gets a page your app can't read, and sees no answer, as when the iframe times out. See [rate limits](/reference/environment-variables/#rate-limits) and [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/).
 
 ## Administrative scopes
 

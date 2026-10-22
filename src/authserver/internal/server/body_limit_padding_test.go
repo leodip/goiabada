@@ -67,6 +67,7 @@ func newPaddingTestServer(t *testing.T, database *datamocks.Database) (*httptest
 
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
+	s.staticFS = web.StaticFS()
 	s.initRoutes(s.initMiddleware())
 
 	counts := make(chan readCount, 1)

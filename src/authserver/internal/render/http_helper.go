@@ -25,11 +25,14 @@ import (
 // Renderer renders pages from the template file system it was built over, and writes JSON.
 type Renderer struct {
 	templateFS fs.FS
+	assets     *assetFingerprints
 }
 
-// New returns a Renderer over templateFS, which holds the layouts and pages.
-func New(templateFS fs.FS) *Renderer {
-	return &Renderer{templateFS: templateFS}
+// New returns a Renderer over templateFS, which holds the layouts and pages, and staticFS, the
+// static files the server serves under /static/, which the pages name through the asset template
+// function.
+func New(templateFS fs.FS, staticFS fs.FS) *Renderer {
+	return &Renderer{templateFS: templateFS, assets: newAssetFingerprints(staticFS)}
 }
 
 // InternalServerError logs err once, with a stack and the request id the page shows, and renders
@@ -202,7 +205,7 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 		}
 	}
 
-	templ, err := template.New(name).Funcs(templateFuncMap).ParseFS(h.templateFS, templateFiles...)
+	templ, err := template.New(name).Funcs(templateFuncMap).Funcs(template.FuncMap{"asset": h.assets.url}).ParseFS(h.templateFS, templateFiles...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to render template")
 	}

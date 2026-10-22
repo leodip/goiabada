@@ -55,7 +55,7 @@ func HandleAccountConsentsGet(
 			return
 		}
 
-		resp := api.GetUserConsentsResponse{Consents: apimapping.ToUserConsentResponses(consents)}
+		resp := api.GetUserConsentsResponse{Consents: apimapping.ToAccountConsentResponses(consents)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

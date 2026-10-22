@@ -1450,7 +1450,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	templateFS := fstest.MapFS{
-		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
+		"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit>
 				<input type="hidden" name="error" value="{{.error}}">
 				<input type="hidden" name="error_description" value="{{.error_description}}">
 				<input type="hidden" name="state" value="{{.state}}">
@@ -1461,7 +1461,7 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Contains(t, w.Body.String(), `<form method="post" action="https://example.com/callback">`)
+	assert.Contains(t, w.Body.String(), `<form class="auth-status" method="post" action="https://example.com/callback" data-auto-submit>`)
 	assert.Contains(t, w.Body.String(), `<input type="hidden" name="error" value="access_denied">`)
 	assert.Contains(t, w.Body.String(), `<input type="hidden" name="error_description" value="Access denied">`)
 	assert.Contains(t, w.Body.String(), `<input type="hidden" name="state" value="def456">`)
@@ -1509,7 +1509,7 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 	r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 	templateFS := fstest.MapFS{
-		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
+		"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 	}
 
 	err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("server_error", "Internal server error",
@@ -1580,7 +1580,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		templateFS := fstest.MapFS{
-			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
+			"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit>
 					<input type="hidden" name="error" value="{{.error}}">
 					<input type="hidden" name="error_description" value="{{.error_description}}">
 					<input type="hidden" name="state" value="{{.state}}">
@@ -1591,7 +1591,7 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Body.String(), `<form method="post" action="https://example.com/callback">`)
+		assert.Contains(t, w.Body.String(), `<form class="auth-status" method="post" action="https://example.com/callback" data-auto-submit>`)
 		assert.Contains(t, w.Body.String(), `<input type="hidden" name="error" value="access_denied">`)
 	})
 }
@@ -1809,7 +1809,7 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		templateFS := fstest.MapFS{
-			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
+			"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 		}
 
 		err := testClientErrorResponder(testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS).redirToClientWithError(w, r, testRedirectError("access_denied", "Access denied",

@@ -40,7 +40,7 @@ test("every page of the sign-in, its error pages included, refuses framing and l
   await page.goto(clientUrl(client.id, "settings"));
   await page.locator('select[name="defaultAcrLevel"]').selectOption("urn:goiabada:level2_mandatory");
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
 
   // Every page the auth server renders in this browser, and every request those pages make elsewhere.
   const context = await emptyBrowser(browser);
@@ -66,10 +66,10 @@ test("every page of the sign-in, its error pages included, refuses framing and l
   await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(client.identifier, { response_mode: "form_post" }).params)}`);
   await submitPassword(tab, user.email, user.password);
   await expect(tab).toHaveURL(/\/auth\/otp/);
-  await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("pre").innerText()).trim()));
+  await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("#otp-secret").innerText()).trim()));
   await tab.getByRole("button", { name: "Verify" }).click();
   await expect(tab).toHaveURL(/\/auth\/consent/);
-  await tab.getByRole("button", { name: "Give consent" }).click();
+  await tab.getByRole("button", { name: "Allow", exact: true }).click();
   await tab.waitForURL((url) => url.href.startsWith(testRedirectUri));
   // The "no longer active" page: a step named with another sign-in's ceremony.
   await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(client.identifier, { prompt: "login" }).params)}`);
@@ -77,7 +77,7 @@ test("every page of the sign-in, its error pages included, refuses framing and l
   await tab.goto(`${env.authUrl}/auth/level1completed?ceremony=another-sign-in`);
   // Signing out, asked first, and the page after.
   await tab.goto(`${env.authUrl}/auth/logout`);
-  await tab.getByRole("button", { name: "Yes" }).click();
+  await tab.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(tab.getByRole("heading", { name: "Signed out" })).toBeVisible();
   // Forgot password, and the not found page.
   await tab.goto(`${env.authUrl}/forgot-password`);
@@ -107,9 +107,9 @@ test("the authorization endpoint answers no CORS request, from a registered web 
   const registered = `https://${client.identifier}.example.com`;
   await page.goto(clientUrl(client.id, "web-origins"));
   await page.locator("#webOrigin").fill(registered);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator("#addOriginBtn").click();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Web origins saved successfully")).toBeVisible();
+  await expect(page.getByText("Web origins saved.")).toBeVisible();
   const allowedOrigin = async (url: string, method: "GET" | "OPTIONS", origin: string, requestMethod: string) => {
     const headers: Record<string, string> = { Origin: origin };
     if (method === "OPTIONS") headers["Access-Control-Request-Method"] = requestMethod;
@@ -170,7 +170,8 @@ test("form_post is offered, and posts the response to the redirect URI; an in-br
   const { redirect, page: form } = await followAuthorize(signIn.context.request, params);
   expect(redirect, "no redirect: the response is in the page").toBeUndefined();
   expect(form!.status).toBe(200);
-  expect(form!.text).toContain(`<form method="post" action="${testRedirectUri}">`);
+  // A form the page's script submits as soon as it is parsed (data-auto-submit).
+  expect(form!.text).toContain(`method="post" action="${testRedirectUri}" data-auto-submit>`);
   expect(form!.text).toMatch(/<input type="hidden" name="code" value="[^"]+"/);
   expect(form!.text).toContain(`<input type="hidden" name="state" value="${params.state}"`);
 
@@ -178,6 +179,36 @@ test("form_post is offered, and posts the response to the redirect URI; an in-br
   expect(inBrowser.status).toBe(400);
   expectRefusedOnPage(inBrowser, /Invalid response_mode parameter/);
   await signIn.context.close();
+});
+
+// With no script to submit it, the form_post page says what it is doing and offers the button that
+// sends the response on.
+test("without JavaScript, the form_post page says it is returning the user, and Continue posts the response to the redirect URI (section 4.2.4)", async ({
+  page,
+  browser,
+  clients,
+  users,
+}) => {
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
+  // The same browser's session, in a context that runs no script.
+  const noScript = await browser.newContext({ storageState: await signIn.context.storageState(), javaScriptEnabled: false });
+  await signIn.context.close();
+  const tab = await noScript.newPage();
+
+  const { params } = codeRequest(client.identifier, { response_mode: "form_post" });
+  await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(params)}`);
+  await expect(tab.getByRole("heading", { name: "Returning you to the application" })).toBeVisible();
+  await expect(tab.getByText("If nothing happens, select Continue.")).toBeVisible();
+  const [posted] = await Promise.all([
+    tab.waitForRequest((r) => r.url() === testRedirectUri && r.method() === "POST"),
+    tab.getByRole("button", { name: "Continue" }).click(),
+  ]);
+  const fields = new URLSearchParams(posted.postData() ?? "");
+  expect(fields.get("code")).toBeTruthy();
+  expect(fields.get("state")).toBe(params.state);
+  await noScript.close();
 });
 
 // form_post answers through a form whose action is the redirect URI, which no form can post to when

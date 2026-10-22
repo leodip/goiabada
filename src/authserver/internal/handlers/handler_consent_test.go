@@ -2366,8 +2366,8 @@ func TestHandleConsentGet_PromptConsentShowsAFullyConsentedScope(t *testing.T) {
 
 	require.NotNil(t, rendered)
 	assert.Equal(t, []authflow.ScopeInfo{
-		{Scope: "openid", Description: "Authenticate your user and identify you via a unique ID", AlreadyConsented: true},
-		{Scope: "profile", Description: "Access to claims: name, family_name, given_name, middle_name, nickname, preferred_username, profile, website, gender, birthdate, zoneinfo, locale, and updated_at", AlreadyConsented: true},
+		{Scope: "openid", Description: "Identify you by an ID unique to your account", AlreadyConsented: true},
+		{Scope: "profile", Description: "Your profile: name, nickname, username, picture, website, gender, birth date, time zone and language", AlreadyConsented: true},
 	}, rendered["scopes"])
 	ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 }

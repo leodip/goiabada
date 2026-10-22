@@ -61,9 +61,10 @@ func HandleNewPost(
 			return
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"error":           message,
+				"errorField":      errorField,
 				"smtpEnabled":     settings.SMTPEnabled,
 				"setPasswordType": r.FormValue("setPasswordType"),
 				"page":            r.URL.Query().Get("page"),
@@ -91,7 +92,7 @@ func HandleNewPost(
 		// Basic validation
 		email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 		if len(email) == 0 {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.user_new.email_required"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.user_new.email_required"), "email")
 			return
 		}
 
@@ -122,7 +123,9 @@ func HandleNewPost(
 			Password:        password,
 		})
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, userNewErrorFields))
+			})
 			return
 		}
 

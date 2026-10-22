@@ -2,7 +2,7 @@
 // registered ones by simple string comparison (3.1.2.3), and a request whose redirect URI is missing,
 // invalid or not registered is answered on the auth server's own page, never by redirect (3.1.2.4).
 // RFC 8252 section 7.3 is the one relaxation: any port on a loopback redirect URI.
-import { addRedirectUri, clientUrl, expectErrorDialog } from "../../lib/admin-console";
+import { addRedirectUri, clientUrl } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -44,7 +44,7 @@ test("a redirect URI is matched exactly: the registered one goes on to sign-in, 
   ]) {
     await test.step(nearMiss, async () => {
       const answer = await getAuthorize(anonymous.request, codeRequest(client.identifier, { redirect_uri: nearMiss }).params);
-      expectRefusedOnPage(answer, /The client does not have this redirect URI registered/);
+      expectRefusedOnPage(answer, /The application does not have this redirect URI registered/);
     });
   }
   await anonymous.close();
@@ -58,11 +58,12 @@ test("a redirect URI with a fragment is refused at the authorization endpoint an
   expectRefusedOnPage(answer, /a fragment is not permitted/);
   await anonymous.close();
 
+  // The console's list takes it, and its save is refused in the tab's status region.
   await page.goto(clientUrl(client.id, "redirect-uris"));
   await page.locator("#redirectURI").fill(`${testRedirectUri}-other#section`);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator("#addURIBtn").click();
   await page.locator("#btnSave").click();
-  await expectErrorDialog(page, /a fragment is not permitted/);
+  await expect(page.locator("#uriListStatus .notice-danger")).toContainText(/a fragment is not permitted/);
   await page.reload();
   await expect(page.locator("#redirectURIsTable")).not.toContainText("#section");
 });
@@ -77,7 +78,7 @@ test("a client with no redirect URI registered, or with two and none named, is r
   const none = await clients.create();
   expectRefusedOnPage(
     await getAuthorize(anonymous.request, codeRequest(none.identifier).params),
-    /The client does not have this redirect URI registered/,
+    /The application does not have this redirect URI registered/,
   );
 
   // Section 3.1.2.3: with several registered, the client MUST say which.

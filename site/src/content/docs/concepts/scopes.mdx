@@ -62,7 +62,7 @@ Your app can read the claims in three places.
 
 A client can override either setting on its own **Tokens** tab. Turn ID token claims off for a client that expects them only from `/userinfo`, as OpenID Connect describes when an access token is issued, or that needs a small ID token. Turn access token claims on when your API should read the user's details from the token without calling `/userinfo`.
 
-Neither setting decides `groups` and `attributes`. Each group and attribute has its own two settings instead: **Include in access token** for the access token, and **Include in id token** for the ID token and `/userinfo`.
+Neither setting decides `groups` and `attributes`. Each group and attribute has its own two settings instead: **Include in the access token** for the access token, and **Include in the ID token** for the ID token and `/userinfo`.
 
 The claims about the sign-in itself, such as `sub`, `iss`, `aud`, `exp`, `auth_time` and `acr`, are always in the ID token. See [Tokens](/concepts/tokens/).
 

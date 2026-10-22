@@ -16,9 +16,11 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// clientTokensAPI is what the client tokens page needs: the client, and the token settings write.
+// clientTokensAPI is what the client tokens page needs: the client, the global token settings each
+// of its "use the global setting" choices names the value of, and the token settings write.
 type clientTokensAPI interface {
 	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetSettingsTokens(ctx context.Context, accessToken string) (*api.SettingsTokensResponse, error)
 	UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 }
 
@@ -88,9 +90,16 @@ func HandleTokensGet(
 			}
 		}
 
+		global, err := apiClient.GetSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
 		bind := map[string]interface{}{
 			"settings":          settingsInfo,
 			"client":            client,
+			"global":            global,
 			"savedSuccessfully": savedSuccessfully,
 		}
 
@@ -155,13 +164,21 @@ func HandleTokensPost(
 		}
 
 		// A refused save draws every input as submitted, a duration that is not a number and both
-		// choices included; the title comes from the stored client.
-		renderError := func(message string) {
+		// choices included; the title comes from the stored client, and the global values the choices
+		// name from the global settings.
+		renderError := func(message, errorField string) {
+			global, globalErr := apiClient.GetSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken)
+			if globalErr != nil {
+				render.HandleAPIError(httpHelper, w, r, globalErr)
+				return
+			}
 
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"client":   client,
-				"error":    message,
+				"settings":   settingsInfo,
+				"client":     client,
+				"global":     global,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_tokens.html", bind)
@@ -172,19 +189,19 @@ func HandleTokensPost(
 
 		tokenExpirationInSeconds, err := strconv.Atoi(settingsInfo.TokenExpirationInSeconds)
 		if err != nil {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.token_expiration_invalid"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.token_expiration_invalid"), "tokenExpirationInSeconds")
 			return
 		}
 
 		refreshTokenOfflineIdleTimeoutInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds)
 		if err != nil {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid"), "refreshTokenOfflineIdleTimeoutInSeconds")
 			return
 		}
 
 		refreshTokenOfflineMaxLifetimeInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds)
 		if err != nil {
-			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid"))
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid"), "refreshTokenOfflineMaxLifetimeInSeconds")
 			return
 		}
 
@@ -198,7 +215,9 @@ func HandleTokensPost(
 
 		_, err = apiClient.UpdateClientTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, clientTokensErrorFields))
+			})
 			return
 		}
 

@@ -3,7 +3,7 @@
 // password, so a client registered only to receive errors cannot bounce visitors to itself (4.11.2).
 // prompt=none is the one exception. Logout is the other place the server redirects, and the admin
 // console, itself a client, must not be an open redirector either (4.11.1). An unknown client or an
-// unregistered redirect URI, refused on the page, is in ../rfc6749/redirect-uri.spec.ts; a cancelled
+// unregistered redirect URI, refused on the page, is in ../rfc6749/redirect-uri.spec.ts; a declined
 // consent answered access_denied in ../rfc6749/authorization-response.spec.ts.
 import type { BrowserContext } from "@playwright/test";
 import { addRedirectUri, setImplicitGrant } from "../../lib/admin-console";
@@ -88,9 +88,9 @@ test("logout redirects only to a URI registered for the client it names; any oth
     await catchElsewhere(signIn.context);
     const tab = await signIn.context.newPage();
     await tab.goto(`${env.authUrl}/auth/logout?${new URLSearchParams(await query(signIn))}`);
-    const yes = tab.getByRole("button", { name: "Yes" });
-    if (await yes.isVisible()) {
-      await yes.click();
+    const signOutButton = tab.getByRole("button", { name: "Sign out", exact: true });
+    if (await signOutButton.isVisible()) {
+      await signOutButton.click();
       await tab.waitForLoadState();
     }
     const landed = new URL(tab.url());

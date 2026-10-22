@@ -29,7 +29,7 @@ func TestHandleEmailVerificationPost_ARefusalIsDrawnWithItsSentence(t *testing.T
 		{
 			name:        "a code the API calls expired",
 			smtpEnabled: true,
-			refusal:     &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "Invalid or expired verification code", StatusCode: http.StatusBadRequest},
+			refusal:     &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "That code isn't right, or it has expired. Send a new one if you need to.", StatusCode: http.StatusBadRequest},
 		},
 		{
 			name:        "email switched off since the page was drawn",

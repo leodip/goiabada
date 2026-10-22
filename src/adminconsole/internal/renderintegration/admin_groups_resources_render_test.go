@@ -4,36 +4,42 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// The group permissions page does the same (#428).
+// The group permissions page draws the grants it loaded as rows, which permission-list.js reads
+// once, as it loads, and sends with every save, beside the group the route's body names (#428).
 func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups_permissions.html", map[string]interface{}{
 		"group": struct {
 			GroupId         int64
 			GroupIdentifier string
-			Permissions     map[int64]string
-		}{
-			GroupId:         5,
-			GroupIdentifier: "admins",
-			Permissions:     map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
-		},
-		"resources":         []api.ResourceResponse{},
+		}{GroupId: 5, GroupIdentifier: "admins"},
+		"granted": []struct {
+			Id    int64
+			Scope string
+		}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+		"resources":         []render.Choice{},
 		"savedSuccessfully": false,
 	})
-	assertSendsTheLoadedPermissionIds(t, out)
+
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `data-save-url="/admin/groups/5/permissions" data-owner-key="groupId" data-owner-id="5"`)
+	assert.Contains(t, out, `data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"`)
+	assert.Contains(t, out, `src="/static/pages/permission-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/permission-list.js", "loadedIds", "grantedIds()")
 }
 
 // Seam 4 for the group family (#350): the three group pages whose templates read the fields the
 // apiclient used to rebuild into a record.Group. This is the only seam that catches a template
 // naming a field the DTO does not carry, because it runs the real template FS, funcmap and layout.
 //
-// The list is the page that reads the most of the response: five columns, of which two are the
-// booleans that decide which token a membership reaches and one is the member count.
+// The list is the page that reads the most of the response: the identifier and description, the
+// member count, and the two booleans that decide which token a membership reaches, drawn as tags.
 func TestRender_AdminGroups(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{
 		"groups": []api.GroupResponse{
@@ -46,15 +52,15 @@ func TestRender_AdminGroups(t *testing.T) {
 	assert.Contains(t, out, "admins")
 	assert.Contains(t, out, "Administradores")
 	assert.Contains(t, out, "site-viewers")
-	assert.Regexp(t, `<td>\s*17\s*</td>`, out,
+	assert.Regexp(t, `data-label="Membros">17</td>`, out,
 		"the member count column is what GetGroupById's second return used to carry")
 
-	// The two token columns, both arms: "Sim" for the id token on the first row and "Não" for its
-	// access token. A row that rendered neither would still contain both words, from the other
-	// row, so the count is what tells them apart: three noes (one per row for access token, plus
-	// the second row's id token) and one yes.
-	assert.Equal(t, 1, strings.Count(out, ">Sim<"))
-	assert.Equal(t, 3, strings.Count(out, ">Não<"))
+	// The token cell, both arms: the first row's ID token tag and no access token tag, and the
+	// second row's word for neither. A row that rendered neither arm would still leave the other
+	// row's text, so the counts are what tell them apart.
+	assert.Equal(t, 1, strings.Count(out, `<span class="tag">ID token</span>`))
+	assert.Equal(t, 0, strings.Count(out, `<span class="tag">Token de acesso</span>`))
+	assert.Equal(t, 1, strings.Count(out, `<span class="text-ink-muted">Nenhum</span>`))
 }
 
 // The delete confirmation, whose member count comes off the response now rather than from a second
@@ -67,8 +73,8 @@ func TestRender_AdminGroupDelete(t *testing.T) {
 
 	assert.Contains(t, out, "admins")
 	assert.Contains(t, out, "Administradores")
-	assert.Contains(t, out, "Quantidade de membros")
-	assert.Regexp(t, `<td class="">17 <a`, out,
+	assert.Contains(t, out, "<dt>Membros</dt>")
+	assert.Regexp(t, `<dd>17 <a`, out,
 		"the count the administrator is about to orphan has to be on the page")
 }
 
@@ -90,7 +96,7 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 		assert.Contains(t, out, "tier")
 		assert.Contains(t, out, "gold")
 		assert.Contains(t, out, "region")
-		assert.NotContains(t, out, "Nenhum atributo associado ao grupo.",
+		assert.NotContains(t, out, "Nenhum atributo ainda.",
 			"with two attributes listed, the empty arm must not also render")
 	})
 
@@ -102,7 +108,7 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 			"attributes":      []api.GroupAttributeResponse{},
 		})
 
-		assert.Contains(t, out, "Nenhum atributo associado ao grupo.")
+		assert.Contains(t, out, "Nenhum atributo ainda.")
 	})
 }
 
@@ -130,59 +136,66 @@ func TestRender_AdminResourcesList(t *testing.T) {
 }
 
 func TestRender_AdminResourcePermissions(t *testing.T) {
-	bind := map[string]interface{}{
-		"resourceId":                   2,
-		"resourceIdentifier":           "faturamento",
-		"resourceDescription":          "Faturamento",
-		"isSystemLevelResource":        false,
-		"builtInPermissionIdentifiers": []string{},
-		"savedSuccessfully":            false,
-		"permissions": []api.PermissionResponse{
-			{Id: 9, PermissionIdentifier: "ler", Description: "Ler faturas", ResourceId: 2,
-				Resource: api.ResourceResponse{Id: 2, ResourceIdentifier: "faturamento"}},
-		},
-	}
-
-	out := renderMenuPage(t, "/admin_resources_permissions.html", bind)
-
-	// The page bootstraps its editor from a JavaScript array built out of the DTO's fields, so a
-	// renamed or missing field arrives as an empty string rather than as a template error.
-	assert.Contains(t, out, `"permissionIdentifier": "ler"`)
-	assert.Contains(t, out, `"description": "Ler faturas"`)
-	// html/template pads a number interpolated into a script with spaces, so the id is asserted in
-	// the form the browser actually receives rather than the form the template reads.
-	assert.Contains(t, out, `"id":  9 `)
-}
-
-// The resource permissions page keeps a copy of every entry it loaded and sends it with every
-// save, so the auth server can refuse a save from an outdated page rather than undo another
-// administrator's rename or new permission. The copy is taken entry by entry after every loaded
-// entry is pushed, since the editor changes the loaded objects in place, and it is never edited,
-// or the page would send its edited list as the loaded one and every save would pass (#428).
-func TestRender_AdminResourcePermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_resources_permissions.html", map[string]interface{}{
-		"resourceId":                   2,
-		"resourceIdentifier":           "faturamento",
-		"resourceDescription":          "Faturamento",
-		"isSystemLevelResource":        false,
-		"builtInPermissionIdentifiers": []string{},
-		"savedSuccessfully":            false,
-		"permissions": []api.PermissionResponse{
-			{Id: 9, PermissionIdentifier: "ler", Description: "Ler faturas", ResourceId: 2},
-			{Id: 10, PermissionIdentifier: "escrever", Description: "Escrever faturas", ResourceId: 2},
-		},
+		"resourceId":            2,
+		"resourceIdentifier":    "faturamento",
+		"isSystemLevelResource": false,
+		"savedSuccessfully":     false,
+		"entries": []struct {
+			Id          int64
+			Identifier  string
+			Description string
+			BuiltIn     bool
+		}{{Id: 9, Identifier: "ler", Description: "Ler faturas"}},
 	})
 
-	const copyTaken = `const loadedPermissions = availablePermissions.map(function(p) { return { "id": p.id, "permissionIdentifier": p.permissionIdentifier, "description": p.description }; });`
-	lastLoaded := strings.Index(out, `"permissionIdentifier": "escrever"`)
-	require.NotEqual(t, -1, lastLoaded, "the loaded entries are pushed into the editable list")
-	require.Less(t, strings.Index(out, `"permissionIdentifier": "ler"`), lastLoaded)
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps a copy of each loaded entry")
-	assert.Greater(t, copyAt, lastLoaded, "the copy is taken after every loaded entry is in the list")
-	assert.Less(t, copyAt, strings.Index(out, "function btnSaveClick"), "the copy is taken at load, before anything can edit the list")
+	// The rows are drawn from the entries' fields, which the editor reads back out of the row, so a
+	// renamed or missing field arrives as an empty attribute rather than as a template error.
+	assert.Contains(t, out, `<tr data-id="9" data-identifier="ler" data-description="Ler faturas">`)
+	assert.Contains(t, out, `type="button" data-entry-edit>Editar<span class="sr-only"> ler</span></button>`)
+	assert.Contains(t, out, `type="button" data-entry-remove>Remover<span class="sr-only"> ler</span></button>`)
+}
 
-	assert.Contains(t, out, `"expectedPermissions": loadedPermissions`)
-	assert.NotRegexp(t, `loadedPermissions\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedPermissions\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+// The auth server's own resource draws its built-in permissions with no Edit or Remove, since no
+// caller may rename or delete them, and asks before every save.
+func TestRender_AdminResourcePermissions_BuiltInsHaveNoEditOrRemove(t *testing.T) {
+	out := renderMenuPage(t, "/admin_resources_permissions.html", map[string]interface{}{
+		"resourceId":            1,
+		"resourceIdentifier":    "authserver",
+		"isSystemLevelResource": true,
+		"savedSuccessfully":     false,
+		"entries": []struct {
+			Id          int64
+			Identifier  string
+			Description string
+			BuiltIn     bool
+		}{{Id: 1, Identifier: "manage", Description: "Manage", BuiltIn: true}, {Id: 9, Identifier: "custom", Description: "Custom"}},
+	})
+
+	assert.Equal(t, 1, strings.Count(out, "data-entry-edit>"), "only the custom permission is editable")
+	assert.Equal(t, 1, strings.Count(out, "data-entry-remove>"))
+	assert.Contains(t, out, `<span class="tag">Embutida</span>`)
+	assert.Contains(t, out, `data-confirm-always="`)
+}
+
+// The resource permissions page draws the entries it loaded as rows, which resource-permissions.js
+// reads once, as it loads, and sends with every save, so the auth server can refuse a save from an
+// outdated page rather than undo another administrator's rename or new permission (#428).
+func TestRender_AdminResourcePermissions_SendsTheLoadedList(t *testing.T) {
+	out := renderMenuPage(t, "/admin_resources_permissions.html", map[string]interface{}{
+		"resourceId":            2,
+		"resourceIdentifier":    "faturamento",
+		"isSystemLevelResource": false,
+		"savedSuccessfully":     false,
+		"entries": []struct {
+			Id          int64
+			Identifier  string
+			Description string
+			BuiltIn     bool
+		}{{Id: 9, Identifier: "ler", Description: "Ler faturas"}, {Id: 10, Identifier: "escrever", Description: "Escrever faturas"}},
+	})
+
+	assert.Contains(t, out, `data-list-key="permissions" data-expected-key="expectedPermissions"`)
+	assert.Contains(t, out, `src="/static/pages/resource-permissions.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/resource-permissions.js", "loadedEntries", "entries()")
 }

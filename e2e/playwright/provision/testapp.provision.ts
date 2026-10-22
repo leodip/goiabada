@@ -50,13 +50,13 @@ test("set up the test app's clients and API", async ({ page }) => {
   }
   await page.goto(resourcesList);
   if ((await rowWithCell(page, testapp.api.resource).count()) > 0) {
-    await deleteResource(page, await idFromListLink(page, resourcesList, testapp.api.resource, "Manage"));
+    await deleteResource(page, await idFromListLink(page, resourcesList, testapp.api.resource));
   }
 
   // Protect an API, steps 1 and 2: the API's resource and its permissions.
   await submitNewResource(page, testapp.api.resource, "The test app's API");
   await expect(page).toHaveURL(resourcesList);
-  const resourceId = await idFromListLink(page, resourcesList, testapp.api.resource, "Manage");
+  const resourceId = await idFromListLink(page, resourcesList, testapp.api.resource);
   await page.goto(resourceUrl(resourceId, "permissions"));
   for (const permission of testapp.api.permissions) await addResourcePermission(page, permission);
   await saveResourcePermissions(page);
@@ -76,16 +76,16 @@ test("set up the test app's clients and API", async ({ page }) => {
   // and its origin.
   const spaId = await createClient(page, { identifier: testapp.spa.clientId });
   await page.goto(clientUrl(spaId, "authentication"));
-  await page.getByRole("radio", { name: "Public client" }).check();
+  await page.getByRole("radio", { name: "Public", exact: true }).check();
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You are switching from confidential to public client");
-  await expect(page.getByText("Client authentication saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're making the client public");
+  await expect(page.getByText("Authentication saved.")).toBeVisible();
   await addRedirectUri(page, spaId, testapp.spa.url);
   await page.goto(clientUrl(spaId, "web-origins"));
   await page.locator("#webOrigin").fill(testapp.spa.origin);
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.locator("#addOriginBtn").click();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Web origins saved successfully")).toBeVisible();
+  await expect(page.getByText("Web origins saved.")).toBeVisible();
   secrets.SPA_CLIENT_ID = testapp.spa.clientId;
 
   // Protect an API, "Let a service call your API", steps 1 and 2: the client credentials flow alone,

@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/httpmw"
+	"github.com/leodip/goiabada/core/issuerlength"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -206,10 +207,10 @@ type Config struct {
 // its own, which is also what lets it load twice in one process (#320).
 //
 // It answers a whole configuration or an error: the parse's, or one naming every numeric or
-// boolean variable that is set and does not parse. A flag given for the same setting does not
-// rescue the variable, because the value the operator wrote is wrong whichever of the two wins,
-// and a setting only the server reads is refused before `migrate` as well, as its flag already
-// is (#434).
+// boolean variable that is set and does not parse, or a base URL longer than the issuer allows.
+// A flag given for the same setting does not rescue the variable, because the value the operator
+// wrote is wrong whichever of the two wins, and a setting only the server reads is refused before
+// `migrate` as well, as its flag already is (#434).
 func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	var malformed malformedValues
 	authServerBaseURL := getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090")
@@ -333,6 +334,15 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	checkDatabaseFlags(fs, &c.Database, &malformed)
 	if len(c.Args) == 0 || c.Args[0] != "migrate" {
 		checkDatabaseTLS(&c.Database, &malformed)
+	}
+
+	// The base URL is held to the issuer's length limit before anything is seeded, on the value
+	// the parse left whichever side supplied it: the general settings save holds every issuer to
+	// the limit, the stored one included, so a base URL past it would leave an installation whose
+	// General settings can never be saved (#615).
+	if issuerlength.Check(c.AuthServer.BaseURL) != nil {
+		malformed.addLine("GOIABADA_AUTHSERVER_BASEURL (--authserver-baseurl) is " + strconv.Quote(c.AuthServer.BaseURL) +
+			", longer than the issuer allows: at most " + strconv.Itoa(issuerlength.Max) + " characters")
 	}
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag

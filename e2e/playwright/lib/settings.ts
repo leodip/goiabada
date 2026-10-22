@@ -2,19 +2,24 @@
 // values first and puts them back afterwards, pass or fail. Those tests live in *.system.ts files, which
 // run alone (playwright.config.ts).
 import { expect, type Page } from "@playwright/test";
+import { confirmDialog } from "./admin-console";
 import { env } from "./environment";
 
 type FormValues = Record<string, string | boolean>;
 
-// The values of a settings page's named fields: text and selects by value, checkboxes by state.
-// Password and hidden fields are left out.
+// The values of a settings page's named fields: text and selects by value, checkboxes by state, a
+// group of radios by the value chosen. Password and hidden fields are left out.
 export async function readSettingsForm(page: Page, path: string): Promise<FormValues> {
   await page.goto(`${env.adminUrl}${path}`);
-  return page.locator("form").first().evaluate((form) => {
+  return page.locator('form[method="post"]').first().evaluate((form) => {
     const values: Record<string, string | boolean> = {};
     for (const element of Array.from(form.querySelectorAll("input[name], select[name]"))) {
       const field = element as HTMLInputElement | HTMLSelectElement;
       if (field instanceof HTMLInputElement && ["hidden", "password", "file"].includes(field.type)) continue;
+      if (field instanceof HTMLInputElement && field.type === "radio") {
+        if (field.checked) values[field.name] = field.value;
+        continue;
+      }
       values[field.name] = field instanceof HTMLInputElement && field.type === "checkbox" ? field.checked : field.value;
     }
     return values;
@@ -22,30 +27,40 @@ export async function readSettingsForm(page: Page, path: string): Promise<FormVa
 }
 
 // Fills a settings page's fields with these values, leaving the others as they are. A switch can
-// enable or disable another (self-registration and its email verification), so the fields are set
-// last to first, skipping a disabled one, and again until each is set or none can be.
+// show or hide others (self-registration its email verification, sending email the server's fields),
+// so the fields are set last to first, skipping one that is hidden or disabled, and again until each
+// is set or none can be.
 export async function fillSettingsForm(page: Page, values: FormValues) {
   let pending = Object.entries(values).reverse();
   while (pending.length > 0) {
     const skipped: typeof pending = [];
     for (const [name, value] of pending) {
-      const field = page.locator(`form [name="${name}"]`).first();
-      if (await field.isDisabled()) {
+      const named = page.locator(`form [name="${name}"]`);
+      const isRadio = (await named.first().getAttribute("type")) === "radio";
+      const field = isRadio ? page.locator(`form [name="${name}"][value="${value}"]`) : named.first();
+      if (!(await field.isVisible()) || (await field.isDisabled())) {
         skipped.push([name, value]);
         continue;
       }
-      if (typeof value === "boolean") await field.setChecked(value);
+      if (isRadio) await field.check();
+      else if (typeof value === "boolean") await field.setChecked(value);
       else if ((await field.evaluate((e) => e.tagName)) === "SELECT") await field.selectOption(value);
       else await field.fill(value);
     }
-    if (skipped.length === pending.length) throw new Error(`fields that stay disabled: ${skipped.map(([n]) => n).join(", ")}`);
+    if (skipped.length === pending.length) throw new Error(`fields that stay hidden or disabled: ${skipped.map(([n]) => n).join(", ")}`);
     pending = skipped;
   }
 }
 
+// Saves a settings page and waits for "Settings saved.", answering Save when the page first asks
+// (an issuer change, email turned off).
 export async function saveSettings(page: Page) {
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Settings saved successfully")).toBeVisible();
+  const saved = page.getByText("Settings saved.", { exact: true });
+  const asked = page.locator("dialog[open]");
+  await expect(saved.or(asked).first()).toBeVisible();
+  if (await asked.isVisible()) await confirmDialog(page);
+  await expect(saved).toBeVisible();
 }
 
 // Runs body, then puts the page's fields back as they were before it, whatever happened.

@@ -55,35 +55,35 @@ func HandleSettingsSessionsPut(
 
 		// Validation
 		if req.UserSessionIdleTimeoutInSeconds <= 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutNotPositive, nil))
 			return
 		}
 		if req.UserSessionMaxLifetimeInSeconds <= 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxLifetimeNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxLifetimeNotPositive, nil))
 			return
 		}
 		const maxValue = 160000000
 		if req.UserSessionIdleTimeoutInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutTooLarge, map[string]any{"max": maxValue}))
 			return
 		}
 		if req.UserSessionMaxLifetimeInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxLifetimeTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxLifetimeTooLarge, map[string]any{"max": maxValue}))
 			return
 		}
 		if req.UserSessionIdleTimeoutInSeconds > req.UserSessionMaxLifetimeInSeconds {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime, nil))
 			return
 		}
 		// The cap is required: a PUT replaces the whole resource, and an absent or null value read
 		// as 0 would turn the cap off for a caller that does not know the field (#564 decision 6).
 		if req.MaxUserSessionsPerUser == nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxSessionsPerUserRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxSessionsPerUserRequired, nil))
 			return
 		}
 		const maxSessionsPerUser = 1000
 		if *req.MaxUserSessionsPerUser < 0 || *req.MaxUserSessionsPerUser > maxSessionsPerUser {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange, map[string]any{"max": maxSessionsPerUser}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange, map[string]any{"max": maxSessionsPerUser}))
 			return
 		}
 

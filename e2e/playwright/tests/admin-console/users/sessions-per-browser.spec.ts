@@ -2,6 +2,7 @@
 // (#564): a sign-in replaces the earlier session of the browser it happens in and no other, and every
 // session that ends says why in the audit log.
 import type { BrowserContext } from "@playwright/test";
+import { confirmDialog } from "../../../lib/admin-console";
 import { signInThroughClient, submitPassword, testRedirectUri } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
@@ -59,7 +60,7 @@ test("a sign-out keeps the device cookie, and each session that ends says why", 
 
   const logout = await signIn.context.newPage();
   await logout.goto(`${env.authUrl}/auth/logout`);
-  await logout.getByRole("button", { name: "Yes" }).click();
+  await logout.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(logout.getByRole("heading", { name: "Signed out" })).toBeVisible();
   expect((await deviceCookieOf(signIn.context))?.value).toBe(device);
   expect(await sessionIds(page, user.id)).toEqual([]);
@@ -67,9 +68,10 @@ test("a sign-out keeps the device cookie, and each session that ends says why", 
 
   await signInAgain(signIn.context, client.identifier, user);
   const [ended] = await sessionIds(page, user.id);
-  await page.locator("table tbody tr").first().getByRole("button", { name: "End session" }).click();
-  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-  await expect(page.getByText("No sessions found.")).toBeVisible();
+  await page.locator("#sessionsTable tbody tr").first().getByRole("button", { name: /^End session/ }).click();
+  await confirmDialog(page, "End this session?");
+  await expect(page.locator("#sessions-status")).toContainText("Session ended.");
+  expect(await sessionIds(page, user.id)).toEqual([]);
   await expectSessionDeleted(page, ended, "ended_by_administrator");
   await signIn.context.close();
 });

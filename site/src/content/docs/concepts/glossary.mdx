@@ -64,14 +64,14 @@ One piece of information inside a token, such as `sub` (who the user is) or `ema
 
 ### Client
 
-An application that asks the auth server for tokens: your app, an API calling another API, or the admin console itself. A client is identified by its client identifier, the `client_id` it sends. See [Clients](/concepts/clients/).
+An application that asks the auth server for tokens: your app, an API calling another API, or the admin console itself. A client is identified by its client identifier, the `client_id` it sends. The sign-in pages and the account pages call it an application, since that's how the person signing in knows it. See [Clients](/concepts/clients/).
 
 - A **confidential client** runs on a server and has a client secret.
 - A **public client** runs where it can't keep a secret, such as a browser or a phone, so it has none and must always use PKCE.
 
 ### Consent
 
-A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Consent required" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. It also asks when a client other than the admin console's asks for `authserver:manage-account` and the user hasn't approved that scope for it yet. See [Consent required](/concepts/clients/#consent-required) for the full rule. Users can revoke a consent under "Manage consents" in their account.
+A user's approval for a client to receive what it asked for. The auth server asks for it when the client has "Ask users for consent" turned on, when the client asks for `offline_access`, or when the request says `prompt=consent`. It also asks when a client other than the admin console's asks for `authserver:manage-account` and the user hasn't approved that scope for it yet. See [Consent required](/concepts/clients/#consent-required) for the full rule. Users can revoke a consent under "Consents" in their account.
 
 ### Dynamic client registration (DCR)
 
@@ -127,7 +127,7 @@ Replacing one of the secrets your deployment holds with a new one: a server's se
 
 ### Self-registration
 
-A user creating their own account from the sign-in page's **Register** link, instead of an administrator creating it. See [Self-registration](/concepts/self-registration/).
+A user creating their own account from the sign-in page's **Create an account** link, instead of an administrator creating it. See [Self-registration](/concepts/self-registration/).
 
 ### Session
 
@@ -135,7 +135,7 @@ What lets a user sign in once and use several clients. After the user signs in, 
 
 ### Signing-key rotation
 
-What **Rotate key** under **Admin**, **Keys** does: the next signing key starts signing tokens, the current one becomes the previous one, and the old previous one is deleted, so a token it signed no longer verifies. See [The key set](/reference/endpoints/discovery-and-jwks/#the-key-set).
+What **Rotate keys** under **Admin**, **Signing keys** does: the next signing key starts signing tokens, the current one becomes the previous one, and the old previous one is deleted, so a token it signed no longer verifies. See [The key set](/reference/endpoints/discovery-and-jwks/#the-key-set).
 
 ### Silent request
 

@@ -213,7 +213,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound)
+		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "nonexistent@example.com"}, *bound)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -250,7 +250,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound)
+		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "existing@example.com"}, *bound)
 
 		// The code is stored by the narrow conditional write, predicated on the address the
 		// lookup found, and never by writing the loaded row back (#404 decision 2).
@@ -502,7 +502,7 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 			jobs.runAll(t, afterresponse.ClassRecovery)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound,
+			assert.Equal(t, map[string]interface{}{"linkSent": true, "email": email}, *bound,
 				"the page must be exactly the one an address with no account gets")
 			assert.Equal(t, tc.wantAudit, *details)
 
@@ -553,7 +553,7 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound)
+			assert.Equal(t, map[string]interface{}{"linkSent": true, "email": email}, *bound)
 			pageRenderer.AssertExpectations(t)
 			database.AssertExpectations(t)
 
@@ -707,7 +707,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		jobs.runAll(t, afterresponse.ClassRecovery)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, map[string]interface{}{"linkSent": true}, *bound, "the requester is told a link was sent")
+		assert.Equal(t, map[string]interface{}{"linkSent": true, "email": "someone@example.com"}, *bound, "the requester is told a link was sent")
 		assert.Equal(t, "code_issued", (*details)["outcome"])
 		pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 		assertOneErrorRecordOnTheRequest(t, capture)

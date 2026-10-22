@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -39,49 +40,17 @@ func parseHTMLResponse(t *testing.T, response *http.Response) *goquery.Document 
 	return doc
 }
 
-// assertClientNameInHTML verifies the client name is displayed correctly
-// Supports both auth layout and consent layout patterns
+// assertClientNameInHTML verifies the client name is displayed: <p class="auth-client-name">, which
+// the auth layout and the consent page both write.
 func assertClientNameInHTML(t *testing.T, doc *goquery.Document, expectedName string) {
-	var found bool
-	var actualName string
-
-	// Auth layout pattern: <span class="mt-1 text-sm text-base-content/80">CLIENT_NAME</span>
-	doc.Find("span.text-sm").Each(func(i int, s *goquery.Selection) {
-		class, _ := s.Attr("class")
-		if strings.Contains(class, "text-base-content") && strings.Contains(class, "mt-1") {
-			actualName = strings.TrimSpace(s.Text())
-			if actualName == expectedName {
-				found = true
-			}
-		}
+	var names []string
+	doc.Find("p.auth-client-name").Each(func(i int, s *goquery.Selection) {
+		names = append(names, strings.TrimSpace(s.Text()))
 	})
-
-	// Consent layout pattern: <h4 class="text-lg font-bold">CLIENT_NAME</h4>
-	if !found {
-		doc.Find("h4.text-lg").Each(func(i int, s *goquery.Selection) {
-			actualName = strings.TrimSpace(s.Text())
-			if actualName == expectedName {
-				found = true
-			}
-		})
-	}
-
-	if !found {
-		t.Logf("Expected client name: %s", expectedName)
-		t.Logf("Actual client name found: %s", actualName)
-
-		// Debug: Show all h4 tags found
-		var h4Count int
-		doc.Find("h4").Each(func(i int, s *goquery.Selection) {
-			h4Count++
-			t.Logf("Found h4 #%d: class='%s', text='%s'", i, s.AttrOr("class", ""), strings.TrimSpace(s.Text()))
-		})
-		t.Logf("Total h4 tags found: %d", h4Count)
-
+	if !slices.Contains(names, expectedName) {
 		dumpResponseBody(t, &http.Response{Body: io.NopCloser(strings.NewReader(doc.Text()))})
 	}
-
-	assert.True(t, found, "Client name '%s' should be displayed in HTML", expectedName)
+	assert.Contains(t, names, expectedName, "Client name '%s' should be displayed in HTML", expectedName)
 }
 
 // assertClientLogoInHTML verifies logo image is present/absent as expected
@@ -105,73 +74,21 @@ func assertClientLogoInHTML(t *testing.T, doc *goquery.Document, clientIdentifie
 	}
 }
 
-// assertClientDescriptionInHTML verifies description is present/absent and matches expected
+// assertClientDescriptionInHTML verifies the description is present or absent as expected:
+// <p class="auth-client-description">, which the auth layout and the consent page both write.
 func assertClientDescriptionInHTML(t *testing.T, doc *goquery.Document, expectedDescription string, expectPresent bool) {
+	var descriptions []string
+	doc.Find("p.auth-client-description").Each(func(i int, s *goquery.Selection) {
+		descriptions = append(descriptions, strings.TrimSpace(s.Text()))
+	})
 	if !expectPresent {
-		// When not expecting description, verify it's not in either layout pattern
 		if expectedDescription != "" {
-			var foundInAuthLayout bool
-			doc.Find("span.text-xs").Each(func(i int, s *goquery.Selection) {
-				class, _ := s.Attr("class")
-				if strings.Contains(class, "text-base-content") {
-					if strings.Contains(s.Text(), expectedDescription) {
-						foundInAuthLayout = true
-					}
-				}
-			})
-
-			var foundInConsentLayout bool
-			doc.Find("p.text-sm").Each(func(i int, s *goquery.Selection) {
-				class, _ := s.Attr("class")
-				if strings.Contains(class, "opacity-70") {
-					if strings.Contains(s.Text(), expectedDescription) {
-						foundInConsentLayout = true
-					}
-				}
-			})
-
-			assert.False(t, foundInAuthLayout || foundInConsentLayout,
+			assert.NotContains(t, descriptions, expectedDescription,
 				"Description should not be visible when ShowDescription=false or description empty")
 		}
 		return
 	}
-
-	// When expecting description, check both layout patterns
-	var found bool
-
-	// Auth layout pattern: <span class="text-xs text-base-content/80">
-	doc.Find("span.text-xs").Each(func(i int, s *goquery.Selection) {
-		class, _ := s.Attr("class")
-		if strings.Contains(class, "text-base-content") {
-			text := strings.TrimSpace(s.Text())
-			if text == expectedDescription {
-				found = true
-			}
-		}
-	})
-
-	// Consent layout pattern: <p class="text-sm opacity-70">
-	if !found {
-		doc.Find("p.opacity-70").Each(func(i int, s *goquery.Selection) {
-			text := strings.TrimSpace(s.Text())
-			if text == expectedDescription {
-				found = true
-			}
-		})
-	}
-
-	if !found {
-		// Debug: Show all p tags with opacity-70 found
-		t.Logf("Expected description: '%s'", expectedDescription)
-		doc.Find("p").Each(func(i int, s *goquery.Selection) {
-			class := s.AttrOr("class", "")
-			if strings.Contains(class, "opacity") || strings.Contains(class, "text-sm") {
-				t.Logf("Found p: class='%s', text='%s'", class, strings.TrimSpace(s.Text()))
-			}
-		})
-	}
-
-	assert.True(t, found,
+	assert.Contains(t, descriptions, expectedDescription,
 		"Description '%s' should be visible when ShowDescription=true and description not empty", expectedDescription)
 }
 

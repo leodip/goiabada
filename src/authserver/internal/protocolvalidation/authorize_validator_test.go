@@ -221,7 +221,7 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
-	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", locErr.EnglishFallback())
+	assert.Equal(t, "Invalid client_id parameter. The application does not exist.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
@@ -237,7 +237,7 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientDisabled, locErr.Code)
-	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", locErr.EnglishFallback())
+	assert.Equal(t, "Invalid client_id parameter. The application is disabled.", locErr.EnglishFallback())
 }
 
 // The code flow's enablement is no longer this layer's question (#573): a client with the flow
@@ -356,7 +356,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 	// message it expects rather than the table asserting one string: "not registered" and
 	// "not an absolute URI" are different diagnoses, and telling an administrator a URI is
 	// not registered when it plainly is sends them looking in the wrong place (#122).
-	const notRegistered = "Invalid redirect_uri parameter. The client does not have this redirect URI registered."
+	const notRegistered = "Invalid redirect_uri parameter. The application does not have this redirect URI registered."
 	const notAbsolute = "Invalid redirect_uri parameter. The redirect URI must be an absolute URI: a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host."
 
 	tests := []struct {
@@ -909,7 +909,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeClientNotFound, locErr.Code)
-	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", locErr.EnglishFallback())
+	assert.Equal(t, "Invalid client_id parameter. The application does not exist.", locErr.EnglishFallback())
 }
 
 func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
@@ -934,7 +934,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
 	assert.Equal(t, i18n.ErrCodeAuthorizeRedirectURINotRegistered, locErr.Code)
-	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", locErr.EnglishFallback())
+	assert.Equal(t, "Invalid redirect_uri parameter. The application does not have this redirect URI registered.", locErr.EnglishFallback())
 }
 
 func TestValidateRequest_EmptyResponseMode(t *testing.T) {

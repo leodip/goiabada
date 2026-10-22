@@ -145,6 +145,7 @@ func TestAPIResourceUpdatePut_OntoAClientIdentifier(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "The resource identifier is already in use by a client", errResp.ErrorDescription)
+	assert.Equal(t, "handler.resource.identifier_names_client", errResp.ErrorCode)
 }
 
 // A row that already holds a collision, from before the check existed, keeps its other edits:
@@ -185,6 +186,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "Resource identifier is required", errResp.ErrorDescription)
+	assert.Equal(t, "handler.resource.identifier_required", errResp.ErrorCode)
 
 	// Too long description
 	longDesc := strings.Repeat("a", 101)
@@ -220,6 +222,7 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "The resource identifier is already in use", errResp.ErrorDescription)
+	assert.Equal(t, "handler.resource.identifier_in_use", errResp.ErrorCode)
 }
 
 func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
@@ -268,6 +271,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	err = json.NewDecoder(resp.Body).Decode(&errResp)
 	require.NoError(t, err)
 	assert.Contains(t, errResp.ErrorDescription, "identifier of a system-level resource cannot be changed")
+	assert.Equal(t, "handler.resource.system_level_identifier_fixed", errResp.ErrorCode)
 }
 
 func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {

@@ -1,295 +1,73 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.authentication.page_title_prefix" }}{{.storedClient.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.authentication.page_title_prefix" }}<span class="text-accent">{{.storedClient.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.authentication" }} – {{ .storedClient.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    var isPublic = {{if .storedClient.IsPublic}}true{{else}}false{{end}};
-    var originalClientSecret = "{{.storedClient.ClientSecret}}";
-
-    var isSystemLevel = {{if .storedClient.IsSystemLevelClient}}true{{else}}false{{end}};
-
-    document.addEventListener("DOMContentLoaded", function() {
-        refreshPublicConfidential();
-
-        const publicClientRadio = document.getElementById("publicClientRadio");
-        const confidentialClientRadio = document.getElementById("confidentialClientRadio");
-        publicClientRadio.addEventListener("change", function() {
-            refreshPublicConfidential();
-        });
-        confidentialClientRadio.addEventListener("change", function() {
-            refreshPublicConfidential();
-        });
-
-
-        function submitForm() {
-            const formClientAuth = document.getElementsByTagName("form")[0];
-            if (isSystemLevel) {
-                showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                    dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
-                    function() { /* cancel */ },
-                    function() { formClientAuth.submit(); }
-                );
-            } else {
-                formClientAuth.submit();
-            }
-        }
-        const btnSave = document.getElementById("btnSave");
-        if(btnSave) {
-            btnSave.addEventListener("click", function(event) {
-                event.preventDefault();
-
-                const formClientAuth = document.getElementsByTagName("form")[0];
-
-                const clientSecret = document.getElementById('clientSecret');
-
-                if(confidentialClientRadio.checked && originalClientSecret !== "" &&
-                    clientSecret.value !== originalClientSecret) {
-
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.authentication.modal.secret_change" }}"]),
-                    function() {
-                    },
-                    function() {
-                        submitForm();
-                    });
-                } else if(!isPublic && publicClientRadio.checked) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.authentication.modal.confidential_to_public" }}"]),
-                    function() {
-                    },
-                    function() {
-                        submitForm();
-                    });
-                } else if(isPublic && confidentialClientRadio.checked) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.authentication.modal.public_to_confidential" }}"]),
-                    function() {
-                    },
-                    function() {
-                        submitForm();
-                    });
-                } else {
-                    submitForm();
-                }
-            });
-        }
-    });
-
-    function refreshPublicConfidential() {
-        const publicClientPanel = document.getElementById("publicClientPanel");
-        const confidentialClientPanel = document.getElementById("confidentialClientPanel");
-        const publicClientRadio = document.getElementById("publicClientRadio");
-        const confidentialClientRadio = document.getElementById("confidentialClientRadio");
-
-        if(publicClientRadio.checked) {
-            publicClientPanel.classList.remove("hidden");
-            confidentialClientPanel.classList.add("hidden");
-        } else {
-            publicClientPanel.classList.add("hidden");
-            confidentialClientPanel.classList.remove("hidden");
-
-            const clientSecret = document.getElementById('clientSecret');
-            if(clientSecret.value === "") {
-                const generateNewSecretLink = document.getElementById("generateNewSecretLink");
-                generateNewSecretLink.click();
-            }
-        }
-    }
-
-    function revealClick(evt) {
-        evt.preventDefault();
-        const clientSecret = document.getElementById('clientSecret');
-        clientSecret.type = "text";
-
-        const revealLink = document.getElementById('revealLink');
-        revealLink.classList.add('hidden');
-
-        const hideLink = document.getElementById('hideLink');
-        hideLink.classList.remove('hidden');
-    }
-
-    function hideClick(evt) {
-        evt.preventDefault();
-        const clientSecret = document.getElementById('clientSecret');
-        clientSecret.type = "password";
-
-        const revealLink = document.getElementById('revealLink');
-        revealLink.classList.remove('hidden');
-
-        const hideLink = document.getElementById('hideLink');
-        hideLink.classList.add('hidden');
-    }
-
-    function copyClick(evt) {
-        evt.preventDefault();
-        const clientSecret = document.getElementById('clientSecret');
-        clientSecret.select();
-        clientSecret.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(clientSecret.value);
-
-        // Show feedback by changing the text temporarily
-        const copyLink = document.getElementById('copyLink');
-        const copyText = document.getElementById('copyText');
-        const originalText = copyText.textContent;
-
-        // Make link unclickable
-        copyLink.style.pointerEvents = 'none';
-        copyLink.classList.add('opacity-60');
-        copyText.textContent = '{{ T $.ctx "adminconsole.admin_clients.authentication.copied_link" }}';
-
-        // Reset after 1 second
-        setTimeout(function() {
-            copyText.textContent = originalText;
-            copyLink.style.pointerEvents = '';
-            copyLink.classList.remove('opacity-60');
-        }, 1000);
-    }
-
-    function generateNewSecretClick(evt) {
-        evt.preventDefault();
-
-        const loadingIcon = document.getElementById("loadingIcon");
-
-        sendAjaxRequest({
-            "url": "/admin/clients/generate-new-secret",
-            "method": "GET",
-            "bodyData": null,
-            "loadingElement": loadingIcon,
-            "loadingClasses": ["loading", "loading-xs"],
-            "modalId": "modal0",
-            "callback": function(result) {
-                const clientSecret = document.getElementById('clientSecret');
-
-                let clientSecretOriginalValue = clientSecret.value;
-                clientSecret.value = result.NewSecret;
-
-                if(clientSecretOriginalValue !== "") {
-                    clientSecret.type = "text";
-
-                    const revealLink = document.getElementById('revealLink');
-                    revealLink.classList.add('hidden');
-
-                    const hideLink = document.getElementById('hideLink');
-                    hideLink.classList.remove('hidden');
-                }
-            }
-        });
-    }
-
-</script>
-
+<script src="{{ asset "/static/pages/admin-clients-authentication.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{ template "client_header" (args "authentication" .client.ClientId .storedClient.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
 
-{{template "manage_clients_tabs" (args "authentication" .client.ClientId $.ctx) }}
-
-<form method="post">
-
-    {{if .client.IsSystemLevelClient}}
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div role="alert" class="alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
-                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
-        </div>
+{{/* A save asks first, in one dialog, about a change of type and about a new secret, against the
+     client as stored, and always on the admin console's own client. The secret is drawn hidden; a
+     public client has none, and its part of the form is hidden and not asked about. */}}
+<form class="panel" method="post" novalidate data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}"{{ if .client.IsSystemLevelClient }} data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="authentication-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-    {{end}}
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full bg-base-100">
-            <div class="flex gap-8">
-                <label class="flex gap-3 cursor-pointer items-center">
-                    <input type="radio" id="publicClientRadio" name="publicConfidential" value="public"
-                        class="radio radio-sm" {{if .client.IsPublic}}checked{{end}} />
-                    <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.authentication.public_client" }}</span>
-                </label>
-                <label class="flex gap-3 cursor-pointer items-center">
-                    <input type="radio" id="confidentialClientRadio" name="publicConfidential" value="confidential"
-                        class="radio radio-sm" {{if not .client.IsPublic}}checked{{end}} />
-                    <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_client" }}</span>
-                </label>
-            </div>
-
-            <div id="publicClientPanel" class="w-full mt-6 bg-base-100 {{if not .client.IsPublic}}hidden{{end}}">
-                <p class="">{{ T $.ctx "adminconsole.admin_clients.authentication.public_intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.authentication.public_intro_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.authentication.public_intro_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.authentication.public_intro_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.authentication.public_intro_suffix" }}</p>
-                <p class="mt-4">{{ T $.ctx "adminconsole.admin_clients.authentication.public_flow_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.authentication.public_flow_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.authentication.public_flow_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.authentication.public_flow_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.authentication.public_flow_suffix" }}</p>
-            </div>
-
-            <div id="confidentialClientPanel" class="w-full mt-6 bg-base-100 {{if .client.IsPublic}}hidden{{end}}">
-                <p class="">{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_intro_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_intro_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_intro_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_intro_suffix" }}</p>
-                <div class="w-full mt-6 form-control">
-                    <label class="label">
-                        <span class="label-text text-base-content">
-                            {{ T $.ctx "adminconsole.admin_clients.authentication.field.client_secret" }}
-                            <div class="tooltip tooltip-top"
-                                data-tip="{{ T $.ctx "adminconsole.admin_clients.authentication.client_secret_tooltip" }}">
-                                <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                                </svg>
-                            </div>
-                        </span>
-                    </label>
-                    <input type="password" readonly id="clientSecret" name="clientSecret" autocomplete="off" value="{{.client.ClientSecret}}"
-                        class="w-full font-mono input input-bordered" />
-                    <div class="mt-2 flex justify-between items-center text-sm">
-                        <div>
-                            <a id="generateNewSecretLink" class="link link-hover link-secondary" onclick="generateNewSecretClick(event);" href="#">{{ T $.ctx "adminconsole.admin_clients.authentication.generate_link" }}</a>
-                            <span id="loadingIcon" class="hidden w-5 h-5 ml-2 align-middle text-primary inline-block">&nbsp;</span>
-                        </div>
-                        <div class="flex gap-6">
-                            <a id="revealLink" class="link link-hover link-secondary" onclick="revealClick(event);" href="#">{{ T $.ctx "adminconsole.admin_clients.authentication.reveal_link" }}</a>
-                            <a id="hideLink" class="link link-hover link-secondary hidden" onclick="hideClick(event);" href="#">{{ T $.ctx "adminconsole.admin_clients.authentication.hide_link" }}</a>
-                            <span class="inline-block w-16">
-                                <a id="copyLink" class="link link-hover link-secondary" onclick="copyClick(event);" href="#"><span id="copyText">{{ T $.ctx "adminconsole.admin_clients.authentication.copy_link" }}</span></a>
-                            </span>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
-
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.authentication.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.authentication.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-        </div>
+    <fieldset>
+      <legend class="field-label mb-3">{{ T $.ctx "adminconsole.admin_clients.authentication.type_legend" }}</legend>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="option-card">
+          <input type="radio" id="publicClientRadio" name="publicConfidential" value="public"{{ if .client.IsPublic }} checked{{ end }} aria-labelledby="public-name" aria-describedby="public-hint"
+            data-confirm="{{ T $.ctx "adminconsole.admin_clients.authentication.modal.confidential_to_public" }}" data-confirm-when="checked" data-stored-checked="{{ .storedClient.IsPublic }}">
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="choice-label" id="public-name">{{ T $.ctx "adminconsole.admin_clients.authentication.public_client" }}</span>
+            <span class="field-hint" id="public-hint">{{ T $.ctx "adminconsole.admin_clients.authentication.public_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="confidentialClientRadio" name="publicConfidential" value="confidential"{{ if not .client.IsPublic }} checked{{ end }} aria-labelledby="confidential-name" aria-describedby="confidential-hint"
+            data-confirm="{{ T $.ctx "adminconsole.admin_clients.authentication.modal.public_to_confidential" }}" data-confirm-when="checked" data-stored-checked="{{ not .storedClient.IsPublic }}">
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="choice-label" id="confidential-name">{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_client" }}</span>
+            <span class="field-hint" id="confidential-hint">{{ T $.ctx "adminconsole.admin_clients.authentication.confidential_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="field" id="confidentialClientPanel"{{ if .client.IsPublic }} hidden{{ end }}>
+      <label class="field-label" for="clientSecret">{{ T $.ctx "adminconsole.admin_clients.authentication.field.client_secret" }}</label>
+      <div class="input-row">
+        <input class="control control-mono" type="password" readonly id="clientSecret" name="clientSecret" value="{{ .client.ClientSecret }}" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="{{ if .error }}{{ if eq .errorField "clientSecret" }}authentication-error {{ end }}{{ end }}clientSecretHint"
+          {{- if .error }}{{ if eq .errorField "clientSecret" }} aria-invalid="true" autofocus{{ end }}{{ end }}
+          data-confirm="{{ T $.ctx "adminconsole.admin_clients.authentication.modal.secret_change" }}" data-stored-value="{{ .storedClient.ClientSecret }}">
+        <button class="button" type="button" id="showSecretBtn" aria-controls="clientSecret" data-hide-label="{{ T $.ctx "adminconsole.admin_clients.authentication.hide_link" }}">{{ T $.ctx "adminconsole.admin_clients.authentication.reveal_link" }}</button>
+        <button class="button" type="button" id="copySecretBtn" data-copy-target="clientSecret" data-copy-status="secret-copied" data-copied-label="{{ T $.ctx "adminconsole.admin_clients.authentication.copied_link" }}" data-copy-failed-label="{{ T $.ctx "adminconsole.admin_clients.authentication.copy_failed" }}" data-copy-failed-status="{{ T $.ctx "adminconsole.admin_clients.authentication.copy_failed_status" }}" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"/><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"/></svg><span>{{ T $.ctx "adminconsole.admin_clients.authentication.copy_link" }}</span></button>
+      </div>
+      <p class="field-hint" id="clientSecretHint">{{ T $.ctx "adminconsole.admin_clients.authentication.client_secret_tooltip" }}</p>
+      <p class="sr-only" id="secret-copied" role="status"></p>
+      <div class="mt-2">
+        <button class="button" type="button" id="generateSecretBtn">{{ T $.ctx "adminconsole.admin_clients.authentication.generate_link" }}</button>
+      </div>
+      <div class="not-empty:mt-2" id="secret-status" role="status" data-generated="{{ T $.ctx "adminconsole.admin_clients.authentication.secret_generated" }}"></div>
     </div>
-
+  </div>
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
 </form>
 
-{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
-
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}
 {{end}}

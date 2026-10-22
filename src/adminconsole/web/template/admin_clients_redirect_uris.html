@@ -1,261 +1,75 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.redirect_uris.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.redirect_uris.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.redirect_uris" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    var redirectURIs = [];
-    var ids = [];
-    {{ range $key, $value := .client.RedirectURIs }}
-        redirectURIs.push("{{ $value }}");
-        ids.push({{$key}});
-    {{end}}
-    // The list as loaded, never edited: the save sends it so the server can refuse a save from
-    // an outdated page rather than undo another administrator's change (#428).
-    const loadedRedirectURIs = redirectURIs.slice();
-
-    document.addEventListener("DOMContentLoaded", function () {
-
-        var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
-
-        const btnSave = document.getElementById("btnSave");
-        if (btnSave) {
-            btnSave.addEventListener("click", function (evt) {
-                evt.preventDefault();
-
-                function doSave() {
-                    const loadingIcon = document.getElementById("loadingIcon");
-
-                    sendAjaxRequest({
-                        "url": "/admin/clients/{{.client.ClientId}}/redirect-uris",
-                        "method": "POST",
-                        "bodyData": JSON.stringify({
-                            "clientId": {{.client.ClientId }},
-                            "redirectURIs": redirectURIs,
-                            "expectedRedirectURIs": loadedRedirectURIs,
-                            "ids": ids,
-                        }),
-                        "loadingElement": loadingIcon,
-                        "loadingClasses": ["loading", "loading-xs"],
-                        "modalId": "modal0",
-                        "callback": function(result) {
-
-                            if (result.Success) {
-                                window.location.href = "/admin/clients/{{.client.ClientId}}/redirect-uris";
-                            } else {
-                                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.modal.unexpected_error" }}");
-                            }
-                        }
-                    });
-                }
-
-                if (isSystemLevel) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                        dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
-                        function() { /* cancel */ },
-                        function() { doSave(); }
-                    );
-                } else {
-                    doSave();
-                }
-            });
-        }
-
-        refreshRedirectURIsTable();
-    });
-
-    function refreshRedirectURIsTable() {
-
-        const redirectURIsTable = document.getElementById("redirectURIsTable");
-        const redirectURIsTableBody = redirectURIsTable.getElementsByTagName("tbody")[0];
-        redirectURIsTableBody.innerHTML = "";
-
-        if(redirectURIs.length == 0) {
-            const row = redirectURIsTableBody.insertRow();
-            const cell1 = row.insertCell(0);
-            const cell2 = row.insertCell(1);
-            cell1.className = "p-2 font-mono text-sm align-middle";
-            cell1.innerHTML = "{{ T $.ctx "adminconsole.admin_clients.redirect_uris.none_yet" }}";
-
-            cell2.className = "p-2 text-right";
-            cell2.innerHTML = "&nbsp;";
-        } else {
-            redirectURIs.forEach((uri, idx) => {
-                const row = redirectURIsTableBody.insertRow();
-                const cell1 = row.insertCell(0);
-                const cell2 = row.insertCell(1);
-                cell1.className = "p-1 font-mono text-sm align-middle";
-                // textContent, not innerHTML: a redirect URI is data, and innerHTML would
-                // parse markup in it. See issue #105. deleteRedirectURI must read it back
-                // with textContent for the same reason.
-                cell1.textContent = uri;
-
-                cell2.className = "p-1 text-right";
-                cell2.replaceChildren(createTrashCanButton("{{ T $.ctx "adminconsole.admin_clients.redirect_uris.remove_label" }} " + uri, deleteRedirectURI));
-            });
-        }
-    }
-
-    function isUrlValid(string) {
-        let url;
-        try {
-            url = new URL(string);
-        } catch (_) {
-            return false;
-        }
-        return true;
-    }
-
-    function addRedirectURIClick(evt) {
-        evt.preventDefault();
-
-        const redirectURI = document.getElementById("redirectURI");
-        if(isUrlValid(redirectURI.value)) {
-
-            if(redirectURIs.includes(redirectURI.value)) {
-                showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", "{{ T $.ctx "adminconsole.admin_clients.redirect_uris.duplicate_error" }}");
-                return;
-            } else {
-                redirectURIs.push(redirectURI.value);
-                ids.push(0);
-                refreshRedirectURIsTable();
-                redirectURI.value = "";
-                setTimeout(function() {
-                    redirectURI.focus();
-                }, 100);
-            }
-        } else {
-            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_clients.modal.error_title" }}", dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.redirect_uris.invalid_url_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.invalid_url_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.invalid_url_suffix" }}"]),
-                function() {
-                    setTimeout(function() {
-                        redirectURI.focus();
-                    }, 100);
-                });
-            return;
-        }
-    }
-
-    function deleteRedirectURI(evt, elem) {
-        evt.preventDefault();
-        const row = elem.parentNode.parentNode;
-        // Must match how the cell was written, above. Reading innerHTML returns a
-        // re-serialised, entity-escaped string, so "?a=1&b=2" came back as "?a=1&amp;b=2"
-        // and indexOf never found it: deletion silently did nothing.
-        const redirectURI = row.getElementsByTagName("td")[0].textContent;
-        const index = redirectURIs.indexOf(redirectURI);
-        if (index > -1) {
-            redirectURIs.splice(index, 1);
-            ids.splice(index, 1);
-        }
-        refreshRedirectURIsTable();
-    }
-
-</script>
-
+{{ if .client.CanManageRedirectURIs }}<script src="{{ asset "/static/pages/client-uri-list.js" }}" defer></script>{{ end }}
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{ template "client_header" (args "redirect-uris" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
 
-{{template "manage_clients_tabs" (args "redirect-uris" .client.ClientId $.ctx) }}
-
-<form method="post">
-
-    {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div role="alert" class="alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
-                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
-        </div>
+{{ if not .client.CanManageRedirectURIs }}
+<div class="panel">
+  <div class="panel-body">
+    <div class="notice notice-note">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.requires_redirect_flow" }}</p>
     </div>
-    {{end}}
+  </div>
+</div>
+{{ else }}
+{{/* The list is drawn as stored; client-uri-list.js edits it in the page and saves it whole,
+     with the list as drawn, so the server refuses a save from an outdated page (#428). */}}
+<form class="panel" id="uriListForm" novalidate data-save-url="/admin/clients/{{ .client.ClientId }}/redirect-uris" data-client-id="{{ .client.ClientId }}" data-list-key="redirectURIs" data-expected-key="expectedRedirectURIs"
+  data-invalid="{{ T $.ctx "adminconsole.admin_clients.redirect_uris.invalid_url" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_clients.redirect_uris.duplicate_error" }}"
+  data-added="{{ T $.ctx "adminconsole.admin_clients.redirect_uris.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_clients.redirect_uris.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_clients.redirect_uris.remove_label" }}"
+  data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}"{{ if .client.IsSystemLevelClient }} data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  <div class="panel-body stacked">
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.saved_successfully" }}</p>
+    </div>
+    {{ end }}
+    <div class="not-empty:block hidden" id="uriListStatus" role="status"></div>
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.redirect_uris.lead" }}</p>
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-
-                {{if not .client.CanManageRedirectURIs}}
-                <div>
-                    <p>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.requires_redirect_flow" }}</p>
-                </div>
-                {{else}}
-                <div id="redirectURIsEnabledPanel">
-                    <p>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.redirect_uris.intro_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.intro_suffix" }}</p>
-
-                    <div class="w-full mt-6 form-control">
-                        <label class="label">
-                            <span class="label-text text-base-content">
-                                {{ T $.ctx "adminconsole.admin_clients.redirect_uris.field.uri" }}
-                            </span>
-                        </label>
-                        <div class="table">
-                            <div class="table-cell w-full">
-                                <input id="redirectURI" type="text" name="aa" value="" autofocus
-                                    class="w-full input input-bordered" autocomplete="off" />
-                            </div>
-                            <button onclick="addRedirectURIClick(event);" class="ml-4 w-fit btn btn-secondary btn-sm">{{ T $.ctx "adminconsole.admin_clients.redirect_uris.add_button" }}</button>
-                        </div>
-                    </div>
-
-                    <div class="w-full mt-6">
-                        <table id="redirectURIsTable" class="table">
-                            <thead>
-                                <tr>
-                                    <th class="p-1 text-lg">{{ T $.ctx "adminconsole.admin_clients.redirect_uris.col_authorized" }}</th>
-                                    <th></th>
-                                </tr>
-                             </thead>
-                            <tbody>
-                            </tbody>
-                        </table>
-                    </div>
-
-                </div>
-                {{end}}
-
-        </div>
-
+    <div class="field">
+      <label class="field-label" for="redirectURI">{{ T $.ctx "adminconsole.admin_clients.redirect_uris.field.uri" }}</label>
+      <div class="input-row">
+        <input class="control control-mono" id="redirectURI" type="url" value="" placeholder="https://app.example.com/callback" autocomplete="off" autocapitalize="none" spellcheck="false" data-list-input aria-describedby="redirectURI-error">
+        <button class="button" type="button" id="addURIBtn" data-list-add>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.add_button" }}</button>
+      </div>
+      <p class="field-error" id="redirectURI-error" data-list-error hidden></p>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.redirect_uris.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            {{if .client.CanManageRedirectURIs}}
-                <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary float-right">&nbsp;</span>
-                <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-            {{end}}
-
-        </div>
+    <div>
+      <div class="table-scroll" role="region" aria-labelledby="uriListTitle" tabindex="0"{{ if not .client.RedirectURIs }} hidden{{ end }} data-list-region>
+        <table class="data-table" id="redirectURIsTable">
+          <thead>
+            <tr>
+              <th scope="col" id="uriListTitle">{{ T $.ctx "adminconsole.admin_clients.redirect_uris.col_authorized" }}</th>
+              <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_clients.list.col_actions" }}</span></th>
+            </tr>
+          </thead>
+          <tbody data-list-rows>
+            {{ range .client.RedirectURIs }}
+            <tr data-value="{{ . }}">
+              <td class="cell-mono cell-wrap">{{ . }}</td>
+              <td class="cell-actions"><button class="button button-sm" type="button" data-list-remove>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.remove_label" }}<span class="sr-only"> {{ . }}</span></button></td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel empty-state" data-list-empty{{ if .client.RedirectURIs }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_clients.redirect_uris.none_yet" }}</p>
     </div>
-
+    <p class="sr-only" role="status" data-list-announce></p>
+  </div>
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
 </form>
 
-{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
-
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}
+{{ end }}
 {{end}}

@@ -1,250 +1,44 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_groups.members_add.page_title_prefix" }}{{.groupIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_groups.members_add.page_title_prefix" }}<span class="text-accent">{{.groupIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.admin_groups.members_add.page_title_prefix" }} – {{ .groupIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    var debouncedSearch = debounce(function() {
-        const search = document.getElementById("search");
-
-        sendAjaxRequest({
-            "url": "/admin/groups/{{.groupId}}/members/search?" + new URLSearchParams(
-            {
-                query: search.value
-            }),
-            "method": "GET",
-            "bodyData": null,
-            "loadingElement": null,
-            "loadingClasses": null,
-            "modalId": "modal0",
-            "callback": function(result) {
-
-                RefreshTable(result.Users);
-            }
-        });
-
-    }, 500);
-
-    function RefreshTable(users) {
-
-        const usersTable = document.getElementById("usersTable");
-        const usersTableBody = usersTable.getElementsByTagName("tbody")[0];
-        usersTableBody.innerHTML = "";
-
-        if(!users) {
-            return;
-        }
-
-        let truncatedResults = false;
-        const maxRows = 10;
-        if(users.length > maxRows) {
-            users = users.slice(0, maxRows);
-            truncatedResults = true;
-        }
-
-        let emptyResult = false;
-        if(users.length == 0) {
-            emptyResult = true;
-        }
-
-        users.forEach(user => {
-            const row = usersTableBody.insertRow();
-            const subjectCell = row.insertCell();
-            const usernameCell = row.insertCell();
-            const emailCell = row.insertCell();
-            const givenNameCell = row.insertCell();
-            const middleNameCell = row.insertCell();
-            const familyNameCell = row.insertCell();
-            const addToGroupCell = row.insertCell();
-
-            subjectCell.textContent = user.Subject;
-            usernameCell.textContent = user.Username;
-            const emailLink = document.createElement("a");
-            emailLink.href = "/admin/users/" + parseInt(user.Id, 10) + "/details";
-            emailLink.className = "link link-hover link-secondary";
-            emailLink.textContent = user.Email;
-            emailCell.appendChild(emailLink);
-            givenNameCell.textContent = user.GivenName;
-            middleNameCell.textContent = user.MiddleName;
-            familyNameCell.textContent = user.FamilyName;
-
-            if(user.AddedToGroup) {
-                const alreadyAdded = document.createElement("span");
-                alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                alreadyAdded.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.in_group_label" }}";
-                addToGroupCell.appendChild(alreadyAdded);
-            } else {
-
-                const addToGroupButton = document.createElement("button");
-                addToGroupButton.type = "button";
-                addToGroupButton.setAttribute("class", "btn btn-xs btn-primary");
-                addToGroupButton.onclick = function(event) {
-                    AddUserToGroup(event, addToGroupButton, user.Id, user.Email);
-                };
-                addToGroupButton.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.add_button" }}";
-                addToGroupCell.appendChild(addToGroupButton);
-
-                const loading = document.createElement("span");
-                loading.setAttribute("id", "loading" + user.Id);
-                loading.setAttribute("class", "hidden w-5 h-5 ml-1 align-middle text-primary");
-                addToGroupCell.appendChild(loading);
-            }
-        });
-
-        if(truncatedResults) {
-            const row = usersTableBody.insertRow();
-            const cell = row.insertCell();
-            cell.setAttribute("colspan", "7");
-            cell.setAttribute("class", "text-center");
-            const truncatedBanner = document.createElement("span");
-            truncatedBanner.className = "p-1 rounded text-warning-content bg-warning";
-            truncatedBanner.textContent = "{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_prefix" }}" + maxRows + "{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated_suffix" }}";
-            cell.appendChild(truncatedBanner);
-        }
-
-        if(emptyResult) {
-            const row = usersTableBody.insertRow();
-            const cell = row.insertCell();
-            cell.setAttribute("colspan", "7");
-            cell.setAttribute("class", "text-center");
-            cell.innerHTML = "<span class='p-1 rounded text-warning-content bg-warning'>{{ T $.ctx "adminconsole.admin_groups.members_add.no_users_found" }}</span>";
-        }
-    }
-
-    function AddUserToGroup(evt, elem, id, email) {
-        evt.preventDefault();
-        const groupIdentifier = "{{.groupIdentifier}}";
-
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_title" }}", dialogMarkup([
-            "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_body_prefix" }}",
-            "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_body_middle" }}",
-            "{{ T $.ctx "adminconsole.admin_groups.members_add.modal_add_body_suffix" }}",
-        ], email, groupIdentifier),
-            function() {},
-            function() {
-
-                var loadingElement = document.getElementById("loading" + id);
-
-                sendAjaxRequest({
-                    "url": "/admin/groups/{{.groupId}}/members/add?" + new URLSearchParams(
-                    {
-                        userId: id
-                    }),
-                    "method": "POST",
-                    "bodyData": JSON.stringify({}),
-                    "loadingElement": loadingElement,
-                    "loadingClasses": ["loading", "loading-xs"],
-                    "modalId": "modal0",
-                    "callback": function(result) {
-
-                        if(result.Success) {
-                            const alreadyAdded = document.createElement("span");
-                            alreadyAdded.setAttribute("class", "px-2 rounded text-success-content bg-success");
-                            alreadyAdded.innerHTML = "{{ T $.ctx "adminconsole.admin_groups.members_add.in_group_label" }}";
-                            elem.parentNode.replaceChild(alreadyAdded, elem);
-                        }
-                    }
-                });
-
-            });
-    }
-
-</script>
-
+<script src="{{ asset "/static/pages/row-actions.js" }}" defer></script>
+<script src="{{ asset "/static/pages/user-search.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{ template "group_header" (args "members" .groupId .groupIdentifier $.ctx) }}
 
-{{template "manage_groups_tabs" (args "members" .groupId $.ctx) }}
-
-<form method="post" onsubmit="event.preventDefault();">
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full bg-base-100">
-            <p class="pl-2">{{ T $.ctx "adminconsole.admin_groups.members_add.intro_prefix" }}<span class="text-accent">{{.groupIdentifier}}</span></p>
-        </div>
+{{/* user-search.js draws what the search finds, each user with an Add that row-actions.js posts,
+     with no dialog, since an addition is undone from the members tab with one Remove. */}}
+<div class="panel">
+  <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_groups.members_add.page_title_prefix" }}</h2>
+    <div class="not-empty:block hidden" id="row-actions-status" role="status"></div>
+    <form id="userSearchForm" role="search" novalidate data-search-url="/admin/groups/{{ .groupId }}/members/search" data-add-url="/admin/groups/{{ .groupId }}/members/add?userId={userId}" data-member-key="AddedToGroup" data-max-rows="10"
+      data-add-label="{{ T $.ctx "adminconsole.admin_groups.members_add.add_button" }}" data-member-label="{{ T $.ctx "adminconsole.admin_groups.members_add.in_group_label" }}" data-added="{{ T $.ctx "adminconsole.admin_groups.members_add.added" }}"
+      data-subject-label="{{ T $.ctx "adminconsole.admin_groups.members_add.col_subject" }}" data-prompt="{{ T $.ctx "adminconsole.admin_groups.members_add.enter_search_term" }}" data-none="{{ T $.ctx "adminconsole.admin_groups.members_add.no_users_found" }}" data-truncated="{{ T $.ctx "adminconsole.admin_groups.members_add.results_truncated" "max" 10 }}">
+      <div class="field max-w-xl">
+        <label class="field-label" for="search">{{ T $.ctx "adminconsole.admin_groups.members_add.field.search" }}</label>
+        <input class="control" id="search" type="search" name="search" value="" autocomplete="off" spellcheck="false" autofocus aria-describedby="searchHint">
+        <p class="field-hint" id="searchHint">{{ T $.ctx "adminconsole.admin_groups.members_add.search_tooltip" }}</p>
+      </div>
+    </form>
+    <p class="text-ink-muted" role="status" data-results-note>{{ T $.ctx "adminconsole.admin_groups.members_add.enter_search_term" }}</p>
+    <div class="table-scroll" role="region" aria-labelledby="resultsTitle" tabindex="0" hidden data-results-region>
+      <table class="data-table data-table-stack" id="usersTable">
+        <thead>
+          <tr>
+            <th scope="col" id="resultsTitle">{{ T $.ctx "adminconsole.admin_groups.members_add.col_user" }}</th>
+            <th scope="col">{{ T $.ctx "adminconsole.admin_groups.members_add.col_subject" }}</th>
+            <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_groups.members.col_actions" }}</span></th>
+          </tr>
+        </thead>
+        <tbody data-results-rows></tbody>
+      </table>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_groups.members_add.field.search" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_groups.members_add.search_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="search" type="text" name="search" value="{{.search}}" autofocus
-                    class="w-full mr-8 input input-bordered" autocomplete="off" onKeyUp="debouncedSearch();" />
-            </div>
-
-        </div>
-
-    </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-            <table id="usersTable" class="table mt-2">
-                <thead>
-                    <tr>
-                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_subject" }}</th>
-                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_username" }}</th>
-                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_email" }}</th>
-                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_given_name" }}</th>
-                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_middle_name" }}</th>
-                        <th>{{ T $.ctx "adminconsole.admin_groups.members_add.col_family_name" }}</th>
-                        <th class="w-40">{{ T $.ctx "adminconsole.admin_groups.members_add.col_add" }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="7" class="text-center"><span class='p-1 rounded text-info-content bg-info'>{{ T $.ctx "adminconsole.admin_groups.members_add.enter_search_term" }}</span></td>
-                    </tr>
-                </tbody>
-            </table>
-
-        </div>
-
-    </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/groups/{{.groupId}}/members">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_groups.members_add.back_to_members" }}</span>
-                </a>
-            </div>
-        </div>
-    </div>
-
-</form>
-
-{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
+  </div>
+  <div class="panel-footer">
+    <a class="button" href="/admin/groups/{{ .groupId }}/members">{{ T $.ctx "adminconsole.admin_groups.members_add.back_to_members" }}</a>
+  </div>
+</div>
 {{end}}
-

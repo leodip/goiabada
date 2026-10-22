@@ -1,133 +1,73 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.delete.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.delete.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.admin_clients.delete.page_title_prefix" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/clients"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_menu.clients" }}</a></p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_clients.delete.page_title_prefix" }}</h1>
+    {{ if not .client.IsSystemLevelClient }}<p class="page-lead">{{ T $.ctx "adminconsole.admin_clients.delete.lead" }}</p>{{ end }}
+  </div>
+</div>
 
-
-
-{{end}}
-
-{{define "body"}}
-
-<form method="post">
-
-    {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
-        <div class="mt-2 w-fit form-control">
-            <p class="px-2 ml-1 rounded text-warning-content bg-warning">{{ T $.ctx "adminconsole.admin_clients.delete.system_cannot_delete" }}</p>
-        </div>
+<form class="panel" method="post" novalidate>
+  <div class="panel-body stacked">
+    {{ if .client.IsSystemLevelClient }}
+    <div class="notice notice-caution">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.delete.system_cannot_delete" }}</p>
     </div>
-    {{end}}
-
-    <div class="grid grid-cols-1 gap-6 mt-2 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-
-            <div class="w-full">
-                <p class="">{{ T $.ctx "adminconsole.admin_clients.delete.confirm_question" }}</p>
-                <p class="mt-2">{{ T $.ctx "adminconsole.admin_clients.delete.confirm_body_prefix" }}<span class='text-accent'>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_body_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_body_suffix" }}</p>
-            </div>
-
-            <div class="w-full mt-3">
-                <table class="table">
-                    <tbody>
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_client_identifier" }}</td>
-                            <td class="font-mono">{{.client.ClientIdentifier}}</td>
-                        </tr>
-                        {{if .client.Description}}
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_description" }}</td>
-                            <td class="">{{.client.Description}}</td>
-                        </tr>
-                        {{end}}
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_enabled" }}</td>
-                            <td class="">{{.client.Enabled}}</td>
-                        </tr>
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_consent_required" }}</td>
-                            <td class="">{{.client.ConsentRequired}}</td>
-                        </tr>
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_public_or_confidential" }}</td>
-                            {{if .client.IsPublic}}
-                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.public" }}</td>
-                            {{else}}
-                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.confidential" }}</td>
-                            {{end}}
-                        </tr>
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_oauth_flows" }}</td>
-                            {{if and .client.AuthorizationCodeEnabled .client.ClientCredentialsEnabled}}
-                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_both" }}</td>
-                            {{else if .client.AuthorizationCodeEnabled}}
-                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_authcode" }}</td>
-                            {{else if .client.ClientCredentialsEnabled}}
-                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_clientcreds" }}</td>
-                            {{else}}
-                                <td class="">{{ T $.ctx "adminconsole.admin_clients.delete.flows_none" }}</td>
-                            {{end}}
-                        </tr>
-                        {{if gt (len .client.Permissions) 0}}
-                        <tr>
-                            <td>{{ T $.ctx "adminconsole.admin_clients.delete.col_assigned_permissions" }}</td>
-                            <td class="">
-                                <ul class="list-disc list-inside">
-                                    {{range .client.Permissions}}
-                                    <li>{{.Resource.ResourceIdentifier}}:{{.PermissionIdentifier}}</li>
-                                    {{end}}
-                                </ul>
-                            </td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="w-full mt-4">
-                <p>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_intent_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.delete.confirm_intent_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.delete.confirm_intent_suffix" }}</p>
-            </div>
-
-            <div class="w-full mt-2 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.delete.field.identifier" }}
-                    </span>
-                </label>
-                <input id="clientIdentifier" type="text" name="clientIdentifier" value=""
-                    class="w-full input input-bordered " autofocus autocomplete="off" {{if .client.IsSystemLevelClient}}readonly{{end}}/>
-            </div>
-        </div>
-
+    {{ end }}
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="delete-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-4 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-            <div class="mb-4 text-right text-error">
-                <p>{{.error}}</p>
-            </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if not .client.IsSystemLevelClient}}
-                <button id="btnDelete" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.delete.button" }}</button>
-            {{end}}
-        </div>
+    <dl class="detail-list">
+      <dt>{{ T $.ctx "adminconsole.admin_clients.delete.col_client_identifier" }}</dt>
+      <dd class="font-mono text-sm">{{ .client.ClientIdentifier }}</dd>
+      {{ if .client.Description }}
+      <dt>{{ T $.ctx "adminconsole.admin_clients.delete.col_description" }}</dt>
+      <dd>{{ .client.Description }}</dd>
+      {{ end }}
+      <dt>{{ T $.ctx "adminconsole.admin_clients.delete.col_enabled" }}</dt>
+      <dd>{{ if .client.Enabled }}{{ T $.ctx "adminconsole.admin_clients.delete.enabled" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.delete.disabled" }}{{ end }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_clients.delete.col_public_or_confidential" }}</dt>
+      <dd>{{ if .client.IsPublic }}{{ T $.ctx "adminconsole.admin_clients.delete.public" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.delete.confidential" }}{{ end }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_clients.delete.col_oauth_flows" }}</dt>
+      <dd>
+        {{- if and .client.AuthorizationCodeEnabled .client.ClientCredentialsEnabled }}{{ T $.ctx "adminconsole.admin_clients.delete.flows_both" }}
+        {{- else if .client.AuthorizationCodeEnabled }}{{ T $.ctx "adminconsole.admin_clients.delete.flows_authcode" }}
+        {{- else if .client.ClientCredentialsEnabled }}{{ T $.ctx "adminconsole.admin_clients.delete.flows_clientcreds" }}
+        {{- else }}{{ T $.ctx "adminconsole.admin_clients.delete.flows_none" }}{{ end -}}
+      </dd>
+      {{ if .client.Permissions }}
+      <dt>{{ T $.ctx "adminconsole.admin_clients.delete.col_assigned_permissions" }}</dt>
+      <dd>
+        <ul class="grid gap-1">
+          {{ range .client.Permissions }}<li class="font-mono text-sm">{{ .Resource.ResourceIdentifier }}:{{ .PermissionIdentifier }}</li>{{ end }}
+        </ul>
+      </dd>
+      {{ end }}
+    </dl>
+
+    {{ if not .client.IsSystemLevelClient }}
+    <div class="field max-w-md">
+      <label class="field-label" for="clientIdentifier">{{ T $.ctx "adminconsole.admin_clients.delete.field.identifier" }}</label>
+      <input class="control control-mono" id="clientIdentifier" type="text" name="clientIdentifier" value="" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus{{ if .error }} aria-invalid="true" aria-describedby="delete-error"{{ end }}>
     </div>
-
+    {{ end }}
+  </div>
+  <div class="panel-footer">
+    {{ if .client.IsSystemLevelClient }}
+    <a class="button" href="/admin/clients">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</a>
+    {{ else }}
+    <a class="button button-quiet" href="/admin/clients">{{ T $.ctx "common.button.cancel" }}</a>
+    <button id="btnDelete" class="button button-danger" type="submit">{{ T $.ctx "adminconsole.admin_clients.delete.button" }}</button>
+    {{ end }}
+  </div>
 </form>
-
 {{end}}

@@ -74,7 +74,9 @@ test("signing out on one site with no ID token ends the other site's part too", 
   await expectResult(app, "Signed in");
 
   await app.getByRole("button", { name: "Sign out with no id_token_hint" }).click();
-  await app.getByRole("button", { name: "Yes" }).click();
+  // The auth server's confirmation, whose Sign out shares its name with the app's own button.
+  await expect(app.getByRole("heading", { name: "Sign out", exact: true })).toBeVisible();
+  await app.getByRole("button", { name: "Sign out", exact: true }).click();
   await app.waitForURL(testapp.web2.url);
   await expectResult(app, "Signed out");
 

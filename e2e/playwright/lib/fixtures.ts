@@ -125,7 +125,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         const identifier = uniqueIdentifier("r");
         await submitNewResource(page, identifier, description);
         await expect(page).toHaveURL(`${env.adminUrl}/admin/resources`);
-        const id = await idFromListLink(page, `${env.adminUrl}/admin/resources`, identifier, "Manage");
+        const id = await idFromListLink(page, `${env.adminUrl}/admin/resources`, identifier);
         const entry = { id, deleted: false };
         created.push(entry);
         if (permissions.length > 0) {
@@ -152,7 +152,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         const identifier = uniqueIdentifier("g");
         await submitNewGroup(page, { ...options, identifier });
         await expect(page).toHaveURL(`${env.adminUrl}/admin/groups`);
-        const id = await idFromListLink(page, `${env.adminUrl}/admin/groups`, identifier, "Manage");
+        const id = await idFromListLink(page, `${env.adminUrl}/admin/groups`, identifier);
         const entry = { id, deleted: false };
         created.push(entry);
         return { id, identifier, markDeleted: () => (entry.deleted = true) };

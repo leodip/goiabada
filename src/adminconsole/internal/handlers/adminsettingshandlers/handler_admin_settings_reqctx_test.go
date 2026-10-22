@@ -55,10 +55,10 @@ func TestAdminSettingsHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 			return HandleGeneralPost(h, nil, c, nil, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/general", handlertest.WithForm(url.Values{}))},
 		{"HandleKeysGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleKeysGet(h, c)
+			return HandleKeysGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/settings/keys")},
 		{"HandleKeysRotatePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleKeysRotatePost(h, c)
+			return HandleKeysRotatePost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate")},
 		{"HandleKeysRevokePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleKeysRevokePost(h, c)

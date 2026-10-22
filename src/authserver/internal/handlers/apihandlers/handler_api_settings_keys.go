@@ -158,7 +158,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 		if kp == nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysKeyNotFound, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysKeyNotFound, nil))
 			return
 		}
 
@@ -168,7 +168,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 		if keyState != record.KeyStatePrevious {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysOnlyPreviousRevocable, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysOnlyPreviousRevocable, nil))
 			return
 		}
 

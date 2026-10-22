@@ -16,6 +16,7 @@ package apihandlers
 // It reads files and nothing else.
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // The sections that say who gets authserver:manage-account.
@@ -51,7 +53,8 @@ func manageAccountScope(t *testing.T) string {
 // says any client that signs a user in can ask for it.
 func TestManageAccountDocs_TheScopesPageSaysWhoGetsIt(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), accountScopeSection.page, accountScopeSection.heading,
-		[]string{"`" + manageAccountScope(t) + "`", "consent screen", "admin console's own client", "**Consent required**"},
+		[]string{"`" + manageAccountScope(t) + "`", "consent screen", "admin console's own client",
+			"**" + i18n.T(context.Background(), "adminconsole.admin_clients.settings.field.consent_required") + "**"},
 		[]string{"any client that signs a user in can ask for it"})
 }
 

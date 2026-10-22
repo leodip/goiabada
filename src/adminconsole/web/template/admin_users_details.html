@@ -1,94 +1,63 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_users.details.page_title_prefix" }}{{.user.Email}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_users.details.page_title_prefix" }}<span class="text-accent">{{.user.Email}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.user_tabs.details" }} – {{ .user.Email }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+{{ template "user_header" (args "details" .user.Id .user.Email .page .query $.ctx) }}
 
-
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const userCreated = {{if .userCreated}}true{{else}}false{{end}};
-        if(userCreated){
-            showModalDialog("modal0", "{{.user.Email}}", "{{ T $.ctx "adminconsole.admin_users.details.user_created_message" }}");
-        }
-    });
-</script>
-
-{{end}}
-
-{{define "body"}}
-
-{{template "manage_users_tabs" (args "details" .user.Id .page .query $.ctx) }}
-
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 mt-6">
-        <table class="table">
-            <tbody>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.details.field.subject" }}</td>
-                    <td>{{.user.Subject}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.details.field.full_name" }}</td>
-                    <td>{{.userFullName}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.details.field.email" }}</td>
-                    <td>{{.user.Email}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.details.field.username" }}</td>
-                    <td>{{.user.Username}}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.details.field.created_at" }}</td>
-                    <td>{{ DateTime $.ctx .user.CreatedAt }}</td>
-                </tr>
-                <tr>
-                    <td class="w-52">{{ T $.ctx "adminconsole.admin_users.details.field.last_updated_at" }}</td>
-                    <td>{{ DateTime $.ctx .user.UpdatedAt }}</td>
-                </tr>
-                <tr>
-                    <td>{{ T $.ctx "adminconsole.admin_users.details.field.enabled" }}</td>
-                    <td>
-                        <input id="enabledDisabled" type="checkbox" name="enabled"
-                            class="toggle" {{if .user.Enabled}}checked{{end}}/>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+{{/* Disabling the user asks first, in one dialog, against the user as stored. A refusal is the
+     enabled switch's, the only field, drawn as stored (#562 decision 10). */}}
+<form class="panel" method="post" novalidate data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_users.modal.save_title" }}">
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="details-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/users{{if .query}}?query={{.query}}&page={{.page}}{{else}}?page={{.page}}{{end}}">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_users.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_users.common.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
-        </div>
+    {{ end }}
+    {{ if .userCreated }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_users.details.user_created_message" }}</p>
     </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_users.common.saved_successfully" }}</p>
+    </div>
+    {{ end }}
 
+    <dl class="detail-list">
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.subject" }}</dt>
+      <dd class="font-mono text-sm">{{ .user.Subject }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.full_name" }}</dt>
+      <dd>{{ if .userFullName }}{{ .userFullName }}{{ else }}<span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_users.details.none" }}</span>{{ end }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.email" }}</dt>
+      <dd class="break-words">{{ .user.Email }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.username" }}</dt>
+      <dd>{{ if .user.Username }}{{ .user.Username }}{{ else }}<span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_users.details.none" }}</span>{{ end }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.created_at" }}</dt>
+      <dd>{{ DateTime $.ctx .user.CreatedAt }}</dd>
+      <dt>{{ T $.ctx "adminconsole.admin_users.details.field.last_updated_at" }}</dt>
+      <dd>{{ DateTime $.ctx .user.UpdatedAt }}</dd>
+    </dl>
+
+    <div class="check-list">
+      <label class="check-row" for="enabledDisabled">
+        <input type="checkbox" id="enabledDisabled" name="enabled" aria-describedby="{{ if .error }}details-error {{ end }}enabledHint"{{ if .error }} aria-invalid="true" autofocus{{ end }}{{ if .user.Enabled }} checked{{ end }}
+          data-confirm="{{ T $.ctx "adminconsole.admin_users.details.disable_warning" }}" data-confirm-when="unchecked" data-stored-checked="{{ .user.Enabled }}">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_users.details.field.enabled" }}</span>
+          <span class="field-hint" id="enabledHint">{{ T $.ctx "adminconsole.admin_users.details.field.enabled_hint" }}</span>
+        </span>
+      </label>
+    </div>
+  </div>
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_users.save_button" }}</button>
+  </div>
 </form>
 
-{{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
-
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_users.save_button") (T $.ctx "adminconsole.admin_users.modal.save_title")) }}
 {{end}}

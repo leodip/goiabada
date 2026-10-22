@@ -608,10 +608,11 @@ func TestWorker_Poll_ReapsBrowserSessionsEvenWhenTheClaimIsLost(t *testing.T) {
 }
 
 // TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost is the same pin for the parked
-// authorization requests (#437). A POST to /auth/authorize writes a row per request and the
-// endpoint is not rate limited, so the physical bound has to sit within one poll of the five
-// minute lifetime. Behind the twelve hour claim the sweep would delete them 144 times later and no
-// behaviour test would notice, since an expired request already reads as absent.
+// authorization requests (#437). A POST to /auth/authorize writes a row per request, and the
+// authorize admission tier bounds how many per address only while the rate limiter switch is on
+// (#504), so the physical bound has to sit within one poll of the five minute lifetime. Behind
+// the twelve hour claim the sweep would delete them 144 times later and no behaviour test would
+// notice, since an expired request already reads as absent.
 func TestWorker_Poll_ReapsAuthorizeRequestsEvenWhenTheClaimIsLost(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB, metrics.NewRegistry())

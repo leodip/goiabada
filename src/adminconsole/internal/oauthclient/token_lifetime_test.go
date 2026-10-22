@@ -35,27 +35,47 @@ func TestExpiresAt(t *testing.T) {
 	}
 }
 
-// Due from 30 seconds before the recorded expiry, inclusive, and never for the unknown expiry.
+// Due from 30 seconds before the recorded expiry, inclusive, or from half the token's lifetime
+// before it when that is shorter, so a set is never due on arrival (#621), and never for the
+// unknown expiry.
 func TestRefreshDue(t *testing.T) {
 	testCases := []struct {
 		name      string
+		expiresIn int64
 		expiresAt int64
 		now       time.Time
 		want      bool
 	}{
-		{"unknown expiry, however late", 0, lifetimeNow.Add(100 * 365 * 24 * time.Hour), false},
-		{"31 seconds left", lifetimeNow.Unix() + 31, lifetimeNow, false},
+		{"unknown expiry, however late", 300, 0, lifetimeNow.Add(100 * 365 * 24 * time.Hour), false},
+		{"31 seconds left", 300, lifetimeNow.Unix() + 31, lifetimeNow, false},
 		// The margin's edge.
-		{"30 seconds left", lifetimeNow.Unix() + 30, lifetimeNow, true},
-		{"1 second left", lifetimeNow.Unix() + 1, lifetimeNow, true},
-		{"expired an hour ago", lifetimeNow.Unix() - 3600, lifetimeNow, true},
+		{"30 seconds left", 300, lifetimeNow.Unix() + 30, lifetimeNow, true},
+		{"1 second left", 300, lifetimeNow.Unix() + 1, lifetimeNow, true},
+		{"expired an hour ago", 300, lifetimeNow.Unix() - 3600, lifetimeNow, true},
+		// A lifetime of exactly twice the margin keeps it.
+		{"a 60 second lifetime, 30 seconds left", 60, lifetimeNow.Unix() + 30, lifetimeNow, true},
+		// Shorter, the margin is half the lifetime.
+		{"a 20 second lifetime, just arrived", 20, lifetimeNow.Unix() + 20, lifetimeNow, false},
+		{"a 20 second lifetime, 11 seconds left", 20, lifetimeNow.Unix() + 11, lifetimeNow, false},
+		{"a 20 second lifetime, 10 seconds left", 20, lifetimeNow.Unix() + 10, lifetimeNow, true},
+		{"a 1 second lifetime, just arrived", 1, lifetimeNow.Unix() + 1, lifetimeNow, false},
+		{"a 1 second lifetime, lapsing now", 1, lifetimeNow.Unix(), lifetimeNow, true},
+		// No lifetime to halve keeps the margin.
+		{"no expires_in, 30 seconds left", 0, lifetimeNow.Unix() + 30, lifetimeNow, true},
+		{"no expires_in, 31 seconds left", 0, lifetimeNow.Unix() + 31, lifetimeNow, false},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, oauthclient.RefreshDue(tc.expiresAt, tc.now))
+			response := &oauth.TokenResponse{ExpiresIn: tc.expiresIn}
+			assert.Equal(t, tc.want, oauthclient.RefreshDue(response, tc.expiresAt, tc.now))
 		})
 	}
+
+	t.Run("nil response keeps the margin", func(t *testing.T) {
+		assert.True(t, oauthclient.RefreshDue(nil, lifetimeNow.Unix()+30, lifetimeNow))
+		assert.False(t, oauthclient.RefreshDue(nil, lifetimeNow.Unix()+31, lifetimeNow))
+	})
 }
 
 // RFC 6749 sections 3.3 and 6: the response's scope when it carries one, else the fallback.

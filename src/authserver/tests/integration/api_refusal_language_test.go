@@ -41,7 +41,7 @@ func TestAPIRefusals_AreAnsweredInTheRequestsLanguage(t *testing.T) {
 		{
 			name:       "a sentence this change moved into the catalog",
 			body:       api.CreateResourceRequest{ResourceIdentifier: "", Description: "d"},
-			code:       "VALIDATION_ERROR",
+			code:       "handler.resource.identifier_required",
 			english:    "Resource identifier is required",
 			portuguese: "O identificador do recurso é obrigatório",
 		},

@@ -20,9 +20,9 @@ A service that manages Goiabada on its own, with no user present, gets its token
 
 <Steps>
 
-1. In the admin console, open **Admin**, **Clients** and click **Create new**. Enter a **Client identifier**, such as `provisioning-service`, turn on **Client credentials flow**, turn off **Authorization code flow with PKCE**, and click **Create**.
+1. In the admin console, open **Admin**, **Clients** and click **New client**. Enter a **Client identifier**, such as `provisioning-service`, turn on **Client credentials**, turn off **Authorization code with PKCE**, and click **Create client**.
 
-2. Click **Manage** next to the new client, open **Authentication** and copy the **Client secret**.
+2. Click the new client's identifier, open **Authentication** and copy the **Client secret**.
 
 3. Open **Permissions**, choose the `authserver` resource and the permission your service needs, such as `manage-users`, click **Grant permission** and then **Save**. [Scopes](/reference/api/scopes/) explains what each permission allows.
 
@@ -92,7 +92,7 @@ The Account API acts on the account of the user the token was issued for, so it 
 
 </Steps>
 
-Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own, and no allowance, to ask for it. What it needs is the user's approval. The consent screen is shown the first time each user signs in to your app asking for `authserver:manage-account`, whatever your client's **Consent required** says, and again if they untick it or withdraw it under **Account**, **Manage consents**. [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) covers the sign-in itself, PKCE included.
+Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own, and no allowance, to ask for it. What it needs is the user's approval. The consent screen is shown the first time each user signs in to your app asking for `authserver:manage-account`, whatever your client's **Ask users for consent** says, and again if they untick it or withdraw it under **Account**, **Consents**. [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) covers the sign-in itself, PKCE included.
 
 Until a user has approved it, your app can't get the scope without them:
 

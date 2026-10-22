@@ -194,7 +194,7 @@ func TestAPIAccountEmailPut_AWrongPasswordIsRefusedAndChangesNothing(t *testing.
 
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, address)
 		assert.Equal(t, "AUTHENTICATION_FAILED", errResp.ErrorCode, address)
-		assert.Equal(t, "Authentication failed. Check your current password and try again.", errResp.ErrorDescription, address)
+		assert.Equal(t, "That password isn't right. Try again.", errResp.ErrorDescription, address)
 	}
 
 	persisted, err := database.GetUserById(context.Background(), nil, u.Id)
