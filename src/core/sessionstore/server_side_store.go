@@ -27,10 +27,11 @@ const (
 	// lives. It is short on purpose: /auth/authorize validates a request before it writes
 	// anything, and every request that passes that validation saves a session, so an
 	// unauthenticated caller costs a row for each one it sends. The authorize admission
-	// tier bounds how fast one address may spend them (#504), and this constant is what
-	// bounds how many of them can be alive at once. Generous for a first sign-in that
-	// includes installing an authenticator app and scanning a code, and far shorter than
-	// the day an authenticated session may run for (#266).
+	// tier bounds how fast one address may spend them while the rate limiter switch is on
+	// (#504), and this constant is what bounds how many of them can be alive at once.
+	// Generous for a first sign-in that includes installing an authenticator app and
+	// scanning a code, and far shorter than the day an authenticated session may run for
+	// (#266).
 	//
 	// The admin console writes no such row: its sign-in handshake rides in a sealed
 	// cookie, which lives this long too, until the callback creates the authenticated

@@ -5,6 +5,7 @@
 // the request is read, so nothing reaches the redirect URI. A system test because the budget is the
 // address's, which every other test signs in from: it runs alone, and waits the window out before it
 // ends.
+import type { Response } from "@playwright/test";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { authorizeEndpoint, codeRequest, emptyBrowser, followAuthorize } from "../../lib/rfc6749";
@@ -53,13 +54,31 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
     expect(admitted, "the burst itself was admitted until the budget ran out").toBeGreaterThan(0);
     expect(admitted).toBeLessThanOrEqual(budget + slack);
 
+    // A refusal holds nothing: the limiter weighs the previous minute's count less every second, and
+    // a refused request adds none, so a moment after the burst the address may be admitted again. Each
+    // check below therefore spends requests naming no client until one is refused, then makes its own
+    // at once, and starts over if that was admitted all the same.
+    const spendUntilRefused = async () => {
+      for (let sent = 0; sent <= budget + slack; sent++) {
+        const answer = await anonymous.request.get(`${authorizeEndpoint}?response_type=code`, { failOnStatusCode: false, maxRedirects: 0 });
+        lastRequest = Date.now();
+        expect(answer.status(), "a request naming no client").toBeLessThan(500);
+        if (answer.status() === 429) return;
+      }
+      throw new Error("the endpoint never refused the address");
+    };
+
     // A browser sent to sign in, with a request that would otherwise start one.
     const signIn = await anonymous.newPage();
-    const viaGet = codeRequest(client.identifier);
-    const gotten = await signIn.goto(`${authorizeEndpoint}?${new URLSearchParams(viaGet.params)}`);
-    lastRequest = Date.now();
-    expect(gotten?.status()).toBe(429);
-    expect(gotten?.headers()["retry-after"]).toBe("60");
+    let gotten = null as Response | null;
+    await expect(async () => {
+      await spendUntilRefused();
+      gotten = await signIn.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(client.identifier).params)}`);
+      lastRequest = Date.now();
+      expect(gotten?.status()).toBe(429);
+    }).toPass({ timeout: 20_000 });
+    expect(gotten!.headers()["retry-after"]).toBe("60");
+    expect(gotten!.headers()["location"]).toBeUndefined();
     await expect(signIn.getByRole("heading", { name: "Too many attempts" })).toBeVisible();
     expect(new URL(signIn.url()).pathname, "the browser stays on the endpoint").toBe("/auth/authorize");
 
@@ -77,15 +96,22 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
       }),
     );
     const own = await anonymous.newPage();
-    await own.goto(clientPage);
-    const [posted] = await Promise.all([
-      own.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/auth/authorize"),
-      own.getByRole("button", { name: "Sign in" }).click(),
-    ]);
-    lastRequest = Date.now();
-    expect(posted.status()).toBe(429);
-    expect(posted.headers()["retry-after"]).toBe("60");
-    expect(posted.headers()["location"]).toBeUndefined();
+    let posted = null as Response | null;
+    await expect(async () => {
+      // The form is loaded before the requests that bring the address to its budget, so the click
+      // follows the refusal at once. An attempt whose post was admitted left the page.
+      if (own.url() !== clientPage) await own.goto(clientPage);
+      await spendUntilRefused();
+      const [answer] = await Promise.all([
+        own.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/auth/authorize"),
+        own.getByRole("button", { name: "Sign in" }).click(),
+      ]);
+      posted = answer;
+      lastRequest = Date.now();
+      expect(answer.status()).toBe(429);
+    }).toPass({ timeout: 20_000 });
+    expect(posted!.headers()["retry-after"]).toBe("60");
+    expect(posted!.headers()["location"]).toBeUndefined();
     await expect(own.getByRole("heading", { name: "Too many attempts" })).toBeVisible();
   } finally {
     // A refused request spends nothing, so two minutes after the last admitted or refused one the
