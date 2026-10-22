@@ -101,11 +101,12 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 	h := newIsolatedDB(t)
 	engine := dbType()
 
-	// To head first, then back down, on migration_000034's pattern: the ORM writes every column
-	// the Go models carry, so seeding at an older version only works if the columns are there.
-	// 000047's down is a no-op, so stepping back to 000046 undoes nothing and changes no shape.
+	// To head first, then back down, on migration_000034's pattern. The rows are seeded with SQL
+	// naming only the columns 000046 carries (seedUserEmail000047), so the seed does not need the
+	// trip; it is kept as the existing pattern. 000047's down is a no-op, so stepping back to
+	// 000046 undoes nothing and changes no shape.
 	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head before seeding through the ORM")
+		require.NoError(t, err, "migrate to head")
 	}
 	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back to 000046")
 
@@ -206,7 +207,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head before seeding through the ORM")
+		require.NoError(t, err, "migrate to head")
 	}
 	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back to 000046")
 
