@@ -122,8 +122,8 @@ const (
 	// EventAuthFailedOtp: the count's statement reports the one call that reached the
 	// limit, and the codes refused after it move nothing and raise nothing more.
 	//
-	// It is the evidence that someone holds the user's password, since the code form sits
-	// behind it, and the reason the user's correct codes are refused from then on, which
+	// It is the evidence that someone holds the user's password or one of their sessions,
+	// since the code form sits behind the password or a step-up from a session, and the reason the user's correct codes are refused from then on, which
 	// the submitter is never told (#489 decision 2).
 	//
 	// Payload: user_id.
