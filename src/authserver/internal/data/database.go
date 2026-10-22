@@ -313,6 +313,12 @@ type Database interface {
 	// already rejected. The count is what this call transitioned and not what the
 	// client has, so a second flip reports 0 (see #245).
 	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
+	// RevokeUnusedCodesByUserIdAndClientId marks every unused, not-yet-revoked code one
+	// user holds with one client revoked and reports how many rows it transitioned. A
+	// consent withdrawal marks them, so a code issued before it cannot be redeemed after
+	// it for a grant the withdrawal's sweep never saw. Used codes are left alone: their
+	// grants are the refresh tokens the same withdrawal sweeps (see #622).
+	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
 	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
 	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error

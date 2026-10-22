@@ -139,6 +139,8 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	// tokens would fail as an unexpected call.
 	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
 	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(nil).Once()
+	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+		Return(int64(1), nil).Once()
 	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return([]*record.RefreshToken{
 			{Id: 11, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "rt-first"},
@@ -170,6 +172,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 		"user_id":                    int64(7),
 		"client_id":                  int64(3),
 		"logged_in_user":             "admin-subject-1",
+		"revoked_code_count":         int64(1),
 		"revoked_refresh_token_jtis": []string{"rt-live"},
 	}, revokedPayload)
 }

@@ -311,7 +311,8 @@ const (
 	EventRevokedClientGrants = "revoked_client_grants"
 	// EventRevokedConsentGrants records that withdrawing a user's consent to one client revoked
 	// the refresh tokens that user holds with that client, through both linkage shapes, and
-	// recorded each of their rotation families revoked (#622). Emitted AFTER the withdrawal's
+	// recorded each of their rotation families revoked, and marked the user's codes with that
+	// client not yet redeemed revoked (#622). Emitted AFTER the withdrawal's
 	// transaction commits, on success only, by the account API's and the admin API's consent
 	// deletions, and emitted even when nothing was found to revoke, so the event attests that
 	// the action happened.
@@ -322,7 +323,8 @@ const (
 	// It advances no generation and ends no session, so the user stays signed in and the
 	// client's access tokens already issued keep working until they expire.
 	//
-	// Its payload carries user_id, client_id and revoked_refresh_token_jtis, plus logged_in_user.
+	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
+	// plus logged_in_user.
 	EventRevokedConsentGrants = "revoked_consent_grants"
 	// EventCrossUserSessionReplaced records that a different user signed in on a browser that was
 	// still carrying someone else's session cookie, so that session was ended. The browser reaches

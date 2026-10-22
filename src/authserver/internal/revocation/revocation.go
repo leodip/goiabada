@@ -35,6 +35,7 @@ type Database interface {
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
 	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
+	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 }
@@ -606,8 +607,9 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 }
 
 // RevokeOnConsentWithdrawalTx ends what a withdrawn consent leaves standing: it deletes the
-// consent row and sweeps the refresh tokens that user holds with that client, in ONE
-// transaction it opens and commits (#622).
+// consent row, marks the unused codes that user holds with that client revoked, and sweeps
+// the refresh tokens that user holds with that client, in ONE transaction it opens and
+// commits (#622).
 //
 // Withdrawing consent through Account, Manage consents or the admin console's user page
 // used to delete the row and nothing else, and the refresh arm consults a stored consent
@@ -616,19 +618,29 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // kept refreshing past the withdrawal for as long as the grant lived: consent withdrawn
 // in name only.
 //
-// The three writes, in the order this transaction issues them:
+// The four writes, in the order this transaction issues them:
 //
 //  1. withdraw, the caller's own deletion of the consent row, FIRST because it is the
 //     write that decides. The sweep exists to enforce it, not the other way round, and a
 //     caller must not be able to end up revoked without the withdrawal that asked for it
 //     (RevokeUserAuthStateTx's write-then-sweep shape).
-//  2. recordFamilies, before the sweep for the reason RevokeClientGrants states (#259):
+//  2. RevokeUnusedCodesByUserIdAndClientId, before the sweep as RevokeClientGrants marks
+//     its codes first. A code issued before the withdrawal can still be redeemed for its
+//     60 seconds, redemption consults no stored consent, and the grant it would start has
+//     no refresh token yet for the sweep to reach. Marked, it is refused at redemption.
+//     Used codes are left alone: their grants are the tokens the sweep revokes, and a
+//     marked code would make the refresh arm answer those tokens with the
+//     session-terminated description instead of "This refresh token has been revoked.".
+//     That leaves one window open, narrower than the code's lifetime: a redemption that
+//     claimed its code before this transaction and inserts its refresh token after it
+//     commits, since the claim and the insert are two autocommit statements.
+//  3. recordFamilies, before the sweep for the reason RevokeClientGrants states (#259):
 //     rotation claims its parent and inserts its child in two separate statements, so a
 //     refresh that validated before this transaction began can insert a live child after
 //     it commits. The family record is the fact that outlives the sweep: the validator
 //     refuses a token whose family has one, and rotation re-checks it inside its own
 //     transaction, so the child is refused at its next refresh or never inserted.
-//  3. RevokeRefreshTokens over the user-and-client-scoped rows, which flips what stands
+//  4. RevokeRefreshTokens over the user-and-client-scoped rows, which flips what stands
 //     now. Scoped by BOTH, because the withdrawal ends one app's access, not what the
 //     user holds with every other client and not the session they are signed in with.
 //
@@ -644,7 +656,8 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // (#301), and so does a family record lost to a containment of the same family that
 // overlaps this transaction, as RevokeClientGrantsTx states: the second attempt reads the
 // record the containment committed and leaves it as it is. The body is safe to rerun: the
-// deletion of an already-deleted row matches nothing, the family records are written or
+// deletion of an already-deleted row matches nothing, the code mark rolls back with
+// the attempt that made it and is made again by the next, the family records are written or
 // found already written, the sweep reads its rows afresh on each attempt, and result is
 // the committing attempt's.
 //
@@ -667,6 +680,11 @@ func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64,
 			return err
 		}
 
+		revokedCodeCount, err := db.RevokeUnusedCodesByUserIdAndClientId(ctx, tx, userId, clientId)
+		if err != nil {
+			return err
+		}
+
 		tokens, err := db.GetRefreshTokensByUserIdAndClientId(ctx, tx, userId, clientId)
 		if err != nil {
 			return err
@@ -680,7 +698,7 @@ func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64,
 		if err != nil {
 			return err
 		}
-		result = ConsentWithdrawalResult{RevokedRefreshTokenJtis: revokedJtis}
+		result = ConsentWithdrawalResult{RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJtis: revokedJtis}
 		return nil
 	})
 	if err != nil {
@@ -689,10 +707,12 @@ func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64,
 	return result, nil
 }
 
-// ConsentWithdrawalResult reports what a consent withdrawal's sweep actually did. It is a
-// type of its own rather than ClientGrantResult because the withdrawal sweeps refresh tokens
-// alone and marks no code, so it has no code count to report (#622).
+// ConsentWithdrawalResult reports what a consent withdrawal's sweep actually did (#622). It is
+// a type of its own rather than ClientGrantResult because its code count is of unused codes
+// alone, one user's with one client, where ClientGrantResult's is of every code the client has.
 type ConsentWithdrawalResult struct {
+	// RevokedCodeCount is how many unused codes this call TRANSITIONED from live to revoked.
+	RevokedCodeCount int64
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
 	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
@@ -942,6 +962,8 @@ func LogRevokedConsentGrants(ctx context.Context, auditLogger AuditLogger, userI
 		"user_id":        userId,
 		"client_id":      clientId,
 		"logged_in_user": loggedInUser,
+		// The unused codes this call TRANSITIONED, for the reason LogRevokedClientGrants gives.
+		"revoked_code_count": result.RevokedCodeCount,
 		// What this call TRANSITIONED, not what the user held. Always a list rather than null:
 		// the success path fills it from RevokeRefreshTokens.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,

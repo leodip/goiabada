@@ -31,14 +31,18 @@ func withdrawalFixture() []*record.RefreshToken {
 	}
 }
 
-// The withdrawal deletes the consent first, then reads the user's tokens with that client, records
-// each family once under the withdrawal's reason, and sweeps only the live tokens, which are what
-// it reports for the audit record.
+// The withdrawal deletes the consent first, then marks the user's unused codes with that client
+// revoked, reads the user's tokens with that client, records each family once under the
+// withdrawal's reason, and sweeps only the live tokens. The codes it marked and the tokens it
+// swept are what it reports for the audit record.
 func TestRevokeOnConsentWithdrawalTx_WithdrawsRecordsAndSweeps(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	tokens := withdrawalFixture()
 	var order []string
 	datamocks.ExpectRunInTransaction(db, revokeTx)
+	db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+		Run(func(mock.Arguments) { order = append(order, "mark codes") }).
+		Return(int64(2), nil).Once()
 	db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 		Run(func(mock.Arguments) { order = append(order, "enumerate") }).
 		Return(tokens, nil).Once()
@@ -65,14 +69,17 @@ func TestRevokeOnConsentWithdrawalTx_WithdrawsRecordsAndSweeps(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"rt-live-a", "rt-live-b"}, result.RevokedRefreshTokenJtis,
 		"only the tokens this call moved from live to revoked are reported")
-	assert.Equal(t, []string{"withdraw", "enumerate", "record", "record", "sweep", "sweep"}, order)
+	assert.Equal(t, int64(2), result.RevokedCodeCount, "the codes the mark transitioned are reported")
+	assert.Equal(t, []string{"withdraw", "mark codes", "enumerate", "record", "record", "sweep", "sweep"}, order)
 }
 
-// A withdrawal that finds nothing to sweep still commits, and reports an empty list rather than
-// null, so the audit record carries [].
+// A withdrawal that finds nothing to mark or sweep still commits, and reports a zero count and an
+// empty list rather than null, so the audit record carries [].
 func TestRevokeOnConsentWithdrawalTx_NothingToSweepReportsAnEmptyList(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
+	db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+		Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 		Return([]*record.RefreshToken{}, nil).Once()
 
@@ -82,6 +89,7 @@ func TestRevokeOnConsentWithdrawalTx_NothingToSweepReportsAnEmptyList(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, result.RevokedRefreshTokenJtis)
 	assert.Empty(t, result.RevokedRefreshTokenJtis)
+	assert.Equal(t, int64(0), result.RevokedCodeCount)
 }
 
 // No withdrawal, no transaction: a sweep without the deletion that asked for it is refused before
@@ -118,13 +126,25 @@ func TestRevokeOnConsentWithdrawalTx_AnyFailureYieldsTheZeroResult(t *testing.T)
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransactionRefused(db, boom)
 			},
-			notAttempted: []string{"GetRefreshTokensByUserIdAndClientId"},
+			notAttempted: []string{"RevokeUnusedCodesByUserIdAndClientId", "GetRefreshTokensByUserIdAndClientId"},
 		},
 		{
 			name:        "the deletion fails",
 			withdrawErr: boom,
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
+			},
+			notAttempted: []string{"RevokeUnusedCodesByUserIdAndClientId", "GetRefreshTokensByUserIdAndClientId",
+				"RecordRefreshTokenFamilyRevoked", "UpdateRefreshToken"},
+		},
+		{
+			// A withdrawal that committed without its code mark would leave a code issued before
+			// it redeemable for a grant the sweep never saw.
+			name: "the code mark fails",
+			setup: func(db *datamocks.Database) {
+				datamocks.ExpectRunInTransaction(db, revokeTx)
+				db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+					Return(int64(0), boom).Once()
 			},
 			notAttempted: []string{"GetRefreshTokensByUserIdAndClientId", "RecordRefreshTokenFamilyRevoked",
 				"UpdateRefreshToken"},
@@ -133,6 +153,8 @@ func TestRevokeOnConsentWithdrawalTx_AnyFailureYieldsTheZeroResult(t *testing.T)
 			name: "the enumeration fails",
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
+				db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 					Return(nil, boom).Once()
 			},
@@ -142,6 +164,8 @@ func TestRevokeOnConsentWithdrawalTx_AnyFailureYieldsTheZeroResult(t *testing.T)
 			name: "a family record fails",
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
+				db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 					Return(withdrawalFixture(), nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", ReasonConsentWithdrawn).
@@ -155,6 +179,8 @@ func TestRevokeOnConsentWithdrawalTx_AnyFailureYieldsTheZeroResult(t *testing.T)
 			setup: func(db *datamocks.Database) {
 				tokens := withdrawalFixture()
 				datamocks.ExpectRunInTransaction(db, revokeTx)
+				db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 					Return(tokens, nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, mock.Anything, ReasonConsentWithdrawn).
@@ -169,6 +195,8 @@ func TestRevokeOnConsentWithdrawalTx_AnyFailureYieldsTheZeroResult(t *testing.T)
 			setup: func(db *datamocks.Database) {
 				tokens := withdrawalFixture()
 				datamocks.ExpectRunInTransactionThenFail(db, revokeTx, boom)
+				db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+					Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 					Return(tokens, nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, mock.Anything, ReasonConsentWithdrawn).
@@ -190,6 +218,8 @@ func TestRevokeOnConsentWithdrawalTx_AnyFailureYieldsTheZeroResult(t *testing.T)
 			assert.Equal(t, ConsentWithdrawalResult{}, result)
 			assert.Nil(t, result.RevokedRefreshTokenJtis,
 				"the error path returns the zero value, and a caller must not audit it")
+			assert.Equal(t, int64(0), result.RevokedCodeCount,
+				"a rolled-back mark is not reported")
 			assertNotAttempted(t, db, tc.notAttempted...)
 		})
 	}
@@ -201,7 +231,7 @@ func TestLogRevokedConsentGrants_Payload(t *testing.T) {
 	recorder := &reuseAuditRecorder{}
 
 	LogRevokedConsentGrants(context.Background(), recorder, withdrawUserId, withdrawClientId, "the-caller",
-		ConsentWithdrawalResult{RevokedRefreshTokenJtis: []string{"rt-1"}})
+		ConsentWithdrawalResult{RevokedCodeCount: 2, RevokedRefreshTokenJtis: []string{"rt-1"}})
 
 	require.Equal(t, 1, recorder.calls)
 	assert.Equal(t, audit.EventRevokedConsentGrants, recorder.event)
@@ -209,6 +239,7 @@ func TestLogRevokedConsentGrants_Payload(t *testing.T) {
 		"user_id":                    withdrawUserId,
 		"client_id":                  withdrawClientId,
 		"logged_in_user":             "the-caller",
+		"revoked_code_count":         int64(2),
 		"revoked_refresh_token_jtis": []string{"rt-1"},
 	}, recorder.details)
 }

@@ -129,8 +129,8 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 }
 
 // The withdrawal writes the same family records, so it loses the same key to the same containment,
-// and reruns its body once for the same reason (#622). The consent deletion is part of the body
-// that reruns, and the second attempt's result is the one that commits.
+// and reruns its body once for the same reason (#622). The consent deletion and the code mark are
+// part of the body that reruns, and the second attempt's result is the one that commits.
 func TestRevokeOnConsentWithdrawalTx_ALostKeyRunsTheWithdrawalOnceMore(t *testing.T) {
 	lostTheKey := errs.Errorf("%w: a containment recorded the family first", data.ErrUniqueViolation)
 
@@ -139,6 +139,9 @@ func TestRevokeOnConsentWithdrawalTx_ALostKeyRunsTheWithdrawalOnceMore(t *testin
 		first := datamocks.ExpectRunInTransaction(db, revokeTx)
 		second := datamocks.ExpectRunInTransaction(db, revokeTx)
 		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		// The first attempt's mark rolled back with it, so the second makes it again and reports it.
+		db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+			Return(int64(1), nil).Twice()
 		db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 			Return([]*record.RefreshToken{token}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonConsentWithdrawn).
@@ -159,12 +162,15 @@ func TestRevokeOnConsentWithdrawalTx_ALostKeyRunsTheWithdrawalOnceMore(t *testin
 		require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
 		require.NoError(t, second.BodyErr)
 		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
+		assert.Equal(t, int64(1), result.RevokedCodeCount)
 	})
 
 	t.Run("a second loss is an error with the zero result", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
+		db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
+			Return(int64(1), nil).Twice()
 		db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, withdrawUserId, withdrawClientId).
 			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonConsentWithdrawn).

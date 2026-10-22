@@ -174,8 +174,9 @@ func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken strin
 		assert.Equal(t, f.withdrawnCode.UserId, int64(details["user_id"].(float64)))
 		assert.Equal(t, loggedInUser, details["logged_in_user"])
 		// The initial token was already revoked by its rotation, so the rotated one is the only
-		// token this withdrawal moved.
+		// token this withdrawal moved, and its code was used, so the mark moved none.
 		assert.Len(t, details["revoked_refresh_token_jtis"], 1)
+		assert.InDelta(t, float64(0), details["revoked_code_count"], 0)
 	}
 	assert.Equal(t, 1, found, "the withdrawal must record %v once for this client", audit.EventRevokedConsentGrants)
 }

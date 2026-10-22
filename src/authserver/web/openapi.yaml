@@ -1106,7 +1106,8 @@ paths:
       summary: Revoke consent
       description: >-
         Revoke an OAuth consent. The refresh tokens the user holds with that client are revoked
-        too, offline ones included.
+        too, offline ones included, and so are the user's authorization codes with that client
+        not yet redeemed.
       operationId: deleteUserConsent
       parameters:
         - name: id
@@ -3573,7 +3574,8 @@ paths:
       summary: Revoke own consent
       description: >-
         Revoke an OAuth consent. The refresh tokens the user holds with that client are revoked
-        too, offline ones included.
+        too, offline ones included, and so are the user's authorization codes with that client
+        not yet redeemed.
       operationId: deleteAccountConsent
       parameters:
         - name: id
