@@ -15,8 +15,12 @@ No file in the repository holds the stack's data key or its database passwords (
 directory and hands the passwords to the three databases and all four values to the
 devcontainer, where `run-tests.sh` and `schemadump` read them; `docker-compose.yml` refuses to
 start without them. `devcontainer.json` runs the script as its `initializeCommand`, on the host,
-before every start; it keeps a `.env` that exists. On a Windows host it needs `sh` on the
-`PATH`, which Git for Windows' `usr/bin` or WSL provides.
+before every start. It keeps every value a `.env` already holds, and adds any of the four the file
+lacks or holds empty, so a `.env` written by hand for `USER_UID` and `USER_GID`, which Compose
+also reads from it, gains them. It runs with no shell around it, so the host needs `sh` on its
+`PATH`. Linux and macOS have it. Windows doesn't: neither WSL nor Git for Windows' default
+install puts `sh` on the Windows `PATH`. On Windows, clone the repository inside WSL and open it
+from there, or add Git for Windows' `usr\bin` directory to the `PATH`.
 
 Keep `.env` as long as the stack's volumes: each database keeps the password its volume was
 first initialised with, and a dev database seeded under one key can't be read under another.

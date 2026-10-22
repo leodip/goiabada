@@ -1,9 +1,10 @@
 {
 	"name": "dev-container-server",
 	"dockerComposeFile": "docker-compose.yml",
-	// Writes .env, the stack's data key and database passwords, before Compose reads it; a no-op
-	// once it exists. Runs on the host, so a Windows host needs sh on its PATH, as Git for
-	// Windows' usr/bin or WSL provides (README.md, "Secrets").
+	// Writes .env, the stack's data key and database passwords, before Compose reads it, keeping
+	// any value already there. Runs on the host with no shell around it, so the host needs sh on
+	// its PATH: on Windows, open the checkout from inside WSL or add Git for Windows' usr\bin to
+	// the PATH (README.md, "Secrets").
 	"initializeCommand": ["sh", "${localWorkspaceFolder}/.devcontainer/generate-env.sh"],
 	"service": "devcontainer",
 	"workspaceFolder": "/workspaces/goiabada/src/",

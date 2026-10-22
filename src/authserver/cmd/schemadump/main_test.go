@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -69,4 +71,23 @@ func TestTargets_SQLiteNeedsNoPassword(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, resolved.password)
+}
+
+// TestRun_AMissingPasswordStopsBeforeAnyDump: every engine is resolved before any is dumped, so
+// an unset MYSQL_ROOT_PASSWORD stops the command naming it before it has dumped SQLite, the engine
+// listed ahead of it, or created a scratch database anywhere.
+func TestRun_AMissingPasswordStopsBeforeAnyDump(t *testing.T) {
+	t.Setenv("POSTGRES_PASSWORD", "generated-postgres")
+	t.Setenv("MSSQL_SA_PASSWORD", "generated-mssql")
+	for _, variable := range []string{"MYSQL_ROOT_PASSWORD", "GOIABADA_SCHEMADUMP_MYSQL_PASSWORD"} {
+		t.Setenv(variable, "")
+		require.NoError(t, os.Unsetenv(variable))
+	}
+
+	var out strings.Builder
+	err := run(&out)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "MYSQL_ROOT_PASSWORD is not set")
+	assert.Empty(t, out.String(), "nothing is dumped before every password is known")
 }

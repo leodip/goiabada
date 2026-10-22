@@ -22,6 +22,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -130,13 +131,14 @@ func main() {
 	// is down and noise otherwise, so only warnings and worse reach the terminal.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
 
-	if err := run(); err != nil {
+	if err := run(os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "schemadump: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+// run dumps every engine and writes the four golden files, reporting its progress to out.
+func run(out io.Writer) error {
 	// Every target is resolved before any is dumped, so a missing password stops the command
 	// before it creates a scratch database anywhere.
 	var resolvedTargets []target
@@ -150,7 +152,7 @@ func run() error {
 
 	dumps := map[data.Dialect][]byte{}
 	for _, resolved := range resolvedTargets {
-		fmt.Printf("dumping %s...\n", resolved.dialect)
+		_, _ = fmt.Fprintf(out, "dumping %s...\n", resolved.dialect)
 		encoded, err := dumpOne(resolved)
 		if err != nil {
 			return errs.Errorf("%s: %w", resolved.dialect, err)
@@ -169,7 +171,7 @@ func run() error {
 		if err := writeAtomically(path, dumps[t.dialect]); err != nil {
 			return err
 		}
-		fmt.Printf("wrote %s\n", path)
+		_, _ = fmt.Fprintf(out, "wrote %s\n", path)
 	}
 	return nil
 }

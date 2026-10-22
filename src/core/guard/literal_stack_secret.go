@@ -19,14 +19,20 @@ import (
 // are gone, the auth server refuses that key as the current one, and the dev and CI stacks draw
 // fresh values for every stack instead. This is the test that fails when a literal comes back.
 //
-// The runnable files are the GitHub workflows and actions, every Compose file, devcontainer.json,
-// the shell scripts, the Go mains under a cmd/ directory, and the fenced code blocks of every
-// Markdown page, the docs site's included, since a reader runs what a page prints. In those it
-// reports a literal value given to one of stackSecretVariables, as a YAML or JSON key, a shell
-// assignment or a `${NAME:-fallback}`; a `-p<password>` to mysql or mysqladmin; a `-P <password>` to
-// sqlcmd; and, in a Go main, a `password:` field set to a string literal. A value passes when it is
-// empty, an interpolation (`$NAME`, `${NAME}`, `$(command)`, `${{ expression }}`) or a placeholder
-// in angle brackets.
+// The runnable files are every YAML file (the GitHub workflows and actions, Compose files and any
+// manifest), devcontainer.json and the editor's .vscode configurations, the Dockerfiles, the
+// Makefiles, the committed env files, the shell scripts, the Go mains under a cmd/ directory, and
+// the fenced code blocks of every Markdown page, the docs site's included, since a reader runs what
+// a page prints. In those it reports a literal value given to one of stackSecretVariables, as a
+// YAML or JSON key, a shell, Makefile or Dockerfile assignment (`ENV NAME value` among them), a
+// `name: NAME` entry whose next line's `value:` is a literal, a `${NAME:-fallback}`, or a
+// `${OTHER:-fallback}` assigned to it; a `-p<password>` or `--password` to mysql or mysqladmin; a
+// `-P <password>` to sqlcmd; and, in a Go main, a `password:` field or an `os.Setenv` of one of the
+// variables set to a string literal. A value passes when it is empty, an interpolation (`$NAME`,
+// `${NAME}`, `$(command)`, `${{ expression }}`) or a placeholder in angle brackets.
+//
+// The bare .env a directory holds is not read: generate-env.sh writes src/.devcontainer/.env with
+// the dev stack's real values, and .gitignore keeps it out of the repository.
 //
 // Separately, the published data key and the three published passwords are reported in any text
 // file outside the few that name them to refuse them (publishedValueOwners), whatever its kind.
@@ -100,6 +106,7 @@ var skippedDirs = map[string]bool{
 var textExtensions = map[string]bool{
 	".go": true, ".sh": true, ".yml": true, ".yaml": true, ".json": true, ".md": true, ".mdx": true,
 	".toml": true, ".txt": true, ".html": true, ".ts": true, ".js": true, ".mjs": true, ".example": true,
+	".mk": true,
 }
 
 type runnableKind int
@@ -108,22 +115,28 @@ const (
 	notRunnable runnableKind = iota
 	runnableConfig
 	runnableShell
+	runnableDockerfile
 	runnableGoMain
 	runnableMarkdown
 )
-
-var composeName = regexp.MustCompile(`^(docker-)?compose([.-][^/]*)?\.ya?ml$`)
 
 // kindOf is what a file is to this guard, by its path relative to the repository root.
 func kindOf(rel string) runnableKind {
 	base := path.Base(rel)
 	ext := path.Ext(base)
 	switch {
-	case strings.HasPrefix(rel, ".github/") && (ext == ".yml" || ext == ".yaml"):
+	case ext == ".yml" || ext == ".yaml":
 		return runnableConfig
-	case composeName.MatchString(base), base == "devcontainer.json":
+	case base == "devcontainer.json", ext == ".json" && strings.Contains("/"+rel, "/.vscode/"):
 		return runnableConfig
-	case ext == ".sh":
+	case ext == ".dockerignore":
+		return notRunnable
+	case base == "Dockerfile", strings.HasPrefix(base, "Dockerfile-"), strings.HasPrefix(base, "Dockerfile."),
+		ext == ".Dockerfile":
+		return runnableDockerfile
+	case ext == ".sh", base == "Makefile", ext == ".mk":
+		return runnableShell
+	case base != ".env" && (ext == ".env" || strings.HasSuffix(base, ".env.example")):
 		return runnableShell
 	case ext == ".go" && !strings.HasSuffix(base, "_test.go") && strings.Contains("/"+rel, "/cmd/"):
 		return runnableGoMain
@@ -134,18 +147,27 @@ func kindOf(rel string) runnableKind {
 }
 
 var (
+	stackSecretNames = strings.Join(stackSecretVariables, "|")
 	// A variable named, then `=` or `:` before its value, the name perhaps quoted: YAML, JSON and
-	// shell all spell an assignment this way. A name inside ${...} is an expansion, read below.
-	assignedVariable = regexp.MustCompile(`(?:^|[^A-Za-z0-9_${])(` + strings.Join(stackSecretVariables, "|") +
-		`)["']?\s*[:=]`)
+	// shell all spell an assignment this way, and a Makefile also as `?=`, `:=` or `+=`. A name
+	// inside ${...} is an expansion, read below.
+	assignedVariable = regexp.MustCompile(`(?:^|[^A-Za-z0-9_${])(` + stackSecretNames + `)["']?\s*(?:[?+:]?=|:)`)
+	// A Dockerfile's other spelling, `ENV NAME value`, with no `=`.
+	dockerfileEnv = regexp.MustCompile(`(?i)^\s*ENV\s+(` + stackSecretNames + `)\s+([^=\s].*)$`)
 	// A variable's fallback inside an expansion: ${NAME:-value}, ${NAME-value}, ${NAME:=value}.
-	fallbackVariable = regexp.MustCompile(`\$\{(` + strings.Join(stackSecretVariables, "|") + `):?[-=]([^}]*)\}`)
-	mysqlClient      = regexp.MustCompile(`\bmysql(admin)?\b`)
-	mysqlPassword    = regexp.MustCompile(`(?:^|\s)-p(\S+)`)
-	sqlcmdClient     = regexp.MustCompile(`\bsqlcmd\b`)
-	sqlcmdPassword   = regexp.MustCompile(`(?:^|\s)-P\s+(\S+)`)
-	goPasswordField  = regexp.MustCompile(`(?i)\bpassword:\s*("[^"]+"|` + "`[^`]+`" + `)`)
-	markdownFence    = regexp.MustCompile("^\\s*(```|~~~)")
+	fallbackVariable = regexp.MustCompile(`\$\{(` + stackSecretNames + `):?[-=]([^}]*)\}`)
+	// The fallback of an expansion of any variable, which an assignment's value opens with.
+	anyFallback = regexp.MustCompile(`^["']?\$\{[A-Za-z_][A-Za-z0-9_]*:?[-=]([^}]*)\}`)
+	// A Kubernetes-style entry: `name: NAME`, then `value:` on the next line.
+	namedEntry      = regexp.MustCompile(`^\s*(?:-\s+)?name:\s*["']?(` + stackSecretNames + `)["']?\s*$`)
+	namedEntryValue = regexp.MustCompile(`^\s*value:(.*)$`)
+	mysqlClient     = regexp.MustCompile(`\bmysql(admin)?\b`)
+	mysqlPassword   = regexp.MustCompile(`(?:^|\s)(?:-p|--password=)(\S+)|(?:^|\s)--password\s+([^-\s]\S*)`)
+	sqlcmdClient    = regexp.MustCompile(`\bsqlcmd\b`)
+	sqlcmdPassword  = regexp.MustCompile(`(?:^|\s)-P\s+(\S+)`)
+	goPasswordField = regexp.MustCompile(`(?i)\bpassword:\s*("[^"]+"|` + "`[^`]+`" + `)`)
+	goSetenv        = regexp.MustCompile(`\bos\.Setenv\(\s*"(` + stackSecretNames + `)"\s*,\s*("[^"]*"|` + "`[^`]*`" + `)`)
+	markdownFence   = regexp.MustCompile("^\\s*(```|~~~)")
 )
 
 // findLiteralStackSecrets walks the repository under root and returns one finding per line that
@@ -262,9 +284,22 @@ func logicalLines(content []byte, kind runnableKind) []logicalLine {
 // literal.
 func literalSecretsIn(rel string, kind runnableKind, content []byte) []string {
 	var findings []string
+	named := ""
 	for _, line := range logicalLines(content, kind) {
-		if reason := literalSecretIn(line.text, kind); reason != "" {
+		reason := literalSecretIn(line.text, kind)
+		if named != "" && reason == "" {
+			if m := namedEntryValue.FindStringSubmatch(line.text); m != nil && isLiteral(firstValue(m[1])) {
+				reason = named + " set to a literal by the value after its name"
+			}
+		}
+		if reason != "" {
 			findings = append(findings, finding(rel, line.number, reason+": "+strings.TrimSpace(line.text)))
+		}
+		named = ""
+		if kind == runnableConfig || kind == runnableMarkdown {
+			if m := namedEntry.FindStringSubmatch(line.text); m != nil {
+				named = m[1]
+			}
 		}
 	}
 	return findings
@@ -276,7 +311,15 @@ func literalSecretIn(line string, kind runnableKind) string {
 		if m := goPasswordField.FindStringSubmatch(line); m != nil {
 			return "a password field set to a literal"
 		}
+		if m := goSetenv.FindStringSubmatch(line); m != nil && isLiteral(m[2][1:len(m[2])-1]) {
+			return m[1] + " set to a literal by os.Setenv"
+		}
 		return ""
+	}
+	if kind == runnableDockerfile {
+		if m := dockerfileEnv.FindStringSubmatch(line); m != nil && isLiteral(firstValue(m[2])) {
+			return m[1] + " set to a literal"
+		}
 	}
 	for _, m := range fallbackVariable.FindAllStringSubmatch(line, -1) {
 		if isLiteral(m[2]) {
@@ -284,14 +327,18 @@ func literalSecretIn(line string, kind runnableKind) string {
 		}
 	}
 	for _, m := range assignedVariable.FindAllStringSubmatchIndex(line, -1) {
-		if isLiteral(firstValue(line[m[1]:])) {
+		rest := strings.TrimSpace(line[m[1]:])
+		if f := anyFallback.FindStringSubmatch(rest); f != nil && isLiteral(f[1]) {
+			return line[m[2]:m[3]] + " falls back to a literal"
+		}
+		if isLiteral(firstValue(rest)) {
 			return line[m[2]:m[3]] + " set to a literal"
 		}
 	}
 	if mysqlClient.MatchString(line) {
 		for _, m := range mysqlPassword.FindAllStringSubmatch(line, -1) {
-			if isLiteral(m[1]) {
-				return "a literal -p password to mysql"
+			if isLiteral(m[1] + m[2]) {
+				return "a literal password to mysql"
 			}
 		}
 	}

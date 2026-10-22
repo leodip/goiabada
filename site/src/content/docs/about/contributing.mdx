@@ -11,7 +11,7 @@ Bug reports and pull requests are welcome. Code and contributions made with AI t
 
 ## Open the dev container
 
-Everything you need, Go, the linters, the Tailwind CLI and the four databases, runs in a dev container, so the only thing your machine needs is Docker and an editor that opens dev containers, such as VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension.
+Everything you need, Go, the linters, the Tailwind CLI and the four databases, runs in a dev container, so the only things your machine needs are Docker, an editor that opens dev containers, such as VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension, and `sh`, which Linux and macOS have. On Windows, clone the repository inside WSL and open it from there, or add Git for Windows' `usr\bin` directory to the `PATH`: neither WSL nor Git for Windows' default install puts `sh` on the Windows `PATH`.
 
 <Steps>
 
@@ -23,7 +23,7 @@ Everything you need, Go, the linters, the Tailwind CLI and the four databases, r
 
 2. Open the repository's `src` folder in your editor, not the repository itself. The dev container is defined in `src/.devcontainer`, and an editor looks for it in the folder you open.
 
-3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes. Before it, `src/.devcontainer/generate-env.sh` writes `src/.devcontainer/.env`, the stack's data key and database passwords, drawn fresh for your checkout; on Windows it needs `sh` on the `PATH`, which WSL or Git for Windows' `usr/bin` provides.
+3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes. Before it, `src/.devcontainer/generate-env.sh` writes `src/.devcontainer/.env`, the stack's data key and database passwords, drawn fresh for your checkout. It runs on your machine, which is why it needs `sh`.
 
 </Steps>
 

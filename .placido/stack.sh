@@ -4,10 +4,9 @@
 # and no published ports (docker-compose.worktree.yml), so issues never collide with
 # each other or with the human stack, `goiabada`. Tests run inside its devcontainer
 # with the environment devcontainer.json declares, which `docker exec` does not apply
-# by itself (see src/.devcontainer/README.md), beside the data key and database
-# passwords Compose gave the container from the worktree's generated .env.
+# by itself (see src/.devcontainer/README.md).
 #
-#   stack.sh up          start the stack and wait for every database (placido's setup)
+#   stack.sh up          build what changed, start the stack, and wait for every database (placido's setup)
 #   stack.sh down        remove its containers, volumes, network and image (teardown)
 #   stack.sh run ARGS    src/authserver/run-tests.sh ARGS, in the devcontainer
 #   stack.sh vet         go vet in every module, in the devcontainer
@@ -27,6 +26,12 @@ REPO_IN_CONTAINER=/workspaces/goiabada
 die() { echo "stack.sh: $*" >&2; exit 1; }
 [[ "$NAME" != goiabada ]] || die "the project name goiabada belongs to the human stack."
 [[ -f "$DC/docker-compose.worktree.yml" ]] || die "$DC has no docker-compose.worktree.yml."
+
+# Builds use the Docker context's own builder, not the one `docker buildx use` picked
+# last: src/build/build-docker-images.sh picks goiabada-multiarch, a container that
+# cannot start again once Docker Desktop restarts, which failed #616's setup.
+BUILDX_BUILDER="${BUILDX_BUILDER:-$(docker context show)}"
+export BUILDX_BUILDER
 
 compose() {
     docker compose -p "$NAME" --project-directory "$DC" \
@@ -76,7 +81,8 @@ in_container() {  # in_container WORKDIR COMMAND...
 
 # Each probe uses the address, port and login the tests use; the engines are not on
 # their default ports. The password is the one the server's own container was started
-# with, read from its environment there, so it is never written here (#501).
+# with, read from its environment there: a literal in the compose files, or one
+# generate-env.sh drew for the worktree (#627).
 probe() {
     case "$1" in
         mysql) docker exec "$NAME-mysql-server-1" sh -c 'mysql --connect-timeout=3 -h mysql-server -P 13306 \
@@ -119,10 +125,14 @@ wait_for_databases() {
 
 case "${1:-}" in
     up)
-        # The stack's data key and database passwords, drawn for this worktree once and
-        # kept beside the compose files, where Compose reads them (#501).
-        sh "$DC/generate-env.sh"
-        compose up -d --wait --wait-timeout "$WAIT"
+        # Compose files that read the data key and database passwords from a generated
+        # .env (#627) refuse to start without one: write it first, when the worktree has
+        # the script. It keeps a .env already there.
+        if [[ -f "$DC/generate-env.sh" ]]; then sh "$DC/generate-env.sh"; fi
+        # --build: an image left from an earlier run, or built before placido merged main
+        # in, lacks what src/.devcontainer has since added, such as Node for #626's unit
+        # gate. Docker's layer cache makes the build quick when nothing changed.
+        compose up -d --build --wait --wait-timeout "$WAIT"
         wait_for_databases
         # The devcontainer must mount this worktree, not another checkout. Docker Desktop
         # on WSL can report the mount by its own proxy instead, named after the SHA-256
