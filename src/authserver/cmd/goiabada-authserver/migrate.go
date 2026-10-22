@@ -64,10 +64,11 @@ const (
 // WITHOUT migrating it, and hands its migrator to runMigrate. base is the loaded database
 // configuration: the environment, then the --db-* flags given before `migrate`.
 //
-// It is the only caller of datafactory.OpenDatabase: datafactory.NewDatabase brings the schema to
-// head on the way out, which would make a step down impossible and a `migrate version` on a
-// database behind this binary a lie, since the read would happen after the migration it was meant
-// to report on.
+// It opens with datafactory.OpenDatabase, as `recover` does: datafactory.NewDatabase brings the
+// schema to head on the way out, which would make a step down impossible and a `migrate version`
+// on a database behind this binary a lie, since the read would happen after the migration it was
+// meant to report on. `recover` needs the schema untouched for its own reason: it refuses a schema
+// other than head rather than migrate it (#498).
 func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io.Writer) int {
 	inv, ok := readMigrateCommand(args, base, stderr)
 	if !ok {
@@ -161,7 +162,34 @@ type migrateInvocation struct {
 
 // parseMigrateArgs reads the arguments after `migrate`: the --db-* flags anywhere among them, and
 // the positional arguments runMigrate takes, in order. A flag overrides the same flag in db, which
-// is a copy, so the loaded configuration is untouched; given twice, the last one wins.
+// is a copy, so the loaded configuration is untouched; given twice, the last one wins (#424).
+func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocation, error) {
+	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	config.RegisterDatabaseFlags(fs, &db)
+
+	positionals, help, err := walkFlagTokens(fs, "migrate",
+		"only the --db-* flags can follow migrate, so give any other flag before it", args)
+	if err != nil {
+		return migrateInvocation{}, err
+	}
+
+	var inv migrateInvocation
+	inv.positional = positionals
+	inv.help = help
+
+	// The flag package parsed each value; the pool's ranges and the TLS mode are held here as Load
+	// holds them for the flags given before `migrate` (#394 decision 5, #502).
+	if err := config.CheckDatabaseFlags(fs, &db); err != nil {
+		return migrateInvocation{}, err
+	}
+
+	inv.database = db
+	return inv, nil
+}
+
+// walkFlagTokens reads the arguments after a subcommand's word, resolving each name through fs and
+// leaving the positional arguments it found, so the two subcommands share one grammar (#498).
 //
 // The scan is written here rather than left to FlagSet.Parse, and only the value parse is the flag
 // package's. Parse stops at the first positional argument, so it cannot take flags interleaved
@@ -171,20 +199,18 @@ type migrateInvocation struct {
 // before any error exists (#424). The grammar followed is flag's: one or two dashes, `name=value`,
 // a non-boolean flag taking the next argument whatever it is, a boolean one never, `--` ending the
 // flags, and a lone `-` positional.
-func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocation, error) {
-	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	config.RegisterDatabaseFlags(fs, &db)
-
-	var inv migrateInvocation
+//
+// command names the subcommand in the undefined-flag refusal and acceptedAfter says what may
+// follow its word, since the two subcommands take different flags there.
+func walkFlagTokens(fs *flag.FlagSet, command, acceptedAfter string, args []string) (positionals []string, help bool, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
-			inv.positional = append(inv.positional, args[i+1:]...)
+			positionals = append(positionals, args[i+1:]...)
 			break
 		}
 		if len(arg) < 2 || arg[0] != '-' {
-			inv.positional = append(inv.positional, arg)
+			positionals = append(positionals, arg)
 			continue
 		}
 
@@ -195,7 +221,7 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 		}
 
 		if !hasValue && (name == "h" || name == "help") {
-			inv.help = true
+			help = true
 			continue
 		}
 
@@ -205,8 +231,7 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 			if name != "" {
 				typed = arg[:strings.IndexByte(arg+"=", '=')]
 			}
-			return migrateInvocation{}, errs.Errorf("%s is not a flag migrate accepts: only the "+
-				"--db-* flags can follow migrate, so give any other flag before it", typed)
+			return nil, false, errs.Errorf("%s is not a flag %s accepts: %s", typed, command, acceptedAfter)
 		}
 
 		if b, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && b.IsBoolFlag() {
@@ -215,27 +240,18 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 			}
 		} else if !hasValue {
 			if i+1 == len(args) {
-				return migrateInvocation{}, errs.Errorf("--%s needs a value: give it as --%s=<value>",
+				return nil, false, errs.Errorf("--%s needs a value: give it as --%s=<value>",
 					name, name)
 			}
 			i++
-			//nolint:gosec // G602: i+1 == len(args) returned above, so i is in range here
 			value = args[i]
 		}
 
 		if err := fs.Set(name, value); err != nil {
-			return migrateInvocation{}, errs.Wrapf(err, "invalid value %q for --%s", value, name)
+			return nil, false, errs.Wrapf(err, "invalid value %q for --%s", value, name)
 		}
 	}
-
-	// The flag package parsed each value; the pool's ranges and the TLS mode are held here as Load
-	// holds them for the flags given before `migrate` (#394 decision 5, #502).
-	if err := config.CheckDatabaseFlags(fs, &db); err != nil {
-		return migrateInvocation{}, err
-	}
-
-	inv.database = db
-	return inv, nil
+	return positionals, help, nil
 }
 
 // emailCaseReader is what the `migrate to` pre-flight reads through the opened database: the

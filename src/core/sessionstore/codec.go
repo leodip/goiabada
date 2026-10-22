@@ -39,8 +39,12 @@ const (
 	// sealing keys. Two keys rather than one is not tidiness: it is what stops a value
 	// sealed for one purpose from opening as the other, which the two codec sets used to
 	// give for free and which nothing else in the envelope would give (decision 9).
+	// valuesKeyInfo is the third, for the values a cookie carries itself rather than
+	// naming a row, so neither a session cookie nor a stored blob opens as one, whatever
+	// name either was sealed under, and the reverse (#620).
 	cookieKeyInfo = "goiabada/sessionstore/cookie/v1"
 	dataKeyInfo   = "goiabada/sessionstore/data/v1"
+	valuesKeyInfo = "goiabada/sessionstore/values/v1"
 
 	// sealingKeyBytes is XChaCha20-Poly1305's key size.
 	sealingKeyBytes = chacha20poly1305.KeySize
@@ -194,7 +198,7 @@ func parsePreviousKeys(keys ConfiguredKeys) (*KeyPair, error) {
 	return &KeyPair{AuthenticationKey: previousAuthenticationKey, EncryptionKey: previousEncryptionKey}, nil
 }
 
-// sealer holds one AEAD per purpose, both derived from one KeyPair.
+// sealer holds one AEAD per purpose, all derived from one KeyPair.
 //
 // One sealer is one generation of keys. The store keeps the current one and, while an
 // operator is rotating, the previous one, which is what lets a rotation happen without
@@ -202,9 +206,10 @@ func parsePreviousKeys(keys ConfiguredKeys) (*KeyPair, error) {
 type sealer struct {
 	cookie cipher.AEAD
 	data   cipher.AEAD
+	values cipher.AEAD
 }
 
-// newSealer derives the two sealing keys from the configured pair and builds an AEAD over
+// newSealer derives the three sealing keys from the configured pair and builds an AEAD over
 // each.
 //
 // Both configured secrets feed the derivation, the encryption key as HKDF's secret and the
@@ -213,7 +218,7 @@ type sealer struct {
 // key directly: the authentication key had a job under the previous codec and it keeps one
 // (decision 9).
 //
-// The empty-key check below is the one error here a caller can actually provoke. The three
+// The empty-key check below is the one error here a caller can actually provoke. The ones
 // after it are structural: HKDF cannot fail for a 32 byte output and the AEAD cannot fail on
 // a 32 byte key, so those are unreachable with the derivation above, and they are returned
 // rather than dropped so a future change to either call cannot fail silently at the first
@@ -242,6 +247,12 @@ func newSealer(pair KeyPair) (*sealer, error) {
 		return nil, errs.Wrap(err, "unable to derive the session data key")
 	}
 
+	valuesKey, err := hkdf.Key(sha256.New, pair.EncryptionKey, pair.AuthenticationKey,
+		valuesKeyInfo, sealingKeyBytes)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to derive the cookie values key")
+	}
+
 	cookieAEAD, err := chacha20poly1305.NewX(cookieKey)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to build the session cookie cipher")
@@ -252,7 +263,12 @@ func newSealer(pair KeyPair) (*sealer, error) {
 		return nil, errs.Wrap(err, "unable to build the session data cipher")
 	}
 
-	return &sealer{cookie: cookieAEAD, data: dataAEAD}, nil
+	valuesAEAD, err := chacha20poly1305.NewX(valuesKey)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to build the cookie values cipher")
+	}
+
+	return &sealer{cookie: cookieAEAD, data: dataAEAD, values: valuesAEAD}, nil
 }
 
 // seal encrypts plaintext under aead and returns the envelope as text.

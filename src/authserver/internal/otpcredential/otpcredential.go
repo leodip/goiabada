@@ -240,30 +240,8 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 	// attempt's; the reset and the increment carry no state between attempts.
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var writeErr error
-		removed, writeErr = db.TryRemoveUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration)
-		if writeErr != nil {
-			return writeErr
-		}
-		if !removed {
-			return nil
-		}
-		if writeErr = db.ResetUserOTPStep(ctx, tx, user.Id); writeErr != nil {
-			return writeErr
-		}
-		// The counter that tells every one of this user's sessions they owe a second factor
-		// again, advanced inside the same transaction as the removal itself. Being per user is
-		// what makes "every session" one statement: the boolean this replaced was per session
-		// and written only for the caller's own sid, so a user disabling their authenticator
-		// from one device left every other session asserting amr ["pwd","otp"] for an
-		// authenticator that no longer existed (#242 decisions 1 and 2).
-		//
-		// Its error is returned rather than discarded, and that is the other half of decision 2:
-		// a removal that commits without the counter moving is precisely the state the re-prompt
-		// exists to prevent.
-		if _, writeErr = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id); writeErr != nil {
-			return writeErr
-		}
-		return db.LowerUserSessionsToPassword(ctx, tx, user.Id, oidc.AuthMethodPassword.String())
+		removed, writeErr = RemoveTx(ctx, db, tx, user)
+		return writeErr
 	})
 	if err != nil {
 		return false, err
@@ -275,6 +253,46 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 	user.OTPSecretEncrypted = nil
 	user.OTPEnabled = false
 	return true, nil
+}
+
+// RemoveTx is Remove's four writes on a transaction the caller opened and will commit. Remove
+// keeps the transaction it has always opened, its two callers and its mutations of the user it
+// was handed; this form is for the one caller that must run the removal inside a transaction
+// holding more than it — the `recover` subcommand, whose single transaction also sets a password
+// and grants a permission, beside the revocation sweep that ends the user's sessions (#498).
+//
+// The same rerun safety as Remove: the generation compared is the caller's read, and removed is
+// the committing attempt's answer, so a caller whose RunInTransaction replays a deadlocked
+// attempt runs these writes again and settles on what committed (#301).
+//
+// The writes are Remove's, all of them, including the session lowering: a caller that ends the
+// sessions afterwards sweeps the rows it wrote, in the same transaction, so no committed state
+// can hold the authenticator gone and a session still naming it either way.
+func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (removed bool, err error) {
+	removed, err = db.TryRemoveUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration)
+	if err != nil {
+		return false, err
+	}
+	if !removed {
+		return false, nil
+	}
+	if err = db.ResetUserOTPStep(ctx, tx, user.Id); err != nil {
+		return false, err
+	}
+	// The counter that tells every one of this user's sessions they owe a second factor
+	// again, advanced inside the same transaction as the removal itself. Being per user is
+	// what makes "every session" one statement: the boolean this replaced was per session
+	// and written only for the caller's own sid, so a user disabling their authenticator
+	// from one device left every other session asserting amr ["pwd","otp"] for an
+	// authenticator that no longer existed (#242 decisions 1 and 2).
+	//
+	// Its error is returned rather than discarded, and that is the other half of decision 2:
+	// a removal that commits without the counter moving is precisely the state the re-prompt
+	// exists to prevent.
+	if _, err = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id); err != nil {
+		return false, err
+	}
+	return removed, db.LowerUserSessionsToPassword(ctx, tx, user.Id, oidc.AuthMethodPassword.String())
 }
 
 // VerifyStored checks a passcode against the authenticator the user has enrolled, and claims the

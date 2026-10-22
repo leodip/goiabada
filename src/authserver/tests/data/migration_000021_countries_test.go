@@ -21,10 +21,11 @@ import (
 //
 // Note the schema is at 000058 throughout; only the version marker moves. 000021 is
 // data-only, so the schema it runs against is irrelevant to what it transforms, as long
-// as it still has the columns 000021 writes, and seeding through the models requires
-// columns that later migrations added. 000058 is the last version that has both: 000059
-// drops the two phone verification code columns 000021 clears (#471), which the models
-// no longer name, so those two are seeded and read with SQL.
+// as it still has the columns 000021 writes, and reading the rows back through
+// GetUserById requires columns that later migrations added. The rows themselves are seeded
+// with SQL (seedUser, then an UPDATE for the columns 000021 transforms). 000058 is the last
+// version that has both: 000059 drops the two phone verification code columns 000021
+// clears (#471), which the models no longer name, so those two are seeded and read with SQL.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
@@ -38,8 +39,9 @@ func TestMigration000021_CountryData(t *testing.T) {
 	// This used to be a plain Migrate(20). That worked while the pre-000021 schema
 	// and the current schema were identical, but 000024 (#106) added
 	// auth_state_generation to users, so the Go model now references a column that
-	// does not exist at version 20 and the CreateUser calls below fail with
-	// "Unknown column". Force changes the marker without touching the schema, which
+	// does not exist at version 20 and the GetUserById reads in assertMigration000021
+	// fail with "Unknown column". The seeds are SQL (seedUser and the UPDATE in
+	// seedMigrationFixture). Force changes the marker without touching the schema, which
 	// is exactly the trick the idempotency check at the end of this test already
 	// used, so 000021's data transformation is still applied to pre-migration data.
 	// It stops at 000058 rather than head since 000059 dropped two columns 000021 writes.
@@ -73,7 +75,7 @@ type migFixture struct {
 	verified bool
 	pending  bool // seed a pending verification code + issued_at
 	addr     string
-	// NULL injections applied via raw SQL after CreateUser:
+	// NULL injections applied by seedMigrationFixture's raw-SQL UPDATE after seedUser:
 	nullPhone, nullUID, nullCC, nullAddr bool
 	// expected post-migration:
 	wUID, wCC, wPhone string

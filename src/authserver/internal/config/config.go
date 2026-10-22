@@ -24,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/httpmw"
+	"github.com/leodip/goiabada/core/issuerlength"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -206,10 +207,10 @@ type Config struct {
 // its own, which is also what lets it load twice in one process (#320).
 //
 // It answers a whole configuration or an error: the parse's, or one naming every numeric or
-// boolean variable that is set and does not parse. A flag given for the same setting does not
-// rescue the variable, because the value the operator wrote is wrong whichever of the two wins,
-// and a setting only the server reads is refused before `migrate` as well, as its flag already
-// is (#434).
+// boolean variable that is set and does not parse, or a base URL longer than the issuer allows.
+// A flag given for the same setting does not rescue the variable, because the value the operator
+// wrote is wrong whichever of the two wins, and a setting only the server reads is refused before
+// `migrate` as well, as its flag already is (#434).
 func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	var malformed malformedValues
 	authServerBaseURL := getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090")
@@ -327,12 +328,21 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	// The pool flags parse as the flag package reads an integer or a duration; their ranges, and
 	// the one rule between two of them, are held here, in the same line as the variables' (#394).
 	// So is the TLS mode's flag, and the CA file is read here, once, with libpq's variables
-	// refused beside it (#502). Under `migrate` those two wait for its own parse, which reads the
-	// file of the configuration it runs with: a --db-* flag after `migrate` can change the engine,
-	// the mode or the file they are checked against.
+	// refused beside it (#502). Under `migrate` and `recover` those two wait for the subcommand's
+	// own parse, which reads the file of the configuration it runs with: a --db-* flag after the
+	// subcommand can change the engine, the mode or the file they are checked against (#498).
 	checkDatabaseFlags(fs, &c.Database, &malformed)
-	if len(c.Args) == 0 || c.Args[0] != "migrate" {
+	if len(c.Args) == 0 || (c.Args[0] != "migrate" && c.Args[0] != "recover") {
 		checkDatabaseTLS(&c.Database, &malformed)
+	}
+
+	// The base URL is held to the issuer's length limit before anything is seeded, on the value
+	// the parse left whichever side supplied it: the general settings save holds every issuer to
+	// the limit, the stored one included, so a base URL past it would leave an installation whose
+	// General settings can never be saved (#615).
+	if issuerlength.Check(c.AuthServer.BaseURL) != nil {
+		malformed.addLine("GOIABADA_AUTHSERVER_BASEURL (--authserver-baseurl) is " + strconv.Quote(c.AuthServer.BaseURL) +
+			", longer than the issuer allows: at most " + strconv.Itoa(issuerlength.Max) + " characters")
 	}
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
@@ -412,9 +422,9 @@ func (f optionalIntFlag) Set(s string) error {
 }
 
 // CheckDatabaseFlags refuses what the pool flags given on fs leave out of range and a malformed TLS
-// mode given on fs, in the one malformed-configuration line Load answers with. The `migrate`
-// subcommand calls it after its own parse of the --db-* flags, so a flag given after `migrate` is
-// held to the rules one given before it is (#394 decision 5, #502).
+// mode given on fs, in the one malformed-configuration line Load answers with. The `migrate` and
+// `recover` subcommands call it after their own parse of the --db-* flags, so a flag given after
+// the subcommand is held to the rules one given before it is (#394 decision 5, #498, #502).
 func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseFlags(fs, c, &malformed)
@@ -424,9 +434,9 @@ func CheckDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) error {
 // CheckDatabaseTLS refuses a CA file, a client certificate pair and a host name override the
 // connection cannot use, and on PostgreSQL libpq's TLS variables, in the one malformed-configuration
 // line Load answers with, and reads the CA file into c.TLSRoots and the pair into
-// c.TLSClientCertificate. Load leaves all of it to the `migrate` subcommand, which calls this once
-// its --db-* flags are applied, so they are checked against the configuration it runs with
-// (#502, #546).
+// c.TLSClientCertificate. Load leaves all of it to the `migrate` and `recover` subcommands, which
+// call this once their --db-* flags are applied, so they are checked against the configuration
+// they run with (#498, #502, #546).
 func CheckDatabaseTLS(c *DatabaseConfig) error {
 	var malformed malformedValues
 	checkDatabaseTLS(c, &malformed)
@@ -710,6 +720,15 @@ func cannotBeRead(err error) string {
 	return reason
 }
 
+// publishedSampleDataKeyHex is the AES data key this repository's hand-written Compose samples
+// shipped until they were deleted for v1.7.0, so anyone who read a database, a backup or a
+// replica of a deployment started from one could decrypt everything it sealed: the client secrets,
+// the OTP seeds, the pending reset codes, the SMTP password and the RSA signing private keys
+// included. It is refused as the current key (#501): an operator running it must rotate, not
+// start. It stays accepted as the previous key, which is how the rotation the refusal points at
+// moves a database off it.
+const publishedSampleDataKeyHex = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+
 // DataKeys decodes the data-encryption keys: the current one, which must be present,
 // hex-encoded and exactly 32 bytes, and the previous one, nil unless a rotation is in progress
 // and held to the same rule when it is. The key is supplied from the environment rather than
@@ -719,6 +738,9 @@ func (c *Config) DataKeys() (current, previous []byte, err error) {
 	key := strings.TrimSpace(c.AESEncryptionKey)
 	if key == "" {
 		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
+	}
+	if strings.EqualFold(key, publishedSampleDataKeyHex) {
+		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published in its Compose files, so every column it sealed is readable by anyone. Generate a new one with: openssl rand -hex 32, then move the data off this key as https://goiabada.dev/deploy/rotate-secrets/#the-aes-key describes, keeping this one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 	current, err = hex.DecodeString(key)
 	if err != nil {

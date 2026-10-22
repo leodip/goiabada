@@ -214,6 +214,79 @@ func TestMain_MigrateHoldsTheConnectionsTLSRulesToItsOwnFlags(t *testing.T) {
 	})
 }
 
+// TestMain_RecoverHoldsTheConnectionsTLSRulesToItsOwnFlags is migrate's case for `recover`: the CA
+// file and libpq's variables are checked against the configuration the recovery runs with, the
+// --db-* flags given after it applied, so a flag there that settles what the environment left wrong
+// is not refused for it (#498 review F8). Each case reaches the database: PostgreSQL's dial fails
+// on a port nothing listens on, and SQLite's decoy, never migrated, is refused for its schema.
+func TestMain_RecoverHoldsTheConnectionsTLSRulesToItsOwnFlags(t *testing.T) {
+	ca := writeTestAuthority(t)
+	missing := filepath.Join(t.TempDir(), "absent.pem")
+	postgres := []string{
+		"GOIABADA_DB_TYPE=postgres",
+		"GOIABADA_DB_HOST=127.0.0.1",
+		"GOIABADA_DB_PORT=1",
+		"GOIABADA_DB_CREATE=false",
+	}
+	recoverArgs := []string{"recover", "--email", "admin@example.com", "--grant-manage"}
+
+	cases := []struct {
+		name       string
+		env        []string
+		args       []string
+		wantStderr string
+	}{
+		{
+			name:       "a CA file from the environment, the verifying mode after recover",
+			env:        []string{"GOIABADA_DB_TLS_CA_FILE=" + ca},
+			args:       []string{"--db-tls-mode=verify-full"},
+			wantStderr: "unable to open the database",
+		},
+		{
+			name:       "an unreadable CA file from the environment, replaced after recover",
+			env:        []string{"GOIABADA_DB_TLS_MODE=verify-full", "GOIABADA_DB_TLS_CA_FILE=" + missing},
+			args:       []string{"--db-tls-ca-file=" + ca},
+			wantStderr: "unable to open the database",
+		},
+		{
+			name:       "an unreadable CA file beside postgres, sqlite after recover",
+			env:        []string{"GOIABADA_DB_TLS_MODE=verify-ca", "GOIABADA_DB_TLS_CA_FILE=" + missing},
+			args:       []string{"--db-type=sqlite"},
+			wantStderr: "refusing to recover: the database records no schema version",
+		},
+		{
+			name:       "libpq's variable beside postgres, sqlite after recover",
+			env:        []string{"PGSSLMODE=verify-full"},
+			args:       []string{"--db-type=sqlite"},
+			wantStderr: "refusing to recover: the database records no schema version",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			decoy := filepath.Join(t.TempDir(), "d.db")
+
+			code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...), tc.env...),
+				append(append([]string{}, recoverArgs...), tc.args...)...)
+
+			require.Equal(t, migrateExitError, code, "stderr: %s", stderr)
+			assert.NotContains(t, stderr, "malformed configuration")
+			assert.Contains(t, stderr, tc.wantStderr)
+		})
+	}
+
+	t.Run("the merged configuration is still held to the rules", func(t *testing.T) {
+		decoy := filepath.Join(t.TempDir(), "d.db")
+
+		code, stderr := runMainProcessWith(t, decoy, append(append([]string{}, postgres...),
+			"GOIABADA_DB_TLS_MODE=verify-full", "GOIABADA_DB_TLS_CA_FILE="+ca),
+			append(append([]string{}, recoverArgs...), "--db-tls-mode=require")...)
+
+		require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+		assert.Equal(t, `malformed configuration: GOIABADA_DB_TLS_CA_FILE (--db-tls-ca-file) is "`+ca+
+			`" while GOIABADA_DB_TLS_MODE (--db-tls-mode) is require, which checks no certificate: only verify-ca and verify-full read a CA file`+"\n", stderr)
+	})
+}
+
 // writeTestAuthority writes a self-signed authority's certificate to a PEM file of the test's and
 // answers its path.
 func writeTestAuthority(t *testing.T) string {

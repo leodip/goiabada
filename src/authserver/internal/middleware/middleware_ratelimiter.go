@@ -420,6 +420,10 @@ type RateLimiter struct {
 	dcr             *requestTier
 	ropcIp          *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
 	ropcIpRequests  *requestTier
+	// authorize is the admission tier on /auth/authorize, whose GET writes a browser-session
+	// row and whose POST parks a request, on every request that passes its first validation
+	// (#504).
+	authorize *requestTier
 
 	// refusals counts every refusal by the tier that refused it, on the metrics listener (#400
 	// decision 5). Every refusal, where the audit event is one per key per window: a rate is what an
@@ -563,6 +567,19 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// per-IP password grants, every request counted, as pwdIpRequests counts the sign-in form's
 		// and for its reason: the grant runs the same bcrypt on a correct password (#564).
 		ropcIpRequests: request("ropc_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
+		// per-IP: the admission tier on /auth/authorize, GET and POST together. The GET saves a
+		// browser session and the POST parks the request on every call that passes its first
+		// validation, so an unauthenticated holder of one public client_id and its registered
+		// redirect URI, both visible in any sign-in link, could otherwise write rows as fast as
+		// it could send requests and drop the cookie (#504). Every request counts, refused ones
+		// included, and those that write nothing too: an SSO hop over a stored session and a
+		// silent renew. A sign-in reaches the endpoint once, or twice when its client posts, and
+		// an SSO hop or a silent renew once each, so 120 a minute is two a second sustained from
+		// one client block: an office of people signing in, moving between clients and renewing
+		// in the same minute, where one browser never comes near it.
+		// Off by default with every tier that reads the client's address (#219); PreAuthLifetime
+		// and the reaper bound how long a row lives, never how many arrive.
+		authorize: request("authorize", countedByIP, "ip", 120, time.Minute),
 	}
 	m.refusals = reg.Counter("goiabada_rate_limit_refusals_total",
 		"Requests the rate limiter refused, by the limiter that refused them.",
@@ -1045,6 +1062,21 @@ func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 // by the request body limit (#219, #426, #428).
 func (m *RateLimiter) LimitDCR(next http.Handler) http.Handler {
 	return m.limitRequests(next, m.dcr, rejectOAuth)
+}
+
+// LimitAuthorize rate limits the authorization endpoint's admission, in front of the writes it
+// makes before it knows who is asking: the browser-session row a GET that passes its first
+// validation saves, and the parked-request row a POST parks (#504). One tier over both methods,
+// as LimitActivate covers both of its, so an address's budget bounds what the two routes write
+// together, and a request refused for its parameters spends it too: what this bounds is the row
+// every request this tier admits may cost, which is decided before the request costs anything.
+//
+// It follows the switch like every tier counted by the client's address, and for LimitDCR's
+// reason: an edge layer that sees the real address bounds the flood better. Off, the endpoint
+// stays as #219 left it, bounded only by PreAuthLifetime and the reaper, which bound how long
+// a row lives rather than how many arrive.
+func (m *RateLimiter) LimitAuthorize(next http.Handler) http.Handler {
+	return m.limitRequests(next, m.authorize, rejectBrowser)
 }
 
 // bucket is the bucket r spends on t: its key, derived from what t counts by and from nothing

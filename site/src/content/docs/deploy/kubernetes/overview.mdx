@@ -33,6 +33,10 @@ This page helps you plan a Goiabada deployment on a Kubernetes cluster.
 
 You also need `kubectl` configured for the cluster, and the setup wizard on the machine you run it from.
 
+<Aside type="note">
+`/auth/authorize` writes a row on every request that passes its first validation, a browser session on a GET and a parked request on a POST, so an unauthenticated flood grows the database. The built-in `authorize` limit bounds it only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, which the wizard turns on under the gateway's `Local` traffic policy and off under `Cluster`, and even on it counts per pod. With it off, or for one budget across the replicas, give the route a budget at your gateway. See [Rate limiting across replicas](/deploy/kubernetes/high-availability/#rate-limiting-across-replicas).
+</Aside>
+
 ## What runs where
 
 ```
@@ -67,6 +71,18 @@ Both servers trust one proxy hop, the gateway, to tell them each client's IP add
 <Aside type="note">
 The wizard takes a lowercase domain name for each host, never an IP address, and refuses the same host for both servers: the Gateway routes by host name, and two listeners on one host and port are both rejected.
 </Aside>
+
+## Recover a locked-out administrator
+
+When nobody who holds `authserver:manage` can sign in any more, the auth server's `recover` subcommand restores sign-in for one named user. The pods read the database credentials from the Secrets the manifest gives them, so the command runs inside one:
+
+```bash
+printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
+printf '%s\n' "$RECOVERY_PASSWORD" | kubectl exec -i -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
+unset RECOVERY_PASSWORD
+```
+
+The first line asks for the new password without showing it, and the second hands it to the command's input, so it never appears in a command line, the shell's history or a log. Each action is its own flag, `--grant-manage`, `--password-stdin` and `--remove-otp`, applied only as asked, and whatever is asked, the user's sessions end and the [audit log](/concepts/audit-log/) records the recovery. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers every flag and the other deployment shapes.
 
 ## Next steps
 

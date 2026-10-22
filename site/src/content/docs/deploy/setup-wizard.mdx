@@ -53,7 +53,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 |---|---|---|
 | Deployment type | Every deployment. See [Deployment types](#deployment-types). | 1, Local testing (`--type` has none) |
 | Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | 1, MySQL (`--db` has none) |
-| Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. | `https://auth.example.com`, then the admin console's on the same domain: `https://admin.example.com` |
+| Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. The auth server's is at most 60 characters, since the first start makes it the issuer. | `https://auth.example.com`, then the admin console's on the same domain: `https://admin.example.com` |
 | Kubernetes namespace | Kubernetes | `goiabada` |
 | Gateway traffic policy | Kubernetes. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
 | Network policy | Kubernetes. Yes admits only Envoy to both servers, and the admin console to the auth server. It needs a network plugin that enforces NetworkPolicies. | No |
@@ -134,7 +134,7 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 |---|---|
 | `--type` | The deployment: `local`, `production`, `kubernetes` or `native`. Giving it turns off the questions. |
 | `--db` | The database: `mysql`, `postgres`, `mssql` or `sqlite`. Required with `--type`. |
-| `--auth-url` | The auth server's URL. Required with `--type`, except for `local`. |
+| `--auth-url` | The auth server's URL, at most 60 characters, since the first start makes it the issuer and the auth server refuses to start on a longer one. Required with `--type`, except for `local`. |
 | `--admin-url` | The admin console's URL. Default: `https://admin.` and the auth server's domain, so `https://admin.example.com` for `https://auth.example.com`. Required when the auth server's host is an IP address or a single word. |
 | `--namespace` | Kubernetes: the namespace. Default: `goiabada`. |
 | `--admin-email` | The first administrator's email. Default: `admin@example.com` for `local`, otherwise `admin@` and the auth server's domain. Required when the auth server's host is an IP address or a single word. |

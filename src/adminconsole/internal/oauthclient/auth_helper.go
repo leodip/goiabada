@@ -9,20 +9,33 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/securerandom"
-	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// SignInHandshakeCookie is the logical name of the cookie the sign-in's handshake rides in from
+// the authorize redirect to the callback: the six values RedirToAuthorize mints, sealed by the
+// session store under keys of their own. The handshake used to be parked in a fresh browser
+// session, which cost the auth server a row for every anonymous request to /admin or /account,
+// at no limit; it is a kilobyte or so sealed, written once and read once, and its safety rests on
+// the posted state matching it and the code being bound to its verifier, not on where it is kept.
+// So the console writes no row until the callback has a signed-in administrator to store (#620).
+const SignInHandshakeCookie = "adminconsole-signin"
+
+// handshakeSealer is what RedirToAuthorize calls on the session store: seal the handshake and
+// build the cookie that carries it.
+type handshakeSealer interface {
+	SealCookieValues(name string, values map[string]string) (string, error)
+	ValuesCookie(name, value string) *http.Cookie
+}
+
 type AuthHelper struct {
-	sessionStore      sessionstore.Store
-	sessionName       string
+	sealer            handshakeSealer
 	baseURL           string
 	authServerBaseURL string
 }
 
-func NewAuthHelper(sessionStore sessionstore.Store, sessionName, baseURL, authServerBaseURL string) *AuthHelper {
+func NewAuthHelper(sealer handshakeSealer, baseURL, authServerBaseURL string) *AuthHelper {
 	return &AuthHelper{
-		sessionStore:      sessionStore,
-		sessionName:       sessionName,
+		sealer:            sealer,
 		baseURL:           baseURL,
 		authServerBaseURL: authServerBaseURL,
 	}
@@ -35,27 +48,24 @@ func (s *AuthHelper) RedirToAuthorize(
 	scope string,
 	redirectBack string,
 ) error {
-	sess, err := s.sessionStore.Get(r, s.sessionName)
-	if err != nil {
-		return err
-	}
-
 	redirectURI := s.baseURL + "/auth/callback"
 	codeVerifier := securerandom.String(120)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	state := securerandom.String(16)
 	nonce := securerandom.String(16)
 
-	sess.Values[sessionkeys.State] = state
-	sess.Values[sessionkeys.Nonce] = nonce
-	sess.Values[sessionkeys.CodeVerifier] = codeVerifier
-	sess.Values[sessionkeys.RedirectURI] = redirectURI
-	sess.Values[sessionkeys.RedirectBack] = redirectBack
-	sess.Values[sessionkeys.RequestedScope] = scope
-	err = s.sessionStore.Save(r, w, sess)
+	sealed, err := s.sealer.SealCookieValues(SignInHandshakeCookie, map[string]string{
+		sessionkeys.State:          state,
+		sessionkeys.Nonce:          nonce,
+		sessionkeys.CodeVerifier:   codeVerifier,
+		sessionkeys.RedirectURI:    redirectURI,
+		sessionkeys.RedirectBack:   redirectBack,
+		sessionkeys.RequestedScope: scope,
+	})
 	if err != nil {
 		return err
 	}
+	http.SetCookie(w, s.sealer.ValuesCookie(SignInHandshakeCookie, sealed))
 
 	values := url.Values{}
 	values.Add("client_id", clientIdentifier)
@@ -76,7 +86,7 @@ func (s *AuthHelper) RedirToAuthorize(
 }
 
 // nonceHash is the nonce an authorize request sends and the sign-in's ID token must carry back:
-// the SHA-256 of the raw value the session keeps, the scheme OIDC Core 15.5.2 describes ("use a
+// the SHA-256 of the raw value the handshake keeps, the scheme OIDC Core 15.5.2 describes ("use a
 // cryptographic hash of the value as the nonce parameter"). RedirToAuthorize sends it and
 // DecodeAndValidateSignInResponse compares against it, so the scheme is written once (#427).
 func nonceHash(nonce string) string {

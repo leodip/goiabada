@@ -53,10 +53,11 @@ type Migratable interface {
 // OpenDatabase constructs the concrete database for the configured engine and returns it having
 // migrated nothing and run no startup task. It is NewDatabase's engine switch and nothing else.
 //
-// It is exported for the `migrate` subcommand, which needs an engine's migrator without the schema
-// being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
-// for a rollback. Every other production caller wants NewDatabase (#268); the data tier opens its
-// second handle with it too, as a pool rather than a start.
+// It is exported for the `migrate` and `recover` subcommands, which need the database without the
+// schema being brought to head first, which is what NewDatabase does: `migrate` because that makes
+// NewDatabase useless for a rollback (#268), `recover` because it refuses a schema other than head
+// rather than migrate it (#498). Every other production caller wants NewDatabase; the data tier
+// opens its second handle with it too, as a pool rather than a start.
 //
 // ctx is the caller's and reaches every statement the engine's constructor issues, so a start
 // waiting on an unreachable server or a held creation lock ends when the caller stops waiting
