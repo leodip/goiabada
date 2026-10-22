@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/recovery"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,10 +23,10 @@ import (
 // The `recover` subcommand's operation, recovery.Run, on every engine: whatever it is asked, the
 // user's authentication generation advances by one and their sessions and refresh tokens end, and
 // each action changes what it names and nothing else (#498, its Done-when: "the data tier shows it
-// on all four engines"). The two forced interleavings at the end show the user and the
-// authenticator are read under the user's row, and the held grant under the manage permission's,
-// so a credential change or a grant holding that row when the recovery starts is what the recovery
-// decides on.
+// on all four engines"), and a call failing inside its transaction commits none of the writes
+// before it. The two forced interleavings at the end show the user and the authenticator are read
+// under the user's row, and the held grant under the manage permission's, so a credential change or
+// a grant holding that row when the recovery starts is what the recovery decides on.
 
 // recoveryPassword passes every password policy, so the test does not depend on which policy the
 // shared database's settings row holds.
@@ -319,6 +321,91 @@ func TestRecovery_ARefusalWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, session)
 	assertTokenRevoked(t, f.sessionToken.Id, false, "the session-bound refresh token")
+}
+
+// recoveryWriteRefuser passes every call through to the real database but the one failAt names,
+// which it refuses inside the transaction, after recording that the recovery reached it.
+type recoveryWriteRefuser struct {
+	data.Database
+	failAt  string
+	failure error
+	reached bool
+}
+
+func (d *recoveryWriteRefuser) refuse(method string, tx *sql.Tx) bool {
+	if method != d.failAt || tx == nil {
+		return false
+	}
+	d.reached = true
+	return true
+}
+
+func (d *recoveryWriteRefuser) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
+	if d.refuse("SetUserPasswordHash", tx) {
+		return d.failure
+	}
+	return d.Database.SetUserPasswordHash(ctx, tx, userId, passwordHash)
+}
+
+func (d *recoveryWriteRefuser) GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx,
+	userId int64) ([]record.UserPermission, error) {
+
+	if d.refuse("GetUserPermissionsByUserId", tx) {
+		return nil, d.failure
+	}
+	return d.Database.GetUserPermissionsByUserId(ctx, tx, userId)
+}
+
+func (d *recoveryWriteRefuser) CreateUserPermission(ctx context.Context, tx *sql.Tx,
+	userPermission *record.UserPermission) error {
+
+	if d.refuse("CreateUserPermission", tx) {
+		return d.failure
+	}
+	return d.Database.CreateUserPermission(ctx, tx, userPermission)
+}
+
+// A call failing inside the transaction rolls back everything the recovery wrote before it, the
+// sweep included, and records nothing: asked for all three actions, a grant whose read or write
+// fails leaves the password set and the authenticator removed before it uncommitted, and a password
+// write that fails leaves the generation, the sessions and the tokens as they were. Run answers the
+// failure rather than a recovery.
+func TestRecovery_AFailedGrantRollsBackEarlierActions(t *testing.T) {
+	ctx := context.Background()
+
+	for _, failAt := range []string{"SetUserPasswordHash", "GetUserPermissionsByUserId", "CreateUserPermission"} {
+		t.Run(failAt, func(t *testing.T) {
+			f := seedRecoveryFixture(t)
+			db := &recoveryWriteRefuser{Database: database, failAt: failAt,
+				failure: errs.New("the engine refused the call")}
+			recorder := &recoveryAuditRecorder{}
+
+			outcome, err := recovery.Run(ctx, db, recorder, recovery.Request{
+				Email: f.user.Email, Password: recoveryPassword, GrantManage: true, RemoveOTP: true,
+			})
+
+			require.ErrorIs(t, err, db.failure)
+			require.True(t, db.reached, "the recovery reached the refused call")
+			var refusal *recovery.RefusedError
+			assert.NotErrorAs(t, err, &refusal, "a failure is not a refusal")
+			assert.Equal(t, recovery.Outcome{}, outcome)
+			assert.Empty(t, recorder.events, "nothing is recorded for a rollback")
+
+			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			require.NoError(t, err)
+			assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "the password is as it was")
+			assert.True(t, after.OTPEnabled, "the authenticator is still enrolled")
+			assert.Equal(t, f.user.OTPSecretEncrypted, after.OTPSecretEncrypted)
+			assert.Equal(t, f.user.OtpConfigGeneration, after.OtpConfigGeneration)
+			assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
+			assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
+			session, err := database.GetUserSessionById(ctx, nil, f.session.Id)
+			require.NoError(t, err)
+			assert.NotNil(t, session, "the user's session still stands")
+			assertTokenRevoked(t, f.sessionToken.Id, false, "the session-bound refresh token")
+			assertTokenRevoked(t, f.offlineToken.Id, false, "the offline refresh token")
+		})
+	}
 }
 
 // A removal and a new enrolment of the authenticator hold the user's row when the recovery starts.

@@ -369,17 +369,50 @@ func TestRecover_FindsTheUserByATrimmedLowercasedAddress(t *testing.T) {
 	assert.Contains(t, stdout, "recovered admin@example.com")
 }
 
+// TestRecover_HoldsThePasswordToTheStoredPolicy: the policy is the one the settings row stores,
+// not a default. "abcdefghij" passes the low policy's six characters and fails the high policy's
+// mixed classes, so only the stored policy tells its two cases apart (#498 round 3 F2).
 func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
-	db, _ := newRecoverDatabase(t)
-	recorder := &recoverAuditRecorder{}
+	for _, tc := range []struct {
+		name     string
+		policy   record.PasswordPolicy
+		password string
+		accepted bool
+	}{
+		{"a password every policy refuses", record.PasswordPolicyLow, "short", false},
+		{"the stored high policy refuses what the low one allows", record.PasswordPolicyHigh, "abcdefghij", false},
+		{"the stored low policy allows it", record.PasswordPolicyLow, "abcdefghij", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, _ := newRecoverDatabase(t)
+			ctx := context.Background()
+			settings, err := db.GetSettingsById(ctx, nil, 1)
+			require.NoError(t, err)
+			settings.PasswordPolicy = tc.policy
+			require.NoError(t, db.UpdateSettings(ctx, nil, settings))
+			recorder := &recoverAuditRecorder{}
 
-	code, _, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
-		email: "admin@example.com", password: "short",
-	})
+			code, _, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
+				email: "admin@example.com", password: tc.password,
+			})
 
-	assert.Equal(t, migrateExitError, code)
-	assert.Contains(t, stderr, "the password is refused by the stored password policy")
-	assert.Empty(t, recorder.events, "a refusal writes no audit event")
+			after, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
+			require.NoError(t, err)
+			if tc.accepted {
+				assert.Equal(t, migrateExitOK, code, stderr)
+				assert.True(t, passwordhash.Verify(after.PasswordHash, tc.password), "the new password verifies")
+				assert.Equal(t, int64(1), after.AuthStateGeneration)
+				assert.Equal(t, []string{audit.EventUpdatedUserAuthentication, audit.EventRevokedUserAuthState},
+					recorder.events)
+				return
+			}
+			assert.Equal(t, migrateExitError, code)
+			assert.Contains(t, stderr, "the password is refused by the stored password policy")
+			assert.Equal(t, "not-a-bcrypt-hash", after.PasswordHash, "the password is as it was")
+			assert.Equal(t, int64(0), after.AuthStateGeneration, "the generation did not move")
+			assert.Empty(t, recorder.events, "a refusal writes no audit event")
+		})
+	}
 }
 
 // TestRecover_RefusesASchemaThisBinaryDoesNotCarry: the server refuses to start on a database a
