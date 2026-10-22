@@ -26,8 +26,19 @@ services:
     #
     #   macOS/Linux   export GH_TOKEN=$(gh auth token)
     #   PowerShell    $env:GH_TOKEN = (gh auth token)
+    #
+    # The data key and the database passwords come from .env, which generate-env.sh writes once
+    # with fresh values for this checkout (#501). `:?` stops Compose with the remedy when .env is
+    # missing, rather than starting a stack with no key and databases with no password. The three
+    # database variables are the ones run-tests.sh and schemadump read, and GOIABADA_DB_PASSWORD is
+    # SQL Server's, the engine devcontainer.json points a hand-started auth server at.
     environment:
       - GH_TOKEN
+      - GOIABADA_AES_ENCRYPTION_KEY=${GOIABADA_AES_ENCRYPTION_KEY:?run .devcontainer/generate-env.sh first}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?run .devcontainer/generate-env.sh first}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?run .devcontainer/generate-env.sh first}
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:?run .devcontainer/generate-env.sh first}
+      - GOIABADA_DB_PASSWORD=${MSSQL_SA_PASSWORD:?run .devcontainer/generate-env.sh first}
     command: sleep infinity
     networks: 
       - goiabada-network
@@ -66,7 +77,7 @@ services:
     ports:
       - 13306:13306  # Devcontainer uses 13306 to avoid conflict with sample docker-compose files
     environment:
-      MYSQL_ROOT_PASSWORD: mySqlPass123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?run .devcontainer/generate-env.sh first}
     networks:
       - goiabada-network
 
@@ -83,7 +94,7 @@ services:
     ports:
       - 15432:15432  # Devcontainer uses 15432 to avoid conflict with sample docker-compose files
     environment:
-      POSTGRES_PASSWORD: myPostgresPass123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run .devcontainer/generate-env.sh first}
     networks:
       - goiabada-network
 
@@ -91,7 +102,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: Y
-      MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!  # Must be at least 8 characters including uppercase, lowercase, digits
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?run .devcontainer/generate-env.sh first}  # generate-env.sh meets SQL Server's password policy
       MSSQL_PID: Developer
       MSSQL_TCP_PORT: 11433
       # mssql-conf's network.tlscert and network.tlskey. The server refuses to start when either

@@ -47,8 +47,8 @@ const (
 //   - the down migration drops both indexes and cannot restore a swept row, and applying the
 //     migration again sweeps what the gap let in.
 //
-// The rows are seeded through the data layer at version 000054, which has no unique key over either
-// pair, and each consent's updated_at is then set with a literal so a case can say "equal" or NULL.
+// The rows are seeded as SQL at version 000054, which has no unique key over either pair, and
+// each consent's updated_at is then set with a literal so a case can say "equal" or NULL.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //

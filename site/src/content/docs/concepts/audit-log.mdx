@@ -34,7 +34,7 @@ These record who can administer Goiabada and who tried to reach past that. See [
 | Event | Written when | Details |
 |---|---|---|
 | `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, rewording an administrative permission's description, switching a client's **May request administrative scopes**, and deleting a group holding an administrative permission. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, and `group_ids` for a group membership change |
-| `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user` |
+| `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user`, or `command` for the `recover` command's grant |
 | `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. The Admin API writes it for every call to that route, even one that keeps the value it had; the admin console's **Save** calls it only when the switch changed. | `client_id`, `client_identifier`, `allowed` (the new value) and `logged_in_user` |
 | `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session and the request doesn't ask for `prompt=login`, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session, or held back until after the password because of `prompt=login`, writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
 | `viewed_client_secret` | Someone read a client's secret through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time you open a confidential client's **Authentication** tab. Reading a client with no secret writes nothing. | `client_id`, `client_identifier` and `logged_in_user` |
@@ -116,6 +116,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `client_id` | The client's row id, the id in the Admin API's client paths. |
 | `client_identifier` | The identifier the client is known by, sent as `client_id` in OAuth requests. On a refusal at the token endpoint, it's the one the request named. |
 | `code_id` | The row id of an authorization code. |
+| `command` | The auth server's `recover` subcommand, named as the actor of every entry a recovery writes, where an entry a request made names its token's subject under `logged_in_user`. |
 | `consent_id` | The row id of a consent a user gave a client. |
 | `email` | The address of an account: the one created, activated, or given an email verification code. |
 | `email_destination` | The address an email verification code was sent to. |
@@ -137,7 +138,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `limiter` | The name of the rate limiter that refused. |
-| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes. |
+| `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
 | `max_user_sessions_per_user` | Under `old` and `new`: the most sessions one user can hold, 0 for no limit. |
 | `method` | The HTTP method of a refused Admin API request. |
 | `new` | The default token settings, or the session settings, after the change, keyed as below. |
@@ -238,7 +239,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `deleted_user_session_client` | A client signed a user out, and was removed from the user's session. The session ends only when no other client is left on it. |
 | `deleted_user_session` | A session was deleted by a sign-in, a sign-out, its user or an administrator. Its `reason` says which: see [Why a session was deleted](#why-a-session-was-deleted). |
 | `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
-| `revoked_user_auth_state` | A user's password was reset or changed, or the user was disabled, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
+| `revoked_user_auth_state` | A user's password was reset or changed, the user was disabled, or the `recover` command recovered the user, so their sessions and refresh tokens were revoked. A user changing their own password keeps the session they did it from. |
 
 ### Tokens
 
@@ -253,6 +254,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and, if there were any, the session ended. |
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
+| `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
 
 ### Registration and emailed links
@@ -282,7 +284,7 @@ These come from the Account API, which users reach through the admin console's a
 | `deleted_own_profile_picture` | A user removed their own profile picture. |
 | `changed_password` | A user changed their own password, after confirming the current one. |
 | `enabled_otp` | A user set up an authenticator for two-factor authentication, on their account page or when a sign-in required it. |
-| `disabled_otp` | A user's authenticator was removed, by the user or by an administrator. |
+| `disabled_otp` | A user's authenticator was removed, by the user, by an administrator or by the `recover` command. |
 | `deleted_own_user_consent` | A user withdrew the consent they had given a client. |
 
 ### Users
@@ -296,13 +298,13 @@ These come from the Account API, which users reach through the admin console's a
 | `generated_email_verification_code` | An administrator generated an email verification code for a user. It was returned to the administrator, not emailed. |
 | `updated_user_phone` | An administrator changed or cleared a user's phone number. |
 | `updated_user_address` | An administrator changed a user's address. |
-| `updated_user_authentication` | An administrator set a new password for a user. |
+| `updated_user_authentication` | An administrator, or the `recover` command, set a new password for a user. |
 | `updated_user_profile_picture` | An administrator uploaded or replaced a user's profile picture. |
 | `deleted_user_profile_picture` | An administrator removed a user's profile picture. |
 | `added_user_attribute` | An administrator added a custom attribute to a user. |
 | `updated_user_attribute` | An administrator changed a user's custom attribute. |
 | `deleted_user_attribute` | An administrator deleted a user's custom attribute. |
-| `added_user_permission` | An administrator granted a permission to a user. One entry per permission. |
+| `added_user_permission` | An administrator, or the `recover` command, granted a permission to a user. One entry per permission. |
 | `deleted_user_permission` | An administrator revoked a permission from a user. One entry per permission. |
 | `deleted_user_consent` | An administrator deleted a consent a user had given a client. |
 | `deleted_user` | An administrator deleted a user. |
@@ -326,7 +328,7 @@ These come from the Account API, which users reach through the admin console's a
 
 | Event | Meaning |
 |---|---|
-| `administrative_permission_changed` | Who is an administrator changed: an administrative permission was granted or revoked, or a user joined or left a group holding one. |
+| `administrative_permission_changed` | Who is an administrator changed: an administrative permission was granted or revoked, by an administrator or by the `recover` command, or a user joined or left a group holding one. |
 | `administrator_change_refused` | An Admin API request was refused because only `authserver:manage` may make that change. |
 
 ### Clients

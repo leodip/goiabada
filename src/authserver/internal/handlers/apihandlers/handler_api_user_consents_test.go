@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -113,6 +114,10 @@ func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
+// consentWithdrawalTx is the transaction the withdrawal's revocation runs in, the counterpart of
+// apiTerminateTx. A nil one would let an expectation match a write made outside any transaction.
+var consentWithdrawalTx = &sql.Tx{}
+
 func TestHandleUserConsentDelete_Success(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -125,18 +130,51 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"})
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
-	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil)
+	// The withdrawal deletes the consent and sweeps what it leaves standing inside ONE
+	// transaction (#622). One live family token, so the family record is written under the
+	// withdrawal's reason and the sweep flips the token before it saves it. The enumeration is
+	// expected on exactly this user and client, so a sweep that reached for any other user's
+	// tokens would fail as an unexpected call.
+	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
+	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(nil).Once()
+	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+		Return(int64(1), nil).Once()
+	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+		Return([]*record.RefreshToken{
+			{Id: 11, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "rt-first"},
+			{Id: 12, RefreshTokenJti: "rt-already-gone", FirstRefreshTokenJti: "rt-first", Revoked: true},
+		}, nil).Once()
+	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonConsentWithdrawn).
+		Return(true, nil).Once()
+	database.On("UpdateRefreshToken", mock.Anything, consentWithdrawalTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
+		return rt.RefreshTokenJti == "rt-live" && rt.Revoked
+	})).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["user_id"] == int64(7) && details["consent_id"] == int64(5) &&
 			details["logged_in_user"] == "admin-subject-1"
-	})).Return()
+	})).Return().Once()
+	// What the withdrawal revoked, beside the deletion event: the live token alone, since the
+	// other was revoked before the call.
+	var revokedPayload map[string]interface{}
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedConsentGrants, mock.Anything).
+		Run(func(args mock.Arguments) {
+			revokedPayload = args.Get(2).(map[string]interface{})
+		}).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
+	assert.Equal(t, map[string]interface{}{
+		"user_id":                    int64(7),
+		"client_id":                  int64(3),
+		"logged_in_user":             "admin-subject-1",
+		"revoked_code_count":         int64(1),
+		"revoked_refresh_token_jtis": []string{"rt-live"},
+	}, revokedPayload)
 }
 
 func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
@@ -165,10 +203,15 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&record.UserConsent{Id: 5, UserId: 7}, nil)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil)
 	// No token: the target ceiling reads what the user holds, and an ordinary user's write goes on.
 	expectHoldsNothing(database, 7)
-	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(assert.AnError)
+	// The delete runs as the withdrawal's own write, first inside the transaction, and its
+	// failure is what the handler reports: nothing after it, neither the enumeration nor the
+	// sweep, runs (#622).
+	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
+	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(assert.AnError).Once()
 
 	handler.ServeHTTP(rr, req)
 

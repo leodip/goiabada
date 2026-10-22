@@ -259,13 +259,15 @@ const (
 	EventChangedPassword       = "changed_password"
 	// EventRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
-	// refresh tokens revoked. Emitted by the four sites that perform that action AFTER their
+	// refresh tokens revoked. Emitted by the five sites that perform that action AFTER their
 	// transaction commits, on success only, and emitted even when nothing was found to revoke,
 	// so the event attests that the action happened rather than that something was there to
 	// sweep (#106 decision 7). Its `reason` field distinguishes the sites: password_reset,
-	// password_change, admin_password_set or account_disabled. A fifth, email_collision_backfill,
-	// existed until #351 replaced the startup pass that emitted it with migration 000047 and a
-	// pre-flight that refuses to migrate rather than disabling an account nobody asked about.
+	// password_change, admin_password_set, account_disabled or recovery_command, the `recover`
+	// subcommand's, which names the command under `command` and leaves logged_in_user empty (#498).
+	// Another, email_collision_backfill, existed until #351 replaced the startup pass that emitted
+	// it with migration 000047 and a pre-flight that refuses to migrate rather than disabling an
+	// account nobody asked about.
 	//
 	// Deliberately NOT EventUserDisabled, which already means "a disabled user was rejected"
 	// and is emitted wherever an auth path refuses one: /auth/authorize, the password and OTP
@@ -309,6 +311,23 @@ const (
 	// terminated_user_session, because no event here lists code ids and a count answers the only
 	// question an auditor has, whether anything was revoked.
 	EventRevokedClientGrants = "revoked_client_grants"
+	// EventRevokedConsentGrants records that withdrawing a user's consent to one client revoked
+	// the refresh tokens that user holds with that client, through both linkage shapes, and
+	// recorded each of their rotation families revoked, and marked the user's codes with that
+	// client not yet redeemed revoked (#622). Emitted AFTER the withdrawal's
+	// transaction commits, on success only, by the account API's and the admin API's consent
+	// deletions, and emitted even when nothing was found to revoke, so the event attests that
+	// the action happened.
+	//
+	// It accompanies EventDeletedOwnUserConsent or EventDeletedUserConsent rather than replacing
+	// it, for the reason EventTerminatedUserSession accompanies EventDeletedUserSession: the
+	// deletion event keeps its fields, and this is the record of what the withdrawal revoked.
+	// It advances no generation and ends no session, so the user stays signed in and the
+	// client's access tokens already issued keep working until they expire.
+	//
+	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
+	// plus logged_in_user.
+	EventRevokedConsentGrants = "revoked_consent_grants"
 	// EventCrossUserSessionReplaced records that a different user signed in on a browser that was
 	// still carrying someone else's session cookie, so that session was ended. The browser reaches
 	// that state through prompt=login, through an id_token_hint naming another user, or simply by
@@ -423,8 +442,9 @@ const (
 	// Payload: change, granted or revoked; target_kind and target_id, the user, group or client
 	// whose permissions changed, the user for a membership change; permission_identifiers, the
 	// administrative permissions granted or revoked, as resource:permission; group_id, for a
-	// membership change, the group joined or left; and logged_in_user. A permission save writes at
-	// most one per direction, a membership change one per administrative group.
+	// membership change, the group joined or left; and logged_in_user, or command for the
+	// `recover` subcommand's grant (#498). A permission save writes at most one per direction, a
+	// membership change one per administrative group.
 	EventAdministrativePermissionChanged = "administrative_permission_changed"
 
 	// EventAdministrativeScopeRefused records an administrative authserver scope refused because
@@ -556,6 +576,7 @@ var auditEventTypes = []string{
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,
 	EventRevokedClientGrants,
+	EventRevokedConsentGrants,
 	EventRevokedKey,
 	EventRevokedUserAuthState,
 	EventROPCAuthFailed,

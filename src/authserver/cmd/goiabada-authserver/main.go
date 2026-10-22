@@ -3,6 +3,8 @@
 //	goiabada-authserver [flags]                                     serve
 //	goiabada-authserver [flags] migrate [--db-* flags] version      report the schema version
 //	goiabada-authserver [flags] migrate [--db-* flags] to <version> step the schema to <version>
+//	goiabada-authserver [flags] recover [--db-* flags] --email <address> [flags]
+//	                                                       restore sign-in for one user (#498)
 //
 // Flags before `migrate` are the server's, and only the --db-* ones among them reach `migrate`;
 // after it, only the --db-* flags are accepted, and one given there overrides the same flag given
@@ -83,18 +85,25 @@ func run() int {
 	// to 44` for a server start and migrated a database up that the operator asked to step down
 	// (#424). A refusal is the operator's typo rather than a server event, so it goes to stderr
 	// as one line and nothing is opened.
-	migrateArgs, isMigrate, err := dispatch(cfg.Args)
+	commandArgs, command, err := dispatch(cfg.Args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return migrateExitUsage
 	}
-	// `migrate` reads its own arguments here, for the same reason: what it refuses, its --db-*
-	// flags and the TLS settings checked against them, is the operator's to retype, and goes to
-	// stderr with nothing before it (#502).
+	// `migrate` and `recover` read their own arguments here, for the same reason: what they
+	// refuse, their --db-* flags and the TLS settings checked against them, is the operator's
+	// to retype, and goes to stderr with nothing before it (#502).
 	var migration migrateInvocation
-	if isMigrate {
+	if command == "migrate" {
 		var ok bool
-		if migration, ok = readMigrateCommand(migrateArgs, cfg.Database, os.Stderr); !ok {
+		if migration, ok = readMigrateCommand(commandArgs, cfg.Database, os.Stderr); !ok {
+			return migrateExitUsage
+		}
+	}
+	var recovery recoverInvocation
+	if command == "recover" {
+		var ok bool
+		if recovery, ok = readRecoverCommand(commandArgs, cfg.Database, os.Stdin, os.Stderr); !ok {
 			return migrateExitUsage
 		}
 	}
@@ -106,16 +115,20 @@ func run() int {
 		"git_commit", buildinfo.GitCommit)
 	slog.Info("config loaded")
 
-	// The `migrate` subcommand runs here: after the configuration is loaded, because it needs
-	// GOIABADA_DB_* and the --db-* flags given before it, and before the data-encryption key is
-	// validated, because a schema migration touches no encrypted value and the key would
-	// otherwise be a precondition for repairing a database on a deployment that has not set one
-	// (#268). Its arguments are the ones dispatch left after the word `migrate`, and the database
-	// configuration was handed to readMigrateCommand by value, so the --db-* flags it parsed among
-	// them override a copy and the loaded configuration stays what the process was started with
-	// (#424).
-	if isMigrate {
+	// The two subcommands run here: after the configuration is loaded, because they need
+	// GOIABADA_DB_* and the --db-* flags given before them, and before the data-encryption key
+	// is validated, because a schema migration touches no encrypted value and neither does a
+	// recovery, which writes a password hash, clears an OTP seed and grants a permission and
+	// decrypts nothing, and the key would otherwise be a precondition for repairing a database
+	// on a deployment that has not set one (#268, #498). Their arguments are the ones dispatch
+	// left after the command's word, and the database configuration was handed to each reader by
+	// value, so the --db-* flags it parsed among them override a copy and the loaded
+	// configuration stays what the process was started with (#424).
+	if command == "migrate" {
 		return runMigrateCommand(migration, os.Stdout, os.Stderr)
+	}
+	if command == "recover" {
+		return runRecoverCommand(recovery, datafactory.OpenDatabase, os.Stdout, os.Stderr)
 	}
 
 	// The process owns the signals, from here to its exit, so a stop arriving while the server is
@@ -150,7 +163,7 @@ func run() int {
 		// banners: the two lines after the failure were prose an operator had to read as a
 		// unit, and a JSON deployment received them as three unrelated records with the
 		// remedy in a message field nothing could query (#320).
-		slog.Error("the data encryption key is missing or malformed, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
+		slog.Error("the data encryption key is missing, malformed or the published sample key, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
 			"error", aesKeyErr,
 			"generate_with", "openssl rand -hex 32")
 		return 1
@@ -440,20 +453,25 @@ func logSessionKeysRefused(ctx context.Context, err error, bootstrapFile string)
 }
 
 // dispatch chooses the command from the positional arguments the flag parse left: none serves,
-// a first `migrate` hands the rest to the subcommand, and anything else is refused, before a
-// database is opened. A typo such as `migrat to 44` used to start the server and migrate the
-// database up, the opposite of what was asked (#424).
-func dispatch(args []string) (migrateArgs []string, isMigrate bool, err error) {
+// a first `migrate` hands the rest to the schema subcommand, a first `recover` to the one that
+// restores sign-in for a user (#498), and anything else is refused, before a database is opened.
+// A typo such as `migrat to 44` used to start the server and migrate the database up, the
+// opposite of what was asked (#424).
+func dispatch(args []string) (rest []string, command string, err error) {
 	if len(args) == 0 {
-		return nil, false, nil
+		return nil, "", nil
 	}
-	if args[0] == "migrate" {
-		return args[1:], true, nil
+	switch args[0] {
+	case "migrate":
+		return args[1:], "migrate", nil
+	case "recover":
+		return args[1:], "recover", nil
 	}
-	return nil, false, errs.Errorf("unknown command %q: run goiabada-authserver [flags] with no "+
-		"command to start the server, or goiabada-authserver [flags] migrate version, or "+
-		"goiabada-authserver [flags] migrate to <version>, to manage the schema; the server's "+
-		"flags go before the command", args[0])
+	return nil, "", errs.Errorf("unknown command %q: run goiabada-authserver [flags] with no "+
+		"command to start the server, goiabada-authserver [flags] migrate version, or "+
+		"goiabada-authserver [flags] migrate to <version>, to manage the schema, or "+
+		"goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for "+
+		"one user; the server's flags go before the command", args[0])
 }
 
 // newSessionStore builds the auth server's browser session store over backend.

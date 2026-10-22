@@ -29,8 +29,10 @@ type Code struct {
 	AcrLevel            AcrLevel       `db:"acr_level"`
 	AuthMethods         string         `db:"auth_methods"`
 	Used                bool           `db:"used"`
-	// Revoked records that the session this code was issued through was explicitly
-	// terminated. Redemption rejects a revoked code, and so does any refresh token
+	// Revoked records that the grant this code started was explicitly cut off: the
+	// session it was issued through was terminated, its client became public, or, for
+	// an unused code, the user withdrew their consent to its client (#622). Redemption
+	// rejects a revoked code, and so does any refresh token
 	// descended from it, since a rotated child inherits its parent's CodeId. Tagged
 	// dont-update so an ordinary full-row UpdateCode cannot regress it (#129).
 	Revoked bool `db:"revoked" fieldtag:"dont-update"`

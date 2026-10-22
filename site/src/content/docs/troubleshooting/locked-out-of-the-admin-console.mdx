@@ -115,7 +115,7 @@ Sign in with the password the administrator had, and change it under **Account**
 
 ## The last administrator can't sign in
 
-The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck, and there's no recovery command. Here's what works today.
+The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck. When nobody can let them back in, the auth server's `recover` command can.
 
 **Another administrator can let them back in.** Any user with `authserver:manage` can open **Admin**, **Users**, the user, and their **Authentication** tab, then use **New password**, or turn off **Enabled** under **Two-factor authentication**. So the best fix comes before the problem: give `authserver:manage` to a second person.
 
@@ -123,7 +123,51 @@ The auth server never lets a change leave no enabled user holding `authserver:ma
 
 **A client of your own with `authserver:manage`** can do everything another administrator could, through the Admin API: [set the administrator's password](/reference/api/admin/operations/updateuserpassword/), or [turn off their two-factor authentication](/reference/api/admin/operations/updateuserotp/). It's the same client the [client secret](#the-admin-consoles-client-secret-changed) fix needs.
 
-With none of these, the only way back is editing the database by hand, which nothing supports or records.
+### Recover the user with the auth server
+
+When none of these is left, the auth server's `recover` subcommand restores sign-in for one named user. Its authority is the database credentials it runs with, so it runs where they already are: on the host, in the container or in the pod that runs the auth server. It does only what its flags ask, and whatever is asked, the user's sessions end and their authentication generation advances, so nothing signed in before the recovery survives it. An unknown or disabled user is refused, a new password is held to the stored password policy, and the [audit log](/concepts/audit-log/) records the recovery with the command named as the actor. It also refuses a database whose schema isn't the one its release carries, and says which step gets past it: a schema a migration left dirty is repaired by hand as [Waiting for the migration lock, or marked dirty](/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/) describes, a schema a newer release migrated is recovered with that release's `recover`, and a schema behind this release is migrated first, with `goiabada-authserver migrate to` or by starting this release's auth server once. On MySQL, PostgreSQL and SQL Server it never creates the database, whatever `GOIABADA_DB_CREATE` or `--db-create` say, so a database name that doesn't exist is refused as missing rather than created empty. SQLite follows its connection string, which creates a missing file unless it's a `file:` URI with `mode=rw`, as [SQLite](/deploy/database/#sqlite) describes.
+
+| Flag | What it does |
+|---|---|
+| `--email <address>` | Names the user to recover, by their stored address. Required. |
+| `--grant-manage` | Grants the `authserver:manage` permission |
+| `--password-stdin` | Sets a new password, read from the first line of the command's input and held to the stored password policy. A line that is empty, or holds only whitespace, is refused. |
+| `--password <password>` | Sets a new password given on the command line, held to the same policy, and refused when it is empty or holds only whitespace. Use `--password-stdin` instead, as below. |
+| `--remove-otp` | Removes the user's OTP authenticator |
+
+One command can ask for several actions, each only as asked, and at least one is required. In each deployment shape, type the new password at the first line, where nothing you type is shown, and the second hands it to the command's input. `printf` is built into the shell, so the password never appears in a command line:
+
+<Tabs>
+  <TabItem label="Docker Compose">
+    ```bash
+    printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
+    printf '%s\n' "$RECOVERY_PASSWORD" | docker compose run --rm -T goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
+    unset RECOVERY_PASSWORD
+    ```
+  </TabItem>
+  <TabItem label="Native binaries">
+    ```bash
+    printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
+    printf '%s\n' "$RECOVERY_PASSWORD" | sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin'
+    unset RECOVERY_PASSWORD
+    ```
+  </TabItem>
+  <TabItem label="Kubernetes">
+    ```bash
+    printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
+    printf '%s\n' "$RECOVERY_PASSWORD" | kubectl exec -i -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
+    unset RECOVERY_PASSWORD
+    ```
+  </TabItem>
+</Tabs>
+
+When no new password is needed, run the command on its own, without the pipe in front of it and without `--password-stdin`. The deployment pages hold the command for their own shape: [Docker Compose](/deploy/docker-compose/#recover-a-locked-out-administrator), [Native binaries](/deploy/native-binaries/#recover-a-locked-out-administrator) and [Kubernetes](/deploy/kubernetes/overview/#recover-a-locked-out-administrator).
+
+<Aside type="danger">
+**Don't give the password with `--password` on a server.** A password on the command line is kept in the shell's history and shown in the process list while the command runs. `sudo` writes its whole command line to the system log, and with an audit policy, the Kubernetes API server writes a `kubectl exec` command to its audit log. Keep `--password` for a script that has no other way to pass it, and when it was used, change the password under **Account**, **Change password** once the administrator is back in.
+</Aside>
+
+The recovery doesn't reset the limits on failed sign-ins. If the sign-in form then answers "Too many attempts", the limits on wrong passwords for the account are still counting the attempts made before the recovery: see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/) for which limits a restart of the auth server resets and which only time does, and deal with whatever is still making attempts first.
 
 ## Next steps
 

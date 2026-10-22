@@ -313,9 +313,9 @@ cause, each a whole sentence.
 |---|---|---|
 | `validator.profile.username_taken` | (none) | Sorry, this username is already taken. |
 | `validator.profile.username_invalid` | (none) | Usernames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long. |
-| `validator.profile.given_name_invalid` | (none) | Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length. |
-| `validator.profile.middle_name_invalid` | (none) | Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length. |
-| `validator.profile.family_name_invalid` | (none) | Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length. |
+| `validator.profile.given_name_invalid` | (none) | Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 1 and 48 characters in length. |
+| `validator.profile.middle_name_invalid` | (none) | Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 1 and 48 characters in length. |
+| `validator.profile.family_name_invalid` | (none) | Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 1 and 48 characters in length. |
 | `validator.profile.nickname_invalid` | (none) | Nicknames cannot contain control characters, such as tabs or line breaks. |
 | `validator.profile.nickname_too_long` | `max` (int) | Please ensure the nickname is no longer than {{.max}} characters. |
 | `validator.profile.nickname_angle_brackets` | (none) | The nickname cannot contain the characters < or >. |

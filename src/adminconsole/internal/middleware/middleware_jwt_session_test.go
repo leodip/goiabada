@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -49,10 +50,17 @@ const (
 // token and the grant's own detachment (#441 decision 2): it answers every call with one scripted
 // response or error and records what it was handed. during, when set, runs inside the call, which is
 // where a browser that goes away mid-refresh goes away.
+//
+// inOrder, when set, answers the first calls one scripted grant each, in order, and the single
+// answer and error after them — the auth server's strict rotation as the #621 tests present it,
+// where the first presentation of a refresh token claims it and the second is refused. The fake
+// holds its own lock only to record and to pick the answer, never across during, so two grants
+// can be in flight at once: whatever serializes them is the middleware's (#621).
 type fakeRefresher struct {
-	answer *oauth.TokenResponse
-	err    error
-	during func()
+	answer  *oauth.TokenResponse
+	err     error
+	during  func()
+	inOrder []scriptedGrant
 
 	mu           sync.Mutex
 	calls        int
@@ -61,16 +69,34 @@ type fakeRefresher struct {
 	returnedAt   time.Time
 }
 
+// scriptedGrant is one in-order answer: a token response, or the endpoint's refusal.
+type scriptedGrant struct {
+	answer *oauth.TokenResponse
+	err    error
+}
+
 func (f *fakeRefresher) Refresh(ctx context.Context, refreshToken string) (*oauth.TokenResponse, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.calls++
 	f.refreshToken = refreshToken
 	f.requestID = chimiddleware.GetReqID(ctx)
-	if f.during != nil {
-		f.during()
+	during := f.during
+	f.mu.Unlock()
+	if during != nil {
+		during()
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.returnedAt = time.Now()
+	if len(f.inOrder) > 0 {
+		next := f.inOrder[0]
+		f.inOrder = f.inOrder[1:]
+		if next.err != nil {
+			return nil, next.err
+		}
+		answer := *next.answer
+		return &answer, nil
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -86,12 +112,18 @@ func (f *fakeRefresher) sent() (int, string) {
 
 // contextHonouringBackend is the memory backend refusing a call on a context that is done, which is
 // what the console's real backend, an HTTP call to the auth server, does. It records the context of
-// every write, so a case can read what the write was handed.
+// every load and every write, so a case can read what each was handed. loadFault, when set, is
+// asked before each load with its number, counting from 1, and a non-nil answer fails that load,
+// a lookup that could not be performed; beforeUpdate, when set, runs before each update, which is
+// where a case holds a save (#621).
 type contextHonouringBackend struct {
 	*sessiontest.MemoryBackend
 
-	mu     sync.Mutex
-	writes []observedContext
+	mu           sync.Mutex
+	writes       []observedContext
+	loads        []observedContext
+	loadFault    func(n int) error
+	beforeUpdate func()
 }
 
 // observedContext is what a context looked like at the moment it was handed over.
@@ -109,10 +141,26 @@ func observe(ctx context.Context) observedContext {
 }
 
 func (b *contextHonouringBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	b.mu.Lock()
+	b.loads = append(b.loads, observe(ctx))
+	n, fault := len(b.loads), b.loadFault
+	b.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if fault != nil {
+		if err := fault(n); err != nil {
+			return nil, err
+		}
+	}
 	return b.MemoryBackend.Load(ctx, id)
+}
+
+// recordedLoads is the context of every load the backend was asked for, in order.
+func (b *contextHonouringBackend) recordedLoads() []observedContext {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]observedContext(nil), b.loads...)
 }
 
 func (b *contextHonouringBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
@@ -124,6 +172,12 @@ func (b *contextHonouringBackend) Create(ctx context.Context, id string, data []
 }
 
 func (b *contextHonouringBackend) Update(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.mu.Lock()
+	before := b.beforeUpdate
+	b.mu.Unlock()
+	if before != nil {
+		before()
+	}
 	b.record(ctx)
 	if err := ctx.Err(); err != nil {
 		return time.Time{}, err
@@ -163,6 +217,7 @@ type sessionHarness struct {
 	backend   *contextHonouringBackend
 	parser    *middlewaremocks.TokenParser
 	refresher *fakeRefresher
+	errorPage *recordingErrorRenderer
 	logs      *logtest.SlogCapture
 }
 
@@ -182,6 +237,7 @@ func newSessionHarness(t *testing.T) *sessionHarness {
 		backend:   backend,
 		parser:    middlewaremocks.NewTokenParser(t),
 		refresher: &fakeRefresher{},
+		errorPage: &recordingErrorRenderer{},
 		logs:      logtest.CaptureSlog(t),
 	}
 }
@@ -230,21 +286,47 @@ func (h *sessionHarness) serve(parser tokenParser, cookies []*http.Cookie) serve
 // serveOn is serve with the request on ctx, the browser's own context.
 func (h *sessionHarness) serveOn(ctx context.Context, parser tokenParser, cookies []*http.Cookie) served {
 	h.t.Helper()
-	m := NewJWT(h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
-		stubErrorRenderer{}, "http://console.example", "admin-console-client")
+	return h.serveThrough(ctx, h.middleware(parser), cookies)
+}
 
+// middleware returns the JWT middleware over parser that every serve in this file goes through.
+// The #621 race test asks for it directly, so its two requests share one instance: the
+// per-session refresh lock it holds is the serialization under test.
+func (h *sessionHarness) middleware(parser tokenParser) *JWT {
+	h.t.Helper()
+	return NewJWT(h.store, h.store, sessionTestName, parser, h.refresher, new(middlewaremocks.AuthHelper),
+		h.errorPage, "http://console.example", "admin-console-client")
+}
+
+// serveThrough sends one request carrying cookies through m, on ctx, the browser's own context.
+func (h *sessionHarness) serveThrough(ctx context.Context, m *JWT, cookies []*http.Cookie) served {
+	h.t.Helper()
+	return h.serveChain(ctx, m, cookies, nil)
+}
+
+// serveChain sends one request carrying cookies through m as the console mounts it, below
+// CookieReset, whose Get loads the session the whole request then shares (#269), and on to a
+// page that, when then is set, runs it after recording what reached it: what a handler further
+// down does with the session, such as saving a flash.
+func (h *sessionHarness) serveChain(ctx context.Context, m *JWT, cookies []*http.Cookie,
+	then func(w http.ResponseWriter, r *http.Request)) served {
+	h.t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil).WithContext(ctx)
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
 	var out served
 	out.recorder = httptest.NewRecorder()
-	m.SessionHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	page := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out.reached = true
 		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
 			out.jwtInfo = &jwtInfo
 		}
-	})).ServeHTTP(out.recorder, req)
+		if then != nil {
+			then(w, r)
+		}
+	})
+	httpmw.CookieReset(h.store, sessionTestName)(m.SessionHandler()(page)).ServeHTTP(out.recorder, req)
 	return out
 }
 
@@ -544,6 +626,41 @@ func TestSessionHandler_UsesTheStoredTokensUntilTheyAreDue(t *testing.T) {
 			assert.Equal(t, tc.expiresAt, sess.Values[sessionkeys.JWTExpiresAt])
 		})
 	}
+}
+
+// Step 4 reads the stored set's own lifetime, as the check under the lock does: a set of 20
+// seconds with 15 left is inside the flat 30-second margin but not half its lifetime, so it is not
+// due, and the request takes no lock, re-reads nothing and verifies the ID token once. Read with
+// the flat margin, every request in the second half of a short-lived set's life would queue on the
+// session's lock for a re-read the check under it then answers by carrying the set.
+func TestSessionHandler_AShortLivedSetIsNotDueBeforeHalfItsLifetime(t *testing.T) {
+	h := newSessionHarness(t)
+	shortLived := storedResponse()
+	shortLived.ExpiresIn = 20
+	expiresAt := time.Now().Add(15 * time.Second).Unix()
+	cookies := h.seed(map[string]any{
+		sessionkeys.JWT:          shortLived,
+		sessionkeys.JWTExpiresAt: expiresAt,
+		"unrelated":              "kept",
+	})
+	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil).Once()
+	loadsBefore, writesBefore := len(h.backend.recordedLoads()), len(h.backend.recordedWrites())
+
+	out := h.serve(h.parser, cookies)
+
+	assert.True(t, out.reached)
+	require.NotNil(t, out.jwtInfo, "the administrator is signed in")
+	assert.Equal(t, shortLived, out.jwtInfo.TokenResponse)
+	assert.Same(t, verifiedStored, out.jwtInfo.IdToken, "the ID token the parser verified")
+	h.assertNoRefreshSent()
+	assert.Empty(t, h.backend.recordedWrites()[writesBefore:], "the session is not written")
+	assert.Empty(t, out.recorder.Result().Cookies(), "nor its cookie")
+	assert.Len(t, h.backend.recordedLoads()[loadsBefore:], 1, "the request's own load, and no re-read under the lock")
+	assert.Empty(t, h.logs.Records(), h.logs.Text())
+
+	sess := h.readBack(cookies)
+	assert.Equal(t, shortLived, sess.Values[sessionkeys.JWT])
+	assert.Equal(t, expiresAt, sess.Values[sessionkeys.JWTExpiresAt])
 }
 
 // expectRefreshValidation answers the refresh response's validation with accepted or refused and
