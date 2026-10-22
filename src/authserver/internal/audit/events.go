@@ -115,6 +115,19 @@ const (
 	// replayed, plus logged_in_user when the account API raised it. Never the code itself. The caller learns nothing either way: a replay
 	// renders the same generic incorrect-code response as a wrong code.
 	EventOTPCodeReplayDetected = "otp_code_replay_detected"
+	// EventOTPAuthenticatorDisabled records the refused code that brought a user's
+	// consecutive failed attempts against their authenticator to
+	// record.OtpConsecutiveFailureLimit, disabling it until a new one is set up (NIST SP
+	// 800-63B section 3.2.2, #489). Emitted once per disable, beside that attempt's
+	// EventAuthFailedOtp: the count's statement reports the one call that reached the
+	// limit, and the codes refused after it move nothing and raise nothing more.
+	//
+	// It is the evidence that someone holds the user's password, since the code form sits
+	// behind it, and the reason the user's correct codes are refused from then on, which
+	// the submitter is never told (#489 decision 2).
+	//
+	// Payload: user_id.
+	EventOTPAuthenticatorDisabled = "otp_authenticator_disabled"
 	// EventRateLimitExceeded records that a rate limiter refused a request. It exists
 	// because a rejected request never reaches the handler, so a sustained guessing run
 	// shows N audited credential failures and then silence, and nothing in the log
@@ -566,6 +579,7 @@ var auditEventTypes = []string{
 	EventIssuanceRefusedScopeDenied,
 	EventIssuanceRefusedSessionInvalid,
 	EventLogout,
+	EventOTPAuthenticatorDisabled,
 	EventOTPCodeReplayDetected,
 	EventRateLimitExceeded,
 	EventRedemptionRefusedRedirectURI,

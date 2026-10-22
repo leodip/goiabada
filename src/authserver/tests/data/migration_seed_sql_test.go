@@ -2,7 +2,6 @@ package datatests
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"testing"
 
@@ -52,15 +51,6 @@ type userSeed struct {
 // none of the fixtures below head needs a value in one.
 func seedUser(t *testing.T, h *isolatedDB, seed userSeed) int64 {
 	t.Helper()
-	return seedUserInto(t, h.SQL, seedFlavor(), seed)
-}
-
-// seedUserInto is seedUser against any handle and placeholder flavor: the startup preflight
-// seeds a throwaway database no isolatedDB wraps, and it seeds in SQL for the same reason
-// every fixture below head does -- the record follows the head schema, so an ORM insert at a
-// pinned version breaks on the next users column a migration adds (#510, #489).
-func seedUserInto(t *testing.T, db *sql.DB, flavor sqlbuilder.Flavor, seed userSeed) int64 {
-	t.Helper()
 
 	if seed.Subject == "" {
 		seed.Subject = fake.UUID()
@@ -99,15 +89,15 @@ func seedUserInto(t *testing.T, db *sql.DB, flavor sqlbuilder.Flavor, seed userS
 
 	insert := sqlbuilder.NewInsertBuilder()
 	insert.InsertInto("users").Cols(cols...).Values(values...)
-	q, args := insert.BuildWithFlavor(flavor)
-	_, err := db.ExecContext(context.Background(), q, args...)
+	q, args := insert.BuildWithFlavor(seedFlavor())
+	_, err := h.SQL.ExecContext(context.Background(), q, args...)
 	require.NoError(t, err, "seed user %s", seed.Username)
 
 	lookup := sqlbuilder.NewSelectBuilder()
 	lookup.Select("id").From("users").Where(lookup.Equal("subject", seed.Subject))
-	q, args = lookup.BuildWithFlavor(flavor)
+	q, args = lookup.BuildWithFlavor(seedFlavor())
 	var id int64
-	require.NoError(t, db.QueryRowContext(context.Background(), q, args...).Scan(&id),
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&id),
 		"read back the seeded user id")
 	return id
 }

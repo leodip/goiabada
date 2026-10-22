@@ -269,8 +269,12 @@ type Database interface {
 	// on every failed attempt, the verification whose refusal moved the count: a wrong
 	// code and a replayed one both count, as the otp rate tier already charges both.
 	// Beyond the limit the statement matches no row, so grinding a disabled authenticator
-	// writes nothing.
-	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
+	// writes nothing. Bound to the authenticator the code was checked against: it matches
+	// only while OTP is on at expectedGeneration, so a refusal in flight across a removal
+	// or a replacement charges nothing to the replacement. True means this call moved the
+	// count to the limit, which exactly one call can, so the disable is audited once.
+	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+		expectedGeneration int64) (bool, error)
 	// ClearUserOtpConsecutiveFailures returns the consecutive-failure count to 0. Called
 	// inside the same transaction as the write that binds a fresh authenticator
 	// (otpcredential.Establish), because rebinding is the one path back from the limit,

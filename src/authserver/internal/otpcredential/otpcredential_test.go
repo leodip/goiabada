@@ -344,8 +344,8 @@ func TestVerifyStored(t *testing.T) {
 	t.Run("a wrong code is refused without claiming anything", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId).
-			Return(nil).Once()
+			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
+			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), "000000", now)
 
@@ -364,8 +364,8 @@ func TestVerifyStored(t *testing.T) {
 			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
 			Return(false, nil).Once()
 		database.EXPECT().
-			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId).
-			Return(nil).Once()
+			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
+			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
 

@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMigration000065_OtpConsecutiveFailures exercises the migration that introduces the
+// TestMigration000066_OtpConsecutiveFailures exercises the migration that introduces the
 // count of consecutive failed attempts against the enrolled authenticator, which NIST SP
 // 800-63B section 3.2.2 bases its disable on (#489). It runs against an ISOLATED database
 // of the configured dialect (see migration_testdb_helper_test.go).
 //
 // The properties, in the order they appear below, following TestMigration000027:
 //
-//  1. Absent at 000064, so the column found afterwards is the one 000065 added.
+//  1. Absent at 000065, so the column found afterwards is the one 000066 added.
 //  2. Declared NOT NULL with a default of 0. A default of anything else would be a count
 //     of failures for every existing user, and since the verification claim holds the
 //     count under record.OtpConsecutiveFailureLimit, it would disable every enrolled
@@ -29,49 +29,49 @@ import (
 //     on the engine rather than in the DDL.
 //  4. The down migration works and re-applying is clean. This is where SQL Server's hazard
 //     lives: it refuses to drop a column while a default constraint depends on it, so
-//     000065 names its constraint and the down migration drops it by name.
+//     000066 names its constraint and the down migration drops it by name.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
-//	--run TestMigration000065_OtpConsecutiveFailures
-func TestMigration000065_OtpConsecutiveFailures(t *testing.T) {
+//	--run TestMigration000066_OtpConsecutiveFailures
+func TestMigration000066_OtpConsecutiveFailures(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(context.Background(), 64), "migrate to 000064")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 65), "migrate to 000065")
 
 	// 1. Absent before the migration.
-	exists, _, _ := otpConsecutiveFailuresShape000065(t, h)
-	assert.False(t, exists, "users.otp_consecutive_failures must not exist at 000064")
+	exists, _, _ := otpConsecutiveFailuresShape000066(t, h)
+	assert.False(t, exists, "users.otp_consecutive_failures must not exist at 000065")
 
 	// Seeded with raw SQL rather than CreateUser: the Go model already carries
-	// OtpConsecutiveFailures, so an ORM insert at 000064 would target a column that does
+	// OtpConsecutiveFailures, so an ORM insert at 000065 would target a column that does
 	// not exist yet.
-	userId := seedPreMigration000065User(t, h)
+	userId := seedPreMigration000066User(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(context.Background(), 65), "apply 000065")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 66), "apply 000066")
 
 	// 2. NOT NULL, defaulting to 0.
-	assertOtpConsecutiveFailuresShape000065(t, h, "after apply")
+	assertOtpConsecutiveFailuresShape000066(t, h, "after apply")
 
 	// 3. A row that predates the column lands at 0, meaning no failed attempt counted.
-	assert.EqualValues(t, 0, readUserOtpConsecutiveFailures000065(t, h, userId),
+	assert.EqualValues(t, 0, readUserOtpConsecutiveFailures000066(t, h, userId),
 		"a users row that predates the column must land at 0")
 
 	// 4. Down, then up again. Nothing else in the suite executes a down migration for
 	// this number, and this one carries mssql's named-constraint drop.
-	require.NoError(t, h.Migrator.Migrate(context.Background(), 64), "roll back 000065")
-	require.NoError(t, h.Migrator.Migrate(context.Background(), 65), "re-apply 000065")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 65), "roll back 000066")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 66), "re-apply 000066")
 
-	assert.EqualValues(t, 0, readUserOtpConsecutiveFailures000065(t, h, userId),
+	assert.EqualValues(t, 0, readUserOtpConsecutiveFailures000066(t, h, userId),
 		"count after the down/up round trip")
-	assertOtpConsecutiveFailuresShape000065(t, h, "after down/up round trip")
+	assertOtpConsecutiveFailuresShape000066(t, h, "after down/up round trip")
 }
 
-// seedPreMigration000065User inserts a minimal users row with literal SQL, covering
-// exactly the NOT NULL columns of the 000064 schema, following
+// seedPreMigration000066User inserts a minimal users row with literal SQL, covering
+// exactly the NOT NULL columns of the 000065 schema, following
 // seedPreMigration000027User, with otp_enabled true so the row is one the verification
 // claim's otp_enabled term would accept.
-func seedPreMigration000065User(t *testing.T, h *isolatedDB) int64 {
+func seedPreMigration000066User(t *testing.T, h *isolatedDB) int64 {
 	t.Helper()
 
 	// boolean columns are `boolean` on PostgreSQL and integer-like everywhere else.
@@ -85,7 +85,7 @@ func seedPreMigration000065User(t *testing.T, h *isolatedDB) int64 {
 		(enabled, subject, username, email_verified, phone_number_verified,
 		 password_hash, otp_enabled)
 		VALUES (%s, '%s', '%s', %s, %s, 'x', %s)`,
-		trueLit, subject, "premig65", falseLit, falseLit, trueLit)
+		trueLit, subject, "premig66", falseLit, falseLit, trueLit)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed pre-migration user")
 
@@ -95,7 +95,7 @@ func seedPreMigration000065User(t *testing.T, h *isolatedDB) int64 {
 	return id
 }
 
-func readUserOtpConsecutiveFailures000065(t *testing.T, h *isolatedDB, userId int64) int64 {
+func readUserOtpConsecutiveFailures000066(t *testing.T, h *isolatedDB, userId int64) int64 {
 	t.Helper()
 	var count int64
 	q := fmt.Sprintf("SELECT otp_consecutive_failures FROM users WHERE id = %d", userId)
@@ -103,22 +103,22 @@ func readUserOtpConsecutiveFailures000065(t *testing.T, h *isolatedDB, userId in
 	return count
 }
 
-func assertOtpConsecutiveFailuresShape000065(t *testing.T, h *isolatedDB, phase string) {
+func assertOtpConsecutiveFailuresShape000066(t *testing.T, h *isolatedDB, phase string) {
 	t.Helper()
-	exists, notNull, def := otpConsecutiveFailuresShape000065(t, h)
+	exists, notNull, def := otpConsecutiveFailuresShape000066(t, h)
 	require.Truef(t, exists, "[%s] users.otp_consecutive_failures must exist", phase)
 	assert.Truef(t, notNull, "[%s] users.otp_consecutive_failures must be NOT NULL", phase)
 	assert.Equalf(t, "0", def,
 		"[%s] users.otp_consecutive_failures must default to 0, got %q", phase, def)
 }
 
-// otpConsecutiveFailuresShape000065 reports whether users.otp_consecutive_failures
+// otpConsecutiveFailuresShape000066 reports whether users.otp_consecutive_failures
 // exists, whether it is NOT NULL, and its default expression normalised to a bare
 // literal. It follows lastOTPStepShape000027, which likewise needs absence to be a
-// result rather than a scan error, since this test asserts absence at 000064. The
+// result rather than a scan error, since this test asserts absence at 000065. The
 // polarity of the nullability flag inverts between engines, so it is resolved per
 // dialect here.
-func otpConsecutiveFailuresShape000065(t *testing.T, h *isolatedDB) (bool, bool, string) {
+func otpConsecutiveFailuresShape000066(t *testing.T, h *isolatedDB) (bool, bool, string) {
 	t.Helper()
 
 	const table, col = "users", "otp_consecutive_failures"

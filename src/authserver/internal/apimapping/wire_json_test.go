@@ -177,11 +177,12 @@ func wireUserModel() *record.User {
 		AddressPostalCode:             "01000-000",
 		AddressCountry:                "BRA",
 		OTPEnabled:                    true,
+		OtpConsecutiveFailures:        record.OtpConsecutiveFailureLimit,
 	}
 }
 
 // wirePopulatedUserJSON is ToUserResponse over wireUserModel with one group, one
-// permission and one attribute loaded on the model. It ends at otpEnabled: the
+// permission and one attribute loaded on the model. It ends at otpAuthenticatorDisabled: the
 // three collection keys that used to follow are gone, and the fixture keeps
 // loading all three so that this literal is what says so (#350).
 const wirePopulatedUserJSON = `{"id":7,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
@@ -192,7 +193,7 @@ const wirePopulatedUserJSON = `{"id":7,"createdAt":"2026-09-16T10:00:00Z","updat
 	`"phoneNumberCountryUniqueId":"BRA_55","phoneNumberCountryCallingCode":"55","phoneNumber":"11 99999-0000",` +
 	`"phoneNumberVerified":true,"addressLine1":"Rua Um, 100","addressLine2":"apto 2",` +
 	`"addressLocality":"Sao Paulo","addressRegion":"SP","addressPostalCode":"01000-000","addressCountry":"BRA",` +
-	`"otpEnabled":true}`
+	`"otpEnabled":true,"otpAuthenticatorDisabled":true}`
 
 // wireBareUserFields is ToUserResponse over a record.User carrying nothing but
 // its id, with no braces: brace-free so the annotated wrappers further down can
@@ -203,7 +204,8 @@ func wireBareUserFields() string {
 		`"emailVerified":false,"zoneInfoCountryName":"","zoneInfo":"","locale":"","birthDate":null,` +
 		`"phoneNumberCountryUniqueId":"","phoneNumberCountryCallingCode":"","phoneNumber":"",` +
 		`"phoneNumberVerified":false,"addressLine1":"","addressLine2":"","addressLocality":"",` +
-		`"addressRegion":"","addressPostalCode":"","addressCountry":"","otpEnabled":false`
+		`"addressRegion":"","addressPostalCode":"","addressCountry":"","otpEnabled":false,` +
+		`"otpAuthenticatorDisabled":false`
 }
 
 func TestWireJSON_UserFamily(t *testing.T) {

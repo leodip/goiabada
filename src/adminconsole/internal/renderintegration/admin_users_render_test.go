@@ -239,3 +239,38 @@ func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 	assert.Contains(t, out, "jane@example.com")
 	assert.Contains(t, out, ">Nenhum</span>", "a user in no groups still gets the row's none arm")
 }
+
+// The Authentication tab says when the user's authenticator is disabled after 100 wrong codes in a
+// row, beside the switch that is the remedy, which the switch names in its description: otpEnabled
+// alone still reads on, and every code is refused (#489). It says nothing of the kind otherwise.
+func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *testing.T) {
+	const notice = `id="otpAuthenticatorDisabled"`
+	for _, tc := range []struct {
+		name     string
+		disabled bool
+	}{
+		{name: "disabled", disabled: true},
+		{name: "working", disabled: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := renderMenuPageIn(t, "/admin_users_authentication.html", map[string]interface{}{
+				"user": &api.UserResponse{Id: 5, Email: "someone@example.com", OTPEnabled: true,
+					OTPAuthenticatorDisabled: tc.disabled},
+				"otpEnabled":        true,
+				"page":              "",
+				"query":             "",
+				"savedSuccessfully": false,
+			}, "en", true)
+
+			if !tc.disabled {
+				assert.NotContains(t, out, notice)
+				assert.Contains(t, out, `aria-describedby="otpEnabledHint"`)
+				return
+			}
+			assert.Contains(t, out, notice)
+			assert.Contains(t, out, "100 wrong one-time codes in a row")
+			assert.Contains(t, out, `aria-describedby="otpAuthenticatorDisabled otpEnabledHint"`,
+				"the switch that is the remedy is described by the notice")
+		})
+	}
+}

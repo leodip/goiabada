@@ -11887,20 +11887,29 @@ func (_c *Database_IncrementUserOtpConfigGeneration_Call) RunAndReturn(run func(
 }
 
 // IncrementUserOtpConsecutiveFailures provides a mock function for the type Database
-func (_mock *Database) IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error {
-	ret := _mock.Called(ctx, tx, userId)
+func (_mock *Database) IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, userId, expectedGeneration)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IncrementUserOtpConsecutiveFailures")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
-		r0 = returnFunc(ctx, tx, userId)
-	} else {
-		r0 = ret.Error(0)
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, userId, expectedGeneration)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, userId, expectedGeneration)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, expectedGeneration)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // Database_IncrementUserOtpConsecutiveFailures_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IncrementUserOtpConsecutiveFailures'
@@ -11912,11 +11921,12 @@ type Database_IncrementUserOtpConsecutiveFailures_Call struct {
 //   - ctx context.Context
 //   - tx *sql.Tx
 //   - userId int64
-func (_e *Database_Expecter) IncrementUserOtpConsecutiveFailures(ctx any, tx any, userId any) *Database_IncrementUserOtpConsecutiveFailures_Call {
-	return &Database_IncrementUserOtpConsecutiveFailures_Call{Call: _e.mock.On("IncrementUserOtpConsecutiveFailures", ctx, tx, userId)}
+//   - expectedGeneration int64
+func (_e *Database_Expecter) IncrementUserOtpConsecutiveFailures(ctx any, tx any, userId any, expectedGeneration any) *Database_IncrementUserOtpConsecutiveFailures_Call {
+	return &Database_IncrementUserOtpConsecutiveFailures_Call{Call: _e.mock.On("IncrementUserOtpConsecutiveFailures", ctx, tx, userId, expectedGeneration)}
 }
 
-func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_IncrementUserOtpConsecutiveFailures_Call {
+func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64)) *Database_IncrementUserOtpConsecutiveFailures_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -11930,21 +11940,26 @@ func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) Run(run func(ctx co
 		if args[2] != nil {
 			arg2 = args[2].(int64)
 		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
 }
 
-func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) Return(err error) *Database_IncrementUserOtpConsecutiveFailures_Call {
-	_c.Call.Return(err)
+func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) Return(b bool, err error) *Database_IncrementUserOtpConsecutiveFailures_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) error) *Database_IncrementUserOtpConsecutiveFailures_Call {
+func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)) *Database_IncrementUserOtpConsecutiveFailures_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -50,6 +50,7 @@ Each of these means the server caught something and refused it. One entry is wor
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back. Either it was stolen or a client sent it twice. The server can't tell which, so it revoked the rest of that token's family. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time, after authenticating and passing PKCE. The server revoked any refresh tokens issued through that code's session and, if it revoked any, ended the session. When the entry's list of revoked refresh tokens is empty, nothing was left to revoke. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again. That usually means a phishing proxy relaying a user's sign-in in real time. |
+| `otp_authenticator_disabled` | A user's authenticator got its 100th wrong code in a row and was disabled. Only someone who knew the user's password could get that far, so treat the password as known. Wherever a code is asked for, the user can't sign in until an administrator turns off their two-factor authentication and they set up a new authenticator. See [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator). |
 | `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. Each auth server instance writes it at most once per limiter and key per window, not once per refused request. |
 
 Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI.
@@ -217,6 +218,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `auth_success_otp` | A user's authenticator code was accepted at sign-in, including a first code that set up their authenticator. |
 | `auth_failed_otp` | An authenticator code was refused at sign-in, because it was wrong or had already been used. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again, at sign-in or while turning on two-factor authentication, and was refused. |
+| `otp_authenticator_disabled` | A user's authenticator was disabled at sign-in, because 100 codes in a row were refused. Written once, beside that 100th refusal's `auth_failed_otp`. |
 | `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |
 | `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Each instance writes it at most once per key per window. |
 | `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser had since replaced, or named none. |

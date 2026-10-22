@@ -234,7 +234,8 @@ type OTPSubmissionResult struct {
 //  7. A replayed code: charges it to the rate limiter, audits EventOTPCodeReplayDetected and
 //     EventAuthFailedOtp, and answers OTPRefused. A wrong code: charges it, audits
 //     EventAuthFailedOtp, and answers OTPRefused. Every wrong code is a guess the OTP budget bounds
-//     (#219).
+//     (#219). The refusal that disabled the authenticator also audits EventOTPAuthenticatorDisabled,
+//     after the others (#489).
 //  8. An enrolling user: stores the key as the user's authenticator (otpcredential.Establish), which
 //     lands only while the user's OTP configuration generation is still the one read in step 2. A
 //     failed write is returned as an error; a write that did not land ends the lost enrolment
@@ -310,12 +311,14 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
 			"user_id": user.Id,
 		})
+		o.auditDisabled(ctx, verified, user.Id)
 		return o.refuse(ctx, authContext, result, OTPRefused)
 	case otpcredential.OutcomeWrong:
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
 			"user_id": user.Id,
 		})
+		o.auditDisabled(ctx, verified, user.Id)
 		return o.refuse(ctx, authContext, result, OTPRefused)
 	}
 
@@ -364,6 +367,18 @@ func (o *OTPSubmission) refuse(ctx context.Context, authContext *ceremony.AuthCo
 	result.Answer = answer
 	result.Display = display
 	return result, nil
+}
+
+// auditDisabled audits EventOTPAuthenticatorDisabled when the refusal is the one that disabled the
+// authenticator. Only the call whose count reached the limit reports it, so it is audited once; the
+// submitter is answered as for any other refused code (#489).
+func (o *OTPSubmission) auditDisabled(ctx context.Context, verified otpcredential.VerifyResult, userId int64) {
+	if !verified.Disabled {
+		return
+	}
+	o.auditLogger.Log(ctx, audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
+		"user_id": userId,
+	})
 }
 
 // endLostEnrolment logs the lost enrolment and clears the ceremony, answering OTPEnrolmentLost with

@@ -53,7 +53,8 @@ func TestAuditLogDocs_TheAlertSectionNamesTheAttackSignals(t *testing.T) {
 		skipColumn: "Details",
 		want: []string{
 			audit.EventRefreshTokenReplayDetected, audit.EventAuthCodeReuseDetected,
-			audit.EventOTPCodeReplayDetected, audit.EventRateLimitExceeded,
+			audit.EventOTPCodeReplayDetected, audit.EventOTPAuthenticatorDisabled,
+			audit.EventRateLimitExceeded,
 		},
 	}})
 }

@@ -56,7 +56,8 @@ type Database interface {
 	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
-	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
+	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+		expectedGeneration int64) (bool, error)
 	ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
@@ -92,9 +93,14 @@ const (
 // revocation.UserAuthStateResult's shape rather than returning a bare bool the callers would each
 // interpret. Step is the matched step, which the replay audit record at both sites carries;
 // it is zero when nothing matched, since there is no step to name.
+//
+// Disabled is true on the one refusal that moved the consecutive-failure count to
+// record.OtpConsecutiveFailureLimit, disabling the authenticator until it is rebound, so the
+// caller audits the disable exactly once (#489). It never changes what the submitter is told.
 type VerifyResult struct {
-	Outcome VerifyOutcome
-	Step    int64
+	Outcome  VerifyOutcome
+	Step     int64
+	Disabled bool
 }
 
 // Establish installs a user's authenticator: it encrypts the seed at rest and, only while OTP is
@@ -309,9 +315,10 @@ func Remove(ctx context.Context, db Database, user *record.User) (removed bool, 
 // record.OtpConsecutiveFailureLimit, and an authenticator already at the limit is
 // disabled: it answers as a wrong code does, and the claim's own predicate holds the
 // row's count under the limit, so the disable answers the row rather than the caller's
-// snapshot of it (NIST SP 800-63B section 3.2.2, #489). The clear on a success is in the
-// claim's statement, not here, and the count a fresh enrolment clears is cleared in
-// Establish's transaction: rebinding is the one path back.
+// snapshot of it (NIST SP 800-63B section 3.2.2, #489). The refusal that moved the count
+// to the limit reports Disabled, so the caller audits the disable once. The clear on a
+// success is in the claim's statement, not here, and the count a fresh enrolment clears
+// is cleared in Establish's transaction: rebinding is the one path back.
 //
 // One caller today, authflow.OTPSubmission's already-enrolled arm.
 func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataCipher, user *record.User, code string, now time.Time) (VerifyResult, error) {
@@ -333,12 +340,15 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 		return VerifyResult{}, err
 	}
 	// The failed attempt advances the count that disables the authenticator -- the same
-	// attempt the caller audits and the otp tier charges. The statement stops at the
-	// limit, so grinding a disabled authenticator moves no row.
+	// attempt the caller audits and the otp tier charges -- against the authenticator the
+	// code was checked against, the generation read with the seed. The statement stops at
+	// the limit, so grinding a disabled authenticator moves no row.
 	if result.Outcome != OutcomeMatched {
-		if err := db.IncrementUserOtpConsecutiveFailures(ctx, nil, user.Id); err != nil {
+		disabled, err := db.IncrementUserOtpConsecutiveFailures(ctx, nil, user.Id, user.OtpConfigGeneration)
+		if err != nil {
 			return VerifyResult{}, err
 		}
+		result.Disabled = disabled
 	}
 	return result, nil
 }

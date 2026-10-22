@@ -1001,6 +1001,7 @@
 "adminconsole.admin_users.authentication.otp_title" = "Two-factor authentication"
 "adminconsole.admin_users.authentication.otp_enabled_hint" = "Clear it to turn two-factor authentication off. Only the user can turn it on again, from their account."
 "adminconsole.admin_users.authentication.otp_disable_warning" = "You're turning off the user's two-factor authentication, so their password alone will sign them in until they set it up again."
+"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "The user's authenticator was disabled after 100 wrong one-time codes in a row, so every code is refused, the right one included. Only someone who knew their password could send those codes, so treat it as known. To let the user back in, turn two-factor authentication off and save. They can then set up a new authenticator."
 "adminconsole.admin_users.authentication.otp_not_set_up" = "The user hasn't set up two-factor authentication. Only they can, from their account."
 
 "adminconsole.admin_users.consents.modal_confirm_title" = "Revoke this consent?"

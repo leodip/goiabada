@@ -11,7 +11,7 @@ Find your case first:
 
 - **Signing in fails for every administrator** with **Sign-in failed** or **Something went wrong**: [the admin console's client secret changed](#the-admin-consoles-client-secret-changed).
 - **The password you set in `GOIABADA_ADMIN_PASSWORD` is refused:** [you changed it after the first start](#you-changed-goiabada_admin_password).
-- **The only administrator can't sign in**, because they forgot their password or lost their authenticator: [the last administrator can't sign in](#the-last-administrator-cant-sign-in).
+- **The only administrator can't sign in**, because they forgot their password, lost their authenticator, or their authenticator refuses every code: [the last administrator can't sign in](#the-last-administrator-cant-sign-in).
 
 ## The admin console's client secret changed
 
@@ -116,6 +116,8 @@ Sign in with the password the administrator had, and change it under **Account**
 ## The last administrator can't sign in
 
 The auth server never lets a change leave no enabled user holding `authserver:manage`: it refuses it with `LAST_ADMINISTRATOR`. That keeps the permission alive, but not a person able to use it. A user who set up two-factor authentication is always asked for a code when signing in to the admin console, and there are no backup codes. So when the only administrator forgets their password or loses their authenticator, they're stuck, and there's no recovery command. Here's what works today.
+
+An authenticator is also disabled after 100 wrong codes in a row. From then on every code is refused, the right one included, the [audit log](/concepts/audit-log/) records `otp_authenticator_disabled`, and the user's **Authentication** tab says so. Only someone who knew the password could send those codes, so change it once you're back in. The way back is the same as for a lost authenticator: turn off two-factor authentication, then set up a new one.
 
 **Another administrator can let them back in.** Any user with `authserver:manage` can open **Admin**, **Users**, the user, and their **Authentication** tab, then use **New password**, or turn off **Enabled** under **Two-factor authentication**. So the best fix comes before the problem: give `authserver:manage` to a second person.
 

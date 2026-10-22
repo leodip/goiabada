@@ -82,7 +82,7 @@ func scaffoldHeadUsersColumns(t *testing.T, h *isolatedDB) {
 	case data.MSSQL:
 		// The constraint named as the migration names it, so the scaffolded shape is the one
 		// that ships: nothing here drops the column, but a reader comparing the pinned table
-		// to 000065's up sees the same table either way.
+		// to 000066's up sees the same table either way.
 		q = "ALTER TABLE [users] ADD [otp_consecutive_failures] BIGINT NOT NULL " +
 			"CONSTRAINT [df_users_otp_consecutive_failures] DEFAULT 0"
 	default: // SQLite

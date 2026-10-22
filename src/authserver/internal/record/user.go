@@ -101,8 +101,8 @@ type User struct {
 	// update set, a whole-row write from a model read before a verification would write
 	// the pre-attempt count back over the row's, silently unlocking a disabled
 	// authenticator. It moves only through TryConsumeEnrolledUserOTPStep, which clears it
-	// in the same statement that claims the step, and
-	// IncrementUserOtpConsecutiveFailures.
+	// in the same statement that claims the step, IncrementUserOtpConsecutiveFailures, and
+	// ClearUserOtpConsecutiveFailures, which a fresh enrolment calls.
 	OtpConsecutiveFailures int64 `db:"otp_consecutive_failures" fieldtag:"dont-update"`
 	// OtpEnrollmentSecretEncrypted is the AES-GCM ciphertext of a TOTP enrolment the server
 	// has issued but the user has not yet confirmed, and OtpEnrollmentIssuedAt is when it was
@@ -135,6 +135,15 @@ type User struct {
 	Groups      []Group         `db:"-"`
 	Permissions []Permission    `db:"-"`
 	Attributes  []UserAttribute `db:"-"`
+}
+
+// OtpAuthenticatorDisabled reports whether the user has an authenticator that the
+// consecutive-failure count has disabled: OTPEnabled still reads true, and every code is
+// refused until it is removed and a new one set up (#489). A count left at the limit after
+// a removal disables nothing, since there is no authenticator, and the next one set up
+// clears it.
+func (u *User) OtpAuthenticatorDisabled() bool {
+	return u.OTPEnabled && u.OtpConsecutiveFailures >= OtpConsecutiveFailureLimit
 }
 
 func (u *User) FullName() string {

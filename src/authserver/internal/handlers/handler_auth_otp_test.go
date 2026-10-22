@@ -867,8 +867,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		// A refused code against the enrolled authenticator advances the consecutive
 		// count (#489).
-		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).Once()
+		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(false, nil).Once()
 
 		handler := buildAuthOtpPost(authOtpPostDeps{
 			pageRenderer:  pageRenderer,
@@ -1547,9 +1547,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(false, nil)
 		// A refused code against the enrolled authenticator advances the consecutive
-		// count, a replay as much as a wrong code (#489).
-		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).Once()
+		// count, a replay as much as a wrong code, against the authenticator the code was
+		// checked against (#489).
+		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
+			Return(false, nil).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected,
 			mock.MatchedBy(func(payload map[string]interface{}) bool {
@@ -2040,8 +2041,9 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			// A refused code against the enrolled authenticator advances the consecutive
 			// count, a replay as much as a wrong code (#489); the enrollment half below
 			// verifies a supplied seed, which counts nothing.
-			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1)).
-				Return(nil).Maybe()
+			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1),
+				user.OtpConfigGeneration).
+				Return(false, nil).Maybe()
 		} else {
 			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 				Return(consumed, nil).Maybe()
