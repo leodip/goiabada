@@ -21,6 +21,13 @@ func TestErrorField(t *testing.T) {
 	assert.Equal(t, "website", ErrorField(refusal(i18n.ErrCodeProfileWebsiteInvalid), ProfileErrorFields))
 	assert.Equal(t, "website", ErrorField(errs.Wrap(refusal(i18n.ErrCodeProfileWebsiteInvalid), "updating the profile"), ProfileErrorFields),
 		"a wrapped refusal names its field too")
+	for _, code := range []string{
+		i18n.ErrCodeProfileNicknameInvalid, i18n.ErrCodeProfileNicknameTooLong, i18n.ErrCodeProfileNicknameAngleBrackets,
+	} {
+		assert.Equal(t, "nickname", ErrorField(refusal(code), ProfileErrorFields), code)
+		assert.Equal(t, "nickname", ErrorField(errs.Wrap(refusal(code), "updating the profile"), ProfileErrorFields),
+			"a wrapped %s names the nickname too", code)
+	}
 	assert.Equal(t, "addressCountry", ErrorField(refusal(i18n.ErrCodeAddressCountryInvalid), AddressErrorFields))
 	assert.Equal(t, "phoneNumber", ErrorField(refusal(i18n.ErrCodePhoneNumberTooShort), PhoneErrorFields))
 

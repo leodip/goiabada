@@ -77,12 +77,29 @@ test("one-character names are saved, shown again, and reach the profile claims",
   expect(id).toMatchObject({ given_name: "김", middle_name: "J", family_name: "王", name: "김 J 王" });
 });
 
+// A nickname is a casual name, free text rather than a username's shape (#632).
+test("a nickname with a space is saved, shown again, and reaches the nickname claim", async ({ page, request, clients, users }) => {
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "profile"));
+  await page.locator('input[name="nickname"]').fill("Amazing Grace");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('input[name="nickname"]')).toHaveValue("Amazing Grace");
+
+  const { client, secret } = await passwordGrantClient(page, clients);
+  const { id } = await userTokens(request, client.identifier, secret, user, "openid profile");
+  expect(id).toMatchObject({ nickname: "Amazing Grace" });
+});
+
 for (const { field, value, message } of [
   { field: "username", value: "1abc", message: "Usernames must start with a letter" },
   { field: "givenName", value: "M4ry", message: "Please enter a valid given name." },
   // A name needs a letter, so a lone hyphen is refused where a lone letter is not.
   { field: "familyName", value: "-", message: "Please enter a valid family name." },
-  { field: "nickname", value: "has space", message: "Nicknames must start with a letter" },
+  // A nickname is free text, but angle brackets are refused rather than stripped (#275, #632).
+  { field: "nickname", value: "ni<ck", message: "The nickname cannot contain the characters < or >." },
   { field: "website", value: "not a url", message: "Please enter a valid website URL." },
   { field: "dateOfBirth", value: "17/05/1990", message: "The date of birth is invalid. Please use the format YYYY-MM-DD." },
   { field: "dateOfBirth", value: "2999-01-01", message: "The date of birth can't be in the future." },

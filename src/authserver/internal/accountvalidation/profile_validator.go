@@ -6,7 +6,9 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -62,13 +64,24 @@ var (
 	// nameHasLetter requires at least one letter, so a value made up entirely of
 	// spaces, apostrophes or hyphens is rejected.
 	nameHasLetter = regexp.MustCompile(`\p{L}`)
-	// usernameShape is a letter, then 1 to 23 letters, digits or underscores. The nickname is held
-	// to the same shape.
+	// usernameShape is a letter, then 1 to 23 letters, digits or underscores.
 	usernameShape = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{1,23}$`)
 	// websiteShape is an optional http or https scheme, a host of dot-separated labels ending in
 	// two or more letters, and an optional path.
 	websiteShape = regexp.MustCompile(`^(https?://)?(www\.)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(/\S*)?$`)
 )
+
+// breaksOrReordersLine reports a character a single-line value refuses: a control character
+// (Cc), such as a tab or a line break; a line or paragraph separator (Zl, Zp), which UAX #14
+// makes a mandatory break and browsers honour; or one of the nine bidi embedding, override and
+// isolate characters, U+202A to U+202E and U+2066 to U+2069, with which "\u202Enimda" displays
+// as "admin" wherever the value is shown. The other format characters stay accepted: the
+// zero-width joiner and non-joiner build emoji sequences and write some scripts, and the
+// left-to-right and right-to-left marks fix the order a typed name shows in.
+func breaksOrReordersLine(r rune) bool {
+	return unicode.IsControl(r) || unicode.In(r, unicode.Zl, unicode.Zp) ||
+		(r >= '\u202A' && r <= '\u202E') || (r >= '\u2066' && r <= '\u2069')
+}
 
 // ParseGender reads a profile's gender as a profile PUT submits it: the word GET returns
 // ("female", "male", "other"), so a client can write back what it read, or the digit the admin
@@ -169,9 +182,27 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		return err
 	}
 
-	if len(input.Nickname) > 0 {
-		if !usernameShape.MatchString(input.Nickname) {
+	// The nickname is the OIDC nickname claim, a casual name that may or may not be the
+	// given name's: "Amazing Grace", "Dr. G", "Jean-Luc". So it is free text rather than
+	// a username's shape, whose claim is preferred_username, and which the username field
+	// fills (#632 item 4). Free text still refuses what no field a person types takes: a
+	// bound, here the name fields' own, in the UTF-16 code units every text bound measures
+	// in; the control characters that would put a line break in a single-line value; and
+	// the angle brackets decision 3 of #275 refuses rather than strips, since nothing
+	// sanitizes and an accepted nickname is stored exactly as it was sent. The control
+	// characters are breaksOrReordersLine's, which adds the line and paragraph separators
+	// and the bidi embeddings, overrides and isolates to the C0 and C1 controls.
+	if input.Nickname != "" {
+		if inputvalidation.TextLength(input.Nickname) > nameMaxLength {
+			return i18n.NewLocalizedError(i18n.ErrCodeProfileNicknameTooLong, map[string]any{"max": nameMaxLength})
+		}
+
+		if strings.ContainsFunc(input.Nickname, breaksOrReordersLine) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileNicknameInvalid, nil)
+		}
+
+		if err := ValidateNoAngleBrackets(input.Nickname, i18n.ErrCodeProfileNicknameAngleBrackets); err != nil {
+			return err
 		}
 	}
 
