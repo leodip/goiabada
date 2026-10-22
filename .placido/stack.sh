@@ -6,7 +6,7 @@
 # with the environment devcontainer.json declares, which `docker exec` does not apply
 # by itself (see src/.devcontainer/README.md).
 #
-#   stack.sh up          start the stack and wait for every database (placido's setup)
+#   stack.sh up          build what changed, start the stack, and wait for every database (placido's setup)
 #   stack.sh down        remove its containers, volumes, network and image (teardown)
 #   stack.sh run ARGS    src/authserver/run-tests.sh ARGS, in the devcontainer
 #   stack.sh vet         go vet in every module, in the devcontainer
@@ -123,7 +123,10 @@ wait_for_databases() {
 
 case "${1:-}" in
     up)
-        compose up -d --wait --wait-timeout "$WAIT"
+        # --build: an image left from an earlier run, or built before placido merged main
+        # in, lacks what src/.devcontainer has since added, such as Node for #626's unit
+        # gate. Docker's layer cache makes the build quick when nothing changed.
+        compose up -d --build --wait --wait-timeout "$WAIT"
         wait_for_databases
         # The devcontainer must mount this worktree, not another checkout. Docker Desktop
         # on WSL can report the mount by its own proxy instead, named after the SHA-256
