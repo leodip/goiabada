@@ -490,6 +490,13 @@ which refuses every other name, so the server or the data tier recreates and mig
 integration server seeds it. The drop itself is each engine package's `DropDatabase`, the one
 spelling `schemadump` and the data tier's fixtures use too (#433).
 
+**Dev stack secrets**: the dev stack's data key and its MySQL, PostgreSQL and SQL Server passwords
+come from `src/.devcontainer/.env`, which `src/.devcontainer/generate-env.sh` writes with fresh
+values (and fills in when one is missing) and `.gitignore` keeps out of git; Compose hands them to
+the databases and the devcontainer. `run-tests.sh` and `schemadump` read them from the environment
+and refuse with one line naming a missing one, so outside the devcontainer, or in a container
+created before #627, run the script and recreate the stack with its volumes (#501).
+
 **Transaction stub**: a unit test that needs the mock database to answer `RunInTransaction`
 uses `datamocks.ExpectRunInTransaction`, hand-written beside the generated mock in
 `authserver/internal/data/mocks` and reachable from every caller without a new import, with
@@ -517,6 +524,12 @@ exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Bot
 driven from a rule test: the finder directly, the reporting half through `guard.Run`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
 does. Every guard follows this: those in `core/guard`, the newest
+`AssertNoLiteralStackSecrets`, which refuses a data key or database password supplied by literal in
+any runnable file -- workflows, Compose and other YAML, devcontainer and editor configurations,
+Dockerfiles, Makefiles, env files (`.env` and `.env.*` among them, unless git tracks no copy of
+it and the repository's `.gitignore` files, its own directory's or a parent's, read as git reads
+them, keep it out of the repository), shell scripts, Go mains and Markdown code blocks -- and the
+published sample key and passwords anywhere outside the refusal and its tests (#501), and before it
 `AssertNoStaleDeferredBodyCloses`, which refuses a deferred func-literal close of a response
 body reading a variable the same function reassigns after the defer is registered, in a later
 statement, a nested closure or the next iteration of a loop, so only the last response is closed

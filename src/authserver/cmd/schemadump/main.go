@@ -22,6 +22,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -49,25 +50,31 @@ import (
 // them from the compose file instead would mean parsing YAML at runtime, and the repository
 // is actively shedding dependencies rather than adding one for a developer tool. A wrong
 // value fails at connect time, before anything is written.
+//
+// The password is no default: it is read from passwordVariable, the variable the dev container's
+// environment carries the password the stack generated for that engine in (#501).
 type target struct {
-	dialect  data.Dialect
-	host     string
-	port     int
-	username string
-	password string
+	dialect          data.Dialect
+	host             string
+	port             int
+	username         string
+	password         string
+	passwordVariable string
 }
 
 func targets() []target {
 	return []target{
 		{dialect: data.SQLite},
-		{dialect: data.MySQL, host: "mysql-server", port: 13306, username: "root", password: "mySqlPass123"},
-		{dialect: data.Postgres, host: "postgres-server", port: 15432, username: "postgres", password: "myPostgresPass123"},
-		{dialect: data.MSSQL, host: "mssql-server", port: 11433, username: "sa", password: "YourStr0ngPassw0rd!"},
+		{dialect: data.MySQL, host: "mysql-server", port: 13306, username: "root", passwordVariable: "MYSQL_ROOT_PASSWORD"},
+		{dialect: data.Postgres, host: "postgres-server", port: 15432, username: "postgres", passwordVariable: "POSTGRES_PASSWORD"},
+		{dialect: data.MSSQL, host: "mssql-server", port: 11433, username: "sa", passwordVariable: "MSSQL_SA_PASSWORD"},
 	}
 }
 
 // withOverrides applies GOIABADA_SCHEMADUMP_<ENGINE>_{HOST,PORT,USERNAME,PASSWORD}, so the
-// command runs somewhere the compose service names do not resolve without editing it.
+// command runs somewhere the compose service names do not resolve without editing it. Without the
+// password override the password is the target's passwordVariable, and an engine whose variable is
+// unset or empty is refused.
 func (t target) withOverrides() (target, error) {
 	prefix := "GOIABADA_SCHEMADUMP_" + strings.ToUpper(string(t.dialect)) + "_"
 	if v, ok := os.LookupEnv(prefix + "HOST"); ok {
@@ -78,6 +85,12 @@ func (t target) withOverrides() (target, error) {
 	}
 	if v, ok := os.LookupEnv(prefix + "PASSWORD"); ok {
 		t.password = v
+	} else if t.passwordVariable != "" {
+		t.password = os.Getenv(t.passwordVariable)
+		if t.password == "" {
+			return t, errs.Errorf("%s is not set, so the %s password is unknown: run schemadump inside the dev container, "+
+				"whose environment carries the passwords its stack generated, or set %sPASSWORD", t.passwordVariable, t.dialect, prefix)
+		}
 	}
 	if v, ok := os.LookupEnv(prefix + "PORT"); ok {
 		port, err := strconv.Atoi(v)
@@ -118,20 +131,28 @@ func main() {
 	// is down and noise otherwise, so only warnings and worse reach the terminal.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})))
 
-	if err := run(); err != nil {
+	if err := run(os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "schemadump: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	dumps := map[data.Dialect][]byte{}
+// run dumps every engine and writes the four golden files, reporting its progress to out.
+func run(out io.Writer) error {
+	// Every target is resolved before any is dumped, so a missing password stops the command
+	// before it creates a scratch database anywhere.
+	var resolvedTargets []target
 	for _, t := range targets() {
 		resolved, err := t.withOverrides()
 		if err != nil {
 			return err
 		}
-		fmt.Printf("dumping %s...\n", resolved.dialect)
+		resolvedTargets = append(resolvedTargets, resolved)
+	}
+
+	dumps := map[data.Dialect][]byte{}
+	for _, resolved := range resolvedTargets {
+		_, _ = fmt.Fprintf(out, "dumping %s...\n", resolved.dialect)
 		encoded, err := dumpOne(resolved)
 		if err != nil {
 			return errs.Errorf("%s: %w", resolved.dialect, err)
@@ -150,7 +171,7 @@ func run() error {
 		if err := writeAtomically(path, dumps[t.dialect]); err != nil {
 			return err
 		}
-		fmt.Printf("wrote %s\n", path)
+		_, _ = fmt.Fprintf(out, "wrote %s\n", path)
 	}
 	return nil
 }
