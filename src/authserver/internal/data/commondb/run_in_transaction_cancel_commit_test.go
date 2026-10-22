@@ -3,11 +3,14 @@ package commondb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +72,7 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyReturnsTheContextErro
 	assert.Empty(t, *requested, "and no backoff was spent on it")
 	c := d.settled(t)
 	assert.Zero(t, c.openTx, "nothing was left open")
-	assert.Zero(t, c.commits, "the driver was never asked to commit: database/sql refused before it")
+	assert.Zero(t, c.commits, "the driver was never asked to commit: the context was done first")
 }
 
 // TestRunInTransaction_ACancellationAfterASuccessfulBodyJoinsTheDeadlockItWasRerunFor is the same
@@ -129,12 +132,12 @@ func TestRunInTransaction_ACommitThatFindsTheTransactionDoneOnALiveContextIsStil
 }
 
 // TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutcome leaves the race
-// in, where the two tests above remove it: the body cancels and returns at once, so Tx.Commit
-// answers the context's own error when its rollback goroutine has not finished and sql.ErrTxDone
-// when it has. Neither asks the driver to commit, so the transaction is known to be rolled back
-// whichever arm wins, and neither may carry data.ErrCommitOutcomeUnknown. Before the tag looked
-// at what Tx.Commit answered, the context's-error arm carried it, and that arm wins nearly every
-// time (#371).
+// in, where the two tests above remove it: the body cancels and returns at once, racing
+// database/sql's rollback goroutine. commit finds the context done and rolls back without asking
+// the driver, its rollback or the goroutine's finishing the transaction, so it is known to be
+// rolled back whichever wins, and the run may not carry data.ErrCommitOutcomeUnknown. Before the
+// tag looked at whether the driver was asked, Tx.Commit's context's-error arm carried it, and that
+// arm wins nearly every time (#371).
 func TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutcome(t *testing.T) {
 	for i := range 300 {
 		d := &scriptedDriver{}
@@ -155,7 +158,7 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutco
 		require.Error(t, err, run)
 		require.ErrorIs(t, err, context.Canceled, run)
 		require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
-			"%s: database/sql refused the commit before the driver, so its outcome is known", run)
+			"%s: the commit was refused before the driver was asked, so its outcome is known", run)
 		c := d.settled(t)
 		require.Zero(t, c.commits, "%s: the driver was never asked to commit", run)
 		require.Zero(t, c.openTx, "%s: nothing was left open", run)
@@ -163,28 +166,205 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutco
 }
 
 // TestRunInTransaction_ACancellationDuringTheDriversCommitIsStillAnUnknownOutcome is the other
-// side of the identity test: a cancellation that lands while the driver's COMMIT is in flight.
-// database/sql has asked the driver by then, and the driver answers with an error of its own
-// wrapping context.Canceled, as pgx's stdlib driver does, which commits on the context BeginTx
-// was given. The server may have committed before the cancellation reached it, so the tag stays,
-// though the context is done and errors.Is finds context.Canceled in the error (#371).
+// side of the refusal: a cancellation that lands while the driver's COMMIT is in flight. database/sql
+// has asked the driver by then, and the server may have committed before the cancellation reached
+// it, so the tag stays whatever the driver answers. The rows are the shapes the shipped drivers
+// answer with: an error of the driver's own wrapping context.Canceled, and the context's own error,
+// bare, which is what pgx's normalizeTimeoutError returns on PostgreSQL and what go-mssqldb returns
+// on SQL Server, a deadline included. The bare rows are identical to ctx.Err(), so an error's
+// identity cannot tell them from a commit database/sql refused, and commit no longer asks it to
+// (#371).
 func TestRunInTransaction_ACancellationDuringTheDriversCommitIsStillAnUnknownOutcome(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	d := &scriptedDriver{
-		commitErrs:   []error{fmt.Errorf("commit interrupted: %w", context.Canceled)},
-		duringCommit: cancel,
+	for _, tc := range []struct {
+		name string
+		// end ends the context, and is what the driver runs while its COMMIT is in flight.
+		end       func(ctx *handCtx)
+		commitErr error
+		ctxErr    error
+		// deadlockFirst has the first attempt's statement aborted as a deadlock victim, so the
+		// cancelled commit is the rerun's, which RunInTransaction answers through abandoned().
+		deadlockFirst bool
+	}{
+		{
+			name:      "a driver error wrapping context.Canceled",
+			end:       func(ctx *handCtx) { ctx.end(context.Canceled, true) },
+			commitErr: fmt.Errorf("commit interrupted: %w", context.Canceled),
+			ctxErr:    context.Canceled,
+		},
+		{
+			name:      "the bare context.Canceled, as pgx answers",
+			end:       func(ctx *handCtx) { ctx.end(context.Canceled, true) },
+			commitErr: context.Canceled,
+			ctxErr:    context.Canceled,
+		},
+		{
+			name:      "the bare context.DeadlineExceeded, as go-mssqldb answers",
+			end:       func(ctx *handCtx) { ctx.end(context.DeadlineExceeded, true) },
+			commitErr: context.DeadlineExceeded,
+			ctxErr:    context.DeadlineExceeded,
+		},
+		{
+			name:          "the bare context.Canceled at the commit of a rerun",
+			end:           func(ctx *handCtx) { ctx.end(context.Canceled, true) },
+			commitErr:     context.Canceled,
+			ctxErr:        context.Canceled,
+			deadlockFirst: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := newHandCtx()
+			defer ctx.end(context.Canceled, true)
+			d := &scriptedDriver{
+				commitErrs:   []error{tc.commitErr},
+				duringCommit: func() { tc.end(ctx) },
+			}
+			wantRuns := 1
+			if tc.deadlockFirst {
+				d.execs = []*scriptedExec{{err: errDeadlock}}
+				wantRuns = 2
+			}
+			db := retryingDB(t, d)
+			recordBackoff(db)
+			ran := 0
+
+			err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
+
+			require.Error(t, err)
+			require.ErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+				"the driver was asked to commit, so whether the engine did is unknown")
+			require.ErrorIs(t, err, tc.ctxErr, "and the driver's own error stays in the tree")
+			if tc.deadlockFirst {
+				require.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
+			}
+			assert.Equal(t, wantRuns, ran, "a commit whose outcome is unknown is not replayed")
+			assert.Equal(t, 1, d.settled(t).commits, "the driver was asked to commit once")
+		})
 	}
-	db := retryingDB(t, d)
-	recordBackoff(db)
-	ran := 0
+}
 
-	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
+// TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver pins the rollback
+// commit owes a context that is done before it is asked to commit. The deferred rollback in
+// runTransactionOnce stands down once committing is set, so this one is commit's. The context
+// ends quietly, its Done left open, so database/sql's own rollback goroutine never wakes and the
+// one rollback the driver sees is commit's: whether it happened and what is done with its error
+// are both observable, where with a real cancellation they race that goroutine (#371).
+func TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver(t *testing.T) {
+	const doneBeforeCommitWarning = "rolling back a transaction whose context was done before its commit reported an error"
+	for _, tc := range []struct {
+		name         string
+		rollbackErr  error
+		wantWarnings int
+	}{
+		{name: "a rollback that succeeds is silent", rollbackErr: nil, wantWarnings: 0},
+		{name: "a rollback that fails is warned about and not returned", rollbackErr: errors.New("connection reset"), wantWarnings: 1},
+		{name: "a rollback database/sql had already done is silent", rollbackErr: sql.ErrTxDone, wantWarnings: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			ctx := newHandCtx()
+			d := &scriptedDriver{rollbackErrs: []error{tc.rollbackErr}}
+			db := retryingDB(t, d)
+			requested := recordBackoff(db)
+			ran := 0
 
-	require.Error(t, err)
-	require.ErrorIs(t, err, data.ErrCommitOutcomeUnknown,
-		"the driver was asked to commit, so whether the engine did is unknown")
-	require.ErrorIs(t, err, context.Canceled, "and the driver's own error stays in the tree")
-	assert.Equal(t, 1, ran, "a commit whose outcome is unknown is not replayed")
-	assert.Equal(t, 1, d.settled(t).commits, "the driver was asked to commit once")
+			err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+				ran++
+				if _, execErr := db.ExecSQL(ctx, tx, "UPDATE settings SET updated_at = updated_at"); execErr != nil {
+					return execErr
+				}
+				ctx.end(context.Canceled, false)
+				return nil
+			})
+
+			require.Error(t, err)
+			require.ErrorIs(t, err, context.Canceled, "the context's error is the answer")
+			require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+				"no COMMIT reached the engine, so the transaction is known to be rolled back")
+			if tc.rollbackErr != nil {
+				require.NotErrorIs(t, err, tc.rollbackErr, "and the rollback's own error is not returned")
+			}
+			assert.Equal(t, 1, ran, "a cancelled run is not rerun")
+			assert.Empty(t, *requested)
+			c := d.settled(t)
+			assert.Zero(t, c.commits, "the driver was never asked to commit")
+			assert.Equal(t, 1, c.rollbacks, "commit rolled the transaction back itself")
+			assert.Equal(t, tc.wantWarnings, warningsContaining(logs, doneBeforeCommitWarning))
+			assert.Zero(t, rollbackWarnings(logs), "and the deferred rollback stood down")
+		})
+	}
+}
+
+// TestCommit_AfterTheDriverWasAskedOnlyTheTransactionDoneSentinelIsARefusal pins commit's flag
+// itself, below RunInTransaction, whose own sql.ErrTxDone arm answers a done context the same way
+// and so hides it. Once Tx.Commit has run, sql.ErrTxDone on a done context is database/sql's
+// rollback goroutine having finished the transaction first, a refusal; the context's own error,
+// bare, is a driver whose COMMIT was in flight, which is not (#371).
+func TestCommit_AfterTheDriverWasAskedOnlyTheTransactionDoneSentinelIsARefusal(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		commitErr   error
+		wantRefused bool
+	}{
+		{name: "sql.ErrTxDone on a done context", commitErr: sql.ErrTxDone, wantRefused: true},
+		{name: "the bare context.Canceled on a done context", commitErr: context.Canceled, wantRefused: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := newHandCtx()
+			defer ctx.end(context.Canceled, true)
+			d := &scriptedDriver{
+				commitErrs:   []error{tc.commitErr},
+				duringCommit: func() { ctx.end(context.Canceled, false) },
+			}
+			db := scriptedDB(t, d)
+			tx, err := db.BeginTransaction(ctx)
+			require.NoError(t, err)
+
+			refused, err := db.commit(ctx, tx)
+
+			require.ErrorIs(t, err, tc.commitErr)
+			assert.Equal(t, tc.wantRefused, refused)
+			assert.Equal(t, 1, d.settled(t).commits, "the driver was asked to commit")
+		})
+	}
+}
+
+// handCtx is a context a test ends by hand, choosing the error it ends with and whether its Done
+// channel closes. Ended with context.DeadlineExceeded, it is a deadline firing at the instant the
+// test picks, which no timer promises. Ended quietly, Err set and Done left open, it keeps
+// database/sql's rollback goroutine asleep, so a rollback commit owes is the only one the driver
+// sees. No real context is ever quiet; that half exists only to make commit's own rollback
+// observable rather than a race against database/sql's.
+type handCtx struct {
+	context.Context
+	done chan struct{}
+
+	mu     sync.Mutex
+	err    error
+	closed bool
+}
+
+func newHandCtx() *handCtx {
+	return &handCtx{Context: context.Background(), done: make(chan struct{})}
+}
+
+func (c *handCtx) Done() <-chan struct{} { return c.done }
+
+func (c *handCtx) Err() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.err
+}
+
+// end sets the context's error, keeping the first, and closes Done when closeDone is set. The
+// error is stored before Done closes, so anything woken by Done reads it.
+func (c *handCtx) end(err error, closeDone bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.err == nil {
+		c.err = err
+	}
+	if closeDone && !c.closed {
+		c.closed = true
+		close(c.done)
+	}
 }

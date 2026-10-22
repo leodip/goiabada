@@ -797,9 +797,11 @@ var ErrUniqueViolation = errors.New("unique constraint violation")
 // than a deadlock: the one exit whose outcome the caller cannot know, because the server may have
 // committed before the failure reached it. Replaying such a transaction would apply the body
 // twice, so a caller that receives this must inspect what the transaction changed before it
-// tries again (#371). A commit database/sql refused before asking the driver, because the
-// context was already done, does not carry it: no COMMIT reached the engine, the transaction was
-// rolled back, and the run answers with the context's error.
+// tries again (#371). A commit whose context was already done does not carry it: the driver is
+// never asked, the transaction is rolled back, and the run answers with the context's error. A
+// cancellation that lands while the driver's COMMIT is in flight does carry it, even when the
+// driver answers with the context's own error, as pgx and go-mssqldb do, since the server may
+// have committed.
 //
 // It exists for the same reason ErrUniqueViolation does: the driver's own text cannot be matched.
 // Every engine phrases a commit failure its own way and none of them says whether the server had

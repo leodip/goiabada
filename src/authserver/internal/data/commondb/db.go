@@ -128,22 +128,36 @@ func (d *Database) CommitTransaction(ctx context.Context, tx *sql.Tx) error {
 	return err
 }
 
-// commit is CommitTransaction, also reporting whether database/sql refused the commit before it
-// asked the driver for one. Tx.Commit does that in exactly two ways once the transaction's context
-// is done: it answers the context's own error, or sql.ErrTxDone when its rollback goroutine has
-// already finished the transaction. Either way no COMMIT reached the engine and the transaction is
-// known to be rolled back. The raw error is compared by identity, here where it is still at hand,
-// and not with errors.Is: a driver that is cancelled while its COMMIT is in flight answers with an
-// error of its own wrapping context.Canceled, and that commit's outcome is unknown (#371).
+// commit is CommitTransaction, also reporting whether the commit was refused before the driver was
+// asked for one, so that no COMMIT reached the engine and the transaction is known to be rolled
+// back. That is decided from what is known before asking, never from the error that comes back: a
+// driver cancelled while its COMMIT is in flight may answer the context's own error, bare, as pgx
+// and go-mssqldb do, and that commit's outcome is unknown (#371).
+//
+// So a context already done is not asked to commit at all: the transaction is rolled back here,
+// since the caller's deferred rollback stands down once committing is set, and the context's
+// error comes back refused. After Tx.Commit, only sql.ErrTxDone on a done context is refused,
+// because that is database/sql's rollback goroutine having finished the transaction first. A
+// cancellation landing between the check and Tx.Commit's own is answered as unknown, which only
+// asks the caller to look before it retries.
 func (d *Database) commit(ctx context.Context, tx *sql.Tx) (refusedBeforeTheDriver bool, err error) {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		// database/sql's own goroutine may have rolled it back already, which is the
+		// sql.ErrTxDone the deferred rollback in runTransactionOnce suppresses the same way.
+		if rollbackErr := d.RollbackTransaction(ctx, tx); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			slog.WarnContext(ctx, "rolling back a transaction whose context was done before its commit reported an error, which is ignored because the context's error is the one the caller needs",
+				"error", rollbackErr)
+		}
+		return true, errs.Wrap(ctxErr, "unable to commit transaction")
+	}
+
 	if d.logSQL {
 		slog.InfoContext(ctx, "committing transaction")
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		ctxErr := ctx.Err()
-		refused := ctxErr != nil && (err == ctxErr || err == sql.ErrTxDone) //nolint:errorlint // identity is the test: a driver's error wrapping the context's is a commit that reached the engine (#371)
+		refused := ctx.Err() != nil && errors.Is(err, sql.ErrTxDone)
 		return refused, errs.Wrap(err, "unable to commit transaction")
 	}
 	return false, nil
@@ -195,9 +209,10 @@ func waitOrCancel(ctx context.Context, d time.Duration) error {
 // A commit that fails for a reason other than a deadlock has an outcome the client cannot know,
 // since the server may have committed before the failure reached it, and replaying it would
 // apply the body twice: such a failure carries data.ErrCommitOutcomeUnknown, so a caller can
-// match what the text of the error cannot say (#371). A commit database/sql refused before it
-// reached the driver, because the context was done, does not carry it: that transaction was
-// rolled back, and the run answers as a cancelled one.
+// match what the text of the error cannot say (#371). A commit whose context is already done is
+// never asked of the driver and does not carry it: that transaction was rolled back, and the run
+// answers as a cancelled one. A cancellation landing while the driver's COMMIT is in flight does
+// carry it, whatever the driver answers, the context's own error included.
 //
 // WHY IT HOLDS. No order in which transactions take their rows is imposed anywhere in the
 // repository, so two transactions on the same account can take the same rows in opposite orders
@@ -239,12 +254,13 @@ func (d *Database) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) err
 		}
 		// The fifth cancellation exit, and the only one whose error arrives carrying nothing
 		// about why. When the body SUCCEEDS and the cancellation lands between its last
-		// statement and the commit, database/sql has already rolled the transaction back on the
-		// goroutine BeginTx started, so Tx.Commit finds it finished and answers sql.ErrTxDone --
-		// a bookkeeping sentinel saying only that the transaction was already over, which
-		// matches neither context.Canceled nor context.DeadlineExceeded. Tx.Commit races that
-		// goroutine, returning ctx.Err() when the rollback has not finished and the sentinel
-		// when it has, so without this the answer to a cancelled run was decided by scheduling.
+		// statement and the commit, database/sql rolls the transaction back on the goroutine
+		// BeginTx started. commit sees a context already done and answers its error without
+		// asking; but a cancellation landing just after that check lets Tx.Commit find the
+		// transaction finished and answer sql.ErrTxDone -- a bookkeeping sentinel saying only
+		// that the transaction was already over, which matches neither context.Canceled nor
+		// context.DeadlineExceeded, so without this the answer to a cancelled run was decided by
+		// scheduling.
 		// Both conditions are required: ErrTxDone on a LIVE context means the transaction was
 		// finished by something other than this helper, which is a defect and keeps its own
 		// error, exactly as the deferred rollback's suppression is written (#386 decision 13).
@@ -347,8 +363,8 @@ func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) e
 	committing = true
 	refusedBeforeTheDriver, commitErr := d.commit(ctx, tx)
 	// A deadlock at the commit returns unchanged, so RunInTransaction reruns the whole body; so
-	// does a commit database/sql refused before asking the driver, because a cancelled context
-	// rolled it back and its outcome is known. Any other commit failure is tagged with the
+	// does a commit refused before the driver was asked, because a cancelled context rolled it
+	// back and its outcome is known. Any other commit failure is tagged with the
 	// sentinel that says its outcome is unknown, the one fact the driver's own text never
 	// carries (#371).
 	if commitErr != nil && !refusedBeforeTheDriver && !d.deadlock(commitErr) {
