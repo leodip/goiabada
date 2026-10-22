@@ -21,9 +21,10 @@ import (
 // The `recover` subcommand's operation, recovery.Run, on every engine: whatever it is asked, the
 // user's authentication generation advances by one and their sessions and refresh tokens end, and
 // each action changes what it names and nothing else (#498, its Done-when: "the data tier shows it
-// on all four engines"). The two forced interleavings at the end show the user, the authenticator
-// and the held grant are read under the user's row, so a credential change holding that row when
-// the recovery starts is what the recovery decides on.
+// on all four engines"). The two forced interleavings at the end show the user and the
+// authenticator are read under the user's row, and the held grant under the manage permission's,
+// so a credential change or a grant holding that row when the recovery starts is what the recovery
+// decides on.
 
 // recoveryPassword passes every password policy, so the test does not depend on which policy the
 // shared database's settings row holds.
@@ -360,9 +361,12 @@ func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) 
 	assert.Equal(t, []string{audit.EventDisabledOTP, audit.EventRevokedUserAuthState}, recorder.events)
 }
 
-// A grant of manage holds the user's row when the recovery starts. The recovery waits for the row,
-// finds manage held, and writes no second row. Read before the transaction, it found none and wrote
-// a second, since users_permissions has no unique key on the pair (#498 review F5).
+// A grant of manage is in flight when the recovery starts, holding what the Admin API's save of a
+// user's permissions holds: the manage permission's row (lockAdministrators), and never the user's.
+// The recovery waits for the row, finds manage held, and writes no second row. Read before the
+// transaction, it found none and wrote a second, since users_permissions has no unique key on the
+// pair (#498 review F5); read under the user's row alone, it did the same on PostgreSQL, where that
+// lock does not wait for the save's insert (#498 round 2 F2).
 func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
@@ -370,7 +374,8 @@ func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 	f := seedRecoveryFixture(t)
 
 	holder := beginTx(t)
-	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
+	_, err := database.AcquireManagePermissionRow(ctx, holder)
+	require.NoError(t, err)
 	require.NoError(t, database.CreateUserPermission(ctx, holder, &record.UserPermission{
 		UserId: f.user.Id, PermissionId: f.manage.Id,
 	}))

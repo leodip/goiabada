@@ -77,7 +77,7 @@ The wizard takes a lowercase domain name for each host, never an IP address, and
 When nobody who holds `authserver:manage` can sign in any more, the auth server's `recover` subcommand restores sign-in for one named user. The pods read the database credentials from the Secrets the manifest gives them, so the command runs inside one:
 
 ```bash
-printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
 printf '%s\n' "$RECOVERY_PASSWORD" | kubectl exec -i -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
 unset RECOVERY_PASSWORD
 ```

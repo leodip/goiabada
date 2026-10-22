@@ -139,7 +139,7 @@ The releases include macOS and Windows binaries, which read the same variables. 
 When nobody who holds `authserver:manage` can sign in any more, the auth server's `recover` subcommand restores sign-in for one named user. Run it as the service's user, from its working directory and with its `goiabada.env`, as [the rollback command](/deploy/upgrade-goiabada/#roll-back-to-an-earlier-release) does, so the database the command reaches is the one the service uses:
 
 ```bash
-printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
 printf '%s\n' "$RECOVERY_PASSWORD" | sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin'
 unset RECOVERY_PASSWORD
 ```

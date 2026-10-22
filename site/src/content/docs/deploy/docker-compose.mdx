@@ -114,7 +114,7 @@ The wizard's **Local testing** choice writes Compose files too, serving plain HT
 When nobody who holds `authserver:manage` can sign in any more, the auth server's `recover` subcommand restores sign-in for one named user. The Compose file gives the auth server's service the database credentials, so one command runs it with them:
 
 ```bash
-printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
 printf '%s\n' "$RECOVERY_PASSWORD" | docker compose run --rm -T goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
 unset RECOVERY_PASSWORD
 ```

@@ -289,13 +289,21 @@ func checkRecoverSchema(ctx context.Context, m schemaVersionReader) string {
 			"no user to recover"
 	case err != nil:
 		return "unable to read the database's schema version: " + err.Error()
+	// Each case names the step that gets past it: `migrate to` refuses a dirty schema as the
+	// server does, and the server refuses to start on a newer one, migrating only an older one up.
 	case dirty:
 		return fmt.Sprintf("the database records schema version %06d, DIRTY: a migration did "+
-			"not finish. Repair it with `goiabada-authserver migrate` first", version)
+			"not finish. Repair the schema by hand as "+
+			"https://goiabada.dev/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/ "+
+			"describes, then run the recovery again", version)
+	case version > m.Head():
+		return fmt.Sprintf("the database records schema version %06d and this binary carries "+
+			"%06d: a newer release migrated it. Run the recover command of that release",
+			version, m.Head())
 	case version != m.Head():
 		return fmt.Sprintf("the database records schema version %06d and this binary carries "+
-			"%06d. Run the recover command of the release whose schema the database is at, or start "+
-			"this release's auth server once to migrate the database to its schema", version, m.Head())
+			"%06d: it is behind this release. Run `goiabada-authserver migrate to %d`, or start "+
+			"this release's auth server once, then run the recovery again", version, m.Head(), m.Head())
 	}
 	return ""
 }

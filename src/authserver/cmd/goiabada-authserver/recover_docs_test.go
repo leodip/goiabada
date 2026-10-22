@@ -52,6 +52,10 @@ func TestLockedOutPage_TheRecoveryNamesTheFlagsTheUsageSpells(t *testing.T) {
 // the operator never typed (#498 review F3 and F4).
 var passwordArgument = regexp.MustCompile(`--password[ =]`)
 
+// recoverPasswordPrompt is the line that asks for the new password before each documented command.
+// IFS= keeps the spaces and tabs a plain read strips from either end of the line.
+const recoverPasswordPrompt = `printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo`
+
 // TestDeployPages_TheRecoveryRunsInEachDeploymentShape: each deployment page documents the
 // recover command for the shape it installs, so an operator follows the page their deployment
 // came from rather than translating a command between shapes, and the troubleshooting page's tabs
@@ -59,7 +63,9 @@ var passwordArgument = regexp.MustCompile(`--password[ =]`)
 // as the rollback command is, so a changed user, working directory, environment file or binary path
 // fails here until the command follows. Every documented command reads the password from stdin,
 // the shape's own way of handing a pipe to the command: -T for Compose, -i for kubectl, and
-// sudo's own stdin for the native form.
+// sudo's own stdin for the native form. The line before each reads the password with IFS= read,
+// since a plain read strips spaces and tabs from either end of what is typed, and the password the
+// command stored would then refuse the one the operator signs in with (#498 round 2 F1).
 func TestDeployPages_TheRecoveryRunsInEachDeploymentShape(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 
@@ -101,10 +107,14 @@ func TestDeployPages_TheRecoveryRunsInEachDeploymentShape(t *testing.T) {
 			"%s: the troubleshooting page's tab runs the command %s does", recoverDocsPage, shape.page)
 
 		for _, text := range []struct{ page, section string }{{shape.page, section}, {recoverDocsPage, tabs}} {
-			for _, line := range strings.Split(text.section, "\n") {
+			lines := strings.Split(text.section, "\n")
+			for i, line := range lines {
 				if !strings.Contains(line, command) {
 					continue
 				}
+				require.Positivef(t, i, "%s: the documented command has a line before it", text.page)
+				assert.Equalf(t, recoverPasswordPrompt, strings.TrimSpace(lines[i-1]),
+					"%s: the line before the command reads the password whole", text.page)
 				assert.Containsf(t, line, "--password-stdin",
 					"%s: the documented command reads the new password from stdin", text.page)
 				assert.Falsef(t, passwordArgument.MatchString(line),

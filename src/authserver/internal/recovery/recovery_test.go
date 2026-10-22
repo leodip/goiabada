@@ -10,8 +10,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/builtin"
 )
 
 // The behaviour a real database shows, every action on every engine and the reads made under the
@@ -106,4 +108,42 @@ func TestRun_TheUserIsDecidedOnUnderItsRow(t *testing.T) {
 			assert.Empty(t, recorder.events)
 		})
 	}
+}
+
+// TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt: the first attempt finds no manage held and
+// grants it, then the engine aborts it as a deadlock victim, which undoes the grant; the rerun finds
+// manage held, granted meanwhile by someone else, and grants nothing. The outcome and the audit
+// records are the committing attempt's, so the recovery neither says nor records a grant it did not
+// make (#301, #498 round 2 F3).
+func TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	user := &record.User{Id: 7, Email: "admin@example.com", Enabled: true}
+	const manageId = int64(11)
+	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(user, nil)
+	database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), builtin.AuthServerResourceIdentifier).
+		Return(&record.Resource{Id: 3, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil)
+	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		Return([]record.Permission{{Id: manageId, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceId: 3}}, nil)
+	stub := datamocks.ExpectRunInTransactionRerun(database, recoveryTx)
+	database.On("AcquireManagePermissionRow", mock.Anything, recoveryTx).Return(manageId, nil).Twice()
+	database.On("AcquireUserRow", mock.Anything, recoveryTx, int64(7)).Return(nil).Twice()
+	database.On("GetUserById", mock.Anything, recoveryTx, int64(7)).Return(user, nil).Twice()
+	database.On("GetUserPermissionsByUserId", mock.Anything, recoveryTx, int64(7)).
+		Return([]record.UserPermission{}, nil).Once()
+	database.On("GetUserPermissionsByUserId", mock.Anything, recoveryTx, int64(7)).
+		Return([]record.UserPermission{{Id: 21, UserId: 7, PermissionId: manageId}}, nil).Once()
+	database.On("CreateUserPermission", mock.Anything, recoveryTx, mock.Anything).Return(nil).Once()
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, recoveryTx, int64(7)).Return(int64(4), nil).Twice()
+	database.On("GetUserSessionsByUserId", mock.Anything, recoveryTx, int64(7)).Return([]record.UserSession{}, nil).Twice()
+	database.On("GetRefreshTokensByUserId", mock.Anything, recoveryTx, int64(7)).Return([]*record.RefreshToken{}, nil).Twice()
+	database.On("PromoteRefreshTokenGenerations", mock.Anything, recoveryTx, []int64{}, int64(4)).Return(nil).Twice()
+	recorder := &auditRecorder{}
+
+	outcome, err := Run(context.Background(), database, recorder, Request{Email: "admin@example.com", GrantManage: true})
+
+	require.NoError(t, err)
+	require.NoError(t, stub.BodyErr)
+	assert.False(t, outcome.ManageGranted, "the grant the aborted attempt made was undone with it")
+	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events,
+		"no grant is recorded: the committing attempt made none")
 }

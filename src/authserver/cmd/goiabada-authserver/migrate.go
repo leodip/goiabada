@@ -64,10 +64,11 @@ const (
 // WITHOUT migrating it, and hands its migrator to runMigrate. base is the loaded database
 // configuration: the environment, then the --db-* flags given before `migrate`.
 //
-// It is the only caller of datafactory.OpenDatabase: datafactory.NewDatabase brings the schema to
-// head on the way out, which would make a step down impossible and a `migrate version` on a
-// database behind this binary a lie, since the read would happen after the migration it was meant
-// to report on.
+// It opens with datafactory.OpenDatabase, as `recover` does: datafactory.NewDatabase brings the
+// schema to head on the way out, which would make a step down impossible and a `migrate version`
+// on a database behind this binary a lie, since the read would happen after the migration it was
+// meant to report on. `recover` needs the schema untouched for its own reason: it refuses a schema
+// other than head rather than migrate it (#498).
 func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io.Writer) int {
 	inv, ok := readMigrateCommand(args, base, stderr)
 	if !ok {

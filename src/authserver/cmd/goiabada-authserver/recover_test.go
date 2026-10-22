@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"flag"
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -384,6 +385,8 @@ func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
 // TestRecover_RefusesASchemaThisBinaryDoesNotCarry: the server refuses to start on a database a
 // newer release migrated or a migration left dirty, and the recovery, which writes credentials and
 // a permission through this binary's data tier, refuses both too, writing nothing (#498 review F9).
+// It refuses an older schema as well, rather than migrate it. Each refusal names the step that gets
+// past it, none of them a command that refuses the same schema (#498 round 2 F4).
 func TestRecover_RefusesASchemaThisBinaryDoesNotCarry(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -393,15 +396,18 @@ func TestRecover_RefusesASchemaThisBinaryDoesNotCarry(t *testing.T) {
 		{"a newer schema", func(t *testing.T, sqlDB *sql.DB, head int) {
 			_, err := sqlDB.Exec("UPDATE schema_migrations SET version = ?", head+1)
 			require.NoError(t, err)
-		}, "and this binary carries"},
+		}, "a newer release migrated it. Run the recover command of that release"},
 		{"a dirty schema", func(t *testing.T, sqlDB *sql.DB, _ int) {
 			_, err := sqlDB.Exec("UPDATE schema_migrations SET dirty = 1")
 			require.NoError(t, err)
-		}, "DIRTY: a migration did not finish"},
+		}, "DIRTY: a migration did not finish. Repair the schema by hand as " +
+			"https://goiabada.dev/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/ " +
+			"describes, then run the recovery again"},
 		{"an older schema", func(t *testing.T, sqlDB *sql.DB, head int) {
 			_, err := sqlDB.Exec("UPDATE schema_migrations SET version = ?", head-1)
 			require.NoError(t, err)
-		}, "and this binary carries"},
+		}, "it is behind this release. Run `goiabada-authserver migrate to %d`, or start this " +
+			"release's auth server once, then run the recovery again"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db, _ := newRecoverDatabase(t)
@@ -417,7 +423,11 @@ func TestRecover_RefusesASchemaThisBinaryDoesNotCarry(t *testing.T) {
 
 			assert.Equal(t, migrateExitError, code)
 			assert.Contains(t, stderr, "refusing to recover: the database records schema version")
-			assert.Contains(t, stderr, tc.want)
+			want := tc.want
+			if strings.Contains(want, "%d") {
+				want = fmt.Sprintf(want, m.Head())
+			}
+			assert.Contains(t, stderr, want)
 			assert.Empty(t, recorder.events)
 			user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
 			require.NoError(t, err)

@@ -40,6 +40,7 @@ const Actor = "goiabada-authserver recover"
 type Database interface {
 	revocation.Database
 	otpcredential.Database
+	AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error)
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
@@ -110,7 +111,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 
 	// The manage permission's id is read before the transaction: the permission row it names is
 	// seeded with the instance and changes with a migration, not with a concurrent request.
-	// Whether the user already holds it is read inside the transaction, under the user's row.
+	// Whether the user already holds it is read inside the transaction, under the permission's row.
 	var managePermissionId int64
 	if req.GrantManage {
 		managePermissionId, err = managePermission(ctx, database)
@@ -150,12 +151,18 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// recovered user signs in with nothing issued before the recovery still standing (#106,
 	// #498).
 	//
-	// The body takes the user's row first and decides from what it reads under it: whether the
-	// user is still there and enabled, which authenticator the removal compares against, and
-	// whether manage is already held. Read before the transaction, a removal and re-enrolment
-	// landing in between left an authenticator in place while the command said none had been
-	// enrolled, and a grant landing in between was written twice. Every credential change takes
-	// the same row first, so under it the user is what this attempt decides on (#131, #542).
+	// The body takes the user's row and decides from what it reads under it: whether the user is
+	// still there and enabled, and which authenticator the removal compares against. Read before
+	// the transaction, a removal and re-enrolment landing in between left an authenticator in
+	// place while the command said none had been enrolled. Every credential change takes the same
+	// row first, so under it the user is what this attempt decides on (#131, #542).
+	//
+	// A grant is not a credential change: the Admin API's saves of who holds manage take the
+	// manage permission's row first (lockAdministrators, #402 decision 11) and never the user's,
+	// and on PostgreSQL the user's row lock does not wait for their insert. So a grant asked for
+	// takes that row too, before the user's, in the order those saves take it, and whether manage
+	// is already held is read under it: a grant landing in between is waited for and found rather
+	// than written a second time.
 	//
 	// The body is safe to rerun on a deadlock, for the reason RevokeUserAuthStateTx gives: it
 	// reads afresh, each write is a compare-and-set, an idempotent column write or an insert
@@ -165,6 +172,11 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", func(tx *sql.Tx) error {
 		outcome.PasswordSet, outcome.OTPRemoved, outcome.ManageGranted = false, false, false
 
+		if req.GrantManage {
+			if _, acquireErr := database.AcquireManagePermissionRow(ctx, tx); acquireErr != nil {
+				return acquireErr
+			}
+		}
 		if acquireErr := database.AcquireUserRow(ctx, tx, user.Id); acquireErr != nil {
 			return acquireErr
 		}
