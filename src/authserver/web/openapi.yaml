@@ -67,29 +67,59 @@ servers:
 
 tags:
   - name: Users
-    description: User management (Admin API)
+    description: >-
+      User management (Admin API). A refused value in a request body answers 400 with the refusal's
+      catalog key as its error_code, such as handler.user.email_required, except a new user's email
+      that is too long, EMAIL_TOO_LONG, and an email another user has, 409 EMAIL_ALREADY_EXISTS; a
+      malformed id and a missing expected list answer VALIDATION_ERROR.
   - name: User Attributes
-    description: Custom user attributes (Admin API)
+    description: >-
+      Custom user attributes (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.attribute.key_required, except a value
+      that is too long, VALUE_TOO_LONG; a malformed id and a missing expected list answer
+      VALIDATION_ERROR.
   - name: User Sessions
     description: User session management (Admin API)
   - name: User Consents
     description: OAuth consent management (Admin API)
   - name: Groups
-    description: Group management (Admin API)
+    description: >-
+      Group management (Admin API). A refused value in a request body answers 400 with the refusal's
+      catalog key as its error_code, such as handler.group.identifier_in_use; a malformed id and a
+      missing expected list answer VALIDATION_ERROR.
   - name: Group Members
-    description: Group membership management (Admin API)
+    description: >-
+      Group membership management (Admin API). Adding a user who is already a member answers 400
+      with error_code handler.group_member.already_member, and removing one who is not with
+      handler.group_member.not_member; a malformed id answers VALIDATION_ERROR.
   - name: Group Attributes
-    description: Custom group attributes (Admin API)
+    description: >-
+      Custom group attributes (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.attribute.value_too_long; a malformed
+      id and a missing expected list answer VALIDATION_ERROR.
   - name: Resources
-    description: Resource management (Admin API)
+    description: >-
+      Resource management (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.resource.identifier_in_use; a
+      malformed id and a missing expected list answer VALIDATION_ERROR.
   - name: Permissions
-    description: Permission management (Admin API)
+    description: >-
+      Permission management (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.permission.identifier_in_use; a
+      malformed id and a missing expected list answer VALIDATION_ERROR.
   - name: Clients
-    description: OAuth client management (Admin API)
+    description: >-
+      OAuth client management (Admin API). A refused value in a request body answers 400 with the
+      refusal's catalog key as its error_code, such as handler.client.identifier_in_use, so a caller
+      can tell which field was refused; a malformed id and a missing expected list answer
+      VALIDATION_ERROR.
   - name: Audit Logs
     description: Audit log query (Admin API)
   - name: Settings
-    description: System settings (Admin API)
+    description: >-
+      System settings (Admin API). A refused value in a request body answers 400 with the refusal's
+      catalog key as its error_code, such as handler.settings_general.issuer_uri_invalid, so a
+      caller can tell which field was refused; a malformed key id answers VALIDATION_ERROR.
   - name: Account
     description: Self-service account management (Account API)
   - name: Browser Sessions
@@ -1751,7 +1781,8 @@ paths:
         one without creates it, and a stored permission the list leaves out is deleted.
 
         The built-in permissions of the `authserver` resource cannot be renamed or deleted, by
-        any caller. Changing the description of one of its administrative permissions needs
+        any caller: the save is refused with handler.permission.built_in_renamed or
+        handler.permission.built_in_deleted. Changing the description of one of its administrative permissions needs
         `authserver:manage`, because the admin console shows that description to an operator
         choosing a permission to grant: `authserver:manage-settings` is refused with 403
         MANAGE_SCOPE_REQUIRED.
@@ -1940,7 +1971,8 @@ paths:
       summary: Delete client
       description: |
         Delete an OAuth2/OIDC client. The admin console's own client, the system-level client,
-        cannot be deleted: the request is refused with 400 and error_code VALIDATION_ERROR.
+        cannot be deleted: the request is refused with 400 and error_code
+        handler.client.system_level_delete_not_allowed.
       operationId: deleteClient
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2274,8 +2306,10 @@ paths:
         and reading its secret, is reserved to `authserver:manage` too.
 
         `allowed` is required: a body without it, or with null, is refused with
-        `VALIDATION_ERROR` rather than read as false. Switching the admin console's own
-        client off is refused with `VALIDATION_ERROR` too. Every switch, one to the value
+        `handler.client_administrative_scopes.allowed_required` rather than read as false.
+        Switching the admin console's own client off is refused with
+        `handler.client_administrative_scopes.console_always_allowed`, and an id that is not a
+        number with `VALIDATION_ERROR`. Every switch, one to the value
         already stored included, leaves an `updated_client_administrative_scopes` audit
         record naming the client, the new value and the caller. The answer is the client
         as it now is, with `administrativeScopesAllowed` holding the new value. No other
@@ -2584,11 +2618,12 @@ paths:
         The stored SMTP password is kept, replaced or removed:
         an absent or empty `smtpPassword` keeps it, a non-empty one replaces it, and
         `clearSmtpPassword: true` removes it. The two together are refused with 400
-        `VALIDATION_ERROR`.
+        `handler.settings_email.smtp_password_and_clear`.
 
         A stored password reaches only the host it was entered for: a save that changes
         `smtpHost` while a password is stored, carrying neither a new `smtpPassword` nor
-        `clearSmtpPassword: true`, is refused with 400 `VALIDATION_ERROR` and writes nothing.
+        `clearSmtpPassword: true`, is refused with 400 `handler.settings_email.smtp_host_changed`
+        and writes nothing.
         The hosts are compared with surrounding space trimmed, one pair of brackets taken off
         an IPv6 literal, and without regard to case. A change of port, username, encryption or
         sender keeps the stored password.
@@ -2614,9 +2649,9 @@ paths:
         '400':
           description: |
             error_code is INVALID_REQUEST_BODY for a body that will not parse; a refused field
-            answers VALIDATION_ERROR, or its catalog key, such as
-            validator.email.invalid_format, when the refusal is localized; and a connection that
-            fails answers VALIDATION_ERROR. Nothing is written.
+            answers its catalog key, such as handler.settings_email.smtp_host_required or
+            validator.email.invalid_format; and a connection that fails answers the key of its
+            cause, such as handler.settings_email.connect_failed_refused. Nothing is written.
 
             A failed connection answers one of these fixed messages, naming at most its coarse
             cause:
@@ -2676,7 +2711,7 @@ paths:
         '400':
           description: |
             error_code is SMTP_NOT_ENABLED while SMTP is disabled, INVALID_REQUEST_BODY for a
-            body that will not parse, VALIDATION_ERROR when `to` is missing,
+            body that will not parse, handler.settings_email.destination_required when `to` is missing,
             validator.email.invalid_format when it is not an email address, and SEND_FAILED when
             the send fails.
 
@@ -2791,7 +2826,7 @@ paths:
     get:
       tags: [Settings]
       summary: Get UI theme
-      description: Get current UI theme and available themes
+      description: Get the current UI theme and the themes it can be set to
       operationId: getSettingsUITheme
       responses:
         '200':
@@ -3015,10 +3050,12 @@ paths:
                 $ref: '#/components/schemas/SuccessResponse'
         '400':
           description: |
-            error_code is VALIDATION_ERROR. The id is malformed, matches no
-            key, or names a key that is not in the previous state, since only a
-            previous key can be revoked. A key that does not exist is answered
-            here rather than with a 404.
+            error_code is VALIDATION_ERROR when the id is malformed,
+            handler.settings_keys.key_not_found when it matches no key, and
+            handler.settings_keys.only_previous_revocable when it names a key that
+            is not in the previous state, since only a previous key can be
+            revoked. A key that does not exist is answered here rather than with
+            a 404.
           content:
             application/json:
               schema:
@@ -4621,8 +4658,8 @@ components:
           maxItems: 1000
           description: >-
             The complete set of groups the user belongs to after the call. An array naming more
-            than 1000 groups is refused with VALIDATION_ERROR before any of them is read back,
-            because every id is validated against the database and the list is read in
+            than 1000 groups is refused with handler.user_groups.too_many before any of them is
+            read back, because every id is validated against the database and the list is read in
             statement-sized batches.
           items:
             type: integer
@@ -4831,9 +4868,39 @@ components:
               type: array
               items:
                 type: string
+            clients:
+              description: |
+                The same clients as clientIdentifiers, in the same order, each with the name
+                its user is shown for it.
+              type: array
+              items:
+                $ref: '#/components/schemas/SessionClientResponse'
           required:
             - isCurrent
             - clientIdentifiers
+            - clients
+
+    SessionClientResponse:
+      description: One client a session authorized.
+      type: object
+      properties:
+        clientIdentifier:
+          type: string
+        name:
+          description: |
+            The name the consent screen shows a user for this client: its display name when
+            an administrator chose to show one, else, for a client that registered itself, the
+            name it registered with, else its identifier.
+          type: string
+        nameUnverified:
+          description: |
+            Whether name is the client's own claim about itself, the name a self-registered
+            client gave and nobody has replaced, which the consent screen marks as unverified.
+          type: boolean
+      required:
+        - clientIdentifier
+        - name
+        - nameUnverified
 
     GetUserSessionsResponse:
       type: object
@@ -4927,7 +4994,24 @@ components:
           nullable: true
         clientIdentifier:
           type: string
+        clientName:
+          description: |
+            The name the consent screen showed the user for this client: its display name when
+            an administrator chose to show one, else, for a client that registered itself, the
+            name it registered with, else its identifier.
+          type: string
+        clientNameUnverified:
+          description: |
+            Whether clientName is the client's own claim about itself, the name a
+            self-registered client gave and nobody has replaced, which the consent screen marks
+            as unverified.
+          type: boolean
         clientDescription:
+          description: |
+            The client's description as stored, on the admin endpoint. The account endpoint,
+            which answers the user, carries it only as the consent screen shows it: when an
+            administrator chose to show it, and never beside an unverified clientName, which is
+            then the description already. Otherwise it is empty there.
           type: string
       required:
         - id
@@ -4938,6 +5022,8 @@ components:
         - scope
         - grantedAt
         - clientIdentifier
+        - clientName
+        - clientNameUnverified
         - clientDescription
 
     GetUserConsentsResponse:
@@ -5751,8 +5837,8 @@ components:
           maxItems: 60
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
-            longer than 2048 bytes, or one listed twice is refused with VALIDATION_ERROR before
-            anything is written. So is a plain http one on a host other than 127.0.0.1, [::1] or
+            longer than 2048 bytes, or one listed twice is refused before anything is written, its
+            error_code the refusal's catalog key, such as handler.client_redirect_uris.too_many. So is a plain http one on a host other than 127.0.0.1, [::1] or
             localhost, unless expectedRedirectURIs lists it.
           items:
             type: string
@@ -5773,7 +5859,8 @@ components:
             maxLength: 267
             description: >-
               A web origin, stored in its canonical form. One longer than 267 bytes, the longest
-              standards-valid origin, is refused with VALIDATION_ERROR before anything is written.
+              standards-valid origin, is refused with handler.client_web_origins.too_long before
+              anything is written.
         expectedWebOrigins:
           type: array
           description: The web origins as last read; [] if there were none.
@@ -6077,10 +6164,14 @@ components:
       properties:
         uiTheme:
           type: string
+          enum: ['', light, dark]
+          description: The theme of the sign-in pages and the admin console. Empty is the automatic theme, light or dark as each visitor's device prefers.
         availableThemes:
           type: array
+          description: The themes uiTheme can be set to besides the automatic one, which is the empty value.
           items:
             type: string
+            enum: [light, dark]
       required:
         - uiTheme
         - availableThemes
@@ -6090,6 +6181,8 @@ components:
       properties:
         uiTheme:
           type: string
+          enum: ['', light, dark]
+          description: Empty for the automatic theme, which follows each visitor's device, or one of availableThemes. Surrounding spaces are ignored.
 
     SettingsTokensResponse:
       type: object

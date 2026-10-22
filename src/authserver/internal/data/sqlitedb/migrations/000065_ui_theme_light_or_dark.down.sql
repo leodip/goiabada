@@ -1,0 +1,2 @@
+-- Migration 000065 down: intentional no-op. The up migration mapped each stored theme to "light" or
+-- "dark", both themes before it too, and which daisyUI theme a value came from is not kept.

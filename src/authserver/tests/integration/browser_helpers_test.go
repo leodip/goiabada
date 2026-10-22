@@ -220,9 +220,9 @@ func getOtpSecretFromEnrollmentPage(t *testing.T, response *http.Response) strin
 	if err != nil {
 		t.Fatal(err)
 	}
-	secret := doc.Find("pre.text-center")
+	secret := doc.Find("#otp-secret")
 	if secret.Length() != 1 {
-		t.Fatal("expecting to find pre element with class 'text-center' but it was not found")
+		t.Fatal("expecting to find the element with id 'otp-secret' but it was not found")
 	}
 	return secret.Text()
 }

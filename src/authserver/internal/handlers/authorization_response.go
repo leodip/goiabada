@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -9,8 +10,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // responseParam is one parameter this server writes into a client's redirect URI: an
@@ -219,7 +224,11 @@ func writeAuthorizationResponse(w http.ResponseWriter, r *http.Request, formPost
 		writeFragmentRedirect(w, r, redirectURI, params)
 		return nil
 	case "form_post":
-		return writeFormPost(w, formPostFS, redirectURI, params)
+		page, err := newFormPostPage(r.Context(), settings)
+		if err != nil {
+			return err
+		}
+		return writeFormPost(w, formPostFS, page, redirectURI, params)
 	default:
 		return writeQueryRedirect(w, r, redirectURI, params)
 	}
@@ -294,21 +303,69 @@ func writeQueryRedirect(w http.ResponseWriter, r *http.Request, redirectURI stri
 	return nil
 }
 
-// writeFormPost answers with form_post.html, an auto-submitting form posting params to redirectURI.
+// formPostPage is what the form_post page shows around the response it carries: its language, the
+// theme, the text in the reader's language, and the stylesheet and script by their fingerprints. The
+// page is parsed alone, with no layout and none of the renderer's template functions, so every value
+// it shows arrives here (#617).
+type formPostPage struct {
+	Lang       string
+	Theme      string
+	AppName    string
+	Title      string
+	Message    string
+	Button     string
+	Stylesheet string
+	Script     string
+}
+
+// formPostAssetURL names the page's stylesheet and script by the fingerprints of the built-in static
+// files, the ones the built-in page is written against.
+var formPostAssetURL = render.NewAssetURLs(web.StaticFS())
+
+// newFormPostPage is the form_post page's presentation for a request in ctx under settings. The
+// theme is written only for light and dark, as the layouts write it, so any other value follows the
+// device.
+func newFormPostPage(ctx context.Context, settings *record.Settings) (formPostPage, error) {
+	stylesheet, err := formPostAssetURL("/static/main.css")
+	if err != nil {
+		return formPostPage{}, err
+	}
+	script, err := formPostAssetURL("/static/form-post.js")
+	if err != nil {
+		return formPostPage{}, err
+	}
+	page := formPostPage{
+		Lang:       i18n.LocaleTag(ctx),
+		AppName:    settings.AppName,
+		Title:      i18n.T(ctx, "form_post.title"),
+		Message:    i18n.T(ctx, "form_post.message"),
+		Button:     i18n.T(ctx, "form_post.button"),
+		Stylesheet: stylesheet,
+		Script:     script,
+	}
+	if settings.UITheme == "light" || settings.UITheme == "dark" {
+		page.Theme = settings.UITheme
+	}
+	return page, nil
+}
+
+// writeFormPost answers with form_post.html, a form posting params to redirectURI, which its script
+// submits at once and its button submits without JavaScript.
 //
 // formPostFS is the built-in template set in every server (NewClientErrorResponder), never
 // GOIABADA_AUTHSERVER_TEMPLATEDIR: the page is how an authorization response is encoded on the wire,
 // as the query string is for the query encoding, and a copy taken from an older release would drop
 // a parameter, iss among them, that discovery says every response carries (#576, decision 5).
 //
-// The bind map holds redirectURI and exactly the parameters in params, so a parameter the caller
-// left out, an empty state above all, is absent rather than present and empty. {{.state}} and
+// The bind map holds redirectURI, page, and exactly the parameters in params, so a parameter the
+// caller left out, an empty state above all, is absent rather than present and empty. {{.state}} and
 // {{if .state}} cannot tell the two apart, but a template that enumerates the map can: range yields
 // the key only when it is present, and len counts it. TestFormPostBindMapOmitsAnAbsentState pins it
 // through both emitters (#146).
-func writeFormPost(w http.ResponseWriter, formPostFS fs.FS, redirectURI string, params []responseParam) error {
-	m := make(map[string]interface{}, 1+len(params))
+func writeFormPost(w http.ResponseWriter, formPostFS fs.FS, page formPostPage, redirectURI string, params []responseParam) error {
+	m := make(map[string]interface{}, 2+len(params))
 	m["redirectURI"] = redirectURI
+	m["page"] = page
 	for _, param := range params {
 		m[param.name] = param.value
 	}

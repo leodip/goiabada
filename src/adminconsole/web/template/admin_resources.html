@@ -1,69 +1,45 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_resources.list.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_resources.list.page_title" }}{{end}}
-{{define "subTitle"}}
-    <div class="inline-block text-xl font-semibold">
-        {{ T $.ctx "adminconsole.admin_resources.list.subtitle" }}
-        <div class="inline-block float-right">
-            <div class="inline-block float-right">
-                <a href="/admin/resources/new" class="px-6 btn btn-sm btn-primary">{{ T $.ctx "adminconsole.admin_resources.list.create_new_button" }}</a>
-            </div>
-        </div>
-    </div>
-    <div class="mt-2 divider"></div>
-{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.admin_resources.list.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
-
-
-{{end}}
-
-{{define "body"}}
-
-<div class="w-full mt-4 overflow-x-auto">
-    <table class="table table-auto">
-        <thead>
-            <tr>
-                <th>{{ T $.ctx "adminconsole.admin_resources.list.col_identifier" }}</th>
-                <th>{{ T $.ctx "adminconsole.admin_resources.list.col_description" }}</th>
-                <th class="w-40"></th>
-                <th class="w-40"></th>
-            </tr>
-        </thead>
-        <tbody>
-            {{ range .resources }}
-            <tr>
-                <td>
-                    <pre>{{.ResourceIdentifier}}</pre>
-                </td>
-                <td>
-                    {{if .Description}}
-                    {{.Description}}
-                    {{end}}
-                </td>
-                <td class="w-40">
-                    <a href="/admin/resources/{{.Id}}/settings" class="link link-secondary link-hover">
-                        <svg class="inline-block w-5 h-5 align-middle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
-                            <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
-                        </svg><span class="inline-block ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.list.action_manage" }}</span>
-                    </a>
-                </td>
-                <td class="w-40">
-                    {{if not .IsSystemLevelResource}}
-                    <a href="/admin/resources/{{.Id}}/delete" class="link link-secondary link-hover">
-                        <svg class="inline-block w-5 h-5 align-middle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
-                        </svg><span class="inline-block ml-1 align-middle">{{ T $.ctx "adminconsole.admin_resources.list.action_delete" }}</span>
-                    </a>
-                    {{end}}
-                </td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
+{{define "page"}}
+<div class="page-header">
+  <h1 class="page-title" id="page-title">{{ T $.ctx "adminconsole.admin_resources.list.subtitle" }}</h1>
+  <div class="page-actions">
+    <a class="button button-primary" href="/admin/resources/new"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg>{{ T $.ctx "adminconsole.admin_resources.list.create_new_button" }}</a>
+  </div>
 </div>
 
+{{ if .resources }}
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+  <table class="data-table data-table-stack" id="resourcesTable">
+    <thead>
+      <tr>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_resources.list.col_identifier" }}</th>
+        <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_resources.list.col_actions" }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .resources }}
+      <tr>
+        <td class="cell-wrap">
+          <a class="text-link font-mono text-sm" href="/admin/resources/{{ .Id }}/settings">{{ .ResourceIdentifier }}</a>
+          {{ if .IsSystemLevelResource }}<span class="tag tag-note ml-1">{{ T $.ctx "adminconsole.admin_resources.list.system_tag" }}</span>{{ end }}
+          {{ if .Description }}<span class="cell-secondary">{{ .Description }}</span>{{ end }}
+        </td>
+        <td class="cell-actions">
+          {{ if not .IsSystemLevelResource }}
+          <a class="text-link text-link-danger" href="/admin/resources/{{ .Id }}/delete">{{ T $.ctx "adminconsole.admin_resources.list.action_delete" }}<span class="sr-only"> {{ .ResourceIdentifier }}</span></a>
+          {{ end }}
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ else }}
+<div class="panel">
+  <p class="empty-state">{{ T $.ctx "adminconsole.admin_resources.list.empty" }}</p>
+</div>
+{{ end }}
 {{end}}

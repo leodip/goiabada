@@ -1,19 +1,16 @@
 {{define "manage_clients_tabs"}}
-
-{{ $type := index . 0 }}
-{{ $id := index . 1 }}
-{{ $ctx := index . 2 }}
-
-<div class="mt-2 tabs tabs-bordered">
-    <a href="/admin/clients/{{$id}}/settings" class="tab tab-bordered {{if eq $type "settings"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.settings" }}</a>
-    <a href="/admin/clients/{{$id}}/logo" class="tab tab-bordered {{if eq $type "logo"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.logo" }}</a>
-    <a href="/admin/clients/{{$id}}/tokens" class="tab tab-bordered {{if eq $type "tokens"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.tokens" }}</a>
-    <a href="/admin/clients/{{$id}}/authentication" class="tab tab-bordered {{if eq $type "authentication"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.authentication" }}</a>
-    <a href="/admin/clients/{{$id}}/oauth2-flows" class="tab tab-bordered {{if eq $type "oauth2-flows"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.oauth2_flows" }}</a>
-    <a href="/admin/clients/{{$id}}/redirect-uris" class="tab tab-bordered {{if eq $type "redirect-uris"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.redirect_uris" }}</a>
-    <a href="/admin/clients/{{$id}}/web-origins" class="tab tab-bordered {{if eq $type "web-origins"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.web_origins" }}</a>
-    <a href="/admin/clients/{{$id}}/user-sessions" class="tab tab-bordered {{if eq $type "user-sessions"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.user_sessions" }}</a>
-    <a href="/admin/clients/{{$id}}/permissions" class="tab tab-bordered {{if eq $type "permissions"}}tab-active{{end}}">{{ T $ctx "adminconsole.client_tabs.permissions" }}</a>
-</div>
-
+{{- $type := index . 0 }}
+{{- $id := index . 1 }}
+{{- $ctx := index . 2 }}
+<nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
+  <a class="tab-item" href="/admin/clients/{{$id}}/settings"{{ if eq $type "settings" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.settings" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/logo"{{ if eq $type "logo" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.logo" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/tokens"{{ if eq $type "tokens" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.tokens" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/authentication"{{ if eq $type "authentication" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.authentication" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/oauth2-flows"{{ if eq $type "oauth2-flows" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.oauth2_flows" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/redirect-uris"{{ if eq $type "redirect-uris" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.redirect_uris" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/web-origins"{{ if eq $type "web-origins" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.web_origins" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/user-sessions"{{ if eq $type "user-sessions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.user_sessions" }}</a>
+  <a class="tab-item" href="/admin/clients/{{$id}}/permissions"{{ if eq $type "permissions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.permissions" }}</a>
+</nav>
 {{end}}

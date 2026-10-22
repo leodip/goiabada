@@ -84,6 +84,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "Trying to delete a system level resource", errResp.ErrorDescription)
+	assert.Equal(t, "handler.resource.system_level_delete_not_allowed", errResp.ErrorCode)
 }
 
 func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {

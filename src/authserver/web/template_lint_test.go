@@ -31,3 +31,34 @@ func TestTemplates_NoCsrfField(t *testing.T) {
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
 }
+
+// TestTemplates_AreWellFormed holds this server's pages to well-formed HTML and to the
+// accessibility rules a template can be held to unrendered, through
+// core/guard.AssertWellFormedTemplates, which carries each rule and its reasoning (#617). Each page
+// is read as served, in the layouts the handlers under ../internal render it in.
+func TestTemplates_AreWellFormed(t *testing.T) {
+	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates)
+}
+
+// TestPages_NameOnlyClassesMainCSSDraws holds every class a page names to a rule in the
+// served main.css, through core/guard.AssertClassesAreDrawn, so a misspelt or leftover class fails
+// here rather than leaving an element undrawn (#617).
+func TestPages_NameOnlyClassesMainCSSDraws(t *testing.T) {
+	css, err := staticFS.ReadFile("static/main.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard.AssertClassesAreDrawn(t, css, emailTemplatesAsWalked(), templateFS)
+}
+
+// emailTemplatesAsWalked is emailTemplates as a walk of templateFS from its root spells them.
+func emailTemplatesAsWalked() []string {
+	walked := make([]string, 0, len(emailTemplates))
+	for _, entry := range emailTemplates {
+		walked = append(walked, "template/"+entry)
+	}
+	return walked
+}
+
+// emailTemplates are not pages: no rule reads them.
+var emailTemplates = []string{"emails/", "layouts/email_layout.html"}

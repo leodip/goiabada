@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // This file holds what no tier of this repository can otherwise observe. There is no JavaScript
@@ -45,10 +47,12 @@ func servedFiles(t *testing.T, fsys fs.FS, dir, ext string) map[string]string {
 }
 
 // jsDeclRe matches a top-level declaration in a served script, in either of the two forms this
-// file uses: `function name(` and `const name = (`. Both start in column zero, which is what
-// keeps a nested helper out of the set: a function declared inside another is not something a
-// template can call, so it is part of its parent's body rather than a declaration of its own.
-var jsDeclRe = regexp.MustCompile(`(?m)^(?:function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)`)
+// file uses: `function name(` and `const name = (`, or a top-level statement, code in column zero
+// that runs when the script loads, such as `document.querySelectorAll(...)` registering a listener.
+// All three start in column zero, which is what keeps a nested helper out of the set: a function
+// declared inside another is not something a template can call, so it is part of its parent's body
+// rather than a declaration of its own.
+var jsDeclRe = regexp.MustCompile(`(?m)^(?:function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=|[A-Za-z_$][\w$]*\s*[.(])`)
 
 // callRe matches a call to name that is not a property access, so `props.t(` and a comment's
 // `t()` are treated alike: a bare identifier followed by an open parenthesis.
@@ -56,13 +60,16 @@ func callRe(name string) *regexp.Regexp {
 	return regexp.MustCompile(`(^|[^A-Za-z0-9_.$])` + regexp.QuoteMeta(name) + `\s*\(`)
 }
 
+// jsDecl is one top-level declaration, or one top-level statement, whose name is empty: the code
+// the script runs on its own when it loads.
 type jsDecl struct {
 	name string
 	body string
 }
 
-// jsDecls splits a served script into its top-level declarations. A declaration's body runs to the
-// start of the next one, which needs no brace matching and is exact for a file written this way.
+// jsDecls splits a served script into its top-level declarations and statements. A declaration's
+// body runs to the start of the next one, which needs no brace matching and is exact for a file
+// written this way.
 func jsDecls(src string) []jsDecl {
 	locs := jsDeclRe.FindAllStringSubmatchIndex(src, -1)
 	decls := make([]jsDecl, 0, len(locs))
@@ -92,7 +99,7 @@ func jsDecls(src string) []jsDecl {
 // roots here are the calls a template makes, and the set grows only through the bodies of functions
 // already reachable.
 //
-// It is also why this is not spelled as "utils.js must define showModalDialog and nothing else":
+// It is also why this is not spelled as "utils.js must define submitOnce and nothing else":
 // TestLayouts_JSBootstrapHasAReader below promises that a future page needing client-side strings
 // may add `t` back, and a denylist would refuse it. Reachability admits it the moment a template
 // calls it, and refuses it until then.
@@ -114,11 +121,15 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 			continue
 		}
 
-		// Roots: a name called from a template, or from a different served script. Calls inside
-		// the declaring file are not roots -- that is the whole point, and the transitive pass
-		// below is what carries them.
+		// Roots: a name called from a template, from a different served script, or from this
+		// file's own top-level statements, which run when it loads. Calls inside the declaring
+		// file's functions are not roots -- that is the whole point, and the transitive pass below
+		// is what carries them.
 		reached := map[string]bool{}
 		for _, d := range decls {
+			if d.name == "" {
+				continue
+			}
 			re := callRe(d.name)
 			for _, tpl := range templates {
 				if re.MatchString(tpl) {
@@ -132,6 +143,11 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 					break
 				}
 			}
+			for _, stmt := range decls {
+				if stmt.name == "" && re.MatchString(stmt.body) {
+					reached[d.name] = true
+				}
+			}
 		}
 
 		// Expand through the bodies of the functions already reachable, until nothing new
@@ -139,7 +155,7 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 		for changed := true; changed; {
 			changed = false
 			for _, from := range decls {
-				if !reached[from.name] {
+				if from.name == "" || !reached[from.name] {
 					continue
 				}
 				for _, to := range decls {
@@ -155,7 +171,7 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 		}
 
 		for _, d := range decls {
-			if !reached[d.name] {
+			if d.name != "" && !reached[d.name] {
 				t.Errorf("%s: %s() is declared but no served template reaches it, directly or "+
 					"through another function a template calls. Dead client-side code is served "+
 					"to every visitor and read by the next maintainer as live; delete it, or call "+
@@ -163,11 +179,11 @@ func TestUtilsJS_EveryFunctionIsReachedFromATemplate(t *testing.T) {
 			}
 		}
 
-		// The file this guard was written for. Without this, deleting showModalDialog and its two
-		// callers together would leave an empty file passing every assertion above.
-		if file == "static/utils.js" && !reached["showModalDialog"] {
-			t.Errorf("static/utils.js: showModalDialog is gone, and it is what forgot_password.html " +
-				"and reset_password.html call. If that is deliberate, this guard needs a new " +
+		// The file this guard was written for. Without this, deleting submitOnce and its
+		// registration together would leave an empty file passing every assertion above.
+		if file == "static/utils.js" && !reached["submitOnce"] {
+			t.Errorf("static/utils.js: submitOnce is gone, and it is what the sign-in and the two " +
+				"one-time code forms rely on. If that is deliberate, this guard needs a new " +
 				"anchor rather than deletion")
 		}
 	}
@@ -221,4 +237,10 @@ func TestLayouts_JSBootstrapHasAReader(t *testing.T) {
 			"shown a catalog key where a sentence belongs. Add {{ JSBootstrap $.ctx }} to the "+
 			"layouts that serve this script (#360)", path.Base(readers[0]))
 	}
+}
+
+// TestStaticScripts_ParseWithinTheSyntaxCap holds every script this server serves to JavaScript the
+// floor browsers run, through core/guard.AssertScriptSyntax, which carries the cap and why (#617).
+func TestStaticScripts_ParseWithinTheSyntaxCap(t *testing.T) {
+	guard.AssertScriptSyntax(t, staticFS, "static")
 }

@@ -58,34 +58,34 @@ func HandleSettingsTokensPut(
 		// Preserve existing behavior: values must be > 0 and <= max, and idle <= max lifetime
 		const maxValue = 160000000
 		if req.TokenExpirationInSeconds <= 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensTokenExpirationNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensTokenExpirationNotPositive, nil))
 			return
 		}
 		if req.TokenExpirationInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensTokenExpirationTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensTokenExpirationTooLarge, map[string]any{"max": maxValue}))
 			return
 		}
 
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds <= 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineIdleTimeoutNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineIdleTimeoutNotPositive, nil))
 			return
 		}
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineIdleTimeoutTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineIdleTimeoutTooLarge, map[string]any{"max": maxValue}))
 			return
 		}
 
 		if req.RefreshTokenOfflineMaxLifetimeInSeconds <= 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive, nil))
 			return
 		}
 		if req.RefreshTokenOfflineMaxLifetimeInSeconds > maxValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineMaxLifetimeTooLarge, map[string]any{"max": maxValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsTokensOfflineMaxLifetimeTooLarge, map[string]any{"max": maxValue}))
 			return
 		}
 
 		if req.RefreshTokenOfflineIdleTimeoutInSeconds > req.RefreshTokenOfflineMaxLifetimeInSeconds {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime, nil))
 			return
 		}
 

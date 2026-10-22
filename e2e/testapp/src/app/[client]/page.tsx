@@ -108,7 +108,7 @@ export default async function WebAppPage({ params }: PageProps<"/[client]">) {
       </form>
 
       <h2>Sign out without a hint</h2>
-      <p>The auth server asks &quot;Are you sure?&quot;, then ends the whole session, every app&apos;s part.</p>
+      <p>The auth server asks &quot;Do you want to sign out?&quot;, then ends the whole session, every app&apos;s part.</p>
       <form method="post" action={`/${key}/logout`}>
         <input type="hidden" name="hint" value="no" />
         <button>Sign out with no id_token_hint</button>

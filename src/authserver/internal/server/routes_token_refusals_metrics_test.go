@@ -29,6 +29,7 @@ import (
 func newTokenRefusalTestServer(database *datamocks.Database, configure func(cfg *config.Config)) *Server {
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
+	s.staticFS = web.StaticFS()
 	if configure != nil {
 		configure(s.cfg)
 	}

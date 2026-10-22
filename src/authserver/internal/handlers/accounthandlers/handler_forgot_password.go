@@ -173,8 +173,10 @@ func HandleForgotPasswordPost(
 		if len(email) == 0 || strings.Count(email, "@") != 1 {
 			auditRequestedPasswordReset(r.Context(), auditLogger, clientIP, email, 0, recoveryOutcomeInvalidAddress)
 
-			// i18n surface: A — browser-flow form rerender.
+			// i18n surface: A — browser-flow form rerender. The address is drawn back as typed, so a
+			// typo is corrected rather than typed again.
 			bind := map[string]interface{}{
+				"email": r.FormValue("email"),
 				"error": i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil).Localize(r.Context()),
 			}
 
@@ -192,7 +194,7 @@ func HandleForgotPasswordPost(
 			return
 		}
 
-		renderForgotPasswordLinkSent(pageRenderer, w, r)
+		renderForgotPasswordLinkSent(pageRenderer, w, r, email)
 
 		afterResponse.Go(r.Context(), afterresponse.ClassRecovery, func(ctx context.Context) {
 			finishForgotPassword(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
@@ -289,10 +291,12 @@ func finishForgotPassword(
 }
 
 // renderForgotPasswordLinkSent is the one answer to a well-formed request, whatever became of it,
-// so the page itself does not tell an address with no account from one that was mailed.
-func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request) {
+// so the page itself does not tell an address with no account from one that was mailed. It names
+// the address as it was typed, which tells the person nothing they did not say.
+func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWriter, r *http.Request, email string) {
 	bind := map[string]interface{}{
 		"linkSent": true,
+		"email":    email,
 	}
 
 	if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind); err != nil {

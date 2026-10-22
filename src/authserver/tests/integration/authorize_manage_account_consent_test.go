@@ -186,7 +186,7 @@ func scopesOnScreen(t *testing.T, page *http.Response) []string {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	require.NoError(t, err)
 	var scopes []string
-	doc.Find(`label[for^="consent"]`).Each(func(_ int, label *goquery.Selection) {
+	doc.Find(`label[for^="consent"] .code-hint`).Each(func(_ int, label *goquery.Selection) {
 		scopes = append(scopes, strings.TrimSpace(label.Text()))
 	})
 	return scopes

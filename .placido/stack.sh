@@ -27,6 +27,12 @@ die() { echo "stack.sh: $*" >&2; exit 1; }
 [[ "$NAME" != goiabada ]] || die "the project name goiabada belongs to the human stack."
 [[ -f "$DC/docker-compose.worktree.yml" ]] || die "$DC has no docker-compose.worktree.yml."
 
+# Builds use the Docker context's own builder, not the one `docker buildx use` picked
+# last: src/build/build-docker-images.sh picks goiabada-multiarch, a container that
+# cannot start again once Docker Desktop restarts, which failed #616's setup.
+BUILDX_BUILDER="${BUILDX_BUILDER:-$(docker context show)}"
+export BUILDX_BUILDER
+
 compose() {
     docker compose -p "$NAME" --project-directory "$DC" \
         -f "$DC/docker-compose.yml" -f "$DC/docker-compose.worktree.yml" "$@"

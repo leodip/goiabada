@@ -126,6 +126,7 @@ func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
+		staticFS:     web.StaticFS(),
 		cfg:          &config.Config{},
 		jobs:         afterresponse.New(registry),
 		metrics:      registry,

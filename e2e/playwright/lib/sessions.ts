@@ -5,10 +5,11 @@ import { userUrl } from "./admin-console";
 import { testRedirectUri } from "./browser-sign-in";
 import { env } from "./environment";
 
-// The ids of the user's sessions, from the Users -> Sessions page.
+// The ids of the user's sessions, from the Users -> Sessions page, each row's End session button
+// carrying its session's.
 export async function sessionIds(page: Page, userId: number): Promise<string[]> {
   await page.goto(userUrl(userId, "sessions"));
-  return page.locator('table tbody span[id^="loadingIcon"]').evaluateAll((spans) => spans.map((s) => s.id.slice("loadingIcon".length)));
+  return page.locator("#sessionsTable tbody button[data-end-session]").evaluateAll((buttons) => buttons.map((b) => (b as HTMLElement).dataset.endSession!));
 }
 
 // Starts a sign-in through the client in a new tab of this browser and says where it lands: straight
@@ -33,17 +34,34 @@ export async function authorizeAgain(context: BrowserContext, clientId: string):
 // Waits for the deleted_user_session row of this session with this reason, among the newest pages of
 // that event: tests running beside this one add rows of their own.
 export async function expectSessionDeleted(page: Page, sessionId: string, reason: string) {
-  const details = `"reason":"${reason}","user_session_id":${sessionId}}`;
   await expect
     .poll(
       async () => {
         for (let n = 1; n <= 5; n++) {
           await page.goto(`${env.adminUrl}/admin/settings/audit-log-viewer?auditEvent=deleted_user_session&page=${n}`);
-          if ((await page.locator(`td.audit-details[data-details$='${details}']`).count()) > 0) return true;
+          if ((await auditRows(page, { reason, user_session_id: sessionId }).count()) > 0) return true;
         }
         return false;
       },
-      { message: `deleted_user_session ${details}` },
+      { message: `deleted_user_session reason ${reason}, user_session_id ${sessionId}` },
     )
     .toBe(true);
+}
+
+// The audit log's rows whose details hold each of these keys with exactly this value: the page lists
+// an event's details as a list of key and value.
+export function auditRows(page: Page, details: Record<string, string>) {
+  let rows = page.locator("#auditLogsTable tbody tr");
+  for (const [key, value] of Object.entries(details)) {
+    const pair = page
+      .locator("dl > div")
+      .filter({ has: page.locator("dt", { hasText: exactly(key) }) })
+      .filter({ has: page.locator("dd", { hasText: exactly(value) }) });
+    rows = rows.filter({ has: pair });
+  }
+  return rows;
+}
+
+function exactly(text: string): RegExp {
+  return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
 }

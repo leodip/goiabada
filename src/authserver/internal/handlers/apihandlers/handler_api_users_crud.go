@@ -125,7 +125,7 @@ func HandleUserPasswordPut(
 
 		// Validate required fields
 		if req.NewPassword == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserNewPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserNewPasswordRequired, nil))
 			return
 		}
 
@@ -241,7 +241,7 @@ func HandleUserOTPPut(
 
 		// Check if trying to enable OTP (not supported)
 		if req.Enabled {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPEnableNotSupported, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserOTPEnableNotSupported, nil))
 			return
 		}
 
@@ -337,7 +337,7 @@ func HandleUserCreatePost(
 
 		// Validate required fields
 		if req.Email == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailRequired, nil))
 			return
 		}
 
@@ -402,7 +402,7 @@ func HandleUserCreatePost(
 			req.SetPasswordType != api.SetPasswordTypeNow &&
 			req.SetPasswordType != api.SetPasswordTypeEmail {
 
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserSetPasswordTypeInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserSetPasswordTypeInvalid, nil))
 			return
 		}
 
@@ -417,7 +417,7 @@ func HandleUserCreatePost(
 		var passwordHash string
 		if !sendSetupEmail {
 			if req.Password == "" {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserPasswordRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserPasswordRequired, nil))
 				return
 			}
 

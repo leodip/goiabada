@@ -3,11 +3,14 @@ package adminsettingshandlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 // settingsKeysAPI is what the keys page needs: the key list, the rotation, and the delete of one.
@@ -17,8 +20,52 @@ type settingsKeysAPI interface {
 	RotateSettingsKeys(ctx context.Context, accessToken string) error
 }
 
+// renderKeys draws the keys page from the keys the auth server answers, in the order it answers
+// them, with bind's other values beside them. GET /api/v1/admin/settings/keys orders its response
+// next, current, then all previous, and the loop that used to re-impose that order here was a
+// structurally identical copy of the one that produces it, so it only ever reordered a list already
+// in that order. Restoring it would make the page's order the console's claim rather than the API's,
+// and would go stale the moment the API's changed (#385).
+func renderKeys(httpHelper HttpHelper, apiClient settingsKeysAPI, w http.ResponseWriter, r *http.Request,
+	accessToken string, bind map[string]interface{}) {
+
+	apiKeys, err := apiClient.GetSettingsKeys(r.Context(), accessToken)
+	if err != nil {
+		render.HandleAPIError(httpHelper, w, r, err)
+		return
+	}
+
+	keys := make([]SettingsKey, 0, len(apiKeys))
+	hasPreviousKey := false
+	for _, k := range apiKeys {
+		hasPreviousKey = hasPreviousKey || k.State == "previous"
+		// API already returns state/type/algorithm and public key encodings
+		keys = append(keys, SettingsKey{
+			Id: k.Id,
+			// The instant, formatted by the page in the viewer's locale (#373).
+			CreatedAt:        k.CreatedAt,
+			State:            k.State,
+			KeyIdentifier:    k.KeyIdentifier,
+			Type:             k.Type,
+			Algorithm:        k.Algorithm,
+			PublicKeyASN1DER: k.PublicKeyASN1DER,
+			PublicKeyPEM:     k.PublicKeyPEM,
+			PublicKeyJWK:     k.PublicKeyJWK,
+		})
+	}
+	bind["keys"] = keys
+	// A rotation deletes the previous key, so the confirmation says so when there is one.
+	bind["hasPreviousKey"] = hasPreviousKey
+
+	err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_keys.html", bind)
+	if err != nil {
+		httpHelper.InternalServerError(w, r, err)
+	}
+}
+
 func HandleKeysGet(
 	httpHelper HttpHelper,
+	httpSession sessionstore.Store,
 	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
 
@@ -31,50 +78,35 @@ func HandleKeysGet(
 			return
 		}
 
-		apiKeys, err := apiClient.GetSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
-			return
-		}
-
-		keys := make([]SettingsKey, 0, len(apiKeys))
-		for _, k := range apiKeys {
-			// API already returns state/type/algorithm and public key encodings
-			keys = append(keys, SettingsKey{
-				Id: k.Id,
-				// The instant, formatted by the page in the viewer's locale (#373).
-				CreatedAt:        k.CreatedAt,
-				State:            k.State,
-				KeyIdentifier:    k.KeyIdentifier,
-				Type:             k.Type,
-				Algorithm:        k.Algorithm,
-				PublicKeyASN1DER: k.PublicKeyASN1DER,
-				PublicKeyPEM:     k.PublicKeyPEM,
-				PublicKeyJWK:     k.PublicKeyJWK,
-			})
-		}
-
-		// Rendered in the order the API returned. GET /api/v1/admin/settings/keys orders its
-		// response next, current, then all previous, and the loop that used to re-impose that
-		// order here was a structurally identical copy of the one that produces it, so it only
-		// ever reordered a list already in that order. Restoring it would make the page's order
-		// the console's claim rather than the API's, and would go stale the moment the API's
-		// changed (#385).
-		bind := map[string]interface{}{
-			"keys": keys,
-		}
-
-		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_keys.html", bind)
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
+
+		_, keysRotated := sess.TakeFlash("keysRotated")
+		if keysRotated {
+			err = httpSession.Save(r, w, sess)
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+				return
+			}
+		}
+
+		renderKeys(httpHelper, apiClient, w, r, jwtInfo.TokenResponse.AccessToken, map[string]interface{}{
+			"keysRotated": keysRotated,
+		})
 	}
 }
 
+// HandleKeysRotatePost rotates the keys and answers with the page again: through a redirect that
+// says it rotated, or drawn at once with the reason it did not, such as the 409 another rotation
+// winning the race answers, "Another key rotation is in progress" (#251).
 func HandleKeysRotatePost(
 	httpHelper HttpHelper,
+	httpSession sessionstore.Store,
 	apiClient settingsKeysAPI,
+	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -82,26 +114,33 @@ func HandleKeysRotatePost(
 		// Get JWT info from context to extract access token
 		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
 
 		if err := apiClient.RotateSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken); err != nil {
-			// Not JSONError directly: the API answers 409 when another rotation won the race,
-			// and JSONError's generic branch would show the administrator "An unexpected
-			// server error has occurred" with a request id, for something neither unexpected
-			// nor a server error. HandleAPIErrorJSON forwards the API's description instead,
-			// so the modal reads "Another key rotation is in progress" (#251).
-			render.HandleAPIErrorJSON(httpHelper, w, r, err)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderKeys(httpHelper, apiClient, w, r, jwtInfo.TokenResponse.AccessToken, map[string]interface{}{
+					"error": message,
+				})
+			})
 			return
 		}
 
-		result := struct {
-			Success bool
-		}{
-			Success: true,
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
 		}
-		httpHelper.EncodeJSON(w, r, result)
+
+		sess.SetFlash("keysRotated", "true")
+		err = httpSession.Save(r, w, sess)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
+
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/settings/keys", baseURL), http.StatusFound)
 	}
 }
 

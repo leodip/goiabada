@@ -139,14 +139,14 @@ func HandleGroupAttributeCreatePost(
 
 		// Validate required fields
 		if createReq.Key == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil))
 			return
 		}
 
 		// The group's id rides in the body, so this is no malformed target: it is translated like
 		// the other fields' refusals (#559 decision 1).
 		if createReq.GroupId <= 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIdRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIdRequired, nil))
 			return
 		}
 
@@ -160,7 +160,7 @@ func HandleGroupAttributeCreatePost(
 		// Validate value length
 		const maxLengthAttrValue = 250
 		if inputvalidation.TextLength(createReq.Value) > maxLengthAttrValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}))
 			return
 		}
 
@@ -262,7 +262,7 @@ func HandleGroupAttributeUpdatePut(
 
 		// Validate required fields
 		if updateReq.Key == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil))
 			return
 		}
 
@@ -276,7 +276,7 @@ func HandleGroupAttributeUpdatePut(
 		// Validate value length
 		const maxLengthAttrValue = 250
 		if inputvalidation.TextLength(updateReq.Value) > maxLengthAttrValue {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeAttributeValueTooLong, map[string]any{"max": maxLengthAttrValue}))
 			return
 		}
 

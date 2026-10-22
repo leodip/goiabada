@@ -2932,7 +2932,7 @@ func TestIssueAuthCode(t *testing.T) {
 		}
 
 		templateFS := fstest.MapFS{
-			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
+			"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit>
 					<input type="hidden" name="code" value="{{.code}}">
 					<input type="hidden" name="state" value="{{.state}}">
 				</form>`)},
@@ -2942,7 +2942,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Body.String(), `<form method="post" action="https://example.com/callback">`)
+		assert.Contains(t, w.Body.String(), `<form class="auth-status" method="post" action="https://example.com/callback" data-auto-submit>`)
 		assert.Contains(t, w.Body.String(), `<input type="hidden" name="code" value="test_code">`)
 		assert.Contains(t, w.Body.String(), `<input type="hidden" name="state" value="test_state">`)
 	})
@@ -3044,7 +3044,7 @@ func TestIssueAuthCode(t *testing.T) {
 					// removed produces a form action to assert against rather than dying on a
 					// missing template and passing for the wrong reason.
 					templateFS := fstest.MapFS{
-						"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
+						"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 					}
 
 					err := issueAuthCode(w, r, templateFS, code, mode.value)
@@ -3352,7 +3352,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 		templateFS := fstest.MapFS{
-			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
+			"form_post.html": {Data: []byte(`<form class="auth-status" method="post" action="{{.redirectURI}}" data-auto-submit></form>`)},
 		}
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -3447,9 +3447,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 			state string
 			want  string
 		}{
-			{name: "a state the client sent", state: "abc123", want: `[code][iss][redirectURI][state]`},
-			{name: "a whitespace-only state", state: "   ", want: `[code][iss][redirectURI][state]`},
-			{name: "no state at all", state: "", want: `[code][iss][redirectURI]`},
+			{name: "a state the client sent", state: "abc123", want: `[code][iss][page][redirectURI][state]`},
+			{name: "a whitespace-only state", state: "   ", want: `[code][iss][page][redirectURI][state]`},
+			{name: "no state at all", state: "", want: `[code][iss][page][redirectURI]`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
@@ -3475,9 +3475,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 			state string
 			want  string
 		}{
-			{name: "a state the client sent", state: "abc123", want: `[error][error_description][iss][redirectURI][state]`},
-			{name: "a whitespace-only state", state: "   ", want: `[error][error_description][iss][redirectURI][state]`},
-			{name: "no state at all", state: "", want: `[error][error_description][iss][redirectURI]`},
+			{name: "a state the client sent", state: "abc123", want: `[error][error_description][iss][page][redirectURI][state]`},
+			{name: "a whitespace-only state", state: "   ", want: `[error][error_description][iss][page][redirectURI][state]`},
+			{name: "no state at all", state: "", want: `[error][error_description][iss][page][redirectURI]`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
@@ -3534,9 +3534,9 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 				body := w.Body.String()
 				// The code input is asserted in every row so that a template failing to render at
 				// all cannot pass the absent-state row for the wrong reason.
-				assert.Contains(t, body, `<input type="hidden" name="code" value="test_code" />`)
+				assert.Contains(t, body, `<input type="hidden" name="code" value="test_code">`)
 				if tc.wantState {
-					assert.Contains(t, body, `<input type="hidden" name="state" value="`+tc.wantValueOf+`" />`)
+					assert.Contains(t, body, `<input type="hidden" name="state" value="`+tc.wantValueOf+`">`)
 				} else {
 					assert.NotContains(t, body, `name="state"`,
 						"a request that carried no state must produce no state field, not an empty one")
@@ -3566,9 +3566,9 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 
 				require.NoError(t, err)
 				body := w.Body.String()
-				assert.Contains(t, body, `<input type="hidden" name="error" value="access_denied" />`)
+				assert.Contains(t, body, `<input type="hidden" name="error" value="access_denied">`)
 				if tc.wantState {
-					assert.Contains(t, body, `<input type="hidden" name="state" value="`+tc.state+`" />`)
+					assert.Contains(t, body, `<input type="hidden" name="state" value="`+tc.state+`">`)
 				} else {
 					assert.NotContains(t, body, `name="state"`,
 						"a request that carried no state must produce no state field, not an empty one")

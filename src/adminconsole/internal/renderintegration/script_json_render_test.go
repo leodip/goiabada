@@ -51,8 +51,8 @@ func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	assert.NotContains(t, out, "<svg onload", "a key value reached the page as live markup")
 
 	// Escaped once and no more: the list the script reads decodes back to exactly what was bound.
-	m := regexp.MustCompile(`const keys = (\[.*?\]);`).FindStringSubmatch(out)
-	require.Len(t, m, 2, "the key list is not in the page's script")
+	m := regexp.MustCompile(`<script type="application/json" id="signing-keys">(\[.*?\])</script>`).FindStringSubmatch(out)
+	require.Len(t, m, 2, "the key list is not in the page's signing-keys data block")
 	var decoded []adminsettingshandlers.SettingsKey
 	require.NoError(t, json.Unmarshal([]byte(m[1]), &decoded))
 	require.Len(t, decoded, 1)
@@ -88,13 +88,14 @@ func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
 			assert.Contains(t, out, `"js.error.error_title":`+hostileScriptJSON)
 			assert.NotContains(t, out, "<svg onload", "a catalog value reached the page as live markup")
 
-			m := regexp.MustCompile(`<script>window\.i18n=(\{.*?\});</script>`).FindStringSubmatch(out)
-			require.Len(t, m, 2, "the window.i18n script element is not in the page")
+			m := jsI18nBlockRe.FindStringSubmatch(out)
+			require.Len(t, m, 2, "the #js-i18n data block is not in the page")
 			var kv map[string]string
 			require.NoError(t, json.Unmarshal([]byte(m[1]), &kv))
 			assert.Equal(t, hostileScriptValue, kv["js.error.error_title"])
 			assert.Equal(t, "Sessão expirada", kv["js.error.session_expired_title"],
 				"the rest of the catalog is untouched by the override")
+			assert.Contains(t, kv["js.error.unexpected"], "{{detail}}", "a client-side placeholder survives for tFormat")
 		})
 	}
 }

@@ -497,6 +497,27 @@ func TestToUserSessionDetailResponse_ClientIdentifiersComeFromTheLoadedClients(t
 	}
 }
 
+// Clients carries the name a user is shown for each client, in the order of clientIdentifiers, and
+// is never nil for the reason clientIdentifiers is not.
+func TestToUserSessionDetailResponse_ClientsCarryTheNameUsersAreShown(t *testing.T) {
+	detail := ToUserSessionDetailResponse(&record.UserSession{Id: 3, Clients: []record.UserSessionClient{
+		{ClientId: 1, Client: record.Client{Id: 1, ClientIdentifier: "portal", DisplayName: "Customer portal", ShowDisplayName: true}},
+		{ClientId: 2, Client: record.Client{Id: 2, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal", CreatedViaDCR: true}},
+		{ClientId: 3, Client: record.Client{Id: 3, ClientIdentifier: "backoffice", DisplayName: "Back office"}},
+	}}, "")
+
+	require.NotNil(t, detail)
+	assert.Equal(t, []api.SessionClientResponse{
+		{ClientIdentifier: "portal", Name: "Customer portal"},
+		{ClientIdentifier: "dcr_a3f9", Name: "Payroll Portal", NameUnverified: true},
+		{ClientIdentifier: "backoffice", Name: "backoffice"},
+	}, detail.Clients)
+
+	empty := ToUserSessionDetailResponse(&record.UserSession{Id: 3}, "")
+	require.NotNil(t, empty.Clients)
+	assert.Empty(t, empty.Clients)
+}
+
 func TestToUserSessionDetailResponse_NilSession(t *testing.T) {
 	assert.Nil(t, ToUserSessionDetailResponse(nil, "session-abc"))
 }
@@ -627,7 +648,42 @@ func TestToUserConsentResponse_IncludesClientDetailsWhenClientLoaded(t *testing.
 	assert.Equal(t, "openid profile", resp.Scope)
 	assert.Equal(t, &grantedAt, resp.GrantedAt)
 	assert.Equal(t, "web-app", resp.ClientIdentifier)
+	assert.Equal(t, "web-app", resp.ClientName)
+	assert.False(t, resp.ClientNameUnverified)
 	assert.Equal(t, "The web app", resp.ClientDescription)
+}
+
+// The name is the one the consent screen showed: a self-registered client nobody has named is
+// named by its own claim, marked as one.
+func TestToUserConsentResponse_NamesTheClientAsTheConsentScreenDid(t *testing.T) {
+	resp := ToUserConsentResponse(&record.UserConsent{Id: 5, ClientId: 11, Client: record.Client{
+		Id: 11, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal", CreatedViaDCR: true}})
+
+	assert.Equal(t, "Payroll Portal", resp.ClientName)
+	assert.True(t, resp.ClientNameUnverified)
+}
+
+// The admin endpoint carries the stored description; the account endpoint, which answers the
+// user, only what the consent screen shows, so a description an administrator kept off the
+// sign-in screens does not reach the user through it.
+func TestToAccountConsentResponses_DescriptionAsTheConsentScreenShowsIt(t *testing.T) {
+	consents := []record.UserConsent{
+		{Id: 1, ClientId: 11, Client: record.Client{Id: 11, ClientIdentifier: "portal", Description: "Orders and invoices", ShowDescription: true}},
+		{Id: 2, ClientId: 12, Client: record.Client{Id: 12, ClientIdentifier: "legacy", Description: "Team notes: retire in Q3"}},
+		{Id: 3, ClientId: 13, Client: record.Client{Id: 13, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal",
+			CreatedViaDCR: true, ShowDescription: true}},
+	}
+
+	admin := ToUserConsentResponses(consents)
+	account := ToAccountConsentResponses(consents)
+
+	require.Len(t, account, 3)
+	assert.Equal(t, []string{"Orders and invoices", "Team notes: retire in Q3", "Payroll Portal"},
+		[]string{admin[0].ClientDescription, admin[1].ClientDescription, admin[2].ClientDescription})
+	assert.Equal(t, []string{"Orders and invoices", "", ""},
+		[]string{account[0].ClientDescription, account[1].ClientDescription, account[2].ClientDescription})
+	assert.Equal(t, "Payroll Portal", account[2].ClientName)
+	assert.Nil(t, ToAccountConsentResponses(nil))
 }
 
 // Client details are only copied when the association was actually loaded,

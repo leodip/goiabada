@@ -3,7 +3,7 @@
 // that replaces it keeps the scope it had (6). Rotation, the replay of a rotated token, and a refresh
 // token presented by another client are in ../oauth/refresh-tokens.spec.ts.
 import type { APIRequestContext, Browser } from "@playwright/test";
-import { grantUserPermission, userUrl } from "../../lib/admin-console";
+import { confirmDialog, grantUserPermission, userUrl } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { expect, test } from "../../lib/fixtures";
 import { jwtClaims, userinfo } from "../../lib/oauth";
@@ -140,8 +140,10 @@ test("a disabled user's refresh token is refused", async ({ page, browser, clien
 
   await page.goto(userUrl(user.id, "details"));
   await page.locator("#enabledDisabled").uncheck();
+  // Disabling asks first.
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're disabling the user");
+  await expect(page.getByText("Changes saved.")).toBeVisible();
 
   const refused = await postToken(
     request,

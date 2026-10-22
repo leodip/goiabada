@@ -115,7 +115,7 @@ func TestHandleEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) {
 func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "AUTHENTICATION_FAILED",
-		Message: "Authentication failed. Check your current password and try again."}}
+		Message: "That password isn't right. Try again."}}
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{
@@ -129,7 +129,7 @@ func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 	HandleEmailPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
-	assert.Equal(t, "Authentication failed. Check your current password and try again.", bind["error"])
+	assert.Equal(t, "That password isn't right. Try again.", bind["error"])
 	assert.Equal(t, "new@example.com", bind["email"], "the address the user typed is kept")
 	requireNoPasswordInBind(t, httpHelper)
 }

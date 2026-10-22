@@ -58,7 +58,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// One renderer, handed to each handler as the one role it answers in: handlers.PageRenderer
 	// or handlers.JSONWriter (#435).
-	httpHelper := render.New(s.templateFS)
+	httpHelper := render.New(s.templateFS, s.staticFS)
 	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
 	// Two bearer guard sets, one per surface, because the two surfaces promise different refusal
@@ -92,7 +92,6 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
-	pages.Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
 	pages.With(accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper))

@@ -102,7 +102,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
-	assert.Equal(t, "The phone number field must contain a valid phone number. To remove the phone number information, please select the (blank) option from the dropdown menu for the phone country and leave the phone number field empty.", err2.ErrorDescription)
+	assert.Equal(t, "Enter the phone number. To remove it, set the country to Not set.", err2.ErrorDescription)
 
 	// Too short
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "123"})

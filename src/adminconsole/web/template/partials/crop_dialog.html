@@ -1,0 +1,32 @@
+{{define "crop_dialog"}}
+{{- /* (args ctx title cancel confirm free): the dialog image-upload.js crops a chosen image in,
+     titled title, its buttons cancel and confirm. The cropper fills #cropArea; the sliders below
+     it do what dragging does, for a keyboard or a single tap: zoom, move the crop left and right
+     and up and down, and with free set, for a crop of any shape, its width and height.
+     image-upload.js enables them, and the confirm button, once the image is ready. */ -}}
+{{- $ctx := index . 0 }}
+<dialog class="dialog dialog-wide" id="cropDialog" aria-labelledby="cropDialogTitle">
+  <div class="dialog-panel">
+    <h2 class="dialog-title" id="cropDialogTitle">{{ index . 1 }}</h2>
+    <div class="crop-area" id="cropArea"></div>
+    <div class="crop-controls">
+      <label class="field-label" for="cropZoom">{{ T $ctx "adminconsole.image_crop.zoom" }}</label>
+      <input class="crop-slider" id="cropZoom" type="range" min="0" max="100" step="1" value="0" disabled>
+      <label class="field-label" for="cropX">{{ T $ctx "adminconsole.image_crop.left_right" }}</label>
+      <input class="crop-slider" id="cropX" type="range" min="0" max="100" step="1" value="50" disabled>
+      <label class="field-label" for="cropY">{{ T $ctx "adminconsole.image_crop.up_down" }}</label>
+      <input class="crop-slider" id="cropY" type="range" min="0" max="100" step="1" value="50" disabled>
+      {{- if index . 4 }}
+      <label class="field-label" for="cropWidth">{{ T $ctx "adminconsole.image_crop.width" }}</label>
+      <input class="crop-slider" id="cropWidth" type="range" min="10" max="100" step="1" value="100" disabled>
+      <label class="field-label" for="cropHeight">{{ T $ctx "adminconsole.image_crop.height" }}</label>
+      <input class="crop-slider" id="cropHeight" type="range" min="10" max="100" step="1" value="100" disabled>
+      {{- end }}
+    </div>
+    <div class="dialog-actions">
+      <button class="button" id="cancelCropBtn" type="button">{{ index . 2 }}</button>
+      <button class="button button-primary" id="confirmCropBtn" type="button" disabled>{{ index . 3 }}</button>
+    </div>
+  </div>
+</dialog>
+{{end}}

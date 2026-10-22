@@ -18,6 +18,7 @@ package authflow
 // It reads files and nothing else.
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -27,15 +28,18 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/guard"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 const clientsPage = "site/src/content/docs/concepts/clients.mdx"
 
 var consentScreenSection = conceptSection{clientsPage, "## Consent required"}
 
-// The consent table's columns, as the page heads them.
+// consentColumnRequired heads the column of the client's consent setting, by its admin console label.
+var consentColumnRequired = "**" + i18n.T(context.Background(), "adminconsole.admin_clients.settings.field.consent_required") + "**"
+
+// The consent table's other columns, as the page heads them.
 const (
-	consentColumnRequired = "**Consent required**"
 	consentColumnOffline  = "`offline_access` asked for"
 	consentColumnPrompt   = "`prompt=consent`"
 	consentColumnAccount  = "`authserver:manage-account` asked for"
@@ -57,7 +61,7 @@ func (w consentWorld) String() string {
 	onOff := map[bool]string{false: "Off", true: "On"}
 	yesNo := map[bool]string{false: "No", true: "Yes"}
 	client := map[bool]string{false: "another client", true: "the admin console's client"}
-	return fmt.Sprintf("Consent required %s, offline_access %s, prompt=consent %s, manage-account %s by %s, approved before %s",
+	return fmt.Sprintf("Ask users for consent %s, offline_access %s, prompt=consent %s, manage-account %s by %s, approved before %s",
 		onOff[w.consentRequired], yesNo[w.offlineAccess], yesNo[w.promptConsent], yesNo[w.manageAccount],
 		client[w.adminConsole], yesNo[w.approvedBefore])
 }
@@ -85,7 +89,7 @@ func consentWorlds() []consentWorld {
 // consentScreenShown is whether a sign-in in world sees the consent screen:
 // decideAfterBinding's answer for a user holding every scope asked for, given stored consent covering the scopes this
 // world requires or none, and, when that is the consent step, consentScreenOwed's for the same
-// consent. With Consent required off, manage-account alone is enough even when another requested
+// consent. With Ask users for consent off, manage-account alone is enough even when another requested
 // scope was never approved; this partial-consent case keeps the table's approval column honest.
 func consentScreenShown(t *testing.T, world consentWorld) bool {
 	t.Helper()
@@ -148,7 +152,7 @@ func consentScreens(t *testing.T) map[consentWorld]bool {
 }
 
 // The consent table on Clients says when a user sees the consent screen, and an administrator
-// deciding whether to turn Consent required on reads it there. Every row is what the code decides
+// deciding whether to turn Ask users for consent on reads it there. Every row is what the code decides
 // for each combination of conditions it matches, and every combination is matched by a row.
 func TestConceptDocs_TheConsentTableIsWhenTheCodeShowsTheScreen(t *testing.T) {
 	assertConsentTable(t, filepath.Dir(guard.SourceRoot(t)), consentScreenSection, consentScreens(t))
@@ -174,10 +178,10 @@ func TestConceptDocs_AConsentTableDisagreeingWithTheCodeFails(t *testing.T) {
 		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
 	}
 	want := []string{
-		"site/clients.mdx: ## Consent required row 1 says the screen is skipped, the code shows it for Consent required Off, offline_access Yes, prompt=consent No, manage-account No by another client, approved before No",
+		"site/clients.mdx: ## Consent required row 1 says the screen is skipped, the code shows it for Ask users for consent Off, offline_access Yes, prompt=consent No, manage-account No by another client, approved before No",
 		`site/clients.mdx: ## Consent required row 2 says "Maybe" under "Stored consent covers what's required", which is not Yes, No or Either`,
-		"site/clients.mdx: ## Consent required has no row for Consent required Off, offline_access No, prompt=consent No, manage-account Yes by another client, approved before No",
-		"site/clients.mdx: ## Consent required has no row for Consent required On, offline_access No, prompt=consent No, manage-account No by another client, approved before No",
+		"site/clients.mdx: ## Consent required has no row for Ask users for consent Off, offline_access No, prompt=consent No, manage-account Yes by another client, approved before No",
+		"site/clients.mdx: ## Consent required has no row for Ask users for consent On, offline_access No, prompt=consent No, manage-account No by another client, approved before No",
 	}
 	if !slices.Equal(report.Errors, want) {
 		t.Errorf("failures\n%q\nwant\n%q", report.Errors, want)
@@ -212,7 +216,7 @@ func TestConceptDocs_AConsentTableAgreeingWithTheCodePasses(t *testing.T) {
 func TestConceptDocs_AConsentTableWithoutItsColumnsStops(t *testing.T) {
 	root := t.TempDir()
 	writeConceptFixture(t, root, "site/clients.mdx", "## Consent required\n\n"+
-		"| **Consent required** | `offline_access` asked for | `prompt=consent` | Stored consent covers what's required | Consent screen |\n"+
+		"| "+consentColumnRequired+" | `offline_access` asked for | `prompt=consent` | Stored consent covers what's required | Consent screen |\n"+
 		"|---|---|---|---|---|\n| On | No | No | No | Shown |\n")
 
 	report := guard.Run(func(r guard.Reporter) {
@@ -240,7 +244,7 @@ func TestConceptDocs_AMissingConsentSectionStops(t *testing.T) {
 	}
 }
 
-const consentFixtureHeader = "| **Consent required** | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |\n" +
+var consentFixtureHeader = "| " + consentColumnRequired + " | `offline_access` asked for | `prompt=consent` | `authserver:manage-account` asked for | Stored consent covers what's required | Consent screen |\n" +
 	"|---|---|---|---|---|---|\n"
 
 // assertConsentTable is the reporting half of the consent table's check: one failure per row whose

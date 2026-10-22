@@ -1,17 +1,20 @@
 package oauthclient_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -19,11 +22,10 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/sessionstore/mocks"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 const (
-	helperSessionName   = "the-session"
 	helperConsoleBase   = "https://console.example"
 	helperAuthBase      = "https://auth.example"
 	helperClientID      = "the-client"
@@ -35,37 +37,66 @@ const (
 	helperAuthorizePath = helperAuthBase + "/auth/authorize?"
 )
 
-// redirToAuthorize runs one RedirToAuthorize over a store mock whose Get hands back a fresh
-// session and whose Save succeeds, and returns that session and what was written.
-func redirToAuthorize(t *testing.T) (*sessionstore.Session, *httptest.ResponseRecorder) {
+// createCountingBackend counts the rows the store inserts.
+type createCountingBackend struct {
+	*sessiontest.MemoryBackend
+	creates atomic.Int64
+}
+
+func (b *createCountingBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.creates.Add(1)
+	return b.MemoryBackend.Create(ctx, id, data, authenticated)
+}
+
+// newHandshakeStore is the production session store over an in-memory backend, which is what
+// seals the handshake cookie. The backend is returned so a test can see that nothing reached it.
+func newHandshakeStore(t *testing.T, secure bool) (*sessionstore.ServerSideStore, *createCountingBackend) {
 	t.Helper()
-	sess := &sessionstore.Session{Values: map[string]any{}}
-	store := sessionstoremocks.NewStore(t)
-	store.On("Get", mock.Anything, helperSessionName).Return(sess, nil).Once()
-	store.On("Save", mock.Anything, mock.Anything, sess).Return(nil).Once()
+	backend := &createCountingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, secure, sessionstore.BrowserSessionCookie,
+		sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		}, nil)
+	require.NoError(t, err)
+	return store, backend
+}
+
+// redirToAuthorize runs one RedirToAuthorize over the real store, and returns the handshake the
+// cookie it set carries, opened as the callback opens it, and what was written.
+func redirToAuthorize(t *testing.T) (map[string]string, *httptest.ResponseRecorder) {
+	t.Helper()
+	store, _ := newHandshakeStore(t, false)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
-	err := oauthclient.NewAuthHelper(store, helperSessionName, helperConsoleBase, helperAuthBase).
+	err := oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase).
 		RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
 	require.NoError(t, err)
-	return sess, w
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1, "one cookie, the handshake's")
+	require.Equal(t, store.CookieName(oauthclient.SignInHandshakeCookie), cookies[0].Name)
+	handshake, err := store.OpenCookieValues(oauthclient.SignInHandshakeCookie, cookies[0].Value)
+	require.NoError(t, err)
+	return handshake, w
 }
 
-func storedString(t *testing.T, sess *sessionstore.Session, key string) string {
+func storedString(t *testing.T, handshake map[string]string, key string) string {
 	t.Helper()
-	value, ok := sess.Values[key].(string)
-	require.Truef(t, ok, "the session holds %s as a string", key)
-	require.NotEmptyf(t, value, "the session's %s is not empty", key)
+	value, ok := handshake[key]
+	require.Truef(t, ok, "the handshake holds %s", key)
+	require.NotEmptyf(t, value, "the handshake's %s is not empty", key)
 	return value
 }
 
-// The authorize redirect and the handshake it parks in the session are one contract with the
-// callback: every value the Location sends is derived from what the session keeps, and the
+// The authorize redirect and the handshake it parks in its cookie are one contract with the
+// callback: every value the Location sends is derived from what the handshake keeps, and the
 // callback can only check what was kept. Each parameter is recomputed here from the stored value
 // rather than compared with a second call's output (#427 seam 3).
 func TestRedirToAuthorize_SendsWhatItStores(t *testing.T) {
 	sess, w := redirToAuthorize(t)
+	assert.Len(t, sess, 6, "the six values the callback reads, and nothing else")
 
 	require.Equal(t, http.StatusFound, w.Code)
 	location := w.Header().Get("Location")
@@ -103,7 +134,7 @@ func TestRedirToAuthorize_SendsWhatItStores(t *testing.T) {
 	sentNonce := sha256.Sum256([]byte(nonce))
 	assert.Equal(t, hex.EncodeToString(sentNonce[:]), query.Get("nonce"),
 		"the hash of the stored nonce is sent and the raw value kept, OIDC Core 15.5.2")
-	assert.NotEqual(t, nonce, query.Get("nonce"), "the raw nonce never leaves the session")
+	assert.NotEqual(t, nonce, query.Get("nonce"), "the raw nonce never leaves the handshake")
 }
 
 // State, nonce and verifier are minted per sign-in: a value repeated across two redirects would be
@@ -117,45 +148,60 @@ func TestRedirToAuthorize_MintsFreshValuesEachTime(t *testing.T) {
 	}
 }
 
-// A session that cannot be read or saved sends nobody to the auth server: a redirect whose
-// handshake was never stored could only come back to a callback that refuses it.
-func TestRedirToAuthorize_SessionFailures(t *testing.T) {
-	testCases := []struct {
-		name  string
-		setup func(store *sessionstoremocks.Store)
-	}{
-		{
-			name: "get fails",
-			setup: func(store *sessionstoremocks.Store) {
-				store.On("Get", mock.Anything, helperSessionName).
-					Return(&sessionstore.Session{Values: map[string]any{}}, errs.New("the store is down")).Once()
-			},
-		},
-		{
-			name: "save fails",
-			setup: func(store *sessionstoremocks.Store) {
-				store.On("Get", mock.Anything, helperSessionName).
-					Return(&sessionstore.Session{Values: map[string]any{}}, nil).Once()
-				store.On("Save", mock.Anything, mock.Anything, mock.Anything).
-					Return(errs.New("the store is down")).Once()
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			store := sessionstoremocks.NewStore(t)
-			tc.setup(store)
+// The handshake rides in a cookie, so starting a sign-in writes no row: an anonymous request to
+// any /admin or /account path used to cost the auth server an insert, at no limit (#620). The
+// cookie is the store's own, HttpOnly, Secure and __Host- prefixed on https, for the
+// pre-authentication lifetime.
+func TestRedirToAuthorize_WritesNoRowAndSetsTheHandshakeCookie(t *testing.T) {
+	for _, secure := range []bool{true, false} {
+		t.Run(fmt.Sprintf("secure=%v", secure), func(t *testing.T) {
+			store, backend := newHandshakeStore(t, secure)
 
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
-			err := oauthclient.NewAuthHelper(store, helperSessionName, helperConsoleBase, helperAuthBase).
-				RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
+			require.NoError(t, oauthclient.NewAuthHelper(store, helperConsoleBase, helperAuthBase).
+				RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack))
 
-			require.Error(t, err)
-			assert.Empty(t, w.Header().Get("Location"), "no redirect")
+			assert.Zero(t, backend.creates.Load(), "no browser-session row")
+			cookies := w.Result().Cookies()
+			require.Len(t, cookies, 1)
+			cookie := cookies[0]
+			if secure {
+				assert.Equal(t, "__Host-"+oauthclient.SignInHandshakeCookie, cookie.Name)
+			} else {
+				assert.Equal(t, oauthclient.SignInHandshakeCookie, cookie.Name)
+			}
+			assert.Equal(t, secure, cookie.Secure)
+			assert.True(t, cookie.HttpOnly)
+			assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+			assert.Equal(t, "/", cookie.Path)
+			assert.Equal(t, int(sessionstore.PreAuthLifetime.Seconds()), cookie.MaxAge)
 		})
 	}
+}
+
+// failingSealer is a store whose seal fails, the one way the handshake cannot be carried.
+type failingSealer struct{}
+
+func (failingSealer) SealCookieValues(string, map[string]string) (string, error) {
+	return "", errs.New("the handshake is too long")
+}
+
+func (failingSealer) ValuesCookie(name, value string) *http.Cookie {
+	return &http.Cookie{Name: name, Value: value}
+}
+
+// A handshake that cannot be sealed sends nobody to the auth server: a redirect whose handshake
+// was never carried could only come back to a callback that refuses it.
+func TestRedirToAuthorize_ASealThatFails(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
+	err := oauthclient.NewAuthHelper(failingSealer{}, helperConsoleBase, helperAuthBase).
+		RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
+
+	require.Error(t, err)
+	assert.Empty(t, w.Header().Get("Location"), "no redirect")
+	assert.Empty(t, w.Result().Cookies(), "no cookie")
 }
 
 // Authenticated means an ID token verified onto the request; a token response whose strings are
@@ -172,7 +218,7 @@ func TestIsAuthenticated(t *testing.T) {
 		{"a verified id token", oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "i"}}, true},
 	}
 
-	helper := oauthclient.NewAuthHelper(nil, helperSessionName, helperConsoleBase, helperAuthBase)
+	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, helper.IsAuthenticated(tc.jwtInfo))
@@ -215,7 +261,7 @@ func TestIsAuthorizedToAccessResource(t *testing.T) {
 			[]string{manage}, false},
 	}
 
-	helper := oauthclient.NewAuthHelper(nil, helperSessionName, helperConsoleBase, helperAuthBase)
+	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, helper.IsAuthorizedToAccessResource(tc.jwtInfo, tc.scopesAnyOf))

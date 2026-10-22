@@ -114,7 +114,6 @@ func TestVendoredLibraries_AreTheFilesVersionsYAMLPins(t *testing.T) {
 	for path, key := range map[string]string{
 		"static/vendor/humanize-duration/humanize-duration.js": "humanize-duration-sha256",
 		"static/vendor/cropperjs/cropper.min.js":               "cropperjs-js-sha256",
-		"static/vendor/cropperjs/cropper.min.css":              "cropperjs-css-sha256",
 	} {
 		content, err := staticFS.ReadFile(path)
 		if err != nil {
@@ -131,22 +130,20 @@ func TestVendoredLibraries_AreTheFilesVersionsYAMLPins(t *testing.T) {
 	}
 }
 
-// daisyUI's standalone-CLI bundle, which this server's main.css is built with, is the file
-// versions.yaml pins, byte for byte, beside input.css (#542). It ships in no binary, so it is
-// read off disk.
-func TestDaisyUIBundle_IsTheFileVersionsYAMLPins(t *testing.T) {
-	const bundle = "tailwindcss/daisyui.mjs"
-	content, err := os.ReadFile(bundle)
+// ui.css, the design tokens and components both servers' pages are drawn with, is one file kept
+// in each application's tailwindcss folder, so a copy of either folder builds on its own. This
+// one is the auth server's, byte for byte, so the two servers draw the same components; the auth
+// server's web tests hold its palettes to WCAG AA contrast (#617).
+func TestUICSS_IsTheAuthServersCopy(t *testing.T) {
+	ours, err := os.ReadFile("tailwindcss/ui.css")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := sha256Hex(content), vendoredPin(t, "daisyui-sha256"); got != want {
-		t.Errorf("%s has SHA-256 %s, and versions.yaml pins %s: run ./version-manager.sh update", bundle, got, want)
+	theirs, err := os.ReadFile("../../authserver/web/tailwindcss/ui.css")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(string(content), `"`+vendoredPin(t, "daisyui")+`"`) {
-		t.Errorf("%s does not carry the version versions.yaml pins, %s", bundle, vendoredPin(t, "daisyui"))
-	}
-	if _, err := os.Stat("tailwindcss/daisyui.LICENSE"); err != nil {
-		t.Errorf("%s has no daisyui.LICENSE beside it: %v", bundle, err)
+	if string(ours) != string(theirs) {
+		t.Error("tailwindcss/ui.css differs from the auth server's copy; edit one, copy it over the other, and regenerate both main.css files")
 	}
 }

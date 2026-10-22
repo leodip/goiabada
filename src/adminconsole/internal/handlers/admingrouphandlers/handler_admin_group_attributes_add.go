@@ -109,7 +109,7 @@ func HandleAttributesAddPost(
 			return
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"groupId":              group.Id,
 				"groupIdentifier":      group.GroupIdentifier,
@@ -118,6 +118,7 @@ func HandleAttributesAddPost(
 				"includeInAccessToken": r.FormValue("includeInAccessToken") == "on",
 				"includeInIdToken":     r.FormValue("includeInIdToken") == "on",
 				"error":                message,
+				"errorField":           errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_attributes_add.html", bind)
@@ -142,7 +143,9 @@ func HandleAttributesAddPost(
 
 		_, err = apiClient.CreateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, render.AttributeErrorFields))
+			})
 			return
 		}
 

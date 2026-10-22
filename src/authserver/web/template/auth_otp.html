@@ -1,36 +1,25 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "auth.otp.page_title" }}{{end}}
-{{define "head"}}
-
-
-{{end}}
+{{define "title"}}{{ T $.ctx "auth.otp.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
+<h1 class="auth-title">{{ T $.ctx "auth.otp.title" }}</h1>
+<p class="auth-lead">{{ T $.ctx "auth.otp.instructions" }}</p>
 
-    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "auth.otp.title" }}</h2>
-    <form action="" method="post" onsubmit="return submitOnce(this)">
+<form method="post" class="stacked" novalidate data-submit-once>
+  <input type="hidden" name="ceremonyId" value="{{ .ceremonyId }}">
 
-        <input type="hidden" name="ceremonyId" value="{{.ceremonyId}}" />
+  {{ if .error }}
+  <div class="notice notice-danger" role="alert" id="otp-error">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ .error }}</p>
+  </div>
+  {{ end }}
 
-        <div class="mb-3">
+  <div class="field">
+    <label class="field-label" for="otp">{{ T $.ctx "auth.otp.code_label" }}</label>
+    <input class="control control-mono" id="otp" type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" autofocus{{ if .error }} aria-invalid="true" aria-describedby="otp-error"{{ end }}>
+  </div>
 
-            <p class="mt-5">{{ T $.ctx "auth.otp.instructions" }}</p>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "auth.otp.code_label" }}</span>
-                </label>
-                <input type="text" name="otp" value="" placeholder="123456"
-                    class="w-full input input-bordered" autocomplete="one-time-code" autofocus />
-            </div>
-
-        </div>
-
-        {{if .error}}
-            <p class="mt-8 text-center text-error">{{.error}}</p>
-        {{end}}
-
-        <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "auth.otp.button" }}</button>
-
-    </form>
-
+  <button class="button button-primary button-block" type="submit">{{ T $.ctx "auth.otp.button" }}</button>
+</form>
 {{end}}

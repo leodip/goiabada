@@ -164,6 +164,7 @@ const (
 	// Clients, their administrative scopes, permissions, redirect URIs, web origins and tokens. A
 	// client's identifier refusal is handler.client.identifier_required above, and its description
 	// bound is handler.admin_resource_permissions.description_too_long, which says the same sentence.
+	ErrCodeClientDescriptionTooLong            = "handler.client.description_too_long"  // Args: {"max": int}
 	ErrCodeClientDisplayNameTooLong            = "handler.client.display_name_too_long" // Args: {"max": int}
 	ErrCodeClientIdentifierInUse               = "handler.client.identifier_in_use"
 	ErrCodeClientIdentifierNamesResource       = "handler.client.identifier_names_resource"

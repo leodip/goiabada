@@ -130,7 +130,7 @@ func HandleSettingsPost(
 		includeInIdToken := r.FormValue("includeInIdToken") == "on"
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"groupId":              group.Id,
 				"storedGroup":          group,
@@ -139,6 +139,7 @@ func HandleSettingsPost(
 				"includeInIdToken":     includeInIdToken,
 				"includeInAccessToken": includeInAccessToken,
 				"error":                message,
+				"errorField":           errorField,
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_settings.html", bind)
@@ -158,7 +159,9 @@ func HandleSettingsPost(
 		// Call API to update group
 		_, err = apiClient.UpdateGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, groupErrorFields))
+			})
 			return
 		}
 

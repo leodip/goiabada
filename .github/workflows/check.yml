@@ -136,6 +136,7 @@ jobs:
     outputs:
       go: ${{ steps.read.outputs.go }}
       tailwind: ${{ steps.read.outputs.tailwind }}
+      node: ${{ steps.read.outputs.node }}
       golangci: ${{ steps.read.outputs.golangci }}
       unparam: ${{ steps.read.outputs.unparam }}
       govulncheck: ${{ steps.read.outputs.govulncheck }}
@@ -146,7 +147,7 @@ jobs:
         run: |
           set -euo pipefail
           f=src/authserver/versions.yaml
-          for k in go tailwind unparam govulncheck mockery; do
+          for k in go tailwind node unparam govulncheck mockery; do
             v=$(yq -r ".tools.$k" "$f")
             [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.$k missing from $f"; exit 1; }
             echo "$k=$v" >> "$GITHUB_OUTPUT"
@@ -427,6 +428,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Core module tests
         working-directory: src/authserver
         run: ./run-tests.sh --type core --no-build
@@ -449,6 +451,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Authserver internal tests
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --no-build
@@ -466,6 +469,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Admin console module tests
         working-directory: src/authserver
         run: ./run-tests.sh --type adminconsole --no-build
@@ -525,6 +529,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Authserver internal tests
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --race --no-build
@@ -615,6 +620,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Build
         working-directory: src/authserver
         run: ./build.sh
@@ -669,6 +675,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - uses: ./.github/actions/serve-db-tls
         with:
           engine: mysql
@@ -721,6 +728,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - uses: ./.github/actions/serve-db-tls
         with:
           engine: postgres
@@ -779,6 +787,7 @@ jobs:
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - uses: ./.github/actions/serve-db-tls
         with:
           engine: mssql

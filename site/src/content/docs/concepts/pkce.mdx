@@ -51,8 +51,8 @@ Most OAuth libraries do all of this for you: turn PKCE on and use `S256`.
 PKCE applies to the authorization code flow, the one flow where a code travels through the browser.
 
 - **A public client always uses it.** A public client has no secret, so the verifier is all that ties the code to it. You can't turn it off: the admin console doesn't offer the choice, and the Admin API stores it as required whatever it's sent. See [public and confidential clients](/concepts/clients/#public-and-confidential-clients).
-- **A confidential client uses it when the global setting says so,** **PKCE required for confidential clients using the authorization code flow**, under **Admin**, **General**. It's on in a new installation.
-- **A confidential client can override the global setting** on its **OAuth2 flows** tab, under **PKCE requirement for this client?**: **Required**, **Optional (not recommended)**, or **Inherit from global setting**, which a new client starts with.
+- **A confidential client uses it when the global setting says so,** **Require PKCE**, under **Admin**, **General**. It's on in a new installation.
+- **A confidential client can override the global setting** on its **OAuth2 flows** tab, under **PKCE**: **Required**, **Optional (not recommended)**, or **Use the global setting**, which a new client starts with.
 
 <Aside type="caution">
 Making PKCE optional takes away a defence against stolen codes. Do it only for a confidential client whose software can't send PKCE, and turn it back on once it can.

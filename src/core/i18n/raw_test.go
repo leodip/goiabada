@@ -22,8 +22,8 @@ func TestRaw_PreservesPlaceholdersAndLocalizes(t *testing.T) {
 		"documents why Raw exists: T() leaks the key for {{param}} messages")
 
 	// Localizes like T for plain (non-parameterized) keys.
-	assert.Equal(t, "Enviar", Raw(pt, "js.image_upload.upload_button"))
-	assert.NotEmpty(t, Raw(en, "js.image_upload.upload_button"))
+	assert.Equal(t, "Erro", Raw(pt, "js.error.error_title"))
+	assert.NotEmpty(t, Raw(en, "js.error.error_title"))
 
 	// Miss policy: an unknown key returns the key itself.
 	assert.Equal(t, "no.such.key.zzz", Raw(en, "no.such.key.zzz"))
@@ -39,22 +39,22 @@ func TestRaw_ResolvesTheLocaleTheSameWayTAsDoes(t *testing.T) {
 		wantRaw        string
 		wantT          string
 	}{
-		{"pt-BR", "Enviar", "Entrar"},
-		{"pt", "Enviar", "Entrar"},
-		{"pt-PT", "Enviar", "Entrar"},
+		{"pt-BR", "Erro", "Entrar"},
+		{"pt", "Erro", "Entrar"},
+		{"pt-PT", "Erro", "Entrar"},
 		// The primary tag is fr-FR, which matches no catalog, while the
 		// matcher takes the second range: the page is pt-BR, so the JS
 		// strings must be too.
-		{"fr-FR,pt;q=0.8", "Enviar", "Entrar"},
+		{"fr-FR,pt;q=0.8", "Erro", "Entrar"},
 		// English outranks pt-BR here, and both surfaces must say so.
-		{"en-US,pt-BR;q=0.5", "Upload", "Sign in"},
+		{"en-US,pt-BR;q=0.5", "Error", "Sign in"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
 		req.Header.Set("Accept-Language", tc.acceptLanguage)
 
 		var gotRaw, gotT string
 		Locale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-			gotRaw = Raw(r.Context(), "js.image_upload.upload_button")
+			gotRaw = Raw(r.Context(), "js.error.error_title")
 			gotT = T(r.Context(), "auth.pwd.title")
 		})).ServeHTTP(httptest.NewRecorder(), req)
 
@@ -66,5 +66,5 @@ func TestRaw_ResolvesTheLocaleTheSameWayTAsDoes(t *testing.T) {
 func TestRaw_NoLocalizerOnContextResolvesFromLocaleTag(t *testing.T) {
 	// A bare test context carries the tag but no translator.
 	ctx := context.WithValue(context.Background(), ctxKeyLocaleTag, "pt-BR")
-	assert.Equal(t, "Enviar", Raw(ctx, "js.image_upload.upload_button"))
+	assert.Equal(t, "Erro", Raw(ctx, "js.error.error_title"))
 }

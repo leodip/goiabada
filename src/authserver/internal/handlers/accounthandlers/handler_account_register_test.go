@@ -564,7 +564,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Password confirmation is required."
+			return data["error"] == "Confirm your password."
 		}))
 		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
 		userCreator.AssertExpectations(t)
@@ -606,7 +606,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "Password confirmation is required."
+			return data["error"] == "Confirm your password."
 		}))
 	})
 
@@ -645,7 +645,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			return data["error"] == "The password confirmation does not match the password."
+			return data["error"] == "The passwords don't match."
 		}))
 	})
 

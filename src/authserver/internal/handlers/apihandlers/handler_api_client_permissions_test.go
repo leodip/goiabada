@@ -32,7 +32,7 @@ func TestHandleClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTransa
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	code, description := decodeErrorEnvelope(t, rr)
-	assert.Equal(t, "VALIDATION_ERROR", code)
+	assert.Equal(t, "handler.client_permissions.client_credentials_disabled", code, "the refusal answers its catalog key")
 	assert.Contains(t, description, "only be configured when client credentials flow is enabled")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "GetPermissionById", "RunInTransaction")

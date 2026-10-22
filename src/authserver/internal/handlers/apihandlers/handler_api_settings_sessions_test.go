@@ -61,27 +61,32 @@ func TestSettingsSessionsPut_RefusesAMissingOrOutOfRangeCap(t *testing.T) {
 	testCases := []struct {
 		name    string
 		body    string
+		code    string
 		message string
 	}{
 		{
 			name:    "absent",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200}`,
-			message: "User session - max sessions per user is required.",
+			code:    "handler.settings_sessions.max_sessions_per_user_required",
+			message: "Enter the maximum sessions per user.",
 		},
 		{
 			name:    "null",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":null}`,
-			message: "User session - max sessions per user is required.",
+			code:    "handler.settings_sessions.max_sessions_per_user_required",
+			message: "Enter the maximum sessions per user.",
 		},
 		{
 			name:    "below 0",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":-1}`,
-			message: "User session - max sessions per user must be between 0 and 1000.",
+			code:    "handler.settings_sessions.max_sessions_per_user_out_of_range",
+			message: "The maximum sessions per user must be between 0 and 1000.",
 		},
 		{
 			name:    "above 1000",
 			body:    `{"userSessionIdleTimeoutInSeconds":3600,"userSessionMaxLifetimeInSeconds":7200,"maxUserSessionsPerUser":1001}`,
-			message: "User session - max sessions per user must be between 0 and 1000.",
+			code:    "handler.settings_sessions.max_sessions_per_user_out_of_range",
+			message: "The maximum sessions per user must be between 0 and 1000.",
 		},
 	}
 
@@ -95,7 +100,7 @@ func TestSettingsSessionsPut_RefusesAMissingOrOutOfRangeCap(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 			var refusal api.ErrorResponse
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &refusal))
-			assert.Equal(t, "VALIDATION_ERROR", refusal.ErrorCode)
+			assert.Equal(t, tc.code, refusal.ErrorCode)
 			assert.Equal(t, tc.message, refusal.ErrorDescription)
 		})
 	}

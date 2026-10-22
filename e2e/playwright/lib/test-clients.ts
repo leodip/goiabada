@@ -26,7 +26,7 @@ export async function browserSignInClient(page: Page, clients: ClientsFixture, {
     await page.goto(clientUrl(client.id, "settings"));
     await page.locator('input[name="consentRequired"]').check();
     await page.locator("#btnSave").click();
-    await expect(page.getByText("Client settings saved successfully")).toBeVisible();
+    await expect(page.getByText("Settings saved.")).toBeVisible();
   }
   return { client, secret: await readClientSecret(page, client.id) };
 }
@@ -37,9 +37,9 @@ export async function publicSignInClient(page: Page, clients: ClientsFixture) {
   const client = await clients.create();
   await addRedirectUri(page, client.id, testRedirectUri);
   await page.goto(clientUrl(client.id, "authentication"));
-  await page.getByRole("radio", { name: "Public client" }).check();
+  await page.locator("#publicClientRadio").check();
   await page.locator("#btnSave").click();
-  await confirmDialog(page, "You are switching from confidential to public client");
-  await expect(page.getByText("Client authentication saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're making the client public");
+  await expect(page.getByText("Authentication saved.")).toBeVisible();
   return client;
 }

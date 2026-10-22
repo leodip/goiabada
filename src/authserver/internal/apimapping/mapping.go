@@ -166,14 +166,22 @@ func ToUserSessionDetailResponse(session *record.UserSession, currentSid string)
 	// Never nil: the schema declares clientIdentifiers a required array, and a nil slice
 	// marshals to null, which is not an empty array to anything reading the document.
 	clientIdentifiers := make([]string, 0, len(session.Clients))
+	clients := make([]api.SessionClientResponse, 0, len(session.Clients))
 	for _, usc := range session.Clients {
 		clientIdentifiers = append(clientIdentifiers, usc.Client.ClientIdentifier)
+		name, unverified := usc.Client.NameForUsers()
+		clients = append(clients, api.SessionClientResponse{
+			ClientIdentifier: usc.Client.ClientIdentifier,
+			Name:             name,
+			NameUnverified:   unverified,
+		})
 	}
 
 	return &api.UserSessionDetailResponse{
 		UserSessionResponse: *base,
 		IsCurrent:           currentSid != "" && session.SessionIdentifier == currentSid,
 		ClientIdentifiers:   clientIdentifiers,
+		Clients:             clients,
 	}
 }
 
@@ -239,6 +247,7 @@ func ToUserConsentResponse(consent *record.UserConsent) *api.UserConsentResponse
 	// Include client information if loaded
 	if consent.Client.Id != 0 {
 		resp.ClientIdentifier = consent.Client.ClientIdentifier
+		resp.ClientName, resp.ClientNameUnverified = consent.Client.NameForUsers()
 		resp.ClientDescription = consent.Client.Description
 	}
 
@@ -256,6 +265,17 @@ func ToUserConsentResponses(consents []record.UserConsent) []api.UserConsentResp
 		if resp != nil {
 			responses[i] = *resp
 		}
+	}
+	return responses
+}
+
+// ToAccountConsentResponses maps the caller's own consents for the account endpoint: as
+// ToUserConsentResponses, with each description as the consent screen shows it, so the user is
+// shown nothing of a client that an administrator kept off the sign-in screens.
+func ToAccountConsentResponses(consents []record.UserConsent) []api.UserConsentResponse {
+	responses := ToUserConsentResponses(consents)
+	for i := range responses {
+		responses[i].ClientDescription = consents[i].Client.DescriptionForUsers()
 	}
 	return responses
 }

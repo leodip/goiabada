@@ -197,6 +197,7 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),
+		staticFS:     web.StaticFS(),
 		cfg:          cfg,
 		jobs:         afterresponse.New(registry),
 		metrics:      registry,

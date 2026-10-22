@@ -119,6 +119,7 @@ func HandleRegisterGet(
 		bind := map[string]interface{}{
 			"ceremonyId":                registrationCeremonyId(r),
 			"requiresEmailVerification": registrationRequiresEmailVerification(settings),
+			"passwordRules":             passwordRulesHint(r),
 		}
 
 		err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -259,14 +260,17 @@ func HandleRegisterPost(
 			}
 		}
 
-		renderError := func(message string) {
-			// The form posts to action="", so the URL the visitor arrived at, ceremony parameter
-			// included, is the one this request has, and the re-render carries the id on.
+		// renderError redraws the form with message, marking the field it names, by its form name,
+		// invalid. The form posts to action="", so the URL the visitor arrived at, ceremony
+		// parameter included, is the one this request has, and the re-render carries the id on.
+		renderError := func(field, message string) {
 			bind := map[string]interface{}{
 				"email":                     email,
 				"error":                     message,
+				"errorField":                field,
 				"ceremonyId":                registrationCeremonyId(r),
 				"requiresEmailVerification": requiresEmailVerification,
+				"passwordRules":             passwordRulesHint(r),
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register.html", bind)
@@ -278,7 +282,7 @@ func HandleRegisterPost(
 		// refuseAddress redraws the form for an address the format or length check refused.
 		refuseAddress := func(message string) {
 			recordRequest(0, registrationOutcomeInvalidAddress)
-			renderError(message)
+			renderError("email", message)
 		}
 
 		if len(email) == 0 {
@@ -333,7 +337,7 @@ func HandleRegisterPost(
 			return
 		}
 		if user != nil {
-			renderError(alreadyRegisteredMessage)
+			renderError("email", alreadyRegisteredMessage)
 			return
 		}
 
@@ -345,7 +349,7 @@ func HandleRegisterPost(
 			return
 		}
 		if livePreRegistration(preRegistration, time.Now().UTC()) != nil {
-			renderError(alreadyRegisteredMessage)
+			renderError("email", alreadyRegisteredMessage)
 			return
 		}
 
@@ -361,17 +365,17 @@ func HandleRegisterPost(
 
 		// i18n surface: A — browser-flow form rerender.
 		if len(password) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
+			renderError("password", i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if len(password) > 0 && len(passwordConfirmation) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationRequired, nil).Localize(r.Context()))
+			renderError("passwordConfirmation", i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationRequired, nil).Localize(r.Context()))
 			return
 		}
 
 		if password != passwordConfirmation {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
+			renderError("passwordConfirmation", i18n.NewLocalizedError(i18n.ErrCodeHandlerPasswordConfirmationMismatch, nil).Localize(r.Context()))
 			return
 		}
 
@@ -380,9 +384,9 @@ func HandleRegisterPost(
 			// i18n surface: A — browser-flow form rerender.
 			var locErr *i18n.LocalizedError
 			if errors.As(err, &locErr) {
-				renderError(locErr.Localize(r.Context()))
+				renderError("password", locErr.Localize(r.Context()))
 			} else {
-				renderError(err.Error())
+				renderError("password", err.Error())
 			}
 			return
 		}
@@ -436,6 +440,7 @@ func HandleRegisterPost(
 		}
 
 		bind := map[string]interface{}{
+			"email":               email,
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
 		}
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_success.html", bind)

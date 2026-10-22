@@ -45,9 +45,9 @@
 //     authorization code or the implicit grant's tokens. The handler delivers them: the encoders of
 //     the authorization response are response writers and stay in internal/handlers.
 //
-// getClientDisplayInfo is the client block every sign-in screen shows, loadClientDisplay reads it
-// for the ceremony's client when a password or OTP form is about to be rendered, and
-// ConsentClientName is the name the consent screen and the redirect-blocked page give a client.
+// getClientDisplayInfo is the client block every sign-in screen shows, and loadClientDisplay reads it
+// for the ceremony's client when a password or OTP form is about to be rendered. The consent screen
+// names the client by record.Client's NameForUsers instead.
 //
 // Rules every operation keeps:
 //

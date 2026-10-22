@@ -133,8 +133,8 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			serve:      email(api.UpdateAccountEmailRequest{Email: "new@example.com", CurrentPassword: "wrong"}, callerIs(accountRefusalUser(t, password))),
 			status:     http.StatusBadRequest,
 			code:       "AUTHENTICATION_FAILED",
-			english:    "Authentication failed. Check your current password and try again.",
-			portuguese: "Falha na autenticação. Verifique sua senha atual e tente novamente.",
+			english:    "That password isn't right. Try again.",
+			portuguese: "Essa senha não está correta. Tente novamente.",
 		},
 		{
 			name: "an email change losing to a concurrent change",
@@ -171,8 +171,8 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			serve:      passwordChange("wrong", "N3wP4ss!word", callerIs(accountRefusalUser(t, password))),
 			status:     http.StatusBadRequest,
 			code:       "AUTHENTICATION_FAILED",
-			english:    "Authentication failed. Check your current password and try again.",
-			portuguese: "Falha na autenticação. Verifique sua senha atual e tente novamente.",
+			english:    "That password isn't right. Try again.",
+			portuguese: "Essa senha não está correta. Tente novamente.",
 		},
 		{
 			name:       "a verification code sent with SMTP off",
@@ -212,8 +212,8 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			}),
 			status:     http.StatusBadRequest,
 			code:       "INVALID_OR_EXPIRED_VERIFICATION_CODE",
-			english:    "Invalid or expired verification code",
-			portuguese: "Código de verificação inválido ou expirado",
+			english:    "That code isn't right, or it has expired. Send a new one if you need to.",
+			portuguese: "Esse código não está correto, ou expirou. Envie um novo, se precisar.",
 		},
 		{
 			name: "a right verification code replaced before it was spent",
@@ -224,8 +224,8 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			}),
 			status:     http.StatusBadRequest,
 			code:       "INVALID_OR_EXPIRED_VERIFICATION_CODE",
-			english:    "Invalid or expired verification code",
-			portuguese: "Código de verificação inválido ou expirado",
+			english:    "That code isn't right, or it has expired. Send a new one if you need to.",
+			portuguese: "Esse código não está correto, ou expirou. Envie um novo, se precisar.",
 		},
 	})
 }
@@ -280,8 +280,8 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	const alreadyEnabledPortuguese = "O OTP já está habilitado"
 	const notEnabledEnglish = "User does not have OTP enabled"
 	const notEnabledPortuguese = "O usuário não tem o OTP habilitado"
-	const invalidCodeEnglish = "Invalid OTP code."
-	const invalidCodePortuguese = "Código OTP inválido."
+	const invalidCodeEnglish = "The code is 6 digits. Enter the one your authenticator app shows."
+	const invalidCodePortuguese = "O código tem 6 dígitos. Digite o que o seu aplicativo autenticador mostra."
 
 	assertRefusalLanguages(t, []refusalCase{
 		{
@@ -306,16 +306,16 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve:      put(map[string]interface{}{"enabled": false, "password": " "}, noEnrollment),
 			status:     http.StatusBadRequest,
 			code:       "AUTHENTICATION_FAILED",
-			english:    "Authentication failed. Check your password and try again.",
-			portuguese: "Falha na autenticação. Verifique sua senha e tente novamente.",
+			english:    "That password isn't right. Try again.",
+			portuguese: "Essa senha não está correta. Tente novamente.",
 		},
 		{
 			name:       "a change with a wrong password",
 			serve:      put(map[string]interface{}{"enabled": false, "password": "wrong"}, noEnrollment),
 			status:     http.StatusBadRequest,
 			code:       "AUTHENTICATION_FAILED",
-			english:    "Authentication failed. Check your password and try again.",
-			portuguese: "Falha na autenticação. Verifique sua senha e tente novamente.",
+			english:    "That password isn't right. Try again.",
+			portuguese: "Essa senha não está correta. Tente novamente.",
 		},
 		{
 			name:       "an enable with OTP already enabled",
@@ -330,8 +330,8 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve:      put(map[string]interface{}{"enabled": true, "password": password, "otpCode": " "}, enrolling),
 			status:     http.StatusBadRequest,
 			code:       "OTP_CODE_REQUIRED",
-			english:    "OTP code is required to enable.",
-			portuguese: "O código OTP é obrigatório para habilitar.",
+			english:    "Enter the 6-digit code from your authenticator app.",
+			portuguese: "Digite o código de 6 dígitos do seu aplicativo autenticador.",
 		},
 		{
 			name:       "an enable with a code of five digits",
@@ -363,11 +363,10 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve: func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 				return put(map[string]interface{}{"enabled": true, "password": password, "otpCode": wrongButWellFormedCode(t)}, enrolling)(t, acceptLanguage)
 			},
-			status:  http.StatusBadRequest,
-			code:    "INVALID_OTP_CODE",
-			english: "Incorrect OTP Code. OTP codes are time-sensitive and change every 30 seconds. Make sure you're using the most recent code generated by your authenticator app.",
-			portuguese: "Código OTP incorreto. Códigos OTP são sensíveis ao tempo e mudam a cada 30 segundos. " +
-				"Confirme que está usando o código mais recente gerado pelo seu aplicativo autenticador.",
+			status:     http.StatusBadRequest,
+			code:       "INVALID_OTP_CODE",
+			english:    "That code isn't right. Codes change every 30 seconds, so enter the one your app shows now.",
+			portuguese: "Esse código não está correto. Os códigos mudam a cada 30 segundos, então digite o que o aplicativo mostra agora.",
 		},
 		{
 			name:       "a disable with OTP not enabled",

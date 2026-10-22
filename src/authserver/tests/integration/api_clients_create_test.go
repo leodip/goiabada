@@ -147,7 +147,7 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 	var errResp map[string]interface{}
 	err := json.NewDecoder(resp.Body).Decode(&errResp)
 	require.NoError(t, err)
-	assert.Equal(t, "VALIDATION_ERROR", errResp["error_code"])
+	assert.Equal(t, "handler.client.identifier_in_use", errResp["error_code"])
 	assert.Contains(t, errResp["error_description"].(string), "already in use")
 }
 

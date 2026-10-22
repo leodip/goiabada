@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -252,4 +253,34 @@ func (c *queryRecordingApiClient) SearchUsersPaginated(_ context.Context, access
 	c.queries = append(c.queries, query)
 	c.tokens = append(c.tokens, accessToken)
 	return usersOnPage(c.total, page, pageSize), c.total, nil
+}
+
+func TestUsersListLink_TheSearchSurvivesThePaginator(t *testing.T) {
+	testCases := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"no search", "", "/admin/users"},
+		{"a word", "ana", "/admin/users?query=ana"},
+		{"a plus-addressed email", "ana+test@example.com", "/admin/users?query=ana%2Btest%40example.com"},
+		{"an ampersand", "x&page=9", "/admin/users?query=x%26page%3D9"},
+		{"a fragment marker", "x#y", "/admin/users?query=x%23y"},
+		{"a space", "ana maria", "/admin/users?query=ana+maria"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			link := usersListLink(tc.query)
+			assert.Equal(t, tc.want, link)
+
+			// What the paginator then does with it: the page number must be the only "page" in the
+			// result, and the search must come back as typed.
+			parsed, err := url.Parse(link)
+			require.NoError(t, err)
+			assert.Equal(t, tc.query, parsed.Query().Get("query"), "the search did not round-trip")
+			assert.Empty(t, parsed.Query()["page"], "the link already carries a page")
+			assert.Empty(t, parsed.Fragment, "part of the link fell into a fragment")
+		})
+	}
 }

@@ -47,7 +47,7 @@ func TestInternalServerError(t *testing.T) {
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -91,7 +91,7 @@ func TestNotFound(t *testing.T) {
 	httpHelper := New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
-	})
+	}, nil)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -124,7 +124,7 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 	httpHelper := New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
-	})
+	}, nil)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -147,7 +147,7 @@ func TestRenderTemplate(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
 		req := newRequest("GET", "/", nil)
@@ -199,7 +199,7 @@ func TestRenderTemplate(t *testing.T) {
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
 		emptyFS := fstest.MapFS{}
-		failing := New(emptyFS)
+		failing := New(emptyFS, nil)
 
 		req := newRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
@@ -232,7 +232,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	t.Run("Without ID Token", func(t *testing.T) {
 		req := newRequest("GET", "/", nil)
@@ -304,7 +304,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
 		}
-		layoutHelper := New(layoutFS)
+		layoutHelper := New(layoutFS, nil)
 		req := httptest.NewRequest("GET", "/", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{
 			AppName:     "sentinel app",
@@ -354,7 +354,7 @@ func TestRenderTemplate_RendersTheTemplateNamedWhateverTheLocale(t *testing.T) {
 		"account_profile.html":       {Data: []byte("{{define \"content\"}}the profile{{end}}")},
 		"account_profile.pt-BR.html": {Data: []byte("{{define \"content\"}}a locale variant{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	for _, templateName := range []string{"/emails/note.html", "emails/note.html"} {
 		t.Run(templateName, func(t *testing.T) {
@@ -387,7 +387,7 @@ func TestRenderTemplate_NilDataMap(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.urlPath}}{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 	req := httptest.NewRequest("GET", "/some/page", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &api.PublicSettingsResponse{AppName: "sentinel app"}))
 
@@ -406,7 +406,7 @@ func TestRenderTemplate_MenuNameJoinsTheNameClaims(t *testing.T) {
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"page.html":           {Data: []byte("{{define \"content\"}}[{{.loggedInUser.GetFullName}}]{{end}}")},
 	}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	for _, tc := range []struct {
 		name                              string
@@ -446,7 +446,7 @@ func TestRenderTemplate_Partials(t *testing.T) {
 	layout := []byte(`<html>{{template "content" .}}</html>`)
 	page := []byte(`{{define "content"}}[{{template "badge" .}}]{{end}}`)
 	render := func(templateFS fstest.MapFS) (string, error) {
-		return renderPage(New(templateFS),
+		return renderPage(New(templateFS, nil),
 			newRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
 	}
 
@@ -485,7 +485,7 @@ func TestRenderTemplate_Partials(t *testing.T) {
 
 func TestJSONError(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -510,7 +510,7 @@ func TestJSONError(t *testing.T) {
 
 func TestEncodeJSON(t *testing.T) {
 	templateFS := fstest.MapFS{}
-	httpHelper := New(templateFS)
+	httpHelper := New(templateFS, nil)
 
 	req := newRequest("GET", "/", nil)
 	w := httptest.NewRecorder()

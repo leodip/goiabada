@@ -12,10 +12,10 @@ import { env } from "../lib/environment";
 import { restoreBaselineSettings } from "../lib/settings";
 import { testPrefix } from "../lib/unique";
 
-// The cells of a list page that hold a name the tests made.
+// The names a list page links to that the tests made: each row's identifier or email is a link.
 async function leftoversOn(page: Page, listUrl: string): Promise<string[]> {
   await page.goto(listUrl);
-  return (await page.getByRole("cell").allInnerTexts())
+  return (await page.getByRole("table").getByRole("link").allInnerTexts())
     .map((text) => text.trim())
     .filter((text) => text.startsWith(testPrefix));
 }
@@ -33,19 +33,19 @@ setup("sweep what earlier runs left", async ({ page }, testInfo) => {
   // is what a run that crashed left. Assumes one run at a time against the environment.
   const clients = `${env.adminUrl}/admin/clients`;
   for (const identifier of await leftoversOn(page, clients)) {
-    await deleteClient(page, await idFromListLink(page, clients, identifier, "Manage"));
+    await deleteClient(page, await idFromListLink(page, clients, identifier));
   }
   const resources = `${env.adminUrl}/admin/resources`;
   for (const identifier of await leftoversOn(page, resources)) {
-    await deleteResource(page, await idFromListLink(page, resources, identifier, "Manage"));
+    await deleteResource(page, await idFromListLink(page, resources, identifier));
   }
   const groups = `${env.adminUrl}/admin/groups`;
   for (const identifier of await leftoversOn(page, groups)) {
-    await deleteGroup(page, await idFromListLink(page, groups, identifier, "Manage"));
+    await deleteGroup(page, await idFromListLink(page, groups, identifier));
   }
   // The users list is paged; a search narrows it to the test users, a page at a time.
   const users = `${env.adminUrl}/admin/users?query=${testPrefix}`;
   for (let emails = await leftoversOn(page, users); emails.length > 0; emails = await leftoversOn(page, users)) {
-    for (const email of emails) await deleteUser(page, await idFromListLink(page, users, email, "Manage"));
+    for (const email of emails) await deleteUser(page, await idFromListLink(page, users, email));
   }
 });

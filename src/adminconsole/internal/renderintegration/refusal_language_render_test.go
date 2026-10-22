@@ -45,12 +45,12 @@ func TestRender_AdminResourceDelete_TheConsolesRefusalIsInThePagesLanguage(t *te
 		handlertest.WithForm(url.Values{"resourceIdentifier": {"shipping"}}))
 
 	w := httptest.NewRecorder()
-	adminresourcehandlers.HandleDeletePost(render.New(web.TemplateFS()), resourceToDelete{}, "https://console.example.test").
+	adminresourcehandlers.HandleDeletePost(render.New(web.TemplateFS(), web.StaticFS()), resourceToDelete{}, "https://console.example.test").
 		ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code, "the refused form is redrawn, not answered with an error page")
 	out := w.Body.String()
 	assert.Contains(t, out, `lang="pt-BR"`)
-	assert.Contains(t, out, "O identificador do recurso não corresponde ao recurso que está sendo excluído.")
-	assert.NotContains(t, out, "Resource identifier does not match the resource being deleted.")
+	assert.Contains(t, out, "Este não é o identificador deste recurso. Digite-o como aparece acima.")
+	assert.NotContains(t, out, "That isn't this resource's identifier. Type it as shown above.")
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -709,7 +710,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		t.Fatal(err)
 	}
 
-	errorMsg := doc.Find("p.text-error").Text()
+	errorMsg := strings.TrimSpace(doc.Find(`[role="alert"]`).Text())
 	assert.Equal(t, "Authentication failed.", errorMsg)
 
 	// Verify that the user can't proceed to the next step. 400 like every other gated step; this
@@ -821,8 +822,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	errorMsg := doc.Find("p.text-error").Text()
-	assert.Contains(t, errorMsg, "Incorrect OTP Code")
+	errorMsg := strings.TrimSpace(doc.Find(`[role="alert"]`).Text())
+	assert.Contains(t, errorMsg, "That code isn't right")
 
 	// Verify that the user can't proceed to the next step.
 	//
@@ -946,8 +947,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	errorMsg := doc.Find("p.text-error").Text()
-	assert.Contains(t, errorMsg, "Incorrect OTP Code")
+	errorMsg := strings.TrimSpace(doc.Find(`[role="alert"]`).Text())
+	assert.Contains(t, errorMsg, "That code isn't right")
 
 	// Verify that the user can't proceed to the next step.
 	//

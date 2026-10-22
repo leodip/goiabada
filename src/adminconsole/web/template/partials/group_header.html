@@ -1,0 +1,16 @@
+{{define "group_header"}}
+{{- /* (args tab groupId groupIdentifier ctx): what every page of one group opens with, the link
+     back to the list, the group's identifier as the page's heading, and the tabs with tab
+     current. */ -}}
+{{- $tab := index . 0 }}
+{{- $id := index . 1 }}
+{{- $identifier := index . 2 }}
+{{- $ctx := index . 3 }}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/groups"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $ctx "adminconsole.admin_menu.groups" }}</a></p>
+    <h1 class="page-title" id="page-title">{{ $identifier }}</h1>
+  </div>
+</div>
+{{ template "manage_groups_tabs" (args $tab $id $ctx) }}
+{{end}}

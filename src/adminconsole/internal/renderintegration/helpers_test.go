@@ -1,6 +1,7 @@
 package renderintegration
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -81,7 +82,7 @@ func renderPageAt(t *testing.T, path, layout, page string, bind map[string]inter
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, locale))
 
-	h := render.New(web.TemplateFS())
+	h := render.New(web.TemplateFS(), web.StaticFS())
 	w := httptest.NewRecorder()
 	err := h.RenderTemplate(w, req, layout, page, bind)
 	require.NoErrorf(t, err, "render %s in %s (template referenced data the bind lacks?)", page, locale)
@@ -98,20 +99,21 @@ func renderPageAt(t *testing.T, path, layout, page string, bind map[string]inter
 	return out
 }
 
-// assertSendsTheLoadedPermissionIds is the check both permission pages owe: the page takes the ids
-// of the grants it rendered once, after they are in assignedPermissions, sends that copy with every
-// save as expectedPermissionIds, and never edits it. A copy taken later, or edited, would send the
-// administrator's edited set as the loaded one and every save would pass the check (#428).
-func assertSendsTheLoadedPermissionIds(t *testing.T, out string) {
+// assertListScriptSendsTheLoadedList is the check a list page edited in the page owes: the page
+// draws the list as stored, in rows, and its script reads them once, as it loads, into loaded
+// through read, sends that copy with every save under the form's data-expected-key, and never edits
+// it. A copy taken later, or edited, would send the administrator's edited list as the loaded one
+// and every save would pass the check (#428).
+func assertListScriptSendsTheLoadedList(t *testing.T, script, loaded, read string) {
 	t.Helper()
-	const copyTaken = "const loadedPermissionIds = Object.keys(assignedPermissions).map(function(key) { return parseInt(key, 10); });"
-	loaded := regexp.MustCompile(`var assignedPermissions = \{\s*3\s*: \{\s*"Scope": "some-resource:read"\s*\},\s*4\s*: \{\s*"Scope": "some-resource:write"\s*\}\s*\};`).FindStringIndex(out)
-	require.NotNil(t, loaded, "the page renders the loaded grants into assignedPermissions")
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps the ids of the loaded grants")
-	assert.Greater(t, copyAt, loaded[1]-1, "the copy is taken after the loaded grants are in the object")
+	b, err := fs.ReadFile(web.StaticFS(), script)
+	require.NoError(t, err)
+	source := string(b)
 
-	assert.Contains(t, out, `"expectedPermissionIds": loadedPermissionIds`)
-	assert.NotRegexp(t, `loadedPermissionIds\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedPermissionIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+	copyTaken := "\nconst " + loaded + " = " + read + ";\n"
+	require.Contains(t, source, copyTaken, "%s keeps a copy of the list as drawn, read as it loads", script)
+	assert.Regexp(t, `body\[[A-Za-z]+\.dataset\.expectedKey\] = `+loaded+`;`, source,
+		"%s sends that copy as the list it loaded", script)
+	assert.NotRegexp(t, loaded+`\.(push|splice|pop|shift|unshift|sort|reverse|fill|copyWithin)\(`, source)
+	assert.NotRegexp(t, loaded+`\s*=[^=]`, strings.Replace(source, copyTaken, "", 1))
 }

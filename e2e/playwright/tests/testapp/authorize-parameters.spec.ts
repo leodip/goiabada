@@ -1,6 +1,7 @@
 // The authorization parameters a client sends to ask for more than single sign-on gives by default,
 // from the test app's web app sign-in form: prompt, max_age, id_token_hint and acr_values (Require
-// two-factor authentication).
+// two-factor authentication). The consent screen prompt=consent shows is answered every way a user
+// can: allowed, not allowed, and allowed with a scope unticked.
 import { expect, test } from "../../lib/fixtures";
 import { freshTotp } from "../../lib/totp";
 import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
@@ -40,9 +41,22 @@ test("prompt=consent shows the consent screen even when the client doesn't requi
   const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { prompt: "consent" });
   await expect(app).toHaveURL(/\/auth\/consent/);
-  await app.getByRole("button", { name: "Give consent" }).click();
+  await app.getByRole("button", { name: "Allow", exact: true }).click();
   await app.waitForURL(testapp.web.url);
   await expectResult(app, "Signed in");
+  await context.close();
+});
+
+test("Don't allow on the consent screen sends the user back to the app with access_denied, signed in to nothing", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user, { prompt: "consent" });
+  await expect(app).toHaveURL(/\/auth\/consent/);
+  await app.getByRole("button", { name: "Don't allow" }).click();
+  await app.waitForURL(testapp.web.url);
+  await expectResult(app, "Sign-in failed");
+  expect(await resultBody(app)).toMatchObject({ error: "access_denied", error_description: "The user did not provide consent" });
+  await expect(app.getByText("Not signed in to this app.")).toBeVisible();
   await context.close();
 });
 
@@ -96,9 +110,9 @@ test("acr_values level 2 mandatory makes a user enrol an authenticator, and the 
   const user = await users.create();
   const { context, page: app } = await userBrowser(browser);
   await signInToWebApp(app, testapp.web, user, { acr_values: "urn:goiabada:level2_mandatory" });
-  // The enrolment page: a QR code and the secret, then a code from it.
+  // The enrolment page: a QR code and its key, then a code from it.
   await expect(app).toHaveURL(/\/auth\/otp/);
-  const secret = (await app.locator("pre").innerText()).trim();
+  const secret = (await app.locator("#otp-secret").innerText()).trim();
   await app.locator('input[name="otp"]').fill(await freshTotp(secret));
   await app.getByRole("button", { name: "Verify" }).click();
   await app.waitForURL(testapp.web.url);

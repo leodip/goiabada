@@ -39,11 +39,12 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
-	httpHelper := render.New(s.templateFS)
-	authHelper := oauthclient.NewAuthHelper(s.sessionStore, builtin.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)
+	httpHelper := render.New(s.templateFS, s.staticFS)
+	authHelper := oauthclient.NewAuthHelper(s.sessionStore, baseURL, s.cfg.AuthServer.BaseURL)
 
 	// Initialize middleware
 	middlewareJwt := middleware.NewJWT(
+		s.sessionStore,
 		s.sessionStore,
 		builtin.AdminConsoleSessionName,
 		tokenParser,
@@ -260,8 +261,8 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Post("/settings/sessions", adminsettingshandlers.HandleSessionsPost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/settings/tokens", adminsettingshandlers.HandleTokensGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/tokens", adminsettingshandlers.HandleTokensPost(httpHelper, s.sessionStore, apiClient, baseURL))
-		r.Get("/settings/keys", adminsettingshandlers.HandleKeysGet(httpHelper, apiClient))
-		r.Post("/settings/keys/rotate", adminsettingshandlers.HandleKeysRotatePost(httpHelper, apiClient))
+		r.Get("/settings/keys", adminsettingshandlers.HandleKeysGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/settings/keys/rotate", adminsettingshandlers.HandleKeysRotatePost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Post("/settings/keys/revoke", adminsettingshandlers.HandleKeysRevokePost(httpHelper, apiClient))
 		r.Get("/settings/email", adminsettingshandlers.HandleEmailGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/settings/email", adminsettingshandlers.HandleEmailPost(httpHelper, s.sessionStore, apiClient, s.settingsCache, baseURL))

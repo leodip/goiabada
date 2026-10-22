@@ -64,6 +64,7 @@ func HandleEmailGet(
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": savedSuccessfully,
+			"accountEmail":      user.Email,
 			"email":             user.Email,
 			"emailVerified":     user.EmailVerified,
 			"emailConfirmation": "",
@@ -76,6 +77,19 @@ func HandleEmailGet(
 			return
 		}
 	}
+}
+
+// accountEmailErrorFields maps the refusals the email change can meet to the field each is about: the
+// address the validator refused or another account holds, found before the write or by the unique
+// key at it, and the current password the auth server found wrong. A missing password answers
+// VALIDATION_ERROR, which names no field, so the field is the one sent blank.
+var accountEmailErrorFields = map[string]string{
+	i18n.ErrCodeEmailRequired:          "email",
+	i18n.ErrCodeEmailInvalidFormat:     "email",
+	i18n.ErrCodeEmailTooLong:           "email",
+	i18n.ErrCodeEmailAlreadyRegistered: "email",
+	"EMAIL_ALREADY_EXISTS":             "email",
+	"AUTHENTICATION_FAILED":            "currentPassword",
 }
 
 func HandleEmailPost(
@@ -111,10 +125,12 @@ func HandleEmailPost(
 		if email != emailConfirmation {
 			bind := map[string]interface{}{
 				"user":              user,
+				"accountEmail":      user.Email,
 				"email":             email,
 				"emailVerified":     user.EmailVerified,
 				"emailConfirmation": emailConfirmation,
 				"error":             i18n.T(r.Context(), "adminconsole.refusal.account_email.confirmation_mismatch"),
+				"errorField":        "emailConfirmation",
 			}
 			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); renderErr != nil {
 				httpHelper.InternalServerError(w, r, renderErr)
@@ -134,10 +150,13 @@ func HandleEmailPost(
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				bind := map[string]interface{}{
 					"user":              user,
+					"accountEmail":      user.Email,
 					"email":             email,
 					"emailVerified":     user.EmailVerified,
 					"emailConfirmation": emailConfirmation,
 					"error":             errorMessage,
+					"errorField": render.ErrorFieldOrBlank(err, accountEmailErrorFields,
+						render.RequiredField{Name: "currentPassword", Value: currentPassword}),
 				}
 				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); renderErr != nil {
 					httpHelper.InternalServerError(w, r, renderErr)

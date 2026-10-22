@@ -61,7 +61,7 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 				w := httptest.NewRecorder()
 				var renderErr error
 				i18n.Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					renderErr = render.New(web.TemplateFS()).RenderTemplate(w, r, tc.layout, tc.page, tc.bind)
+					renderErr = render.New(web.TemplateFS(), web.StaticFS()).RenderTemplate(w, r, tc.layout, tc.page, tc.bind)
 				})).ServeHTTP(w, req)
 
 				require.NoError(t, renderErr)
@@ -124,7 +124,7 @@ func TestAjax_ThePagesLanguageOutranksTheBrowserAndTheProfile(t *testing.T) {
 				handlertest.WithBody(strings.NewReader(`{"resourceId":7,"permissions":[],"expectedPermissions":[]}`)))
 			req.Header.Set("Accept-Language", "en")
 			w := httptest.NewRecorder()
-			handler := adminresourcehandlers.HandlePermissionsPost(render.New(nil), nil,
+			handler := adminresourcehandlers.HandlePermissionsPost(render.New(nil, nil), nil,
 				apiclient.NewAuthServerClient(upstream.URL, nil, nil))
 			i18n.Locale(nil)(middleware.LocaleFromJWT()(handler)).ServeHTTP(w, req)
 
