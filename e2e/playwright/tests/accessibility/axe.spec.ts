@@ -250,6 +250,8 @@ test("the pages reached with no session: errors, not found, and the console sign
         await expect(own.locator("h1")).toBeVisible();
       },
     },
+    // The callback's address opened on its own, as from a bookmark: the same page, at 405.
+    at(own, "the console's sign-in error, its address opened on its own", `${env.adminUrl}/auth/callback`, 405),
     titled(own, "a sign-in request no longer active", "This request is no longer active", async () => {
       // The console sends the browser to sign in, which starts a request; this page names another.
       await own.goto(`${env.adminUrl}/account/profile`);

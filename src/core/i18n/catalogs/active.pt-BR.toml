@@ -344,6 +344,7 @@
 "adminconsole.sign_in_error.failed.title" = "Falha no acesso"
 "adminconsole.sign_in_error.exchange.body" = "O console de administração não conseguiu concluir o acesso com o servidor de autenticação. Isso normalmente significa que o segredo do cliente do console ou o endereço do servidor de autenticação está errado."
 "adminconsole.sign_in_error.unverified.body" = "Não foi possível verificar a resposta do servidor de autenticação. Isso normalmente significa que o console de administração e o servidor de autenticação discordam sobre o emissor (issuer) ou o cliente."
+"adminconsole.sign_in_error.wrong_method.body" = "Este endereço é para onde o servidor de autenticação envia a resposta de um acesso, portanto não pode ser aberto por si só."
 "adminconsole.sign_in_error.start_again" = "Começar de novo"
 "adminconsole.sign_in_error.log_line" = "O log do servidor registra a causa sob este ID de requisição:"
 
