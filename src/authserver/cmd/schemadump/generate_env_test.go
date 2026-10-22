@@ -105,7 +105,8 @@ func TestGenerateEnv_EachCheckoutDrawsItsOwn(t *testing.T) {
 }
 
 // TestGenerateEnv_ASecondRunChangesNothing: a complete .env is left byte for byte as it was, since
-// each database keeps the password its volume was initialised with.
+// each database keeps the password its volume was initialised with; one written by hand and left
+// readable by others keeps its bytes too, but not that mode.
 func TestGenerateEnv_ASecondRunChangesNothing(t *testing.T) {
 	dir := generateEnvIn(t, nil)
 	first := runGenerateEnv(t, dir)
@@ -113,6 +114,31 @@ func TestGenerateEnv_ASecondRunChangesNothing(t *testing.T) {
 	second := runGenerateEnv(t, dir)
 
 	assert.Equal(t, string(first), string(second))
+
+	handWritten := "GOIABADA_AES_ENCRYPTION_KEY=k\nMYSQL_ROOT_PASSWORD=m\nPOSTGRES_PASSWORD=p\nMSSQL_SA_PASSWORD=s\n"
+	dir = generateEnvIn(t, []byte(handWritten))
+
+	assert.Equal(t, handWritten, string(runGenerateEnv(t, dir)))
+	assertEnvMode(t, dir)
+}
+
+// TestGenerateEnv_AFailedChmodStopsTheScript: a complete .env whose mode cannot be narrowed is not
+// passed over in silence; the script fails, and the file is left as it was.
+func TestGenerateEnv_AFailedChmodStopsTheScript(t *testing.T) {
+	handWritten := "GOIABADA_AES_ENCRYPTION_KEY=k\nMYSQL_ROOT_PASSWORD=m\nPOSTGRES_PASSWORD=p\nMSSQL_SA_PASSWORD=s\n"
+	dir := generateEnvIn(t, []byte(handWritten))
+	bin := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "chmod"), []byte("#!/bin/sh\nexit 1\n"), 0o600))
+	require.NoError(t, os.Chmod(filepath.Join(bin, "chmod"), 0o700))
+
+	cmd := exec.Command("sh", filepath.Join(dir, "generate-env.sh"))
+	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+
+	require.Error(t, err, "generate-env.sh passed over a chmod that failed:\n%s", out)
+	content, err := os.ReadFile(filepath.Join(dir, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, handWritten, string(content))
 }
 
 // TestGenerateEnv_APartialEnvGainsOnlyWhatItLacks: a .env holding Compose's other variables, one of
@@ -132,5 +158,50 @@ func TestGenerateEnv_APartialEnvGainsOnlyWhatItLacks(t *testing.T) {
 	for _, name := range []string{"GOIABADA_AES_ENCRYPTION_KEY", "POSTGRES_PASSWORD", "MSSQL_SA_PASSWORD"} {
 		assert.Regexp(t, generatedValue[name], values[name], name)
 	}
+	assertEnvMode(t, dir)
+}
+
+// TestGenerateEnv_ExportedSpacedAndQuotedEmptyAssignments: an exported and a spaced assignment
+// are values Compose reads, so they are kept and nothing is appended after them to override them;
+// a pair of empty quotes, before a comment or not, is no value to Compose, so it is dropped and
+// drawn.
+func TestGenerateEnv_ExportedSpacedAndQuotedEmptyAssignments(t *testing.T) {
+	dir := generateEnvIn(t, []byte("export GOIABADA_AES_ENCRYPTION_KEY=kept-exported\n"+
+		"MYSQL_ROOT_PASSWORD = kept-spaced\n"+
+		"POSTGRES_PASSWORD=\"\"\n"+
+		"MSSQL_SA_PASSWORD='' # set me\n"))
+
+	content := string(runGenerateEnv(t, dir))
+
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	require.Len(t, lines, 4, content)
+	assert.Equal(t, "export GOIABADA_AES_ENCRYPTION_KEY=kept-exported", lines[0])
+	assert.Equal(t, "MYSQL_ROOT_PASSWORD = kept-spaced", lines[1])
+	_, values := envValues([]byte(lines[2] + "\n" + lines[3]))
+	assert.Regexp(t, generatedValue["POSTGRES_PASSWORD"], values["POSTGRES_PASSWORD"])
+	assert.Regexp(t, generatedValue["MSSQL_SA_PASSWORD"], values["MSSQL_SA_PASSWORD"])
+	assertEnvMode(t, dir)
+}
+
+// TestGenerateEnv_ACRLFEnvIsReadAsComposeReadsIt: a value ending in a CR is kept, an assignment
+// holding nothing but the CR is empty and is drawn, and an empty assignment after a value, which
+// Compose would read as overriding it, is dropped and leaves that value to stand, with nothing
+// appended for it.
+func TestGenerateEnv_ACRLFEnvIsReadAsComposeReadsIt(t *testing.T) {
+	dir := generateEnvIn(t, []byte("USER_UID=1000\r\n"+
+		"GOIABADA_AES_ENCRYPTION_KEY=k\r\n"+
+		"MYSQL_ROOT_PASSWORD=m\r\n"+
+		"POSTGRES_PASSWORD=p\r\n"+
+		"POSTGRES_PASSWORD=\r\n"+
+		"MSSQL_SA_PASSWORD=\r\n"))
+
+	content := string(runGenerateEnv(t, dir))
+
+	assert.True(t, strings.HasPrefix(content, "USER_UID=1000\r\nGOIABADA_AES_ENCRYPTION_KEY=k\r\n"+
+		"MYSQL_ROOT_PASSWORD=m\r\nPOSTGRES_PASSWORD=p\r\nMSSQL_SA_PASSWORD="), "the values already there are kept:\n%q", content)
+	names, values := envValues([]byte(content))
+	assert.Equal(t, []string{"USER_UID", "GOIABADA_AES_ENCRYPTION_KEY", "MYSQL_ROOT_PASSWORD", "POSTGRES_PASSWORD",
+		"MSSQL_SA_PASSWORD"}, names)
+	assert.Regexp(t, generatedValue["MSSQL_SA_PASSWORD"], values["MSSQL_SA_PASSWORD"])
 	assertEnvMode(t, dir)
 }

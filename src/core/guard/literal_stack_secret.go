@@ -2,6 +2,7 @@ package guard
 
 import (
 	"bytes"
+	"errors"
 	"io/fs"
 	"os"
 	"path"
@@ -26,13 +27,18 @@ import (
 // a page prints. In those it reports a literal value given to one of stackSecretVariables, as a
 // YAML or JSON key, a shell, Makefile or Dockerfile assignment (`ENV NAME value` among them), a
 // `name: NAME` entry whose next line's `value:` is a literal, a `${NAME:-fallback}`, or a
-// `${OTHER:-fallback}` assigned to it; a `-p<password>` or `--password` to mysql or mysqladmin; a
-// `-P <password>` to sqlcmd; and, in a Go main, a `password:` field or an `os.Setenv` of one of the
-// variables set to a string literal. A value passes when it is empty, an interpolation (`$NAME`,
-// `${NAME}`, `$(command)`, `${{ expression }}`) or a placeholder in angle brackets.
+// `${OTHER:-fallback}` assigned to it; a `-p<password>` or `--password=<password>` to mysql,
+// mysqladmin or mysqldump, which read a bare `--password` as a request to prompt and the word after
+// it as the database; a `-P <password>` to sqlcmd; and, in a Go main, a `password:` field or an
+// `os.Setenv` of one of the variables set to a string literal. A value passes when it is empty, an
+// interpolation (`$NAME`, `${NAME}`, `$(command)`, `${{ expression }}`) or a placeholder in angle
+// brackets.
 //
-// The bare .env a directory holds is not read: generate-env.sh writes src/.devcontainer/.env with
-// the dev stack's real values, and .gitignore keeps it out of the repository.
+// The env files are every `.env`, `.env.<anything>` and `<name>.env`, since Compose reads a
+// directory's .env on its own and `env_file:` names any of them. One that a .gitignore in its own
+// directory ignores is not read at all: generate-env.sh writes src/.devcontainer/.env with the dev
+// stack's real values, and the e2e suite and the docs site keep local ones the same way, none of
+// them the repository's.
 //
 // Separately, the published data key and the three published passwords are reported in any text
 // file outside the few that name them to refuse them (publishedValueOwners), whatever its kind.
@@ -136,7 +142,7 @@ func kindOf(rel string) runnableKind {
 		return runnableDockerfile
 	case ext == ".sh", base == "Makefile", ext == ".mk":
 		return runnableShell
-	case base != ".env" && (ext == ".env" || strings.HasSuffix(base, ".env.example")):
+	case isEnvFile(base):
 		return runnableShell
 	case ext == ".go" && !strings.HasSuffix(base, "_test.go") && strings.Contains("/"+rel, "/cmd/"):
 		return runnableGoMain
@@ -161,8 +167,8 @@ var (
 	// A Kubernetes-style entry: `name: NAME`, then `value:` on the next line.
 	namedEntry      = regexp.MustCompile(`^\s*(?:-\s+)?name:\s*["']?(` + stackSecretNames + `)["']?\s*$`)
 	namedEntryValue = regexp.MustCompile(`^\s*value:(.*)$`)
-	mysqlClient     = regexp.MustCompile(`\bmysql(admin)?\b`)
-	mysqlPassword   = regexp.MustCompile(`(?:^|\s)(?:-p|--password=)(\S+)|(?:^|\s)--password\s+([^-\s]\S*)`)
+	mysqlClient     = regexp.MustCompile(`\bmysql(admin|dump)?\b`)
+	mysqlPassword   = regexp.MustCompile(`(?:^|\s)(?:-p|--password=)(\S+)`)
 	sqlcmdClient    = regexp.MustCompile(`\bsqlcmd\b`)
 	sqlcmdPassword  = regexp.MustCompile(`(?:^|\s)-P\s+(\S+)`)
 	goPasswordField = regexp.MustCompile(`(?i)\bpassword:\s*("[^"]+"|` + "`[^`]+`" + `)`)
@@ -195,6 +201,15 @@ func findLiteralStackSecrets(root string) ([]string, int, error) {
 		if kind == notRunnable && !textExtensions[path.Ext(rel)] {
 			return nil
 		}
+		if isEnvFile(d.Name()) {
+			ignored, ignoreErr := gitignoredBeside(filepath.Dir(p), d.Name())
+			if ignoreErr != nil {
+				return ignoreErr
+			}
+			if ignored {
+				return nil
+			}
+		}
 		content, readErr := os.ReadFile(p)
 		if readErr != nil {
 			return readErr
@@ -212,6 +227,37 @@ func findLiteralStackSecrets(root string) ([]string, int, error) {
 		return nil, 0, err
 	}
 	return findings, files, nil
+}
+
+// isEnvFile reports whether a file of this base name is an env file: `.env` (whose extension is
+// `.env`), `.env.production`, `.env.example` and `goiabada.env` among them.
+func isEnvFile(base string) bool {
+	return strings.HasPrefix(base, ".env.") || path.Ext(base) == ".env" ||
+		strings.HasSuffix(base, ".env.example")
+}
+
+// gitignoredBeside reports whether the .gitignore in dir, if there is one, ignores the file named
+// base there: by a pattern matching the name as git matches it, a leading slash anchoring it to the
+// directory, the last matching line deciding, so `!.env.example` after `.env*` keeps the example
+// read. A pattern naming a subdirectory, and a comment, match no name here.
+func gitignoredBeside(dir, base string) (bool, error) {
+	content, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	ignored := false
+	for _, line := range strings.Split(string(content), "\n") {
+		pattern := strings.TrimSpace(line)
+		negated := strings.HasPrefix(pattern, "!")
+		pattern = strings.TrimPrefix(strings.TrimPrefix(pattern, "!"), "/")
+		if matched, matchErr := path.Match(pattern, base); matchErr == nil && matched {
+			ignored = !negated
+		}
+	}
+	return ignored, nil
 }
 
 // publishedValuesIn reports each line of content spelling a published value.
@@ -337,7 +383,7 @@ func literalSecretIn(line string, kind runnableKind) string {
 	}
 	if mysqlClient.MatchString(line) {
 		for _, m := range mysqlPassword.FindAllStringSubmatch(line, -1) {
-			if isLiteral(m[1] + m[2]) {
+			if isLiteral(m[1]) {
 				return "a literal password to mysql"
 			}
 		}
