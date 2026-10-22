@@ -3,9 +3,11 @@ package commondb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,6 +63,8 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyReturnsTheContextErro
 		"a cancelled run answers with the context error, whatever the commit reported (decision 13)")
 	require.NotErrorIs(t, err, sql.ErrTxDone,
 		"and not with the sentinel that says only that the transaction was already over")
+	require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"and not tagged as an unknown outcome: no COMMIT reached the engine, so it was rolled back (#371)")
 	assert.Equal(t, 1, ran, "one attempt: a cancelled run is not rerun")
 	assert.Empty(t, *requested, "and no backoff was spent on it")
 	c := d.settled(t)
@@ -96,6 +100,8 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyJoinsTheDeadlockItWas
 	require.Error(t, err)
 	require.ErrorIs(t, err, context.Canceled, "the context error is still what decided the outcome")
 	require.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
+	require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"and the commit database/sql refused is not an unknown outcome (#371)")
 	assert.Contains(t, err.Error(), "transaction abandoned after the engine aborted it")
 	assert.Equal(t, 2, ran, "the deadlock was rerun once, and the rerun was the cancelled one")
 }
@@ -117,5 +123,68 @@ func TestRunInTransaction_ACommitThatFindsTheTransactionDoneOnALiveContextIsStil
 	require.ErrorIs(t, err, sql.ErrTxDone, "a live context leaves the commit's own error alone")
 	require.NotErrorIs(t, err, context.Canceled, "and contributes no context error")
 	require.NotErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"and with no cancellation to explain it, whatever finished the transaction may have committed it (#371)")
 	assert.Equal(t, 1, ran, "a commit failure that is not a deadlock is not replayed")
+}
+
+// TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutcome leaves the race
+// in, where the two tests above remove it: the body cancels and returns at once, so Tx.Commit
+// answers the context's own error when its rollback goroutine has not finished and sql.ErrTxDone
+// when it has. Neither asks the driver to commit, so the transaction is known to be rolled back
+// whichever arm wins, and neither may carry data.ErrCommitOutcomeUnknown. Before the tag looked
+// at what Tx.Commit answered, the context's-error arm carried it, and that arm wins nearly every
+// time (#371).
+func TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutcome(t *testing.T) {
+	for i := range 300 {
+		d := &scriptedDriver{}
+		db := retryingDB(t, d)
+		recordBackoff(db)
+		ctx, cancel := context.WithCancel(context.Background())
+
+		err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+			if _, execErr := db.ExecSQL(ctx, tx, "UPDATE settings SET updated_at = updated_at"); execErr != nil {
+				return execErr
+			}
+			cancel()
+			return nil
+		})
+		cancel()
+
+		run := fmt.Sprintf("run %d", i)
+		require.Error(t, err, run)
+		require.ErrorIs(t, err, context.Canceled, run)
+		require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+			"%s: database/sql refused the commit before the driver, so its outcome is known", run)
+		c := d.settled(t)
+		require.Zero(t, c.commits, "%s: the driver was never asked to commit", run)
+		require.Zero(t, c.openTx, "%s: nothing was left open", run)
+	}
+}
+
+// TestRunInTransaction_ACancellationDuringTheDriversCommitIsStillAnUnknownOutcome is the other
+// side of the identity test: a cancellation that lands while the driver's COMMIT is in flight.
+// database/sql has asked the driver by then, and the driver answers with an error of its own
+// wrapping context.Canceled, as pgx's stdlib driver does, which commits on the context BeginTx
+// was given. The server may have committed before the cancellation reached it, so the tag stays,
+// though the context is done and errors.Is finds context.Canceled in the error (#371).
+func TestRunInTransaction_ACancellationDuringTheDriversCommitIsStillAnUnknownOutcome(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	d := &scriptedDriver{
+		commitErrs:   []error{fmt.Errorf("commit interrupted: %w", context.Canceled)},
+		duringCommit: cancel,
+	}
+	db := retryingDB(t, d)
+	recordBackoff(db)
+	ran := 0
+
+	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"the driver was asked to commit, so whether the engine did is unknown")
+	require.ErrorIs(t, err, context.Canceled, "and the driver's own error stays in the tree")
+	assert.Equal(t, 1, ran, "a commit whose outcome is unknown is not replayed")
+	assert.Equal(t, 1, d.settled(t).commits, "the driver was asked to commit once")
 }

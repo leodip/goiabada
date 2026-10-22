@@ -797,7 +797,9 @@ var ErrUniqueViolation = errors.New("unique constraint violation")
 // than a deadlock: the one exit whose outcome the caller cannot know, because the server may have
 // committed before the failure reached it. Replaying such a transaction would apply the body
 // twice, so a caller that receives this must inspect what the transaction changed before it
-// tries again (#371).
+// tries again (#371). A commit database/sql refused before asking the driver, because the
+// context was already done, does not carry it: no COMMIT reached the engine, the transaction was
+// rolled back, and the run answers with the context's error.
 //
 // It exists for the same reason ErrUniqueViolation does: the driver's own text cannot be matched.
 // Every engine phrases a commit failure its own way and none of them says whether the server had

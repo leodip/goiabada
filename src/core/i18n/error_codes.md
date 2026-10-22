@@ -123,13 +123,14 @@ when a caller sends the same request without the console's check.
 
 ## Admin and account API refusals a person reaches through the console
 
-The admin and account API writes each of these with the `error_code` and the
-status it always had (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
+The admin and account API writes each of these with its own `error_code` and
+status (`VALIDATION_ERROR`, `CONCURRENT_UPDATE`,
 `EMAIL_ALREADY_EXISTS`, `LAST_ADMINISTRATOR`, `FILE_TOO_LARGE`, `NO_FILE`,
 `VALUE_TOO_LONG`, `EMAIL_TOO_LONG`, `OTP_NOT_ENABLED`, `AUTHENTICATION_FAILED`,
 `SMTP_NOT_ENABLED`, `INVALID_OR_EXPIRED_VERIFICATION_CODE`, `OTP_ALREADY_ENABLED`,
 `SECRET_KEY_NOT_ACCEPTED`, `OTP_CODE_REQUIRED`, `INVALID_OTP_CODE`,
-`OTP_ENROLLMENT_NOT_PENDING`, `SEND_FAILED`, `ROTATION_IN_PROGRESS`), so the key is not on the wire: only
+`OTP_ENROLLMENT_NOT_PENDING`, `SEND_FAILED`, `ROTATION_IN_PROGRESS`,
+`ROTATION_OUTCOME_UNKNOWN`), so the key is not on the wire: only
 `error_description` comes from here, in the request's language.
 The account API's
 disable of an authenticator it does not have reuses `handler.user.otp_not_enabled`,
@@ -178,7 +179,7 @@ key per cause, each a whole sentence.
 | `handler.settings_email.authentication_rejected` | (none) | The SMTP server rejected the username or password. |
 | `handler.settings_email.message_refused` | (none) | The SMTP server refused the message. |
 | `handler.settings_keys.rotation_in_progress` | (none) | Another key rotation is in progress |
-| `handler.settings_keys.commit_outcome_unknown` | (none) | The commit's outcome is unknown. Inspect the signing keys before rotating again |
+| `handler.settings_keys.commit_outcome_unknown` | `requestId` (string) | The key rotation may or may not have happened. Check the signing keys before you rotate again. Request Id: {{.requestId}} |
 
 ## Refusals the admin API answers by key
 

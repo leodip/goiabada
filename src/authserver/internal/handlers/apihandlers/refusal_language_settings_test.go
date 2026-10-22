@@ -346,10 +346,12 @@ func TestSettingsKeysRefusals_AreInTheRequestsLanguage(t *testing.T) {
 					ServeHTTP(rr, inRequestLanguage(rotateRequest(), acceptLanguage))
 				return rr
 			},
-			status:     http.StatusConflict,
-			code:       "ROTATION_OUTCOME_UNKNOWN",
-			english:    "The commit's outcome is unknown. Inspect the signing keys before rotating again",
-			portuguese: "O resultado da transação é desconhecido. Verifique as chaves de assinatura antes de rotacionar novamente",
+			status: http.StatusConflict,
+			code:   "ROTATION_OUTCOME_UNKNOWN",
+			english: "The key rotation may or may not have happened. Check the signing keys before you rotate again. " +
+				"Request Id: " + rotateKeysRequestId,
+			portuguese: "A rotação de chaves pode ou não ter acontecido. Verifique as chaves de assinatura antes de rotacionar novamente. " +
+				"ID da requisição: " + rotateKeysRequestId,
 		},
 		{
 			name:       "a key another administrator revoked",

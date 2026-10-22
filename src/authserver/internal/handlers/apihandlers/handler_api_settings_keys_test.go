@@ -189,6 +189,9 @@ func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 // the generic 500, which is the one status the published docs call retry-reasonable and whose
 // OpenAPI text promises nothing was rotated. No audit entry: whether the rotation happened is
 // exactly what is unknown, and the log carries exactly one entry per rotation that actually did.
+// It still writes what KEY_SET_INCOMPLETE writes, one Error record with the driver's error and the
+// same request id on the wire, since an operator must inspect the keys and that record is the only
+// trace of why (#279).
 func TestHandleSettingsKeysRotatePost_CommitOutcomeUnknown(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -211,13 +214,23 @@ func TestHandleSettingsKeysRotatePost_CommitOutcomeUnknown(t *testing.T) {
 	database.On("CreateKeyPair", mock.Anything, rotateTx, mock.Anything).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
+	capture := logtest.CaptureSlog(t)
+
 	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
+
+	logged := capture.Text()
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	body := decodeErrorBody(t, rr)
 	assert.Equal(t, "ROTATION_OUTCOME_UNKNOWN", body.ErrorCode)
-	assert.Equal(t, "The commit's outcome is unknown. Inspect the signing keys before rotating again",
-		body.ErrorDescription)
+	assert.Equal(t, "The key rotation may or may not have happened. Check the signing keys before you rotate again. "+
+		"Request Id: "+rotateKeysRequestId, body.ErrorDescription,
+		"the id on the wire and the id in the log have to be the same string")
+
+	assert.Equal(t, 1, strings.Count(logged, "level=ERROR"), "one record, not none and not two")
+	assert.Contains(t, logged, "request_id="+rotateKeysRequestId)
+	assert.Contains(t, logged, "connection reset by peer", "the driver's error is what the operator needs")
+	assert.Contains(t, logged, "unable to rotate the signing keys")
 	// auditLogger has no expectation at all, which NewAuditLogger's cleanup turns into a failure
 	// on any Log call: whether this rotation happened is exactly what is unknown.
 	database.AssertExpectations(t)

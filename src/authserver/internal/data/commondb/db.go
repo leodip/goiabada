@@ -124,15 +124,29 @@ func (d *Database) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
 }
 
 func (d *Database) CommitTransaction(ctx context.Context, tx *sql.Tx) error {
+	_, err := d.commit(ctx, tx)
+	return err
+}
+
+// commit is CommitTransaction, also reporting whether database/sql refused the commit before it
+// asked the driver for one. Tx.Commit does that in exactly two ways once the transaction's context
+// is done: it answers the context's own error, or sql.ErrTxDone when its rollback goroutine has
+// already finished the transaction. Either way no COMMIT reached the engine and the transaction is
+// known to be rolled back. The raw error is compared by identity, here where it is still at hand,
+// and not with errors.Is: a driver that is cancelled while its COMMIT is in flight answers with an
+// error of its own wrapping context.Canceled, and that commit's outcome is unknown (#371).
+func (d *Database) commit(ctx context.Context, tx *sql.Tx) (refusedBeforeTheDriver bool, err error) {
 	if d.logSQL {
 		slog.InfoContext(ctx, "committing transaction")
 	}
 
-	err := tx.Commit()
+	err = tx.Commit()
 	if err != nil {
-		return errs.Wrap(err, "unable to commit transaction")
+		ctxErr := ctx.Err()
+		refused := ctxErr != nil && (err == ctxErr || err == sql.ErrTxDone) //nolint:errorlint // identity is the test: a driver's error wrapping the context's is a commit that reached the engine (#371)
+		return refused, errs.Wrap(err, "unable to commit transaction")
 	}
-	return nil
+	return false, nil
 }
 
 func (d *Database) RollbackTransaction(ctx context.Context, tx *sql.Tx) error {
@@ -181,7 +195,9 @@ func waitOrCancel(ctx context.Context, d time.Duration) error {
 // A commit that fails for a reason other than a deadlock has an outcome the client cannot know,
 // since the server may have committed before the failure reached it, and replaying it would
 // apply the body twice: such a failure carries data.ErrCommitOutcomeUnknown, so a caller can
-// match what the text of the error cannot say (#371).
+// match what the text of the error cannot say (#371). A commit database/sql refused before it
+// reached the driver, because the context was done, does not carry it: that transaction was
+// rolled back, and the run answers as a cancelled one.
 //
 // WHY IT HOLDS. No order in which transactions take their rows is imposed anywhere in the
 // repository, so two transactions on the same account can take the same rows in opposite orders
@@ -329,11 +345,13 @@ func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) e
 	}
 
 	committing = true
-	commitErr := d.CommitTransaction(ctx, tx)
-	// A deadlock at the commit returns unchanged, so RunInTransaction reruns the whole body; any
-	// other commit failure is tagged with the sentinel that says its outcome is unknown, the one
-	// fact the driver's own text never carries (#371).
-	if commitErr != nil && !d.deadlock(commitErr) {
+	refusedBeforeTheDriver, commitErr := d.commit(ctx, tx)
+	// A deadlock at the commit returns unchanged, so RunInTransaction reruns the whole body; so
+	// does a commit database/sql refused before asking the driver, because a cancelled context
+	// rolled it back and its outcome is known. Any other commit failure is tagged with the
+	// sentinel that says its outcome is unknown, the one fact the driver's own text never
+	// carries (#371).
+	if commitErr != nil && !refusedBeforeTheDriver && !d.deadlock(commitErr) {
 		return errs.Errorf("%w: %w", data.ErrCommitOutcomeUnknown, commitErr)
 	}
 	return commitErr

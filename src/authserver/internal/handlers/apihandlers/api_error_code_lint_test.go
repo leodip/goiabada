@@ -104,7 +104,7 @@ var apiErrorCodes = map[string]string{
 	"MANAGE_SCOPE_REQUIRED": "403 from the administrative policy: the request acts on an administrator or an administrative permission, which only authserver:manage may do, so no granular scope will ever be enough (#402).",
 
 	// Key rotation, kept by decision 7 where every other 500-adjacent code went: a caller acts on
-	// both, and openapi.yaml documents them.
+	// each, and openapi.yaml documents them.
 	"ROTATION_IN_PROGRESS":     "409 on rotateKeys: another rotation won the race and this call rotated nothing, so the caller does not retry.",
 	"ROTATION_OUTCOME_UNKNOWN": "409 on rotateKeys: the commit that would end the rotation failed for a reason other than a deadlock, so its outcome is unknown and the caller inspects the key set before retrying.",
 	"KEY_SET_INCOMPLETE":       "500 on rotateKeys: the key set is not in a rotatable state.",
