@@ -23,7 +23,7 @@ Everything you need, Go, the linters, the Tailwind CLI and the four databases, r
 
 2. Open the repository's `src` folder in your editor, not the repository itself. The dev container is defined in `src/.devcontainer`, and an editor looks for it in the folder you open.
 
-3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes.
+3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes. Before it, `src/.devcontainer/generate-env.sh` writes `src/.devcontainer/.env`, the stack's data key and database passwords, drawn fresh for your checkout; on Windows it needs `sh` on the `PATH`, which WSL or Git for Windows' `usr/bin` provides.
 
 </Steps>
 
@@ -52,7 +52,7 @@ Every command below runs inside the container, from the directory it names.
 Each rebuilds and restarts when you save a Go file or a template in its own module. A change under `src/core` isn't watched: save a file in the server's module, or run `make serve` again, to pick it up.
 
 <Aside type="danger">
-The dev container's administrator password, keys and secrets are published in the repository. **Never** use them in a deployment.
+The dev container's administrator password, session keys and client secret are published in the repository. **Never** use them, or the data key and database passwords in `src/.devcontainer/.env`, in a deployment.
 </Aside>
 
 ## Run the tests

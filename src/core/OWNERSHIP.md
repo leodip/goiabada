@@ -285,6 +285,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertNoGuardInTestsReachedFrom` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoHTMLSinks` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoLiteralStackSecrets` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoParentImport` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoStaleDeferredBodyCloses` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |

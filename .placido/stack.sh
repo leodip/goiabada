@@ -4,7 +4,8 @@
 # and no published ports (docker-compose.worktree.yml), so issues never collide with
 # each other or with the human stack, `goiabada`. Tests run inside its devcontainer
 # with the environment devcontainer.json declares, which `docker exec` does not apply
-# by itself (see src/.devcontainer/README.md).
+# by itself (see src/.devcontainer/README.md), beside the data key and database
+# passwords Compose gave the container from the worktree's generated .env.
 #
 #   stack.sh up          start the stack and wait for every database (placido's setup)
 #   stack.sh down        remove its containers, volumes, network and image (teardown)
@@ -74,16 +75,17 @@ in_container() {  # in_container WORKDIR COMMAND...
 }
 
 # Each probe uses the address, port and login the tests use; the engines are not on
-# their default ports.
+# their default ports. The password is the one the server's own container was started
+# with, read from its environment there, so it is never written here (#501).
 probe() {
     case "$1" in
-        mysql) docker exec "$NAME-mysql-server-1" mysql --connect-timeout=3 -h mysql-server -P 13306 \
-                   -uroot -pmySqlPass123 -e 'select 1' >/dev/null 2>&1 ;;
-        postgres) docker exec -e PGCONNECT_TIMEOUT=3 -e PGPASSWORD=myPostgresPass123 "$NAME-postgres-server-1" \
-                   psql -h postgres-server -p 15432 -U postgres -c 'select 1' >/dev/null 2>&1 ;;
+        mysql) docker exec "$NAME-mysql-server-1" sh -c 'mysql --connect-timeout=3 -h mysql-server -P 13306 \
+                   -uroot -p"$MYSQL_ROOT_PASSWORD" -e "select 1"' >/dev/null 2>&1 ;;
+        postgres) docker exec -e PGCONNECT_TIMEOUT=3 "$NAME-postgres-server-1" sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" \
+                   psql -h postgres-server -p 15432 -U postgres -c "select 1"' >/dev/null 2>&1 ;;
         mssql) docker exec "$NAME-mssql-server-1" bash -c \
                    "\$(ls /opt/mssql-tools*/bin/sqlcmd | head -1) -C -S mssql-server,11433 -U sa \
-                    -P 'YourStr0ngPassw0rd!' -l 3 -t 3 -Q 'SELECT 1'" >/dev/null 2>&1 ;;
+                    -P \"\$MSSQL_SA_PASSWORD\" -l 3 -t 3 -Q 'SELECT 1'" >/dev/null 2>&1 ;;
     esac
 }
 
@@ -117,6 +119,9 @@ wait_for_databases() {
 
 case "${1:-}" in
     up)
+        # The stack's data key and database passwords, drawn for this worktree once and
+        # kept beside the compose files, where Compose reads them (#501).
+        sh "$DC/generate-env.sh"
         compose up -d --wait --wait-timeout "$WAIT"
         wait_for_databases
         # The devcontainer must mount this worktree, not another checkout. Docker Desktop

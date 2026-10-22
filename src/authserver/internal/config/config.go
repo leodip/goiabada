@@ -730,7 +730,7 @@ func (c *Config) DataKeys() (current, previous []byte, err error) {
 		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is required. Generate with: openssl rand -hex 32")
 	}
 	if strings.EqualFold(key, publishedSampleDataKeyHex) {
-		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published in its Compose files, so every column it sealed is readable by anyone. Generate a new one with: openssl rand -hex 32, then move the data off this key as https://goiabada.dev/deploy/rotate-secrets/ describes, keeping this one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
+		return nil, nil, errs.Errorf("GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published in its Compose files, so every column it sealed is readable by anyone. Generate a new one with: openssl rand -hex 32, then move the data off this key as https://goiabada.dev/deploy/rotate-secrets/#the-aes-key describes, keeping this one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 	current, err = hex.DecodeString(key)
 	if err != nil {

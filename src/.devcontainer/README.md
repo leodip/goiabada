@@ -3,8 +3,31 @@
 `devcontainer.json` plus `docker-compose.yml` is the stack VS Code opens for human development:
 a `devcontainer` service with the checkout mounted at `/workspaces/goiabada`, MySQL, PostgreSQL,
 SQL Server and Mailpit on a private network, and four ports published to the host so a person can
-reach the databases and the Mailpit UI: 13306, 15432, 11433 and 8025. Nothing below changes that
-stack.
+reach the databases and the Mailpit UI: 13306, 15432, 11433 and 8025. Nothing in
+[A second stack beside it](#a-second-stack-beside-it) changes that stack.
+
+## Secrets
+
+No file in the repository holds the stack's data key or its database passwords (#501).
+`generate-env.sh` writes them into `.env` in this directory, once, with fresh values:
+`GOIABADA_AES_ENCRYPTION_KEY`, `MYSQL_ROOT_PASSWORD`, `POSTGRES_PASSWORD` and
+`MSSQL_SA_PASSWORD`. `.gitignore` keeps the file out of git. Compose reads `.env` from this
+directory and hands the passwords to the three databases and all four values to the
+devcontainer, where `run-tests.sh` and `schemadump` read them; `docker-compose.yml` refuses to
+start without them. `devcontainer.json` runs the script as its `initializeCommand`, on the host,
+before every start; it keeps a `.env` that exists. On a Windows host it needs `sh` on the
+`PATH`, which Git for Windows' `usr/bin` or WSL provides.
+
+Keep `.env` as long as the stack's volumes: each database keeps the password its volume was
+first initialised with, and a dev database seeded under one key can't be read under another.
+Deleting `.env` means taking the volumes down with it (`down -v`) and seeding again.
+
+A stack created before #627 has the published sample data key, which the auth server refuses, and
+the old literal passwords baked into its volumes. Rebuild it once: take the stack down with its
+volumes (from VS Code, `docker compose -p goiabada down -v` in this directory, or as
+[Stop](#stop) shows for a second stack), then reopen the container or start it again, which
+writes `.env`, initialises new volumes with its passwords and lets the auth server seed a new
+dev database.
 
 ## TLS from a test authority
 
@@ -35,12 +58,14 @@ second stack unchanged.
 
 Run from anywhere. `--project-directory` pins the compose files' relative paths (the build
 context, the `../..` bind mount) to the worktree, so the stack mounts that checkout rather than
-whichever directory you happen to be in. Pick a project name that is not `goiabada`.
+whichever directory you happen to be in, and is where Compose reads `.env` from. Pick a project
+name that is not `goiabada`. Run `generate-env.sh` first, as [Secrets](#secrets) says.
 
 ```sh
 WT=/path/to/worktree          # the checkout this stack must mount
 NAME=goiabada-wt-130          # any name but goiabada, which is the human stack
 
+sh "$WT/src/.devcontainer/generate-env.sh"
 docker compose -p "$NAME" \
   --project-directory "$WT/src/.devcontainer" \
   -f "$WT/src/.devcontainer/docker-compose.yml" \
@@ -73,11 +98,14 @@ wait_for() {  # wait_for <label> <deadline-seconds> <probe command...>
     sleep 2
   done
 }
-wait_for mysql    120 docker exec "$NAME-mysql-server-1"   mysql --connect-timeout=3 -h mysql-server -P 13306 -uroot -pmySqlPass123 -e 'select 1' &&
-wait_for postgres 120 docker exec -e PGCONNECT_TIMEOUT=3 -e PGPASSWORD=myPostgresPass123 "$NAME-postgres-server-1"   psql -h postgres-server -p 15432 -U postgres -c 'select 1' &&
-wait_for mssql    300 docker exec "$NAME-mssql-server-1"   /opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S mssql-server,11433 -U sa -P 'YourStr0ngPassw0rd!' -C -Q 'select 1' ||
+wait_for mysql    120 docker exec "$NAME-mysql-server-1"   sh -c 'mysql --connect-timeout=3 -h mysql-server -P 13306 -uroot -p"$MYSQL_ROOT_PASSWORD" -e "select 1"' &&
+wait_for postgres 120 docker exec -e PGCONNECT_TIMEOUT=3 "$NAME-postgres-server-1"   sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h postgres-server -p 15432 -U postgres -c "select 1"' &&
+wait_for mssql    300 docker exec "$NAME-mssql-server-1"   sh -c '/opt/mssql-tools18/bin/sqlcmd -l 3 -t 3 -S mssql-server,11433 -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "select 1"' ||
 exit 1
 ```
+
+Each probe runs in its database's own container and reads the password from that container's
+environment, the one the server was started with, so it is never typed here.
 
 The three are chained so the first database that misses its deadline ends the wait with a
 failure; without the chain a later success would hide an earlier timeout.
@@ -98,7 +126,8 @@ The devcontainer's environment comes from `containerEnv` in `devcontainer.json`,
 never reads. VS Code injects it for the human container; for an automated stack pass every
 entry as `-e KEY=VALUE` on each `docker exec`, or the launched authserver has no configuration,
 drops into first-run setup and the integration tier times out with zero tests. `CGO_ENABLED=0`
-is among those entries and matters for the build.
+is among those entries and matters for the build. The data key and the database passwords are
+not among them: Compose set those on the container from `.env`, and `docker exec` inherits them.
 
 ```sh
 docker exec -u vscode -w /workspaces/goiabada/src/authserver \

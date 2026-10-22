@@ -1,6 +1,10 @@
 {
 	"name": "dev-container-server",
 	"dockerComposeFile": "docker-compose.yml",
+	// Writes .env, the stack's data key and database passwords, before Compose reads it; a no-op
+	// once it exists. Runs on the host, so a Windows host needs sh on its PATH, as Git for
+	// Windows' usr/bin or WSL provides (README.md, "Secrets").
+	"initializeCommand": ["sh", "${localWorkspaceFolder}/.devcontainer/generate-env.sh"],
 	"service": "devcontainer",
 	"workspaceFolder": "/workspaces/goiabada/src/",
 
@@ -26,13 +30,13 @@
 		"GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS": "false",
 		"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		"GOIABADA_AES_ENCRYPTION_KEY": "3008ac6e5d242f37a0135f06b0fe3bc164b9147153c911ad1407c1256b0d802a",
+		// GOIABADA_AES_ENCRYPTION_KEY and GOIABADA_DB_PASSWORD are not here: docker-compose.yml sets
+		// them, from the .env generate-env.sh writes for this checkout (#501).
 
 		"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET": "devcontainer-admin-console-secret-0123456789abcdef",
 
 		"GOIABADA_DB_TYPE": "mssql",
 		"GOIABADA_DB_USERNAME": "sa",
-		"GOIABADA_DB_PASSWORD": "YourStr0ngPassw0rd!",
 		"GOIABADA_DB_HOST": "mssql-server",
 		"GOIABADA_DB_PORT": "11433",
 		"GOIABADA_DB_NAME": "goiabada",

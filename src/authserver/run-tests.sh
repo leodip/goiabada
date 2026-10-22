@@ -454,6 +454,22 @@ kill_processes_on_ports() {
     done
 }
 
+# The data key and the three database passwords come from the environment, never from this
+# script (#501): in the devcontainer from src/.devcontainer/.env, which
+# src/.devcontainer/generate-env.sh writes once with fresh values and Compose hands the
+# devcontainer and the databases alike, and in CI from values each run draws. Nothing here
+# substitutes a value for an absent one. A container created before #627 carries the sample data
+# key the auth server refuses and none of the generated passwords: it needs a rebuild, its database
+# volumes dropped, since each server keeps the password its volume was initialised with, and its
+# dev database re-seeded. src/.devcontainer/README.md has the steps.
+require_stack_variable() {
+    local name=$1
+    if [ -z "${!name:-}" ]; then
+        echo "run-tests.sh: $name is not set; it comes from the stack's generated src/.devcontainer/.env, so rebuild the devcontainer (src/.devcontainer/README.md, \"Secrets\")." >&2
+        exit 1
+    fi
+}
+
 # Function to configure database environment
 configure_database() {
     local db_type=$1
@@ -470,7 +486,8 @@ configure_database() {
         "mysql")
             export GOIABADA_DB_TYPE=mysql
             export GOIABADA_DB_USERNAME=root
-            export GOIABADA_DB_PASSWORD=mySqlPass123
+            require_stack_variable MYSQL_ROOT_PASSWORD
+            export GOIABADA_DB_PASSWORD="$MYSQL_ROOT_PASSWORD"
             export GOIABADA_DB_HOST=mysql-server
             export GOIABADA_DB_PORT=13306
             export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
@@ -479,7 +496,8 @@ configure_database() {
         "postgres")
             export GOIABADA_DB_TYPE=postgres
             export GOIABADA_DB_USERNAME=postgres
-            export GOIABADA_DB_PASSWORD=myPostgresPass123
+            require_stack_variable POSTGRES_PASSWORD
+            export GOIABADA_DB_PASSWORD="$POSTGRES_PASSWORD"
             export GOIABADA_DB_HOST=postgres-server
             export GOIABADA_DB_PORT=15432
             export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
@@ -488,7 +506,8 @@ configure_database() {
         "mssql")
             export GOIABADA_DB_TYPE=mssql
             export GOIABADA_DB_USERNAME=sa
-            export GOIABADA_DB_PASSWORD=YourStr0ngPassw0rd!
+            require_stack_variable MSSQL_SA_PASSWORD
+            export GOIABADA_DB_PASSWORD="$MSSQL_SA_PASSWORD"
             export GOIABADA_DB_HOST=mssql-server
             export GOIABADA_DB_PORT=11433
             export GOIABADA_DB_NAME="goiabada_${db_name_suffix}"
@@ -519,10 +538,10 @@ configure_database() {
     export GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS=19190
 
     # Data-at-rest encryption key (issue #83). Required by the auth server and the
-    # data/integration test harnesses. Honors the value from the devcontainer env
-    # if present, otherwise uses a fixed test key so existing containers work
-    # without a rebuild.
-    export GOIABADA_AES_ENCRYPTION_KEY="${GOIABADA_AES_ENCRYPTION_KEY:-3008ac6e5d242f37a0135f06b0fe3bc164b9147153c911ad1407c1256b0d802a}"
+    # data/integration test harnesses, and taken from the environment like the
+    # database passwords above.
+    require_stack_variable GOIABADA_AES_ENCRYPTION_KEY
+    export GOIABADA_AES_ENCRYPTION_KEY
 }
 
 # Drop the database configure_database just named, on the three engines with a server, so the

@@ -77,9 +77,13 @@ permissions:
 # level because GitHub does not support YAML anchors in workflow files, and
 # every container job needs the same block.
 #
-# The database variables are deliberately absent: run-tests.sh's
-# configure_database sets them per database, and that function is the reason CI
-# can reuse the script unchanged.
+# The data key and the database passwords are deliberately absent (#501): no
+# runnable file supplies either by literal, so each run draws its own. The
+# versions job draws the database passwords, which the database jobs' services
+# read, and each test job draws its data key in its first step. run-tests.sh's
+# configure_database reads them from the environment and sets the other database
+# variables per database, and that function is the reason CI can reuse the script
+# unchanged.
 env:
   TZ: Europe/Lisbon
 
@@ -106,7 +110,6 @@ env:
   GOIABADA_AUTHSERVER_TEMPLATEDIR: ""
   GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-  GOIABADA_AES_ENCRYPTION_KEY: 3008ac6e5d242f37a0135f06b0fe3bc164b9147153c911ad1407c1256b0d802a
   GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE: /tmp/bootstrap.env
 
   GOIABADA_ADMINCONSOLE_BASEURL: http://localhost:19091
@@ -140,7 +143,24 @@ jobs:
       unparam: ${{ steps.read.outputs.unparam }}
       govulncheck: ${{ steps.read.outputs.govulncheck }}
       mockery: ${{ steps.read.outputs.mockery }}
+      mysql-password: ${{ steps.passwords.outputs.mysql }}
+      postgres-password: ${{ steps.passwords.outputs.postgres }}
+      mssql-password: ${{ steps.passwords.outputs.mssql }}
     steps:
+      # The passwords this run's database servers start with, drawn fresh rather than written in
+      # this file (#501). A service's env reads another job's outputs and no step of its own job,
+      # so they are drawn in a job before the database jobs, and in this one because it is
+      # already required: a database job skipped for a failed job it needs counts as passing.
+      # They are not masked, since GitHub drops a masked value from a job's outputs; each is a
+      # throwaway for one run's service containers, which nothing outside the run reaches.
+      # SQL Server's policy asks for three of upper case, lower case, digits and symbols, which a
+      # hex string lacks.
+      - id: passwords
+        run: |
+          set -euo pipefail
+          echo "mysql=$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
+          echo "postgres=$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
+          echo "mssql=Aa1-$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: read
         run: |
@@ -611,6 +631,9 @@ jobs:
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Draw this run's data key
+        # Fresh for every job rather than written in this file (#501).
+        run: echo "GOIABADA_AES_ENCRYPTION_KEY=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" >> "$GITHUB_ENV"
       - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
@@ -630,6 +653,8 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      MYSQL_ROOT_PASSWORD: ${{ needs.versions.outputs.mysql-password }}
     container:
       image: golang:${{ needs.versions.outputs.go }}-bookworm
       credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
@@ -652,19 +677,22 @@ jobs:
         image: mysql:26
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
         env:
-          MYSQL_ROOT_PASSWORD: mySqlPass123
+          MYSQL_ROOT_PASSWORD: ${{ needs.versions.outputs.mysql-password }}
           MYSQL_TCP_PORT: 13306
         volumes:
           - db-tls:/db-tls:ro
         options: >-
           --tmpfs /var/lib/mysql
-          --health-cmd "mysqladmin ping -uroot -pmySqlPass123 --port=13306 --protocol=tcp"
+          --health-cmd "mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD --port=13306 --protocol=tcp"
           --health-interval 3s --health-timeout 3s --health-retries 30
       mailpit:
         image: axllent/mailpit
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Draw this run's data key
+        # Fresh for every job rather than written in this file (#501).
+        run: echo "GOIABADA_AES_ENCRYPTION_KEY=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" >> "$GITHUB_ENV"
       - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
@@ -688,6 +716,8 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ${{ needs.versions.outputs.postgres-password }}
     container:
       image: golang:${{ needs.versions.outputs.go }}-bookworm
       credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
@@ -700,7 +730,7 @@ jobs:
         image: postgres:18
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
         env:
-          POSTGRES_PASSWORD: myPostgresPass123
+          POSTGRES_PASSWORD: ${{ needs.versions.outputs.postgres-password }}
           POSTGRES_DB: goiabada
           PGPORT: 15432
         volumes:
@@ -717,6 +747,9 @@ jobs:
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Draw this run's data key
+        # Fresh for every job rather than written in this file (#501).
+        run: echo "GOIABADA_AES_ENCRYPTION_KEY=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" >> "$GITHUB_ENV"
       - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:
@@ -740,6 +773,8 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    env:
+      MSSQL_SA_PASSWORD: ${{ needs.versions.outputs.mssql-password }}
     container:
       image: golang:${{ needs.versions.outputs.go }}-bookworm
       credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
@@ -752,7 +787,7 @@ jobs:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: YourStr0ngPassw0rd!
+          MSSQL_SA_PASSWORD: ${{ needs.versions.outputs.mssql-password }}
           MSSQL_PID: Express
           MSSQL_TCP_PORT: 11433
         volumes:
@@ -768,13 +803,16 @@ jobs:
         options: >-
           --tmpfs /var/opt/mssql/data:uid=10001,gid=0
           --tmpfs /var/opt/mssql/log:uid=10001,gid=0
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P 'YourStr0ngPassw0rd!' -Q 'SELECT 1'"
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1'"
           --health-interval 5s --health-timeout 5s --health-retries 40
       mailpit:
         image: axllent/mailpit
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Draw this run's data key
+        # Fresh for every job rather than written in this file (#501).
+        run: echo "GOIABADA_AES_ENCRYPTION_KEY=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" >> "$GITHUB_ENV"
       - uses: ./.github/actions/runner-specs
       - uses: ./.github/actions/setup-test-container
         with:

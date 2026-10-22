@@ -258,6 +258,8 @@ If you lose this key, every secret and signing key in the database is lost with 
 
 To rotate it, set `GOIABADA_AES_ENCRYPTION_KEY` to a new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old one, then restart the auth server. At start, it re-encrypts everything under the new key in one transaction. Leaving the previous key set across restarts is harmless, but remove it once the rotation is done. If the data decrypts under neither key, the auth server refuses to start rather than risk damaging it. [Rotate secrets](/deploy/rotate-secrets/#the-aes-key) has the procedure for each platform, and [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) where to keep the key.
 
+The auth server refuses to start with the sample key this repository's Compose files once published as `GOIABADA_AES_ENCRYPTION_KEY`, and accepts it only as `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, to rotate off it.
+
 ## The first start
 
 When the auth server starts on an empty database, it creates the first administrator from `GOIABADA_ADMIN_EMAIL` and `GOIABADA_ADMIN_PASSWORD`, and a client for the admin console. How it gets that client's secret depends on what you set:
