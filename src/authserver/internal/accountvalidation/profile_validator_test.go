@@ -495,6 +495,10 @@ func TestValidateProfile_Nickname(t *testing.T) {
 		{"empty is allowed", "", ""},
 		{"a control character: a tab", "ni	ck", i18n.ErrCodeProfileNicknameInvalid},
 		{"a control character: a line break", "ni\nck", i18n.ErrCodeProfileNicknameInvalid},
+		// C1 is control too, and its next line, U+0085, a mandatory break (UAX #14 class NL).
+		{"a C1 control character: a next line", "Amazing\u0085Grace", i18n.ErrCodeProfileNicknameInvalid},
+		{"a C1 control character: the first", "ni\u0080ck", i18n.ErrCodeProfileNicknameInvalid},
+		{"a C1 control character: the last", "ni\u009fck", i18n.ErrCodeProfileNicknameInvalid},
 		// A line or paragraph separator is a mandatory break too, which browsers honour.
 		{"a line separator", "Amazing\u2028Grace", i18n.ErrCodeProfileNicknameInvalid},
 		{"a paragraph separator", "Amazing\u2029Grace", i18n.ErrCodeProfileNicknameInvalid},
