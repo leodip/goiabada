@@ -42,6 +42,7 @@ func ToUserResponse(user *record.User) *api.UserResponse {
 		AddressPostalCode:             user.AddressPostalCode,
 		AddressCountry:                user.AddressCountry,
 		OTPEnabled:                    user.OTPEnabled,
+		OTPAuthenticatorDisabled:      user.OtpAuthenticatorDisabled(),
 	}
 
 	if user.CreatedAt.Valid {

@@ -189,6 +189,21 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		if got := reloadUser(t, userId).LastOTPStep; got != 0 {
 			t.Errorf("last_otp_step = %d, want 0: the refused claim must not spend a step of the replacement", got)
 		}
+		// Nor is the refusal counted against the replacement: it was never tried against it (#489).
+		if got := reloadUser(t, userId).OtpConsecutiveFailures; got != 0 {
+			t.Errorf("otp_consecutive_failures = %d, want 0: the refused claim must not count against the replacement", got)
+		}
+		// And a wrong code checked against the first authenticator counts nothing either.
+		result, err = otpcredential.VerifyStored(ctx, database, dataCipher, read, "000000", now)
+		if err != nil {
+			t.Fatalf("VerifyStored of a wrong code failed: %v", err)
+		}
+		if result.Outcome != otpcredential.OutcomeWrong {
+			t.Errorf("a wrong code: Outcome = %v, want OutcomeWrong", result.Outcome)
+		}
+		if got := reloadUser(t, userId).OtpConsecutiveFailures; got != 0 {
+			t.Errorf("otp_consecutive_failures = %d, want 0: a wrong code for the removed authenticator must not count against the replacement", got)
+		}
 
 		// The replacement itself verifies from a read of it.
 		result, err = otpcredential.VerifyStored(ctx, database, dataCipher, replaced, codeFor(t, replacementSeed, now), now)

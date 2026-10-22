@@ -253,12 +253,39 @@ type Database interface {
 	// passcode checked against an authenticator removed, or removed and replaced, under
 	// the request is refused rather than asserting otp for one that no longer exists
 	// (#111, #144, #471). False carries the same imprecision as TryConsumeUserOTPStep's.
+	//
+	// The same statement also returns otp_consecutive_failures to 0, and refuses while
+	// that count stands at record.OtpConsecutiveFailureLimit: a success disregards the
+	// attempts before it, and an authenticator at the limit is disabled until it is
+	// rebound (NIST SP 800-63B section 3.2.2, #489). Clearing beside the claim is what
+	// keeps the two from being separable -- the verification that succeeded is the one
+	// that moved the count -- and holding the limit in the predicate is what makes the
+	// disable answer the row rather than the caller's snapshot of it.
 	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
 		expectedGeneration int64) (bool, error)
 	// ResetUserOTPStep returns the consumed-step marker to 0. Called when OTP is
 	// disabled: the marker belongs to the enrolled authenticator, and it is the only
 	// remedy if a clock jump strands the marker in the future (#111).
 	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
+	// IncrementUserOtpConsecutiveFailures advances the count of consecutive failed
+	// attempts against the user's enrolled authenticator by one, stopping at
+	// record.OtpConsecutiveFailureLimit, where the authenticator is disabled until it is
+	// rebound (NIST SP 800-63B section 3.2.2, #489). Called by otpcredential.VerifyStored
+	// on every failed attempt, the verification whose refusal moved the count: a wrong
+	// code and a replayed one both count, as the otp rate tier already charges both.
+	// Beyond the limit the statement matches no row, so grinding a disabled authenticator
+	// writes nothing. Bound to the authenticator the code was checked against: it matches
+	// only while OTP is on at expectedGeneration, so a refusal in flight across a removal
+	// or a replacement charges nothing to the replacement. True means this call moved the
+	// count to the limit, which exactly one call can, so the disable is audited once.
+	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+		expectedGeneration int64) (bool, error)
+	// ClearUserOtpConsecutiveFailures returns the consecutive-failure count to 0. Called
+	// inside the same transaction as the write that binds a fresh authenticator
+	// (otpcredential.Establish), because rebinding is the one path back from the limit,
+	// and a count left standing would refuse the very enrolment that exists to clear it
+	// (#489).
+	ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
 	// TryInstallPendingOTPEnrollment records a TOTP enrollment the server has just
 	// issued, only if the user has no live one and no authenticator already, and
 	// reports whether this call installed it. Compare-and-set is what makes the

@@ -57,6 +57,41 @@ func dbType() data.Dialect {
 	return d
 }
 
+// scaffoldHeadUsersColumns adds to a users table pinned below head the users columns the head
+// record names that the pinned schema does not carry: one ALTER per column, in the configured
+// dialect, mirroring the migration that added it. #489's otp_consecutive_failures is the first
+// entry; the next migration that adds a users column joins it here.
+//
+// What it is for: the migration tests read their fixtures back through the ORM, at the version
+// the migration under test needs, and that read stays the ORM's because its scan is what those
+// tests are about -- so a users column a later migration adds fails there, loudly, rather than
+// being missed by a narrower select (#510). The loud failure is the prompt; this helper is the
+// answer it asks for: with the column scaffolded on, the pinned shape serves the read while the
+// migration under test still sees exactly the columns it transforms. A column a later migration
+// DROPS the model no longer names (#471), and the downs that re-add it cost these reads nothing,
+// so only additions belong here.
+func scaffoldHeadUsersColumns(t *testing.T, h *isolatedDB) {
+	t.Helper()
+
+	var q string
+	switch dbType() {
+	case data.MySQL:
+		q = "ALTER TABLE `users` ADD COLUMN `otp_consecutive_failures` bigint NOT NULL DEFAULT 0"
+	case data.Postgres:
+		q = "ALTER TABLE users ADD COLUMN otp_consecutive_failures bigint NOT NULL DEFAULT 0"
+	case data.MSSQL:
+		// The constraint named as the migration names it, so the scaffolded shape is the one
+		// that ships: nothing here drops the column, but a reader comparing the pinned table
+		// to 000066's up sees the same table either way.
+		q = "ALTER TABLE [users] ADD [otp_consecutive_failures] BIGINT NOT NULL " +
+			"CONSTRAINT [df_users_otp_consecutive_failures] DEFAULT 0"
+	default: // SQLite
+		q = "ALTER TABLE users ADD COLUMN otp_consecutive_failures INTEGER NOT NULL DEFAULT 0"
+	}
+	_, err := h.SQL.ExecContext(context.Background(), q)
+	require.NoError(t, err, "scaffold the head-only users columns onto the pinned schema")
+}
+
 // newIsolatedDB creates a fresh, empty database of the configured dialect and a
 // migrator bound to it (at version 0). Cleanup (close + drop) is registered on t.
 func newIsolatedDB(t *testing.T) *isolatedDB {

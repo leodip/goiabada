@@ -1507,6 +1507,11 @@ func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId
 // transaction, so a matching generation is the authenticator the request read (#144,
 // #471 decision 3).
 //
+// The claim also carries the consecutive-failure count's two rules, in the same
+// statement: it returns otp_consecutive_failures to 0, and it refuses while the count
+// stands at record.OtpConsecutiveFailureLimit, where the authenticator is disabled until
+// it is rebound (NIST SP 800-63B section 3.2.2, #489).
+//
 // Everything else, the false and the error, is as TryConsumeUserOTPStep documents.
 func (d *Database) TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
 	expectedGeneration int64) (bool, error) {
@@ -1528,6 +1533,15 @@ func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId in
 		ub.Assign("last_otp_step", step),
 		ub.Assign("updated_at", time.Now().UTC()),
 	)
+	if enrolledAt != nil {
+		// The verification claim returns the consecutive-failure count to 0 in the same
+		// statement, which is the "disregard any previous failed attempts" NIST SP 800-63B
+		// section 3.2.2 asks of a verifier, done beside the claim rather than after it so
+		// no committed state has a step consumed and the attempts before it still
+		// standing (#489). SetMore rather than a second Set, which replaces: the claim
+		// must keep the step it came for.
+		ub.SetMore(ub.Assign("otp_consecutive_failures", 0))
+	}
 	// The strict inequality is what refuses a replay: the second submission of one code
 	// carries the step already stored, so it matches no row. rowsAffected == 1 means
 	// this call transitioned the row on all four engines, because matching the WHERE
@@ -1545,6 +1559,11 @@ func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId in
 		predicates = append(predicates,
 			ub.Equal("otp_enabled", true),
 			ub.Equal("otp_config_generation", *enrolledAt),
+			// The count's limit is part of the claim, not a read before it: an
+			// authenticator disabled at record.OtpConsecutiveFailureLimit stays disabled
+			// even to a request that loaded the user before the count reached it, the
+			// same way the generation term refuses a replaced authenticator (#489).
+			ub.LessThan("otp_consecutive_failures", record.OtpConsecutiveFailureLimit),
 		)
 	}
 	ub.Where(predicates...)
@@ -1599,6 +1618,135 @@ func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int6
 	_, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to reset user OTP step")
+	}
+
+	return nil
+}
+
+// IncrementUserOtpConsecutiveFailures advances the count of consecutive failed attempts
+// against the user's enrolled authenticator by one, stopping at
+// record.OtpConsecutiveFailureLimit, where the authenticator is disabled until it is
+// rebound (NIST SP 800-63B section 3.2.2, #489), and reports whether this call is the one
+// that moved the count to the limit, so the caller audits the disable exactly once.
+//
+// The count is bound to the authenticator the refused code was checked against, as the
+// verification claim is: the statements match only while otp_enabled is true and
+// otp_config_generation is still expectedGeneration, the generation the caller read
+// beside the seed. A request in flight while the authenticator is removed, or removed
+// and replaced, therefore charges nothing to the replacement, which no failed attempt
+// was tried against.
+//
+// Two statements, each a compare-and-set, rather than an increment and a read-back: the
+// first advances a count still short of the last step, and only when it matches nothing
+// does the second move the count from the limit's last step to the limit. Exactly one
+// call can match that second statement, which is what makes "this call disabled it" a
+// fact of the row rather than of the caller's snapshot, and neither statement needs a
+// transaction to hold it with, so tx stays optional, as on TryConsumeUserOTPStep. A
+// count cleared by a success landing between the two matches neither, and this attempt,
+// which came before that success, is disregarded with the others.
+//
+// A row that matches nothing is not an error, unlike IncrementUserOtpConfigGeneration's
+// missing row: a user already at the limit matches no row, and so does an authenticator
+// removed or replaced since the read, or a row deleted, and none is a failure. The
+// ceiling is the load-bearing half -- an attacker grinding a disabled authenticator must
+// not move the row at all.
+//
+// updated_at is left alone, for AcquireUserRow's reason: a refused code is not an edit of
+// the account, and the column is the OIDC updated_at claim and the console's "Last
+// updated at", which anyone holding the password could otherwise move at will.
+//
+// Deliberately not part of UpdateUser. otp_consecutive_failures is tagged dont-update
+// because a whole-row write from a model read before the refusal would write the
+// pre-attempt count back over the row's, silently unlocking a disabled authenticator.
+func (d *Database) IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+	expectedGeneration int64) (bool, error) {
+
+	if userId == 0 {
+		return false, errs.New("can't increment the OTP consecutive failures of user with id 0")
+	}
+
+	advanced, err := d.casUserOtpConsecutiveFailures(ctx, tx, userId, expectedGeneration,
+		func(ub *sqlbuilder.UpdateBuilder) string {
+			return "otp_consecutive_failures = otp_consecutive_failures + 1"
+		},
+		func(ub *sqlbuilder.UpdateBuilder) string {
+			return ub.LessThan("otp_consecutive_failures", record.OtpConsecutiveFailureLimit-1)
+		})
+	if err != nil || advanced {
+		return false, err
+	}
+
+	return d.casUserOtpConsecutiveFailures(ctx, tx, userId, expectedGeneration,
+		func(ub *sqlbuilder.UpdateBuilder) string {
+			return ub.Assign("otp_consecutive_failures", record.OtpConsecutiveFailureLimit)
+		},
+		func(ub *sqlbuilder.UpdateBuilder) string {
+			return ub.Equal("otp_consecutive_failures", record.OtpConsecutiveFailureLimit-1)
+		})
+}
+
+// casUserOtpConsecutiveFailures is one of IncrementUserOtpConsecutiveFailures' two
+// statements: the assignment applied where the row still holds the authenticator at
+// expectedGeneration and the count matches countTerm, reporting whether it matched.
+func (d *Database) casUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+	expectedGeneration int64, assignment, countTerm func(*sqlbuilder.UpdateBuilder) string) (bool, error) {
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(assignment(ub))
+	ub.Where(
+		ub.Equal("id", userId),
+		ub.Equal("otp_enabled", true),
+		ub.Equal("otp_config_generation", expectedGeneration),
+		countTerm(ub),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to increment user OTP consecutive failures")
+	}
+	// Both assignments change the count, so a matched row is a changed row and MySQL's
+	// changed-rows count agrees with the other engines' matched-rows count here.
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when incrementing user OTP consecutive failures")
+	}
+	return rowsAffected == 1, nil
+}
+
+// ClearUserOtpConsecutiveFailures returns the consecutive-failure count to 0, the state
+// of a user no failed attempt has been counted against. Called inside the same
+// transaction as the write that binds a fresh authenticator, because rebinding is the
+// one path back from record.OtpConsecutiveFailureLimit: a count committed with the
+// authenticator would disable the enrolment that exists to clear it (NIST SP 800-63B
+// section 3.2.2, #489).
+//
+// Unconditional and narrow, as ResetUserOTPStep is: the enrolment transaction already
+// matched the row it expected, and nothing gates on whether the count was already 0.
+// Unlike the increment, tx is required, as IncrementUserOtpConfigGeneration's is -- the
+// clear must commit with the establish that rebinds, or not at all.
+func (d *Database) ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error {
+
+	if userId == 0 {
+		return errs.New("can't clear the OTP consecutive failures of user with id 0")
+	}
+	if tx == nil {
+		return errs.New("clearing the OTP consecutive failures requires a transaction: it must commit with the write that rebinds the authenticator")
+	}
+
+	ub := d.Flavor.NewUpdateBuilder()
+	ub.Update("users")
+	ub.Set(
+		ub.Assign("otp_consecutive_failures", 0),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(ub.Equal("id", userId))
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	_, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return errs.Wrap(err, "unable to clear user OTP consecutive failures")
 	}
 
 	return nil

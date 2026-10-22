@@ -865,6 +865,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
+		// A refused code against the enrolled authenticator advances the consecutive
+		// count (#489).
+		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(false, nil).Once()
 
 		handler := buildAuthOtpPost(authOtpPostDeps{
 			pageRenderer:  pageRenderer,
@@ -1273,6 +1277,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 		database.On("ClearPendingOTPEnrollment", mock.Anything, otpEnrolTx, int64(1)).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
+		// The rebind's clear, in the enrolment's own transaction (#489).
+		database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpEnrolTx, int64(1)).Return(nil).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return()
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return()
@@ -1540,6 +1546,11 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		expectedStep := time.Now().UTC().Unix() / otp.StepSeconds
 		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 			Return(false, nil)
+		// A refused code against the enrolled authenticator advances the consecutive
+		// count, a replay as much as a wrong code, against the authenticator the code was
+		// checked against (#489).
+		database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
+			Return(false, nil).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected,
 			mock.MatchedBy(func(payload map[string]interface{}) bool {
@@ -2027,6 +2038,12 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		if enrolled {
 			database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything,
 				user.OtpConfigGeneration).Return(consumed, nil).Maybe()
+			// A refused code against the enrolled authenticator advances the consecutive
+			// count, a replay as much as a wrong code (#489); the enrollment half below
+			// verifies a supplied seed, which counts nothing.
+			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1),
+				user.OtpConfigGeneration).
+				Return(false, nil).Maybe()
 		} else {
 			database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything).
 				Return(consumed, nil).Maybe()

@@ -148,6 +148,7 @@ func TestEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 		{"EventAuthCodeReuseDetected", EventAuthCodeReuseDetected, "auth_code_reuse_detected"},
 		{"EventRefreshTokenReplayDetected", EventRefreshTokenReplayDetected,
 			"refresh_token_replay_detected"},
+		{"EventOTPAuthenticatorDisabled", EventOTPAuthenticatorDisabled, "otp_authenticator_disabled"},
 		{"EventOTPCodeReplayDetected", EventOTPCodeReplayDetected, "otp_code_replay_detected"},
 		{"EventTokenIssuedAuthorizationCodeResponse", EventTokenIssuedAuthorizationCodeResponse,
 			"token_issued_authorization_code_response"},

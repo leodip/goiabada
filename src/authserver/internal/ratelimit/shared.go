@@ -22,8 +22,11 @@ import (
 // figure NIST SP 800-63B Section 3.2.2 names.
 // It is not that section's limit: NIST counts consecutive failures and disables the authenticator
 // at 100, where this backstop is a rate of 100 per hour that decays with its window, and a
-// success refunds its own charge only. That deviation is recorded and the decision whether to
-// close it is a follow-up of #394. Per process, N replicas make the budget 100*N, and every
+// success refunds its own charge only. #489 recorded the decision: the OTP, which a stranger
+// cannot reach without the password, gets that section's consecutive count and disable in
+// otpcredential.VerifyStored, and the password keeps this rate, because a count anyone can
+// trip by knowing an email address would turn the one-hour denial of #89 into an indefinite
+// one. Per process, N replicas make the budget 100*N, and every
 // rollout refills it. They are also the cheap tiers to share: a credential check already depends
 // on the database, and a couple of short statements sit beside a bcrypt. The per-IP tiers exist
 // to refuse a flood for free and the mail tiers bound a nuisance, so both stay in memory, per
