@@ -11,12 +11,16 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
 
 // accountConsentsDatabase is what the account consent endpoints need: the caller's consents and
-// the clients they name.
+// the clients they name. It embeds revocation.Database for what a consent withdrawal
+// revokes beside the row it deletes (#622).
 type accountConsentsDatabase interface {
+	revocation.Database
+
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
@@ -55,7 +59,7 @@ func HandleAccountConsentsGet(
 			return
 		}
 
-		resp := api.GetUserConsentsResponse{Consents: apimapping.ToUserConsentResponses(consents)}
+		resp := api.GetUserConsentsResponse{Consents: apimapping.ToAccountConsentResponses(consents)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
@@ -108,7 +112,16 @@ func HandleAccountConsentDelete(
 			return
 		}
 
-		if err := database.DeleteUserConsent(r.Context(), nil, consentId); err != nil {
+		// The withdrawal also revokes the codes this user has not yet redeemed with this
+		// client and the refresh tokens this user holds with it.
+		// The refresh arm consults a stored consent only when the client has Consent required
+		// on or the grant is an offline one, so deleting the row alone would leave a
+		// once-consented client's grant standing (#622).
+		result, err := revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
+			func(tx *sql.Tx) error {
+				return database.DeleteUserConsent(r.Context(), tx, consentId)
+			})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -118,6 +131,10 @@ func HandleAccountConsentDelete(
 			"consent_id":     consentId,
 			"logged_in_user": subject,
 		})
+		// What the withdrawal revoked, beside the deletion event and after the commit, as
+		// TerminateUserSessionTx's callers record EventTerminatedUserSession (#622).
+		revocation.LogRevokedConsentGrants(r.Context(), auditLogger, consent.UserId, consent.ClientId,
+			subject, result)
 
 		resp := api.SuccessResponse{Success: true}
 		writeJSON(w, r, http.StatusOK, resp)

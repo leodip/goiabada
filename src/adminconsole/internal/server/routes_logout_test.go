@@ -87,7 +87,7 @@ func TestInitRoutes_ACrossSiteGetOfTheSignOutOnlyAsksToConfirm(t *testing.T) {
 	})
 
 	assert.Equal(t, http.StatusOK, rec.Code, "the confirmation page, not a sign-out")
-	assert.Contains(t, rec.Body.String(), `<form method="post" action="/auth/logout">`)
+	assert.Contains(t, rec.Body.String(), `<form method="post" action="/auth/logout"`)
 	assert.NotContains(t, asked(), logoutRequestPath, "the GET asks the auth server for nothing")
 	assert.True(t, storedTokens(t, s, cookies), "the navigation signed nobody out")
 }

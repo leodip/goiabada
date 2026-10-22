@@ -11,7 +11,7 @@ Bug reports and pull requests are welcome. Code and contributions made with AI t
 
 ## Open the dev container
 
-Everything you need, Go, the linters, the Tailwind CLI and the four databases, runs in a dev container, so the only thing your machine needs is Docker and an editor that opens dev containers, such as VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension.
+Everything you need, Go, the linters, the Tailwind CLI and the four databases, runs in a dev container, so the only things your machine needs are Docker, an editor that opens dev containers, such as VS Code with the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension, and `sh`, which Linux and macOS have. On Windows, clone the repository inside WSL and open it from there, or add Git for Windows' `usr\bin` directory to the `PATH`: neither WSL nor Git for Windows' default install puts `sh` on the Windows `PATH`.
 
 <Steps>
 
@@ -23,7 +23,7 @@ Everything you need, Go, the linters, the Tailwind CLI and the four databases, r
 
 2. Open the repository's `src` folder in your editor, not the repository itself. The dev container is defined in `src/.devcontainer`, and an editor looks for it in the folder you open.
 
-3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes.
+3. Reopen the folder in the container. In VS Code, that's **Dev Containers: Reopen in Container** from the command palette. The first build takes a few minutes. Before it, `src/.devcontainer/generate-env.sh` writes `src/.devcontainer/.env`, the stack's data key and database passwords, drawn fresh for your checkout. It runs on your machine, which is why it needs `sh`.
 
 </Steps>
 
@@ -52,7 +52,7 @@ Every command below runs inside the container, from the directory it names.
 Each rebuilds and restarts when you save a Go file or a template in its own module. A change under `src/core` isn't watched: save a file in the server's module, or run `make serve` again, to pick it up.
 
 <Aside type="danger">
-The dev container's administrator password, keys and secrets are published in the repository. **Never** use them in a deployment.
+The dev container's administrator password, session keys and client secret are published in the repository. **Never** use them, or the data key and database passwords in `src/.devcontainer/.env`, in a deployment.
 </Aside>
 
 ## Run the tests
@@ -152,7 +152,7 @@ Much of what a reviewer would otherwise check is a test that fails: the architec
 
 The dev container runs MySQL, PostgreSQL and SQL Server beside it, and `make serve` uses SQL Server. The tests leave that database alone: each data and integration run starts from an empty database of its own. `./run-tests.sh` does stop a running `make serve`, though: it frees ports 19090, 19091 and 19190 before the data and integration tiers and again when it exits, so start `make serve` again afterwards.
 
-Mailpit runs beside them too. Under **Email - SMTP** in the admin console's settings, turn on **SMTP enabled** and set the host to `mailpit`, the port to 1025, the encryption to **None**, and **From email** to any address, such as `noreply@example.com`. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
+Mailpit runs beside them too. Under **Email** in the admin console's settings, turn on **Send email** and set the host to `mailpit`, the port to 1025, the encryption to **None**, and **Sender email** to any address, such as `noreply@example.com`. Every mail Goiabada sends then lands in Mailpit, at http://localhost:8025.
 
 ## CI
 

@@ -347,7 +347,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 		{
 			name:     "one past the cap is refused for its size",
 			total:    maxGroupIdsPerRequest + 1,
-			wantCode: "VALIDATION_ERROR",
+			wantCode: "handler.user_groups.too_many",
 		},
 		{
 			name:     "the cap itself reaches the existence check",

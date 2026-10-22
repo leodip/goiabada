@@ -1,7 +1,7 @@
 // What a group means outside the Groups pages: its members' tokens carry the group, its attributes and
 // its permissions, each as the include switches say, and a change on the Groups pages shows in the
 // next token. The tokens come from the password grant, on a client of the test's own that allows it.
-import { addGroupAttribute, addGroupMember, grantGroupPermission, groupUrl, rowWithCell } from "../../../lib/admin-console";
+import { addGroupAttribute, addGroupMember, confirmDialog, grantGroupPermission, groupUrl, rowWithCell } from "../../../lib/admin-console";
 import { expect, test } from "../../../lib/fixtures";
 import { passwordToken, userTokens, userinfo } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
@@ -50,7 +50,7 @@ test("a change to a group shows in the next token: switches, rename, removal", a
   await page.goto(groupUrl(group.id, "settings"));
   await page.locator('input[name="includeInAccessToken"]').uncheck();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Group settings saved successfully")).toBeVisible();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
   let tokens = await userTokens(request, client.identifier, secret, user, "openid groups");
   expect(tokens.access.groups).toBeUndefined();
   expect(tokens.id.groups).toEqual([group.identifier]);
@@ -58,14 +58,17 @@ test("a change to a group shows in the next token: switches, rename, removal", a
   const renamed = `${group.identifier}-r`;
   await page.locator("#groupIdentifier").fill(renamed);
   await page.locator("#btnSave").click();
-  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-  await expect(page.getByText("Group settings saved successfully")).toBeVisible();
+  await confirmDialog(page, "You're changing the group identifier");
+  // The page the save before left says "Settings saved." too, so the rename's answer is the heading
+  // naming the group as renamed.
+  await expect(page.getByRole("heading", { level: 1, name: renamed, exact: true })).toBeVisible();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
   expect((await userTokens(request, client.identifier, secret, user, "openid groups")).id.groups).toEqual([renamed]);
 
   await page.goto(groupUrl(group.id, "members"));
-  await rowWithCell(page, user.email).getByRole("button", { name: "Remove" }).click();
-  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-  await expect(rowWithCell(page, user.email).getByText("Removed")).toBeVisible();
+  await rowWithCell(page, user.email).getByRole("button", { name: `Remove ${user.email}`, exact: true }).click();
+  await confirmDialog(page, `Remove ${user.email} from the group?`);
+  await expect(rowWithCell(page, user.email).getByText("Removed", { exact: true })).toBeVisible();
   tokens = await userTokens(request, client.identifier, secret, user, "openid groups");
   expect(tokens.id.groups).toBeUndefined();
 });
@@ -117,9 +120,9 @@ test("a member holds the group's permissions, and loses them when removed", asyn
   expect(answer.body.error).toBe("invalid_scope");
 
   await page.goto(groupUrl(group.id, "members"));
-  await rowWithCell(page, user.email).getByRole("button", { name: "Remove" }).click();
-  await page.locator("dialog[open]").getByRole("button", { name: "Yes" }).click();
-  await expect(rowWithCell(page, user.email).getByText("Removed")).toBeVisible();
+  await rowWithCell(page, user.email).getByRole("button", { name: `Remove ${user.email}`, exact: true }).click();
+  await confirmDialog(page, `Remove ${user.email} from the group?`);
+  await expect(rowWithCell(page, user.email).getByText("Removed", { exact: true })).toBeVisible();
   answer = await passwordToken(request, client.identifier, secret, user.email, user.password, scope);
   expect(answer.body.error).toBe("invalid_scope");
 });

@@ -61,7 +61,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 				validatorDB := datamocks.NewDatabase(t)
 				validatorDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
 					Return(r.client, nil).Once()
-				handler := HandleTokenPost(render.New(nil), datamocks.NewDatabase(t),
+				handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t),
 					handlersmocks.NewTokenIssuer(t),
 					protocolvalidation.NewTokenValidator(validatorDB, nil, nil, testDataCipher),
 					handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())
@@ -96,7 +96,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 	// The control: a request naming no client stays invalid_request, 400, with no challenge, since
 	// no client failed to authenticate.
 	t.Run("missing client_id", func(t *testing.T) {
-		handler := HandleTokenPost(render.New(nil), datamocks.NewDatabase(t),
+		handler := HandleTokenPost(render.New(nil, nil), datamocks.NewDatabase(t),
 			handlersmocks.NewTokenIssuer(t),
 			protocolvalidation.NewTokenValidator(datamocks.NewDatabase(t), nil, nil, testDataCipher),
 			handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics())

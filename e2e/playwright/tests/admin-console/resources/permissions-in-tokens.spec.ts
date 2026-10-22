@@ -44,10 +44,10 @@ test("renaming a permission carries the grant over to the new name", async ({ pa
   const secret = await readClientSecret(page, client.id);
 
   await page.goto(resourceUrl(resource.id, "permissions"));
-  await page.getByRole("button", { name: "Edit permission read", exact: true }).click();
+  await page.getByRole("button", { name: "Edit read", exact: true }).click();
   await page.locator("#permissionIdentifier").fill("view");
   const validated = page.waitForResponse((r) => new URL(r.url()).pathname === "/admin/resources/validate-permission");
-  await page.getByRole("button", { name: "Update permission" }).click();
+  await page.getByRole("button", { name: "Update permission", exact: true }).click();
   await validated;
   // The table changes once the page has read the answer, which is after the answer arrives.
   await expect(resourcePermissionRow(page, "view")).toHaveCount(1);
@@ -74,7 +74,7 @@ test("removing a permission from its resource takes it from the clients that hel
   const secret = await readClientSecret(page, client.id);
 
   await page.goto(resourceUrl(resource.id, "permissions"));
-  await page.getByRole("button", { name: "Remove permission read", exact: true }).click();
+  await page.getByRole("button", { name: "Remove read", exact: true }).click();
   await saveResourcePermissions(page);
 
   const answer = await clientCredentialsToken(request, client.identifier, secret, `${resource.identifier}:read`);

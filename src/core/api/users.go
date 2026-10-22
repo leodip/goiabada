@@ -255,16 +255,25 @@ type SearchUsersWithPermissionAnnotationResponse struct {
 	Query string                       `json:"query"`
 }
 
+// UserConsentResponse is a consent and the client it was given to. ClientName and
+// ClientNameUnverified are the name the user was shown for that client on the consent screen and
+// whether it is the client's own claim about itself, so a page listing a user's consents names
+// each client as the user saw it. ClientDescription is the stored description on the admin
+// endpoint; the account endpoint, which answers the user, carries it only as the consent screen
+// shows it: when an administrator chose to show it, and never beside an unverified name, which is
+// then the description already.
 type UserConsentResponse struct {
-	Id                int64      `json:"id"`
-	CreatedAt         *time.Time `json:"createdAt"`
-	UpdatedAt         *time.Time `json:"updatedAt"`
-	ClientId          int64      `json:"clientId"`
-	UserId            int64      `json:"userId"`
-	Scope             string     `json:"scope"`
-	GrantedAt         *time.Time `json:"grantedAt"`
-	ClientIdentifier  string     `json:"clientIdentifier"`
-	ClientDescription string     `json:"clientDescription"`
+	Id                   int64      `json:"id"`
+	CreatedAt            *time.Time `json:"createdAt"`
+	UpdatedAt            *time.Time `json:"updatedAt"`
+	ClientId             int64      `json:"clientId"`
+	UserId               int64      `json:"userId"`
+	Scope                string     `json:"scope"`
+	GrantedAt            *time.Time `json:"grantedAt"`
+	ClientIdentifier     string     `json:"clientIdentifier"`
+	ClientName           string     `json:"clientName"`
+	ClientNameUnverified bool       `json:"clientNameUnverified"`
+	ClientDescription    string     `json:"clientDescription"`
 }
 
 type GetUserConsentsResponse struct {

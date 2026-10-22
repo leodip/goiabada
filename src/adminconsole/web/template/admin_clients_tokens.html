@@ -1,283 +1,85 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.tokens.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.tokens.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.tokens" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
 
-{{define "head"}}
+{{define "page"}}
+{{- $access := .settings.IncludeOpenIDConnectClaimsInAccessToken }}
+{{- $id := .settings.IncludeOpenIDConnectClaimsInIdToken }}
+{{ template "client_header" (args "tokens" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');
-        tokenExpirationInSeconds.addEventListener('keyup', function () {
-            debouncedTokenExpirationUpdate();
-        });
-        debouncedTokenExpirationUpdate();
-
-        const refreshTokenOfflineIdleTimeoutInSeconds = document.getElementById('refreshTokenOfflineIdleTimeoutInSeconds');
-        refreshTokenOfflineIdleTimeoutInSeconds.addEventListener('keyup', function () {
-            debouncedRefreshTokenOfflineIdleTimeoutUpdate();
-        });
-        debouncedRefreshTokenOfflineIdleTimeoutUpdate();
-
-        const refreshTokenOfflineMaxLifetimeInSeconds = document.getElementById('refreshTokenOfflineMaxLifetimeInSeconds');
-        refreshTokenOfflineMaxLifetimeInSeconds.addEventListener('keyup', function () {
-            debouncedRefreshTokenOfflineMaxLifetimeUpdate();
-        });
-        debouncedRefreshTokenOfflineMaxLifetimeUpdate();
-
-        // Save handler with system-level confirmation
-        var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
-        const btnSave = document.getElementById("btnSave");
-        if (btnSave) {
-            btnSave.addEventListener("click", function(event) {
-                event.preventDefault();
-                const form = document.getElementsByTagName("form")[0];
-
-                if (isSystemLevel) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                        dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
-                        function() { /* cancel */ },
-                        function() { form.submit(); }
-                    );
-                } else {
-                    form.submit();
-                }
-            });
-        }
-    });
-
-    var debouncedTokenExpirationUpdate = debounce(function() {
-        const tokenExpirationInSeconds = document.getElementById('tokenExpirationInSeconds');
-        const tokenExpirationDescription = document.getElementById('tokenExpirationDescription');
-        updateLabel(tokenExpirationInSeconds, tokenExpirationDescription);
-    }, 200);
-
-    var debouncedRefreshTokenOfflineIdleTimeoutUpdate = debounce(function() {
-        const refreshTokenOfflineIdleTimeoutInSeconds = document.getElementById('refreshTokenOfflineIdleTimeoutInSeconds');
-        const refreshTokenOfflineIdleTimeoutDescription = document.getElementById('refreshTokenOfflineIdleTimeoutDescription');
-        updateLabel(refreshTokenOfflineIdleTimeoutInSeconds, refreshTokenOfflineIdleTimeoutDescription);
-    }, 200);
-
-    var debouncedRefreshTokenOfflineMaxLifetimeUpdate = debounce(function() {
-        const refreshTokenOfflineMaxLifetimeInSeconds = document.getElementById('refreshTokenOfflineMaxLifetimeInSeconds');
-        const refreshTokenOfflineMaxLifetimeDescription = document.getElementById('refreshTokenOfflineMaxLifetimeDescription');
-        updateLabel(refreshTokenOfflineMaxLifetimeInSeconds, refreshTokenOfflineMaxLifetimeDescription);
-    }, 200);
-
-    function updateLabel(input, label) {
-        let str = input.value.trim();
-        let num = parseInt(str);
-        if (isNaN(num)) {
-            num = 0;
-        }
-        // set a limit (~5 years)
-        if(num > 160000000) {
-            label.innerText = "{{ T $.ctx "adminconsole.admin_clients.tokens.duration_too_long" }}";
-            return;
-        }
-        num = num * 1000;
-
-        if(num == 0 && str != "0") {
-            label.innerText = "{{ T $.ctx "adminconsole.admin_clients.tokens.duration_invalid" }}";
-            return;
-        }
-
-        label.innerText = humanizeDuration(num, { units: ["d", "h", "m", "s"] });
-    }
-</script>
-
-{{end}}
-
-{{define "body"}}
-
-{{template "manage_clients_tabs" (args "tokens" .client.Id $.ctx) }}
-
-<form method="post">
-
-    {{if .client.IsSystemLevelClient}}
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div role="alert" class="alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
-                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
-        </div>
+{{/* errorField names the duration a refusal is about, which is marked invalid, described by the
+     notice and focused. */}}
+<form class="panel" method="post" novalidate data-duration-too-long="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_too_long" }}" data-duration-invalid="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_invalid" }}" data-duration-zero="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_zero" }}"
+  {{- if .client.IsSystemLevelClient }} data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  <div class="panel-body stacked">
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.tokens.lead" }} <a class="text-link" href="/admin/settings/tokens">{{ T $.ctx "adminconsole.admin_clients.tokens.global_link" }}</a></p>
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="tokens-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-    {{end}}
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-            <p class="mb-6">{{ T $.ctx "adminconsole.admin_clients.tokens.intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.tokens.intro_em1" }}</span>{{ T $.ctx "adminconsole.admin_clients.tokens.intro_middle" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.tokens.intro_em2" }}</span>{{ T $.ctx "adminconsole.admin_clients.tokens.intro_suffix" }}</p>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.tokens.field.token_expiration" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.tokens.field.token_expiration_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="tokenExpirationInSeconds" type="text" name="tokenExpirationInSeconds" value="{{.settings.TokenExpirationInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />
-                <label class="label">
-                    <span id="tokenExpirationDescription" class="label-text text-base-content"></span>
-                    <span></span>
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.tokens.field.idle_timeout" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.tokens.field.idle_timeout_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" name="refreshTokenOfflineIdleTimeoutInSeconds"
-                    value="{{.settings.RefreshTokenOfflineIdleTimeoutInSeconds}}" class="w-full input input-bordered "
-                    autocomplete="off" />
-                <label class="label">
-                    <span id="refreshTokenOfflineIdleTimeoutDescription" class="label-text text-base-content"></span>
-                    <span></span>
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_clients.tokens.field.max_lifetime" }}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.tokens.field.max_lifetime_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="refreshTokenOfflineMaxLifetimeInSeconds" type="text" name="refreshTokenOfflineMaxLifetimeInSeconds" value="{{.settings.RefreshTokenOfflineMaxLifetimeInSeconds}}"
-                    class="w-full input input-bordered " autocomplete="off" />
-                <label class="label">
-                    <span id="refreshTokenOfflineMaxLifetimeDescription" class="label-text text-base-content"></span>
-                    <span></span>
-                </label>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <div class="flex items-center gap-2 mb-4">
-                    <p class="font-medium">{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_access" }}</p>
-                    <div class="tooltip tooltip-top"
-                        data-tip="{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" }}">
-                        <svg class="inline-block w-5 h-5 cursor-pointer"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="space-y-3 ml-1">
-                    <label class="flex gap-3 cursor-pointer items-center">
-                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="on"
-                            {{if eq .settings.IncludeOpenIDConnectClaimsInAccessToken "on"}}checked{{end}} />
-                        <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.access_yes" }}</span>
-                    </label>
-                    <label class="flex gap-3 cursor-pointer items-center">
-                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm"  value="off"
-                            {{if eq .settings.IncludeOpenIDConnectClaimsInAccessToken "off"}}checked{{end}} />
-                        <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.access_no" }}</span>
-                    </label>
-                    <label class="flex gap-3 cursor-pointer items-center">
-                        <input type="radio" name="includeOpenIDConnectClaimsInAccessToken" class="radio radio-sm" value="default"
-                        {{if eq .settings.IncludeOpenIDConnectClaimsInAccessToken "default"}}checked{{end}} />
-                        <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.access_inherit_prefix" }}<a href="/admin/settings/tokens"
-                            class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.tokens.access_inherit_link" }}</a></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="w-full mt-6 form-control">
-                <div class="flex items-center gap-2 mb-4">
-                    <p class="font-medium">{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_id" }}</p>
-                    <div class="tooltip tooltip-top"
-                        data-tip="{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" }}">
-                        <svg class="inline-block w-5 h-5 cursor-pointer"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="space-y-3 ml-1">
-                    <label class="flex gap-3 cursor-pointer items-center">
-                        <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="on"
-                            {{if eq .settings.IncludeOpenIDConnectClaimsInIdToken "on"}}checked{{end}} />
-                        <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.id_on" }}</span>
-                    </label>
-                    <label class="flex gap-3 cursor-pointer items-center">
-                        <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm"  value="off"
-                            {{if eq .settings.IncludeOpenIDConnectClaimsInIdToken "off"}}checked{{end}} />
-                        <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.id_off" }}</span>
-                    </label>
-                    <label class="flex gap-3 cursor-pointer items-center">
-                        <input type="radio" name="includeOpenIDConnectClaimsInIdToken" class="radio radio-sm" value="default"
-                        {{if eq .settings.IncludeOpenIDConnectClaimsInIdToken "default"}}checked{{end}} />
-                        <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.tokens.id_default_prefix" }}<a href="/admin/settings/tokens"
-                            class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.tokens.id_default_link" }}</a>{{ T $.ctx "adminconsole.admin_clients.tokens.id_default_suffix" }}</span>
-                    </label>
-                </div>
-            </div>
-
-        </div>
-
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.tokens.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.tokens.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-        </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="tokenExpirationInSeconds">{{ T $.ctx "adminconsole.admin_clients.tokens.field.token_expiration" }}</label>
+        <input class="control" id="tokenExpirationInSeconds" type="text" inputmode="numeric" name="tokenExpirationInSeconds" value="{{ .settings.TokenExpirationInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "tokenExpirationInSeconds" }}tokens-error {{ end }}{{ end }}tokenExpirationDescription tokenExpirationHint"
+          {{- if .error }}{{ if eq .errorField "tokenExpirationInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint font-semibold" id="tokenExpirationDescription" data-duration-for="tokenExpirationInSeconds" data-duration-global="{{ .global.TokenExpirationInSeconds }}" aria-live="polite"></p>
+        <p class="field-hint" id="tokenExpirationHint">{{ T $.ctx "adminconsole.admin_clients.tokens.field.token_expiration_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="refreshTokenOfflineIdleTimeoutInSeconds">{{ T $.ctx "adminconsole.admin_clients.tokens.field.idle_timeout" }}</label>
+        <input class="control" id="refreshTokenOfflineIdleTimeoutInSeconds" type="text" inputmode="numeric" name="refreshTokenOfflineIdleTimeoutInSeconds" value="{{ .settings.RefreshTokenOfflineIdleTimeoutInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "refreshTokenOfflineIdleTimeoutInSeconds" }}tokens-error {{ end }}{{ end }}refreshTokenOfflineIdleTimeoutDescription refreshTokenOfflineIdleTimeoutHint"
+          {{- if .error }}{{ if eq .errorField "refreshTokenOfflineIdleTimeoutInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint font-semibold" id="refreshTokenOfflineIdleTimeoutDescription" data-duration-for="refreshTokenOfflineIdleTimeoutInSeconds" data-duration-global="{{ .global.RefreshTokenOfflineIdleTimeoutInSeconds }}" aria-live="polite"></p>
+        <p class="field-hint" id="refreshTokenOfflineIdleTimeoutHint">{{ T $.ctx "adminconsole.admin_clients.tokens.field.idle_timeout_tooltip" }}</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="refreshTokenOfflineMaxLifetimeInSeconds">{{ T $.ctx "adminconsole.admin_clients.tokens.field.max_lifetime" }}</label>
+        <input class="control" id="refreshTokenOfflineMaxLifetimeInSeconds" type="text" inputmode="numeric" name="refreshTokenOfflineMaxLifetimeInSeconds" value="{{ .settings.RefreshTokenOfflineMaxLifetimeInSeconds }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "refreshTokenOfflineMaxLifetimeInSeconds" }}tokens-error {{ end }}{{ end }}refreshTokenOfflineMaxLifetimeDescription refreshTokenOfflineMaxLifetimeHint"
+          {{- if .error }}{{ if eq .errorField "refreshTokenOfflineMaxLifetimeInSeconds" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <p class="field-hint font-semibold" id="refreshTokenOfflineMaxLifetimeDescription" data-duration-for="refreshTokenOfflineMaxLifetimeInSeconds" data-duration-global="{{ .global.RefreshTokenOfflineMaxLifetimeInSeconds }}" aria-live="polite"></p>
+        <p class="field-hint" id="refreshTokenOfflineMaxLifetimeHint">{{ T $.ctx "adminconsole.admin_clients.tokens.field.max_lifetime_tooltip" }}</p>
+      </div>
     </div>
+  </div>
 
+  <div class="panel-body">
+    <div class="form-grid">
+      <fieldset aria-describedby="includeClaimsInAccessHint">
+        <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_access" }}</legend>
+        <p class="field-hint mb-3" id="includeClaimsInAccessHint">{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" }}</p>
+        <div class="grid gap-2">
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="on"{{ if eq $access "on" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.access_yes" }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="off"{{ if eq $access "off" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.access_no" }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInAccessToken" value="default"{{ if eq $access "default" }} checked{{ end }}><span>{{ if .global.IncludeOpenIDConnectClaimsInAccessToken }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_included" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_left_out" }}{{ end }}</span></label>
+        </div>
+      </fieldset>
+      <fieldset aria-describedby="includeClaimsInIdHint">
+        <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_id" }}</legend>
+        <p class="field-hint mb-3" id="includeClaimsInIdHint">{{ T $.ctx "adminconsole.admin_clients.tokens.include_oidc_in_id_tooltip" }}</p>
+        <div class="grid gap-2">
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="on"{{ if eq $id "on" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.id_on" }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="off"{{ if eq $id "off" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.id_off" }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="default"{{ if eq $id "default" }} checked{{ end }}><span>{{ if .global.IncludeOpenIDConnectClaimsInIdToken }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_included" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_left_out" }}{{ end }}</span></label>
+        </div>
+      </fieldset>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
 </form>
 
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
+{{ if .client.IsSystemLevelClient }}
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}
+{{ end }}
 {{end}}

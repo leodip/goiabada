@@ -13,16 +13,16 @@ A user is a person who signs in. A group is a set of users: the permissions and 
 
 <Steps>
 
-1. In the admin console, open **Admin**, **Users** and click **Create new**.
+1. In the admin console, open **Admin**, **Users** and click **New user**.
 
 2. Enter the user's **Email**, and their **Given name**, **Middle name** and **Family name** if you like. Turn on **Email verified** if you know the address is theirs.
 
 3. Choose how the user gets a password:
 
-   - **Set password now**, and type it in. Tell the user what it is.
-   - **Email the user a link to set up their password.** The user chooses the password themselves, within 24 hours. This choice appears only when email is set up, under **Email - SMTP**.
+   - **Set the password now**, and type it in. Tell the user what it is.
+   - **Email a link to set it**. The user chooses the password themselves, within 24 hours. This choice appears only when email is set up, under **Admin**, **Email**.
 
-4. Click **Create**. The user's page opens on its **Details** tab.
+4. Click **Create user**. The user's page opens on its **Details** tab.
 
 </Steps>
 
@@ -32,13 +32,13 @@ Users can also create their own accounts from the sign-in page: see [Self-regist
 
 <Steps>
 
-1. Open **Admin**, **Groups** and click **Create new**.
+1. Open **Admin**, **Groups** and click **New group**.
 
 2. Enter a **Group identifier**, such as `editors`, and a **Description**.
 
-3. Leave **Include group in access token if requested** and **Include group in id token if requested** on if clients should see that a user is in this group. Click **Create**.
+3. Leave **Include in the access token** and **Include in the ID token** on if clients should see that a user is in this group. Click **Create group**.
 
-4. Open the group's **Members** tab, click **Add member**, search for a user, click **Add to group** and confirm with **Yes**.
+4. Open the group's **Members** tab, click **Add members**, search for a user and click **Add to group**.
 
 </Steps>
 
@@ -62,7 +62,7 @@ Deleting a user deletes everything attached to them: their permissions, their gr
 
 ## Passwords
 
-**Set password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes).
+**New password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes).
 
 A user who forgot their password can ask for a reset link from the sign-in page: see [Password recovery](/concepts/password-recovery/). The link you email a new user to set up their password is the same kind of link.
 
@@ -74,7 +74,7 @@ A group identifier is 3 to 38 characters long. It starts with a letter, ends wit
 
 A user can be in any number of groups. They hold every permission each of their groups holds, as well as their own. Deleting a group takes nobody's account with it: its members just lose what the group gave them.
 
-A group is listed in the `groups` claim when the client asks for the `groups` scope. **Include group in access token if requested** puts it in the access token, and **Include group in id token if requested** puts it in the ID token and in the `/userinfo` answer. Turn either off for a group a client has no business seeing.
+A group is listed in the `groups` claim when the client asks for the `groups` scope. **Include in the access token** puts it in the access token, and **Include in the ID token** puts it in the ID token and in the `/userinfo` answer. Turn either off for a group a client has no business seeing.
 
 ## Attributes
 
@@ -82,7 +82,7 @@ An attribute is a key and a value you attach to a user or a group, such as `depa
 
 - A **key** is 1 to 38 characters long, with the same characters as a group identifier.
 - A **value** is at most 250 characters, and can't contain `<` or `>`.
-- **Include attribute in access token if requested** and **Include attribute in id token if requested** work as they do for groups.
+- **Include in the access token** and **Include in the ID token** work as they do for groups.
 
 A user's claim holds their own attributes and those of every group they're in. When a user and one of their groups both have an attribute with the same key, the group's value wins.
 

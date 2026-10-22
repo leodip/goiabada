@@ -131,6 +131,6 @@ func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
 
 	bind := handlertest.Bind(t, httpHelper)
 	require.Equal(t, true, bind["isSystemLevelResource"])
-	assert.Equal(t, "System-level resources cannot be deleted.", bind["error"],
+	assert.Equal(t, "This is the auth server's own resource, so it can't be deleted.", bind["error"],
 		"the refusal is the server's flag acted on, and it happens before DeleteResource is called")
 }

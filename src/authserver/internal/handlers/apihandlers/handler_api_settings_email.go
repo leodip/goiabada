@@ -113,48 +113,48 @@ func HandleSettingsEmailPut(
 			smtpPasswordMaxBytes = 256
 		)
 		if smtpHost == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostRequired, nil))
 			return
 		}
 		if req.SMTPPort == 0 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPortRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPortRequired, nil))
 			return
 		}
 		if strings.TrimSpace(req.SMTPFromEmail) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailRequired, nil))
 			return
 		}
 
 		if inputvalidation.TextLength(smtpHost) > smtpHostMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostTooLong, map[string]any{"max": smtpHostMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostTooLong, map[string]any{"max": smtpHostMaxLength}))
 			return
 		}
 
 		if req.SMTPPort < 1 || req.SMTPPort > 65535 {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPortOutOfRange, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPortOutOfRange, nil))
 			return
 		}
 
 		// Encryption value
 		smtpEncryption, err := emaildelivery.SMTPEncryptionFromString(req.SMTPEncryption)
 		if err != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPEncryptionInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPEncryptionInvalid, nil))
 			return
 		}
 
 		if inputvalidation.TextLength(req.SMTPUsername) > smtpFieldMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameTooLong, map[string]any{"max": smtpFieldMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameTooLong, map[string]any{"max": smtpFieldMaxLength}))
 			return
 		}
 		// An application bound, measured in bytes because len(string) counts bytes. No
 		// PLAIN or LOGIN provider credential is known to exceed it, and it must not shrink
 		// to the neighbours' 60: SendGrid's SMTP password is its 69-character API key.
 		if len(req.SMTPPassword) > smtpPasswordMaxBytes {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordTooLong, map[string]any{"max": smtpPasswordMaxBytes}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordTooLong, map[string]any{"max": smtpPasswordMaxBytes}))
 			return
 		}
 		if inputvalidation.TextLength(req.SMTPFromName) > smtpFieldMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromNameTooLong, map[string]any{"max": smtpFieldMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromNameTooLong, map[string]any{"max": smtpFieldMaxLength}))
 			return
 		}
 
@@ -163,7 +163,7 @@ func HandleSettingsEmailPut(
 			return
 		}
 		if inputvalidation.TextLength(req.SMTPFromEmail) > smtpFieldMaxLength {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong, map[string]any{"max": smtpFieldMaxLength}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong, map[string]any{"max": smtpFieldMaxLength}))
 			return
 		}
 
@@ -175,7 +175,7 @@ func HandleSettingsEmailPut(
 		// The password is kept, replaced or removed (#410 decision 1). The API never answers it, so
 		// an absent or empty one keeps what is stored, and only the flag removes it.
 		if req.SMTPPassword != "" && req.ClearSMTPPassword {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordAndClear, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordAndClear, nil))
 			return
 		}
 		// A stored password reaches only the host it was entered for: pointing it elsewhere needs
@@ -184,7 +184,7 @@ func HandleSettingsEmailPut(
 		storedHost := hostport.Unbracket(strings.TrimSpace(currentSettings.SMTPHost))
 		if len(currentSettings.SMTPPasswordEncrypted) > 0 && req.SMTPPassword == "" && !req.ClearSMTPPassword &&
 			!strings.EqualFold(smtpHost, storedHost) {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostChanged, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostChanged, nil))
 			return
 		}
 
@@ -202,8 +202,8 @@ func HandleSettingsEmailPut(
 		conn, err := dialer.DialContext(r.Context(), "tcp", hostport.Join(smtpHost, req.SMTPPort))
 		if err != nil {
 			slog.WarnContext(r.Context(), "unable to connect to the smtp server", "error", err)
-			writeLocalizedError(w, r, connectionFailureMessage(smtpDialFailure,
-				emaildelivery.ClassifyConnectionError(err)), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, connectionFailureMessage(smtpDialFailure,
+				emaildelivery.ClassifyConnectionError(err)))
 			return
 		}
 		if conn != nil {
@@ -293,7 +293,7 @@ func HandleSettingsEmailSendTestPost(
 			return
 		}
 		if strings.TrimSpace(req.To) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailDestinationRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailDestinationRequired, nil))
 			return
 		}
 		if err := emailValidator.ValidateEmailAddress(req.To); err != nil {

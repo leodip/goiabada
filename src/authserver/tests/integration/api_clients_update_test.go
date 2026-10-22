@@ -408,7 +408,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 			var errResp api.ErrorResponse
 			err := json.NewDecoder(resp2.Body).Decode(&errResp)
 			require.NoError(t, err)
-			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+			assert.Equal(t, "handler.client.system_level_identifier_fixed", errResp.ErrorCode)
 			assert.Equal(t, "The identifier of a system-level client cannot be changed.", errResp.ErrorDescription)
 		})
 	}
@@ -452,7 +452,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 			var errResp api.ErrorResponse
 			err := json.NewDecoder(resp.Body).Decode(&errResp)
 			require.NoError(t, err)
-			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+			assert.Equal(t, "handler.client.self_registered_identifier_fixed", errResp.ErrorCode)
 			assert.Equal(t, "The identifier of a self-registered client cannot be changed.", errResp.ErrorDescription)
 
 			// The refusal has to leave the row alone as well as answer 400: a guard that rejects the

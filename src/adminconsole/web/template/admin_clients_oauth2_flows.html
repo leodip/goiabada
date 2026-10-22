@@ -1,389 +1,106 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_clients.oauth2_flows.page_title_prefix" }}{{.client.ClientIdentifier}}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.page_title_prefix" }}<span class="text-accent">{{.client.ClientIdentifier}}</span>{{end}}
-{{define "subTitle"}}{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.oauth2_flows" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const pkceRadios = document.querySelectorAll('input[name="pkceRequired"]');
-        const pkceWarning = document.getElementById('pkceWarning');
-        const authCodeEnabled = document.querySelector('input[name="authCodeEnabled"]');
-        const pkceSection = document.getElementById('pkceSection');
-        const globalPKCERequired = {{if .client.GlobalPKCERequired}}true{{else}}false{{end}};
-
-        function getSelectedPkceValue() {
-            for (const radio of pkceRadios) {
-                if (radio.checked) {
-                    return radio.value;
-                }
-            }
-            return 'global';
-        }
-
-        function updatePkceWarning() {
-            if (!pkceWarning) return;
-
-            const value = getSelectedPkceValue();
-
-            // Show warning if PKCE will be optional (either explicitly or via global)
-            const willBeOptional = (value === 'off') ||
-                                   (value === 'global' && !globalPKCERequired);
-
-            if (willBeOptional) {
-                pkceWarning.classList.remove('hidden');
-            } else {
-                pkceWarning.classList.add('hidden');
-            }
-        }
-
-        function updatePkceSectionVisibility() {
-            if (!pkceSection || !authCodeEnabled) return;
-
-            if (authCodeEnabled.checked) {
-                pkceSection.classList.remove('hidden');
-                updatePkceWarning(); // Also update warning visibility
-            } else {
-                pkceSection.classList.add('hidden');
-                // A public client renders no warning element at all: the selection can no longer
-                // produce an optional outcome, so there is nothing to hide here (#245).
-                if (pkceWarning) {
-                    pkceWarning.classList.add('hidden'); // Hide warning when section is hidden
-                }
-            }
-        }
-
-        // Add listeners to all PKCE radio buttons
-        pkceRadios.forEach(function(radio) {
-            radio.addEventListener('change', updatePkceWarning);
-        });
-
-        if (authCodeEnabled) {
-            authCodeEnabled.addEventListener('change', updatePkceSectionVisibility);
-        }
-
-        // Initial state
-        updatePkceSectionVisibility();
-
-        // Implicit flow warning handling
-        const implicitRadios = document.querySelectorAll('input[name="implicitGrantEnabled"]');
-        const implicitWarning = document.getElementById('implicitWarning');
-        const globalImplicitFlowEnabled = {{if .client.GlobalImplicitFlowEnabled}}true{{else}}false{{end}};
-
-        function getSelectedImplicitValue() {
-            for (const radio of implicitRadios) {
-                if (radio.checked) {
-                    return radio.value;
-                }
-            }
-            return 'global';
-        }
-
-        function updateImplicitWarning() {
-            if (!implicitWarning) return;
-
-            const value = getSelectedImplicitValue();
-
-            // Show warning if implicit flow will be enabled (either explicitly or via global)
-            const willBeEnabled = (value === 'on') ||
-                                  (value === 'global' && globalImplicitFlowEnabled);
-
-            if (willBeEnabled) {
-                implicitWarning.classList.remove('hidden');
-            } else {
-                implicitWarning.classList.add('hidden');
-            }
-        }
-
-        // Add listeners to all implicit flow radio buttons
-        implicitRadios.forEach(function(radio) {
-            radio.addEventListener('change', updateImplicitWarning);
-        });
-
-        // Initial state
-        updateImplicitWarning();
-
-        // ROPC flow warning handling
-        const ropcRadios = document.querySelectorAll('input[name="ropcEnabled"]');
-        const ropcWarning = document.getElementById('ropcWarning');
-        const globalROPCEnabled = {{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}true{{else}}false{{end}};
-
-        function getSelectedRopcValue() {
-            for (const radio of ropcRadios) {
-                if (radio.checked) {
-                    return radio.value;
-                }
-            }
-            return 'global';
-        }
-
-        function updateRopcWarning() {
-            if (!ropcWarning) return;
-
-            const value = getSelectedRopcValue();
-
-            // Show warning if ROPC flow will be enabled (either explicitly or via global)
-            const willBeEnabled = (value === 'on') ||
-                                  (value === 'global' && globalROPCEnabled);
-
-            if (willBeEnabled) {
-                ropcWarning.classList.remove('hidden');
-            } else {
-                ropcWarning.classList.add('hidden');
-            }
-        }
-
-        // Add listeners to all ROPC flow radio buttons
-        ropcRadios.forEach(function(radio) {
-            radio.addEventListener('change', updateRopcWarning);
-        });
-
-        // Initial state
-        updateRopcWarning();
-
-        // Save handler with system-level confirmation
-        var isSystemLevel = {{if .client.IsSystemLevelClient}}true{{else}}false{{end}};
-        const btnSave = document.getElementById("btnSave");
-        if (btnSave) {
-            btnSave.addEventListener("click", function(event) {
-                event.preventDefault();
-                const form = document.getElementsByTagName("form")[0];
-
-                if (isSystemLevel) {
-                    showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_clients.modal.are_you_sure" }}",
-                        dialogMarkup(["{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"]),
-                        function() { /* cancel */ },
-                        function() { form.submit(); }
-                    );
-                } else {
-                    form.submit();
-                }
-            });
-        }
-
-    });
-</script>
-
+<script src="{{ asset "/static/pages/admin-clients-oauth2-flows.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+{{- $pkce := .client.PKCERequired }}
+{{- $implicit := .client.ImplicitGrantEnabled }}
+{{- $ropc := .client.ResourceOwnerPasswordCredentialsEnabled }}
+{{ template "client_header" (args "oauth2-flows" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
 
-{{template "manage_clients_tabs" (args "oauth2-flows" .client.ClientId $.ctx) }}
-
-<form method="post">
-
-    {{if .client.IsSystemLevelClient}}
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div role="alert" class="alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 stroke-current" fill="none"
-                viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <span>{{ T $.ctx "adminconsole.admin_clients.common.system_warning" }}</span>
-        </div>
+{{/* Each three-way choice holds an explicit value or "global", the global setting, whose value now
+     the form carries in data-global-* for the script, which shows a choice's warning while the
+     flow it governs would be on, or PKCE optional, whichever way that comes about. */}}
+<form class="panel" method="post" novalidate data-global-pkce-required="{{ .client.GlobalPKCERequired }}" data-global-implicit-enabled="{{ .client.GlobalImplicitFlowEnabled }}" data-global-ropc-enabled="{{ .client.GlobalResourceOwnerPasswordCredentialsEnabled }}"
+  {{- if .client.IsSystemLevelClient }} data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  {{ if .savedSuccessfully }}
+  <div class="panel-body">
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.saved_successfully" }}</p>
     </div>
-    {{end}}
+  </div>
+  {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-
-        <div class="w-full h-full pb-6 bg-base-100">
-
-            <!-- Recommended Flows Section -->
-            <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4">
-                <legend class="fieldset-legend text-success">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.recommended_legend" }}</legend>
-
-                <div class="w-full form-control">
-                    <span class="label-text mb-4">
-                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.auth_code_label" }}</span>
-                        <span class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </span>
-                    </span>
-                    <div class="ml-1">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" name="authCodeEnabled" class="toggle"
-                                {{if .client.AuthorizationCodeEnabled}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div id="pkceSection" class="w-full mt-4 pl-4 form-control {{if not .client.AuthorizationCodeEnabled}}hidden{{end}}">
-                    <p class="label-text mb-4">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_question" }}</p>
-                    <div class="ml-1 space-y-3">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="pkceRequired" class="radio radio-sm" value="on"
-                                {{if and .client.PKCERequired (deref .client.PKCERequired)}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_required" }}</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="pkceRequired" class="radio radio-sm" value="off"
-                                {{if and .client.PKCERequired (not (deref .client.PKCERequired))}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_optional" }}</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="pkceRequired" class="radio radio-sm" value="global"
-                                {{if not .client.PKCERequired}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
-                                class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalPKCERequired}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_required" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_optional" }}{{end}}</span>
-                        </label>
-                    </div>
-                    {{if .client.IsPublic}}
-                        <p class="mt-2 ml-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_public_note" }}</p>
-                    {{end}}
-                </div>
-
-                {{if not .client.IsPublic}}
-                <div id="pkceWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_confidential" }}</span>
-                </div>
-                {{end}}
-
-                <div class="w-full mt-8 form-control">
-                    <span class="label-text mb-4">
-                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_label" }}</span>
-                        <span class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </span>
-                    </span>
-                    <div class="ml-1">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="checkbox" name="clientCredentialsEnabled" class="toggle"
-                                {{if .client.ClientCredentialsEnabled}}checked{{end}} {{if .client.IsPublic}}disabled{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
-                        </label>
-                    </div>
-                    {{if .client.IsPublic}}
-                        <p class="mt-2 ml-1 text-sm">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_em" }}</span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_suffix" }}</p>
-                    {{end}}
-                </div>
-            </fieldset>
-
-            <!-- Legacy Flows Section -->
-            <fieldset class="fieldset bg-base-200 border-base-300 rounded-box border p-4 mt-8">
-                <legend class="fieldset-legend text-warning">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.legacy_legend" }}</legend>
-
-                <div class="w-full form-control">
-                    <span class="label-text mb-4">
-                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_label" }}</span>
-                        <span class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </span>
-                    </span>
-                    <div class="ml-1 space-y-3">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="on"
-                                {{if and .client.ImplicitGrantEnabled (deref .client.ImplicitGrantEnabled)}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="off"
-                                {{if and .client.ImplicitGrantEnabled (not (deref .client.ImplicitGrantEnabled))}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.disabled" }}</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="implicitGrantEnabled" class="radio radio-sm" value="global"
-                                {{if not .client.ImplicitGrantEnabled}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
-                                class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalImplicitFlowEnabled}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_enabled" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_disabled" }}{{end}}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div id="implicitWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_warning" }}</span>
-                </div>
-
-                <div class="w-full mt-8 form-control">
-                    <span class="label-text mb-4">
-                        <span class="text-accent font-medium">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_label" }}</span>
-                        <span class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </span>
-                    </span>
-                    <div class="ml-1 space-y-3">
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="ropcEnabled" class="radio radio-sm" value="on"
-                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (deref .client.ResourceOwnerPasswordCredentialsEnabled)}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="ropcEnabled" class="radio radio-sm" value="off"
-                                {{if and .client.ResourceOwnerPasswordCredentialsEnabled (not (deref .client.ResourceOwnerPasswordCredentialsEnabled))}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.disabled" }}</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input type="radio" name="ropcEnabled" class="radio radio-sm" value="global"
-                                {{if not .client.ResourceOwnerPasswordCredentialsEnabled}}checked{{end}} />
-                            <span class="label-text">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_prefix" }}<a href="/admin/settings/general"
-                                class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_link" }}</a>{{if .client.GlobalResourceOwnerPasswordCredentialsEnabled}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_enabled" }}{{else}}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.inherit_currently_disabled" }}{{end}}</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div id="ropcWarning" role="alert" class="hidden mt-2 alert alert-warning alert-soft">
-                    <span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_warning" }}</span>
-                </div>
-            </fieldset>
-
-        </div>
-
+  <div class="panel-body stacked">
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.recommended_legend" }}</h2>
+    <div class="check-list">
+      <label class="check-row" for="authCodeEnabled">
+        <input type="checkbox" id="authCodeEnabled" name="authCodeEnabled" aria-describedby="authCodeHint"{{ if .client.AuthorizationCodeEnabled }} checked{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.auth_code_label" }}</span>
+          <span class="field-hint" id="authCodeHint">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.auth_code_tooltip" }}</span>
+        </span>
+      </label>
+      <label class="check-row" for="clientCredentialsEnabled">
+        <input type="checkbox" id="clientCredentialsEnabled" name="clientCredentialsEnabled" aria-describedby="clientCredentialsHint"{{ if .client.ClientCredentialsEnabled }} checked{{ end }}{{ if .client.IsPublic }} disabled{{ end }}>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_label" }}</span>
+          <span class="field-hint" id="clientCredentialsHint">{{ if .client.IsPublic }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.client_creds_tooltip" }}{{ end }}</span>
+        </span>
+      </label>
     </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            <div class="float-left p-3">
-                <a class="link-secondary" href="/admin/clients">
-                    <svg class="inline-block w-6 h-6 align-middle" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                    </svg>
-                    <span class="ml-1 align-middle">{{ T $.ctx "adminconsole.admin_clients.common.back_to_list" }}</span>
-                </a>
-            </div>
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_clients.oauth2_flows.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <button id="btnSave" class="float-right btn btn-primary">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
-        </div>
-    </div>
+    <fieldset id="pkceSection" aria-describedby="pkceHint"{{ if not .client.AuthorizationCodeEnabled }} hidden{{ end }}>
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_question" }}</legend>
+      <p class="field-hint mb-3" id="pkceHint">{{ if .client.IsPublic }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_public_note" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_hint" }}{{ end }}</p>
+      <div class="grid gap-2">
+        <label class="choice"><input type="radio" name="pkceRequired" value="on"{{ if $pkce }}{{ if deref $pkce }} checked{{ end }}{{ end }}{{ if .client.IsPublic }} disabled{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_required" }}</span></label>
+        <label class="choice"><input type="radio" name="pkceRequired" value="off"{{ if $pkce }}{{ if not (deref $pkce) }} checked{{ end }}{{ end }}{{ if .client.IsPublic }} disabled{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_optional" }}</span></label>
+        <label class="choice"><input type="radio" name="pkceRequired" value="global"{{ if not $pkce }} checked{{ end }}{{ if .client.IsPublic }} disabled{{ end }}><span>{{ if .client.GlobalPKCERequired }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_required" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_optional" }}{{ end }}</span></label>
+      </div>
+      {{ if not .client.IsPublic }}
+      <div class="notice notice-caution mt-3" id="pkceWarning" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+        <p>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.pkce_warning_confidential" }}</p>
+      </div>
+      {{ end }}
+    </fieldset>
+  </div>
 
+  <div class="panel-body stacked">
+    <div>
+      <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.legacy_legend" }}</h2>
+      <p class="field-hint mt-1">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.legacy_hint" }} <a class="text-link" href="/admin/settings/general">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_link" }}</a></p>
+    </div>
+    <div class="form-grid">
+      <fieldset aria-describedby="implicitHint">
+        <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_label" }}</legend>
+        <p class="field-hint mb-3" id="implicitHint">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_tooltip" }}</p>
+        <div class="grid gap-2">
+          <label class="choice"><input type="radio" name="implicitGrantEnabled" value="on"{{ if $implicit }}{{ if deref $implicit }} checked{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span></label>
+          <label class="choice"><input type="radio" name="implicitGrantEnabled" value="off"{{ if $implicit }}{{ if not (deref $implicit) }} checked{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.disabled" }}</span></label>
+          <label class="choice"><input type="radio" name="implicitGrantEnabled" value="global"{{ if not $implicit }} checked{{ end }}><span>{{ if .client.GlobalImplicitFlowEnabled }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_enabled" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_disabled" }}{{ end }}</span></label>
+        </div>
+        <div class="notice notice-caution mt-3" id="implicitWarning" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+          <p>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.implicit_warning" }}</p>
+        </div>
+      </fieldset>
+      <fieldset aria-describedby="ropcHint">
+        <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_label" }}</legend>
+        <p class="field-hint mb-3" id="ropcHint">{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_tooltip" }}</p>
+        <div class="grid gap-2">
+          <label class="choice"><input type="radio" name="ropcEnabled" value="on"{{ if $ropc }}{{ if deref $ropc }} checked{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.enabled" }}</span></label>
+          <label class="choice"><input type="radio" name="ropcEnabled" value="off"{{ if $ropc }}{{ if not (deref $ropc) }} checked{{ end }}{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.disabled" }}</span></label>
+          <label class="choice"><input type="radio" name="ropcEnabled" value="global"{{ if not $ropc }} checked{{ end }}><span>{{ if .client.GlobalResourceOwnerPasswordCredentialsEnabled }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_enabled" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.global_disabled" }}{{ end }}</span></label>
+        </div>
+        <div class="notice notice-caution mt-3" id="ropcWarning" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+          <p>{{ T $.ctx "adminconsole.admin_clients.oauth2_flows.ropc_warning" }}</p>
+        </div>
+      </fieldset>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
 </form>
 
-
-{{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
+{{ if .client.IsSystemLevelClient }}
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}
+{{ end }}
 {{end}}

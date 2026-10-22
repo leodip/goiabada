@@ -107,7 +107,7 @@ func HandleWebOriginsGet(
 		adminClientWebOrigins := struct {
 			ClientId            int64
 			ClientIdentifier    string
-			WebOrigins          map[int64]string
+			WebOrigins          []string
 			EffectiveWebOrigins []effectiveWebOrigin
 			IsSystemLevelClient bool
 		}{
@@ -121,9 +121,10 @@ func HandleWebOriginsGet(
 			return clientResp.WebOrigins[i].Origin < clientResp.WebOrigins[j].Origin
 		})
 
-		adminClientWebOrigins.WebOrigins = make(map[int64]string)
+		// A slice, in the order just sorted, for the reason the redirect URIs page gives.
+		adminClientWebOrigins.WebOrigins = make([]string, 0, len(clientResp.WebOrigins))
 		for _, origin := range clientResp.WebOrigins {
-			adminClientWebOrigins.WebOrigins[origin.Id] = origin.Origin
+			adminClientWebOrigins.WebOrigins = append(adminClientWebOrigins.WebOrigins, origin.Origin)
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)

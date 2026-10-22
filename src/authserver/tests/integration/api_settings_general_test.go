@@ -158,7 +158,7 @@ func TestAPISettingsGeneralPut_ValidationErrors(t *testing.T) {
 		var errResp api.ErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		_ = resp.Body.Close()
-		assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode, issuer)
+		assert.Equal(t, "handler.settings_general.issuer_uri_invalid", errResp.ErrorCode, issuer)
 		assert.Equal(t, issuerRule, errResp.ErrorDescription, issuer)
 	}
 

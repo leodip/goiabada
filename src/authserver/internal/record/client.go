@@ -80,6 +80,43 @@ func (c *Client) MayRequestAdministrativeScopes() bool {
 	return c.ClientIdentifier == builtin.AdminConsoleClientIdentifier || c.AdministrativeScopesAllowed
 }
 
+// NameForUsers returns the name a user is shown for this client, by the consent screen, the
+// redirect-blocked page and the account pages, and whether that name is the client's own claim
+// about itself rather than something an administrator vouched for. RFC 7591 section 5 requires all
+// client metadata be treated as self-asserted, so a name a client chose for itself is shown as a
+// claim, never as an attestation (#108).
+//
+// The precedence is about the provenance of the NAME, not about how trustworthy the client is: an
+// administrator who reviewed a self-registered client and gave it a display name has vouched for
+// that name, so the marking drops with it. The client itself cannot reach either of the first two
+// rungs, because it cannot set DisplayName and cannot clear created_via_dcr.
+//
+// The password and OTP screens show the identifier instead (authflow's getClientDisplayInfo): a
+// warning repeated on three screens stops being read, and consent is the one sign-in screen where
+// the user grants authority.
+func (c *Client) NameForUsers() (name string, unverified bool) {
+	if c.ShowDisplayName && c.DisplayName != "" {
+		return c.DisplayName, false // an administrator named it
+	}
+	if c.CreatedViaDCR && c.Description != "" {
+		return c.Description, true // the client named itself
+	}
+	return c.ClientIdentifier, false
+}
+
+// DescriptionForUsers returns the description shown beneath NameForUsers's name: empty unless an
+// administrator chose to show it, and empty when that name is unverified, since the name is then
+// the description and would be shown twice (#108).
+func (c *Client) DescriptionForUsers() string {
+	if !c.ShowDescription {
+		return ""
+	}
+	if _, unverified := c.NameForUsers(); unverified {
+		return ""
+	}
+	return c.Description
+}
+
 // IsPKCERequired returns whether PKCE is required for this client.
 // A public client always requires PKCE, whatever the client-level override and the global
 // setting say. Otherwise the client-level override, when set, takes precedence over the

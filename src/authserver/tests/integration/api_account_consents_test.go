@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -69,7 +72,64 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	assert.Equal(t, client.Id, found.ClientId)
 	assert.Equal(t, consent.Scope, found.Scope)
 	assert.Equal(t, client.ClientIdentifier, found.ClientIdentifier)
-	assert.Equal(t, client.Description, found.ClientDescription)
+	assert.Equal(t, client.ClientIdentifier, found.ClientName, "a client with no display name shown is named by its identifier")
+	assert.False(t, found.ClientNameUnverified)
+	assert.Empty(t, found.ClientDescription, "a description the sign-in screens do not show does not reach the user here either")
+}
+
+// The account endpoint names each client as the consent screen did, and carries a description only
+// when that screen shows it: an administrator's name and description shown, and a self-registered
+// client's own name, marked unverified and not repeated as its description.
+func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+
+	named := &record.Client{
+		ClientIdentifier: "acct-consents-named-" + fake.UUID()[:8],
+		DisplayName:      "Customer portal",
+		ShowDisplayName:  true,
+		Description:      "Orders and invoices",
+		ShowDescription:  true,
+		Enabled:          true,
+		IsPublic:         true,
+	}
+	selfRegistered := &record.Client{
+		ClientIdentifier: "dcr_" + fake.UUID()[:8],
+		Description:      "Payroll Portal",
+		ShowDescription:  true,
+		CreatedViaDCR:    true,
+		Enabled:          true,
+		IsPublic:         true,
+	}
+	consentIds := map[int64]*record.Client{}
+	for _, client := range []*record.Client{named, selfRegistered} {
+		require.NoError(t, database.CreateClient(context.Background(), nil, client))
+		defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+		consent := &record.UserConsent{UserId: u.Id, ClientId: client.Id, Scope: "openid",
+			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
+		require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
+		defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+		consentIds[consent.Id] = client
+	}
+
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/account/consents", accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var getResp api.GetUserConsentsResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&getResp))
+
+	got := map[string]api.UserConsentResponse{}
+	for _, c := range getResp.Consents {
+		if client, ok := consentIds[c.Id]; ok {
+			got[client.ClientIdentifier] = c
+		}
+	}
+	require.Len(t, got, 2)
+	assert.Equal(t, "Customer portal", got[named.ClientIdentifier].ClientName)
+	assert.False(t, got[named.ClientIdentifier].ClientNameUnverified)
+	assert.Equal(t, "Orders and invoices", got[named.ClientIdentifier].ClientDescription)
+	assert.Equal(t, "Payroll Portal", got[selfRegistered.ClientIdentifier].ClientName)
+	assert.True(t, got[selfRegistered.ClientIdentifier].ClientNameUnverified)
+	assert.Empty(t, got[selfRegistered.ClientIdentifier].ClientDescription)
 }
 
 func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
@@ -142,6 +202,107 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	require.NoError(t, err)
 	assert.Nil(t, got)
+}
+
+// Account, Manage consents withdraws a consent through this endpoint, the path #622 names: the
+// withdrawal revokes the refresh tokens the user holds with that client, of a client whose
+// Consent required is off too, while the user's grant with another client keeps refreshing.
+func TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, _ := createAdminClientWithToken(t)
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+
+	// The fixture signs the same user in to two more clients through the password form, so the
+	// user needs a password the test knows. A narrow write of the hash, which revokes nothing.
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.Id, passwordHashed))
+	f := newConsentWithdrawalFixture(t, u, password)
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", f.consent.Id)
+	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	f.assertWithdrawn(t, adminToken, u.Subject)
+}
+
+// A code issued before the withdrawal and redeemed after it would start a grant the withdrawal's
+// sweep never saw, since redemption consults no stored consent. The withdrawal marks the user's
+// unused codes with that client revoked, so the redemption is refused, while the same user's code
+// with another client still redeems (#622).
+func TestAPIAccountConsentDelete_RefusesACodeIssuedBeforeTheWithdrawal(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, _ := createAdminClientWithToken(t)
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.Id, passwordHashed))
+
+	withdrawnSecret, otherSecret := fake.LetterN(32), fake.LetterN(32)
+	withdrawnClient, withdrawnCode := createAuthCode(t, withdrawnSecret, "openid profile email",
+		authCodeOptions{user: u, userPassword: password})
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, withdrawnCode.ClientId) })
+	otherClient, otherCode := createAuthCode(t, otherSecret, "openid profile email",
+		authCodeOptions{user: u, userPassword: password})
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) })
+	// Consent required off, so nothing but the withdrawal's mark can refuse the redemption.
+	require.False(t, withdrawnCode.Client.ConsentRequired)
+
+	consent := &record.UserConsent{
+		UserId:    u.Id,
+		ClientId:  withdrawnCode.ClientId,
+		Scope:     "openid profile email",
+		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	}
+	require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
+
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
+	resp := makeAPIRequest(t, "DELETE", deleteURL, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	form := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {withdrawnCode.Client.ClientIdentifier},
+		"client_secret": {withdrawnSecret},
+		"code":          {withdrawnCode.Code},
+		"redirect_uri":  {withdrawnCode.RedirectURI},
+		"code_verifier": {testCodeVerifier},
+	}
+	refused := postToTokenEndpoint(t, withdrawnClient, appConfig.AuthServer.BaseURL+"/auth/token/", form)
+	assert.Equal(t, "invalid_grant", refused["error"])
+	assert.Equal(t, "Code is invalid.", refused["error_description"])
+	assert.Empty(t, refused["refresh_token"])
+
+	stored, err := database.GetCodeById(context.Background(), nil, withdrawnCode.Id)
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	assert.True(t, stored.Revoked, "the withdrawal marks the unused code revoked")
+
+	// The same user's code with another client is outside the withdrawal and still redeems.
+	redeemCode(t, otherClient, otherCode, otherSecret)
+
+	logs, logsResp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventRevokedConsentGrants)
+	defer func() { _ = logsResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, logsResp.StatusCode)
+	found := 0
+	for _, entry := range logs.AuditLogs {
+		var details map[string]interface{}
+		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
+			continue
+		}
+		if int64(details["client_id"].(float64)) != withdrawnCode.ClientId {
+			continue
+		}
+		found++
+		assert.InDelta(t, float64(1), details["revoked_code_count"], 0, "the record counts the code the mark moved")
+		assert.Empty(t, details["revoked_refresh_token_jtis"])
+	}
+	assert.Equal(t, 1, found, "the withdrawal must record %v once for this client", audit.EventRevokedConsentGrants)
 }
 
 func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {

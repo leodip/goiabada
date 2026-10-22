@@ -1,9 +1,12 @@
 package renderintegration
 
 import (
+	"io/fs"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/adminconsole/internal/render"
+	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/stretchr/testify/assert"
@@ -45,35 +48,35 @@ func TestRender_AdminClientRedirectURIs(t *testing.T) {
 				ClientId              int64
 				ClientIdentifier      string
 				CanManageRedirectURIs bool
-				RedirectURIs          map[int64]string
+				RedirectURIs          []string
 				IsSystemLevelClient   bool
 			}{
 				ClientId:              7,
 				ClientIdentifier:      "an-implicit-app",
 				CanManageRedirectURIs: canManage,
-				RedirectURIs:          map[int64]string{1: "https://example.com/cb"},
+				RedirectURIs:          []string{"https://example.com/cb"},
 			},
 			"savedSuccessfully": false,
 		})
 	}
 
 	manageable := page(true)
-	assert.Contains(t, manageable, "redirectURIsEnabledPanel")
+	assert.Contains(t, manageable, `id="uriListForm"`)
 	assert.Contains(t, manageable, `id="btnSave"`)
-	assert.NotContains(t, manageable, "URIs de redirecionamento são usadas pelo fluxo")
+	assert.NotContains(t, manageable, "URIs de redirecionamento servem ao fluxo")
 
 	blocked := page(false)
-	assert.NotContains(t, blocked, "redirectURIsEnabledPanel")
+	assert.NotContains(t, blocked, `id="uriListForm"`)
 	assert.NotContains(t, blocked, `id="btnSave"`)
 	// The sentence names both redirect-based flows, which is the whole point of the change:
 	// an implicit-only administrator used to be told to enable a flow their client never uses.
-	assert.Contains(t, blocked, "URIs de redirecionamento são usadas pelo fluxo authorization code com PKCE e pelo fluxo implicit.")
+	assert.Contains(t, blocked, "URIs de redirecionamento servem ao fluxo authorization code e ao fluxo implícito.")
 }
 
 // The redirect URIs page keeps the list as it loaded it and sends that copy with every save, so the
 // auth server can refuse a save from a page another administrator's save has outdated rather than
-// undo their change (#428). The copy has to be taken after the loaded values are pushed and never
-// edited, or the page would send its edited list as the loaded one and every save would pass.
+// undo their change (#428). The page draws the stored list as rows, and its script reads them once
+// as it loads and never edits that copy.
 func TestRender_AdminClientRedirectURIs_SendsTheLoadedList(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
@@ -81,27 +84,23 @@ func TestRender_AdminClientRedirectURIs_SendsTheLoadedList(t *testing.T) {
 			ClientId              int64
 			ClientIdentifier      string
 			CanManageRedirectURIs bool
-			RedirectURIs          map[int64]string
+			RedirectURIs          []string
 			IsSystemLevelClient   bool
 		}{
 			ClientId:              7,
 			ClientIdentifier:      "an-app",
 			CanManageRedirectURIs: true,
-			RedirectURIs:          map[int64]string{1: "https://example.com/a", 2: "https://example.com/b"},
+			RedirectURIs:          []string{"https://example.com/a", "https://example.com/b?x=1&y=2"},
 		},
 		"savedSuccessfully": false,
 	})
 
-	const copyTaken = "const loadedRedirectURIs = redirectURIs.slice();"
-	lastPush := strings.LastIndex(out, `redirectURIs.push("https:\/\/example.com\/b");`)
-	require.NotEqual(t, -1, lastPush, "the loaded values are pushed into the editable list")
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps a copy of the loaded list")
-	assert.Greater(t, copyAt, lastPush, "the copy is taken after every loaded value is in the list")
-
-	assert.Contains(t, out, `"expectedRedirectURIs": loadedRedirectURIs,`)
-	assert.NotRegexp(t, `loadedRedirectURIs\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedRedirectURIs\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+	assert.Contains(t, out, `<tr data-value="https://example.com/a">`)
+	assert.Contains(t, out, `<tr data-value="https://example.com/b?x=1&amp;y=2">`,
+		"a value is drawn escaped for its attribute, which the browser reads back as the value")
+	assert.Contains(t, out, `data-list-key="redirectURIs" data-expected-key="expectedRedirectURIs"`)
+	assert.Contains(t, out, `src="/static/pages/client-uri-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/client-uri-list.js", "loadedEntries", "entries()")
 }
 
 // The Web Origins page has no gate left and shows two lists: this client's editable rows, and the
@@ -120,13 +119,13 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 		"client": struct {
 			ClientId            int64
 			ClientIdentifier    string
-			WebOrigins          map[int64]string
+			WebOrigins          []string
 			EffectiveWebOrigins []effectiveWebOrigin
 			IsSystemLevelClient bool
 		}{
 			ClientId:         7,
 			ClientIdentifier: "a-javascript-app",
-			WebOrigins:       map[int64]string{1: "https://mine.example.com"},
+			WebOrigins:       []string{"https://mine.example.com"},
 			EffectiveWebOrigins: []effectiveWebOrigin{
 				{Origin: "https://mine.example.com", ClientIdentifier: "a-javascript-app"},
 				{Origin: "https://theirs.example.com", ClientIdentifier: "another-app"},
@@ -138,7 +137,7 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 	// The form renders unconditionally now. This client has the authorization code flow off,
 	// which the bind no longer even carries, and it still gets the form and the save button:
 	// needing a web origin is about the app being JavaScript in a browser, not about any flow.
-	assert.Contains(t, out, "webOriginsEnabledPanel")
+	assert.Contains(t, out, `id="uriListForm"`)
 	assert.Contains(t, out, `id="btnSave"`)
 
 	// Another client's origin is visible here, and the sentence above the list says why an
@@ -149,62 +148,146 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 	assert.Contains(t, out, "Origens permitidas em todo o servidor")
 	assert.Contains(t, out, "é permitida para todos os clientes") //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 
-	// The intro says the value is a bare origin rather than a URL, which is where the trailing
-	// slash that CORS can never match used to come from.
-	assert.Contains(t, out, "sem nada depois do host")
+	// The lead says the value is a bare origin rather than a URL, which is where the trailing
+	// slash that CORS can never match used to come from, and the form keeps only an entry's
+	// origin.
+	assert.Contains(t, out, "uma porta opcional, sem nada depois")
+	assert.Contains(t, out, `data-expected-key="expectedWebOrigins" data-origins`)
 }
 
 // The web origins page keeps the list as it loaded it and sends that copy with every save, as the
-// redirect URIs page does, so the auth server can refuse a save from an outdated page rather than
-// undo another administrator's change (#428). The copy is taken after the loaded values are pushed
-// and never edited, or the page would send its edited list as the loaded one and every save would
-// pass.
+// redirect URIs page does, through the same script (#428).
 func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_clients_web_origins.html", map[string]interface{}{
 		"client": struct {
 			ClientId            int64
 			ClientIdentifier    string
-			WebOrigins          map[int64]string
+			WebOrigins          []string
 			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
 			IsSystemLevelClient bool
 		}{
 			ClientId:         7,
 			ClientIdentifier: "a-javascript-app",
-			WebOrigins:       map[int64]string{1: "https://a.example.com", 2: "https://b.example.com"},
+			WebOrigins:       []string{"https://a.example.com", "https://b.example.com"},
 		},
 		"savedSuccessfully": false,
 	})
 
-	const copyTaken = "const loadedWebOrigins = webOrigins.slice();"
-	lastPush := strings.LastIndex(out, `webOrigins.push("https:\/\/b.example.com");`)
-	require.NotEqual(t, -1, lastPush, "the loaded values are pushed into the editable list")
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps a copy of the loaded list")
-	assert.Greater(t, copyAt, lastPush, "the copy is taken after every loaded value is in the list")
-
-	assert.Contains(t, out, `"expectedWebOrigins": loadedWebOrigins,`)
-	assert.NotRegexp(t, `loadedWebOrigins\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedWebOrigins\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+	assert.Contains(t, out, `<tr data-value="https://a.example.com">`)
+	assert.Contains(t, out, `<tr data-value="https://b.example.com">`)
+	assert.Contains(t, out, `data-list-key="webOrigins" data-expected-key="expectedWebOrigins"`)
+	assert.Contains(t, out, `src="/static/pages/client-uri-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/client-uri-list.js", "loadedEntries", "entries()")
 }
 
-// The client permissions page does the same (#428).
+// The client permissions page does the same, through its own script (#428).
 func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_clients_permissions.html", map[string]interface{}{
 		"client": struct {
 			ClientId                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
-			Permissions              map[int64]string
-			IsSystemLevelClient      bool
+			Permissions              []struct {
+				Id    int64
+				Scope string
+			}
+			IsSystemLevelClient bool
 		}{
 			ClientId:                 7,
 			ClientIdentifier:         "a-service",
 			ClientCredentialsEnabled: true,
-			Permissions:              map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
+			Permissions: []struct {
+				Id    int64
+				Scope string
+			}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
 		},
 		"resources":         []api.ResourceResponse{},
 		"savedSuccessfully": false,
 	})
-	assertSendsTheLoadedPermissionIds(t, out)
+
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"`)
+	assert.Contains(t, out, `src="/static/pages/permission-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/permission-list.js", "loadedIds", "grantedIds()")
+}
+
+// The Remove buttons of the lists edited in the page, a client's redirect URIs, web origins and
+// permissions, a user's permissions and groups, and a group's permissions, are named for what they do and to which row: the
+// visible "Remove" and the row's value beside it for a screen reader, in the administrator's
+// language, as the page draws the stored rows, and as the scripts build the row of an entry added
+// in the page, from the form's data-remove-label.
+func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
+	type permission struct {
+		Id    int64
+		Scope string
+	}
+	cases := []struct {
+		page   string
+		bind   map[string]interface{}
+		row    string
+		script string
+	}{
+		{"/admin_clients_redirect_uris.html", map[string]interface{}{"client": struct {
+			ClientId              int64
+			ClientIdentifier      string
+			CanManageRedirectURIs bool
+			RedirectURIs          []string
+			IsSystemLevelClient   bool
+		}{ClientId: 7, ClientIdentifier: "an-app", CanManageRedirectURIs: true, RedirectURIs: []string{"https://example.com/cb"}}},
+			"https://example.com/cb", "pages/client-uri-list.js"},
+		{"/admin_clients_web_origins.html", map[string]interface{}{"client": struct {
+			ClientId            int64
+			ClientIdentifier    string
+			WebOrigins          []string
+			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
+			IsSystemLevelClient bool
+		}{ClientId: 7, ClientIdentifier: "a-javascript-app", WebOrigins: []string{"https://a.example.com"}}},
+			"https://a.example.com", "pages/client-uri-list.js"},
+		{"/admin_clients_permissions.html", map[string]interface{}{"client": struct {
+			ClientId                 int64
+			ClientIdentifier         string
+			ClientCredentialsEnabled bool
+			Permissions              []permission
+			IsSystemLevelClient      bool
+		}{ClientId: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true, Permissions: []permission{{3, "some-resource:read"}}},
+			"resources": []api.ResourceResponse{}},
+			"some-resource:read", "pages/permission-list.js"},
+		{"/admin_users_permissions.html", map[string]interface{}{
+			"user":      &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"granted":   []permission{{3, "some-resource:read"}},
+			"resources": []render.Choice{}},
+			"some-resource:read", "pages/permission-list.js"},
+		{"/admin_users_groups.html", map[string]interface{}{
+			"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"memberships": []struct {
+				Id              int64
+				GroupIdentifier string
+			}{{3, "admins"}},
+			"groupChoices": []render.Choice{}},
+			"admins", "pages/user-groups.js"},
+		{"/admin_groups_permissions.html", map[string]interface{}{
+			"group": struct {
+				GroupId         int64
+				GroupIdentifier string
+			}{GroupId: 5, GroupIdentifier: "admins"},
+			"granted":   []permission{{3, "some-resource:read"}},
+			"resources": []render.Choice{}},
+			"some-resource:read", "pages/permission-list.js"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.page, func(t *testing.T) {
+			for lang, remove := range map[string]string{"en": "Remove", "pt-BR": "Remover"} {
+				out := renderMenuPageIn(t, tc.page, tc.bind, lang, true)
+				assert.Contains(t, out, `type="button" data-list-remove>`+remove+`<span class="sr-only"> `+tc.row+`</span></button>`)
+				assert.Contains(t, out, `data-remove-label="`+remove+`"`)
+			}
+			script, err := fs.ReadFile(web.StaticFS(), tc.script)
+			require.NoError(t, err)
+			assert.Contains(t, string(script), `remove.type = "button";`, "a script-built Remove is a plain button")
+			assert.Contains(t, string(script), `.dataset.removeLabel;`)
+			assert.Contains(t, string(script), `name.className = "sr-only";`)
+		})
+	}
 }

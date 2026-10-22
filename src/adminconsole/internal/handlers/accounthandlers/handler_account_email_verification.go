@@ -146,8 +146,9 @@ func HandleEmailVerificationPost(
 		verificationCode := strings.TrimSpace(r.PostFormValue("verificationCode"))
 		req := &api.VerifyAccountEmailRequest{VerificationCode: verificationCode}
 
-		// renderRefused redraws the form with the code the user typed and the API's reason.
-		renderRefused := func(message string) {
+		// renderRefused redraws the form with the code the user typed and the API's reason, the code
+		// field marked when the refusal is about the code.
+		renderRefused := func(message, errorField string) {
 			settings, ok := reqctx.SettingsFrom(r.Context())
 			if !ok {
 				httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
@@ -159,6 +160,7 @@ func HandleEmailVerificationPost(
 				"emailVerified":     user.EmailVerified,
 				"smtpEnabled":       settings.SMTPEnabled,
 				"error":             message,
+				"errorField":        errorField,
 				"verificationCode":  verificationCode,
 			}
 			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); renderErr != nil {
@@ -170,12 +172,14 @@ func HandleEmailVerificationPost(
 			// Handle invalid/expired code gracefully as validation error
 			var apiErr *apiclient.APIError
 			if errors.As(verifyErr, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
-				renderRefused(apiErr.Message)
+				renderRefused(apiErr.Message, "verificationCode")
 				return
 			}
 
 			// Delegate other errors to generic handler
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, renderRefused)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, func(message string) {
+				renderRefused(message, "")
+			})
 			return
 		}
 

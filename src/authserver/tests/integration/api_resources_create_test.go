@@ -117,6 +117,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "The resource identifier is already in use", errResp.ErrorDescription)
+	assert.Equal(t, "handler.resource.identifier_in_use", errResp.ErrorCode)
 }
 
 // A resource identifier may not name a client either. The two namespaces are separate tables
@@ -146,6 +147,7 @@ func TestAPIResourcesCreate_ClashingWithAClientIdentifier(t *testing.T) {
 	var errResp api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "The resource identifier is already in use by a client", errResp.ErrorDescription)
+	assert.Equal(t, "handler.resource.identifier_names_client", errResp.ErrorCode)
 }
 
 func TestAPIResourcesCreate_InvalidRequestBody(t *testing.T) {

@@ -1,53 +1,55 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "consent.page_title" }}{{end}}
-{{define "head"}}
-
-{{end}}
+{{define "title"}}{{ T $.ctx "consent.page_title" }} – {{ .appName }}{{end}}
+{{define "head"}}{{end}}
 
 {{define "body"}}
+{{ if .showClientSection }}
+<div class="auth-client">
+  {{ if .hasLogo }}
+  <img class="auth-client-logo" src="{{ .clientLogoUrl }}" alt="" data-hide-on-error>
+  {{ end }}
+  {{ if .clientName }}
+  <p class="auth-client-name">{{ .clientName }}</p>
+  {{ end }}
+  {{ if .clientDescription }}
+  <p class="auth-client-description">{{ .clientDescription }}</p>
+  {{ end }}
+  {{ if .clientWebsiteUrl }}
+  <a class="text-link text-sm" href="{{ .clientWebsiteUrl }}" target="_blank" rel="noopener noreferrer">{{ .clientWebsiteUrl }}</a>
+  {{ end }}
+</div>
+{{ end }}
 
+<h1 class="auth-title">{{ T $.ctx "consent.title" }}</h1>
+<p class="auth-lead">{{ T $.ctx "consent.intro" }}</p>
 
-    <h2 class='mb-2 text-2xl font-semibold text-center'>{{ T $.ctx "consent.title" }}</h2>
-    <form action="" method="post">
+<form method="post" class="stacked">
+  <input type="hidden" name="ceremonyId" value="{{ .ceremonyId }}">
 
-        <input type="hidden" name="ceremonyId" value="{{.ceremonyId}}" />
+  {{ if .clientNameUnverified }}
+  <div class="notice notice-caution">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+    <p>{{ T $.ctx "consent.client_unverified" }}</p>
+  </div>
+  {{ end }}
 
-        <div class="mb-3">
+  <fieldset>
+    <legend class="field-label mb-2">{{ T $.ctx "consent.scopes_legend" }}</legend>
+    <div class="check-list">
+      {{ range $i, $s := .scopes }}
+      <label class="check-row" for="consent{{ $i }}">
+        <input type="checkbox" id="consent{{ $i }}" name="consent{{ $i }}" checked>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ .Description }}</span>
+          <span class="code-hint">{{ .Scope }}</span>
+        </span>
+      </label>
+      {{ end }}
+    </div>
+  </fieldset>
 
-            <p class="mt-2">{{ T $.ctx "consent.intro" }}</p>
-
-            {{if .showClientSection}}
-            <div class="flex flex-col items-center mt-5 mb-8">
-                {{if .hasLogo}}
-                <div class="w-[220px] h-[220px] shrink-0 overflow-hidden rounded-lg">
-                    <img src="{{.clientLogoUrl}}" onerror="this.parentElement.style.display='none'"
-                         class="object-contain w-full h-full" alt="" />
-                </div>
-                {{end}}
-                {{if .clientName}}<span class="mt-1 text-sm text-base-content/80">{{.clientName}}</span>{{end}}
-                {{if .clientNameUnverified}}<span class="mt-0.5 text-xs text-warning">{{ T $.ctx "consent.client_unverified" }}</span>{{end}}
-                {{if .clientDescription}}<span class="mt-0.5 text-xs text-base-content/60">{{.clientDescription}}</span>{{end}}
-                {{if .clientWebsiteUrl}}<a href="{{.clientWebsiteUrl}}" target="_blank" rel="noopener noreferrer"
-                     class="mt-0.5 text-xs link link-primary">{{.clientWebsiteUrl}}</a>{{end}}
-            </div>
-            {{end}}
-
-            <table class="mt-2 table-auto">
-                <tbody>
-                {{range $i, $s := .scopes}}
-                    <tr>
-                        <td>
-                            <input type="checkbox" id="consent{{$i}}" name="consent{{$i}}" checked />
-                        </td>
-                        <td class="p-2"><label for="consent{{$i}}">{{.Scope}}</label></td>
-                        <td class="p-2">{{.Description}}</td>
-                    </tr>
-                {{end}}
-                </tbody>
-            </table>
-
-            <button class="w-full mt-3 btn btn-neutral" name="btnCancel" value="cancel">{{ T $.ctx "consent.button.cancel" }}</button>
-            <button class="w-full mt-3 btn btn-primary" name="btnSubmit" value="submit">{{ T $.ctx "consent.button.submit" }}</button>
-
-    </form>
-
+  <div class="auth-actions">
+    <button class="button" type="submit" name="btnCancel" value="cancel">{{ T $.ctx "consent.button.cancel" }}</button>
+    <button class="button button-primary" type="submit" name="btnSubmit" value="submit">{{ T $.ctx "consent.button.submit" }}</button>
+  </div>
+</form>
 {{end}}

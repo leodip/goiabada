@@ -32,6 +32,8 @@ The manifest the setup wizard generates runs one replica of each server. At one 
 
 3. **Decide on the rate limiter,** whose per-pod limits multiply with the replicas: see [Rate limiting across replicas](#rate-limiting-across-replicas).
 
+4. **Keep each browser on one admin console pod,** with more than one console replica: see [The admin console across replicas](#the-admin-console-across-replicas).
+
 </Steps>
 
 ## Connections
@@ -68,6 +70,12 @@ Not every limit holds across replicas:
 - **Per pod:** every other limit, the per-IP limits and the limits on outgoing mail. Behind the Service, three replicas give a client up to three times each budget, and a rollout resets them. For a limit across the whole deployment, use the gateway's own rate limiting.
 
 The budgets are in [Rate limits](/reference/environment-variables/#rate-limits). With the limiter on, the auth server also logs a warning at every start that it trusts one proxy hop with no list; behind Envoy alone that's expected, as [The startup warnings](/deploy/client-ip-and-proxy-trust/#the-startup-warnings) explains.
+
+## The admin console across replicas
+
+The admin console refreshes an administrator's access token in its last 30 seconds, or in the last half of its lifetime when that's shorter, on whichever request finds it due. One console pod lets one refresh run at a time for each browser session, and the requests that waited take its answer. Two pods can't see each other's, though, so when two pods both refresh one session in that window, each presents the same [refresh token](/concepts/refresh-tokens/). The auth server rotates refresh tokens strictly: the second is refused, or treated as a [replay](/concepts/refresh-tokens/#replay), which revokes the session's tokens and leaves a `refresh_token_replay_detected` entry in the [audit log](/concepts/audit-log/). Either way the administrator may have to sign in again.
+
+At one console replica there's nothing to do. With more, keep each browser on one console pod with session affinity at the gateway, such as a consistent hash on the client's address or on a cookie, which Envoy Gateway's [load balancing](https://gateway.envoyproxy.io/docs/tasks/traffic/load-balancing/) offers. A browser then moves to another pod only when the pods change, as in a rollout or a drain.
 
 ## Resource limits
 

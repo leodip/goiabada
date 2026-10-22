@@ -1,465 +1,611 @@
-// Image Upload with Cropper.js
-// Generic image upload with client-side cropping, configurable via data-* attributes on the container element.
+// image-upload.js is the image upload of the account picture, client logo and user picture pages:
+// a file chosen, cropped in a dialog with Cropper.js, sent, and deleted after a confirmation. Each
+// page draws the same widget and configures it on #imageUploadContainer:
 //
-// Required data attributes on #imageUploadContainer:
-//   data-upload-url    - POST target URL
-//   data-delete-url    - DELETE target URL
+//   data-upload-url    POST target
+//   data-delete-url    DELETE target
+//   data-field-name    the multipart field the image goes in
+//   data-url-key       the key of the JSON answer holding the new image's URL
+//   data-crop-mode     "square", 1:1 at 512 by 512, or "free", any rectangle, its longest side
+//                      at most 512
+//   data-output-format "jpeg", always JPEG at 0.9, or "preserve", the chosen file's format,
+//                      transparency included, a GIF sent as PNG
+//   data-alt, data-crop-alt
+//                      the preview image's and the image being cropped's text alternatives
+//   data-uploaded, data-deleted
+//                      the sentences the status region says after each
+//   data-delete-title, data-delete-confirm
+//                      what the delete dialog, #deleteImage, asks
 //
-// Optional data attributes (with defaults for backwards compatibility):
-//   data-field-name    - multipart form field name (default: "picture")
-//   data-url-key       - JSON response key for the image URL (default: "pictureUrl")
-//   data-entity-label  - label used in UI text, e.g. "profile picture" or "logo" (default: "profile picture")
-//   data-crop-mode     - "square" (1:1 aspect ratio, 512x512) or "free" (any rectangle, longest side capped at 512) (default: "square")
-//   data-output-format - "jpeg" (forced JPEG 0.9) or "preserve" (keep original format/transparency) (default: "jpeg")
+// The preview frame, #imagePreview, holds the image when there is one; ui.css hides the frame's
+// placeholder then. What the widget says goes to its status region, #imageUploadStatus, a live
+// region, through showNotice.
+//
+// The crop dialog is the crop_dialog partial: the cropper's canvas in #cropArea, and sliders that
+// do what dragging the crop does, for a keyboard or a single tap: #cropZoom, #cropX and #cropY, and
+// for a free crop #cropWidth and #cropHeight. The crop is kept in the image's own pixels, so the
+// sliders and the drawn selection agree whatever size the dialog is drawn at, and it never leaves
+// the image; what is sent is drawn from the chosen image's own pixels by the same crop. The dialog is a <dialog>, so Escape cancels it and focus goes back to
+// the button that opened it, and whichever way it closes it lets go of the chosen file. One image
+// operation runs at a time, a file chosen, read, cropped and sent, or a deletion: the Upload and
+// Delete buttons are disabled from its start to its end, and a callback of a file choice other
+// than the latest does nothing. While a crop is being sent its dialog stays open, Cancel disabled,
+// Escape ignored and the cropper locked. A browser that closes the dialog anyway, as some do on a
+// repeated Escape, takes nothing with it: the sending carries on, the status region says so, and
+// the buttons stay disabled until it is done.
 
-(function() {
-    'use strict';
+(function () {
+  const maxSize = 3 * 1024 * 1024;
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  // The least of the image a crop covers, as a share of its width or height.
+  const minShare = 0.1;
+  // The sides the auth server accepts an image at, imageupload.MinDimension and MaxDimension: a
+  // crop is sent with each side between them, so it is never refused for its size.
+  const outputMin = 10;
+  const outputMax = 512;
 
-    let cropper = null;
-    let currentFile = null;
-    let currentFileMimeType = null;
+  const container = document.getElementById("imageUploadContainer");
+  if (!container) {
+    return;
+  }
+  const config = container.dataset;
+  const free = config.cropMode === "free";
+  const fileInput = document.getElementById("imageUploadInput");
+  const uploadButton = document.getElementById("uploadImageBtn");
+  const deleteButton = document.getElementById("deleteImageBtn");
+  const preview = document.getElementById("imagePreview");
+  const status = document.getElementById("imageUploadStatus");
+  const cropDialog = document.getElementById("cropDialog");
+  const cropArea = document.getElementById("cropArea");
+  const cancelButton = document.getElementById("cancelCropBtn");
+  const confirmButton = document.getElementById("confirmCropBtn");
+  const confirmLabel = confirmButton.textContent;
+  const sliders = {
+    zoom: document.getElementById("cropZoom"),
+    x: document.getElementById("cropX"),
+    y: document.getElementById("cropY"),
+    width: document.getElementById("cropWidth"),
+    height: document.getElementById("cropHeight")
+  };
 
-    // Initialize when DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
-        initImageUpload();
+  // The open crop: the cropper, the chosen image and its file's type, the image's own size, the crop
+  // in the image's pixels, and where the image is drawn in the cropper's canvas, set once it is
+  // drawn.
+  let cropper = null;
+  let source = null;
+  let fileType = null;
+  let natural = null;
+  let crop = null;
+  let drawn = null;
+  let resizeObserver = null;
+  let uploading = false;
+  // Whether an image operation runs, and the latest file choice, by which a reader's or a decoder's
+  // callback knows whether it is still wanted.
+  let busy = false;
+  let choice = 0;
+
+  // setBusy starts or ends an image operation, during which no other can start.
+  function setBusy(on) {
+    busy = on;
+    uploadButton.disabled = on;
+    deleteButton.disabled = on;
+  }
+
+  // focusLost tells whether an operation's end should place the focus: when it is on nothing, on
+  // Delete while a deletion has it disabled or its success has hidden it, or in a dialog just
+  // closed, where a browser leaves it until it next tidies up. Focus the person moved elsewhere is
+  // not lost, Delete usable again included, and stays where they put it.
+  function focusLost() {
+    const focused = document.activeElement;
+    return !focused || focused === document.body
+      || (focused === deleteButton && (deleteButton.disabled || deleteButton.hidden))
+      || focused.closest("dialog:not([open])") !== null;
+  }
+
+  // regainFocus puts lost focus back on Upload, which an operation disables, dropping its focus,
+  // and which a dialog opened during the operation could not give it back to.
+  function regainFocus() {
+    if (focusLost()) {
+      uploadButton.focus();
+    }
+  }
+
+  // The CSRF header, when the page carries the token.
+  function csrfHeaders() {
+    const token = document.querySelector('input[name="gorilla.csrf.Token"]');
+    return token ? { "X-CSRF-Token": token.value } : {};
+  }
+
+  function chooseFile() {
+    const file = fileInput.files[0];
+    if (!file || busy) {
+      fileInput.value = "";
+      return;
+    }
+    if (!allowedTypes.includes(file.type)) {
+      fileInput.value = "";
+      showNotice(status, "danger", t("js.image_upload.invalid_format"));
+      return;
+    }
+    // The server holds its own limit; this one spares sending a file it would refuse.
+    if (file.size > maxSize) {
+      fileInput.value = "";
+      showNotice(status, "danger", t("js.image_upload.file_too_large"));
+      return;
+    }
+    // The file is decoded before the dialog opens, so a file that is not the image its type
+    // claims is refused here rather than opening a crop of nothing. The operation starts with the
+    // reading.
+    choice++;
+    const mine = choice;
+    setBusy(true);
+    const reader = new FileReader();
+    reader.addEventListener("error", function () {
+      if (mine === choice) {
+        unreadable();
+      }
     });
+    reader.addEventListener("load", function () {
+      if (mine !== choice) {
+        return;
+      }
+      const image = document.createElement("img");
+      image.alt = config.cropAlt;
+      image.src = reader.result;
+      image.decode().then(function () {
+        if (mine === choice) {
+          fileType = file.type;
+          openCrop(image);
+        }
+      }, function () {
+        if (mine === choice) {
+          unreadable();
+        }
+      });
+    });
+    reader.readAsDataURL(file);
+  }
 
-    function getConfig() {
-        const container = document.getElementById('imageUploadContainer');
-        if (!container) return null;
-        return {
-            uploadUrl: container.dataset.uploadUrl || '',
-            deleteUrl: container.dataset.deleteUrl || '',
-            fieldName: container.dataset.fieldName || 'picture',
-            urlKey: container.dataset.urlKey || 'pictureUrl',
-            entityLabel: container.dataset.entityLabel || 'profile picture',
-            cropMode: container.dataset.cropMode || 'square',
-            outputFormat: container.dataset.outputFormat || 'jpeg',
-        };
+  // unreadable ends a file choice whose file is no image.
+  function unreadable() {
+    fileInput.value = "";
+    setBusy(false);
+    regainFocus();
+    showNotice(status, "danger", t("js.image_upload.unreadable"));
+  }
+
+  // The cropper's elements: the image, which the person neither moves nor scales, the selection,
+  // square for a picture, and its handles. The selection, its guides and handles, and the shade
+  // are drawn for a pointer and hidden from assistive technology, for which the sliders do the
+  // same; the image keeps its text alternative.
+  function cropTemplate() {
+    const handles = ["n", "e", "s", "w", "ne", "nw", "se", "sw"].map(function (side) {
+      return '<cropper-handle action="' + side + '-resize"></cropper-handle>';
+    }).join("");
+    return '<cropper-canvas background>'
+      + '<cropper-image initial-fit="contain"></cropper-image>'
+      + '<cropper-shade hidden aria-hidden="true"></cropper-shade>'
+      + '<cropper-selection movable resizable precise aria-hidden="true"' + (free ? "" : ' aspect-ratio="1"') + '>'
+      + '<cropper-grid bordered covered></cropper-grid>'
+      + '<cropper-crosshair centered></cropper-crosshair>'
+      + '<cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.35)"></cropper-handle>'
+      + handles
+      + '</cropper-selection>'
+      + '</cropper-canvas>';
+  }
+
+  // openCrop opens the dialog over image and, once the cropper has drawn it, starts the crop at
+  // the whole image, the largest centered square of it for a picture.
+  function openCrop(image) {
+    source = image;
+    natural = { width: image.naturalWidth, height: image.naturalHeight };
+    cropArea.replaceChildren(image);
+    cropDialog.showModal();
+    // The bundle's global, Cropper, is its module: the class is its Cropper.
+    const opened = new Cropper.Cropper(image, { container: cropArea, template: cropTemplate() });
+    cropper = opened;
+    opened.getCropperSelection().addEventListener("change", followSelection);
+    opened.getCropperImage().$ready().then(function () {
+      // A frame later the image has its fitted size.
+      requestAnimationFrame(function () {
+        if (cropper !== opened) {
+          return;
+        }
+        const side = Math.min(natural.width, natural.height);
+        crop = free ? { x: 0, y: 0, width: natural.width, height: natural.height }
+          : { x: (natural.width - side) / 2, y: (natural.height - side) / 2, width: side, height: side };
+        fit();
+        resizeObserver = new ResizeObserver(refit);
+        resizeObserver.observe(opened.getCropperCanvas());
+        if (document.activeElement === cancelButton) {
+          sliders.zoom.focus();
+        }
+      });
+    }, function () {
+      if (cropper === opened) {
+        cropDialog.close();
+        unreadable();
+      }
+    });
+  }
+
+  // fit measures where the image is drawn in the canvas and draws the crop there.
+  function fit() {
+    const canvasBox = cropper.getCropperCanvas().getBoundingClientRect();
+    const imageBox = cropper.getCropperImage().getBoundingClientRect();
+    drawn = {
+      left: imageBox.left - canvasBox.left,
+      top: imageBox.top - canvasBox.top,
+      scale: imageBox.width / natural.width
+    };
+    show(crop);
+  }
+
+  // refit draws the image to fit the canvas again once the dialog changes size, and the crop with
+  // it. The image takes no move or scale from the person, so it allows them for this call alone.
+  function refit() {
+    if (!drawn) {
+      return;
     }
+    const image = cropper.getCropperImage();
+    image.translatable = true;
+    image.scalable = true;
+    image.$center("contain");
+    image.translatable = false;
+    image.scalable = false;
+    fit();
+  }
 
-    function initImageUpload() {
-        const fileInput = document.getElementById('imageUploadInput');
-        const uploadBtn = document.getElementById('uploadImageBtn');
-        const deleteBtn = document.getElementById('deleteImageBtn');
-        const cropModal = document.getElementById('cropModal');
+  // least is the least a side of the crop may be: minShare of the image's side, and no fewer pixels
+  // than the auth server accepts unless the image itself has fewer.
+  function least(side) {
+    return Math.min(side, Math.max(side * minShare, outputMin));
+  }
 
-        if (!fileInput) return; // Image upload not on this page
-
-        // File input change handler
-        fileInput.addEventListener('change', handleFileSelect);
-
-        // Upload button click handler
-        if (uploadBtn) {
-            uploadBtn.addEventListener('click', function() {
-                fileInput.click();
-            });
-        }
-
-        // Delete button click handler
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', handleDelete);
-        }
-
-        // Modal buttons
-        const cancelCropBtn = document.getElementById('cancelCropBtn');
-        const confirmCropBtn = document.getElementById('confirmCropBtn');
-
-        if (cancelCropBtn) {
-            cancelCropBtn.addEventListener('click', closeCropModal);
-        }
-
-        if (confirmCropBtn) {
-            confirmCropBtn.addEventListener('click', handleCropConfirm);
-        }
-
-        // Close modal on backdrop click
-        if (cropModal) {
-            cropModal.addEventListener('click', function(e) {
-                if (e.target === cropModal) {
-                    closeCropModal();
-                }
-            });
-        }
+  // clamp keeps a crop to its shape, at least least() and at most all of the image, a free crop no
+  // longer than outputMax / outputMin times its width or height, the most the auth server's bounds
+  // allow, and within the image.
+  function clamp(next) {
+    let width;
+    let height;
+    if (free) {
+      width = Math.min(Math.max(next.width, least(natural.width)), natural.width);
+      height = Math.min(Math.max(next.height, least(natural.height)), natural.height);
+      const ratio = outputMax / outputMin;
+      width = Math.min(width, height * ratio);
+      height = Math.min(height, width * ratio);
+    } else {
+      const most = Math.min(natural.width, natural.height);
+      width = Math.min(Math.max(next.width, least(most)), most);
+      height = width;
     }
+    return {
+      x: Math.min(Math.max(next.x, 0), natural.width - width),
+      y: Math.min(Math.max(next.y, 0), natural.height - height),
+      width: width,
+      height: height
+    };
+  }
 
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+  // show makes next the crop and draws it.
+  function show(next) {
+    crop = clamp(next);
+    cropper.getCropperSelection().$change(drawn.left + crop.x * drawn.scale, drawn.top + crop.y * drawn.scale,
+      crop.width * drawn.scale, crop.height * drawn.scale);
+    update();
+  }
 
-        // Validate file type
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!allowedTypes.includes(file.type)) {
-            showError(t('js.image_upload.invalid_format'));
-            event.target.value = '';
-            return;
-        }
-
-        // Validate file size (3MB default, but actual limit is server-side)
-        const maxSize = 3 * 1024 * 1024;
-        if (file.size > maxSize) {
-            showError(t('js.image_upload.file_too_large'));
-            event.target.value = '';
-            return;
-        }
-
-        currentFile = file;
-        currentFileMimeType = file.type;
-        openCropModal(file);
+  // followSelection has the crop follow a dragged selection, accepting only a change that already
+  // keeps every rule clamp holds, within what floating point leaves over, so the drawn selection,
+  // the sliders and what is sent are the same crop. A move refused, which can only have left the
+  // image, is drawn at the image's edge instead, where the person was taking it; a resize refused,
+  // off the image, below the least crop or past the shape a free crop may take, stays where it was.
+  function followSelection(event) {
+    const box = event.detail;
+    if (!drawn || (box.width === 0 && box.height === 0)) {
+      return;
     }
-
-    function openCropModal(file) {
-        const cropModal = document.getElementById('cropModal');
-        const cropImage = document.getElementById('cropImage');
-        const cfg = getConfig();
-
-        if (!cropModal || !cropImage || !cfg) return;
-
-        // Read file and display in modal
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            cropImage.src = e.target.result;
-            cropModal.classList.remove('hidden');
-            cropModal.classList.add('flex');
-
-            // Initialize Cropper.js after image loads
-            cropImage.onload = function() {
-                if (cropper) {
-                    cropper.destroy();
-                }
-
-                const isFree = cfg.cropMode === 'free';
-
-                cropper = new Cropper(cropImage, {
-                    aspectRatio: isFree ? NaN : 1,
-                    viewMode: 1,
-                    minCropBoxWidth: 64,
-                    minCropBoxHeight: 64,
-                    maxCropBoxWidth: 512,
-                    maxCropBoxHeight: 512,
-                    responsive: true,
-                    restore: false,
-                    guides: true,
-                    center: true,
-                    highlight: false,
-                    cropBoxMovable: true,
-                    cropBoxResizable: true,
-                    toggleDragModeOnDblclick: false,
-                });
-            };
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function closeCropModal() {
-        const cropModal = document.getElementById('cropModal');
-        const fileInput = document.getElementById('imageUploadInput');
-
-        if (cropModal) {
-            cropModal.classList.add('hidden');
-            cropModal.classList.remove('flex');
-        }
-
-        if (cropper) {
-            cropper.destroy();
-            cropper = null;
-        }
-
-        if (fileInput) {
-            fileInput.value = '';
-        }
-
-        currentFile = null;
-        currentFileMimeType = null;
-    }
-
-    function handleCropConfirm() {
-        if (!cropper) return;
-
-        const confirmBtn = document.getElementById('confirmCropBtn');
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = t('js.image_upload.uploading');
-        }
-
-        const cfg = getConfig();
-        if (!cfg) return;
-
-        // Build canvas options based on crop mode
-        var canvasOpts = {
-            imageSmoothingEnabled: true,
-            imageSmoothingQuality: 'high',
-        };
-
-        if (cfg.cropMode === 'free') {
-            // Use natural crop dimensions, cap longest side at 512
-            var cropData = cropper.getData(true); // rounded
-            var w = cropData.width;
-            var h = cropData.height;
-            if (w > 512 || h > 512) {
-                if (w >= h) {
-                    canvasOpts.width = 512;
-                    canvasOpts.height = Math.round(512 * h / w);
-                } else {
-                    canvasOpts.height = 512;
-                    canvasOpts.width = Math.round(512 * w / h);
-                }
-            } else {
-                canvasOpts.width = w;
-                canvasOpts.height = h;
-            }
-        } else {
-            // Square: fixed 512x512
-            canvasOpts.width = 512;
-            canvasOpts.height = 512;
-        }
-
-        const canvas = cropper.getCroppedCanvas(canvasOpts);
-
-        // Determine output format
-        if (cfg.outputFormat === 'preserve') {
-            var mime = currentFileMimeType || 'image/jpeg';
-            var ext = 'image.jpg';
-            var quality = undefined;
-
-            if (mime === 'image/png') {
-                // PNG: preserve transparency, no quality param
-                ext = 'image.png';
-            } else if (mime === 'image/webp') {
-                ext = 'image.webp';
-                quality = 0.9;
-            } else if (mime === 'image/gif') {
-                // GIF -> PNG fallback (canvas can't encode GIF reliably)
-                mime = 'image/png';
-                ext = 'image.png';
-            } else {
-                // JPEG or fallback
-                mime = 'image/jpeg';
-                ext = 'image.jpg';
-                quality = 0.9;
-            }
-
-            if (quality !== undefined) {
-                canvas.toBlob(function(blob) {
-                    uploadImage(blob, ext);
-                }, mime, quality);
-            } else {
-                canvas.toBlob(function(blob) {
-                    uploadImage(blob, ext);
-                }, mime);
-            }
-        } else {
-            // Forced JPEG
-            canvas.toBlob(function(blob) {
-                uploadImage(blob, 'image.jpg');
-            }, 'image/jpeg', 0.9);
-        }
-    }
-
-    function uploadImage(blob, filename) {
-        const cfg = getConfig();
-        if (!cfg) return;
-
-        const formData = new FormData();
-        formData.append(cfg.fieldName, blob, filename);
-
-        if (!cfg.uploadUrl) {
-            showError(t('js.image_upload.upload_url_missing'));
-            resetUploadButton();
-            return;
-        }
-
-        // Get CSRF token
-        const csrfToken = document.querySelector('input[name="gorilla.csrf.Token"]');
-
-        fetch(withPageLanguage(cfg.uploadUrl), {
-            method: 'POST',
-            body: formData,
-            headers: csrfToken ? {
-                'X-CSRF-Token': csrfToken.value
-            } : {}
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    // The admin API refused the access token. There is no dialog here to
-                    // acknowledge, so sign out at once: the home page shows the same sentence.
-                    // The promise never settles, so no error line flashes while the page leaves.
-                    if (isSessionEnded(data)) {
-                        goToSessionEnded();
-                        return new Promise(() => {});
-                    }
-                    // error_description first: these endpoints now answer through the console's
-                    // shared JSON writers, whose body is RFC 6749 5.2's {error, error_description}
-                    // -- error is the code ("not_found"), the sentence is in error_description.
-                    // The || chain keeps this working against either shape (#279).
-                    throw new Error(data.error_description || data.error || t('js.image_upload.upload_failed'));
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                // Update the preview image using the configured URL key
-                updatePreviewImage(data[cfg.urlKey]);
-                showSuccess(tFormat('js.image_upload.updated_successfully', { entity: capitalize(cfg.entityLabel) }));
-                closeCropModal();
-
-                // Show delete button
-                const deleteBtn = document.getElementById('deleteImageBtn');
-                if (deleteBtn) {
-                    deleteBtn.classList.remove('hidden');
-                }
-            } else {
-                throw new Error(data.error || t('js.image_upload.upload_failed'));
-            }
-        })
-        .catch(error => {
-            showError(error.message);
-        })
-        .finally(() => {
-            resetUploadButton();
+    const next = {
+      x: (box.x - drawn.left) / drawn.scale,
+      y: (box.y - drawn.top) / drawn.scale,
+      width: box.width / drawn.scale,
+      height: box.height / drawn.scale
+    };
+    const kept = clamp(next);
+    const epsilon = 1e-6;
+    if (["x", "y", "width", "height"].some(function (key) { return Math.abs(kept[key] - next[key]) > epsilon; })) {
+      event.preventDefault();
+      const moved = Math.abs(next.width - crop.width) < 1e-3 && Math.abs(next.height - crop.height) < 1e-3;
+      if (moved) {
+        queueMicrotask(function () {
+          if (drawn && !uploading) {
+            show(next);
+          }
         });
+      }
+      return;
     }
+    crop = kept;
+    update();
+  }
 
-    function handleDelete() {
-        const cfg = getConfig();
-        if (!cfg) return;
-
-        if (!confirm(tFormat('js.image_upload.confirm_delete', { entity: cfg.entityLabel }))) {
-            return;
-        }
-
-        const deleteBtn = document.getElementById('deleteImageBtn');
-        if (deleteBtn) {
-            deleteBtn.disabled = true;
-            deleteBtn.textContent = t('js.image_upload.deleting');
-        }
-
-        if (!cfg.deleteUrl) {
-            showError(t('js.image_upload.delete_url_missing'));
-            resetDeleteButton();
-            return;
-        }
-
-        // Get CSRF token
-        const csrfToken = document.querySelector('input[name="gorilla.csrf.Token"]');
-
-        fetch(withPageLanguage(cfg.deleteUrl), {
-            method: 'DELETE',
-            headers: csrfToken ? {
-                'X-CSRF-Token': csrfToken.value
-            } : {}
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    // See the upload path above, for this branch and the sentence.
-                    if (isSessionEnded(data)) {
-                        goToSessionEnded();
-                        return new Promise(() => {});
-                    }
-                    // See the upload path above: error_description carries the sentence.
-                    throw new Error(data.error_description || data.error || t('js.image_upload.delete_failed'));
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                // Reset to default avatar
-                resetToDefaultAvatar();
-                showSuccess(tFormat('js.image_upload.deleted_successfully', { entity: capitalize(cfg.entityLabel) }));
-
-                // Hide delete button
-                if (deleteBtn) {
-                    deleteBtn.classList.add('hidden');
-                }
-            } else {
-                throw new Error(data.error || t('js.image_upload.delete_failed'));
-            }
-        })
-        .catch(error => {
-            showError(error.message);
-        })
-        .finally(() => {
-            resetDeleteButton();
-        });
+  // update sets the sliders from the crop, each a percentage and said as one, and which controls
+  // may be used: none until the crop is drawn or while it is being sent, and a position slider
+  // only while the crop has room to move that way.
+  function update() {
+    const usable = drawn !== null && !uploading;
+    const roomX = crop ? natural.width - crop.width : 0;
+    const roomY = crop ? natural.height - crop.height : 0;
+    if (crop) {
+      const share = Math.max(crop.width / natural.width, crop.height / natural.height);
+      setSlider(sliders.zoom, (1 - share) / (1 - minShare) * 100);
+      setSlider(sliders.x, roomX > 0 ? crop.x / roomX * 100 : 50);
+      setSlider(sliders.y, roomY > 0 ? crop.y / roomY * 100 : 50);
+      if (free) {
+        setSlider(sliders.width, crop.width / natural.width * 100);
+        setSlider(sliders.height, crop.height / natural.height * 100);
+      }
     }
-
-    function updatePreviewImage(url) {
-        const preview = document.getElementById('imagePreview');
-        const placeholder = document.getElementById('imagePlaceholder');
-
-        if (preview) {
-            // Add cache-busting parameter
-            preview.src = url + '?t=' + Date.now();
-            preview.classList.remove('hidden');
-        }
-
-        if (placeholder) {
-            placeholder.classList.add('hidden');
-            placeholder.classList.remove('flex');
-        }
+    sliders.zoom.disabled = !usable;
+    sliders.x.disabled = !usable || roomX < 0.5;
+    sliders.y.disabled = !usable || roomY < 0.5;
+    if (free) {
+      sliders.width.disabled = !usable;
+      sliders.height.disabled = !usable;
     }
-
-    function resetToDefaultAvatar() {
-        const preview = document.getElementById('imagePreview');
-        const placeholder = document.getElementById('imagePlaceholder');
-
-        if (preview) {
-            preview.src = '';
-            preview.classList.add('hidden');
-        }
-
-        if (placeholder) {
-            placeholder.classList.remove('hidden');
-            placeholder.classList.add('flex');
-        }
+    confirmButton.disabled = !usable;
+    if (cropper) {
+      cropper.getCropperCanvas().disabled = !usable;
     }
+  }
 
-    function resetUploadButton() {
-        const confirmBtn = document.getElementById('confirmCropBtn');
-        if (confirmBtn) {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = t('js.image_upload.upload_button');
+  function setSlider(slider, value) {
+    slider.value = String(Math.round(value));
+    slider.setAttribute("aria-valuetext", slider.value + "%");
+  }
+
+  // Whichever way the crop dialog closes, Cancel, Escape or a finished upload, the chosen file
+  // and the cropper go with it.
+  function releaseFile() {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
+    }
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
+    cropArea.replaceChildren();
+    fileInput.value = "";
+    source = null;
+    fileType = null;
+    natural = null;
+    crop = null;
+    drawn = null;
+    update();
+    if (!uploading) {
+      setBusy(false);
+      regainFocus();
+    }
+  }
+
+  // The size the crop is sent at: outputMax square when square, and when free the crop's own size,
+  // shrunk so its longest side is at most outputMax, or grown so its shortest is at least
+  // outputMin, which clamp's bound on its shape keeps from both at once.
+  function outputSize() {
+    if (!free) {
+      return { width: outputMax, height: outputMax };
+    }
+    let scale = Math.min(1, outputMax / Math.max(crop.width, crop.height));
+    scale = Math.max(scale, outputMin / Math.min(crop.width, crop.height));
+    const side = function (length) {
+      return Math.min(outputMax, Math.max(outputMin, Math.round(length * scale)));
+    };
+    return { width: side(crop.width), height: side(crop.height) };
+  }
+
+  // exportCrop draws the crop at size from the chosen image's own pixels, the crop being within the
+  // image, so nothing outside it is sampled. JPEG has no transparency: what the image leaves
+  // transparent is sent white.
+  function exportCrop(size, format) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d");
+    if (format.type === "image/jpeg") {
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, size.width, size.height);
+    }
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, crop.x, crop.y, crop.width, crop.height, 0, 0, size.width, size.height);
+    return canvas;
+  }
+
+  // The format the crop is sent in: the file name, its type and the quality.
+  function outputFormat() {
+    if (config.outputFormat === "preserve") {
+      if (fileType === "image/png" || fileType === "image/gif") {
+        return { name: "image.png", type: "image/png" };
+      }
+      if (fileType === "image/webp") {
+        return { name: "image.webp", type: "image/webp", quality: 0.9 };
+      }
+    }
+    return { name: "image.jpg", type: "image/jpeg", quality: 0.9 };
+  }
+
+  // setUploading holds the dialog open, and every control that could start another image operation
+  // or change this crop disabled, while the crop is being sent.
+  function setUploading(on) {
+    uploading = on;
+    cancelButton.disabled = on;
+    confirmButton.textContent = on ? t("js.image_upload.uploading") : confirmLabel;
+    update();
+  }
+
+  // settle ends the sending and the operation: the controls back, the dialog closed if it is still
+  // open, and the focus back on Upload.
+  function settle() {
+    setUploading(false);
+    setBusy(false);
+    if (cropDialog.open) {
+      cropDialog.close();
+    }
+    regainFocus();
+  }
+
+  function confirmCrop() {
+    if (!drawn || uploading) {
+      return;
+    }
+    const format = outputFormat();
+    const canvas = exportCrop(outputSize(), format);
+    setUploading(true);
+    canvas.toBlob(function (blob) {
+      if (blob) {
+        upload(blob, format.name);
+      } else {
+        failUpload(t("js.image_upload.upload_failed"));
+      }
+    }, format.type, format.quality);
+  }
+
+  function upload(blob, name) {
+    const form = new FormData();
+    form.append(config.fieldName, blob, name);
+    fetch(withPageLanguage(config.uploadUrl), { method: "POST", body: form, headers: csrfHeaders() })
+      .then((response) => response.json().then((data) => {
+        // The admin API refused the access token: sign out at once, as the home page then says
+        // why. The promise never settles, so nothing flashes while the page leaves.
+        if (isSessionEnded(data)) {
+          goToSessionEnded();
+          return new Promise(() => {});
         }
-    }
-
-    function resetDeleteButton() {
-        const deleteBtn = document.getElementById('deleteImageBtn');
-        if (deleteBtn) {
-            deleteBtn.disabled = false;
-            deleteBtn.textContent = t('js.image_upload.delete_button');
+        // The console's JSON writers put the code in error and the sentence in
+        // error_description (#279).
+        if (!response.ok || !data.success) {
+          throw new Error(data.error_description || data.error || t("js.image_upload.upload_failed"));
         }
-    }
+        return data;
+      }))
+      .then((data) => {
+        settle();
+        showImage(data[config.urlKey]);
+        showNotice(status, "positive", config.uploaded);
+      })
+      .catch((error) => {
+        failUpload(error.message);
+      });
+  }
 
-    function showError(message) {
-        const errorDiv = document.getElementById('imageUploadError');
-        if (errorDiv) {
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
-            setTimeout(() => {
-                errorDiv.classList.add('hidden');
-            }, 5000);
-        } else {
-            alert(tFormat('js.image_upload.error_prefix', { message: message }));
+  function failUpload(message) {
+    settle();
+    showNotice(status, "danger", message);
+  }
+
+  function askToDelete() {
+    if (busy) {
+      return;
+    }
+    showModalDialog("deleteImage", config.deleteTitle, config.deleteConfirm, null, deleteImage);
+  }
+
+  // deleteImage deletes the image, an operation of its own, so Delete and Upload are disabled while
+  // it runs, which drops Delete's focus, the focus its dialog gave back to it. Lost focus goes to
+  // the Upload button once the image and its Delete button are gone, back to Delete when the
+  // deletion fails; focus the person moved elsewhere meanwhile stays.
+  function deleteImage() {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    fetch(withPageLanguage(config.deleteUrl), { method: "DELETE", headers: csrfHeaders() })
+      .then((response) => response.json().then((data) => {
+        // As the upload does: a refused access token signs out at once.
+        if (isSessionEnded(data)) {
+          goToSessionEnded();
+          return new Promise(() => {});
         }
-    }
-
-    function showSuccess(message) {
-        const successDiv = document.getElementById('imageUploadSuccess');
-        if (successDiv) {
-            successDiv.textContent = message;
-            successDiv.classList.remove('hidden');
-            setTimeout(() => {
-                successDiv.classList.add('hidden');
-            }, 3000);
+        if (!response.ok || !data.success) {
+          throw new Error(data.error_description || data.error || t("js.image_upload.delete_failed"));
         }
-    }
+        return data;
+      }))
+      .then(() => {
+        setBusy(false);
+        showImage(null);
+        regainFocus();
+        showNotice(status, "positive", config.deleted);
+      })
+      .catch((error) => {
+        setBusy(false);
+        if (focusLost()) {
+          deleteButton.focus();
+        }
+        showNotice(status, "danger", error.message);
+      });
+  }
 
-    function capitalize(str) {
-        if (!str) return str;
-        return str.charAt(0).toUpperCase() + str.slice(1);
+  // showImage puts the image at url in the preview, a fresh request each time, or takes it away
+  // when url is null. The Delete button is shown only beside an image.
+  function showImage(url) {
+    const current = preview.querySelector("img");
+    if (current) {
+      current.remove();
     }
+    if (url) {
+      const image = document.createElement("img");
+      image.alt = config.alt;
+      image.src = url + "?t=" + Date.now();
+      preview.appendChild(image);
+      deleteButton.hidden = false;
+      return;
+    }
+    deleteButton.hidden = true;
+  }
+
+  uploadButton.addEventListener("click", function () {
+    fileInput.click();
+  });
+  fileInput.addEventListener("change", chooseFile);
+  deleteButton.addEventListener("click", askToDelete);
+  cancelButton.addEventListener("click", function () {
+    cropDialog.close();
+  });
+  confirmButton.addEventListener("click", confirmCrop);
+  cropDialog.addEventListener("cancel", function (event) {
+    if (uploading) {
+      event.preventDefault();
+    }
+  });
+  cropDialog.addEventListener("close", function () {
+    if (uploading) {
+      showNotice(status, "note", t("js.image_upload.uploading"));
+    }
+    releaseFile();
+  });
+  sliders.zoom.addEventListener("input", function () {
+    const share = 1 - Number(sliders.zoom.value) / 100 * (1 - minShare);
+    const scale = share / Math.max(crop.width / natural.width, crop.height / natural.height);
+    const width = crop.width * scale;
+    const height = crop.height * scale;
+    show({ x: crop.x + (crop.width - width) / 2, y: crop.y + (crop.height - height) / 2, width: width, height: height });
+  });
+  sliders.x.addEventListener("input", function () {
+    show(Object.assign({}, crop, { x: Number(sliders.x.value) / 100 * (natural.width - crop.width) }));
+  });
+  sliders.y.addEventListener("input", function () {
+    show(Object.assign({}, crop, { y: Number(sliders.y.value) / 100 * (natural.height - crop.height) }));
+  });
+  if (free) {
+    sliders.width.addEventListener("input", function () {
+      const width = Number(sliders.width.value) / 100 * natural.width;
+      show(Object.assign({}, crop, { x: crop.x + (crop.width - width) / 2, width: width }));
+    });
+    sliders.height.addEventListener("input", function () {
+      const height = Number(sliders.height.value) / 100 * natural.height;
+      show(Object.assign({}, crop, { y: crop.y + (crop.height - height) / 2, height: height }));
+    });
+  }
 })();

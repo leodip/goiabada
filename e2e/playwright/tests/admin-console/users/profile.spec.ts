@@ -1,21 +1,10 @@
-import type { Page } from "@playwright/test";
-import { userUrl } from "../../../lib/admin-console";
+import { choose, expectRefusal, userUrl } from "../../../lib/admin-console";
 import { expect, test } from "../../../lib/fixtures";
 import { userTokens } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
-const saved = "Profile saved successfully";
-
-// The value of the first option of a select whose value matches.
-async function optionValue(page: Page, name: string, pattern: RegExp): Promise<string> {
-  const values = await page.locator(`select[name="${name}"] option`).evaluateAll((options) =>
-    options.map((o) => (o as HTMLOptionElement).value),
-  );
-  const value = values.find((v) => pattern.test(v));
-  if (!value) throw new Error(`no ${name} option matching ${pattern}`);
-  return value;
-}
+const saved = "Profile saved.";
 
 function usernameFor(id: number) {
   // Letters, digits and underscores, 2 to 24 characters.
@@ -34,10 +23,9 @@ test("the profile is saved, shown again, and reaches the profile claims", async 
   await page.locator('input[name="website"]').fill("https://mary.example.com");
   await page.locator('select[name="gender"]').selectOption("0");
   await page.locator('input[name="dateOfBirth"]').fill("1990-05-17");
-  const zone = await optionValue(page, "zoneInfo", /___Europe\/Lisbon$/);
-  await page.locator('select[name="zoneInfo"]').selectOption(zone);
-  const locale = await optionValue(page, "locale", /^pt-BR$/);
-  await page.locator('select[name="locale"]').selectOption(locale);
+  // The time zone and the language are searched for, each entry naming its zone or its tag.
+  await choose(page, "zoneInfo", "Europe/Lisbon", /Europe\/Lisbon/);
+  await choose(page, "locale", "pt-BR", /^pt-BR – /);
   await page.locator("#btnSave").click();
   await expect(page.getByText(saved)).toBeVisible();
 
@@ -46,8 +34,11 @@ test("the profile is saved, shown again, and reaches the profile claims", async 
   await expect(page.locator('input[name="familyName"]')).toHaveValue("O'Brien-Smith");
   await expect(page.locator('select[name="gender"]')).toHaveValue("0");
   await expect(page.locator('input[name="dateOfBirth"]')).toHaveValue("1990-05-17");
-  await expect(page.locator('select[name="zoneInfo"]')).toHaveValue(zone);
-  await expect(page.locator('select[name="locale"]')).toHaveValue(locale);
+  await expect(page.locator("#zoneInfo")).toHaveValue(/Europe\/Lisbon/);
+  await expect(page.locator("#locale")).toHaveValue(/^pt-BR – /);
+  // What the form posts: the hidden selects behind the two fields.
+  await expect(page.locator('select[name="zoneInfo"]')).toHaveValue(/___Europe\/Lisbon$/);
+  await expect(page.locator('select[name="locale"]')).toHaveValue("pt-BR");
 
   const { client, secret } = await passwordGrantClient(page, clients);
   const { id } = await userTokens(request, client.identifier, secret, user, "openid profile");
@@ -62,7 +53,7 @@ test("the profile is saved, shown again, and reaches the profile claims", async 
     gender: "female",
     birthdate: "1990-05-17",
     zoneinfo: "Europe/Lisbon",
-    locale,
+    locale: "pt-BR",
   });
   expect(typeof id.updated_at).toBe("number");
 });
@@ -81,7 +72,7 @@ for (const { field, value, message } of [
     await page.goto(userUrl(user.id, "profile"));
     await page.locator(`input[name="${field}"]`).fill(value);
     await page.locator("#btnSave").click();
-    await expect(page.getByText(message)).toBeVisible();
+    await expectRefusal(page, "profile-error", field, message);
     // The form echoes what was typed, a date of birth it cannot parse included.
     await expect(page.locator(`input[name="${field}"]`)).toHaveValue(value);
     await page.goto(userUrl(user.id, "profile"));
@@ -99,7 +90,7 @@ test("a refused date of birth over a stored one is kept as typed, and the stored
 
   await dateOfBirth.fill("17/05/1991");
   await page.locator("#btnSave").click();
-  await expect(page.getByText("The date of birth is invalid. Please use the format YYYY-MM-DD.")).toBeVisible();
+  await expectRefusal(page, "profile-error", "dateOfBirth", "The date of birth is invalid. Please use the format YYYY-MM-DD.");
   // What was typed, not the stored date beside a refusal of it.
   await expect(dateOfBirth).toHaveValue("17/05/1991");
   await page.goto(userUrl(user.id, "profile"));
@@ -118,5 +109,5 @@ test("a username already taken is refused", async ({ page, users }) => {
   await page.goto(userUrl(second.id, "profile"));
   await page.locator('input[name="username"]').fill(username);
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Sorry, this username is already taken.")).toBeVisible();
+  await expectRefusal(page, "profile-error", "username", "Sorry, this username is already taken.");
 });

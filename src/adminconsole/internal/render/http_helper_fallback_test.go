@@ -30,7 +30,8 @@ func failingErrorPageHelper() *Renderer {
 	return New(fstest.MapFS{
 		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
 		"error.html":                  {Data: []byte("{{define \"content\"}}{{template \"never_defined\" .}}{{end}}")},
-	})
+	}, nil)
+
 }
 
 func errorLevelRecords(logs *logtest.SlogCapture) []logtest.CapturedRecord {
@@ -167,6 +168,6 @@ func TestInternalServerError_RenderFailureSpeaksTheRequestsLocale(t *testing.T) 
 	router.ServeHTTP(w, newRequest("GET", "/", nil))
 
 	require.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.True(t, strings.HasPrefix(w.Body.String(), "Pedimos desculpas"), "got %q", w.Body.String())
+	assert.True(t, strings.HasPrefix(w.Body.String(), "O console de administração"), "got %q", w.Body.String())
 	assert.Contains(t, w.Body.String(), "ID da requisição:")
 }

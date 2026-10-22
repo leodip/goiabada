@@ -61,7 +61,7 @@ import (
 // it is the answer decision 18 flattened the spellings into.
 var apiErrorCodes = map[string]string{
 	// The three generic conditions decision 18 settled.
-	"VALIDATION_ERROR":     "category: a rejected value, 400. Also routed on by the console's email-settings page.",
+	"VALIDATION_ERROR":     "category: a rejected value, 400. The console's render.ErrorFieldOrBlank marks the first required field sent blank on it.",
 	"INVALID_REQUEST_BODY": "category: a body that will not parse, 400.",
 	"NOT_FOUND":            "category: an absent entity, 404.",
 
@@ -75,8 +75,6 @@ var apiErrorCodes = map[string]string{
 	"OTP_ALREADY_ENABLED":                  "adminconsole: handler_account_otp.go reloads the page on it, from the enable and from the enrolment fetch.",
 	"OTP_NOT_ENABLED":                      "adminconsole: handler_account_otp.go reloads the page on it, from the disable.",
 	"INVALID_OR_EXPIRED_VERIFICATION_CODE": "adminconsole: handler_account_email_verification.go:139.",
-	"SMTP_NOT_ENABLED":                     "adminconsole: handler_admin_settings_email.go's switch redraws the settings form.",
-	"SEND_FAILED":                          "adminconsole: handler_admin_settings_email.go's switch.",
 
 	// Conditions an integrator can act on, distinguishable from a plain rejected value. #279 kept
 	// these codes live for that reason, and they are documented in openapi.yaml.
@@ -86,6 +84,8 @@ var apiErrorCodes = map[string]string{
 	"FILE_TOO_LARGE":       "400 on an upload: the caller re-encodes smaller.",
 	"NO_FILE":              "400 on an upload: the multipart part is missing.",
 	"CONCURRENT_UPDATE":    "409 on a list save, the account's email change and code send, the administrator's email verification code generation, and an OTP enable or disable: the stored list or account changed after it was loaded, or another save added the same value at the same moment, so nothing was written and the caller reads it again and retries (#428, #404, #471).",
+	"SMTP_NOT_ENABLED":     "400 on the test email and the email verification code's send and check: SMTP is off, so the caller turns it on first.",
+	"SEND_FAILED":          "400 on the test email: it could not be sent, and error_description says what to check.",
 	"LAST_ADMINISTRATOR":   "409 on the six writes that can remove a holder of authserver:manage: the change would leave no enabled user holding it, so the caller grants it to another user first (#402).",
 
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is not
@@ -105,7 +105,7 @@ var apiErrorCodes = map[string]string{
 
 	// Key rotation, kept by decision 7 where every other 500-adjacent code went: a caller acts on
 	// both, and openapi.yaml documents them.
-	"ROTATION_IN_PROGRESS": "409 on rotateKeys: another rotation holds the lock, so the caller retries later.",
+	"ROTATION_IN_PROGRESS": "409 on rotateKeys: another rotation won the race and this call rotated nothing, so the caller does not retry.",
 	"KEY_SET_INCOMPLETE":   "500 on rotateKeys: the key set is not in a rotatable state.",
 
 	// Written outside a handler, by something in front of one.

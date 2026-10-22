@@ -99,7 +99,7 @@ func TestAPIClientRedirectURIsPut_TheBoundsAt60And2048(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			var body map[string]interface{}
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-			assert.Equal(t, "VALIDATION_ERROR", body["error_code"])
+			assert.Regexp(t, `^handler\.client_redirect_uris\.[a-z_]+$`, body["error_code"], "the refusal answers its catalog key")
 			assert.Contains(t, body["error_description"], tc.wantDescription)
 			assert.ElementsMatch(t, sixty, readRedirectURIs(t, accessToken, client.Id), "a refused save changes nothing")
 		})

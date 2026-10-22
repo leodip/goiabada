@@ -152,7 +152,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			httpHelper := render.New(web.TemplateFS())
+			httpHelper := render.New(web.TemplateFS(), web.StaticFS())
 			testCase.handler(httpHelper).ServeHTTP(w, handlertest.Request(testCase.method, "/image", opts...))
 
 			assert.Equal(t, http.StatusForbidden, w.Code)

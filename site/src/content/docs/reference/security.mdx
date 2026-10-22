@@ -41,7 +41,7 @@ This page helps you report a security issue in Goiabada, and shows what it does 
 
 ## Sessions and cookies
 
-- **The cookie holds an identifier, nothing else.** The session's contents stay on the server.
+- **The cookie holds an identifier, nothing else.** The session's contents stay on the server. While a sign-in to the admin console is under way, the console keeps its sign-in handshake, and no tokens, in a second sealed cookie with the same attributes, for 30 minutes at most. The sign-in's own callback removes it, whether the sign-in succeeds or not, and the console stores a session only once it succeeds, so a visitor who never signs in stores nothing on the server.
 - **The cookie is `HttpOnly`,** so no script can read it, **`SameSite=Lax`,** so the browser leaves it off another site's form posts, and **`Secure`** when the server's base URL is `https`, so it never travels over plain HTTP. On `https` its name carries the `__Host-` prefix, so a sibling subdomain can't set one.
 - **A second cookie names the browser, not a session.** It holds a random identifier, with the same attributes, for 400 days, and is used only to end the user's own earlier sessions from that browser when they sign in again. A session stores only its SHA-256. See [Sessions](/concepts/sessions/#how-the-auth-server-recognizes-a-browser).
 - **Sessions expire:** after 2 hours idle or 24 hours in all, by default. See [Sessions](/concepts/sessions/#how-long-a-session-lasts).

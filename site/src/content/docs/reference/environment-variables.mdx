@@ -65,7 +65,7 @@ A base URL is the address browsers and clients use. A listener is where the serv
 
 | Variable | What it does |
 |---|---|
-| `GOIABADA_AUTHSERVER_BASEURL`<br/>Flag: `--authserver-baseurl`<br/>Default: `http://localhost:9090`<br/>Read by: both | The auth server's public URL. The first start also makes it the issuer that tokens carry. An `https://` URL marks the auth server's cookies `Secure`. |
+| `GOIABADA_AUTHSERVER_BASEURL`<br/>Flag: `--authserver-baseurl`<br/>Default: `http://localhost:9090`<br/>Read by: both | The auth server's public URL. The first start also makes it the issuer that tokens carry, so it's at most 60 characters; a longer one the auth server refuses at start. An `https://` URL marks the auth server's cookies `Secure`. |
 | `GOIABADA_AUTHSERVER_INTERNALBASEURL`<br/>Flag: `--authserver-internalbaseurl`<br/>Default: empty<br/>Read by: both | Where the admin console calls the auth server's API, such as `http://goiabada-authserver:9090` inside a cluster. Empty, it uses the public URL. The auth server only reports it in its startup log. |
 | `GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE`<br/>Flag: `--adminconsole-internal-ca-file`<br/>Default: empty<br/>Read by: admin console | A PEM file of the certificate authorities you trust to sign the auth server's certificate, on the `https://` URL the admin console calls it at. They're trusted beside the system's authorities, not in place of them. It's read once, at start. |
 | `GOIABADA_ADMINCONSOLE_BASEURL`<br/>Flag: `--adminconsole-baseurl`<br/>Default: `http://localhost:9091`<br/>Read by: both | The admin console's public URL. The auth server links to it in its emails and sends visitors of `/` there. An `https://` URL marks the admin console's cookies `Secure`. The auth server's first start also registers it, and it followed by `/auth/callback`, as the admin console client's redirect URIs. To change it later, first add the new URL, and it followed by `/auth/callback`, on the client's **Redirect URIs** tab: `https://`, or `http` on loopback. |
@@ -175,6 +175,7 @@ The auth server limits these endpoints. The limits counted by a user or an email
 | `POST /account/register` (self-registration)<br/>Limiter: `register_email` | 5 per 5 minutes | every request | email | always |
 | `POST /account/register`<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address | switch on |
 | `GET /account/activate` and `POST /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes, for the two together | every request | IP address | switch on |
+| `GET /auth/authorize` and `POST /auth/authorize`<br/>Limiter: `authorize` | 120 per minute, for the two together | every request | IP address | switch on |
 | `POST /connect/register` (dynamic client registration)<br/>Limiter: `dcr` | 10 per minute | every request | IP address | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` | always |
@@ -258,6 +259,8 @@ If you lose this key, every secret and signing key in the database is lost with 
 </Aside>
 
 To rotate it, set `GOIABADA_AES_ENCRYPTION_KEY` to a new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old one, then restart the auth server. At start, it re-encrypts everything under the new key in one transaction. Leaving the previous key set across restarts is harmless, but remove it once the rotation is done. If the data decrypts under neither key, the auth server refuses to start rather than risk damaging it. [Rotate secrets](/deploy/rotate-secrets/#the-aes-key) has the procedure for each platform, and [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) where to keep the key.
+
+The auth server refuses to start with the sample key this repository's Compose files once published as `GOIABADA_AES_ENCRYPTION_KEY`, and accepts it only as `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, to rotate off it.
 
 ## The first start
 

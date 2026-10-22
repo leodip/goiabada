@@ -74,7 +74,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := render.New(nil)
+			httpHelper := render.New(nil, nil)
 			req := handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
 				handlertest.WithAccessToken(),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),
@@ -98,7 +98,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 // telling them to reload, rather than the generic error (#428).
 func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
-	httpHelper := render.New(nil)
+	httpHelper := render.New(nil, nil)
 	req := handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
 		handlertest.WithAccessToken(),
 		handlertest.WithBody(bytes.NewBufferString(`{"groupId":5,"assignedPermissionsIds":[6],"expectedPermissionIds":[3]}`)),

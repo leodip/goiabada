@@ -1,245 +1,99 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.keys.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
-{{define "subTitle"}}
-
-<div class="inline-block text-xl font-semibold">
-    {{ T $.ctx "adminconsole.admin_settings.keys.subtitle" }}
-</div>
-<div class="mt-2 divider"></div>
-
-{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.admin_settings.keys.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    const keys = {{ .keys }};
-
-    function showPEM(elem, evt, keyIdentifier) {
-        evt.preventDefault();
-
-        const viewPublicKeyDialogPEMKeyId = document.getElementById('viewPublicKeyDialogPEMKeyId');
-        const viewPublicKeyDialogPEMContent = document.getElementById('viewPublicKeyDialogPEMContent');
-        const viewPublicKeyDialogPEM = document.getElementById('viewPublicKeyDialogPEM');
-
-        const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
-        if (key) {
-            viewPublicKeyDialogPEMKeyId.innerText = key.KeyIdentifier;
-            viewPublicKeyDialogPEMContent.value = key.PublicKeyPEM;
-
-            viewPublicKeyDialogPEM.showModal();
-        }
-    }
-
-    function showASN1DER(elem, evt, keyIdentifier) {
-        evt.preventDefault();
-
-        const viewPublicKeyDialogASN1DERKeyId = document.getElementById('viewPublicKeyDialogASN1DERKeyId');
-        const viewPublicKeyDialogASN1DERContent = document.getElementById('viewPublicKeyDialogASN1DERContent');
-        const viewPublicKeyDialogASN1DER = document.getElementById('viewPublicKeyDialogASN1DER');
-
-        const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
-        if (key) {
-            viewPublicKeyDialogASN1DERKeyId.innerText = key.KeyIdentifier;
-            viewPublicKeyDialogASN1DERContent.value = key.PublicKeyASN1DER;
-
-            viewPublicKeyDialogASN1DER.showModal();
-        }
-    }
-
-    function showJWK(elem, evt, keyIdentifier) {
-        evt.preventDefault();
-
-        const viewPublicKeyDialogJWKKeyId = document.getElementById('viewPublicKeyDialogJWKKeyId');
-        const viewPublicKeyDialogJWKContent = document.getElementById('viewPublicKeyDialogJWKContent');
-        const viewPublicKeyDialogJWK = document.getElementById('viewPublicKeyDialogJWK');
-
-        const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
-        if (key) {
-            viewPublicKeyDialogJWKKeyId.innerText = key.KeyIdentifier;
-            viewPublicKeyDialogJWKContent.value = key.PublicKeyJWK;
-
-            viewPublicKeyDialogJWK.showModal();
-        }
-    }
-
-    function rotate(elem, evt) {
-        evt.preventDefault();
-
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_title" }}",
-            dialogMarkup(["{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}"]),
-            function () {
-            },
-            function () {
-                const loadingIcon = document.getElementById("loadingIcon");
-                sendAjaxRequest({
-                    "url": "/admin/settings/keys/rotate",
-                    "method": "POST",
-                    "bodyData": JSON.stringify({}),
-                    "loadingElement": loadingIcon,
-                    "loadingClasses": ["loading", "loading-xs"],
-                    "modalId": "modal0",
-                    "callback": function (result) {
-                        if (result.Success) {
-                            showModalDialog("modal0", "{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotated_title" }}", "{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotated_body" }}",
-                                function () {
-                                    window.location.reload();
-                                });
-                        }
-                    }
-                });
-            });
-    }
-
-    function revoke(elem, evt, keyIdentifier) {
-        evt.preventDefault();
-
-        showModalDialog("modal1", "{{ T $.ctx "adminconsole.admin_settings.keys.modal_revoke_title" }}",
-            "{{ T $.ctx "adminconsole.admin_settings.keys.modal_revoke_body" }}",
-            function () {
-            },
-            function () {
-                const key = keys.find(k => k.KeyIdentifier === keyIdentifier);
-                if (key) {
-
-                    sendAjaxRequest({
-                        "url": "/admin/settings/keys/revoke",
-                        "method": "POST",
-                        "bodyData": JSON.stringify({
-                            "id": key.Id
-                        }),
-                        "loadingElement": null,
-                        "loadingClasses": null,
-                        "modalId": "modal0",
-                        "callback": function (result) {
-                            if (result.Success) {
-                                window.location.reload();
-                            }
-                        }
-                    });
-                }
-            });
-    }
-
-</script>
-
+<script src="{{ asset "/static/pages/row-actions.js" }}" defer></script>
+<script src="{{ asset "/static/pages/admin-settings-keys.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}</p>
+    <h1 class="page-title" id="page-title">{{ T $.ctx "adminconsole.admin_settings.keys.subtitle" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_settings.keys.lead" }}</p>
+  </div>
+  {{/* A rotation asks first, in the confirm_change dialog, saying it will delete the previous key
+       when there is one, which admin-settings-keys.js keeps true after a revocation with
+       data-confirm-without-previous, and answers with the page again, saying it rotated or why not. */}}
+  <form class="page-actions" id="rotateForm" method="post" action="/admin/settings/keys/rotate" data-confirm-dialog="confirmRotate" data-confirm-title="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}{{ if .hasPreviousKey }} {{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_deletes_previous" }}{{ end }}" data-confirm-without-previous="{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotate_body" }}">
+    <button class="button button-primary" id="btnRotate" type="submit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z" clip-rule="evenodd"/></svg>{{ T $.ctx "adminconsole.admin_settings.keys.rotate_button" }}</button>
+  </form>
+</div>
 
-    <div class="grid grid-cols-1 gap-6">
+{{ if .error }}
+<div class="notice notice-danger mb-4" role="alert">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+  <p>{{ .error }}</p>
+</div>
+{{ end }}
+{{ if .keysRotated }}
+<div class="notice notice-positive mb-4" role="status">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+  <p>{{ T $.ctx "adminconsole.admin_settings.keys.modal_rotated_body" }}</p>
+</div>
+{{ end }}
 
-        <p class="">{{ T $.ctx "adminconsole.admin_settings.keys.intro_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.admin_settings.keys.intro_em" }}</span>{{ T $.ctx "adminconsole.admin_settings.keys.intro_suffix" }}</p>
+<div class="not-empty:mb-4" id="row-actions-status" role="status" data-confirm-title="{{ T $.ctx "adminconsole.admin_settings.keys.modal_revoke_title" }}"></div>
 
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_type" }}</th>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_algorithm" }}</th>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_identifier" }}</th>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_created_at" }}</th>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_state" }}</th>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_public_key" }}</th>
-                    <th>{{ T $.ctx "adminconsole.admin_settings.keys.col_revoke" }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .keys}}
-                    <tr>
-                        <td>{{.Type}}</td>
-                        <td>{{.Algorithm}}</td>
-                        <td>{{.KeyIdentifier}}</td>
-                        <td>{{ DateTime $.ctx .CreatedAt }}</td>
-                        <td>
-                            {{if eq .State "current"}}
-                                <span class="px-2 rounded text-success-content bg-success">{{ T $.ctx "adminconsole.admin_settings.keys.state_current" }}</span>
-                            {{else if eq .State "previous"}}
-                                <span class="px-2 rounded text-neutral-content bg-neutral">{{ T $.ctx "adminconsole.admin_settings.keys.state_previous" }}</span>
-                            {{else if eq .State "next"}}
-                                <span class="px-2 rounded text-neutral-content bg-neutral">{{ T $.ctx "adminconsole.admin_settings.keys.state_next" }}</span>
-                            {{end}}
-                        </td>
-                        <td>
-                            <ul>
-                                <li class="p-1"><a onclick="showPEM(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_settings.keys.format_pem" }}</a></li>
-                                <li class="p-1"><a onclick="showASN1DER(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_settings.keys.format_asn1der" }}</a></li>
-                                <li class="p-1"><a onclick="showJWK(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_settings.keys.format_jwk" }}</a></li>
-                            </ul>
-                        </td>
-                        <td>
-                            {{if eq .State "previous"}}
-                                <a onclick="revoke(this, event, '{{.KeyIdentifier}}');" href="#" class="link link-hover link-secondary">{{ T $.ctx "adminconsole.admin_settings.keys.revoke_link" }}</a>
-                            {{end}}
-                        </td>
-                    </tr>
-                {{end}}
-            </tbody>
-        </table>
+{{/* Each key's public key buttons show it in #publicKeyDialog, read from the signing-keys data
+     block by admin-settings-keys.js; a previous key's Revoke asks first and gives way to a tag. */}}
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+  <table class="data-table data-table-stack" id="keysTable">
+    <thead>
+      <tr>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_settings.keys.col_identifier" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_settings.keys.col_state" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_settings.keys.col_algorithm" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_settings.keys.col_created_at" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.admin_settings.keys.col_public_key" }}</th>
+        <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_settings.keys.col_revoke" }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .keys }}
+      <tr>
+        <td class="cell-mono cell-wrap">{{ .KeyIdentifier }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_settings.keys.col_state" }}">
+          {{- if eq .State "current" }}<span class="tag tag-positive">{{ T $.ctx "adminconsole.admin_settings.keys.state_current" }}</span>
+          {{- else if eq .State "next" }}<span class="tag tag-note">{{ T $.ctx "adminconsole.admin_settings.keys.state_next" }}</span>
+          {{- else if eq .State "previous" }}<span class="tag">{{ T $.ctx "adminconsole.admin_settings.keys.state_previous" }}</span>
+          {{- end }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_settings.keys.col_algorithm" }}">{{ .Algorithm }} ({{ .Type }})</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_settings.keys.col_created_at" }}">{{ DateTime $.ctx .CreatedAt }}</td>
+        <td data-label="{{ T $.ctx "adminconsole.admin_settings.keys.col_public_key" }}">
+          <span class="flex flex-wrap gap-2">
+            <button class="button button-sm" type="button" data-public-key="{{ .KeyIdentifier }}" data-format="pem">{{ T $.ctx "adminconsole.admin_settings.keys.format_pem" }}<span class="sr-only"> {{ .KeyIdentifier }}</span></button>
+            <button class="button button-sm" type="button" data-public-key="{{ .KeyIdentifier }}" data-format="jwk">{{ T $.ctx "adminconsole.admin_settings.keys.format_jwk" }}<span class="sr-only"> {{ .KeyIdentifier }}</span></button>
+            <button class="button button-sm" type="button" data-public-key="{{ .KeyIdentifier }}" data-format="der">{{ T $.ctx "adminconsole.admin_settings.keys.format_asn1der" }}<span class="sr-only"> {{ .KeyIdentifier }}</span></button>
+          </span>
+        </td>
+        <td class="cell-actions">
+          {{- if eq .State "previous" }}
+          <button class="button button-sm" type="button" data-action-url="/admin/settings/keys/revoke" data-action-body="{&#34;id&#34;:{{ .Id }}}" data-dialog="revokeKey"
+            data-confirm="{{ T $.ctx "adminconsole.admin_settings.keys.modal_revoke_body" }}" data-done="{{ T $.ctx "adminconsole.admin_settings.keys.revoked" }}" data-done-label="{{ T $.ctx "adminconsole.admin_settings.keys.revoked_label" }}">{{ T $.ctx "adminconsole.admin_settings.keys.revoke_link" }}<span class="sr-only"> {{ .KeyIdentifier }}</span></button>
+          {{- end }}
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
 
+<script type="application/json" id="signing-keys">{{ .keys }}</script>
+
+<dialog class="dialog dialog-wide" id="publicKeyDialog" aria-labelledby="publicKeyDialogTitle" data-title-pem="{{ T $.ctx "adminconsole.admin_settings.keys.dialog_pem_title" }}" data-title-jwk="{{ T $.ctx "adminconsole.admin_settings.keys.dialog_jwk_title" }}" data-title-der="{{ T $.ctx "adminconsole.admin_settings.keys.dialog_asn1der_title" }}">
+  <form method="dialog" class="dialog-panel">
+    <h2 class="dialog-title" id="publicKeyDialogTitle">{{ T $.ctx "adminconsole.admin_settings.keys.dialog_pem_title" }}</h2>
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.keys.dialog_key_identifier_label" }} <span class="font-mono break-all text-ink" id="publicKeyDialogKeyId"></span></p>
+    <pre class="max-h-[50vh] overflow-auto rounded-md border border-line bg-subtle p-3 font-mono text-sm whitespace-pre-wrap break-all" id="publicKeyContent" role="region" tabindex="0" aria-labelledby="publicKeyDialogTitle"></pre>
+    <p class="sr-only" id="publicKeyCopied" role="status"></p>
+    <div class="dialog-actions">
+      <button class="button" type="button" data-copy-target="publicKeyContent" data-copy-status="publicKeyCopied" data-copied-label="{{ T $.ctx "adminconsole.admin_settings.keys.copied_label" }}" data-copy-failed-label="{{ T $.ctx "adminconsole.admin_settings.keys.copy_failed" }}" data-copy-failed-status="{{ T $.ctx "adminconsole.admin_settings.keys.copy_failed_status" }}" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.988 3.012A2.25 2.25 0 0 1 18 5.25v6.5A2.25 2.25 0 0 1 15.75 14H13.5v-3.379a3 3 0 0 0-.879-2.121l-3.12-3.121a3 3 0 0 0-1.402-.791 2.252 2.252 0 0 1 1.913-1.576A2.25 2.25 0 0 1 12.25 1h1.5a2.25 2.25 0 0 1 2.238 2.012ZM11.5 3.25a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v.25h-3v-.25Z" clip-rule="evenodd"/><path d="M3.5 6A1.5 1.5 0 0 0 2 7.5v9A1.5 1.5 0 0 0 3.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L8.44 6.439A1.5 1.5 0 0 0 7.378 6H3.5Z"/></svg><span>{{ T $.ctx "adminconsole.admin_settings.keys.copy_button" }}</span></button>
+      <button class="button button-primary">{{ T $.ctx "adminconsole.admin_settings.keys.dialog_close_button" }}</button>
     </div>
+  </form>
+</dialog>
 
-    <div class="grid grid-cols-1 gap-6 mt-8">
-        <div class="text-right">
-            <span id="loadingIcon" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>
-            <button class="inline-block align-middle btn btn-sm btn-primary"  onclick="rotate(this, event);">{{ T $.ctx "adminconsole.admin_settings.keys.rotate_button" }}</button>
-        </div>
-    </div>
-
-    <dialog id="viewPublicKeyDialogPEM" class="modal">
-        <div class="max-w-[608px] modal-box">
-            <h3 class="text-lg">
-                {{ T $.ctx "adminconsole.admin_settings.keys.dialog_pem_title" }}
-            </h3>
-            <p>{{ T $.ctx "adminconsole.admin_settings.keys.dialog_key_identifier_label" }} <span id="viewPublicKeyDialogPEMKeyId" class="font-mono text-accent"></span></p>
-            <textarea id="viewPublicKeyDialogPEMContent" readonly
-                class="textarea textarea-bordered h-[440px] p-2 mt-3 w-[563px] resize-none whitespace-pre-wrap font-mono">
-            </textarea>
-            <div class="modal-action">
-                <form method="dialog">
-                    <button class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.keys.dialog_close_button" }}</button>
-                </form>
-            </div>
-        </div>
-    </dialog>
-
-    <dialog id="viewPublicKeyDialogASN1DER" class="modal">
-        <div class="max-w-[683px] modal-box">
-            <h3 class="text-lg">
-                {{ T $.ctx "adminconsole.admin_settings.keys.dialog_asn1der_title" }}
-            </h3>
-            <p>{{ T $.ctx "adminconsole.admin_settings.keys.dialog_key_identifier_label" }} <span id="viewPublicKeyDialogASN1DERKeyId" class="font-mono text-accent"></span></p>
-            <textarea id="viewPublicKeyDialogASN1DERContent" readonly
-                class="textarea textarea-bordered h-[330px] p-2 mt-3 w-[636px] break-all resize-none font-mono">
-            </textarea>
-            <div class="modal-action">
-                <form method="dialog">
-                    <button class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.keys.dialog_close_button" }}</button>
-                </form>
-            </div>
-        </div>
-    </dialog>
-
-    <dialog id="viewPublicKeyDialogJWK" class="modal">
-        <div class="max-w-[751px] modal-box">
-            <h3 class="text-lg">
-                {{ T $.ctx "adminconsole.admin_settings.keys.dialog_jwk_title" }}
-            </h3>
-            <p>{{ T $.ctx "adminconsole.admin_settings.keys.dialog_key_identifier_label" }} <span id="viewPublicKeyDialogJWKKeyId" class="font-mono text-accent"></span></p>
-            <textarea id="viewPublicKeyDialogJWKContent" readonly
-                class="textarea textarea-bordered h-[550px] p-2 mt-3 w-[700px] break-all resize-none font-mono">
-            </textarea>
-            <div class="modal-action">
-                <form method="dialog">
-                    <button class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.keys.dialog_close_button" }}</button>
-                </form>
-            </div>
-        </div>
-    </dialog>
-
-    {{template "modal_dialog" (args "modal0" "close" $.ctx ) }}
-    {{template "modal_dialog" (args "modal1" "yes_no" $.ctx ) }}
-
+{{ template "modal_dialog" (args "confirmRotate" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_settings.keys.rotate_button") (T $.ctx "adminconsole.admin_settings.keys.modal_rotate_title")) }}
+{{ template "modal_dialog" (args "revokeKey" "confirm" $.ctx (T $.ctx "adminconsole.admin_settings.keys.revoke_dialog_button") (T $.ctx "adminconsole.admin_settings.keys.modal_revoke_title")) }}
 {{end}}

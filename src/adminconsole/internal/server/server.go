@@ -26,6 +26,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/upstreammetrics"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/builtin"
@@ -491,7 +492,7 @@ func (s *Server) initMiddleware() chi.Router {
 		i18n.Locale(nil),
 
 		// Adds settings to the request context (fetched from cache, not database)
-		middleware.SettingsCache(s.settingsCache),
+		middleware.SettingsCache(s.settingsCache, render.New(s.templateFS, s.staticFS)),
 
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // settingsSessionsAPI is what the session settings page needs: the settings, and the write.
@@ -98,10 +100,11 @@ func HandleSessionsPost(
 			MaxUserSessionsPerUser:          r.FormValue("maxUserSessionsPerUser"),
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"error":    message,
+				"settings":   settingsInfo,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_sessions.html", bind)
@@ -110,25 +113,23 @@ func HandleSessionsPost(
 			}
 		}
 
-		// Convert values; invalid input becomes 0 to trigger server-side validation
-		idleInt := 0
-		if v := settingsInfo.UserSessionIdleTimeoutInSeconds; len(v) > 0 {
-			if p, err := strconv.Atoi(v); err == nil {
-				idleInt = p
-			}
+		// A value that is not a whole number is refused here, at its field. Sent as a number, it
+		// would be refused in the words of another rule, or, for the cap, sent as 0, which means no
+		// limit (#564 decision 6).
+		idleInt, err := strconv.Atoi(strings.TrimSpace(settingsInfo.UserSessionIdleTimeoutInSeconds))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_sessions.idle_timeout_invalid"), "userSessionIdleTimeoutInSeconds")
+			return
 		}
-		maxInt := 0
-		if v := settingsInfo.UserSessionMaxLifetimeInSeconds; len(v) > 0 {
-			if p, err := strconv.Atoi(v); err == nil {
-				maxInt = p
-			}
+		maxInt, err := strconv.Atoi(strings.TrimSpace(settingsInfo.UserSessionMaxLifetimeInSeconds))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_sessions.max_lifetime_invalid"), "userSessionMaxLifetimeInSeconds")
+			return
 		}
-
-		// The cap is always sent (#564 decision 6). 0 is a cap, no limit, so invalid input cannot
-		// become 0 as above: it becomes -1, which the auth server refuses with its range message.
-		maxSessionsInt := -1
-		if p, err := strconv.Atoi(settingsInfo.MaxUserSessionsPerUser); err == nil {
-			maxSessionsInt = p
+		maxSessionsInt, err := strconv.Atoi(strings.TrimSpace(settingsInfo.MaxUserSessionsPerUser))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_sessions.max_sessions_per_user_invalid"), "maxUserSessionsPerUser")
+			return
 		}
 
 		updateReq := &api.UpdateSettingsSessionsRequest{
@@ -137,9 +138,11 @@ func HandleSessionsPost(
 			MaxUserSessionsPerUser:          &maxSessionsInt,
 		}
 
-		_, err := apiClient.UpdateSettingsSessions(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err = apiClient.UpdateSettingsSessions(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, sessionsErrorFields))
+			})
 			return
 		}
 

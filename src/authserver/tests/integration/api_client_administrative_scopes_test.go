@@ -153,7 +153,7 @@ func TestClientAdministrativeScopes_AdminReadDoesNotReachTheRoute(t *testing.T) 
 	assert.Empty(t, refusalRows(t, manageToken, requestId))
 }
 
-// The admin console's client is always allowed: switching it off is refused 400 VALIDATION_ERROR,
+// The admin console's client is always allowed: switching it off is refused 400, answering its key,
 // to authserver:manage as to anyone, and leaves it allowed; switching it on changes nothing and is
 // answered as any switch is.
 func TestClientAdministrativeScopes_TheAdminConsolesClientCannotBeSwitchedOff(t *testing.T) {
@@ -165,7 +165,7 @@ func TestClientAdministrativeScopes_TheAdminConsolesClientCannotBeSwitchedOff(t 
 	resp, requestId := putAdministrativeScopes(t, manageToken, console.clientId, map[string]any{"allowed": false})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	assert.Equal(t, "VALIDATION_ERROR", errorCodeOf(t, resp))
+	assert.Equal(t, "handler.client_administrative_scopes.console_always_allowed", errorCodeOf(t, resp))
 	assert.True(t, storedClient(t, console.clientId).AdministrativeScopesAllowed, "the admin console's client stays allowed")
 	assert.Empty(t, allowanceSwitchRows(t, manageToken, requestId))
 
@@ -187,8 +187,8 @@ func TestClientAdministrativeScopes_TheRouteAnswersItsOwnFourHundreds(t *testing
 		status int
 		code   string
 	}{
-		{"no allowed field", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{}, http.StatusBadRequest, "VALIDATION_ERROR"},
-		{"a null allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{"allowed": nil}, http.StatusBadRequest, "VALIDATION_ERROR"},
+		{"no allowed field", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{}, http.StatusBadRequest, "handler.client_administrative_scopes.allowed_required"},
+		{"a null allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{"allowed": nil}, http.StatusBadRequest, "handler.client_administrative_scopes.allowed_required"},
 		{"a string allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{"allowed": "true"}, http.StatusBadRequest, "INVALID_REQUEST_BODY"},
 		{"no body", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), nil, http.StatusBadRequest, "INVALID_REQUEST_BODY"},
 		{"an id that is no number", "/api/v1/admin/clients/abc/administrative-scopes", map[string]any{"allowed": true}, http.StatusBadRequest, "VALIDATION_ERROR"},

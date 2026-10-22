@@ -2,10 +2,14 @@ package adminsettingshandlers
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
@@ -103,10 +107,11 @@ func HandleAuditLogsPost(
 			AuditLogRetentionDays:      r.FormValue("auditLogRetentionDays"),
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"settings": settingsInfo,
-				"error":    message,
+				"settings":   settingsInfo,
+				"error":      message,
+				"errorField": errorField,
 			}
 
 			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_audit_logs.html", bind)
@@ -115,15 +120,10 @@ func HandleAuditLogsPost(
 			}
 		}
 
-		// Parse retention days with validation
-		retentionInt := 0
-		if v := settingsInfo.AuditLogRetentionDays; len(v) > 0 {
-			p, err := strconv.Atoi(v)
-			if err != nil {
-				renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_audit_logs.retention_days_invalid"))
-				return
-			}
-			retentionInt = p
+		retentionInt, err := strconv.Atoi(strings.TrimSpace(settingsInfo.AuditLogRetentionDays))
+		if err != nil {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.settings_audit_logs.retention_days_invalid"), "auditLogRetentionDays")
+			return
 		}
 
 		updateReq := &api.UpdateSettingsAuditLogsRequest{
@@ -132,9 +132,11 @@ func HandleAuditLogsPost(
 			AuditLogRetentionDays:      retentionInt,
 		}
 
-		_, err := apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err = apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, auditLogsErrorFields))
+			})
 			return
 		}
 
@@ -172,7 +174,7 @@ func HandleAuditLogViewerGet(
 		// Parse pagination parameters
 		pageStr := r.URL.Query().Get("page")
 		auditEvent := r.URL.Query().Get("auditEvent")
-		requestId := r.URL.Query().Get("requestId")
+		requestId := strings.TrimSpace(r.URL.Query().Get("requestId"))
 
 		pageInt := pagination.ParsePage(pageStr)
 
@@ -207,8 +209,23 @@ func HandleAuditLogViewerGet(
 			return
 		}
 
+		// Whether the auth server stores events at all, which the page says when it does not, since
+		// the list then gains nothing new however long it is watched.
+		settingsResp, err := apiClient.GetSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			render.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
+		rows := make([]AuditLogRow, 0, len(auditLogsResp.AuditLogs))
+		for _, entry := range auditLogsResp.AuditLogs {
+			details, ok := auditLogDetails(entry.Details)
+			rows = append(rows, AuditLogRow{AuditLogResponse: entry, DetailPairs: details, DetailsParsed: ok})
+		}
+
 		pageResult := AuditLogsPageResult{
 			AuditLogs:  auditLogsResp.AuditLogs,
+			Rows:       rows,
 			Total:      auditLogsResp.Total,
 			Page:       pageInt,
 			PageSize:   pageSize,
@@ -219,12 +236,13 @@ func HandleAuditLogViewerGet(
 		p := pagination.New(auditLogsResp.Total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"pageResult":        pageResult,
-			"paginator":         p,
-			"selectedEvent":     auditEvent,
-			"selectedRequestId": requestId,
-			"paginatorLink":     auditLogViewerLink(auditEvent, requestId),
-			"auditEventTypes":   eventTypesResp.AuditEventTypes,
+			"pageResult":          pageResult,
+			"paginator":           p,
+			"selectedEvent":       auditEvent,
+			"selectedRequestId":   requestId,
+			"paginatorLink":       auditLogViewerLink(auditEvent, requestId),
+			"auditEventTypes":     eventTypesResp.AuditEventTypes,
+			"auditLogsInDatabase": settingsResp.AuditLogsInDatabaseEnabled,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", bind)
@@ -254,4 +272,45 @@ func auditLogViewerLink(auditEvent string, requestId string) string {
 		return path
 	}
 	return path + "?" + query.Encode()
+}
+
+// auditLogDetails reads an entry's details, a JSON object, as its keys and values in the order they
+// were written: a string as it is, any other value as its JSON. Details that are no JSON object
+// answer ok false, and the page shows them as they were written. They are read here rather than in
+// the browser, which parsed them in a script and showed a nested value as "[object Object]".
+func auditLogDetails(details string) ([]AuditLogDetail, bool) {
+	decoder := json.NewDecoder(strings.NewReader(details))
+	decoder.UseNumber()
+	open, err := decoder.Token()
+	if err != nil || open != json.Delim('{') {
+		return nil, false
+	}
+	var pairs []AuditLogDetail
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		if err != nil {
+			return nil, false
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return nil, false
+		}
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil {
+			return nil, false
+		}
+		// Only a JSON string is read as text: Unmarshal takes null into a string too, as "".
+		text := string(raw)
+		if len(raw) > 0 && raw[0] == '"' && json.Unmarshal(raw, &text) != nil {
+			return nil, false
+		}
+		pairs = append(pairs, AuditLogDetail{Key: key, Value: text})
+	}
+	if closing, err := decoder.Token(); err != nil || closing != json.Delim('}') {
+		return nil, false
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, false
+	}
+	return pairs, true
 }

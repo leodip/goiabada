@@ -70,8 +70,12 @@ and that its API refuses a request with no token.
 `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, so it takes a `reset.sh` to change. It is `true` by default,
 as in production, and then the limits counted by an IP address apply to the suite, which signs
 everyone in from this machine's one address: 30 wrong passwords and 120 password checks a minute, at
-the sign-in form and the password grant each. The suite is written to stay under them, and the `system`
-tests for them run only in this mode.
+the sign-in form and the password grant each, and 120 requests a minute to the authorization endpoint,
+its GET and POST together, which every browser sign-in, single sign-on and raw authorization request
+spends once or twice whatever it asks for. The suite is written to stay under them: the password grant
+is the shortest way to a user's tokens and spends no authorization request, so the tests sign in through
+the browser only where the subject needs it. The `system` tests for these limits run only in this mode,
+each waiting until the address's window has passed before it ends.
 
 `E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for, and skips
 those tests. It is the only switch there is: the limits counted by an account or a user apply either way,
@@ -86,10 +90,13 @@ the switch on before a release.
 after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
 
 Tests sit under `playwright/tests/`, one folder per area: the admin console (`admin-console/sign-in`,
-`admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and `settings/`), the test app
-(`testapp/`: a user signing in to its web apps, its SPA and its API, single sign-on across its two
-sites, signing out, and the authorization parameters), and the protocol itself where no page reaches
-it (`oauth/`). They run four at a time against an environment that stays up between
+`admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and
+`settings/`), the test app (`testapp/`: a user signing in to its web apps, its SPA and its API, single
+sign-on across its two sites, signing out, the authorization parameters, and the auth server's own
+pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
+itself where no page reaches it (`oauth/`), and accessibility (`accessibility/`: axe over every page and
+state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
+and the main journeys by keyboard). They run four at a time against an environment that stays up between
 runs, so every test keeps to these rules, which is what lets the suite run again and again without a
 reset:
 
@@ -98,7 +105,7 @@ reset:
   `lib/fixtures.ts`). The setup step (`tests/admin.setup.ts`) sweeps anything left with that prefix by
   a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
-  (`authserver`) are only read; a test reaching their save answers No to the confirmation. The
+  (`authserver`) are only read; a test reaching their save answers Cancel to the confirmation. The
   exceptions are the tests whose subject is global, the settings pages, the signing keys, the
   guards around the system resource, and the limits on sign-ins from one address, which every
   test signs in from. They are named `*.system.ts` and run in the `system` project, which

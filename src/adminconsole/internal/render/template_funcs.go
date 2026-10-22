@@ -33,20 +33,16 @@ var jsBootstrapKeys = []string{
 	"js.error.server_error_title",
 	"js.error.error_title",
 	"js.error.unexpected",
+	"js.error.unexpected_text",
 	"js.image_upload.invalid_format",
 	"js.image_upload.file_too_large",
 	"js.image_upload.uploading",
-	"js.image_upload.upload_url_missing",
 	"js.image_upload.upload_failed",
-	"js.image_upload.updated_successfully",
-	"js.image_upload.confirm_delete",
-	"js.image_upload.deleting",
-	"js.image_upload.delete_url_missing",
 	"js.image_upload.delete_failed",
-	"js.image_upload.deleted_successfully",
-	"js.image_upload.upload_button",
-	"js.image_upload.delete_button",
-	"js.image_upload.error_prefix",
+	"js.image_upload.unreadable",
+	"js.combobox.no_matches",
+	"js.combobox.one_result",
+	"js.combobox.results",
 }
 
 // addUrlParam is the template function that appends one query parameter to a URL. It is one of two
@@ -212,6 +208,9 @@ var templateFuncMap = template.FuncMap{
 		return m
 	},
 
+	// ScopeList words each scope of a consent as the consent screen does (scopeList).
+	"ScopeList": scopeList,
+
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {
 		return els
@@ -238,85 +237,16 @@ var templateFuncMap = template.FuncMap{
 		return template.HTML("<!-- version: " + buildinfo.Version + "; build date: " + buildinfo.BuildDate + "; git commit: " + buildinfo.GitCommit + "-->")
 	},
 	"isAdminClientPage": func(urlPath string) bool {
-		if urlPath == "/admin/clients" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/clients/") {
-			if strings.HasSuffix(urlPath, "/settings") ||
-				strings.HasSuffix(urlPath, "/tokens") ||
-				strings.HasSuffix(urlPath, "/authentication") ||
-				strings.HasSuffix(urlPath, "/oauth2-flows") ||
-				strings.HasSuffix(urlPath, "/redirect-uris") ||
-				strings.HasSuffix(urlPath, "/web-origins") ||
-				strings.HasSuffix(urlPath, "/user-sessions") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.HasSuffix(urlPath, "/delete") ||
-				strings.HasSuffix(urlPath, "/new") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/clients")
 	},
 	"isAdminResourcePage": func(urlPath string) bool {
-		if urlPath == "/admin/resources" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/resources/") {
-			if strings.HasSuffix(urlPath, "/settings") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.Contains(urlPath, "/users-with-permission") ||
-				strings.Contains(urlPath, "/groups-with-permission") ||
-				strings.HasSuffix(urlPath, "/delete") ||
-				strings.HasSuffix(urlPath, "/new") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/resources")
 	},
 	"isAdminGroupPage": func(urlPath string) bool {
-		if urlPath == "/admin/groups" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/groups/") {
-			if strings.HasSuffix(urlPath, "/settings") ||
-				strings.HasSuffix(urlPath, "/attributes") ||
-				strings.HasSuffix(urlPath, "/attributes/add") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.Contains(urlPath, "/members") ||
-				strings.HasSuffix(urlPath, "/members/add") ||
-				strings.HasSuffix(urlPath, "/new") ||
-				strings.HasSuffix(urlPath, "/delete") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/groups")
 	},
 	"isAdminUserPage": func(urlPath string) bool {
-		if urlPath == "/admin/users" {
-			return true
-		}
-
-		if strings.HasPrefix(urlPath, "/admin/users/") {
-			if strings.HasSuffix(urlPath, "/details") ||
-				strings.HasSuffix(urlPath, "/profile") ||
-				strings.HasSuffix(urlPath, "/email") ||
-				strings.HasSuffix(urlPath, "/phone") ||
-				strings.HasSuffix(urlPath, "/address") ||
-				strings.HasSuffix(urlPath, "/authentication") ||
-				strings.HasSuffix(urlPath, "/consents") ||
-				strings.HasSuffix(urlPath, "/sessions") ||
-				strings.HasSuffix(urlPath, "/attributes") ||
-				strings.HasSuffix(urlPath, "/permissions") ||
-				strings.HasSuffix(urlPath, "/groups") ||
-				strings.HasSuffix(urlPath, "/new") ||
-				strings.HasSuffix(urlPath, "/delete") {
-				return true
-			}
-		}
-		return false
+		return inSection(urlPath, "/admin/users")
 	},
 	"isAdminSettingsEmailPage": func(urlPath string) bool {
 		if urlPath == "/admin/settings" {
@@ -331,4 +261,10 @@ var templateFuncMap = template.FuncMap{
 		}
 		return false
 	},
+}
+
+// inSection reports whether urlPath is the list at base or any page under it, so the sidebar marks
+// its section current on every page of one record, a tab added later included.
+func inSection(urlPath, base string) bool {
+	return urlPath == base || strings.HasPrefix(urlPath, base+"/")
 }

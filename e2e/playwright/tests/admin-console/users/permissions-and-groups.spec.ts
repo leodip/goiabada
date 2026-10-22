@@ -1,9 +1,19 @@
-import { addPermissionRow, expectErrorDialog, groupUrl, resourceUrl, rowWithCell, userUrl } from "../../../lib/admin-console";
+import type { Page } from "@playwright/test";
+import { addPermissionRow, expectFieldError, groupUrl, resourceUrl, rowWithCell, userUrl } from "../../../lib/admin-console";
 import { expect, test } from "../../../lib/fixtures";
 import { passwordToken, userTokens } from "../../../lib/oauth";
 import { passwordGrantClient } from "../../../lib/test-clients";
 
-const permissionsSaved = "Permissions saved successfully";
+const permissionsSaved = "Permissions saved.";
+const groupsSaved = "Groups saved.";
+const noGroups = "Not in any group yet.";
+
+// Chooses a group in the Group field by its identifier, which its option carries; the option's
+// label adds the group's description, shortened.
+async function chooseGroup(page: Page, identifier: string) {
+  const select = page.locator("#groupsSelect");
+  await select.selectOption((await select.locator(`option[data-group-identifier="${identifier}"]`).getAttribute("value"))!);
+}
 
 test("a permission granted to the user reaches their tokens, and is removed again", async ({
   page,
@@ -36,7 +46,7 @@ test("a permission granted to the user reaches their tokens, and is removed agai
   await expect(rowWithCell(page, user.email)).toHaveCount(1);
 
   await page.goto(userUrl(user.id, "permissions"));
-  await table.getByRole("button", { name: `Remove permission ${resource.identifier}:read`, exact: true }).click();
+  await table.getByRole("button", { name: `Remove ${resource.identifier}:read`, exact: true }).click();
   await page.locator("#btnSave").click();
   await expect(page.getByText(permissionsSaved)).toBeVisible();
   const answer = await passwordToken(request, client.identifier, secret, user.email, user.password, scope);
@@ -49,7 +59,14 @@ test("a permission already in the list is refused", async ({ page, resources, us
   await page.goto(userUrl(user.id, "permissions"));
   await addPermissionRow(page, resource.identifier, "read");
   await addPermissionRow(page, resource.identifier, "read");
-  await expectErrorDialog(page, "The permission is already in the list.");
+  await expectFieldError(page, "permissionsSelect", "The user already has that permission.");
+});
+
+test("Grant with no permission chosen is refused at the field", async ({ page, users }) => {
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "permissions"));
+  await page.getByRole("button", { name: "Grant permission" }).click();
+  await expectFieldError(page, "permissionsSelect", "Choose a permission to grant.");
 });
 
 test("a permissions save from a page loaded before another save is refused", async ({ page, context, resources, users }) => {
@@ -65,22 +82,25 @@ test("a permissions save from a page loaded before another save is refused", asy
 
   await addPermissionRow(page, resource.identifier, "write");
   await page.locator("#btnSave").click();
-  await expectErrorDialog(page, "The list was changed by another save after it was loaded.");
+  await expect(page.locator("#permissionListStatus")).toContainText("The list was changed by another save after it was loaded.");
   await page.reload();
   await expect(page.locator("#permissionsTable")).not.toContainText(`${resource.identifier}:write`);
 });
 
 test("group membership is granted and removed from the user's side", async ({ page, groups, users }) => {
-  const group = await groups.create();
+  const group = await groups.create({ description: "Everyone in sales" });
   const user = await users.create();
   const table = page.locator("#groupsTable");
 
   await page.goto(userUrl(user.id, "groups"));
-  await expect(table).toContainText("(none yet)");
-  await page.locator("#groupsSelect").selectOption({ label: group.identifier });
-  await page.getByRole("button", { name: "Grant membership" }).click();
+  await expect(page.getByText(noGroups)).toBeVisible();
+  await expect(table).toBeHidden();
+  await chooseGroup(page, group.identifier);
+  // The chosen group's description, whole, under the field.
+  await expect(page.locator("#groupsSelect-description")).toHaveText("Everyone in sales");
+  await page.getByRole("button", { name: "Add to group" }).click();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Groups saved successfully")).toBeVisible();
+  await expect(page.getByText(groupsSaved)).toBeVisible();
   await page.reload();
   await expect(table).toContainText(group.identifier);
 
@@ -88,11 +108,11 @@ test("group membership is granted and removed from the user's side", async ({ pa
   await expect(rowWithCell(page, user.email)).toHaveCount(1);
 
   await page.goto(userUrl(user.id, "groups"));
-  await table.getByRole("button", { name: `Remove group ${group.identifier}`, exact: true }).click();
+  await table.getByRole("button", { name: `Remove ${group.identifier}`, exact: true }).click();
   await page.locator("#btnSave").click();
-  await expect(page.getByText("Groups saved successfully")).toBeVisible();
+  await expect(page.getByText(groupsSaved)).toBeVisible();
   await page.reload();
-  await expect(table).toContainText("(none yet)");
+  await expect(page.getByText(noGroups)).toBeVisible();
 });
 
 test("a group already in the list is refused", async ({ page, groups, users }) => {
@@ -100,8 +120,15 @@ test("a group already in the list is refused", async ({ page, groups, users }) =
   const user = await users.create();
   await page.goto(userUrl(user.id, "groups"));
   for (let i = 0; i < 2; i++) {
-    await page.locator("#groupsSelect").selectOption({ label: group.identifier });
-    await page.getByRole("button", { name: "Grant membership" }).click();
+    await chooseGroup(page, group.identifier);
+    await page.getByRole("button", { name: "Add to group" }).click();
   }
-  await expectErrorDialog(page, "The group is already in the list.");
+  await expectFieldError(page, "groupsSelect", "The user is already in that group.");
+});
+
+test("Add to group with no group chosen is refused at the field", async ({ page, users }) => {
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "groups"));
+  await page.getByRole("button", { name: "Add to group" }).click();
+  await expectFieldError(page, "groupsSelect", "Choose a group to add the user to.");
 });

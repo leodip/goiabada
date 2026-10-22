@@ -8983,6 +8983,86 @@ func (_c *Database_GetRefreshTokensByUserId_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// GetRefreshTokensByUserIdAndClientId provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, userId, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensByUserIdAndClientId")
+	}
+
+	var r0 []*record.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) ([]*record.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, userId, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) []*record.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*record.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetRefreshTokensByUserIdAndClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensByUserIdAndClientId'
+type Database_GetRefreshTokensByUserIdAndClientId_Call struct {
+	*mock.Call
+}
+
+// GetRefreshTokensByUserIdAndClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - clientId int64
+func (_e *Database_Expecter) GetRefreshTokensByUserIdAndClientId(ctx any, tx any, userId any, clientId any) *Database_GetRefreshTokensByUserIdAndClientId_Call {
+	return &Database_GetRefreshTokensByUserIdAndClientId_Call{Call: _e.mock.On("GetRefreshTokensByUserIdAndClientId", ctx, tx, userId, clientId)}
+}
+
+func (_c *Database_GetRefreshTokensByUserIdAndClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, clientId int64)) *Database_GetRefreshTokensByUserIdAndClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByUserIdAndClientId_Call) Return(refreshTokens []*record.RefreshToken, err error) *Database_GetRefreshTokensByUserIdAndClientId_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByUserIdAndClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)) *Database_GetRefreshTokensByUserIdAndClientId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetResourceById provides a mock function for the type Database
 func (_mock *Database) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error) {
 	ret := _mock.Called(ctx, tx, resourceId)
@@ -13292,6 +13372,84 @@ func (_c *Database_RevokeRefreshTokenFamily_Call) Return(n int64, err error) *Da
 }
 
 func (_c *Database_RevokeRefreshTokenFamily_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)) *Database_RevokeRefreshTokenFamily_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeUnusedCodesByUserIdAndClientId provides a mock function for the type Database
+func (_mock *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error) {
+	ret := _mock.Called(ctx, tx, userId, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeUnusedCodesByUserIdAndClientId")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) (int64, error)); ok {
+		return returnFunc(ctx, tx, userId, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) int64); ok {
+		r0 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RevokeUnusedCodesByUserIdAndClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeUnusedCodesByUserIdAndClientId'
+type Database_RevokeUnusedCodesByUserIdAndClientId_Call struct {
+	*mock.Call
+}
+
+// RevokeUnusedCodesByUserIdAndClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - clientId int64
+func (_e *Database_Expecter) RevokeUnusedCodesByUserIdAndClientId(ctx any, tx any, userId any, clientId any) *Database_RevokeUnusedCodesByUserIdAndClientId_Call {
+	return &Database_RevokeUnusedCodesByUserIdAndClientId_Call{Call: _e.mock.On("RevokeUnusedCodesByUserIdAndClientId", ctx, tx, userId, clientId)}
+}
+
+func (_c *Database_RevokeUnusedCodesByUserIdAndClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, clientId int64)) *Database_RevokeUnusedCodesByUserIdAndClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RevokeUnusedCodesByUserIdAndClientId_Call) Return(n int64, err error) *Database_RevokeUnusedCodesByUserIdAndClientId_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_RevokeUnusedCodesByUserIdAndClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)) *Database_RevokeUnusedCodesByUserIdAndClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }

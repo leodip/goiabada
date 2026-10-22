@@ -13,7 +13,7 @@ Some apps can't be set up by hand. A command-line tool or an AI assistant connec
 
 <Steps>
 
-1. In the admin console, open **Admin**, **General**, turn on **Dynamic client registration enabled**, and save.
+1. In the admin console, open **Admin**, **General**, turn on **Dynamic client registration**, and save.
 
 2. Limit who can reach `/connect/register`. While DCR is on, anyone who can reach it can create a client, with no token and no sign-in. Turn on the rate limiter with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, which then allows 10 registrations a minute from each IP address, or limit the endpoint at your reverse proxy. See [rate limits](/reference/environment-variables/#rate-limits).
 
@@ -93,7 +93,7 @@ A self-registered client is never sent an error. When a sign-in fails, the user 
 
 1. Open **Admin**, **Clients**. Each client that registered itself carries a **Self-registered** badge.
 
-2. Open one you recognize and fix how your users see it. On the **Settings** tab, give it a **Display name** and turn on **Show display name**, which replaces the name it gave itself and the consent screen's note that it hasn't been verified. Once you trust it, you can turn **Consent required** off.
+2. Open one you recognize and fix how your users see it. On the **Settings** tab, give it a **Display name** and turn on **Display name** under **Sign-in and consent pages**, which replaces the name it gave itself and the consent screen's note that it hasn't been verified. Once you trust it, you can turn **Ask users for consent** off.
 
 3. For one you don't recognize, untick **Enabled** to stop it signing anyone in, or delete it from the list.
 
@@ -111,7 +111,7 @@ It's enabled straight away, with an identifier made up of `dcr_` and a UUID that
 
 ## Turning it off
 
-Turning **Dynamic client registration enabled** off stops new registrations: `/connect/register` answers `403` with `access_denied`, and discovery stops carrying `registration_endpoint`. Clients that already registered keep working. To stop one, disable or delete it.
+Turning **Dynamic client registration** off stops new registrations: `/connect/register` answers `403` with `access_denied`, and discovery stops carrying `registration_endpoint`. Clients that already registered keep working. To stop one, disable or delete it.
 
 ## Next steps
 

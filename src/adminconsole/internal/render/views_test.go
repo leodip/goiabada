@@ -32,6 +32,10 @@ func TestSessionInfos_CarriesEveryFieldTheRowRenders(t *testing.T) {
 		},
 		IsCurrent:         true,
 		ClientIdentifiers: []string{"admin-console", "billing"},
+		Clients: []api.SessionClientResponse{
+			{ClientIdentifier: "admin-console", Name: "Admin console"},
+			{ClientIdentifier: "billing", Name: "Billing Portal", NameUnverified: true},
+		},
 	}})
 
 	require.Len(t, got, 1)
@@ -46,22 +50,39 @@ func TestSessionInfos_CarriesEveryFieldTheRowRenders(t *testing.T) {
 		DeviceOS:      "Linux",
 		UserAgent:     "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
 		Clients:       []string{"admin-console", "billing"},
+		ClientNames:   []ClientName{{Name: "Admin console"}, {Name: "Billing Portal", Unverified: true}},
 	}, got[0])
 }
 
-// Both pages list the newest session first, by id, whatever order the API answered in.
-func TestSessionInfos_NewestIdFirst(t *testing.T) {
+// Both pages list the session of the device in use first, then the others by when each was last
+// active, the most recent first, whatever order the API answered in. Two last active at once, or
+// neither saying when, come newest session first, and a session that does not say comes last.
+func TestSessionInfos_ThisDeviceFirstThenMostRecentlyActive(t *testing.T) {
+	at := func(minute int) *time.Time {
+		instant := time.Date(2026, 10, 19, 9, minute, 0, 0, time.UTC)
+		return &instant
+	}
+	session := func(id int64, lastAccessed *time.Time, current bool) api.UserSessionDetailResponse {
+		return api.UserSessionDetailResponse{
+			UserSessionResponse: api.UserSessionResponse{Id: id, LastAccessed: lastAccessed},
+			IsCurrent:           current,
+		}
+	}
+
 	got := SessionInfos([]api.UserSessionDetailResponse{
-		{UserSessionResponse: api.UserSessionResponse{Id: 3}},
-		{UserSessionResponse: api.UserSessionResponse{Id: 7}},
-		{UserSessionResponse: api.UserSessionResponse{Id: 5}},
+		session(3, at(50), false),
+		session(9, nil, false),
+		session(4, at(10), true),
+		session(7, at(20), false),
+		session(5, at(20), false),
+		session(8, nil, false),
 	})
 
 	ids := make([]int64, 0, len(got))
 	for _, s := range got {
 		ids = append(ids, s.UserSessionId)
 	}
-	assert.Equal(t, []int64{7, 5, 3}, ids)
+	assert.Equal(t, []int64{4, 3, 7, 5, 9, 8}, ids)
 }
 
 // A user with no session gets an empty table rather than a nil the bind would carry as nothing.
@@ -84,15 +105,17 @@ func TestConsentInfos_CarriesEveryFieldTheRowRendersInTheAPIsOrder(t *testing.T)
 			Scope:             "openid profile",
 			GrantedAt:         &grantedAt,
 			ClientIdentifier:  "billing",
+			ClientName:        "Billing",
 			ClientDescription: "The billing app",
 		},
 		// grantedAt is nullable on the wire: the row is shown undated rather than dropped.
-		{Id: 2, Scope: "openid", ClientIdentifier: "reports"},
+		{Id: 2, Scope: "openid", ClientIdentifier: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true},
 	})
 
 	assert.Equal(t, []ConsentInfo{
-		{ConsentId: 9, Client: "billing", ClientDescription: "The billing app", GrantedAt: &grantedAt, Scope: "openid profile"},
-		{ConsentId: 2, Client: "reports", Scope: "openid"},
+		{ConsentId: 9, Client: "billing", ClientName: "Billing", ClientDescription: "The billing app", GrantedAt: &grantedAt,
+			Scope: "openid profile"},
+		{ConsentId: 2, Client: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, Scope: "openid"},
 	}, got)
 }
 

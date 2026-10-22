@@ -29,6 +29,7 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -106,7 +107,11 @@ const (
 	pwdIpBudget = 30
 	pwdIpWindow = 60
 	// The per-address ceiling in front of each: every password check per minute per /64 (#564).
-	pwdIpCeiling         = 120
+	pwdIpCeiling = 120
+	// The admission tier on the authorization endpoint: every request per minute per /64,
+	// shared by the GET and the POST (#504).
+	authorizeBudget      = 120
+	authorizeWindow      = 60
 	routesTestCeremonyId = "9f1c2c2f-2a0f-4a3b-8b6d-1f0a5c9e7d21"
 	// A well-formed base32 TOTP secret, so the code the OTP case submits is refused for
 	// being wrong rather than for the secret being unreadable.
@@ -144,6 +149,12 @@ func newRoutesTestServer(t *testing.T) *Server {
 // newRoutesTestServerWith is newRoutesTestServer with configure applied to the configuration
 // initRoutes reads, after the limiter is switched on.
 func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Server {
+	t.Helper()
+	return newRoutesTestServerOver(t, configure, newTestSessionStore())
+}
+
+// newRoutesTestServerOver is newRoutesTestServerWith over a session store the caller holds.
+func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessionStore *sessionstore.ConditionalStore) *Server {
 	t.Helper()
 
 	passwordHash, err := passwordhash.Hash("the account's real password")
@@ -191,8 +202,9 @@ func newRoutesTestServerWith(t *testing.T, configure func(*config.Config)) *Serv
 	s := &Server{
 		router:       chi.NewRouter(),
 		database:     database,
-		sessionStore: newTestSessionStore(),
+		sessionStore: sessionStore,
 		templateFS:   web.TemplateFS(),
+		staticFS:     web.StaticFS(),
 		cfg:          cfg,
 		jobs:         afterresponse.New(registry),
 		metrics:      registry,
@@ -464,6 +476,18 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "/connect/register", strings.NewReader("{}"))
 			r.Header.Set("Content-Type", "application/json")
 			return withRoutesTestSettings(r)
+		}},
+		{"GET /auth/authorize", authorizeBudget, authorizeWindow, shapeBrowser, func(int) *http.Request {
+			// No client_id and no cookie: the handler refuses the request at its first
+			// validation and, finding no stored session to clear, writes no row (#581).
+			// The tier counts it anyway, because what it bounds is the row every request
+			// it admits may cost (#504).
+			return browserRequest(http.MethodGet, "/auth/authorize")
+		}},
+		{"POST /auth/authorize", authorizeBudget, authorizeWindow, shapeBrowser, func(int) *http.Request {
+			// No client_id, so the parking refuses the form before it writes one; the
+			// tier counts it anyway, for the GET case's reason (#504).
+			return browserForm(http.MethodPost, "/auth/authorize", "")
 		}},
 	} {
 		t.Run(tc.name+" is limited", func(t *testing.T) {

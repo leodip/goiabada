@@ -33,6 +33,10 @@ This page helps you plan a Goiabada deployment on a Kubernetes cluster.
 
 You also need `kubectl` configured for the cluster, and the setup wizard on the machine you run it from.
 
+<Aside type="note">
+`/auth/authorize` writes a row on every request that passes its first validation, a browser session on a GET and a parked request on a POST, so an unauthenticated flood grows the database. The built-in `authorize` limit bounds it only with `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, which the wizard turns on under the gateway's `Local` traffic policy and off under `Cluster`, and even on it counts per pod. With it off, or for one budget across the replicas, give the route a budget at your gateway. See [Rate limiting across replicas](/deploy/kubernetes/high-availability/#rate-limiting-across-replicas).
+</Aside>
+
 ## What runs where
 
 ```

@@ -5,7 +5,7 @@ description: A refresh answers invalid_grant, and the refresh token your app jus
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page helps you when refreshing a token fails and takes your app's newest refresh token down with it, so the user has to sign in again.
+This page helps you when refreshing a token fails and takes your app's newest refresh token down with it, or when every refresh token of one user stops working at once, so the user has to sign in again.
 
 ## What you see
 
@@ -17,7 +17,11 @@ Your app refreshes, and the token endpoint answers `400`:
 
 Then the refresh token your app got from its previous refresh fails too, with the same "This refresh token has been revoked." The audit log may hold a `refresh_token_replay_detected` [event](/concepts/audit-log/) for your client.
 
+Or every refresh token the user holds with your app fails at once, on every device, and the audit log holds a `revoked_consent_grants` event naming the user and your client: the user's consent was withdrawn. See [A withdrawn consent](#a-withdrawn-consent).
+
 ## Why it happens
+
+There are two causes: a refresh token that came back after it was rotated, which is the usual one, and a consent withdrawn.
 
 A refresh token is good for one refresh. Each refresh returns a new one and retires the old one, and that's called rotation.
 
@@ -30,7 +34,15 @@ Your own app usually causes it in one of two ways:
 
 There's no grace period for either: a retired token is retired the moment the refresh succeeds.
 
+### A withdrawn consent
+
+When the user withdraws their consent to your app under **Account**, **Consents**, or an administrator removes it from the user, every refresh token the user holds with your app is revoked at once: the grants of every sign-in and every device, offline ones included. The user's grants with other apps, and their session with the auth server, keep working.
+
+There's nothing to fix in your app beyond signing the user in again. If your app asks for consent, the user is asked again.
+
 ## Fix it
+
+This is for a refresh token sent twice. After a withdrawn consent, sign the user in again.
 
 <Aside type="caution">
 Refresh through **one** path at a time, and store the new refresh token in place of the old one **before** you use anything else from the response.
@@ -43,7 +55,7 @@ Once a family is revoked, the user has to sign in to your app again. Their sessi
 
 ## What's revoked, and what isn't
 
-**Only that one grant is revoked.** The user's session with the auth server, their sign-ins to other clients and their other grants keep working.
+**After a replay, only that one grant is revoked.** The user's session with the auth server, their sign-ins to other clients and their other grants keep working. A withdrawn consent revokes every grant the user holds with that one client.
 
 **Access tokens already issued stay valid** until they expire. They're signed JWTs your APIs check on their own, so revoking the refresh token stops the next refresh, not an access token already handed out. Keep access token lifetimes short.
 
@@ -62,7 +74,7 @@ These refreshes answer `invalid_grant` too:
 | "The refresh token is invalid because the associated session has expired or been terminated." | The session it was issued through ended, or the client was made public. |
 | "The refresh token is invalid because it has expired (offline_access_max_lifetime)." | An offline refresh token reached its maximum lifetime. |
 | "The refresh token is invalid." | The user is disabled, or the token is unknown. Rarely, a token issued while its family was being revoked. |
-| "The user has either not given consent to this client or the previously granted consent has been revoked." | The user withdrew their consent, under **Account**, **Manage consents**, or it was never given. Checked for an offline refresh token, for any refresh token of a client that requires consent, and for a refresh renewing `authserver:manage-account` from a sign-in to any client but the admin console's. |
+| "The user has either not given consent to this client or the previously granted consent has been revoked." | The consent is missing where a refresh consults it, most often because it was never given. Checked only for a refresh token from a sign-in, the authorization code grant: an offline one, any of a client that requires consent, and one renewing `authserver:manage-account` to any client but the admin console's. A refresh token from the [password grant](/legacy-flows/ropc/) is never checked for a consent. A consent the user withdraws under **Account**, **Consents**, or an administrator removes from the user, also revokes that client's refresh tokens for the user at once. After a withdrawal, a token from a sign-in that is offline or of a client that requires consent still answers with this description; any other, a password grant token included, answers "This refresh token has been revoked." |
 | "Scope 'authserver:manage-account' is not recognized. The user has not consented to the 'authserver:manage-account' permission." | The user's consent leaves `authserver:manage-account` out: they unticked it on the consent screen. Send them through an ordinary sign-in to approve it, or refresh with a `scope` that leaves it out. |
 | "The refresh token is invalid because it does not belong to the client." | The request named a client other than the one the token was issued to. Each client refreshes only its own tokens. |
 

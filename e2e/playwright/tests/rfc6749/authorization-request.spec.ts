@@ -2,7 +2,7 @@
 // (3.1), parameters sent empty, unknown or twice (3.1 and erratum 5708), response_type (3.1.1), and
 // the client_id it must know before anything is redirected (4.1.2.1). Requests that should reach the
 // client go through a browser already signed in, so their answers come back at once.
-import { setImplicitGrant } from "../../lib/admin-console";
+import { clientUrl, confirmDialog, setImplicitGrant } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
@@ -19,7 +19,13 @@ import {
 } from "../../lib/rfc6749";
 import { browserSignInClient } from "../../lib/test-clients";
 
-test("a GET and a POST to the authorization endpoint both issue a code", async ({ page, browser, clients, users, request }) => {
+test("a GET and a POST to the authorization endpoint both issue a code, the POST through a redirect that works once", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
   const user = await users.create();
   const { client, secret } = await browserSignInClient(page, clients);
   const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
@@ -35,10 +41,13 @@ test("a GET and a POST to the authorization endpoint both issue a code", async (
   const posted = await signIn.context.request.post(authorizeEndpoint, { form: viaPost.params, failOnStatusCode: false, maxRedirects: 0 });
   expect(posted.status()).toBeGreaterThanOrEqual(300);
   expect(posted.status()).toBeLessThan(400);
-  const { redirect: fromPost } = await followFrom(signIn.context.request, new URL(posted.headers()["location"], authorizeEndpoint).href);
+  const parked = new URL(posted.headers()["location"], authorizeEndpoint);
+  const { redirect: fromPost } = await followFrom(signIn.context.request, parked.href);
   expect(fromPost?.searchParams.get("state")).toBe(viaPost.params.state);
   const fromPostTokens = await codeToken(request, client.identifier, secret, fromPost!.searchParams.get("code")!, viaPost.verifier, testRedirectUri);
   expect(fromPostTokens.status, JSON.stringify(fromPostTokens.body)).toBe(200);
+  // The request is parked under a one-time handle the redirect carries: followed again, it is refused.
+  expectRefusedOnPage(await getAuthorize(signIn.context.request, [...parked.searchParams]), /This sign-in link is no longer valid/);
   await signIn.context.close();
 });
 
@@ -55,6 +64,7 @@ test("no step of the sign-in can be skipped: nothing reaches the client before t
       const response = await anonymous.request.get(`${env.authUrl}${step}?ceremony=${ceremony}`, { failOnStatusCode: false, maxRedirects: 0 });
       expect(response.headers()["location"] ?? "", `${step} answered ${response.status()}`).not.toContain(new URL(testRedirectUri).host);
       expect(response.status()).toBe(400);
+      expect(await response.text()).toContain("This step is no longer available");
     });
   }
   await anonymous.close();
@@ -196,6 +206,21 @@ test("a missing or unknown client_id is refused on the page, never redirected", 
   const anonymous = await emptyBrowser(browser);
 
   expectRefusedOnPage(await getAuthorize(anonymous.request, codeRequest("unused", { client_id: undefined }).params), /The client_id parameter is missing/);
-  expectRefusedOnPage(await getAuthorize(anonymous.request, codeRequest("e2e-no-such-client").params), /The client does not exist/);
+  expectRefusedOnPage(await getAuthorize(anonymous.request, codeRequest("e2e-no-such-client").params), /The application does not exist/);
+  await anonymous.close();
+});
+
+test("a disabled client is refused on the page, never redirected to its registered redirect URI", async ({ page, browser, clients }) => {
+  const { client } = await browserSignInClient(page, clients);
+  await page.goto(clientUrl(client.id, "settings"));
+  await page.locator("#enabledDisabled").uncheck();
+  // Disabling asks first.
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're disabling the client");
+  await expect(page.getByText("Settings saved.")).toBeVisible();
+  const anonymous = await emptyBrowser(browser);
+
+  // Section 4.1.2.1: a client identifier that is invalid MUST NOT be redirected to.
+  expectRefusedOnPage(await getAuthorize(anonymous.request, codeRequest(client.identifier).params), /The application is disabled/);
   await anonymous.close();
 });

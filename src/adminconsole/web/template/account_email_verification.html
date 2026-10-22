@@ -1,134 +1,73 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.account.email_verification.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.account.email_verification.page_title" }}{{end}}
-
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.account.email_verification.section_title" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-
-{{define "menu"}}
-    {{template "account_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.account.email_verification.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-
-    function sendVerificationEmail(evt) {
-        evt.preventDefault();
-
-        const loadingIcon = document.getElementById("loadingIcon");
-
-        sendAjaxRequest({
-            "url": "/account/email-send-verification",
-            "method": "POST",
-            "bodyData": JSON.stringify({}),
-            "loadingElement": loadingIcon,
-            "loadingClasses": ["loading", "loading-xs"],
-            "modalId": "modal0",
-            "callback": function(result) {
-
-                if(result.EmailVerified) {
-                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_already_verified_title" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_already_verified_body" }}");
-                } else if(result.TooManyRequests) {
-                    showModalDialog("modal0", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_title" }}", dialogMarkup(["{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_prefix" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_too_many_body_suffix" }}"], result.WaitInSeconds));
-                } else if(result.EmailVerificationSent) {
-                    showModalDialog(
-                        "modal0",
-                        "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_title" }}",
-                        dialogMarkup(["{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_prefix" }}", "{{ T $.ctx "adminconsole.account.email_verification.modal_sent_body_suffix" }}"], result.EmailDestination),
-                        function() {
-                            const verificationCode = document.getElementById("verificationCode");
-                            setTimeout(function() {
-                                verificationCode.focus();
-                            }, 50);
-                        }
-                    );
-                }
-            }
-        });
-    }
-</script>
-
+<script src="{{ asset "/static/pages/account-email-verification.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.account.email_verification.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.email_verification.lead" }}</p>
+  </div>
+</div>
 
-<form action="/account/email-verification" method="post">
-
-    {{ if and .smtpEnabled (not .emailVerified) (.email) }}
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <p>{{ T $.ctx "adminconsole.account.email_verification.unverified_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.account.email_verification.unverified_em" }}</span>{{ T $.ctx "adminconsole.account.email_verification.unverified_suffix" }}</p>
-        </div>
-    {{end}}
-
-    {{ if and .smtpEnabled (.emailVerified) (.email) }}
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <p>{{ T $.ctx "adminconsole.account.email_verification.verified_prefix" }}<span class="text-accent">{{ T $.ctx "adminconsole.account.email_verification.verified_em" }}</span>{{ T $.ctx "adminconsole.account.email_verification.verified_suffix" }}</p>
-        </div>
-    {{end}}
-
-    <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.email_verification.field.email" }}</span>
-            </label>
-            <input type="text" id="email" name="email" value="{{.email}}"
-                class="w-full input input-bordered" autocomplete="off" readonly="readonly" />
-        </div>
-    </div>
-
-    {{ if and .smtpEnabled (.emailVerified) (.email) }}
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div class="mt-6">
-                {{if .savedSuccessfully}}
-                    <div class="mb-4 text-right text-success">
-                        <p>&#10004; {{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
-                    </div>
-                {{end}}
-            </div>
-        </div>
-    {{end}}
-
-    {{ $codeForm := and .smtpEnabled (not .emailVerified) (.email) }}
-
-    {{ if $codeForm }}
-        <div class="grid grid-cols-1 gap-6 mt-2 md:grid-cols-3">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">{{ T $.ctx "adminconsole.account.email_verification.field.code" }}</span>
-                </label>
-                <input type="text" id="verificationCode" name="verificationCode" value="{{.verificationCode}}"
-                    class="w-full input input-bordered " autocomplete="off" autofocus />
-            </div>
-        </div>
-    {{end}}
-
+{{ $codeForm := and .smtpEnabled (not .emailVerified) .email }}
+<form class="panel" method="post" action="/account/email-verification" novalidate>
+  <div class="panel-body stacked">
     {{/* A refusal is drawn whatever email's state: email switched off since the page was drawn is
          refused with a sentence of its own, and the page had nothing else to show (#562). */}}
-    {{ if or $codeForm .error }}
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div class="mt-6">
-                {{if .error}}
-                    <div class="mb-4 text-right text-error">
-                        <p>{{.error}}</p>
-                    </div>
-                {{end}}
-                {{ if $codeForm }}
-                    {{if .savedSuccessfully}}
-                        <div class="mb-4 text-right text-success">
-                            <p>&#10004; {{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
-                        </div>
-                    {{end}}
-                    <button class="link link-primary" onclick="sendVerificationEmail(event);">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
-                    <button class="float-right btn btn-primary">{{ T $.ctx "adminconsole.account.email_verification.verify_button" }}</button>
-                {{end}}
-            </div>
-        </div>
-    {{end}}
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="verification-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.account.email_verification.success" }}</p>
+    </div>
+    {{ end }}
 
+    {{ if .email }}
+    <div>
+      <p class="field-label">{{ T $.ctx "adminconsole.account.email_verification.field.email" }}</p>
+      <p class="flex flex-wrap items-center gap-2">
+        <span class="break-all font-medium">{{ .email }}</span>
+        {{ if .emailVerified }}
+        <span class="tag tag-positive">{{ T $.ctx "adminconsole.account.email_verification.verified" }}</span>
+        {{ else }}
+        <span class="tag tag-caution">{{ T $.ctx "adminconsole.account.email_verification.unverified" }}</span>
+        {{ end }}
+      </p>
+    </div>
+    {{ else }}
+    <p>{{ T $.ctx "adminconsole.account.email_verification.no_email" }} <a class="text-link" href="/account/email">{{ T $.ctx "adminconsole.account.email_verification.add_email" }}</a></p>
+    {{ end }}
+
+    {{ if $codeForm }}
+    <p>{{ T $.ctx "adminconsole.account.email_verification.instructions" }}</p>
+    <div>
+      <button class="button" type="button" data-send-verification data-sent="{{ T $.ctx "adminconsole.account.email_verification.code_sent" "email" .email }}" data-wait="{{ T $.ctx "adminconsole.account.email_verification.wait" "wait" "{wait}" }}">{{ T $.ctx "adminconsole.account.email_verification.send_button" }}</button>
+      <div class="not-empty:mt-4" id="verification-status" role="status"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="verificationCode">{{ T $.ctx "adminconsole.account.email_verification.field.code" }}</label>
+        <input class="control control-mono" id="verificationCode" type="text" name="verificationCode" value="{{ .verificationCode }}" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"{{ if .error }}{{ if eq .errorField "verificationCode" }} aria-invalid="true" aria-describedby="verification-error"{{ end }} autofocus{{ end }}>
+      </div>
+    </div>
+    {{ else if and .email (not .emailVerified) }}
+    <p>{{ T $.ctx "adminconsole.account.email_verification.smtp_disabled" }}</p>
+    {{ end }}
+  </div>
+  {{ if $codeForm }}
+  <div class="panel-footer">
+    <button class="button button-primary" type="submit">{{ T $.ctx "adminconsole.account.email_verification.verify_button" }}</button>
+  </div>
+  {{ end }}
 </form>
-
-{{template "modal_dialog" (args "modal0" "close" $.ctx) }}
 
 {{end}}

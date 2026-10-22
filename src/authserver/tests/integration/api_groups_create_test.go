@@ -174,6 +174,7 @@ func TestHandleGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	require.NoError(t, err)
 	assert.Contains(t, response["error_description"].(string), "The group identifier is already in use")
+	assert.Equal(t, "handler.group.identifier_in_use", response["error_code"])
 }
 
 // TestHandleGroupCreatePost_AngleBracketsRejected pins the reject that replaced the strip: this

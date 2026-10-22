@@ -110,7 +110,7 @@ func HandleAttributesAddPost(
 			return
 		}
 
-		renderError := func(message string) {
+		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
 				"user":                 user,
 				"attributeKey":         r.FormValue("attributeKey"),
@@ -118,6 +118,7 @@ func HandleAttributesAddPost(
 				"includeInAccessToken": r.FormValue("includeInAccessToken") == "on",
 				"includeInIdToken":     r.FormValue("includeInIdToken") == "on",
 				"error":                message,
+				"errorField":           errorField,
 				"page":                 r.URL.Query().Get("page"),
 				"query":                r.URL.Query().Get("query"),
 			}
@@ -132,7 +133,7 @@ func HandleAttributesAddPost(
 		attrValue := strings.TrimSpace(r.FormValue("attributeValue"))
 
 		if len(attrKey) == 0 {
-			renderError(i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil).Localize(r.Context()))
+			renderError(i18n.NewLocalizedError(i18n.ErrCodeAttributeKeyRequired, nil).Localize(r.Context()), "attributeKey")
 			return
 		}
 
@@ -150,7 +151,9 @@ func HandleAttributesAddPost(
 
 		_, err = apiClient.CreateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, request)
 		if err != nil {
-			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
+				renderError(message, render.ErrorField(err, render.AttributeErrorFields))
+			})
 			return
 		}
 

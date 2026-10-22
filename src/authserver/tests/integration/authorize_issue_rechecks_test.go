@@ -101,7 +101,7 @@ func TestIssue_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 			assert.Equal(t, http.StatusOK, resp.StatusCode, "the refusal is rendered")
 			assert.Empty(t, resp.Header.Get("Location"), "a disabled client is never answered")
 			page := parseHTMLResponse(t, resp).Text()
-			assert.Contains(t, page, "The client is disabled")
+			assert.Contains(t, page, "The application is disabled")
 
 			// The context is cleared, so a reload finds nothing to resume and issues nothing.
 			again := loadPage(t, parked.httpClient, issueURL)

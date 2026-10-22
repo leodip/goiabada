@@ -1,16 +1,27 @@
-import { deleteResource, idFromListLink, rowWithCell, submitNewResource } from "../../../lib/admin-console";
+import { deleteResource, expectRefusal, idFromListLink, resourceUrl, rowWithCell, submitNewResource } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { uniqueIdentifier } from "../../../lib/unique";
 
 const list = `${env.adminUrl}/admin/resources`;
 
-test("the list shows the system resource, which offers no Delete", async ({ page }) => {
+test("the list shows the system resource, tagged, which offers no Delete", async ({ page }) => {
   await page.goto(list);
   const row = rowWithCell(page, "authserver");
   await expect(row).toHaveCount(1);
-  await expect(row.getByRole("link", { name: "Manage" })).toBeVisible();
-  await expect(row.getByRole("link", { name: "Delete" })).toHaveCount(0);
+  await expect(row.getByText("System", { exact: true })).toBeVisible();
+  // Its identifier is the link to its pages.
+  const id = await idFromListLink(page, list, "authserver");
+  await expect(row.getByRole("link", { name: "authserver", exact: true })).toHaveAttribute("href", `/admin/resources/${id}/settings`);
+  await expect(row.getByRole("link", { name: /^Delete/ })).toHaveCount(0);
+});
+
+test("the list's New resource opens the new resource form", async ({ page }) => {
+  await page.goto(list);
+  await page.getByRole("link", { name: "New resource", exact: true }).click();
+  await expect(page).toHaveURL(`${list}/new`);
+  await expect(page.getByRole("heading", { level: 1, name: "New resource", exact: true })).toBeVisible();
+  await expect(page.locator("#resourceIdentifier")).toHaveValue("");
 });
 
 test("a resource is created with its description, trimmed, and listed", async ({ page }) => {
@@ -19,10 +30,14 @@ test("a resource is created with its description, trimmed, and listed", async ({
   await expect(page).toHaveURL(list);
   const row = rowWithCell(page, identifier);
   await expect(row).toHaveCount(1);
-  await expect(row.getByRole("cell", { name: "An e2e resource", exact: true })).toBeVisible();
-  await expect(row.getByRole("link", { name: "Delete" })).toBeVisible();
+  await expect(row.getByText("An e2e resource", { exact: true })).toBeVisible();
+  await expect(row.getByText("System", { exact: true })).toHaveCount(0);
+  await expect(row.getByRole("link", { name: `Delete ${identifier}`, exact: true })).toBeVisible();
 
-  await deleteResource(page, await idFromListLink(page, list, identifier, "Manage"));
+  const id = await idFromListLink(page, list, identifier);
+  await page.goto(resourceUrl(id, "settings"));
+  await expect(page.getByRole("heading", { level: 1, name: identifier, exact: true })).toBeVisible();
+  await deleteResource(page, id);
   await expect(rowWithCell(page, identifier)).toHaveCount(0);
 });
 
@@ -40,7 +55,7 @@ for (const { identifier, message } of [
   test(`the identifier ${JSON.stringify(identifier)} is refused, and the form keeps what was typed`, async ({ page }) => {
     await submitNewResource(page, identifier, "kept");
     await expect(page).toHaveURL(`${list}/new`);
-    await expect(page.getByText(message)).toBeVisible();
+    await expectRefusal(page, "resource-error", "resourceIdentifier", message);
     await expect(page.locator("#resourceIdentifier")).toHaveValue(identifier);
     await expect(page.locator('input[name="description"]')).toHaveValue("kept");
   });
@@ -50,7 +65,7 @@ test("an identifier already in use is refused", async ({ page, resources }) => {
   const existing = await resources.create();
   await submitNewResource(page, existing.identifier);
   await expect(page).toHaveURL(`${list}/new`);
-  await expect(page.getByText("The resource identifier is already in use")).toBeVisible();
+  await expectRefusal(page, "resource-error", "resourceIdentifier", "The resource identifier is already in use");
   await page.goto(list);
   await expect(rowWithCell(page, existing.identifier)).toHaveCount(1);
 });
@@ -63,7 +78,7 @@ for (const { description, message } of [
     const identifier = uniqueIdentifier("r");
     await submitNewResource(page, identifier, description);
     await expect(page).toHaveURL(`${list}/new`);
-    await expect(page.getByText(message)).toBeVisible();
+    await expectRefusal(page, "resource-error", "description", message);
     await page.goto(list);
     await expect(rowWithCell(page, identifier)).toHaveCount(0);
   });

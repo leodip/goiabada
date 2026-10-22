@@ -145,15 +145,16 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyTwo pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentyThree pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
-// call four: T, Lang, args and versionComment, which are also here. The other seventeen -- the
+// call four: T, Lang, args and versionComment, which are also here. The other nineteen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
 // reference-data formatters -- are this application's alone, and a new entry here means one of its
-// templates calls it. The twenty-second was marshal, which typed the keys page's JSON as already
-// safe and went in #120, the engine escaping that value itself. CatalogLang is the twenty-second
-// now, the catalog a page rendered from, which its scripts name back on every request (#559).
-func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
+// templates calls it. marshal, which typed the keys page's JSON as already safe, went in #120, the
+// engine escaping that value itself. CatalogLang came in #559, the catalog a page rendered from,
+// which its scripts name back on every request, and ScopeList in #617, the scopes the account
+// consents page names in words.
+func TestTemplateFuncMap_IsThisApplicationsTwentyThree(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -162,11 +163,35 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
 
 	want := []string{
 		"CatalogLang", "DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
-		"RefTimezone", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
+		"RefTimezone", "ScopeList", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
 		"isAdminClientPage", "isAdminGroupPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",
 	}
 	if !reflect.DeepEqual(keys, want) {
 		t.Errorf("templateFuncMap = %v, want %v", keys, want)
+	}
+}
+
+// The sidebar marks a section current on its list and on every page of one of its records, the tabs
+// its predicate once missed included: the user picture and attribute forms, the client logo and the
+// group attribute edit form. A path that only shares the section's prefix as text is not in it.
+func TestTemplateFuncMap_TheSectionPredicatesCoverEveryPageOfARecord(t *testing.T) {
+	for name, paths := range map[string][]string{
+		"isAdminUserPage":     {"/admin/users", "/admin/users/7/picture", "/admin/users/7/attributes/add", "/admin/users/7/attributes/edit/3", "/admin/users/new"},
+		"isAdminClientPage":   {"/admin/clients", "/admin/clients/7/logo", "/admin/clients/7/settings"},
+		"isAdminGroupPage":    {"/admin/groups", "/admin/groups/4/attributes/edit/11", "/admin/groups/4/members/add"},
+		"isAdminResourcePage": {"/admin/resources", "/admin/resources/3/users-with-permission/add/9"},
+	} {
+		in := templateFuncMap[name].(func(string) bool)
+		for _, path := range paths {
+			if !in(path) {
+				t.Errorf("%s(%q) is false", name, path)
+			}
+		}
+		for _, path := range []string{"/admin/usersx", "/admin/clientsx/7", "/admin/settings/general"} {
+			if in(path) {
+				t.Errorf("%s(%q) is true", name, path)
+			}
+		}
 	}
 }

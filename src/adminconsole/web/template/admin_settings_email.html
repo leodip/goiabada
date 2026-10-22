@@ -1,285 +1,139 @@
-{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.admin_settings.email.page_title" }}{{end}}
-{{define "pageTitle"}}{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}{{end}}
-{{define "subTitle"}}
-    <div class="text-xl font-semibold">{{ T $.ctx "adminconsole.admin_settings.email.subtitle" }}</div>
-    <div class="mt-2 divider"></div>
-{{end}}
-{{define "menu"}}
-    {{template "admin_menu" . }}
-{{end}}
-
+{{define "title"}}{{ T $.ctx "adminconsole.admin_settings.email.page_title" }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
 {{define "head"}}
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const smtpEnabled = document.getElementById('smtpEnabled');
-        smtpEnabled.addEventListener('change', function () {
-            refreshVisibility(true);
-        });
-
-        const clearSmtpPassword = document.getElementById('clearSmtpPassword');
-        if (clearSmtpPassword) {
-            clearSmtpPassword.addEventListener('change', function () {
-                refreshVisibility(false);
-            });
-        }
-
-        document.getElementById('hostOrIP').addEventListener('input', refreshHostChangeWarning);
-        document.getElementById('password').addEventListener('input', refreshHostChangeWarning);
-
-        refreshVisibility(true);
-    });
-
-    function refreshVisibility(focusHost) {
-        const smtpEnabled = document.getElementById('smtpEnabled');
-
-        const hostOrIP = document.getElementById('hostOrIP');
-        const port = document.getElementById('port');
-        const username = document.getElementById('username');
-        const password = document.getElementById('password');
-        const clearSmtpPassword = document.getElementById('clearSmtpPassword');
-        const smtpEncryption = document.getElementById('smtpEncryption');
-        const fromName = document.getElementById('fromName');
-        const fromEmail = document.getElementById('fromEmail');
-
-        // Ticking the removal disables the box, so a new password and a removal are never sent
-        // together; the box keeps what was typed, should the removal be unticked again.
-        const removing = clearSmtpPassword !== null && clearSmtpPassword.checked;
-
-        if (smtpEnabled.checked) {
-            hostOrIP.removeAttribute('disabled');
-            port.removeAttribute('disabled');
-            username.removeAttribute('disabled');
-            if (removing) {
-                password.setAttribute('disabled', 'disabled');
-            } else {
-                password.removeAttribute('disabled');
-            }
-            if (clearSmtpPassword) {
-                clearSmtpPassword.removeAttribute('disabled');
-            }
-            smtpEncryption.removeAttribute('disabled');
-            fromName.removeAttribute('disabled');
-            fromEmail.removeAttribute('disabled');
-            if (focusHost) {
-                setTimeout(function () {
-                    hostOrIP.focus();
-                }, 100);
-            }
-        } else {
-            hostOrIP.setAttribute('disabled', 'disabled');
-            port.setAttribute('disabled', 'disabled');
-            username.setAttribute('disabled', 'disabled');
-            password.setAttribute('disabled', 'disabled');
-            if (clearSmtpPassword) {
-                clearSmtpPassword.setAttribute('disabled', 'disabled');
-            }
-            smtpEncryption.setAttribute('disabled', 'disabled');
-            fromName.setAttribute('disabled', 'disabled');
-            fromEmail.setAttribute('disabled', 'disabled');
-        }
-
-        const clearNotice = document.getElementById('clearSmtpPasswordNotice');
-        if (clearNotice) {
-            clearNotice.classList.toggle('hidden', !(smtpEnabled.checked && removing));
-        }
-
-        refreshHostChangeWarning();
-    }
-
-    // The host in the form the auth server compares it in: surrounding space trimmed, one pair of
-    // brackets taken off an IPv6 literal, and without regard to case.
-    function normalizeHost(host) {
-        host = host.trim();
-        if (host.length >= 2 && host.charAt(0) === '[' && host.charAt(host.length - 1) === ']') {
-            host = host.substring(1, host.length - 1);
-        }
-        return host.toLowerCase();
-    }
-
-    // A saved password reaches only the host it was saved for, so editing the host away from that
-    // one needs the password again or its removal. The auth server refuses the save otherwise;
-    // this says so before the save is sent.
-    function refreshHostChangeWarning() {
-        const warning = document.getElementById('hostChangeWarning');
-        const hasSmtpPassword = document.getElementById('hasSmtpPassword').value === 'true';
-        const savedHostOrIP = document.getElementById('savedHostOrIP').value;
-        const smtpEnabled = document.getElementById('smtpEnabled');
-        const hostOrIP = document.getElementById('hostOrIP');
-        const password = document.getElementById('password');
-        const clearSmtpPassword = document.getElementById('clearSmtpPassword');
-
-        const hostChanged = normalizeHost(hostOrIP.value) !== normalizeHost(savedHostOrIP);
-        const answered = password.value !== '' || (clearSmtpPassword !== null && clearSmtpPassword.checked);
-
-        warning.classList.toggle('hidden', !(hasSmtpPassword && smtpEnabled.checked && hostChanged && !answered));
-    }
-</script>
-
+<script src="{{ asset "/static/pages/admin-settings-email.js" }}" defer></script>
 {{end}}
 
-{{define "body"}}
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.admin_settings.common.page_title_root" }}</p>
+    <h1 class="page-title">{{ T $.ctx "adminconsole.admin_settings.email.subtitle" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.admin_settings.email.lead" }}</p>
+  </div>
+</div>
+{{ template "email_settings_tabs" (args "configuration" $.ctx) }}
 
-{{template "email_settings_tabs" (args "configuration" $.ctx) }}
-
-<form method="post">
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div class="w-full form-control">
-            <label class="cursor-pointer label">
-                <span class="label-text">
-                    <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.email.field.smtp_enabled" }}</span>
-                    <div class="tooltip tooltip-top"
-                        data-tip="{{ T $.ctx "adminconsole.admin_settings.email.smtp_enabled_tooltip" }}">
-                        <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                        </svg>
-                    </div>
-                </span>
-                <input id="smtpEnabled" type="checkbox" name="smtpEnabled"
-                    class="ml-2 toggle" {{if .settings.SMTPEnabled}}checked{{end}} />
-            </label>
-        </div>
+{{/* errorField names the field a refusal is about, which is marked invalid, described by the notice
+     and focused. The server's sections show only while email is on, as admin-settings-email.js
+     decides again as the box changes; turning email off asks first, since the save clears every
+     SMTP setting, against whether email was on as stored, which the saved host says. */}}
+<form class="panel" method="post" novalidate data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_settings.modal.save_title" }}">
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="email-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.email.field.host_or_ip" }}
-                    </span>
-                </label>
-                <input id="hostOrIP" type="text" name="hostOrIP" value="{{.settings.SMTPHost}}"
-                    class="w-full input input-bordered" autocomplete="off" autofocus />
-                <input id="savedHostOrIP" type="hidden" name="savedHostOrIP" value="{{.settings.SavedSMTPHost}}" />
-                <p id="hostChangeWarning" class="hidden mt-2 text-sm text-warning">
-                    {{ T $.ctx "adminconsole.admin_settings.email.host_change_warning" }}
-                </p>
-            </div>
-
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.email.field.port" }}
-                    </span>
-                </label>
-                <input id="port" type="text" name="port" value="{{.settings.SMTPPort}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-        </div>
+    {{ end }}
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
     </div>
+    {{ end }}
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div class="w-full form-control">
-            <label class="label">
-                <span class="label-text text-base-content">
-                    {{ T $.ctx "adminconsole.admin_settings.email.field.encryption" }}
-                </span>
-            </label>
-            <select class="w-full select select-bordered" id="smtpEncryption" name="smtpEncryption">
-                <option value="none" {{if eq .settings.SMTPEncryption "none"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_none" }}</option>
-                <option value="ssltls" {{if eq .settings.SMTPEncryption "ssltls"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_ssltls" }}</option>
-                <option value="starttls" {{if eq .settings.SMTPEncryption "starttls"}}selected{{end}}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_starttls" }}</option>
-            </select>
-        </div>
+    <div class="check-list">
+      <label class="check-row" for="smtpEnabled">
+        <input type="checkbox" id="smtpEnabled" name="smtpEnabled" aria-describedby="smtpEnabledHint"{{ if .settings.SMTPEnabled }} checked{{ end }}
+          data-confirm="{{ T $.ctx "adminconsole.admin_settings.email.disable_warning" }}" data-confirm-when="unchecked" data-stored-checked="{{ if .settings.SavedSMTPHost }}true{{ else }}false{{ end }}">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.email.field.smtp_enabled" }}</span>
+          <span class="field-hint" id="smtpEnabledHint">{{ T $.ctx "adminconsole.admin_settings.email.smtp_enabled_tooltip" }}</span>
+        </span>
+      </label>
     </div>
+  </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.email.field.username" }}
-                    </span>
-                </label>
-                <input id="username" type="text" name="username" value="{{.settings.SMTPUsername}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        <span class="align-middle">{{ T $.ctx "adminconsole.admin_settings.email.field.password" }}</span>
-                        {{if .settings.HasSMTPPassword}}
-                            <span class="ml-1 align-middle badge badge-success badge-sm">{{ T $.ctx "adminconsole.admin_settings.email.password_saved" }}</span>
-                        {{else}}
-                            <span class="ml-1 align-middle badge badge-ghost badge-sm">{{ T $.ctx "adminconsole.admin_settings.email.password_not_set" }}</span>
-                        {{end}}
-                        <div class="tooltip tooltip-top"
-                            data-tip="{{ T $.ctx "adminconsole.admin_settings.email.password_tooltip" }}">
-                            <svg class="inline-block w-6 h-6 ml-1 align-middle cursor-pointer"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                            </svg>
-                        </div>
-                    </span>
-                </label>
-                <input id="password" type="password" name="password" value="{{.settings.SMTPPassword}}"
-                    {{if .settings.HasSMTPPassword}}placeholder="{{ T $.ctx "adminconsole.admin_settings.email.password_keep_placeholder" }}"{{end}}
-                    class="w-full input input-bordered" autocomplete="new-password" />
-                <input id="hasSmtpPassword" type="hidden" name="hasSmtpPassword" value="{{if .settings.HasSMTPPassword}}true{{end}}" />
-                {{if .settings.HasSMTPPassword}}
-                    <label class="justify-start cursor-pointer label">
-                        <input id="clearSmtpPassword" type="checkbox" name="clearSmtpPassword"
-                            class="checkbox checkbox-sm" {{if .settings.ClearSMTPPassword}}checked{{end}} />
-                        <span class="ml-2 label-text">{{ T $.ctx "adminconsole.admin_settings.email.clear_password" }}</span>
-                    </label>
-                    <p id="clearSmtpPasswordNotice" class="text-sm text-warning {{if not .settings.ClearSMTPPassword}}hidden{{end}}">
-                        {{ T $.ctx "adminconsole.admin_settings.email.clear_password_notice" }}
-                    </p>
-                {{end}}
-            </div>
-        </div>
+  <div class="panel-body stacked" data-smtp-section{{ if not .settings.SMTPEnabled }} hidden{{ end }}>
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.email.section_server" }}</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="hostOrIP">{{ T $.ctx "adminconsole.admin_settings.email.field.host_or_ip" }}</label>
+        <input class="control" id="hostOrIP" type="text" name="hostOrIP" value="{{ .settings.SMTPHost }}" autocomplete="off" spellcheck="false"
+          {{- if .error }}{{ if eq .errorField "hostOrIP" }} aria-describedby="email-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <input id="savedHostOrIP" type="hidden" name="savedHostOrIP" value="{{ .settings.SavedSMTPHost }}">
+      </div>
+      <div class="field">
+        <label class="field-label" for="port">{{ T $.ctx "adminconsole.admin_settings.email.field.port" }}</label>
+        <input class="control" id="port" type="text" inputmode="numeric" name="port" value="{{ .settings.SMTPPort }}" autocomplete="off"
+          {{- if .error }}{{ if eq .errorField "port" }} aria-describedby="email-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+      </div>
+      <div class="field">
+        <label class="field-label" for="smtpEncryption">{{ T $.ctx "adminconsole.admin_settings.email.field.encryption" }}</label>
+        <select class="control" id="smtpEncryption" name="smtpEncryption" aria-describedby="{{ if .error }}{{ if eq .errorField "smtpEncryption" }}email-error {{ end }}{{ end }}encryptionHint"
+          {{- if .error }}{{ if eq .errorField "smtpEncryption" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+          <option value="none"{{ if eq .settings.SMTPEncryption "none" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_none" }}</option>
+          <option value="ssltls"{{ if eq .settings.SMTPEncryption "ssltls" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_ssltls" }}</option>
+          <option value="starttls"{{ if eq .settings.SMTPEncryption "starttls" }} selected{{ end }}>{{ T $.ctx "adminconsole.admin_settings.email.encryption_starttls" }}</option>
+        </select>
+        <p class="field-hint" id="encryptionHint">{{ T $.ctx "adminconsole.admin_settings.email.encryption_hint" }}</p>
+      </div>
     </div>
-
-    <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-2">
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.email.field.from_name" }}
-                    </span>
-                </label>
-                <input id="fromName" type="text" name="fromName" value="{{.settings.SMTPFromName}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-
-            <div class="w-full form-control">
-                <label class="label">
-                    <span class="label-text text-base-content">
-                        {{ T $.ctx "adminconsole.admin_settings.email.field.from_email" }}
-                    </span>
-                </label>
-                <input id="fromEmail" type="text" name="fromEmail" value="{{.settings.SMTPFromEmail}}"
-                    class="w-full input input-bordered" autocomplete="off" />
-            </div>
-        </div>
+    <div class="notice notice-caution" id="hostChangeWarning" hidden>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.email.host_change_warning" }}</p>
     </div>
+  </div>
 
-    <div class="grid grid-cols-1 gap-6 mt-8 lg:grid-cols-2">
-        <div>
-            {{if .error}}
-                <div class="mb-4 text-right text-error">
-                    <p>{{.error}}</p>
-                </div>
-            {{end}}
-            {{if .savedSuccessfully}}
-                <div class="mb-4 text-right text-success">
-                    <p>&#10004; {{ T $.ctx "adminconsole.admin_settings.common.saved_successfully" }}</p>
-                </div>
-            {{end}}
-            <div class="float-right">
-                <button id="btnSave" class="btn btn-primary">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
-            </div>
-        </div>
+  <div class="panel-body stacked" data-smtp-section{{ if not .settings.SMTPEnabled }} hidden{{ end }}>
+    <div>
+      <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.email.section_sign_in" }}</h2>
+      <p class="field-hint mt-1">{{ T $.ctx "adminconsole.admin_settings.email.sign_in_hint" }}</p>
     </div>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="username">{{ T $.ctx "adminconsole.admin_settings.email.field.username" }}</label>
+        <input class="control" id="username" type="text" name="username" value="{{ .settings.SMTPUsername }}" autocomplete="off" spellcheck="false"
+          {{- if .error }}{{ if eq .errorField "username" }} aria-describedby="email-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+      </div>
+      <div class="field">
+        <label class="field-label" for="password">{{ T $.ctx "adminconsole.admin_settings.email.field.password" }}
+          {{- if .settings.HasSMTPPassword }} <span class="tag tag-positive -my-0.5">{{ T $.ctx "adminconsole.admin_settings.email.password_saved" }}</span>
+          {{- else }} <span class="tag -my-0.5">{{ T $.ctx "adminconsole.admin_settings.email.password_not_set" }}</span>{{ end }}</label>
+        <input class="control" id="password" type="password" name="password" value="{{ .settings.SMTPPassword }}"{{ if .settings.HasSMTPPassword }} placeholder="{{ T $.ctx "adminconsole.admin_settings.email.password_keep_placeholder" }}"{{ end }} autocomplete="new-password"
+          {{- if .settings.HasSMTPPassword }} aria-describedby="{{ if .error }}{{ if eq .errorField "password" }}email-error {{ end }}{{ end }}passwordHint"{{ else }}{{ if .error }}{{ if eq .errorField "password" }} aria-describedby="email-error"{{ end }}{{ end }}{{ end }}
+          {{- if .error }}{{ if eq .errorField "password" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
+        <input id="hasSmtpPassword" type="hidden" name="hasSmtpPassword" value="{{ if .settings.HasSMTPPassword }}true{{ end }}">
+        {{- if .settings.HasSMTPPassword }}
+        <p class="field-hint" id="passwordHint">{{ T $.ctx "adminconsole.admin_settings.email.password_tooltip" }}</p>
+        {{- end }}
+      </div>
+    </div>
+    {{ if .settings.HasSMTPPassword }}
+    <div class="check-list">
+      <label class="check-row" for="clearSmtpPassword">
+        <input type="checkbox" id="clearSmtpPassword" name="clearSmtpPassword"{{ if .settings.ClearSMTPPassword }} checked{{ end }}>
+        <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.email.clear_password" }}</span>
+      </label>
+    </div>
+    <div class="notice notice-caution" id="clearSmtpPasswordNotice"{{ if not .settings.ClearSMTPPassword }} hidden{{ end }}>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_settings.email.clear_password_notice" }}</p>
+    </div>
+    {{ end }}
+  </div>
 
+  <div class="panel-body stacked" data-smtp-section{{ if not .settings.SMTPEnabled }} hidden{{ end }}>
+    <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_settings.email.section_sender" }}</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label class="field-label" for="fromName">{{ T $.ctx "adminconsole.admin_settings.email.field.from_name" }}</label>
+        <input class="control" id="fromName" type="text" name="fromName" value="{{ .settings.SMTPFromName }}" autocomplete="off"
+          {{- if .error }}{{ if eq .errorField "fromName" }} aria-describedby="email-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+      </div>
+      <div class="field">
+        <label class="field-label" for="fromEmail">{{ T $.ctx "adminconsole.admin_settings.email.field.from_email" }}</label>
+        <input class="control" id="fromEmail" type="email" inputmode="email" name="fromEmail" value="{{ .settings.SMTPFromEmail }}" autocomplete="off" spellcheck="false"
+          {{- if .error }}{{ if eq .errorField "fromEmail" }} aria-describedby="email-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_settings.common.save_button" }}</button>
+  </div>
 </form>
 
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_settings.common.save_button") (T $.ctx "adminconsole.admin_settings.modal.save_title")) }}
 {{end}}

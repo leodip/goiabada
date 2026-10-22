@@ -83,13 +83,13 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Empty(t, w.Header().Get("Location"), "form_post answers with a page, not a redirect")
 		body := w.Body.String()
-		assert.Contains(t, body, `<form method="post" action="https://example.com/callback">`)
-		assert.Contains(t, body, `<input type="hidden" name="access_token" value="access-token-123" />`)
-		assert.Contains(t, body, `<input type="hidden" name="token_type" value="Bearer" />`)
-		assert.Contains(t, body, `<input type="hidden" name="expires_in" value="3600" />`)
-		assert.Contains(t, body, `<input type="hidden" name="id_token" value="id-token-123" />`)
-		assert.Contains(t, body, `<input type="hidden" name="scope" value="openid profile" />`)
-		assert.Contains(t, body, `<input type="hidden" name="state" value="client-csrf-token" />`)
+		assert.Contains(t, body, `<form class="auth-status" method="post" action="https://example.com/callback" data-auto-submit>`)
+		assert.Contains(t, body, `<input type="hidden" name="access_token" value="access-token-123">`)
+		assert.Contains(t, body, `<input type="hidden" name="token_type" value="Bearer">`)
+		assert.Contains(t, body, `<input type="hidden" name="expires_in" value="3600">`)
+		assert.Contains(t, body, `<input type="hidden" name="id_token" value="id-token-123">`)
+		assert.Contains(t, body, `<input type="hidden" name="scope" value="openid profile">`)
+		assert.Contains(t, body, `<input type="hidden" name="state" value="client-csrf-token">`)
 		assert.NotContains(t, body, `name="code"`, "a token response must not carry an authorization code")
 		assert.NotContains(t, body, `name="error"`)
 	})
@@ -158,7 +158,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	// The bind map holds exactly the parameters the fragment would carry, so a template that
 	// enumerates it sees the same set (#146), and an absent state is absent rather than
 	// empty.
-	t.Run("the bind map holds the redirect URI and the parameters, and no absent state", func(t *testing.T) {
+	t.Run("the bind map holds the redirect URI, the page and the parameters, and no absent state", func(t *testing.T) {
 		const keysTemplate = `{{range $k, $v := .}}[{{$k}}]{{end}}`
 		for _, tc := range []struct {
 			name  string
@@ -166,11 +166,11 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 			want  string
 		}{
 			{name: "a state the client sent", state: "abc123",
-				want: `[access_token][expires_in][id_token][iss][redirectURI][scope][state][token_type]`},
+				want: `[access_token][expires_in][id_token][iss][page][redirectURI][scope][state][token_type]`},
 			{name: "a whitespace-only state", state: "   ",
-				want: `[access_token][expires_in][id_token][iss][redirectURI][scope][state][token_type]`},
+				want: `[access_token][expires_in][id_token][iss][page][redirectURI][scope][state][token_type]`},
 			{name: "no state at all", state: "",
-				want: `[access_token][expires_in][id_token][iss][redirectURI][scope][token_type]`},
+				want: `[access_token][expires_in][id_token][iss][page][redirectURI][scope][token_type]`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
@@ -198,7 +198,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		err = issueImplicitTokens(w, r, web.TemplateFS(), "form_post", "https://example.com/callback", "   ",
 			implicitTokenResponse())
 		require.NoError(t, err)
-		assert.Contains(t, w.Body.String(), `<input type="hidden" name="state" value="   " />`)
+		assert.Contains(t, w.Body.String(), `<input type="hidden" name="state" value="   ">`)
 	})
 
 	// A state is the client's own string, and the page it is written into is HTML. html/template
@@ -351,10 +351,10 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	assert.Empty(t, rr.Header().Get("Location"))
 	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
 	body := rr.Body.String()
-	assert.Contains(t, body, `<form method="post" action="https://example.com/callback">`)
-	assert.Contains(t, body, `<input type="hidden" name="access_token" value="access-token-123" />`)
-	assert.Contains(t, body, `<input type="hidden" name="id_token" value="id-token-123" />`)
-	assert.Contains(t, body, `<input type="hidden" name="state" value="test-state" />`)
+	assert.Contains(t, body, `<form class="auth-status" method="post" action="https://example.com/callback" data-auto-submit>`)
+	assert.Contains(t, body, `<input type="hidden" name="access_token" value="access-token-123">`)
+	assert.Contains(t, body, `<input type="hidden" name="id_token" value="id-token-123">`)
+	assert.Contains(t, body, `<input type="hidden" name="state" value="test-state">`)
 	// The tokens the implicit grant signed are counted as issued, under implicit (#400 decision 5).
 	assert.Equal(t, []string{`goiabada_tokens_issued_total{grant_type="implicit"} 1`},
 		tokenSamples(t, registry))

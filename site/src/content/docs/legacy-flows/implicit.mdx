@@ -21,7 +21,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
 <Steps>
 
-1. In the admin console, open **Admin**, **Clients** and click **Manage** beside your app's client.
+1. In the admin console, open **Admin**, **Clients** and click your app's client identifier.
 
 2. On **OAuth2 flows**, under **Legacy flows (deprecated in OAuth 2.1)**, set **Implicit flow** to **Enabled**, and click **Save**.
 
@@ -45,7 +45,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
 </Steps>
 
-**Implicit flow** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or inherit the global **Implicit flow enabled** under **Admin**, **General**, which is off in a new install.
+**Implicit flow** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or inherit the global **Implicit flow** under **Admin**, **General**, which is off in a new install.
 
 ## Response types
 
@@ -101,7 +101,7 @@ Nothing in a `token` response proves the access token was issued for your reques
 
 <Steps>
 
-1. On the client's **Authentication** tab, choose **Public client** if it isn't one, click **Save**, and confirm with **Yes**. Your app runs in the browser, so it can't keep a secret.
+1. On the client's **Authentication** tab, choose **Public** if it isn't one, click **Save**, and confirm with **Save**. Your app runs in the browser, so it can't keep a secret.
 
 2. On **OAuth2 flows**, turn on **Authorization code with PKCE**, and click **Save**.
 

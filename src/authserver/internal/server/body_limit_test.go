@@ -29,6 +29,7 @@ import (
 func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
 	s := newStaticBranchTestServer(datamocks.NewDatabase(t))
 	s.templateFS = web.TemplateFS()
+	s.staticFS = web.StaticFS()
 	s.initRoutes(s.initMiddleware())
 
 	var registered []string

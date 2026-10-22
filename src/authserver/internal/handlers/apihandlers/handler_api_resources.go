@@ -70,14 +70,14 @@ func HandleResourceCreatePost(
 
 		// Validate resource identifier is present
 		if strings.TrimSpace(createReq.ResourceIdentifier) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil))
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(createReq.Description) > maxLengthDescription {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceDescriptionTooLong, map[string]any{"max": maxLengthDescription}))
 			return
 		}
 
@@ -99,7 +99,7 @@ func HandleResourceCreatePost(
 			return
 		}
 		if existing != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil))
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleResourceCreatePost(
 			return
 		}
 		if clashingClient != nil {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierNamesClient, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierNamesClient, nil))
 			return
 		}
 
@@ -215,14 +215,14 @@ func HandleResourceUpdatePut(
 
 		// Validate identifier present
 		if strings.TrimSpace(updateReq.ResourceIdentifier) == "" {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierRequired, nil))
 			return
 		}
 
 		// Validate description length
 		const maxLengthDescription = 100
 		if inputvalidation.TextLength(updateReq.Description) > maxLengthDescription {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceDescriptionTooLong, map[string]any{"max": maxLengthDescription}), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceDescriptionTooLong, map[string]any{"max": maxLengthDescription}))
 			return
 		}
 
@@ -244,7 +244,7 @@ func HandleResourceUpdatePut(
 			return
 		}
 		if existing != nil && existing.Id != resource.Id {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil))
 			return
 		}
 
@@ -253,7 +253,7 @@ func HandleResourceUpdatePut(
 
 		// System-level resource protection: block identifier changes
 		if resource.IsSystemLevelResource() && trimmedResourceIdentifier != resource.ResourceIdentifier {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelIdentifierFixed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelIdentifierFixed, nil))
 			return
 		}
 
@@ -268,7 +268,7 @@ func HandleResourceUpdatePut(
 				return
 			}
 			if clashingClient != nil {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierNamesClient, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierNamesClient, nil))
 				return
 			}
 		}
@@ -325,7 +325,7 @@ func HandleResourceDelete(
 		}
 
 		if resource.IsSystemLevelResource() {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelDeleteNotAllowed, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceSystemLevelDeleteNotAllowed, nil))
 			return
 		}
 

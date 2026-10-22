@@ -25,7 +25,7 @@ This page walks you through your first sign-in to the admin console, and the thr
 
 2. Open the admin console: `http://localhost:9091` after the [Quickstart](/get-started/quickstart/), or the admin console URL you gave the wizard.
 
-3. Click **Admin**. The admin console sends you to the auth server's sign-in page.
+3. Click **Administration**. The admin console sends you to the auth server's sign-in page.
 
 4. Enter the email and password, and click **Sign in**. You're back in the admin console, on the list of clients.
 
@@ -41,19 +41,19 @@ From then on, signing in to the admin console asks for a code from that app as w
 
 ### Decide who can register
 
-A new installation lets nobody register. Only you create users until you turn on **User self registration enabled** under **Admin**, **General**. Registering then needs email set up, since a new installation also asks people to verify their address.
+A new installation lets nobody register. Only you create users until you turn on **User registration** under **Admin**, **General**. Registering then needs email set up, since a new installation also asks people to verify their address.
 
 Accounts people create can manage their own account, including their profile, sessions and consents, but can't administer Goiabada. See [Self-registration](/concepts/self-registration/).
 
 ### Set up email
 
-Goiabada sends email to verify addresses and to reset passwords. Add your SMTP server under **Admin**, **Email - SMTP**, and send yourself a test message from there. Turning **SMTP enabled** off later empties every field on that page, the password included, so note them first if you'll turn it back on.
+Goiabada sends email to verify addresses and to reset passwords. Add your SMTP server under **Admin**, **Email**, and send yourself a test message from there. Turning **Send email** off later empties every field on that page, the password included, so note them first if you'll turn it back on.
 
 ## How the sign-in works
 
-The admin console is a client of the auth server, like the apps you'll connect later. Clicking **Admin** starts a standard OpenID Connect sign-in: the browser goes to the auth server, you sign in there, and the auth server sends you back to the admin console with an authorization code.
+The admin console is a client of the auth server, like the apps you'll connect later. Clicking **Administration** starts a standard OpenID Connect sign-in: the browser goes to the auth server, you sign in there, and the auth server sends you back to the admin console with an authorization code.
 
-To open the **Admin** pages, a user needs the `authserver:manage` permission. The first administrator has it, along with `authserver:manage-account`, which opens a user's own **Account** pages and which every new user gets. A user without `authserver:manage` who clicks **Admin** sees an "Unauthorized (403)" page.
+To open the **Admin** pages, a user needs the `authserver:manage` permission. The first administrator has it, along with `authserver:manage-account`, which opens a user's own **Account** pages and which every new user gets. A user without `authserver:manage` who signs in through **Administration** sees an "Administrators only" page.
 
 The admin console's client asks for a second factor only from users who have one set up. That's why your first sign-in needs only a password, and why signing in needs a code too once you turn on two-factor authentication.
 

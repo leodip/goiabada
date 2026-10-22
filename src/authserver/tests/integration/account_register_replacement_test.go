@@ -163,7 +163,7 @@ func TestSelfRegister_WithoutVerificationADeadRegistrationDoesNotTakeTheAddress(
 		_ = resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Contains(t, body, "Your account has been created.")
+		assert.Contains(t, body, "Your account is ready.")
 		user, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		require.NotNil(t, user, "a dead pending registration does not keep the address taken")

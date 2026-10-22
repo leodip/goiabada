@@ -64,7 +64,7 @@ func HandleSettingsUIThemePut(
 				}
 			}
 			if !valid {
-				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsUIThemeInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsUIThemeInvalid, nil))
 				return
 			}
 		}

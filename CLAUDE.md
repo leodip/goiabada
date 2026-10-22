@@ -41,6 +41,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `inputvalidation/` - Identifier validation and the angle-bracket predicate, the two rules both applications apply, to text an administrator or a registering client supplies. `IdentifierValidator.Validate` matches against a pattern compiled once, and the admin console names it through its own port. It was `core/validators` until #442. `ValidateNoAngleBrackets`, which wraps the predicate in an error only the auth server emits, is in `authserver/internal/accountvalidation` beside the other account validators — email, password, profile, address, phone — and the authorize and token validators are in `authserver/internal/protocolvalidation` (#344, #385, #442)
 - `internal/refgraph/` - The reference-graph reader the tree-wide guards in `guard/` and `ownershipdump` in `cmd/` share: the import graph, which resolves against the module directories `sourceroot/` declares, build constraints, the tables `ARCHITECTURE.md` and `OWNERSHIP.md` hold as data, and the symbol census. It left `core/testutil`, now `guard/`, so that `ownershipdump` links neither `testing` nor testify (#431, #442)
 - `internal/pinnedfetch/` - The download the reference-data generators share: a GET through an injectable doer, read through `boundedread`, and the SHA-256 check against the digest each generator pins in its source, whose refusal prints the digest received so updating a pin is edit, run, paste, run (#432)
+- `issuerlength/` - The one bound on an issuer's length, `Check`: 60 UTF-16 code units, under the issuer column's 64. The auth server's start holds the base URL to it, since the first start seeds the base URL as the issuer, the general settings save every issuer, and the setup wizard the auth server URL it writes, so the three cannot disagree on which base URLs start and save. A leaf importing only `core/errs`, for `adminpassword/`'s reason, held there by `AssertImportsOnly` from `core/guard`'s `imports_only_lint_test.go` (#615)
 - `locales/` - The locale identifiers and display names a user picks from. A shared reference vocabulary beside `countries/`, `timezones/` and `gender/`
 - `localzone/` - The process's local time zone, resolved from `TZ` by `Install`, which both servers call before their first record: a dependency fixes the local zone during package initialization, before the embedded `time/tzdata` registers, so `TZ` was ignored on a host with no zone database. A name that is no zone, `Local`, or an absolute zone-file path that does not load stops the server with one stderr line and exit 2 (#331)
 - `logging/` - The one `slog` handler, installed by both servers at startup, and the field helpers pattern 8 below is written about. Nothing else calls `slog.SetDefault`, `New`, `Default` or `With`, and a guard says so (#320). `RequestTargetForLog` is here beside `FieldForLog`, the one rendering of a request target for a record: the path escaped, every query value redacted but those an allowlist names, and the whole bounded. The request logger and the CSRF refusal in `httpmw/` and the auth server's API debug middleware call it (#159, #442)
@@ -48,7 +49,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `oauth/` - The OAuth/OIDC values both processes share: token, JWT and JWKS types, the PKCE challenge helper, and the error response of RFC 6749 section 5.2. `ErrorDetail` is a comparable struct of code, description, HTTP status and WWW-Authenticate challenge, read through `Code()`, `Description()`, `HTTPStatus()` and `WWWAuthenticate()`, whose `Is` compares with `==`; `ConformErrorDescription` replaces every character RFC 6749 Appendix A.8 forbids in an `error_description` and bounds the result to 512 bytes, because a description interpolates request text and, since #213's deferral, is parked on an auth context every request of that ceremony then carries. Both were `core/customerrors`, the detail a map, until #442. The admin console's client of the protocol — JWKS parser, token client, authorize redirect — is `adminconsole/internal/oauthclient`; `response_type` parsing is the provider's and is in `authserver/internal/protocolvalidation` (#385). `IsWellFormedSpaceDelimited` and `SplitSpaceDelimited`, the one grammar and the one splitter of the five space-delimited request parameters (exactly one space between values, none at either end, and no other separator), are here because `core/i18n` reads `ui_locales` with them in a middleware both processes mount (#244)
 - `phonecountries/` - The phone country list a user picks a phone number's country from: one entry per country and E.164 calling code, built once from `countries/`, sorted by country name, with `ByUniqueID` its lookup. An entry's id, `<alpha3>_<index>`, is stored on the user row, so the order of a country's codes is stored data (#432). It left core for `authserver/internal/phonecountries` in #344, when no console code read it, and came back in #563 so the admin console's two phone pages can build their list from it instead of asking the admin API, which refuses a token carrying `authserver:manage-account` alone
 - `securerandom/` - Random strings over `crypto/rand`, drawn by rejection sampling so an alphabet whose length does not divide 256 introduces no modulo bias: `String(n)` over the alphabet ids, secrets and security tokens are minted over, `StringFromAlphabet(n, alphabet)` over one the caller names, at most 256 bytes. Neither returns an error, because a CSPRNG failure ends the process (#211). It was `core/stringutil` until #442, which deleted the auth server's `randomstring` wrapper beside it
-- `sessionstore/` - The server-side session store and its codec, which is where an `AuthContext` lives; the cookie carries the key and nothing else (#266). `Options` is the six cookie attributes this repository sets rather than an `http.Cookie`, so a MaxAge below zero is the one way to say "delete this" and there is no `Expires` beside it to disagree (#269). It holds the one session-key rule both configurations apply, `ParseKeys`, whose refusals name the variable each value was configured under (#434). `ConditionalStore` writes a session on condition nothing wrote it since a fresh read, which the auth server's store is built with and the admin console's is not, so the console's browser session stays last-writer-wins (#579)
+- `sessionstore/` - The server-side session store and its codec, which is where an `AuthContext` lives; the cookie carries the key and nothing else (#266). The one exception is `SealCookieValues`, `OpenCookieValues` and `ValuesCookie`: a short-lived state a browser carries itself, sealed under a key of its own so it never opens as a session cookie, which the admin console's sign-in handshake rides in from the authorize redirect to the callback, so an anonymous request to `/admin` or `/account` writes no row (#620). `Options` is the six cookie attributes this repository sets rather than an `http.Cookie`, so a MaxAge below zero is the one way to say "delete this" and there is no `Expires` beside it to disagree (#269). It holds the one session-key rule both configurations apply, `ParseKeys`, whose refusals name the variable each value was configured under (#434). `ConditionalStore` writes a session on condition nothing wrote it since a fresh read, which the auth server's store is built with and the admin console's is not, so the console's browser session stays last-writer-wins (#579). `GetFresh` loads the session as stored now, past the request's memo and writing nothing, which the admin console's refresh re-reads through under its per-session lock (#621)
 - `sourceroot/` - The one declaration of the four module directories, `ModuleDirs`, and the ascent that finds the source root from them, `FindSourceRoot`, which the tree-wide guards (through `guard.SourceRoot`), `ownershipdump` and the auth server's `schemadump` root their walks with. It left `core/internal/refgraph` because Go's internal rule kept `schemadump` from reading it there, which is how the same four directories came to be declared twice (#480)
 - `timezones/` - The IANA zone table a user's zone is picked from, one row per country and zone, generated from the tzdata release and SHA-256 its generator pins. Nothing loads it at startup; a test checks every zone loads (#49, #432)
 
@@ -82,7 +83,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/publicsettings/` - The auth server's public settings every page renders with: `Client` reads `/api/public/settings` under its own timeout and bound, and `Cache` serves the answer for a TTL, every request arriving during a fetch sharing that one fetch with no lock held across it, and an `Invalidate` never undone by a fetch that started before it. It was `internal/cache`, and the client `apiclient.SettingsClient`, until #441
 - `internal/reqctx/` - The two request-scoped values, the signed-in administrator's token set and the auth server's public settings, each written by one middleware and read through a typed accessor over an unexported key; an absent value is `ErrNoJwtInfo` or `ErrNoSettings` rather than a panic. The twin of the auth server's, and the context-value guard holds the module to it with one exemption, `internal/handlertest/request.go`'s write of chi's route context (#440)
 - `internal/sessionbackend/` - The HTTP backend of `core/sessionstore` over the auth server's browser-session endpoint, the twin of the auth server's package of the same name, and its `TokenSource` port, which `oauthclient.SessionTokenSource` implements as a cache over the token client's client-credentials grant. It left `apiclient` in #441
-- `internal/sessionkeys/` - The eight keys of the console's browser session. Stored data: a live session carries these spellings, so renaming one signs every administrator out at deploy. It was `internal/constants` until the context keys left for `reqctx` (#440)
+- `internal/sessionkeys/` - The two keys of the console's browser session, the token set and its expiry, and the six of its sealed sign-in handshake. Stored data: a live session carries the two spellings, so renaming one signs every administrator out at deploy, and renaming one of the six fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map and the callback deletes the stale copies a session written before #620 can hold. It was `internal/constants` until the context keys left for `reqctx` (#440, #620)
 - `web/template/` - Admin UI templates
 
 ## Database Pattern
@@ -489,6 +490,13 @@ which refuses every other name, so the server or the data tier recreates and mig
 integration server seeds it. The drop itself is each engine package's `DropDatabase`, the one
 spelling `schemadump` and the data tier's fixtures use too (#433).
 
+**Dev stack secrets**: the dev stack's data key and its MySQL, PostgreSQL and SQL Server passwords
+come from `src/.devcontainer/.env`, which `src/.devcontainer/generate-env.sh` writes with fresh
+values (and fills in when one is missing) and `.gitignore` keeps out of git; Compose hands them to
+the databases and the devcontainer. `run-tests.sh` and `schemadump` read them from the environment
+and refuse with one line naming a missing one, so outside the devcontainer, or in a container
+created before #627, run the script and recreate the stack with its volumes (#501).
+
 **Transaction stub**: a unit test that needs the mock database to answer `RunInTransaction`
 uses `datamocks.ExpectRunInTransaction`, hand-written beside the generated mock in
 `authserver/internal/data/mocks` and reachable from every caller without a new import, with
@@ -516,6 +524,12 @@ exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Bot
 driven from a rule test: the finder directly, the reporting half through `guard.Run`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
 does. Every guard follows this: those in `core/guard`, the newest
+`AssertNoLiteralStackSecrets`, which refuses a data key or database password supplied by literal in
+any runnable file -- workflows, Compose and other YAML, devcontainer and editor configurations,
+Dockerfiles, Makefiles, env files (`.env` and `.env.*` among them, unless git tracks no copy of
+it and the repository's `.gitignore` files, its own directory's or a parent's, read as git reads
+them, keep it out of the repository), shell scripts, Go mains and Markdown code blocks -- and the
+published sample key and passwords anywhere outside the refusal and its tests (#501), and before it
 `AssertNoStaleDeferredBodyCloses`, which refuses a deferred func-literal close of a response
 body reading a variable the same function reassigns after the defer is registered, in a later
 statement, a nested closure or the next iteration of a loop, so only the last response is closed
@@ -676,7 +690,7 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 
 1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
 2. **Audit logging**: All security events logged via `auditLogger` (see `authserver/internal/audit/events.go` for event names)
-3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password, OTP and email changes, email verification and its resend, forgot/reset password, self-registration, activation, DCR). Credential checks count failures only, so a successful attempt spends nothing. The limits counted by a user or by an email apply whatever `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` says: those counted by a user something has already authenticated, the signing-in user or a token's subject (OTP, account password, email verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant, and reset mails and registration notices per address), since only Goiabada can count them (#503). The switch governs only the tiers that read the client's address, those counted by an IP address and `pwd_account_net`, the 10 wrong passwords per 15 minutes for one email from one client block; with it off the password check reserves the account-wide tier alone. The price is #89's lockout: 100 wrong passwords block an account's password sign-in for up to an hour, its remedy blocking the attacker at the proxy or CDN (#503)
+3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password, OTP and email changes, email verification and its resend, forgot/reset password, self-registration, activation, DCR, and the authorization endpoint, both methods of which share one admission budget per client block, #504). Credential checks count failures only, so a successful attempt spends nothing. The limits counted by a user or by an email apply whatever `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` says: those counted by a user something has already authenticated, the signing-in user or a token's subject (OTP, account password, email verification and its resend), since no stranger can spend them (#542), and those counted by an email anyone can type (wrong passwords per account, 100 an hour shared by the sign-in form and the password grant, and reset mails and registration notices per address), since only Goiabada can count them (#503). The switch governs only the tiers that read the client's address, those counted by an IP address and `pwd_account_net`, the 10 wrong passwords per 15 minutes for one email from one client block; with it off the password check reserves the account-wide tier alone. The price is #89's lockout: 100 wrong passwords block an account's password sign-in for up to an hour, its remedy blocking the attacker at the proxy or CDN (#503)
 4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
 5. **Credential form fields**: A handler reads a credential-bearing field (`password`, `passwordConfirmation`, `currentPassword`, `newPassword`, `newPasswordConfirmation`, `otp`, `secretKey`, `base64Image`, `verificationCode`, `clientSecret`) and a form-binding marker (`ceremonyId`, `continuationId`) with `r.PostFormValue`, never `r.FormValue`. `r.FormValue` merges the URL query behind the request body, so the value would be accepted from the request target, where it reaches the browser's history, the `Referer` of anything the page loads, and the access log of every proxy, gateway and CDN in front of the deployment. Every such form is POST-only with a separate GET handler that renders it, so the query is never a submission. Enforced by `core/guard.AssertNoCredentialQueryFallback`, which carries the walk and the four merged-form accessors it refuses, called from a `credential_read_lint_test.go` in each `internal/handlers` package and from `core/httpmw`; each caller owns its own name list, because the lists must differ. The auth server's adds the four token-endpoint credentials (`code`, `code_verifier`, `refresh_token`, `client_secret`) and `access_token`, which `JwtAuthorizationHeaderToContext` in `authserver/internal/middleware` reads lawfully from a form body per OIDC Core 1.0 5.3.1; the kernel's is `access_token` alone, and since #385 moved that read out of core it refuses the read coming back rather than holding a site. Only `state` is exempt, at `/auth/authorize`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as well as POST; `code` is not, being an authorization *response* value the client returns in the request entity-body (RFC 6749 4.1.2, 4.1.3) (#202, #333)
 6. **Transactions**: exist for atomicity, and every one is opened through `RunInTransaction`, which reruns the body when the engine aborts it as a deadlock victim (bounded, then the error surfaces); `begin_transaction_lint_test.go` in `src/authserver/internal/data` refuses a bare `BeginTransaction` in production code. No lock order is imposed. One property is kept on purpose (#139): a termination deletes the session row first, and issuance takes that row before inserting its code, or before signing the implicit grant's tokens, in one transaction, so a code or a token can never slip between a termination's sweep and its commit. A second is kept the same way (#131): a refresh rotation takes the user's row first (`AcquireUserRow`), as a credential change does through its write and its generation increment, so a rotation's child is never stamped from a token a revocation has already moved past, and a revocation's sweep never misses a child. A third is kept the same way (#542): a sign-in's claim to a one-time code is checked on the user under the user's row (`otpcredential.OTPClaim.Recheck`), first in the transaction that binds it to a session or issues it, and a removal takes the user's row first and lowers the sessions in the same transaction, so a code is never bound or issued after the removal of the authenticator it came from. Concurrent transactions on the same account can still deadlock on MySQL, PostgreSQL or SQL Server; the loser is rolled back with nothing half applied and rerun. SQLite has one connection and cannot deadlock. Do not add ordering to prevent a deadlock; add a test that forces it and shows the retry resolves it (#301)
@@ -684,6 +698,136 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 8. **Logging**: `core/logging` owns the one `slog` handler, installed by both servers at startup. Every message is a lowercase string literal with no `component:` prefix and no `failed to` or `error ` opener, the one verb being "unable to"; values ride as snake_case attributes, one fixed name per concept, `error` for an error, `client_identifier` for the wire string against `client_id` for the row id. `request_id` is the handler's, injected from the context, so a site with a `context.Context` or `*http.Request` in scope at any depth uses the `*Context` variant. Error means someone must act, Warn a refused or handled request, Info lifecycle and configuration, Debug per-request tracing. Two guards hold it. `sloglint`, enabled in `.golangci.yml` and run by `./run-tests.sh --type lint` and CI's Lint job over type-checked code, holds the lowercase message, the snake_case keys, the refused `err` and `request_id`, and the `*Context` rule; a function that hands its caller's key/value run to a record is registered there under `custom-funcs` so the keys are read at its call sites. `TestSlogConvention` in `core/guard/slog_lint.go`, called from all three module tiers, holds what sloglint cannot express: that the message is a literal at the call rather than a constant, the refused message openers, `slog.SetDefault`/`New`/`Default`/`With` outside the handler's own files, a `...` spread into a record or a forwarder outside the functions `slogSpreadSites` lists, that list against `custom-funcs`, and a plain `slog.Debug`/`Info`/`Warn`/`Error` in any production package outside the directories `slogNoRequestDirs` lists, the ones with no request above them: the mains and composition (both `config` and `server` packages, `datafactory`, `migrator`, the four engine adapters, `bootstrap`), `cleanup`, the developer tools and generators, test support, and the setup wizard. Each entry is one directory and not its subtree, so a package created anywhere else, beneath a listed one included, is checked from its first commit (#442). The plain-record rule admits the functions `slogPlainSites` names, each with the reason no context reaches it: the admin console's template function `addUrlParam` and the `convertToString` it calls, `core/i18n`'s startup records in `loadOverrideCatalogs` and `orEmpty`, and `StaticFS` and `TemplateFS` in each application's `web` package. That rule is what refuses a new helper written without a context after sloglint has admitted it. `AssertRequestPathContext` and `AssertAuditLogContext` share the same scope, and `requestContextOwners` admits `core/i18n`'s `WithLocale`, whose background context is the fallback for a nil one. A package holding both startup and request work, like `core/i18n` with its locale middleware, stays in scope with its startup functions admitted by name. A request-path helper therefore takes a `context.Context`; a helper with neither a context nor a request is a startup or template site. No request-path writer is left carrying no `request_id`: the audit path was the last but one until #328 gave `AuditLogger.Log` a context, and `commondb`'s transaction and statement records were the last until #386 gave every `Database` method one. Level is not decidable and is pinned per site through `logtest.CaptureSlog(t)`, the one way a test reads records (#320)
 9. **Multi-row writes and list saves**: a request that writes more than one row validates the whole request first, bounds and duplicates included, so a refusal writes nothing; then writes in one `RunInTransaction` whose body reads what it needs on the transaction, returns each failure through `errs.Wrap` and writes no response, since a deadlock victim's body is rerun; then answers, audit events after the commit. A save replacing a whole list is the common case, and there are seven: a client's redirect URIs and web origins, user, group, client and resource permissions, and a user's groups. Each requires the list as its caller loaded it (`expectedRedirectURIs` and its siblings; absent or `null` is a 400, `[]` means an empty list was loaded), reads the stored rows on the transaction, and answers 409 `CONCURRENT_UPDATE` with nothing written when they differ from it as a set; otherwise it applies `replaceSet`'s plan, which deletes every row whose key is not wanted and every extra copy of one that is, so a duplicate left by an overlap is repaired by the next save. A unique-key race answers the same 409, through the one failure writer `writeListSaveFailure`. No list save takes a row lock: overlapping saves merge item by item, and the data tier's `list_save_test.go` shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, decided on and written back with a security consequence, which today means #245's public/confidential switch (`AcquireClientRow`), #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims (`AcquireUserRow`), and #407's settings section saves (`AcquireSettingsRow`), each of which reads the settings row again under it and writes its own section onto what it read, through `apihandlers.saveSettingsSection`, so a save of another section committed meanwhile is not written back over (#428)
 10. **Metric labels**: a metric label takes only values from a closed set declared when its family is registered with `core/metrics`, through `metrics.Enum` (listed in the catalog) or `metrics.Described` (named there in words, for the status codes, the route table or the build stamp), and a value outside the set is recorded as `other`, so no family can exceed the product of its sets whatever the requests. Nothing taken from a request or from the database reaches a label without being mapped into a declared set first: no user id, subject, email, username, session identifier, client identifier, IP address, raw path, query, user agent or error description. `client_identifier` is never a label, because with dynamic client registration on anyone can mint identifiers. The route label is the router's own table read once at startup, `unmatched` for a request no route answered, read through the one function `routePattern` in `core/metrics/http.go`; the method label is a standard verb or `other`; the status label is the exact code. Each server's unit tier holds every family it registers, name, type, labels and value sets, to the catalog table on the docs' Monitoring page through `core/guard.AssertMetricsCatalog`, in both directions, so a new family or label fails until the docs describe it (#400)
+
+## UI conventions
+
+Both servers draw their pages with `ui.css`, Goiabada's design tokens and components, and Tailwind
+utilities for layout (#617). The file is one copy in each application's `web/tailwindcss/`, which
+`TestUICSS_IsTheAuthServersCopy` holds byte-identical; edit one, copy it over the other, and
+regenerate both `main.css`. Every class a page names has a rule in the served
+`main.css` (`core/guard.AssertClassesAreDrawn`), so a misspelt or leftover class fails the unit tier.
+
+- **Themes**: automatic (the settings' empty value: each visitor's device decides), light and
+  dark. The layouts write `data-theme` for light and dark alone. A color is a token, `bg-surface`,
+  `text-ink-muted`, `border-line`, never a raw value, and every pair a component draws text or a
+  boundary on is in `TestThemeContrast_EveryPairMeetsWCAGAA`, at WCAG AA in both themes.
+- **Components**: `page-header` with `page-eyebrow`, `page-title`, `page-lead` and `page-actions`;
+  `panel`, `panel-body` (several, each under a `panel-title`, for a panel in sections),
+  `panel-footer`; `button`, with `-primary` for a form's one main action, `-danger`, `-quiet`,
+  `-sm`, `-icon` and `-block`; `field`, holding `field-label`, a `control`, `field-hint` and
+  `field-error`; `input-row` for a control and the button acting on it; `choice`, `switch`,
+  `option-card`, `check-list` of `check-row`; `detail-list`, a `dl` of a record's facts;
+  `notice` with `-danger`, `-positive`, `-caution` or `-note`; `tag`; `table-scroll` around a
+  `data-table`; `tab-bar` and `tab-item`, one underlined row while the tabs fit and rows of pills
+  where they do not, which `shell.js` decides, so a bar never scrolls sideways; `pager`; `dialog`; `empty-state`; `spinner`;
+  `text-link`. The auth server's card adds `auth-title`, `auth-lead`, `auth-status` with a
+  `status-icon` (`-danger`, `-positive`, `-caution`, `-note`), `auth-actions` for two answers side
+  by side, `auth-steps`, `auth-qr`, `secret-key` with `secret-key-row`, `code-hint`,
+  `auth-address`, `auth-section-title`, `identity-row` and `link-list` of `link-row`; the console's
+  pages without a menu (home, the error pages, sign-out) draw the same card. An uploaded image is an
+  `image-upload` with an `image-preview` (`-square` for a logo), cropped in the `crop_dialog`
+  partial: a `crop-area` the cropper draws in, and `crop-controls` whose `crop-slider`s do what
+  dragging does, so a crop needs neither a pointer nor a drag.
+- **Markup**: `core/guard.AssertWellFormedTemplates` holds every page to well-formed HTML and to
+  the accessibility rules readable from a template: every element closed explicitly and in order,
+  what a branch opens closed in it, quoted attributes, no nesting a browser repairs, a label for
+  every control, alt on every image, a name on every link and button, one `<h1>`, no skipped
+  heading level.
+- **Scripts**: no executable script in a template, no `on…` attribute, no `javascript:` URL. Page
+  behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
+  `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
+  JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`
+  attributes, and text by message ID: through `T`, except the console's `js.*` strings, which carry
+  client-side placeholders and go through `i18n.Raw` in `JSBootstrap`. ES2020 at most, with no build
+  step, for the declared floor: Chrome and Edge 111, Safari 16.4, Firefox 128.
+  `core/guard.AssertScriptSyntax` parses every static script with acorn under Node, both pinned in
+  `versions.yaml`, so each module's unit tier needs `node` on the path, as the dev container and the
+  test jobs have it. The auth server's pages work with JavaScript off; the console says it needs it.
+  In the console a script answers an action in a live region the page draws empty, through
+  `showNotice`, not in a dialog, its failures too (`sendAjaxRequest`'s `statusRegion`); a removal
+  asks first in a `modal_dialog` of type `confirm`, whose
+  second button names the action; a button marked `data-copy-target` copies, a long `select`
+  marked `data-searchable` becomes a `combobox` that filters as the person types, the select kept
+  hidden to post the value, an element marked `data-duration-for` says the seconds typed in a field
+  as a duration, and a form marked `data-confirm-dialog` asks before a save whose consequences need
+  saying, every one in one `modal_dialog` of type `confirm_change`, each from a control marked
+  `data-confirm` against the value stored when the page was drawn (`data-stored-value`,
+  `data-stored-checked`), as `shell.js` wires them; a form a script saves calls `confirmChanges`.
+  A script that shows something following a control's value shows it again on `pageshow`, since a
+  browser restoring the form, as on Back, fires no change, and a script asking the server about a
+  choice drops an answer to any request but its latest, a failure included, through
+  `sendAjaxRequest`'s `current`; one asking the server to validate values applies the values it
+  sent, never the fields as they are when the answer arrives, and drops the answer once the person
+  has typed past them. A row's own action, a removal or an addition saved at once, is a button
+  marked `data-action-url`, which `static/pages/row-actions.js` posts, asking first when the
+  button carries `data-confirm`; a search that finds users to add is `#userSearchForm`, which
+  `static/pages/user-search.js` turns into a search as the person types and never lets submit.
+- **Accessibility**: WCAG 2.2 AA on every page, in every state and both themes. An error is a
+  `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
+  wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon
+  is `aria-hidden="true"`, and a button showing one alone carries `sr-only` text; targets are at
+  least 24 pixels. A refusal about one field marks it `aria-invalid="true"` and names the notice in
+  its `aria-describedby`, under the same `{{if .error}}` the notice renders under, which the guard
+  reads as one branch; a handler whose form has several fields says which in `errorField`, and in
+  the console reads it off the admin API's error code through `render.ErrorField`, or, for the
+  API's `VALIDATION_ERROR`, which names no field, the first required field sent blank through
+  `render.ErrorFieldOrBlank`. No
+  template rebinds `$`, which the guard refuses, since it reads `$` as the data the template was
+  called with.
+- **Page patterns**: every page is one of a few shapes, built the same way each time, and the first
+  page of each shape is its reference. A list (`admin_users.html`): the page header with the main
+  action, a GET search form if the list searches, a `data-table-stack` table whose first cell links
+  to the record and whose last holds the row's other actions as links, a `notice` or `empty-state`
+  for nothing found, and the paginator only past one page. A settings form
+  (`admin_settings_sessions.html`): eyebrow, title and lead, one `panel` holding the notices at its
+  top and the fields in a `form-grid`, each field's help visible under it, and Save in the
+  `panel-footer`; a longer one (`admin_settings_general.html`) in sections, each a `panel-body`
+  under a `panel-title`, and the settings a switch governs hidden while it is off rather than
+  disabled (`admin_settings_email.html`). An action on the whole page that changes what is stored
+  (`admin_settings_keys.html`, Rotate keys) is a form posted from `page-actions`, asked first in a
+  `confirm_change` dialog, which answers with the page again. A choice among a few options (`admin_settings_ui_theme.html`): `option-card`s in
+  a fieldset with a legend; several of many (`consent.html`): a `check-list` of `check-row`s in a
+  fieldset with a legend. A confirmation that deletes or removes says so on its buttons: "Cancel",
+  and the action in `button-danger`. On the auth server, a form (`auth_pwd.html`): the title, an
+  `auth-lead` saying what the page asks when the title does not, the notice at the top of the form,
+  the fields, and one `button-block` primary button; a page that reports (`auth_error.html`): an
+  `auth-status` with a `status-icon` in the outcome's tone, the title and the icon centered, the
+  message left-aligned, an address it names in an `auth-address`, and at most one action, a
+  `button-block`. A list whose rows a person ends or revokes (`account_user_sessions.html`): each
+  row's button asks in a `confirm` dialog with the row's own sentence in `data-confirm`, and on
+  success gives way to a `tag` saying so, which takes its focus unless the person moved it elsewhere
+  meanwhile, while the page's live region says it too; a row added the same way from a search
+  (`admin_groups_members_add.html`) acts at once, with no
+  dialog, since one Remove undoes it. A home of destinations (the console's `index.html`): a `link-list`. A record with tabs
+  (`admin_clients_settings.html`): a header linking back to the list in the eyebrow, the record's
+  identifier as the title, the `tab-bar`, one partial per kind of record (`client_header`,
+  `user_header`, `group_header`, `resource_header`), then each tab one `panel`, its sections `panel-body`s
+  under a `panel-title`, its yes or no settings a `check-list` whose rows say what each does, and
+  Save in the `panel-footer`. A create form (`admin_clients_new.html`): the same back link, title
+  and lead, one `panel`, and Cancel beside the create action. A delete confirmation page
+  (`admin_clients_delete.html`): a lead saying what the deletion takes with it, the record in a
+  `detail-list`, its identifier typed to confirm, and Cancel beside the action in `button-danger`. A
+  list edited in the page and saved whole (`admin_clients_redirect_uris.html`): a field and its Add
+  in an `input-row`, refused at the field, the rows drawn as stored, each with a Remove naming its
+  row, a change announced, and Save sending the list beside the list as drawn; where a row's Edit
+  loads it into those fields (`admin_resources_permissions.html`), the row is marked `data-editing`
+  while the edit lasts, its Edit giving way to a `tag` saying so. A new shape gets its reference page
+  and a line here when its first page is built.
+- **Wording**: the glossary's terms (`site/src/content/docs/concepts/glossary.mdx`): sign in and sign
+  out, client, one-time code, two-factor authentication, auth server. Client and application are one
+  thing with a name per reader. Wherever an administrator or a developer reads, the console's admin
+  pages, the admin API's messages and the docs, it is a client, which is OAuth's word and the API's.
+  Wherever the person signing in reads, the auth server's pages and the console's account pages, it
+  is an application, since that person never registered one; a page quoting such a screen quotes it
+  as it reads. No page calls it both, though a parameter's name, such as `client_id`, stays as it
+  is. On an administrator's page "app" names a kind of software, such as a single-page app or a
+  mobile app, and never a client: a sentence about what uses a client says that ("anything that
+  signs in with this client"). Every sentence is true when it is read, its tense included: a
+  question asked before an action says what will happen ("The key will be deleted"), a notice after
+  it what was done, and help about standing behaviour the present. Sentence case; a
+  button says what it does ("Save", "New user"); a page title reads "Page – app name". Both catalogs
+  change together, a message ID is kept, and a renamed one goes in the release notes, since
+  operators' override catalogs are keyed by it.
 
 ## Standards
 

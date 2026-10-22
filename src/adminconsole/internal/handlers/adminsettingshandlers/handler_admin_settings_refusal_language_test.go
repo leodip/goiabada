@@ -68,8 +68,8 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/settings/email/send-test-email",
 			form:       url.Values{"destinationEmail": {""}},
-			english:    "Destination email is required.",
-			portuguese: "O e-mail de destino é obrigatório.",
+			english:    "Enter the address to send the test email to.",
+			portuguese: "Informe o endereço para onde enviar o e-mail de teste.",
 		},
 		{
 			name:     "a retention that is not a number",
@@ -79,8 +79,8 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 			},
 			target:     "/admin/settings/audit-logs",
 			form:       url.Values{"auditLogRetentionDays": {"ninety"}},
-			english:    "Audit log retention days must be a valid number.",
-			portuguese: "Os dias de retenção de logs de auditoria devem ser um número válido.",
+			english:    "Enter the retention as a whole number of days.",
+			portuguese: "Informe a retenção como um número inteiro de dias.",
 		},
 	}
 

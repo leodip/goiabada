@@ -7,58 +7,64 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// The user permissions page keeps the set of grants it loaded and sends it with every save (#428).
+// The user permissions page draws the grants it loaded as rows, which permission-list.js reads
+// once, as it loads, and sends with every save (#428).
 func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_permissions.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
-		"userPermissions":   map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
-		"resources":         []api.ResourceResponse{},
-		"page":              "",
+		"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"granted": []struct {
+			Id    int64
+			Scope string
+		}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+		"resources":         []render.Choice{},
+		"page":              "2",
 		"query":             "",
 		"savedSuccessfully": false,
 	})
-	assertSendsTheLoadedPermissionIds(t, out)
+
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `data-save-url="/admin/users/5/permissions" data-reload-url="/admin/users/5/permissions?page=2"`)
+	assert.Contains(t, out, `data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"`)
+	assert.NotContains(t, out, "data-owner-key", "the route names the user, so the body does not")
+	assert.Contains(t, out, `src="/static/pages/permission-list.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/permission-list.js", "loadedIds", "grantedIds()")
 }
 
-// The user groups page keeps the ids of the memberships it loaded and sends them with every save,
-// so the auth server can refuse a save from an outdated page rather than undo another
-// administrator's change. The copy is taken after every loaded membership is pushed and never
-// edited, or the page would send its edited set as the loaded one and every save would pass (#428).
+// The user groups page draws the memberships it loaded as rows, which user-groups.js reads once, as
+// it loads, and sends with every save, so the auth server can refuse a save from an outdated page
+// rather than undo another administrator's change (#428).
 func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_groups.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
-		"userGroups":        map[int64]string{3: "admins", 4: "auditors"},
-		"allGroups":         []api.GroupResponse{},
+		"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"memberships": []struct {
+			Id              int64
+			GroupIdentifier string
+		}{{Id: 3, GroupIdentifier: "admins"}, {Id: 4, GroupIdentifier: "auditors"}},
+		"groupChoices":      []render.Choice{{Id: 3, Identifier: "admins", Label: "admins"}},
 		"page":              "",
 		"query":             "",
 		"savedSuccessfully": false,
 	})
 
-	const copyTaken = "const loadedGroupIds = assignedGroups.map(function(assignedGroup) { return parseInt(assignedGroup.id, 10); });"
-	// The template ranges over the map in key order, so auditors (4) is the last loaded push.
-	lastLoaded := strings.Index(out, `"groupIdentifier": "auditors"`)
-	require.NotEqual(t, -1, lastLoaded, "the loaded memberships are pushed into the editable list")
-	require.Less(t, strings.Index(out, `"groupIdentifier": "admins"`), lastLoaded)
-	copyAt := strings.Index(out, copyTaken)
-	require.NotEqual(t, -1, copyAt, "the page keeps the ids of the loaded memberships")
-	assert.Greater(t, copyAt, lastLoaded, "the copy is taken after every loaded membership is in the list")
-	assert.Less(t, copyAt, strings.Index(out, "function btnSaveClick"), "the copy is taken at load, before anything can edit the list")
-
-	assert.Contains(t, out, `"expectedGroupIds": loadedGroupIds`)
-	assert.NotRegexp(t, `loadedGroupIds\.(push|splice|pop|shift|unshift)\(`, out)
-	assert.NotRegexp(t, `loadedGroupIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+	assert.Contains(t, out, `<tr data-id="3">`)
+	assert.Contains(t, out, `<tr data-id="4">`)
+	assert.Contains(t, out, `<a class="text-link" href="/admin/groups/4/settings">auditors</a>`)
+	assert.Contains(t, out, `data-list-key="assignedGroupsIds" data-expected-key="expectedGroupIds"`)
+	assert.Contains(t, out, `src="/static/pages/user-groups.js`)
+	assertListScriptSendsTheLoadedList(t, "pages/user-groups.js", "loadedGroupIds", "memberOf()")
 }
 
-// TestRender_AdminUsersPaginator is the template hop of the paginator swap (#271): the partial is
-// unchanged and now reads a *pagination.Paginator instead of the unmaintained library's value, so
-// what needs proving is that a Go template resolves the replacement's exported fields the way it
-// resolved the library's niladic methods, and that addUrlParam turns them into page links.
+// TestRender_AdminUsersPaginator is the template hop of the paginator (#271): the partial reads a
+// *pagination.Paginator, so what needs proving is that a Go template resolves its exported fields,
+// and that addUrlParam turns them into page links.
 //
 // 73 users at 10 a page on page 4 is 8 pages, which exercises both ends of the bar at once:
 // "1 2 3 [4] 5 6 ...". The lone "1" is decision 3's rule, the one place this change departs from
@@ -73,7 +79,8 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 			Page:     4,
 			PageSize: 10,
 		},
-		"paginator": pagination.New(73, 10, 4, 5),
+		"paginator":     pagination.New(73, 10, 4, 5),
+		"paginatorLink": "/admin/users",
 	})
 
 	// Page 1 is a link, not dots. Reverting the rule renders "..." here instead.
@@ -81,10 +88,9 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	assert.Contains(t, out, `href="/admin/users?page=2"`)
 	assert.Contains(t, out, `href="/admin/users?page=6"`)
 
-	// One set of dots, at the trailing end, standing for pages 7 and 8. btn-disabled is the
-	// partial's ellipsis class and nothing else on this page uses it.
-	assert.Equal(t, 1, strings.Count(out, "btn-disabled"), "expected exactly one ellipsis in the bar")
-	assert.Contains(t, out, ">...</a>")
+	// One set of dots, at the trailing end, standing for pages 7 and 8, hidden from assistive
+	// technology since it is no page.
+	assert.Equal(t, 1, strings.Count(out, `<span class="pager-item" aria-hidden="true">…</span>`), "expected exactly one ellipsis in the bar")
 
 	// Pages 3 and 5 are each a number link and an arrow target, so two occurrences each. That
 	// count is what says Previous and Next resolved at all: a field the template cannot read
@@ -92,12 +98,27 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(out, `href="/admin/users?page=3"`), "page 3 as a number and as the back arrow")
 	assert.Equal(t, 2, strings.Count(out, `href="/admin/users?page=5"`), "page 5 as a number and as the forward arrow")
 
-	// The current page is the active button and carries no link of its own.
-	assert.Contains(t, out, `class="join-item btn btn-sm btn-active">4</a>`)
-	assert.NotContains(t, out, `href="/admin/users?page=4"`)
+	// The current page is marked as such, and is its number's only link.
+	assert.Contains(t, out, `<a class="pager-item" aria-current="page" href="/admin/users?page=4">4</a>`)
+	assert.Equal(t, 1, strings.Count(out, `href="/admin/users?page=4"`))
 
 	// The -1 sentinel must never reach addUrlParam: it means "ellipsis", not a page.
 	assert.NotContains(t, out, "page=-1")
+
+	// A search's pages carry the search as the handler encoded it, a plus-addressed email's "+" as
+	// %2B, so the next page searches for the same address rather than for one with a space in it.
+	searched := renderMenuPage(t, "/admin_users.html", map[string]interface{}{
+		"pageResult": adminuserhandlers.PageResult{
+			Users:    []api.UserResponse{{Id: 1, Username: "ana", Email: "ana+test@example.com"}},
+			Total:    23,
+			Query:    "ana+test@example.com",
+			Page:     1,
+			PageSize: 10,
+		},
+		"paginator":     pagination.New(23, 10, 1, 5),
+		"paginatorLink": "/admin/users?query=ana%2Btest%40example.com",
+	})
+	assert.Contains(t, searched, `href="/admin/users?page=2&amp;query=ana%2Btest%40example.com"`)
 }
 
 // The two admin user pages that read a timestamp and a full name off the bind. Neither was covered
@@ -152,6 +173,31 @@ func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
 	assert.NotContains(t, out, "0001", "an absent timestamp must render as nothing, not as the zero time")
 }
 
+// A refused disable, such as the last administrator's, marks Enabled, the page's one field, and
+// gives it the focus, as every other refused field does, so the keyboard resumes there rather than
+// at the top of the page (#617).
+func TestRender_AdminUserDetailsRefusedFocusesEnabled(t *testing.T) {
+	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"userFullName":      "",
+		"page":              "1",
+		"query":             "",
+		"savedSuccessfully": false,
+		"userCreated":       false,
+		"error":             "The last administrator can't be disabled.",
+	})
+
+	start := strings.Index(out, `id="enabledDisabled"`)
+	require.GreaterOrEqual(t, start, 0, "the Enabled checkbox renders")
+	open := strings.LastIndex(out[:start], "<input")
+	require.GreaterOrEqual(t, open, 0, "as an input")
+	end := strings.Index(out[open:], ">")
+	require.Positive(t, end, "whose tag closes")
+	tag := out[open : open+end]
+	assert.Contains(t, tag, `aria-invalid="true"`)
+	assert.Contains(t, tag, " autofocus")
+}
+
 // The delete confirmation, which is the one page in this change whose output moves for a real
 // user: the memberships row listed "none" for everybody before, and lists what deleting the user
 // will discard now (#350, deferred decision 1).
@@ -177,7 +223,7 @@ func TestRender_AdminUserDelete(t *testing.T) {
 	assert.NotContains(t, out, "Jan 2026", "an English month name is what the old layout produced")
 	assert.Contains(t, out, "admins", "the memberships the deletion discards have to be on the page")
 	assert.Contains(t, out, "site-viewers")
-	assert.NotContains(t, out, "(nenhum)", "with two groups listed, the none arm must not also render")
+	assert.NotContains(t, out, ">Nenhum<", "with two groups listed, the none arm must not also render")
 }
 
 // The none arm, which is what every user saw before the fix and what a user in no groups sees now.
@@ -191,5 +237,5 @@ func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 	})
 
 	assert.Contains(t, out, "jane@example.com")
-	assert.Contains(t, out, "(nenhum)", "a user in no groups still gets the row's none arm")
+	assert.Contains(t, out, ">Nenhum</span>", "a user in no groups still gets the row's none arm")
 }

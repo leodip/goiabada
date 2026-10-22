@@ -2,7 +2,6 @@ package adminsettingshandlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,12 +9,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
-	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -41,119 +40,70 @@ func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
 	panic("unexpected call to DeleteSettingsKey")
 }
 
-// TestHandleKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between
-// the rotate handler and HandleAPIErrorJSON. The helper's own forwarding is pinned in
-// render's api_error_helper_test.go, but that test cannot see which of the two error paths
-// this handler calls: swapping HandleAPIErrorJSON back to a direct JSONError leaves the
-// helper's tests and the whole admin console suite green while putting the 409 back behind
-// "An unexpected server error has occurred" and a request id.
-//
-// That sentence is the entire point of the change. The auth server answers 409
-// ROTATION_IN_PROGRESS when another rotation won the race, which is a fact about the
-// administrator's own request and something they can act on, and the modal that
-// sendAjaxRequest opens shows error_description verbatim (#251).
-//
-// The rows for the other statuses are what keeps the forwarding narrow: a genuine server
-// fault must stay a generic 500 with its detail in the log rather than on the screen.
-func TestHandleKeysRotatePost_APIErrorReachesTheBrowser(t *testing.T) {
-
+// A refused rotation answers with the keys page again, beside the API's sentence. The auth server
+// answers 409 ROTATION_IN_PROGRESS when another rotation won the race, which is a fact about the
+// administrator's own request and something they can act on, so its sentence is what the page says
+// (#251). A genuine server fault stays the error page, its detail in the log rather than on the
+// screen.
+func TestHandleKeysRotatePost_ARefusalRedrawsThePageWithItsSentence(t *testing.T) {
 	const refusal = "Another key rotation is in progress"
+	for _, apiErr := range []error{
+		&apiclient.APIError{Code: "ROTATION_IN_PROGRESS", Message: refusal, StatusCode: http.StatusConflict},
+		&apiclient.APIError{Code: "handler.settings_keys.rotation_in_progress", Message: refusal, StatusCode: http.StatusBadRequest},
+	} {
+		httpHelper := handlersmocks.NewHttpHelper(t)
+		handlertest.RefuseInternalServerError(t, httpHelper)
+		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_keys.html").Once()
+		keys := []api.SettingsSigningKeyResponse{{Id: 1, State: "current", KeyIdentifier: "key-1"}}
 
-	const generic = "An unexpected server error has occurred"
+		req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
+		rec := httptest.NewRecorder()
+		HandleKeysRotatePost(httpHelper, newSettingsTestStore(), &stubApiClient{rotateErr: apiErr, keys: keys}, consoleBaseURL).ServeHTTP(rec, req)
 
-	testCases := []struct {
-		name            string
-		apiErr          error
-		wantStatus      int
-		wantError       string
-		wantDescription string
-	}{
-		{
-			name:            "a 409 is forwarded with its status and description",
-			apiErr:          &apiclient.APIError{Code: "ROTATION_IN_PROGRESS", Message: refusal, StatusCode: http.StatusConflict},
-			wantStatus:      http.StatusConflict,
-			wantError:       "ROTATION_IN_PROGRESS",
-			wantDescription: refusal,
-		},
-		{
-			name:            "a 400 is forwarded too, which is what #122 established",
-			apiErr:          &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "bad request", StatusCode: http.StatusBadRequest},
-			wantStatus:      http.StatusBadRequest,
-			wantError:       "VALIDATION_ERROR",
-			wantDescription: "bad request",
-		},
-		{
-			name:            "an incomplete key set stays generic, since 500 is not the administrator's mistake",
-			apiErr:          &apiclient.APIError{Code: "KEY_SET_INCOMPLETE", Message: "Expected current and next keys to exist", StatusCode: http.StatusInternalServerError},
-			wantStatus:      http.StatusInternalServerError,
-			wantError:       "server_error",
-			wantDescription: generic,
-		},
-		{
-			name:            "a transport error stays generic",
-			apiErr:          errors.New("connection refused"),
-			wantStatus:      http.StatusInternalServerError,
-			wantError:       "server_error",
-			wantDescription: generic,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-
-			// templateFS is nil because JSONError renders no template. This is the real
-			// helper rather than a mock so the assertions below are on the bytes the
-			// browser receives.
-			httpHelper := render.New(nil)
-
-			req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
-				handlertest.WithAccessToken(),
-			)
-
-			rec := httptest.NewRecorder()
-
-			handler := HandleKeysRotatePost(httpHelper, &stubApiClient{rotateErr: tc.apiErr})
-			handler.ServeHTTP(rec, req)
-
-			assert.Equal(t, tc.wantStatus, rec.Code)
-
-			var response map[string]string
-			err := json.Unmarshal(rec.Body.Bytes(), &response)
-			require.NoError(t, err)
-
-			assert.Equal(t, tc.wantError, response["error"])
-			assert.Contains(t, response["error_description"], tc.wantDescription)
-
-			if tc.wantStatus == http.StatusInternalServerError {
-				// The generic branch must not leak the API's message either: that is
-				// what sends it to the log rather than the screen.
-				assert.NotContains(t, response["error_description"], tc.apiErr.Error())
-			}
-		})
+		bind := handlertest.Bind(t, httpHelper)
+		assert.Equal(t, refusal, bind["error"])
+		require.Len(t, bind["keys"], 1, "the keys are drawn beside the refusal")
 	}
 }
 
-// TestHandleKeysRotatePost_SuccessIsUnchanged is here so that routing the
-// failure path through a different helper cannot alter what a successful rotation answers.
-func TestHandleKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
+func TestHandleKeysRotatePost_AServerFaultIsTheErrorPage(t *testing.T) {
+	for _, apiErr := range []error{
+		&apiclient.APIError{Code: "KEY_SET_INCOMPLETE", Message: "Expected current and next keys to exist", StatusCode: http.StatusInternalServerError},
+		errors.New("connection refused"),
+	} {
+		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
-	httpHelper := render.New(nil)
+		req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
+		HandleKeysRotatePost(httpHelper, newSettingsTestStore(), &stubApiClient{rotateErr: apiErr}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+
+		httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	}
+}
+
+// A rotation answers with a redirect to the keys page, which says once that the keys rotated.
+func TestHandleKeysRotatePost_ARotationRedirectsToThePageThatSaysSo(t *testing.T) {
+	store := newSettingsTestStore()
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
-
 	rec := httptest.NewRecorder()
+	HandleKeysRotatePost(httpHelper, store, &stubApiClient{}, consoleBaseURL).ServeHTTP(rec, req)
 
-	handler := HandleKeysRotatePost(httpHelper, &stubApiClient{rotateErr: nil})
-	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, consoleBaseURL+"/admin/settings/keys", rec.Header().Get("Location"))
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-
-	var response struct {
-		Success bool
+	for _, want := range []bool{true, false} {
+		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_keys.html").Once()
+		get := handlertest.Request(http.MethodGet, "/admin/settings/keys", handlertest.WithAccessToken())
+		for _, cookie := range rec.Result().Cookies() {
+			get.AddCookie(cookie)
+		}
+		HandleKeysGet(httpHelper, store, &stubApiClient{}).ServeHTTP(httptest.NewRecorder(), get)
+		assert.Equal(t, want, handlertest.Bind(t, httpHelper)["keysRotated"], "said once, then no more")
+		httpHelper.Calls = nil
 	}
-	err := json.Unmarshal(rec.Body.Bytes(), &response)
-	require.NoError(t, err)
-	assert.True(t, response.Success)
 }
 
 // TestHandleKeysGet_RendersTheApiOrder owns the console half of the claim that freed
@@ -225,7 +175,7 @@ func TestHandleKeysGet_RendersTheApiOrder(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/settings/keys",
 				handlertest.WithAccessToken())
 
-			handler := HandleKeysGet(httpHelper, &stubApiClient{keys: apiKeys})
+			handler := HandleKeysGet(httpHelper, newSettingsTestStore(), &stubApiClient{keys: apiKeys})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			bind := handlertest.Bind(t, httpHelper, "for %v", tc.given)
