@@ -42,8 +42,8 @@ type signInRefusal struct {
 // 500s are what the auth server answered, which someone must fix, and point at the log. The two
 // 500s that concern the tokens share one message on purpose: those are the refusals an attacker is
 // likeliest to be reading, and naming the check that stopped them would tell them which one to
-// work on. The 405 is the one a browser that reaches the callback by GET gets, which carries no
-// authorization response at all.
+// work on. The 405 is the one a request by any method but POST gets, a browser's GET above all,
+// which carries no authorization response at all.
 var (
 	refusalSession = signInRefusal{http.StatusBadRequest,
 		"adminconsole.sign_in_error.session.title", "adminconsole.sign_in_error.session.body"}
@@ -136,8 +136,9 @@ func HandleAuthCallbackPost(
 		// r.PostFormValue rather than r.FormValue here and for code, error and error_description
 		// below. auth_helper.go asks the authorization endpoint for response_mode=form_post
 		// precisely so all four arrive in a request body, on success and on failure alike, and
-		// only the POST reaches this handler: a browser that arrives by GET is answered by
-		// HandleAuthCallbackGet's error page, before any of the four are read (#632 item 3).
+		// only the POST reaches this handler: a browser that arrives by GET, or a request by any
+		// other method, is answered by HandleAuthCallbackWrongMethod's error page, before any of
+		// the four are read (#632 item 3).
 		// r.Form would have merged the URL query behind that body, which meant
 		// POST /auth/callback?code=... was accepted and undid the exact leak form_post was chosen
 		// to prevent: an authorization code in the request target reaches the browser's history,
@@ -241,18 +242,21 @@ func HandleAuthCallbackPost(
 	}
 }
 
-// HandleAuthCallbackGet answers a browser that reaches the callback by GET: a bookmark, the
-// history, a pasted address. Nothing a person opens on their own carries an authorization
-// response -- the callback is where the auth server form_posts one -- so the route used to answer
-// with chi's bare 405, an empty body that left a blank page with nothing to do next (#632 item 3).
-// The sign-in error page is drawn instead, at the same honest status and with the same Allow
-// header: the method is still wrong, only the body no longer is. No session is read and nothing is
-// logged beyond the refusal itself, because there is no sign-in here to say anything about.
-func HandleAuthCallbackGet(httpHelper HttpHelper) http.HandlerFunc {
+// HandleAuthCallbackWrongMethod answers every method but POST at the callback, above all a browser
+// that reaches it by GET: a bookmark, the history, a pasted address. Nothing a person opens on their
+// own carries an authorization response -- the callback is where the auth server form_posts one --
+// so the route used to answer with chi's bare 405, an empty body that left a blank page with nothing
+// to do next (#632 item 3). The sign-in error page is drawn instead, at the same honest status and
+// with the same Allow header: the method is still wrong, only the body no longer is. The route
+// hands this handler every method but POST, rather than chi answering the others, because chi's own
+// 405 would name every method registered on the path in Allow, GET among them, though GET is
+// refused too (RFC 9110 section 15.5.6). No session is read and nothing is logged beyond the
+// refusal itself, because there is no sign-in here to say anything about.
+func HandleAuthCallbackWrongMethod(httpHelper HttpHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", http.MethodPost)
 		refuseSignIn(httpHelper, w, r, refusalWrongMethod,
-			errs.New("the callback was reached by GET, which carries no authorization response"))
+			errs.Errorf("the callback was reached by %s, which carries no authorization response", r.Method))
 	}
 }
 

@@ -47,8 +47,8 @@ import (
 // server's must not carry "state", because handler_authorize.go reads .FormValue("state") at two
 // sites and OIDC Core 3.1.2.1 requires the authorization endpoint to accept GET as well as POST, so
 // there the name has a lawful query source; the admin console's carries it because it has no such
-// endpoint and those names reach it only at /auth/callback, which is registered POST-only and
-// arranged with response_mode=form_post precisely so they arrive in a body (#202).
+// endpoint and those names reach it only at /auth/callback, which reads them only from a POST and
+// is arranged with response_mode=form_post precisely so they arrive in a body (#202).
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes and
 // relative to it ("authserver/internal"). Every directory named is also a coverage floor: it must

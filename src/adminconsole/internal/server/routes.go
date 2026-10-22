@@ -97,11 +97,21 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	// Auth routes
 	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
-		// A browser that reaches the callback by GET -- a bookmark, the history, a pasted address --
-		// gets the sign-in error page at the 405 it arrives with, rather than the empty body the
-		// POST-only registration answered every other method with (#632 item 3).
-		r.Get("/callback", handlers.HandleAuthCallbackGet(httpHelper))
-		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient))
+		// The callback is registered for every method and dispatched here, so that chi never writes
+		// its own 405 on this path, which would name GET in Allow beside POST once a GET route
+		// existed. A browser that reaches the callback by GET -- a bookmark, the history, a pasted
+		// address -- and a request by any other method but POST get the sign-in error page at 405
+		// with Allow: POST, rather than the empty body the POST-only registration answered them
+		// with (#632 item 3).
+		callbackPost := handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenClient)
+		callbackWrongMethod := handlers.HandleAuthCallbackWrongMethod(httpHelper)
+		r.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodPost {
+				callbackPost(w, req)
+				return
+			}
+			callbackWrongMethod(w, req)
+		})
 		// The confirmation page is the GET the menu's link arrives at; the issuer-change redirect
 		// arrives with its tokens already cleared and is sent home. The POST answers the page,
 		// and the sessions pages' script submits it directly, and it is the only one of the two
