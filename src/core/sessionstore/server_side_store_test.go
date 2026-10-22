@@ -1335,6 +1335,135 @@ func TestServerSideStore_GetIsMemoisedPerRequest(t *testing.T) {
 	})
 }
 
+// contextRecordingBackend is the fake backend recording the context of every load, so a case
+// can read what the store handed the backend.
+type contextRecordingBackend struct {
+	*fakeBackend
+	loadContexts []context.Context
+}
+
+func (b *contextRecordingBackend) Load(ctx context.Context, id string) (*Record, error) {
+	b.loadContexts = append(b.loadContexts, ctx)
+	return b.fakeBackend.Load(ctx, id)
+}
+
+type getFreshTestKey struct{}
+
+// TestServerSideStore_GetFreshReadsPastTheRequestsMemo is the read the admin console's refresh
+// makes under its lock (#621): the session as stored now, which another request may have written
+// since this one's Get, without disturbing the memo that request's later Save writes from.
+func TestServerSideStore_GetFreshReadsPastTheRequestsMemo(t *testing.T) {
+	t.Run("it sees another request's write and leaves the memo as it was", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+
+		req := requestWith(cookie)
+		memo, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+
+		other := requestWith(cookie)
+		written, err := store.Get(other, storeTestName)
+		require.NoError(t, err)
+		written.Values["greeting"] = "written since"
+		require.NoError(t, store.Save(other, httptest.NewRecorder(), written))
+
+		fresh, err := store.GetFresh(req, storeTestName)
+		require.NoError(t, err)
+		assert.Equal(t, "written since", fresh.Values["greeting"], "the row as stored now")
+		assert.NotSame(t, memo, fresh)
+		assert.Equal(t, memo.ID, fresh.ID)
+		assert.False(t, fresh.IsNew)
+
+		again, err := store.Get(req, storeTestName)
+		require.NoError(t, err)
+		assert.Same(t, memo, again, "the memo is neither replaced")
+		assert.Equal(t, "hello", again.Values["greeting"], "nor written through")
+	})
+
+	t.Run("it never writes, not even a touch", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+		id := decodeCookieId(t, store, cookie)
+		backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
+		backend.loads, backend.touches, backend.updates, backend.creates = 0, 0, 0, 0
+
+		fresh, err := store.GetFresh(requestWith(cookie), storeTestName)
+		require.NoError(t, err)
+		assert.Equal(t, "hello", fresh.Values["greeting"])
+		assert.Equal(t, 1, backend.loads)
+		assert.Zero(t, backend.touches, "a stale row is not touched")
+		assert.Zero(t, backend.updates)
+		assert.Zero(t, backend.creates)
+	})
+
+	t.Run("each call is a load of its own", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+		backend.loads = 0
+
+		req := requestWith(cookie)
+		_, err := store.GetFresh(req, storeTestName)
+		require.NoError(t, err)
+		_, err = store.GetFresh(req, storeTestName)
+		require.NoError(t, err)
+		_, err = store.Get(req, storeTestName)
+		require.NoError(t, err)
+		assert.Equal(t, 3, backend.loads, "nothing GetFresh read answers a later call")
+	})
+
+	t.Run("a lookup that failed is the error, beside a non-nil session", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+		backend.loadErr = errors.New("the database is unreachable")
+
+		fresh, err := store.GetFresh(requestWith(cookie), storeTestName)
+		require.Error(t, err, "never a fresh session on its own (#266)")
+		assert.Contains(t, err.Error(), "the database is unreachable")
+		require.NotNil(t, fresh)
+		assert.Empty(t, fresh.Values)
+	})
+
+	t.Run("a row gone and no cookie are a fresh session", func(t *testing.T) {
+		backend := newFakeBackend()
+		store := newTestStore(backend, false)
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+		delete(backend.rows, decodeCookieId(t, store, cookie))
+
+		gone, err := store.GetFresh(requestWith(cookie), storeTestName)
+		require.NoError(t, err)
+		assert.True(t, gone.IsNew)
+		assert.Empty(t, gone.Values)
+
+		none, err := store.GetFresh(httptest.NewRequest("GET", "/", nil), storeTestName)
+		require.NoError(t, err)
+		assert.True(t, none.IsNew)
+		assert.Empty(t, none.Values)
+	})
+
+	t.Run("the load runs on the request's context", func(t *testing.T) {
+		backend := &contextRecordingBackend{fakeBackend: newFakeBackend()}
+		store := newTestStore(backend, false)
+		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
+
+		deadline := time.Now().Add(time.Minute)
+		ctx, cancel := context.WithDeadline(context.WithValue(context.Background(), getFreshTestKey{}, "the-value"), deadline)
+		defer cancel()
+		_, err := store.GetFresh(requestWith(cookie).WithContext(ctx), storeTestName)
+		require.NoError(t, err)
+
+		require.Len(t, backend.loadContexts, 1)
+		loaded := backend.loadContexts[0]
+		assert.Equal(t, "the-value", loaded.Value(getFreshTestKey{}), "keeping the request's values")
+		got, ok := loaded.Deadline()
+		require.True(t, ok, "and its deadline")
+		assert.True(t, deadline.Equal(got))
+	})
+}
+
 // --- flashes (decision 4) -------------------------------------------------------------
 
 // TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce is the flash pair through the
