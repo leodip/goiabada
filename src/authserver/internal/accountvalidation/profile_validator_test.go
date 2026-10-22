@@ -495,6 +495,21 @@ func TestValidateProfile_Nickname(t *testing.T) {
 		{"empty is allowed", "", ""},
 		{"a control character: a tab", "ni	ck", i18n.ErrCodeProfileNicknameInvalid},
 		{"a control character: a line break", "ni\nck", i18n.ErrCodeProfileNicknameInvalid},
+		// A line or paragraph separator is a mandatory break too, which browsers honour.
+		{"a line separator", "Amazing\u2028Grace", i18n.ErrCodeProfileNicknameInvalid},
+		{"a paragraph separator", "Amazing\u2029Grace", i18n.ErrCodeProfileNicknameInvalid},
+		// A bidi embedding, override or isolate makes the claim display reordered in a
+		// relying party: "\u202Enimda" shows as "admin".
+		{"a right-to-left override", "\u202Enimda", i18n.ErrCodeProfileNicknameInvalid},
+		{"a left-to-right embedding", "\u202Aab", i18n.ErrCodeProfileNicknameInvalid},
+		{"a pop directional formatting", "ab\u202C", i18n.ErrCodeProfileNicknameInvalid},
+		{"a left-to-right isolate", "\u2066ab", i18n.ErrCodeProfileNicknameInvalid},
+		{"a pop directional isolate", "ab\u2069", i18n.ErrCodeProfileNicknameInvalid},
+		// The other format characters stay accepted: a joiner builds an emoji sequence and
+		// writes some scripts, and a direction mark fixes the order a typed name shows in.
+		{"a zero-width joiner in an emoji sequence", "👩\u200D💻", ""},
+		{"a zero-width non-joiner", "می\u200Cخواهم", ""},
+		{"a right-to-left mark", "Grace\u200F", ""},
 		// Decision 3 of #275: with the username's pattern gone, the angle-bracket
 		// rule is the only guard against markup here once nothing sanitizes.
 		{"pins decision 3 of #275: no less-than", "ni<ck", i18n.ErrCodeProfileNicknameAngleBrackets},
