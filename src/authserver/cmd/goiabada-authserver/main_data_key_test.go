@@ -39,3 +39,25 @@ func TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart(t *testing.T) {
 	code, records = runMainSignalledAt(t, path, "starting the http listener")
 	require.Equalf(t, 0, code, "the key the database was set up with still starts it\n%s", dump(records))
 }
+
+// TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase is the refusal of the data key the
+// Compose samples published (#501) at the process: a start under it exits 1 under a headline that
+// names it, with the refusal's remedy in the record's error, and before the database is opened, so
+// nothing is sealed under a key anyone can read.
+func TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "k.db")
+
+	published := append(append([]string{}, singleStepEnv...),
+		"GOIABADA_AES_ENCRYPTION_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+	code, records := runMainSignalledAtWith(t, path, "", published)
+
+	require.Equalf(t, 1, code, "the published key stops the start\n%s", dump(records))
+	refusal := recordNamed(records, "the data encryption key is missing, malformed or the published sample key, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it")
+	require.NotNilf(t, refusal, "the refusal is its own record\n%s", dump(records))
+	assert.Equal(t, "ERROR", refusal["level"])
+	assert.Contains(t, refusal["error"], "GOIABADA_AES_ENCRYPTION_KEY is the sample key this repository published")
+	assert.Contains(t, refusal["error"], "https://goiabada.dev/deploy/rotate-secrets/#the-aes-key")
+	assert.Equal(t, "openssl rand -hex 32", refusal["generate_with"])
+	assert.NoFileExists(t, path, "no database was opened")
+	assert.NotContains(t, messagesOf(records), "starting the http listener", "and it never listens")
+}
