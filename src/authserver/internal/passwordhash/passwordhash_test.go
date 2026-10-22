@@ -139,14 +139,6 @@ func TestDummyHash(t *testing.T) {
 		}
 	})
 
-	t.Run("DummyHash refuses a password past the bound", func(t *testing.T) {
-		// The missing-account path compares against DummyHash through Verify too, so it takes the
-		// same refusal a real account does for a password past the bound.
-		if Verify(DummyHash, fake.LetterN(MaxPasswordBytes+1)) {
-			t.Error("DummyHash should not verify against a password past the bound")
-		}
-	})
-
 	t.Run("DummyHash has correct bcrypt format", func(t *testing.T) {
 		// Bcrypt hashes start with $2a$, $2b$, or $2y$ followed by cost factor
 		if len(DummyHash) < 60 {

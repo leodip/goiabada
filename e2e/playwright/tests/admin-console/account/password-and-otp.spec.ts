@@ -80,7 +80,7 @@ test("a password of bcrypt's whole bound, 72 bytes, is set and signs in, and not
   await again.context.close();
 });
 
-test("the user enrols an authenticator, is asked for its code at sign-in, and turns it off",async ({ page, browser, users }) => {
+test("the user enrols an authenticator, is asked for its code at sign-in, and turns it off", async ({ page, browser, users }) => {
   const user = await users.create();
   const own = await signInToConsole(browser, user, "/account/otp");
   await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();
