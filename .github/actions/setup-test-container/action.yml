@@ -1,7 +1,7 @@
 # Shared setup for the container-based test jobs in check.yml.
 #
 # The golang:*-bookworm image is close to what run-tests.sh needs but not
-# identical, and seven jobs need the same three steps. Debian rather than
+# identical, and seven jobs need the same four steps. Debian rather than
 # alpine, because GitHub injects a glibc-linked Node.js runtime into container
 # jobs to execute actions, which does not run on musl.
 
@@ -16,6 +16,15 @@ inputs:
 runs:
   using: composite
   steps:
+    # The checkout belongs to the runner's user and this image runs as root, so
+    # git refuses it as dubious ownership. actions/checkout marks it safe only
+    # under a temporary HOME the later steps never see. The literal-secret guard
+    # lists the tracked files with git ls-files, and in CI a git that cannot
+    # answer stops it (#501).
+    - name: Mark the checkout safe for git
+      shell: bash
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
     # net-tools supplies netstat, which run-tests.sh's kill_processes_on_ports
     # uses. Without it that function silently finds nothing rather than
     # failing, so a stale listener would go unnoticed.
