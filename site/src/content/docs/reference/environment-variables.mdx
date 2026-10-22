@@ -175,6 +175,7 @@ The auth server limits these endpoints. The limits counted by a user or an email
 | `POST /account/register` (self-registration)<br/>Limiter: `register_email` | 5 per 5 minutes | every request | email | always |
 | `POST /account/register`<br/>Limiter: `register` | 20 per 5 minutes | every request | IP address | switch on |
 | `GET /account/activate` and `POST /account/activate`<br/>Limiter: `activate` | 30 per 5 minutes, for the two together | every request | IP address | switch on |
+| `GET /auth/authorize` and `POST /auth/authorize`<br/>Limiter: `authorize` | 120 per minute, for the two together | every request | IP address | switch on |
 | `POST /connect/register` (dynamic client registration)<br/>Limiter: `dcr` | 10 per minute | every request | IP address | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account_net` | 10 per 15 minutes | failed sign-ins | IP address and username, shared with `POST /auth/pwd` | switch on |
 | `POST /auth/token` with `grant_type=password`<br/>Limiter: `pwd_account` | 100 per 60 minutes | failed sign-ins | username, shared with `POST /auth/pwd` | always |
