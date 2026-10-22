@@ -257,6 +257,9 @@ func TestReadRecoverCommand_ReadsThePasswordFromStdin(t *testing.T) {
 		{"a line", "Aa$$1 23456!`x`\\\nthe next line is not read\n", "Aa$$1 23456!`x`\\"},
 		{"a line ended by CRLF", "alongenoughpassword\r\n", "alongenoughpassword"},
 		{"no line ending", "alongenoughpassword", "alongenoughpassword"},
+		// Sign-in compares the password untrimmed, so a trimmed one could never be signed in with.
+		{"spaces and tabs at either end", " \tLong Passw0rd!\t \n", " \tLong Passw0rd!\t "},
+		{"spaces and tabs at either end, CRLF", " \tLong Passw0rd!\t \r\n", " \tLong Passw0rd!\t "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
