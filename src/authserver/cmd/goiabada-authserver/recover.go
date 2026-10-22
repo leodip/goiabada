@@ -37,7 +37,8 @@ own flag, applied only as asked, and at least one is required:
                          and the process list see it
   --remove-otp           remove the user's OTP authenticator
 
-A new password is held to the stored password policy, and an empty one is refused.
+A new password is held to the stored password policy, and one that is empty, or holds only
+whitespace, is refused.
 
 Whatever is asked, the user's sessions end and their authentication generation advances, so
 nothing signed in before the recovery survives it. An unknown or disabled user is refused, and so

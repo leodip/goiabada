@@ -131,8 +131,8 @@ When none of these is left, the auth server's `recover` subcommand restores sign
 |---|---|
 | `--email <address>` | Names the user to recover, by their stored address. Required. |
 | `--grant-manage` | Grants the `authserver:manage` permission |
-| `--password-stdin` | Sets a new password, read from the first line of the command's input and held to the stored password policy. An empty line is refused. |
-| `--password <password>` | Sets a new password given on the command line, held to the same policy. Use `--password-stdin` instead, as below. |
+| `--password-stdin` | Sets a new password, read from the first line of the command's input and held to the stored password policy. A line that is empty, or holds only whitespace, is refused. |
+| `--password <password>` | Sets a new password given on the command line, held to the same policy, and refused when it is empty or holds only whitespace. Use `--password-stdin` instead, as below. |
 | `--remove-otp` | Removes the user's OTP authenticator |
 
 One command can ask for several actions, each only as asked, and at least one is required. In each deployment shape, type the new password at the first line, where nothing you type is shown, and the second hands it to the command's input. `printf` is built into the shell, so the password never appears in a command line:
