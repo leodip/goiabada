@@ -35,10 +35,10 @@ import (
 // brackets.
 //
 // The env files are every `.env`, `.env.<anything>` and `<name>.env`, since Compose reads a
-// directory's .env on its own and `env_file:` names any of them. One that a .gitignore in its own
-// directory ignores is not read at all: generate-env.sh writes src/.devcontainer/.env with the dev
-// stack's real values, and the e2e suite and the docs site keep local ones the same way, none of
-// them the repository's.
+// directory's .env on its own and `env_file:` names any of them. One that the repository's
+// .gitignore files ignore, read as git reads them from the walk's root down, is not read at all:
+// generate-env.sh writes src/.devcontainer/.env with the dev stack's real values, and the e2e
+// suite and the docs site keep local ones the same way, none of them the repository's.
 //
 // Separately, the published data key and the three published passwords are reported in any text
 // file outside the few that name them to refuse them (publishedValueOwners), whatever its kind.
@@ -202,7 +202,7 @@ func findLiteralStackSecrets(root string) ([]string, int, error) {
 			return nil
 		}
 		if isEnvFile(d.Name()) {
-			ignored, ignoreErr := gitignoredBeside(filepath.Dir(p), d.Name())
+			ignored, ignoreErr := gitignored(root, rel)
 			if ignoreErr != nil {
 				return ignoreErr
 			}
@@ -236,28 +236,86 @@ func isEnvFile(base string) bool {
 		strings.HasSuffix(base, ".env.example")
 }
 
-// gitignoredBeside reports whether the .gitignore in dir, if there is one, ignores the file named
-// base there: by a pattern matching the name as git matches it, a leading slash anchoring it to the
-// directory, the last matching line deciding, so `!.env.example` after `.env*` keeps the example
-// read. A pattern naming a subdirectory, and a comment, match no name here.
-func gitignoredBeside(dir, base string) (bool, error) {
-	content, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+// gitignored reports whether the .gitignore files from root down to the file at rel, a path
+// relative to root, ignore it as git would: each directory's patterns read against the path below
+// that directory, a deeper file's match overriding a parent's and, within a file, the last matching
+// line deciding, so `!.env.example` after `.env*` keeps the example read. A file whose directory, or
+// one above it, is ignored is ignored too, since git does not look inside it. A .gitignore that
+// cannot be read is an error, never a pass.
+func gitignored(root, rel string) (bool, error) {
+	components := strings.Split(rel, "/")
+	for i := 1; i < len(components); i++ {
+		ignored, err := ignoredBelow(root, components[:i], true)
+		if err != nil || ignored {
+			return ignored, err
+		}
 	}
-	if err != nil {
-		return false, err
-	}
+	return ignoredBelow(root, components, false)
+}
+
+// ignoredBelow is the verdict of the .gitignore files in root and in each directory above the path
+// whose components are given, on that path alone.
+func ignoredBelow(root string, components []string, isDir bool) (bool, error) {
 	ignored := false
-	for _, line := range strings.Split(string(content), "\n") {
-		pattern := strings.TrimSpace(line)
-		negated := strings.HasPrefix(pattern, "!")
-		pattern = strings.TrimPrefix(strings.TrimPrefix(pattern, "!"), "/")
-		if matched, matchErr := path.Match(pattern, base); matchErr == nil && matched {
-			ignored = !negated
+	for depth := 0; depth < len(components); depth++ {
+		content, err := os.ReadFile(filepath.Join(root, filepath.Join(components[:depth]...), ".gitignore"))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		for _, line := range strings.Split(string(content), "\n") {
+			pattern := strings.TrimSpace(line)
+			if pattern == "" || strings.HasPrefix(pattern, "#") {
+				continue
+			}
+			negated := strings.HasPrefix(pattern, "!")
+			if gitignorePatternMatches(strings.TrimPrefix(pattern, "!"), components[depth:], isDir) {
+				ignored = !negated
+			}
 		}
 	}
 	return ignored, nil
+}
+
+// gitignorePatternMatches reports whether one .gitignore pattern matches the path, given by its
+// components below the .gitignore's directory. A trailing slash matches a directory alone. A
+// pattern with no other slash matches the name at any depth; one with a slash, a leading one
+// stripped, is anchored to the .gitignore's directory, and `**` in it stands for any number of
+// directories, `**/` in front for any depth.
+func gitignorePatternMatches(pattern string, components []string, isDir bool) bool {
+	if strings.HasSuffix(pattern, "/") {
+		if !isDir {
+			return false
+		}
+		pattern = strings.TrimSuffix(pattern, "/")
+	}
+	if !strings.Contains(pattern, "/") {
+		pattern = "**/" + pattern
+	}
+	return componentsMatch(strings.Split(strings.TrimPrefix(pattern, "/"), "/"), components)
+}
+
+// componentsMatch matches a pattern's components against a path's, one name each, `**` taking any
+// number of them.
+func componentsMatch(pattern, components []string) bool {
+	if len(pattern) == 0 {
+		return len(components) == 0
+	}
+	if pattern[0] == "**" {
+		for skip := 0; skip <= len(components); skip++ {
+			if componentsMatch(pattern[1:], components[skip:]) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(components) == 0 {
+		return false
+	}
+	matched, err := path.Match(pattern[0], components[0])
+	return err == nil && matched && componentsMatch(pattern[1:], components[1:])
 }
 
 // publishedValuesIn reports each line of content spelling a published value.

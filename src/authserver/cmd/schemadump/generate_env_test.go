@@ -205,3 +205,89 @@ func TestGenerateEnv_ACRLFEnvIsReadAsComposeReadsIt(t *testing.T) {
 	assert.Regexp(t, generatedValue["MSSQL_SA_PASSWORD"], values["MSSQL_SA_PASSWORD"])
 	assertEnvMode(t, dir)
 }
+
+// TestGenerateEnv_AColonAssignmentIsAValue: Compose also reads `NAME: value`, so such a line is
+// kept beside a spaced `=` one, with nothing appended to override it, while an empty `NAME:` is no
+// value and is dropped and drawn.
+func TestGenerateEnv_AColonAssignmentIsAValue(t *testing.T) {
+	dir := generateEnvIn(t, []byte("GOIABADA_AES_ENCRYPTION_KEY = kept-spaced\n"+
+		"MYSQL_ROOT_PASSWORD: kept-colon\n"+
+		"POSTGRES_PASSWORD:\n"+
+		"MSSQL_SA_PASSWORD=s\n"))
+
+	content := string(runGenerateEnv(t, dir))
+
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	require.Len(t, lines, 4, content)
+	assert.Equal(t, "GOIABADA_AES_ENCRYPTION_KEY = kept-spaced", lines[0])
+	assert.Equal(t, "MYSQL_ROOT_PASSWORD: kept-colon", lines[1])
+	assert.Equal(t, "MSSQL_SA_PASSWORD=s", lines[2])
+	_, values := envValues([]byte(lines[3]))
+	assert.Regexp(t, generatedValue["POSTGRES_PASSWORD"], values["POSTGRES_PASSWORD"])
+	assertEnvMode(t, dir)
+}
+
+// TestGenerateEnv_ACompleteEnvLosesAStrayEmptyAssignment: a .env holding all four and then an
+// empty assignment of one, which Compose would read as overriding its value, is rewritten without
+// that line, its values kept and nothing appended.
+func TestGenerateEnv_ACompleteEnvLosesAStrayEmptyAssignment(t *testing.T) {
+	complete := "GOIABADA_AES_ENCRYPTION_KEY=k\nMYSQL_ROOT_PASSWORD=m\nPOSTGRES_PASSWORD=p\nMSSQL_SA_PASSWORD=s\n"
+	dir := generateEnvIn(t, []byte(complete+"POSTGRES_PASSWORD=\n"))
+
+	assert.Equal(t, complete, string(runGenerateEnv(t, dir)))
+	assertEnvMode(t, dir)
+}
+
+// TestGenerateEnv_AnUnreadableEnvIsRefused: a .env the script cannot read, such as one a sudo run
+// left owned by root, stops it naming the file before grep reads it, and is left as it was rather
+// than replaced by four new values its database volumes do not know.
+func TestGenerateEnv_AnUnreadableEnvIsRefused(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a file whatever its mode")
+	}
+	complete := "GOIABADA_AES_ENCRYPTION_KEY=k\nMYSQL_ROOT_PASSWORD=m\nPOSTGRES_PASSWORD=p\nMSSQL_SA_PASSWORD=s\n"
+	dir := generateEnvIn(t, []byte(complete))
+	envFile := filepath.Join(dir, ".env")
+	require.NoError(t, os.Chmod(envFile, 0o000))
+
+	out, err := exec.Command("sh", filepath.Join(dir, "generate-env.sh")).CombinedOutput()
+
+	require.NoError(t, os.Chmod(envFile, 0o600))
+	require.Error(t, err, "generate-env.sh replaced a .env it could not read:\n%s", out)
+	assert.Contains(t, string(out), "cannot read "+envFile)
+	assert.NotContains(t, string(out), "Permission denied", "the file is refused before anything tries to read it")
+	content, err := os.ReadFile(envFile)
+	require.NoError(t, err)
+	assert.Equal(t, complete, string(content))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 2, "no temporary file is left beside the .env")
+}
+
+// TestGenerateEnv_AReadErrorWhileFilteringIsRefused: a .env that passes the readability check but
+// fails grep's read, its exit status 2 rather than 1, stops the script the same way, the file left
+// as it was and no temporary file beside it.
+func TestGenerateEnv_AReadErrorWhileFilteringIsRefused(t *testing.T) {
+	complete := "GOIABADA_AES_ENCRYPTION_KEY=k\nMYSQL_ROOT_PASSWORD=m\nPOSTGRES_PASSWORD=p\nMSSQL_SA_PASSWORD=s\n"
+	dir := generateEnvIn(t, []byte(complete))
+	envFile := filepath.Join(dir, ".env")
+	realGrep, err := exec.LookPath("grep")
+	require.NoError(t, err)
+	bin := t.TempDir()
+	stub := "#!/bin/sh\nif [ \"$1\" = -v ]; then echo \"grep: $3: Input/output error\" >&2; exit 2; fi\nexec " + realGrep + " \"$@\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "grep"), []byte(stub), 0o600))
+	require.NoError(t, os.Chmod(filepath.Join(bin, "grep"), 0o700))
+
+	cmd := exec.Command("sh", filepath.Join(dir, "generate-env.sh"))
+	cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+
+	require.Error(t, err, "generate-env.sh passed over a read error:\n%s", out)
+	assert.Contains(t, string(out), "cannot read "+envFile)
+	content, err := os.ReadFile(envFile)
+	require.NoError(t, err)
+	assert.Equal(t, complete, string(content))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 2, "no temporary file is left beside the .env")
+}

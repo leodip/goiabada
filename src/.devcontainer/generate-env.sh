@@ -9,10 +9,11 @@
 # password their volume was initialised with, and a dev database is sealed under the key it was
 # seeded with. A variable it lacks, or holds empty, is drawn and added, so a .env written by hand
 # for USER_UID and USER_GID, which Compose also reads from it, gains the four rather than being
-# left without them. It reads an assignment as Compose does, `export NAME=value` and
-# `NAME = value` included, and `NAME=""` as empty. Whatever it held, it is left readable by its
-# owner alone. Delete the file only together with the stack's volumes. .gitignore keeps it out of
-# the repository.
+# left without them. It reads an assignment as Compose does, `export NAME=value`, `NAME = value`
+# and `NAME: value` included, and `NAME=""` as empty. Whatever it held, it is left readable by its
+# owner alone, and one it cannot read stops it, untouched, rather than being replaced by values its
+# volumes do not know. Delete the file only together with the stack's volumes. .gitignore keeps it
+# out of the repository.
 set -eu
 
 env_file="$(cd "$(dirname "$0")" && pwd)/.env"
@@ -31,8 +32,9 @@ value_for() {
     esac
 }
 
-# An assignment of one of names as Compose reads it: perhaps exported, perhaps spaced around the `=`.
-assignment() { echo "^[[:space:]]*(export[[:space:]]+)?($1)[[:space:]]*="; }
+# An assignment of one of names as Compose reads it: perhaps exported, delimited by `=` or `:`,
+# perhaps spaced around it.
+assignment() { echo "^[[:space:]]*(export[[:space:]]+)?($1)[[:space:]]*[=:]"; }
 # One Compose reads as empty: nothing, or an empty pair of quotes, before perhaps a comment and the
 # line's end, a CR among the spaces there.
 empty_assignment() { echo "$(assignment "$1")[[:space:]]*(\"\"|'')?([[:space:]]+#.*)?[[:space:]]*\$"; }
@@ -40,10 +42,18 @@ empty_assignment() { echo "$(assignment "$1")[[:space:]]*(\"\"|'')?([[:space:]]+
 umask 077
 tmp="$env_file.$$"
 if [ -f "$env_file" ]; then
+    [ -r "$env_file" ] || { echo "generate-env.sh: cannot read $env_file" >&2; exit 1; }
     empty="$(empty_assignment "$(echo $names | tr ' ' '|')")"
     # Every line but an empty assignment of one of the four, which Compose would read as no value,
     # or as overriding the one before it.
-    grep -v -E "$empty" "$env_file" >"$tmp" || true
+    # grep's 1 is no line kept; above it, a read error, which must not pass for an empty file.
+    status=0
+    grep -v -E "$empty" "$env_file" >"$tmp" || status=$?
+    if [ "$status" -gt 1 ]; then
+        rm -f "$tmp"
+        echo "generate-env.sh: cannot read $env_file" >&2
+        exit 1
+    fi
     missing=""
     for name in $names; do
         grep -q -E "$(assignment "$name")" "$tmp" || missing="$missing $name"

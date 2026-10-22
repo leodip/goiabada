@@ -17,7 +17,9 @@ devcontainer, where `run-tests.sh` and `schemadump` read them; `docker-compose.y
 start without them. `devcontainer.json` runs the script as its `initializeCommand`, on the host,
 before every start. It keeps every value a `.env` already holds, and adds any of the four the file
 lacks or holds empty, so a `.env` written by hand for `USER_UID` and `USER_GID`, which Compose
-also reads from it, gains them. It runs with no shell around it, so the host needs `sh` on its
+also reads from it, gains them. A `.env` it cannot read, such as one a `sudo` run left owned by
+root, stops it with the file untouched, since writing a new one would lose the values the volumes
+hold. It runs with no shell around it, so the host needs `sh` on its
 `PATH`. Linux and macOS have it. Windows doesn't: neither WSL nor Git for Windows' default
 install puts `sh` on the Windows `PATH`. On Windows, clone the repository inside WSL and open it
 from there, or add Git for Windows' `usr\bin` directory to the `PATH`.

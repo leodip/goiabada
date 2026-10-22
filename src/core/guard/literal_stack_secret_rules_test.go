@@ -48,6 +48,14 @@ func literalStackTree(t *testing.T) string {
 	// and the example taken back.
 	writeGoFile(t, root, "deploy/app/.gitignore", "# env files\n\n.env*\nsub/.env.example\n!.env.example\n")
 	writeGoFile(t, root, "deploy/app/.env.example", "MYSQL_PASSWORD=devpass\n")
+	// A parent's anchored pattern, which reaches no deeper; a pattern for a directory, which names no
+	// file; and a deeper .gitignore taking back what its parent ignored.
+	writeGoFile(t, root, "ops/.gitignore", "/.env\n.env.production/\n")
+	writeGoFile(t, root, "ops/stage/.env", "MYSQL_PASSWORD=devpass\n")
+	writeGoFile(t, root, "ops/.env.production", "MYSQL_PASSWORD=devpass\n")
+	writeGoFile(t, root, "infra/.gitignore", ".env*\n")
+	writeGoFile(t, root, "infra/eu/.gitignore", "!.env.example\n")
+	writeGoFile(t, root, "infra/eu/.env.example", "MYSQL_PASSWORD=devpass\n")
 	writeGoFile(t, root, "e2e/.env.example", "MYSQL_PASSWORD=devpass\n")
 	writeGoFile(t, root, "src/.vscode/launch.json", "{\n"+
 		"\t\"env\": {\"GOIABADA_AES_ENCRYPTION_KEY\": \"4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a\"}\n}\n")
@@ -86,8 +94,10 @@ func literalStackTree(t *testing.T) string {
 
 // TestLiteralStackSecrets_TheRuleTable is the tree that must fail, each finding named at its own
 // line, a continued command at its first, and the Markdown prose and a quoted comment left alone.
-// A bare .env and a .env.production are read when no .gitignore beside them ignores them, and an
-// example a .gitignore takes back with `!` after ignoring the rest.
+// A bare .env and a .env.production are read when no .gitignore ignores them, and so are an
+// example a .gitignore takes back with `!` after ignoring the rest, one a deeper .gitignore takes
+// back from its parent's, a .env one level below a parent's `/.env`, and a file a pattern for a
+// directory of its name does not reach.
 // The text file holds the published key in upper case and nothing else, so the case-insensitive
 // pre-check is what finds it.
 func TestLiteralStackSecrets_TheRuleTable(t *testing.T) {
@@ -96,7 +106,7 @@ func TestLiteralStackSecrets_TheRuleTable(t *testing.T) {
 	findings, files, err := findLiteralStackSecrets(root)
 	require.NoError(t, err)
 
-	assert.Equal(t, 17, files, "the test file and the text file are read for published values but are no runnable files")
+	assert.Equal(t, 20, files, "the test file and the text file are read for published values but are no runnable files")
 	assert.Equal(t, []string{
 		".github/workflows/ci.yml:2: GOIABADA_AES_ENCRYPTION_KEY set to a literal: GOIABADA_AES_ENCRYPTION_KEY: 4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a",
 		".github/workflows/ci.yml:6: a literal password to mysql: --health-cmd \"mysqladmin ping -uroot -pdevpass --protocol=tcp\"",
@@ -111,6 +121,9 @@ func TestLiteralStackSecrets_TheRuleTable(t *testing.T) {
 		"deploy/k8s/deployment.yaml:3: GOIABADA_DB_PASSWORD set to a literal by the value after its name: value: \"devpass\"",
 		"docs/notes.txt:1: a published value: the old key was " + strings.ToUpper(publishedDataKey),
 		"e2e/.env.example:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass",
+		"infra/eu/.env.example:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass",
+		"ops/.env.production:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass",
+		"ops/stage/.env:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass",
 		"site/docs/page.mdx:4: SA_PASSWORD set to a literal: SA_PASSWORD=devpass ./start.sh",
 		"site/docs/page.mdx:9: MSSQL_SA_PASSWORD set to a literal by the value after its name: value: devpass",
 		"src/.devcontainer/devcontainer.json:3: GOIABADA_DB_PASSWORD set to a literal: \"GOIABADA_DB_PASSWORD\": \"devpass\",",
@@ -143,8 +156,9 @@ func TestLiteralStackSecrets_TheRuleTable(t *testing.T) {
 // whose value comes from a secret, and one naming no listed variable; the guard's own owners naming
 // a published value; a mysql --password followed by the database, which prompts; a test file's
 // literal, the testdata directory and a .dockerignore, out of scope; and the env files a .gitignore
-// beside them ignores, by exact name, with a leading slash, or by `.env*`, the bare .env
-// generate-env.sh writes among them, holding literals and the published key alike.
+// ignores, by exact name, with a leading slash, or by `.env*`, the bare .env generate-env.sh writes
+// among them, holding literals and the published key alike, and those ignored from a parent
+// directory: a bare name at any depth, `**/`, a path anchored there, and a directory pattern.
 func TestLiteralStackSecrets_AnEnvironmentDrawnTreeReportsNothing(t *testing.T) {
 	root := t.TempDir()
 	writeGoFile(t, root, ".github/workflows/ci.yml", "env:\n"+
@@ -177,10 +191,20 @@ func TestLiteralStackSecrets_AnEnvironmentDrawnTreeReportsNothing(t *testing.T) 
 	writeGoFile(t, root, "src/.devcontainer/.gitignore", "# generated\n.env\n")
 	writeGoFile(t, root, "src/.devcontainer/.env", "MYSQL_ROOT_PASSWORD=drawnbygenerateenv\n"+
 		"GOIABADA_AES_ENCRYPTION_KEY="+publishedDataKey+"\n")
-	writeGoFile(t, root, "site/.gitignore", "/.env.production\n")
 	writeGoFile(t, root, "site/.env.production", "POSTGRES_PASSWORD=devpass\n")
 	writeGoFile(t, root, "e2e/testapp/.gitignore", ".env*\n!.env.example\n")
 	writeGoFile(t, root, "e2e/testapp/.env.local", "MYSQL_PASSWORD=devpass\n")
+	// Ignored from a parent directory: a bare name at any depth below it, `**/`, a path anchored
+	// there, and a directory pattern, whose contents a deeper .gitignore cannot take back.
+	writeGoFile(t, root, "e2e/.gitignore", ".env\n")
+	writeGoFile(t, root, "e2e/infra/.env", "MYSQL_PASSWORD=devpass\n")
+	writeGoFile(t, root, "deploy/.gitignore", "**/.env\n")
+	writeGoFile(t, root, "deploy/local/.env", "MYSQL_PASSWORD=devpass\n")
+	writeGoFile(t, root, "site/.gitignore", "/.env.production\npreview/.env\n")
+	writeGoFile(t, root, "site/preview/.env", "MYSQL_PASSWORD=devpass\n")
+	writeGoFile(t, root, "tools/.gitignore", "local/\n")
+	writeGoFile(t, root, "tools/local/.gitignore", "!.env\n")
+	writeGoFile(t, root, "tools/local/.env", "MYSQL_PASSWORD=devpass\n")
 	writeGoFile(t, root, "src/.vscode/launch.json", "{\n"+
 		"\t\"env\": {\"GOIABADA_AES_ENCRYPTION_KEY\": \"${env:GOIABADA_AES_ENCRYPTION_KEY}\"}\n}\n")
 	writeGoFile(t, root, "deploy/k8s/deployment.yaml", "env:\n"+
@@ -225,7 +249,7 @@ func TestLiteralStackSecrets_ALiteralTreeFails(t *testing.T) {
 
 	require.True(t, report.Failed())
 	assert.False(t, report.Stopped, "a literal is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "35 lines supply a data key or a database password by literal")
+	assert.Contains(t, report.Text(), "38 lines supply a data key or a database password by literal")
 	assert.Contains(t, report.Text(), "src/run.sh:5: PGPASSWORD set to a literal")
 }
 
