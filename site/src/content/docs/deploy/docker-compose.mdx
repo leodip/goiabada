@@ -109,6 +109,18 @@ The generated file also drops every capability, keeps the root file system read-
 The wizard's **Local testing** choice writes Compose files too, serving plain HTTP on `localhost`, published on every interface, with no proxy. It's for the [Quickstart](/get-started/quickstart/), never for a deployment other people reach.
 </Aside>
 
+## Recover a locked-out administrator
+
+When nobody who holds `authserver:manage` can sign in any more, the auth server's `recover` subcommand restores sign-in for one named user. The Compose file gives the auth server's service the database credentials, so one command runs it with them:
+
+```bash
+printf 'New password: ' && IFS= read -rs RECOVERY_PASSWORD && echo
+printf '%s\n' "$RECOVERY_PASSWORD" | docker compose run --rm -T goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
+unset RECOVERY_PASSWORD
+```
+
+The first line asks for the new password without showing it, and the second hands it to the command's input, so it never appears in a command line, the shell's history or a log. Each action is its own flag, `--grant-manage`, `--password-stdin` and `--remove-otp`, applied only as asked, and whatever is asked, the user's sessions end and the [audit log](/concepts/audit-log/) records the recovery. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers every flag and the other deployment shapes.
+
 ## Next steps
 
 <CardGrid>

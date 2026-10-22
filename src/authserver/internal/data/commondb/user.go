@@ -149,6 +149,49 @@ func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*
 	return user, nil
 }
 
+// GetUserByIdForUpdate reads the user as last committed and takes the row for the rest of the
+// caller's transaction: a locking read, where GetUserById is a consistent one.
+//
+// The difference is MySQL's. Under InnoDB's default REPEATABLE READ every consistent read in a
+// transaction reads the snapshot the first one established, so a plain read after waiting on a
+// row lock still answers what the row held before the wait when anything was read earlier in the
+// transaction; a locking read answers the latest committed row whatever was read before it. On
+// PostgreSQL and SQL Server at READ COMMITTED each statement reads what was committed when it
+// started, and SQLite has one writer at a time, so on those three only the lock is added (#498).
+//
+// The locking clause is the engine's own, so it is chosen here from the flavor rather than
+// written once: FOR UPDATE on MySQL and PostgreSQL, the UPDLOCK and ROWLOCK table hints on SQL
+// Server, which has no FOR UPDATE on a SELECT, and none on SQLite, which has no row locks.
+//
+// tx is required: without one the statement autocommits and the row is released before the
+// caller can decide on what it read.
+func (d *Database) GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
+
+	if tx == nil {
+		return nil, errs.New("a locking read of a user requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(record.User)).
+		For(d.Flavor)
+
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("id", userId))
+
+	switch d.Flavor {
+	case sqlbuilder.MySQL, sqlbuilder.PostgreSQL:
+		selectBuilder.ForUpdate()
+	case sqlbuilder.SQLServer:
+		// The columns are already qualified with "users", so only the FROM clause takes the hints.
+		selectBuilder.From("users WITH (UPDLOCK, ROWLOCK)")
+	case sqlbuilder.SQLite:
+		// One writer at a time: nothing else writes the row while the caller's transaction does.
+	default:
+		return nil, errs.Errorf("no locking read of a user is written for the %s flavor", d.Flavor)
+	}
+
+	return d.getUserCommon(ctx, tx, selectBuilder, userStruct)
+}
+
 func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error {
 
 	if users == nil {

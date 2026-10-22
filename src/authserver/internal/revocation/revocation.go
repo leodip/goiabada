@@ -263,15 +263,15 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	return result, nil
 }
 
-// Reasons a revocation records. The first four are recorded on EventRevokedUserAuthState, one
-// per credential site (#106 decision 7). ReasonClientBecamePublic is recorded on
-// EventRevokedClientGrants, and is also the reason a family's revocation record carries when
-// RevokeClientGrants wrote it (#245, #259). ReasonConsentWithdrawn is the reason a family's
-// revocation record carries when a consent withdrawal's sweep wrote it (#622). Constants
-// rather than inline strings so the sites
-// cannot drift and a log consumer has something to match against, and one block so the next
-// site's reason has one place to go. Every value is stored data: renaming a constant is free,
-// changing its string is not.
+// Reasons a revocation records. The first five are recorded on EventRevokedUserAuthState, one
+// per credential site (#106 decision 7), the fourth naming the recovery command that holds the
+// database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
+// is recorded on EventRevokedClientGrants, and is also the reason a family's revocation record
+// carries when RevokeClientGrants wrote it (#245, #259). ReasonConsentWithdrawn is the reason a
+// family's revocation record carries when a consent withdrawal's sweep wrote it (#622).
+// Constants rather than inline strings so the sites cannot drift and a log consumer has
+// something to match against, and one block so the next site's reason has one place to go.
+// Every value is stored data: renaming a constant is free, changing its string is not.
 //
 // This is the list's only home. Another, constants.RevocationReasonEmailCollisionBackfill, was
 // declared in core because the site emitting it was the startup pass that disabled the losers of
@@ -282,6 +282,7 @@ const (
 	ReasonPasswordReset      = "password_reset"
 	ReasonPasswordChange     = "password_change"
 	ReasonAdminPasswordSet   = "admin_password_set"
+	ReasonRecoveryCommand    = "recovery_command"
 	ReasonAccountDisabled    = "account_disabled"
 	ReasonClientBecamePublic = "client_became_public"
 	ReasonConsentWithdrawn   = "consent_withdrawn"
@@ -290,8 +291,8 @@ const (
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
 // transaction and commits it, returning the result for the caller to audit AFTER the commit.
 //
-// It exists so the four credential sites cannot each get the transaction discipline subtly
-// wrong. Three properties are easy to lose when this is open-coded four times, and all three
+// It exists so the five credential sites cannot each get the transaction discipline subtly
+// wrong. Three properties are easy to lose when this is open-coded five times, and all three
 // are what the tests assert:
 //
 //   - the credential write and the sweep are in the same transaction, so a user can never end
@@ -980,7 +981,28 @@ func LogRevokedConsentGrants(ctx context.Context, auditLogger AuditLogger, userI
 func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
 	loggedInUser string, result UserAuthStateResult) {
 
-	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, revokedUserAuthStateDetails(userId, reason,
+		loggedInUser, result))
+}
+
+// LogRevokedUserAuthStateByCommand is LogRevokedUserAuthState for a site no token makes, the
+// `recover` subcommand: logged_in_user is empty, as at the sign-in sites, and the command is
+// named under `command`, the key the recovery's other entries name it under, so one recovery
+// names its actor under one key (#498).
+func LogRevokedUserAuthStateByCommand(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
+	command string, result UserAuthStateResult) {
+
+	details := revokedUserAuthStateDetails(userId, reason, "", result)
+	details["command"] = command
+	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, details)
+}
+
+// revokedUserAuthStateDetails is EventRevokedUserAuthState's payload, the one shape both of its
+// writers log.
+func revokedUserAuthStateDetails(userId int64, reason string, loggedInUser string,
+	result UserAuthStateResult) map[string]interface{} {
+
+	return map[string]interface{}{
 		"user_id":        userId,
 		"reason":         reason,
 		"logged_in_user": loggedInUser,
@@ -992,7 +1014,7 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 		"preserved_session_identifier": result.PreservedSessionIdentifier,
 		"old_generation":               result.OldGeneration,
 		"new_generation":               result.NewGeneration,
-	})
+	}
 }
 
 // LogAuthCodeReuse emits EventAuthCodeReuseDetected, the security record of the RFC 6749 section

@@ -1413,7 +1413,61 @@ func TestLogAuthCodeReuse_Payload(t *testing.T) {
 	}, recorder.details)
 }
 
-// TestReasons_AreStoredData holds the six reason spellings. The first five are written into the
+// revokedUserAuthStateResult is a sweep's result with something in every field, for the two
+// payload tests below.
+var revokedUserAuthStateResult = UserAuthStateResult{
+	TerminatedSessionIdentifiers: []string{"sid-1"},
+	RevokedRefreshTokenJtis:      []string{"rt-1", "rt-2"},
+	OldGeneration:                3,
+	NewGeneration:                4,
+}
+
+// TestLogRevokedUserAuthState_Payload pins the revoked_user_auth_state payload field by field.
+func TestLogRevokedUserAuthState_Payload(t *testing.T) {
+	recorder := &reuseAuditRecorder{}
+
+	LogRevokedUserAuthState(context.Background(), recorder, 13, ReasonAdminPasswordSet, "admin-subject",
+		revokedUserAuthStateResult)
+
+	require.Equal(t, 1, recorder.calls)
+	assert.Equal(t, audit.EventRevokedUserAuthState, recorder.event)
+	assert.Equal(t, map[string]interface{}{
+		"user_id":                        int64(13),
+		"reason":                         ReasonAdminPasswordSet,
+		"logged_in_user":                 "admin-subject",
+		"terminated_session_identifiers": []string{"sid-1"},
+		"revoked_refresh_token_jtis":     []string{"rt-1", "rt-2"},
+		"preserved_session_identifier":   "",
+		"old_generation":                 int64(3),
+		"new_generation":                 int64(4),
+	}, recorder.details)
+}
+
+// TestLogRevokedUserAuthStateByCommand_Payload: the recovery's revocation record names the command
+// under `command`, as the recovery's other records do, and leaves logged_in_user empty, since no
+// token made it (#498).
+func TestLogRevokedUserAuthStateByCommand_Payload(t *testing.T) {
+	recorder := &reuseAuditRecorder{}
+
+	LogRevokedUserAuthStateByCommand(context.Background(), recorder, 13, ReasonRecoveryCommand,
+		"goiabada-authserver recover", revokedUserAuthStateResult)
+
+	require.Equal(t, 1, recorder.calls)
+	assert.Equal(t, audit.EventRevokedUserAuthState, recorder.event)
+	assert.Equal(t, map[string]interface{}{
+		"user_id":                        int64(13),
+		"reason":                         ReasonRecoveryCommand,
+		"logged_in_user":                 "",
+		"command":                        "goiabada-authserver recover",
+		"terminated_session_identifiers": []string{"sid-1"},
+		"revoked_refresh_token_jtis":     []string{"rt-1", "rt-2"},
+		"preserved_session_identifier":   "",
+		"old_generation":                 int64(3),
+		"new_generation":                 int64(4),
+	}, recorder.details)
+}
+
+// TestReasons_AreStoredData holds the seven reason spellings. The first six are written into the
 // reason of an audit record, ReasonClientBecamePublic also into a rotation family's revocation
 // record, and ReasonConsentWithdrawn into that family record alone, so a spelling changed here
 // leaves every row already stored unmatched by a consumer filtering on the new one. Only the Go
@@ -1422,6 +1476,7 @@ func TestReasons_AreStoredData(t *testing.T) {
 	assert.Equal(t, "password_reset", ReasonPasswordReset)
 	assert.Equal(t, "password_change", ReasonPasswordChange)
 	assert.Equal(t, "admin_password_set", ReasonAdminPasswordSet)
+	assert.Equal(t, "recovery_command", ReasonRecoveryCommand)
 	assert.Equal(t, "account_disabled", ReasonAccountDisabled)
 	assert.Equal(t, "client_became_public", ReasonClientBecamePublic)
 	assert.Equal(t, "consent_withdrawn", ReasonConsentWithdrawn)

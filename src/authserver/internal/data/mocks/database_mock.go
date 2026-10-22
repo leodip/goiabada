@@ -9666,6 +9666,80 @@ func (_c *Database_GetUserById_Call) RunAndReturn(run func(ctx context.Context, 
 	return _c
 }
 
+// GetUserByIdForUpdate provides a mock function for the type Database
+func (_mock *Database) GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
+	ret := _mock.Called(ctx, tx, userId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserByIdForUpdate")
+	}
+
+	var r0 *record.User
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*record.User, error)); ok {
+		return returnFunc(ctx, tx, userId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *record.User); ok {
+		r0 = returnFunc(ctx, tx, userId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.User)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetUserByIdForUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserByIdForUpdate'
+type Database_GetUserByIdForUpdate_Call struct {
+	*mock.Call
+}
+
+// GetUserByIdForUpdate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+func (_e *Database_Expecter) GetUserByIdForUpdate(ctx any, tx any, userId any) *Database_GetUserByIdForUpdate_Call {
+	return &Database_GetUserByIdForUpdate_Call{Call: _e.mock.On("GetUserByIdForUpdate", ctx, tx, userId)}
+}
+
+func (_c *Database_GetUserByIdForUpdate_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_GetUserByIdForUpdate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetUserByIdForUpdate_Call) Return(user *record.User, err error) *Database_GetUserByIdForUpdate_Call {
+	_c.Call.Return(user, err)
+	return _c
+}
+
+func (_c *Database_GetUserByIdForUpdate_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)) *Database_GetUserByIdForUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUserBySubject provides a mock function for the type Database
 func (_mock *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error) {
 	ret := _mock.Called(ctx, tx, subject)

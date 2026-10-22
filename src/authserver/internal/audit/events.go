@@ -259,13 +259,15 @@ const (
 	EventChangedPassword       = "changed_password"
 	// EventRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
-	// refresh tokens revoked. Emitted by the four sites that perform that action AFTER their
+	// refresh tokens revoked. Emitted by the five sites that perform that action AFTER their
 	// transaction commits, on success only, and emitted even when nothing was found to revoke,
 	// so the event attests that the action happened rather than that something was there to
 	// sweep (#106 decision 7). Its `reason` field distinguishes the sites: password_reset,
-	// password_change, admin_password_set or account_disabled. A fifth, email_collision_backfill,
-	// existed until #351 replaced the startup pass that emitted it with migration 000047 and a
-	// pre-flight that refuses to migrate rather than disabling an account nobody asked about.
+	// password_change, admin_password_set, account_disabled or recovery_command, the `recover`
+	// subcommand's, which names the command under `command` and leaves logged_in_user empty (#498).
+	// Another, email_collision_backfill, existed until #351 replaced the startup pass that emitted
+	// it with migration 000047 and a pre-flight that refuses to migrate rather than disabling an
+	// account nobody asked about.
 	//
 	// Deliberately NOT EventUserDisabled, which already means "a disabled user was rejected"
 	// and is emitted wherever an auth path refuses one: /auth/authorize, the password and OTP
@@ -440,8 +442,9 @@ const (
 	// Payload: change, granted or revoked; target_kind and target_id, the user, group or client
 	// whose permissions changed, the user for a membership change; permission_identifiers, the
 	// administrative permissions granted or revoked, as resource:permission; group_id, for a
-	// membership change, the group joined or left; and logged_in_user. A permission save writes at
-	// most one per direction, a membership change one per administrative group.
+	// membership change, the group joined or left; and logged_in_user, or command for the
+	// `recover` subcommand's grant (#498). A permission save writes at most one per direction, a
+	// membership change one per administrative group.
 	EventAdministrativePermissionChanged = "administrative_permission_changed"
 
 	// EventAdministrativeScopeRefused records an administrative authserver scope refused because
