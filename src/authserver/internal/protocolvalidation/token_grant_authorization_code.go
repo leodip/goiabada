@@ -201,7 +201,8 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 
 	// The termination boundary (#129 decision 4). Ending a session marks every code
 	// that session authorized, so a code marked here belongs to a grant that was
-	// explicitly cut off.
+	// explicitly cut off. A consent withdrawal marks the user's unused codes with its
+	// client the same way, so a code issued before it is not redeemed after it (#622).
 	if codeEntity.Revoked {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest)

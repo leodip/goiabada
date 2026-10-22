@@ -8,6 +8,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateRefreshToken(t *testing.T) {
@@ -851,6 +854,250 @@ func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for user id 0, got %d", len(got))
+	}
+}
+
+// newWithdrawalCode creates a used code of one user with one client, for the consent
+// withdrawal's enumeration tests (#622).
+func newWithdrawalCode(t *testing.T, clientId int64, userId int64) *record.Code {
+	t.Helper()
+	code := &record.Code{
+		ClientId:            clientId,
+		UserId:              userId,
+		Code:                "code_" + fake.LetterN(8),
+		CodeHash:            "hash_" + fake.LetterN(8),
+		CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
+		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
+		RedirectURI:         "https://example.com/callback",
+		Scope:               "openid",
+		IpAddress:           "127.0.0.1",
+		UserAgent:           "test",
+		ResponseMode:        "query",
+		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier:   "sess_" + fake.LetterN(8),
+		AcrLevel:            "1",
+		AuthMethods:         "pwd",
+		Used:                true,
+	}
+	if err := database.CreateCode(context.Background(), nil, code); err != nil {
+		t.Fatalf("Failed to create code: %v", err)
+	}
+	return code
+}
+
+// newWithdrawalToken fills a refresh token's jti, scope and times and creates it, keeping the
+// linkage, type, family and revoked flag the caller set.
+func newWithdrawalToken(t *testing.T, rt *record.RefreshToken) *record.RefreshToken {
+	t.Helper()
+	rt.RefreshTokenJti = fake.UUID()
+	rt.Scope = "openid"
+	rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
+	rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
+	if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
+		t.Fatalf("Failed to create refresh token: %v", err)
+	}
+	return rt
+}
+
+// TestGetRefreshTokensByUserIdAndClientId pins the consent withdrawal's enumeration (#622): both
+// linkage shapes with the client predicate added to each, revoked rows of both shapes returned
+// beside the live ones, the same user's tokens with another client and another user's tokens with
+// the same client both refused, and no double-counting from the UNION ALL.
+func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
+	client := createTestClient(t)
+	otherClient := createTestClient(t)
+	user := createTestUser(t)
+	otherUser := createTestUser(t)
+
+	newCode := func(clientId int64, userId int64) *record.Code {
+		return newWithdrawalCode(t, clientId, userId)
+	}
+	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
+		return newWithdrawalToken(t, rt)
+	}
+
+	// The two shapes that must match: this user's tokens with THIS client, one through a code
+	// and one linked directly.
+	viaCode := newToken(&record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newCode(client.Id, user.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	ropc := newToken(&record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
+	})
+
+	// Revoked rows of both shapes, each the only member of its family, must match too: the
+	// withdrawal records the family of every row returned, and a family whose members are all
+	// revoked can still have a child mid-rotation that only the record refuses.
+	revokedViaCode := newToken(&record.RefreshToken{
+		CodeId:               sql.NullInt64{Int64: newCode(client.Id, user.Id).Id, Valid: true},
+		RefreshTokenType:     "Refresh",
+		FirstRefreshTokenJti: "family_" + fake.UUID(),
+		Revoked:              true,
+	})
+	revokedRopc := newToken(&record.RefreshToken{
+		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType:     "Offline",
+		FirstRefreshTokenJti: "family_" + fake.UUID(),
+		Revoked:              true,
+	})
+
+	// The four that must not, one per branch per predicate, so that removing either predicate
+	// fails here rather than at the withdrawal.
+	otherClientViaCode := newToken(&record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newCode(otherClient.Id, user.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	otherClientRopc := newToken(&record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: otherClient.Id, Valid: true},
+		RefreshTokenType: "Offline",
+	})
+	otherUserViaCode := newToken(&record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newCode(client.Id, otherUser.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh",
+	})
+	otherUserRopc := newToken(&record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: otherUser.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline",
+	})
+
+	got, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId failed: %v", err)
+	}
+
+	found := make(map[int64]bool, len(got))
+	for _, rt := range got {
+		found[rt.Id] = true
+	}
+
+	for _, want := range []struct {
+		label string
+		id    int64
+	}{
+		{"the user's auth-code token with this client", viaCode.Id},
+		{"the user's ROPC token with this client", ropc.Id},
+		{"the user's revoked auth-code token with this client", revokedViaCode.Id},
+		{"the user's revoked ROPC token with this client", revokedRopc.Id},
+	} {
+		if !found[want.id] {
+			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
+		}
+	}
+
+	for _, unwanted := range []struct {
+		label string
+		id    int64
+	}{
+		{"the same user's auth-code token with another client", otherClientViaCode.Id},
+		{"the same user's ROPC token with another client", otherClientRopc.Id},
+		{"another user's auth-code token with this client", otherUserViaCode.Id},
+		{"another user's ROPC token with this client", otherUserRopc.Id},
+	} {
+		if found[unwanted.id] {
+			t.Errorf("returned a token outside this user and client: %s (id %d)", unwanted.label, unwanted.id)
+		}
+	}
+
+	// The union must not double-count: an auth-code token carries no client of its own and
+	// matches only the first branch.
+	if len(got) != 4 {
+		t.Errorf("expected exactly 4 tokens for this user and client, got %d (duplicates from the UNION ALL?)", len(got))
+	}
+}
+
+// TestRevokeOnConsentWithdrawalTx_RecordsFamiliesWithNoLiveMember runs the real withdrawal over
+// a user's families with one client whose stored members are all revoked already, one of each
+// linkage shape (#622). The sweep has nothing left to flip, so it reports no token, but both
+// families must be recorded: a rotation that claimed a member before the withdrawal can still
+// insert a live child after it, and only the record refuses that child. Another client's family
+// of the same user is left unrecorded.
+func TestRevokeOnConsentWithdrawalTx_RecordsFamiliesWithNoLiveMember(t *testing.T) {
+	ctx := context.Background()
+	client := createTestClient(t)
+	otherClient := createTestClient(t)
+	user := createTestUser(t)
+
+	// A code-descended family rotated once: parent and child both revoked.
+	codeFamily := "family_" + fake.UUID()
+	codeId := sql.NullInt64{Int64: newWithdrawalCode(t, client.Id, user.Id).Id, Valid: true}
+	parent := newWithdrawalToken(t, &record.RefreshToken{
+		CodeId: codeId, RefreshTokenType: "Refresh", FirstRefreshTokenJti: codeFamily, Revoked: true,
+	})
+	newWithdrawalToken(t, &record.RefreshToken{
+		CodeId: codeId, RefreshTokenType: "Refresh", FirstRefreshTokenJti: codeFamily,
+		PreviousRefreshTokenJti: parent.RefreshTokenJti, Revoked: true,
+	})
+
+	// A password grant family, its one member revoked.
+	directFamily := "family_" + fake.UUID()
+	newWithdrawalToken(t, &record.RefreshToken{
+		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		RefreshTokenType: "Offline", FirstRefreshTokenJti: directFamily, Revoked: true,
+	})
+
+	// The same user's revoked family with another client, which the withdrawal does not reach.
+	otherClientFamily := "family_" + fake.UUID()
+	newWithdrawalToken(t, &record.RefreshToken{
+		CodeId:           sql.NullInt64{Int64: newWithdrawalCode(t, otherClient.Id, user.Id).Id, Valid: true},
+		RefreshTokenType: "Refresh", FirstRefreshTokenJti: otherClientFamily, Revoked: true,
+	})
+
+	result, err := revocation.RevokeOnConsentWithdrawalTx(ctx, database, user.Id, client.Id,
+		func(*sql.Tx) error { return nil })
+	require.NoError(t, err, "RevokeOnConsentWithdrawalTx")
+	assert.Empty(t, result.RevokedRefreshTokenJtis, "every member was revoked already, so the sweep flips none")
+
+	for _, f := range []struct {
+		label string
+		jti   string
+		want  bool
+	}{
+		{"the code-descended family with this client", codeFamily, true},
+		{"the password grant family with this client", directFamily, true},
+		{"the family with another client", otherClientFamily, false},
+	} {
+		recorded, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, f.jti)
+		require.NoError(t, err, "IsRefreshTokenFamilyRevoked")
+		assert.Equal(t, f.want, recorded, "%s recorded", f.label)
+	}
+}
+
+// TestGetRefreshTokensByUserIdAndClientId_NoTokens covers the empty result and the zero-id
+// guards, one per identifier.
+func TestGetRefreshTokensByUserIdAndClientId_NoTokens(t *testing.T) {
+	user := createTestUser(t)
+	client := createTestClient(t)
+
+	got, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId failed: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for a fresh user and client, got %d", len(got))
+	}
+
+	got, err = database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, 0, client.Id)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId(0, client) should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for user id 0, got %d", len(got))
+	}
+
+	got, err = database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, 0)
+	if err != nil {
+		t.Fatalf("GetRefreshTokensByUserIdAndClientId(user, 0) should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no tokens for client id 0, got %d", len(got))
 	}
 }
 
