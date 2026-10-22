@@ -531,6 +531,10 @@ func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, use
 // plus a client filter cannot substitute for it, because an auth-code token's row
 // carries no client at all: its client is on the code, which this query joins to.
 //
+// Revoked rows are returned on purpose, beside the live ones: the withdrawal records the
+// rotation family of every row it reads, and a family whose stored members are all revoked
+// can still have a child mid-rotation that only that record refuses.
+//
 // Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: the shapes
 // are mutually exclusive, so the union cannot produce duplicates, and each branch can
 // use its own index where an OR across the two tables would defeat both (#106).

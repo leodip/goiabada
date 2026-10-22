@@ -113,7 +113,8 @@ func HandleUserConsentDelete(
 			return
 		}
 
-		// The withdrawal also revokes the refresh tokens this user holds with this client.
+		// The withdrawal also revokes the codes this user has not yet redeemed with this
+		// client and the refresh tokens this user holds with it.
 		// The refresh arm consults a stored consent only when the client has Consent required
 		// on or the grant is an offline one, so deleting the row alone would leave a
 		// once-consented client's grant standing (#622).

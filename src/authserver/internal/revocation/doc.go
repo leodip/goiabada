@@ -6,12 +6,12 @@
 // TerminateUserSessionTx, which ends one session and the grants issued under it;
 // RevokeOnAuthCodeReuseTx, the answer to a redeemed code presented again;
 // RevokeClientGrantsTx, for a client that no longer has to authenticate; and
-// RevokeOnConsentWithdrawalTx, which deletes a user's consent to one client and revokes the
-// refresh tokens that user holds with it (#622). RevokeUserAuthState,
-// RevokeOnAuthCodeReuse and RevokeClientGrants are the same operations on a transaction the caller
-// owns, which they require, and RevokeRefreshTokens, beneath them, runs on the caller's transaction
-// or, given nil, on none. The Reason* constants are the reasons a revocation records (#106, #129,
-// #245, #387, #622).
+// RevokeOnConsentWithdrawalTx, which deletes a user's consent to one client, marks that user's
+// unused codes with it revoked and revokes the refresh tokens that user holds with it (#622).
+// RevokeUserAuthState, RevokeOnAuthCodeReuse and RevokeClientGrants are the same operations on a
+// transaction the caller owns, which they require, and RevokeRefreshTokens, beneath them, runs on
+// the caller's transaction or, given nil, on none. The Reason* constants are the reasons a
+// revocation records (#106, #129, #245, #387, #622).
 //
 // Each operation reports what it actually did, the sessions it ended and only the tokens it moved
 // from live to revoked. On an error each *Tx operation reports nothing, the zero result, so a

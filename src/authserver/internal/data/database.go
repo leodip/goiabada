@@ -730,7 +730,8 @@ type Database interface {
 	// for the authorization code flow, refresh_tokens.user_id with
 	// refresh_tokens.client_id for ROPC. It is what a consent withdrawal sweeps, and
 	// GetRefreshTokensByUserId plus a client filter cannot substitute for it, because
-	// an auth-code token's row carries no client to filter on (#622).
+	// an auth-code token's row carries no client to filter on (#622). Revoked rows are
+	// returned too, on purpose: the withdrawal records the family of every row it reads.
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,
