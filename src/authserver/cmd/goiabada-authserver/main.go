@@ -128,7 +128,7 @@ func run() int {
 		return runMigrateCommand(migration, os.Stdout, os.Stderr)
 	}
 	if command == "recover" {
-		return runRecoverCommand(recovery, os.Stdout, os.Stderr)
+		return runRecoverCommand(recovery, datafactory.OpenDatabase, os.Stdout, os.Stderr)
 	}
 
 	// The process owns the signals, from here to its exit, so a stop arriving while the server is

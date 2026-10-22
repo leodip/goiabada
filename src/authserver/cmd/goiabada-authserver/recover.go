@@ -46,8 +46,8 @@ is a database whose schema is not the one this binary carries.
 
 Connection details come from the GOIABADA_DB_* environment variables or the --db-* flags
 (--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create,
-the pool's --db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and
---db-conn-max-idle-time, and the connection's --db-tls-mode, --db-tls-ca-file,
+which recover reads as false whatever it is given, since it never creates a database, the pool's
+--db-max-open-conns, --db-max-idle-conns, --db-conn-max-lifetime and --db-conn-max-idle-time, and the connection's --db-tls-mode, --db-tls-ca-file,
 --db-tls-client-cert-file, --db-tls-client-key-file and --db-tls-server-name), given before or after recover. A flag after recover overrides the same flag before it. Every other
 flag goes before recover.`
 
@@ -97,8 +97,14 @@ func readPasswordLine(r io.Reader) (string, error) {
 	return scanner.Text(), nil
 }
 
-// runRecoverCommand runs the invocation readRecoverCommand read.
-func runRecoverCommand(inv recoverInvocation, stdout, stderr io.Writer) int {
+// recoverDatabaseOpener is how runRecoverCommand opens the database: datafactory.OpenDatabase in
+// main, and in a test one that records the configuration it was handed.
+type recoverDatabaseOpener func(ctx context.Context, dbConfig *config.DatabaseConfig,
+	logSQL bool) (datafactory.Migratable, error)
+
+// runRecoverCommand runs the invocation readRecoverCommand read, opening the database through
+// open.
+func runRecoverCommand(inv recoverInvocation, open recoverDatabaseOpener, stdout, stderr io.Writer) int {
 	if inv.help {
 		outf(stdout, "%s\n", recoverUsage)
 		return migrateExitOK
@@ -109,7 +115,12 @@ func runRecoverCommand(inv recoverInvocation, stdout, stderr io.Writer) int {
 	// (#386).
 	ctx := context.Background()
 
-	database, err := datafactory.OpenDatabase(ctx, &inv.database, false)
+	// A recovery never creates the database it names, whatever --db-create or GOIABADA_DB_CREATE
+	// say, which default to creating it: a new database holds no user to recover, so a mistyped
+	// name would leave an empty database on the server behind a refusal saying only that it was
+	// never migrated. Not created, it is refused as missing. SQLite reads no such setting.
+	inv.database.Create = false
+	database, err := open(ctx, &inv.database, false)
 	if err != nil {
 		outf(stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError

@@ -181,6 +181,23 @@ func TestMain_RecoverRunsThroughTheRealMain(t *testing.T) {
 		assert.Equal(t, int64(1), user.AuthStateGeneration, "the recovery advanced the generation")
 	})
 
+	// The lost-authenticator recovery, --remove-otp and nothing else (#498 review round 10 F1).
+	t.Run("an authenticator removed, the one action", func(t *testing.T) {
+		dir := t.TempDir()
+		target, decoy := filepath.Join(dir, "f.db"), filepath.Join(dir, "d.db")
+		db, _ := newRecoverDatabaseAt(t, target)
+		enrollOTP(t, db)
+
+		code, stderr := runMainProcess(t, decoy, "recover", "--db-dsn=file:"+target,
+			"--email", "admin@example.com", "--remove-otp")
+
+		require.Equal(t, migrateExitOK, code, "stderr: %s", stderr)
+		user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+		require.NoError(t, err)
+		assert.False(t, user.OTPEnabled, "the authenticator was removed")
+		assert.Empty(t, user.OTPSecretEncrypted)
+	})
+
 	t.Run("a password read from stdin", func(t *testing.T) {
 		dir := t.TempDir()
 		target, decoy := filepath.Join(dir, "f.db"), filepath.Join(dir, "d.db")

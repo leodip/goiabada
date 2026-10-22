@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -145,6 +147,32 @@ func TestParseRecoverArgs(t *testing.T) {
 		assert.Empty(t, inv.password, "the password is read from stdin, not from the arguments")
 	})
 
+	// Each action is enough alone, so the no-action refusal never refuses one of them: given only
+	// --remove-otp, the lost-authenticator recovery, or only --password, as a script types it
+	// (#498 review round 10 F1).
+	for _, tc := range []struct {
+		name string
+		args []string
+		want recoverInvocation
+	}{
+		{"--grant-manage", []string{"--grant-manage"}, recoverInvocation{grantManage: true}},
+		{"--remove-otp", []string{"--remove-otp"}, recoverInvocation{removeOTP: true}},
+		{"--password <value>", []string{"--password", "alongenoughpassword"},
+			recoverInvocation{password: "alongenoughpassword"}},
+		{"--password=<value>", []string{"--password=alongenoughpassword"},
+			recoverInvocation{password: "alongenoughpassword"}},
+		{"--password-stdin", []string{"--password-stdin"}, recoverInvocation{passwordStdin: true}},
+	} {
+		t.Run("an action alone is enough: "+tc.name, func(t *testing.T) {
+			base := config.DatabaseConfig{Type: "sqlite"}
+			inv, err := parseRecoverArgs(append([]string{"--email", "admin@example.com"}, tc.args...), base)
+			require.NoError(t, err)
+			tc.want.email = "admin@example.com"
+			tc.want.database = base
+			assert.Equal(t, tc.want, inv, "only that action's field is set")
+		})
+	}
+
 	t.Run("an undefined flag names what recover accepts", func(t *testing.T) {
 		_, err := parseRecoverArgs([]string{"--email", "a@example.com", "--grant"},
 			config.DatabaseConfig{Type: "sqlite"})
@@ -218,7 +246,7 @@ func TestRecoverCommand_HelpPrintsTheUsageAndOpensNothing(t *testing.T) {
 	inv, ok := readRecoverCommand([]string{"--help", "--password-stdin"}, sqliteBase(a),
 		strings.NewReader(""), &stderr)
 	require.True(t, ok, "stderr: %s", stderr.String())
-	code := runRecoverCommand(inv, &stdout, &stderr)
+	code := runRecoverCommand(inv, datafactory.OpenDatabase, &stdout, &stderr)
 
 	require.Equal(t, migrateExitOK, code)
 	assert.Equal(t, recoverUsage+"\n", stdout.String())
@@ -297,7 +325,7 @@ func TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened(t *testing.T) 
 	inv, ok := readRecoverCommand([]string{"--email", "admin@example.com", "--grant-manage",
 		"--db-dsn=file:" + b}, sqliteBase(a), strings.NewReader(""), &stderr)
 	require.True(t, ok, "stderr: %s", stderr.String())
-	code := runRecoverCommand(inv, &stdout, &stderr)
+	code := runRecoverCommand(inv, datafactory.OpenDatabase, &stdout, &stderr)
 
 	require.Equal(t, migrateExitOK, code, "stderr: %s", stderr.String())
 	assert.NoFileExists(t, a)
@@ -307,6 +335,48 @@ func TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, grants, 1, "the grant was written in the database the flag after recover named")
 	assert.Equal(t, manage.Id, grants[0].PermissionId)
+}
+
+// TestRecoverCommand_NeverCreatesTheDatabase: the opener is handed a configuration that does not
+// create the database, whether the base asks to, as GOIABADA_DB_CREATE's default does, or a
+// --db-create after recover does, so a mistyped name is refused as missing rather than created
+// empty on the server (#498 review round 10 F2). SQLite creates a missing file whatever this says,
+// which is why a server engine is named here.
+func TestRecoverCommand_NeverCreatesTheDatabase(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		baseCreate bool
+		args       []string
+	}{
+		{"the base creates", true, nil},
+		{"the base creates and --db-create=true follows recover", true, []string{"--db-create=true"}},
+		{"--db-create follows recover", false, []string{"--db-create"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := config.DatabaseConfig{Type: "postgres", Host: "localhost", Port: 5432,
+				Name: "goiabada_typo", Create: tc.baseCreate}
+			args := append([]string{"--email", "admin@example.com", "--grant-manage"}, tc.args...)
+
+			var stdout, stderr bytes.Buffer
+			inv, ok := readRecoverCommand(args, base, strings.NewReader(""), &stderr)
+			require.True(t, ok, "stderr: %s", stderr.String())
+			require.True(t, inv.database.Create, "the invocation read asks to create the database")
+
+			var opened []config.DatabaseConfig
+			open := func(_ context.Context, c *config.DatabaseConfig, _ bool) (datafactory.Migratable, error) {
+				opened = append(opened, *c)
+				return nil, errors.New(`database "goiabada_typo" does not exist`)
+			}
+			code := runRecoverCommand(inv, open, &stdout, &stderr)
+
+			require.Equal(t, migrateExitError, code)
+			require.Len(t, opened, 1)
+			assert.False(t, opened[0].Create, "the recovery asked the opener to create the database")
+			assert.Equal(t, "goiabada_typo", opened[0].Name)
+			assert.Contains(t, stderr.String(), `unable to open the database: database "goiabada_typo" does not exist`)
+			assert.Empty(t, stdout.String())
+		})
+	}
 }
 
 // TestRecoverUsage_NamesEveryDatabaseFlag: every flag config.RegisterDatabaseFlags registers can
