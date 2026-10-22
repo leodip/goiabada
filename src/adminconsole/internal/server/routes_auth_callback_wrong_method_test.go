@@ -28,7 +28,7 @@ import (
 // the start-again button (#632 item 3). Every other method but POST gets the same answer, and the
 // same Allow: POST: chi's own 405 would name every method registered on the path, so once GET had
 // a route of its own it advertised GET, which RFC 9110 section 15.5.6 forbids when GET is refused.
-func TestRoutes_TheCallbackReachedByGetAnswersTheSignInErrorPage(t *testing.T) {
+func TestRoutes_TheCallbackByAnyMethodButPostAnswersTheSignInErrorPage(t *testing.T) {
 	cfg := &config.Config{
 		AdminConsole: config.AdminConsoleConfig{BaseURL: "https://console.example.test", OAuthClientSecret: "the-secret"},
 		AuthServer:   config.AuthServerConfig{BaseURL: "https://auth.example.test"},

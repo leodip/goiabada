@@ -25,9 +25,10 @@ import (
 // "code", "state", "error" and "error_description" on top of the ten credential names because this
 // module has no authorization endpoint: those four reach it only at /auth/callback, which
 // auth_helper.go arranges by asking for response_mode=form_post precisely so they arrive in a body,
-// and which is registered POST-only. The authserver's list must not carry "state", because
-// handler_authorize.go reads .FormValue("state") legitimately: OIDC Core 3.1.2.1 requires the
-// authorization endpoint to accept both GET and POST, so there that name has a lawful query source.
+// and which reads them only from a POST, every other method getting HandleAuthCallbackWrongMethod's
+// page. The authserver's list must not carry "state", because handler_authorize.go reads
+// .FormValue("state") legitimately: OIDC Core 3.1.2.1 requires the authorization endpoint to accept
+// both GET and POST, so there that name has a lawful query source.
 //
 // The walk is this module's internal/ tree, so a credential read that appeared in src/core would be
 // seen by neither this file nor its authserver twin. No such merged-form credential read exists
