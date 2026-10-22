@@ -14,8 +14,8 @@ import (
 // from the cache. Without it a token can expire between the check and the endpoint's own
 // validation, which costs a 401 and a retry for no reason; with it the only 401s left are
 // revocations and clock disagreements, which is what that path is for (#266). It is the same
-// 30 seconds as refreshMargin, which gives the console's other token, the administrator's, its
-// margin.
+// 30 seconds as refreshMargin, the most the console's other token, the administrator's, is
+// refreshed before its expiry.
 const sessionTokenExpiryMargin = 30 * time.Second
 
 // SessionTokenSource obtains and caches the bearer token the admin console presents to the

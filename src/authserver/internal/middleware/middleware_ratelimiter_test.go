@@ -1179,6 +1179,92 @@ func TestLimitActivate_PerIP(t *testing.T) {
 	})
 }
 
+// TestLimitAuthorize_PerIP is the admission tier on /auth/authorize: the browser-session row a
+// GET writes and the parked-request row a POST writes, bounded per client block, from one bucket
+// the two methods share (#504).
+//
+// The budget is exact because it is published policy: 120 requests per minute, sized for an office
+// behind one address rather than one browser, since a sign-in, an SSO hop and a silent renew each
+// reach the endpoint once or twice. The shared bucket is the point: a flood split across the two
+// routes is still one flood, which is what a tier per method would miss.
+//
+// The handler stub writes 418 rather than 200 on purpose: a middleware that writes nothing
+// produces exactly 200 with an empty body, so 418 is what tells "the handler ran" apart from
+// "nothing was written", and from 429.
+func TestLimitAuthorize_PerIP(t *testing.T) {
+	const budget = 120
+
+	run := func(m *RateLimiter, method, target, ip string) (int, bool) {
+		req := limiterRequest(method, target, nil)
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		reached := false
+		m.LimitAuthorize(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusTeapot)
+		})).ServeHTTP(rr, req)
+		return rr.Code, reached
+	}
+
+	t.Run("the budget is exactly 120 per IP, GET and POST together", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget; i++ {
+			method := http.MethodGet
+			if i%2 == 1 {
+				method = http.MethodPost
+			}
+			if code, reached := run(m, method, "/auth/authorize", "203.0.113.7:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: got code %d, handler reached %v; want %d and true",
+					i+1, code, reached, http.StatusTeapot)
+			}
+		}
+		if code, reached := run(m, http.MethodGet, "/auth/authorize", "203.0.113.7:5000"); code != http.StatusTooManyRequests || reached {
+			t.Errorf("request %d: got code %d, handler reached %v; want %d and false",
+				budget+1, code, reached, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a second client IP has an independent bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		for i := 0; i < budget+1; i++ {
+			run(m, http.MethodGet, "/auth/authorize", "203.0.113.7:5000")
+		}
+		// Same middleware instance, different host: a global key would block this, which is
+		// exactly what an empty key would produce.
+		if code, reached := run(m, http.MethodGet, "/auth/authorize", "198.51.100.9:5000"); code != http.StatusTeapot || !reached {
+			t.Errorf("second IP: got code %d, handler reached %v; want %d and true",
+				code, reached, http.StatusTeapot)
+		}
+	})
+
+	t.Run("a distinct client per request buys no fresh bucket", func(t *testing.T) {
+		m := newTestMiddleware(nil, true)
+		// A distinct client_id per request must not key the bucket, or a flood naming a new
+		// client each time would spend a fresh budget each time.
+		blocked := false
+		for i := 0; i < budget+1; i++ {
+			target := fmt.Sprintf("/auth/authorize?client_id=client%d&response_type=code&scope=openid", i)
+			if code, _ := run(m, http.MethodGet, target, "203.0.113.7:5000"); code == http.StatusTooManyRequests {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			t.Errorf("expected one host to be limited within %d requests regardless of the client it names", budget+1)
+		}
+	})
+
+	t.Run("disabled limiter never blocks", func(t *testing.T) {
+		m := newTestMiddleware(nil, false)
+		for i := 0; i < budget*2; i++ {
+			if code, reached := run(m, http.MethodGet, "/auth/authorize", "203.0.113.1:5000"); code != http.StatusTeapot || !reached {
+				t.Fatalf("request %d: disabled limiter should never block, got code %d, handler reached %v",
+					i+1, code, reached)
+			}
+		}
+	})
+}
+
 // TestLimitRegister_PerIP verifies self-registration is bounded per client block, and that a
 // distinct address per request buys nothing (#219).
 //
@@ -2531,8 +2617,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 //
 // Over every tier the production constructor builds, found by walking the struct rather than by
 // listing them, because a listed set is green on the tier nobody added it to: the two keys a trip
-// test can reach today are two of seventeen tiers, and the next tier is what this exists for (#320
-// decision 3). The seventeen are ten request tiers, two of them the per-address ceilings on
+// test can reach today are two of eighteen tiers, and the next tier is what this exists for (#320
+// decision 3). The eighteen are eleven request tiers, two of them the per-address ceilings on
 // password checks, and five failures-only ones, plus the two failures-only tiers of the password
 // gate, which ratelimit.AccountLimiter counts and accountTiers names (#439, #564).
 func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
@@ -2546,10 +2632,10 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 
 	// The count is asserted because a walk that silently stopped matching would pass over an
 	// empty set exactly as it passes over a conformant one. It counts instances rather than
-	// distinct names, so a second tier carrying a name an earlier one already used is an
-	// eighteenth tier here rather than a replacement for the seventeenth.
-	if len(tiers) != 17 {
-		t.Fatalf("walked %d tiers, expected the 17 the constructor builds: %v", len(tiers), tiers)
+	// distinct names, so a second tier carrying a name an earlier one already used is a
+	// nineteenth tier here rather than a replacement for the eighteenth.
+	if len(tiers) != 18 {
+		t.Fatalf("walked %d tiers, expected the 18 the constructor builds: %v", len(tiers), tiers)
 	}
 	for _, found := range tiers {
 		if found.keyField == "" {

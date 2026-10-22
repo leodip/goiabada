@@ -205,11 +205,12 @@ func (w *Worker) reapRateLimitCounters(ctx context.Context) {
 //
 // It is the second sweep that runs outside the claim, for the reason the first one does. A POST to
 // /auth/authorize writes a row after checking the client and redirect URI and before anything else,
-// and the endpoint is not rate limited, so an unauthenticated caller can produce rows as fast as it
-// can send requests, each as large as the request it sent. A request stops being consumable after
-// five minutes (authorizerequest.Lifetime), and on the twelve hour claim the row would go on
-// EXISTING for up to twelve. Every five minutes keeps the physical bound within one poll of the
-// logical one, the relationship #266 decision 19 argued for browser sessions.
+// and the authorize admission tier bounds how fast one address may spend those rows only while the
+// rate limiter switch is on, so with it off an unauthenticated caller can still produce them as
+// fast as it can send requests, each as large as the request it sent (#504). A request stops being
+// consumable after five minutes (authorizerequest.Lifetime), and on the twelve hour claim the row
+// would go on EXISTING for up to twelve. Every five minutes keeps the physical bound within one poll
+// of the logical one, the relationship #266 decision 19 argued for browser sessions.
 //
 // Single-flight is given up on the same terms: the delete is idempotent and keyed on an indexed
 // column. Do not move this call into performTask (#437).
@@ -222,14 +223,18 @@ func (w *Worker) reapAuthorizeRequests(ctx context.Context) {
 // reapBrowserSessions deletes browser sessions whose expires_at has passed.
 //
 // It runs on the poll, outside the claim, which is the one sweep in this worker that does.
-// The reason is a rate the others do not face: /auth/authorize writes a browser session
-// before it validates anything and is not rate limited, so an unauthenticated caller can
-// produce rows as fast as it can send requests. A pre-authentication session stops being
-// usable after thirty minutes, but on the twelve hour claim it would go on EXISTING for up
-// to twelve, and a sustained hundred requests a second would leave about 4.3 million rows
-// waiting for one enormous DELETE. Every five minutes puts the physical bound below the
-// logical one, which is the relationship the thirty minute lifetime was argued on, and
-// each sweep then deletes five minutes of accumulation rather than half a day's.
+// The reason is a rate the others do not face: /auth/authorize saves a browser session on
+// every request that passes its first validation, and the authorize admission tier bounds
+// how fast one address may spend those rows only while the rate limiter switch is on, so
+// with it off an unauthenticated caller can still produce them as fast as it can send
+// requests (#504). The admin console writes none of these: its sign-in handshake rides in
+// a sealed cookie until the callback creates the authenticated session (#620). A
+// pre-authentication session stops being usable after thirty minutes, but on the twelve
+// hour claim it would go on EXISTING for up to twelve, and a sustained hundred requests a
+// second would leave about 4.3 million rows waiting for one enormous DELETE. Every five
+// minutes puts the physical bound below the logical one, which is the relationship the
+// thirty minute lifetime was argued on, and each sweep then deletes five minutes of
+// accumulation rather than half a day's.
 //
 // Giving up single-flight is affordable here and is not affordable for the sweeps inside
 // performTask. This delete is idempotent and keyed on an indexed column, so two instances

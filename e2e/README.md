@@ -70,8 +70,12 @@ and that its API refuses a request with no token.
 `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, so it takes a `reset.sh` to change. It is `true` by default,
 as in production, and then the limits counted by an IP address apply to the suite, which signs
 everyone in from this machine's one address: 30 wrong passwords and 120 password checks a minute, at
-the sign-in form and the password grant each. The suite is written to stay under them, and the `system`
-tests for them run only in this mode.
+the sign-in form and the password grant each, and 120 requests a minute to the authorization endpoint,
+its GET and POST together, which every browser sign-in, single sign-on and raw authorization request
+spends once or twice whatever it asks for. The suite is written to stay under them: the password grant
+is the shortest way to a user's tokens and spends no authorization request, so the tests sign in through
+the browser only where the subject needs it. The `system` tests for these limits run only in this mode,
+each waiting until the address's window has passed before it ends.
 
 `E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for, and skips
 those tests. It is the only switch there is: the limits counted by an account or a user apply either way,

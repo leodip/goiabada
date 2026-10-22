@@ -46,7 +46,7 @@
 # alpine:latest, which moved the release images to a new minor with no change
 # on our side (#396).
 tools:
-  go: "1.27.2"
+  go: "1.27.3"
   tailwind: "4.3.3"
   node: "26.12.0"
   golangci-lint: "2.15.0"

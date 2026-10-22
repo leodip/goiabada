@@ -40,10 +40,11 @@ func (s *Server) initRoutes(root chi.Router) {
 	identifierValidator := inputvalidation.NewIdentifierValidator()
 
 	httpHelper := render.New(s.templateFS, s.staticFS)
-	authHelper := oauthclient.NewAuthHelper(s.sessionStore, builtin.AdminConsoleSessionName, baseURL, s.cfg.AuthServer.BaseURL)
+	authHelper := oauthclient.NewAuthHelper(s.sessionStore, baseURL, s.cfg.AuthServer.BaseURL)
 
 	// Initialize middleware
 	middlewareJwt := middleware.NewJWT(
+		s.sessionStore,
 		s.sessionStore,
 		builtin.AdminConsoleSessionName,
 		tokenParser,

@@ -150,7 +150,7 @@ func run() int {
 		// banners: the two lines after the failure were prose an operator had to read as a
 		// unit, and a JSON deployment received them as three unrelated records with the
 		// remedy in a message field nothing could query (#320).
-		slog.Error("the data encryption key is missing or malformed, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
+		slog.Error("the data encryption key is missing, malformed or the published sample key, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
 			"error", aesKeyErr,
 			"generate_with", "openssl rand -hex 32")
 		return 1
