@@ -663,7 +663,7 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 //
 // It returns what it revoked for the caller to audit AFTER the commit, through
 // LogRevokedConsentGrants, beside and not instead of EventDeletedOwnUserConsent or
-// EventDeletedUserConsent, whose payloads stay as they were. That is decision 9's shape:
+// EventDeletedUserConsent, whose payloads stay as they were. That is #129 decision 9's shape:
 // TerminateUserSessionTx added EventTerminatedUserSession beside EventDeletedUserSession,
 // one a lifecycle fact and one the security action. On any error the result is the zero
 // value, so a caller cannot audit a rolled-back revocation.
