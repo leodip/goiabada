@@ -17,9 +17,9 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-// signInHandshakeKeys are the values RedirToAuthorize parks in the session for the callback to
-// check and then delete. Every one is required: a sign-in missing any of them was not started by
-// this console's authorize redirect, or has lost what it needs to finish.
+// signInHandshakeKeys are the values RedirToAuthorize seals into the handshake cookie for the
+// callback to check. Every one is required: a sign-in missing any of them was not started by this
+// console's authorize redirect, or has lost what it needs to finish.
 var signInHandshakeKeys = []string{
 	sessionkeys.State,
 	sessionkeys.CodeVerifier,
@@ -38,9 +38,9 @@ type signInRefusal struct {
 }
 
 // The six refusals (#427 decisions 6, 10 and 11; the sixth #632 item 3). The 400s are what came
-// from the browser's session or request, and say what the administrator can do about it; the 500s
-// are what the auth server answered, which someone must fix, and point at the log. The two 500s
-// that concern the tokens share one message on purpose: those are the refusals an attacker is
+// from the browser's handshake or request, and say what the administrator can do about it; the
+// 500s are what the auth server answered, which someone must fix, and point at the log. The two
+// 500s that concern the tokens share one message on purpose: those are the refusals an attacker is
 // likeliest to be reading, and naming the check that stopped them would tell them which one to
 // work on. The 405 is the one a browser that reaches the callback by GET gets, which carries no
 // authorization response at all.
@@ -59,10 +59,14 @@ var (
 
 // callbackSessionStore is what the callback calls on the browser session store. Regenerate is
 // in it, so a store that cannot rotate does not compile here, where it used to fall back to a
-// plain save that left the pre-sign-in identifier naming the administrator's tokens (#431).
+// plain save that left the pre-sign-in identifier naming the administrator's tokens (#431). The
+// other three open the handshake cookie RedirToAuthorize set and remove it (#620).
 type callbackSessionStore interface {
 	Get(r *http.Request, name string) (*sessionstore.Session, error)
 	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
+	CookieName(logicalName string) string
+	OpenCookieValues(name, value string) (map[string]string, error)
+	DeletionCookie(name string) *http.Cookie
 }
 
 // codeExchanger is the callback's one call to the token endpoint: redeem this code. The token
@@ -73,14 +77,25 @@ type codeExchanger interface {
 }
 
 // HandleAuthCallbackPost completes the admin console's sign-in: the authorization response comes
-// back here, form-posted, and the session that sent the browser away is checked against it.
+// back here, form-posted, and the handshake that sent the browser away is checked against it.
 //
-// The order is the whole design (#427 decision 5). Everything refusable from the session and the
+// The order is the whole design (#427 decision 5). Everything refusable from the handshake and the
 // request alone is refused before the code is exchanged, because the exchange spends the code: a
 // session missing its redirect-back value used to be noticed only once the code was burned, and
 // one missing its nonce skipped the nonce check altogether and signed the administrator in. Then
 // the exchange, then the ID token's checks, and only then is anything written. Every refusal
 // leaves the session exactly as it was.
+//
+// The handshake arrives in its own sealed cookie rather than in the session, so the session row
+// this handler writes is the console's first, created when there is a signed-in administrator to
+// store in it (#620). The answer removes that cookie when it is spent: when it does not open or
+// does not hold every value, since it would only be refused again, and once the posted state has
+// matched it, whatever follows, since a handshake is good for one callback. A posted state that is
+// absent or another leaves it, because the browser holds one handshake cookie and a second sign-in
+// overwrites the first's: the callback of the sign-in it overwrote is refused for the mismatch, and
+// the cookie is the newer sign-in's, which would still finish. A request that did not bring it is
+// not answered with a removal either, because this route is CSRF-exempt and a cross-site post never
+// carries the Lax cookie, so a removal there would let any other site end a sign-in in flight.
 func HandleAuthCallbackPost(
 	httpHelper HttpHelper,
 	httpSession callbackSessionStore,
@@ -88,31 +103,34 @@ func HandleAuthCallbackPost(
 	exchanger codeExchanger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		handshakeCookieName := httpSession.CookieName(oauthclient.SignInHandshakeCookie)
+		handshakeCookie, noCookieErr := r.Cookie(handshakeCookieName)
+		removeHandshake := func() { http.SetCookie(w, httpSession.DeletionCookie(handshakeCookieName)) }
+
+		// A browser that did not bring the sign-in's handshake back -- no cookie, or one that
+		// did not open -- has causes the administrator can act on and an operator can fix: a
+		// sign-in left too long, blocked cookies, a key rotated away mid sign-in, or a console
+		// on another site than the auth server with a cookie policy that keeps it off a
+		// cross-site form post (#408).
+		if noCookieErr != nil {
+			refuseSignIn(httpHelper, w, r, refusalNoSession,
+				errs.Errorf("the browser brought no %s cookie", handshakeCookieName))
 			return
 		}
-
-		handshake := make(map[string]string, len(signInHandshakeKeys))
+		handshake, err := httpSession.OpenCookieValues(oauthclient.SignInHandshakeCookie, handshakeCookie.Value)
+		if err != nil {
+			removeHandshake()
+			refuseSignIn(httpHelper, w, r, refusalNoSession, errs.Wrap(err, "the sign-in handshake cookie did not open"))
+			return
+		}
 		for _, key := range signInHandshakeKeys {
-			value, readErr := handshakeValue(sess.Values, key)
-			if readErr != nil {
-				// A session the store had to make up on this request -- no cookie, a cookie that
-				// did not decode, or a row that is gone -- is a browser that did not bring the
-				// sign-in's session back, which has causes the administrator can act on and an
-				// operator can fix: a sign-in left too long, blocked cookies, or a console on
-				// another site than the auth server with a cookie policy that keeps it off a
-				// cross-site form post (#408). A session that came back but does not hold the
-				// handshake is the ordinary stale case (#427 decision 11).
-				if sess.IsNew {
-					refuseSignIn(httpHelper, w, r, refusalNoSession, readErr)
-				} else {
-					refuseSignIn(httpHelper, w, r, refusalSession, readErr)
-				}
+			if handshake[key] == "" {
+				// A handshake that came back but does not hold every value is the ordinary
+				// stale case (#427 decision 11).
+				removeHandshake()
+				refuseSignIn(httpHelper, w, r, refusalSession, errs.Errorf("the handshake holds no %s", key))
 				return
 			}
-			handshake[key] = value
 		}
 
 		// r.PostFormValue rather than r.FormValue here and for code, error and error_description
@@ -127,14 +145,23 @@ func HandleAuthCallbackPost(
 		// deployment. This path is also CSRF-exempt, so a cross-origin POST does reach it (#202).
 		if r.PostFormValue("state") != handshake[sessionkeys.State] {
 			refuseSignIn(httpHelper, w, r, refusalSession,
-				errs.New("the posted state is not the one this session sent"))
+				errs.New("the posted state is not the one this sign-in sent"))
+			return
+		}
+		removeHandshake()
+
+		// Read once the state has matched, so a session that cannot be read spends the handshake
+		// too, and still before the code is.
+		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
 		code := r.PostFormValue("code")
 		if len(strings.TrimSpace(code)) == 0 {
 			// Read only once the state has matched, so what is shown is the answer to this
-			// session's own request. Both are the auth server's words passed through the
+			// sign-in's own request. Both are the auth server's words passed through the
 			// browser, so they are conformed to RFC 6749's error_description characters and bound
 			// before they reach the log, and html/template escapes them on the page.
 			errorCode := oauth.ConformErrorDescription(r.PostFormValue("error"))
@@ -180,12 +207,15 @@ func HandleAuthCallbackPost(
 		stored.Scope = oauthclient.EffectiveScope(stored.Scope, handshake[sessionkeys.RequestedScope])
 		sess.Values[sessionkeys.JWT] = stored
 		sess.Values[sessionkeys.JWTExpiresAt] = oauthclient.ExpiresAt(&stored, time.Now())
+		// A session written before #620 can still hold a handshake of its own, which nothing
+		// reads any more and which is not carried into the signed-in session.
 		for _, key := range signInHandshakeKeys {
 			delete(sess.Values, key)
 		}
 		// The identifier rotates here, and this is the admin console's one privilege
-		// transition: the lines above turn a session that was holding nothing but handshake
-		// values into one holding an administrator's access, id and refresh tokens.
+		// transition: the lines above turn a session that was holding nothing, usually one the
+		// store made up on this request, into one holding an administrator's access, id and
+		// refresh tokens.
 		//
 		// A cookie store is structurally immune to session fixation, because the cookie IS
 		// the state and an attacker's planted copy stays the attacker's own stale state. A
@@ -203,7 +233,10 @@ func HandleAuthCallbackPost(
 			return
 		}
 
-		// The base URL plus path the console itself stored in its server-side session.
+		// The base URL plus path the console itself sealed into the handshake. It arrives in a
+		// cookie, but one the AEAD has just authenticated under the console's own session keys,
+		// so no browser can choose it.
+		//nolint:gosec // G710: the console's base URL and path, sealed by this console and opened above
 		http.Redirect(w, r, handshake[sessionkeys.RedirectBack], http.StatusFound)
 	}
 }
@@ -221,24 +254,6 @@ func HandleAuthCallbackGet(httpHelper HttpHelper) http.HandlerFunc {
 		refuseSignIn(httpHelper, w, r, refusalWrongMethod,
 			errs.New("the callback was reached by GET, which carries no authorization response"))
 	}
-}
-
-// handshakeValue reads one of the values RedirToAuthorize parked, refusing one that is absent,
-// not a string, or empty. The assertion is checked because the session is a map of anything, and
-// an unchecked one panicked on a value some other writer left there.
-func handshakeValue(values map[string]any, key string) (string, error) {
-	raw, present := values[key]
-	if !present {
-		return "", errs.Errorf("the session holds no %s", key)
-	}
-	value, ok := raw.(string)
-	if !ok {
-		return "", errs.Errorf("the session's %s is a %T rather than a string", key, raw)
-	}
-	if value == "" {
-		return "", errs.Errorf("the session's %s is empty", key)
-	}
-	return value, nil
 }
 
 // refuseSignInByAuthServer answers the error the auth server posted back instead of a code: a

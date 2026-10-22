@@ -1100,6 +1100,94 @@ func TestRevokeCodesByClientId_TransactionAndFailurePath(t *testing.T) {
 	}
 }
 
+// TestRevokeUnusedCodesByUserIdAndClientId covers the consent withdrawal's code mark (#622):
+// every unused code the user holds with the client is marked, and nothing else is, neither a used
+// code of the same grant nor a code of another user or another client.
+func TestRevokeUnusedCodesByUserIdAndClientId(t *testing.T) {
+	client := createTestClient(t)
+	otherClient := createTestClient(t)
+	user := createTestUser(t)
+	otherUser := createTestUser(t)
+
+	first := createTestCode(t, client.Id, user.Id)
+	second := createTestCode(t, client.Id, user.Id)
+	used := createTestCode(t, client.Id, user.Id)
+	claimed, err := database.MarkCodeAsUsed(context.Background(), nil, used.Id)
+	if err != nil || !claimed {
+		t.Fatalf("MarkCodeAsUsed: claimed=%v err=%v", claimed, err)
+	}
+	otherClientCode := createTestCode(t, otherClient.Id, user.Id)
+	otherUserCode := createTestCode(t, client.Id, otherUser.Id)
+
+	count, err := database.RevokeUnusedCodesByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("RevokeUnusedCodesByUserIdAndClientId returned error: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 codes revoked, got %d", count)
+	}
+	assertCodeRevoked(t, first.Id, true, "an unused code of the user with the client")
+	assertCodeRevoked(t, second.Id, true, "the second unused code of the user with the client")
+
+	// A used code's grant is its refresh tokens, which the withdrawal sweeps; marked, it would
+	// change the refresh arm's answer to those tokens.
+	assertCodeRevoked(t, used.Id, false, "a used code of the user with the client")
+	// One negative control per predicate, so removing either fails here.
+	assertCodeRevoked(t, otherClientCode.Id, false, "a code of the same user with another client")
+	assertCodeRevoked(t, otherUserCode.Id, false, "a code of another user with the same client")
+
+	// The count is what this call transitioned, not what matched.
+	count, err = database.RevokeUnusedCodesByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("second RevokeUnusedCodesByUserIdAndClientId returned error: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("a second call must report 0 rows, got %d", count)
+	}
+
+	// A zero id on either side is rejected rather than used as a filter.
+	if _, err := database.RevokeUnusedCodesByUserIdAndClientId(context.Background(), nil, 0, client.Id); err == nil {
+		t.Error("a zero user id must return an error")
+	}
+	if _, err := database.RevokeUnusedCodesByUserIdAndClientId(context.Background(), nil, user.Id, 0); err == nil {
+		t.Error("a zero client id must return an error")
+	}
+	assertCodeRevoked(t, otherClientCode.Id, false, "a code of another client after the zero-id calls")
+	assertCodeRevoked(t, otherUserCode.Id, false, "a code of another user after the zero-id calls")
+}
+
+// TestRevokeUnusedCodesByUserIdAndClientId_TransactionAndFailurePath holds the mark to the
+// withdrawal's transaction, so a withdrawal that rolls back leaves the code redeemable, and its
+// failure to an error rather than a benign zero.
+func TestRevokeUnusedCodesByUserIdAndClientId_TransactionAndFailurePath(t *testing.T) {
+	client := createTestClient(t)
+	user := createTestUser(t)
+	code := createTestCode(t, client.Id, user.Id)
+
+	tx := beginTx(t)
+	count, err := database.RevokeUnusedCodesByUserIdAndClientId(context.Background(), tx, user.Id, client.Id)
+	if err != nil {
+		t.Fatalf("RevokeUnusedCodesByUserIdAndClientId in a transaction returned error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
+	}
+
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction: %v", rollbackErr)
+	}
+	assertCodeRevoked(t, code.Id, false, "a code revoked inside a rolled-back transaction")
+
+	// The failure path, forced by the same finished transaction.
+	count, err = database.RevokeUnusedCodesByUserIdAndClientId(context.Background(), tx, user.Id, client.Id)
+	if err == nil {
+		t.Error("a statement that cannot run must return an error, not a benign zero count")
+	}
+	if count != 0 {
+		t.Errorf("a failed call must report 0 rows, got %d", count)
+	}
+}
+
 // TestUpdateCode_DoesNotClobberRevoked pins the dont-update tag on Code.Revoked
 // (#129 decision 4). Nothing else in the suite fails if the tag is removed: the
 // termination sweep writes the column with its own statement, while UpdateCode writes

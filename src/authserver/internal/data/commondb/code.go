@@ -209,6 +209,54 @@ func (d *Database) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, client
 	return rowsAffected, nil
 }
 
+// RevokeUnusedCodesByUserIdAndClientId marks every code one user holds with one client
+// that is neither used nor revoked yet revoked, and reports how many rows this call
+// transitioned. It is the code half of a consent withdrawal (#622): a code issued
+// before the withdrawal can still be redeemed for its 60 seconds, and redemption
+// consults no stored consent, so without the mark it would start a grant the
+// withdrawal never saw.
+//
+// Unused codes only, unlike RevokeCodesByClientId. A used code's grant is the refresh
+// tokens the withdrawal sweeps, and marking it as well would make the refresh arm's
+// revoked-code check answer those tokens with the session-terminated description
+// before the sweep's own "This refresh token has been revoked." could.
+//
+// The `revoked = false` term makes the count mean "rows this call transitioned", for
+// the reason RevokeCodesBySessionIdentifier gives. A zero user or client id is rejected
+// rather than used as a filter, for the reason RevokeCodesByClientId gives.
+func (d *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error) {
+
+	if userId == 0 || clientId == 0 {
+		return 0, errs.New("can't revoke codes with a user id or a client id of 0")
+	}
+
+	ub := sqlbuilder.NewUpdateBuilder()
+	ub.Update("codes")
+	ub.Set(
+		ub.Assign("revoked", true),
+		ub.Assign("updated_at", time.Now().UTC()),
+	)
+	ub.Where(
+		ub.Equal("user_id", userId),
+		ub.Equal("client_id", clientId),
+		ub.Equal("used", false),
+		ub.Equal("revoked", false),
+	)
+
+	query, args := ub.BuildWithFlavor(d.Flavor)
+	result, err := d.ExecSQL(ctx, tx, query, args...)
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to revoke unused codes by user id and client id")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to get rows affected when revoking unused codes by user id and client id")
+	}
+
+	return rowsAffected, nil
+}
+
 func (d *Database) getCodeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	codeStruct *sqlbuilder.Struct) (*record.Code, error) {
 

@@ -118,7 +118,12 @@ func newStaticBranchTestServer(database *datamocks.Database) *Server {
 // store's other test callers already use. They never vary and nothing reads them, so
 // generating them would only add an error to check in a helper that cannot fail.
 func newTestSessionStore() *sessionstore.ConditionalStore {
-	backend := sessiontest.NewMemoryBackend()
+	return newTestSessionStoreOver(sessiontest.NewMemoryBackend())
+}
+
+// newTestSessionStoreOver is newTestSessionStore over a backend the caller holds, for a test
+// that counts what the store writes.
+func newTestSessionStoreOver(backend sessionstore.ConditionalBackend) *sessionstore.ConditionalStore {
 	store, err := sessionstore.NewServerSideStore(
 		backend,
 		sessionkeys.SessionIdentifier,

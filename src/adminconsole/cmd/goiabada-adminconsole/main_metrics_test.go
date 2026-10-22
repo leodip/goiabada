@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // The metrics listener at the process (#400 decisions 3 and 6): main reads the three settings,
@@ -163,12 +168,39 @@ func freePort(t *testing.T) int {
 
 // getWhenUp sends a GET to url until something answers it, for as long as ctx allows, following no
 // redirect.
-func getWhenUp(t *testing.T, ctx context.Context, url string) (int, string, string) {
+// returningBrowserCookie is the session cookie a browser brings back, sealed under the session
+// keys startMetricsChild starts the child with, so the child opens it and asks the auth server's
+// session endpoint for the row it names, which no auth server here holds.
+func returningBrowserCookie(t *testing.T) *http.Cookie {
+	t.Helper()
+	authenticationKey, err := hex.DecodeString(strings.Repeat("b1", 64))
+	require.NoError(t, err)
+	encryptionKey, err := hex.DecodeString(strings.Repeat("b2", 32))
+	require.NoError(t, err)
+	store, err := newSessionStore(sessiontest.NewMemoryBackend(), false, sessionstore.KeyPair{
+		AuthenticationKey: authenticationKey, EncryptionKey: encryptionKey}, nil)
+	require.NoError(t, err)
+	seed := httptest.NewRequest(http.MethodGet, "/", nil)
+	session, err := store.Get(seed, builtin.AdminConsoleSessionName)
+	require.NoError(t, err)
+	saved := httptest.NewRecorder()
+	require.NoError(t, store.Save(seed, saved, session))
+	cookies := saved.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return cookies[0]
+}
+
+func getWhenUp(t *testing.T, ctx context.Context, url string, cookies ...*http.Cookie) (int, string, string) {
 	t.Helper()
 
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	for {
-		resp, err := client.Get(url)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		require.NoError(t, err)
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
+		resp, err := client.Do(req)
 		if err == nil {
 			body, readErr := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
@@ -184,7 +216,7 @@ func getWhenUp(t *testing.T, ctx context.Context, url string) (int, string, stri
 }
 
 // stubAuthServer answers the public settings and a client credentials grant, and refuses the
-// browser-session endpoint, so a console page that saves a session reaches three of the clients
+// browser-session endpoint, so a console page that loads a session reaches three of the clients
 // main builds: the settings client, the token client and the session backend.
 func stubAuthServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -218,10 +250,11 @@ func TestMain_ServesMetricsOnTheirOwnListenerAndDrainsIt(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Equal(t, "text/plain; version=0.0.4; charset=utf-8", contentType)
 
-	// An administrator with no session reaching the console is sent to sign in, which saves the
-	// sign-in's state in a new session: the settings, then a token for the session endpoint, then
-	// the session endpoint itself, which this auth server refuses.
-	getWhenUp(t, ctx, "http://127.0.0.1:"+strconv.Itoa(httpPort)+"/admin/users")
+	// A browser returning with a session cookie reaching the console has its session loaded: the
+	// settings, then a token for the session endpoint, then the session endpoint itself, which
+	// this auth server refuses. A browser with none would reach no session endpoint at all, since
+	// the sign-in it starts writes no row (#620).
+	getWhenUp(t, ctx, "http://127.0.0.1:"+strconv.Itoa(httpPort)+"/admin/users", returningBrowserCookie(t))
 
 	status, _, body = getWhenUp(t, ctx, "http://127.0.0.1:"+strconv.Itoa(httpPort)+"/metrics")
 	assert.Equal(t, http.StatusNotFound, status, "the main listener serves no metrics")

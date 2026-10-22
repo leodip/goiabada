@@ -54,11 +54,11 @@ type ValidateProfileInput struct {
 const nameMaxLength = 48
 
 var (
-	// nameShape allows Unicode letters, spaces, apostrophes and hyphens, 2 to 48
+	// nameShape allows Unicode letters, spaces, apostrophes and hyphens, 1 to 48
 	// characters. Note the literal space rather than \s: tabs, newlines and other
 	// control characters have no place in a name and would otherwise let a value
 	// span multiple lines.
-	nameShape = regexp.MustCompile(`^[\p{L} '-]{2,48}$`)
+	nameShape = regexp.MustCompile(`^[\p{L} '-]{1,48}$`)
 	// nameHasLetter requires at least one letter, so a value made up entirely of
 	// spaces, apostrophes or hyphens is rejected.
 	nameHasLetter = regexp.MustCompile(`\p{L}`)

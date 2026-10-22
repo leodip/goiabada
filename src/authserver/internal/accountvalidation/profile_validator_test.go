@@ -50,11 +50,11 @@ func assertLocalizedError(t *testing.T, err error, expectedCode string, expected
 // site that knows the limit.
 var profileErrorMessages = map[string]string{
 	i18n.ErrCodeProfileGivenNameInvalid: "Please enter a valid given name. It should contain only letters, " +
-		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+		"spaces, hyphens, and apostrophes and be between 1 and 48 characters in length.",
 	i18n.ErrCodeProfileMiddleNameInvalid: "Please enter a valid middle name. It should contain only letters, " +
-		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+		"spaces, hyphens, and apostrophes and be between 1 and 48 characters in length.",
 	i18n.ErrCodeProfileFamilyNameInvalid: "Please enter a valid family name. It should contain only letters, " +
-		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+		"spaces, hyphens, and apostrophes and be between 1 and 48 characters in length.",
 	i18n.ErrCodeProfileUsernameInvalid: "Usernames must start with a letter and consist only of letters, " +
 		"numbers, and underscores. They must be between 2 and 24 characters long.",
 	i18n.ErrCodeProfileNicknameInvalid: "Nicknames must start with a letter and consist only of letters, " +
@@ -71,8 +71,8 @@ var profileErrorMessages = map[string]string{
 // =============================================================================
 // Tests for ValidateName
 //
-// The shared name pattern is `^[\p{L}\s'-]{2,48}$`: Unicode letters, spaces,
-// apostrophes and hyphens, 2 to 48 characters. An empty name is allowed, since
+// The shared name pattern is `^[\p{L}\s'-]{1,48}$`: Unicode letters, spaces,
+// apostrophes and hyphens, 1 to 48 characters. An empty name is allowed, since
 // given / middle / family names are all optional.
 // =============================================================================
 
@@ -84,7 +84,10 @@ func TestValidateName_Accepted(t *testing.T) {
 		value string
 	}{
 		{"simple name", "Jane"},
-		{"two characters is the minimum", "Jo"},
+		{"two characters", "Jo"},
+		{"single latin letter", "J"},
+		{"single chinese character", "王"},
+		{"single korean character", "김"},
 		{"hyphenated", "Mary-Jane"},
 		{"apostrophe", "O'Brien"},
 		{"space separated", "Mary Jane"},
@@ -115,6 +118,9 @@ func TestValidateName_RejectsWhitespaceOnlyAndControlCharacters(t *testing.T) {
 		name  string
 		value string
 	}{
+		{"single space only", " "},
+		{"single hyphen only", "-"},
+		{"single apostrophe only", "'"},
 		{"two spaces only", "  "},
 		{"many spaces only", strings.Repeat(" ", 10)},
 		{"hyphens only", "--"},
@@ -200,7 +206,6 @@ func TestValidateName_Rejected(t *testing.T) {
 		name  string
 		value string
 	}{
-		{"single character", "J"},
 		{"49 characters", strings.Repeat("a", 49)},
 		{"contains a digit", "Jane2"},
 		{"contains an underscore", "Jane_Doe"},
@@ -238,7 +243,7 @@ func TestValidateName_ReturnsTheCallerSuppliedCode(t *testing.T) {
 
 	for _, code := range codes {
 		t.Run(code, func(t *testing.T) {
-			err := validator.ValidateName("J", code)
+			err := validator.ValidateName("J.", code)
 
 			assertLocalizedError(t, err, code, profileErrorMessages[code])
 		})
@@ -411,7 +416,7 @@ func TestValidateProfile_NameFieldsReportTheirOwnCode(t *testing.T) {
 	}{
 		{
 			name:         "given name",
-			input:        ValidateProfileInput{GivenName: "J"},
+			input:        ValidateProfileInput{GivenName: "J."},
 			expectedCode: i18n.ErrCodeProfileGivenNameInvalid,
 		},
 		{
@@ -443,7 +448,7 @@ func TestValidateProfile_NameFieldsAreCheckedInOrder(t *testing.T) {
 	validator := NewProfileValidator(datamocks.NewDatabase(t))
 
 	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
-		GivenName:  "J",
+		GivenName:  "J.",
 		MiddleName: "Q1",
 		FamilyName: "Doe_",
 	})

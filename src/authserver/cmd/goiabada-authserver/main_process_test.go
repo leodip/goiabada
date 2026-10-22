@@ -429,7 +429,7 @@ func TestMain_HonorsATimeZoneFromTheFirstRecord(t *testing.T) {
 			code, stderr := runMainProcessWith(t, decoy, []string{"TZ=" + tz})
 
 			require.Equal(t, 1, code, "stderr: %s", stderr)
-			assert.Contains(t, stderr, "the data encryption key is missing or malformed")
+			assert.Contains(t, stderr, "the data encryption key is missing, malformed or the published sample key")
 			first, _, _ := strings.Cut(stderr, "\n")
 			assert.Contains(t, first, "+05:30 level=INFO msg=\"auth server started\"")
 			assert.NoFileExists(t, decoy)
@@ -447,7 +447,7 @@ func TestMain_LeavesAnUnsetOrEmptyTimeZoneAsItWas(t *testing.T) {
 		code, stderr := runMainProcessWith(t, decoy, nil)
 
 		require.Equal(t, 1, code, "stderr: %s", stderr)
-		assert.Contains(t, stderr, "the data encryption key is missing or malformed")
+		assert.Contains(t, stderr, "the data encryption key is missing, malformed or the published sample key")
 	})
 	for _, tz := range []string{"", ":"} {
 		t.Run("TZ="+tz, func(t *testing.T) {
