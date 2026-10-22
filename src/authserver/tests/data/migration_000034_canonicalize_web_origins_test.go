@@ -92,13 +92,14 @@ type repair000034 struct {
 func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	// Seeded through the ORM at 000033 after a round trip to head, on
-	// migration_000029_created_via_dcr_test.go's pattern: going to head first is
-	// what keeps this test working when later migrations add a column, since the
-	// ORM writes every column the Go models carry. ErrNoChange is tolerated
-	// because 000034 is currently head.
+	// Seeded at 000033 after a round trip to head, on
+	// migration_000029_created_via_dcr_test.go's pattern. The client and web
+	// origins are seeded with SQL naming only the columns 000033 carries
+	// (seedClient000034, seedWebOrigin000034), so the seed does not need the trip;
+	// it is kept as the existing pattern. ErrNoChange is tolerated from when
+	// 000034 was head.
 	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head before seeding through the ORM")
+		require.NoError(t, err, "migrate to head")
 	}
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 33), "roll back to 000033")
 

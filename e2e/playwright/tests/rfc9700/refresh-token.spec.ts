@@ -75,17 +75,28 @@ test("a refresh token ends when the user's consent to the client, or the user's 
   const token = asClient(request, { identifier: client.identifier, secret });
 
   await test.step("consent revoked", async () => {
-    const { context, tokens } = await signInForTokens(browser, request, { identifier: client.identifier, secret }, user, "openid profile");
+    // A client of its own, whose Ask users for consent is turned off once the user has approved the
+    // screen: a refresh then consults no stored consent, so only the withdrawal's revocation can end
+    // the grant (#622). The step's shared client keeps consent required for the step after.
+    const consentClient = await browserSignInClient(page, clients, { consentRequired: true });
+    const consentToken = asClient(request, { identifier: consentClient.client.identifier, secret: consentClient.secret });
+    const { context, tokens } = await signInForTokens(browser, request, { identifier: consentClient.client.identifier, secret: consentClient.secret }, user, "openid profile");
     await context.close();
+    await page.goto(clientUrl(consentClient.client.id, "settings"));
+    await page.locator('input[name="consentRequired"]').uncheck();
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Settings saved.")).toBeVisible();
     // Refreshes while the consent stands; the token it issues is the live one.
-    const refreshed = await token({ grant_type: "refresh_token", refresh_token: tokens.refresh_token as string });
+    const refreshed = await consentToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token as string });
     expectTokenResponse(refreshed);
     await page.goto(userUrl(user.id, "consents"));
-    const row = rowWithCell(page, client.identifier);
-    await row.getByRole("button", { name: `Revoke ${client.identifier}`, exact: true }).click();
-    await confirmDialog(page, `Revoke the consent the user gave ${client.identifier}?`);
+    const row = rowWithCell(page, consentClient.client.identifier);
+    await row.getByRole("button", { name: `Revoke ${consentClient.client.identifier}`, exact: true }).click();
+    await confirmDialog(page, `Revoke the consent the user gave ${consentClient.client.identifier}?`);
     await expect(row.getByText("Revoked", { exact: true })).toBeVisible();
-    expectTokenError(await token({ grant_type: "refresh_token", refresh_token: refreshed.body.refresh_token as string }), "invalid_grant");
+    const refused = await consentToken({ grant_type: "refresh_token", refresh_token: refreshed.body.refresh_token as string });
+    expectTokenError(refused, "invalid_grant");
+    expect(refused.body.error_description).toBe("This refresh token has been revoked.");
   });
 
   await test.step("permission removed", async () => {

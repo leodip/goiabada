@@ -69,6 +69,10 @@ func TestEventTypes_ContainsCriticalEvents(t *testing.T) {
 		// this event stopped being emitted the revocation would be the one part of the action
 		// leaving no trace at all.
 		EventRevokedClientGrants,
+		// Records that withdrawing a consent revoked the refresh tokens the user held with that
+		// client (#622). Same class: deleted_user_consent and deleted_own_user_consent survive
+		// either way, and name no client, so without it the revocation would leave no trace.
+		EventRevokedConsentGrants,
 	}
 
 	for _, critical := range criticalEvents {
@@ -138,6 +142,7 @@ func TestEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 		{"EventRevokedUserAuthState", EventRevokedUserAuthState, "revoked_user_auth_state"},
 		{"EventTerminatedUserSession", EventTerminatedUserSession, "terminated_user_session"},
 		{"EventRevokedClientGrants", EventRevokedClientGrants, "revoked_client_grants"},
+		{"EventRevokedConsentGrants", EventRevokedConsentGrants, "revoked_consent_grants"},
 		{"EventRotatedKeys", EventRotatedKeys, "rotated_keys"},
 		{"EventRevokedKey", EventRevokedKey, "revoked_key"},
 		{"EventAuthCodeReuseDetected", EventAuthCodeReuseDetected, "auth_code_reuse_detected"},

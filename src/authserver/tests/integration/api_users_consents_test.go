@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -245,6 +246,34 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	require.NoError(t, err)
 	assert.Nil(t, deletedConsent)
+}
+
+// The admin console's user page withdraws a consent through this endpoint, and the withdrawal
+// revokes the refresh tokens the user holds with that client, of a client whose Consent required
+// is off too, while the user's grant with another client keeps refreshing (#622).
+func TestAPIUserConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, adminClient := createAdminClientWithToken(t)
+
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+	user := &record.User{
+		Subject:      fake.UUID(),
+		Enabled:      true,
+		Email:        fake.Email(),
+		PasswordHash: passwordHashed,
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
+	defer func() { _ = database.DeleteUser(context.Background(), nil, user.Id) }()
+	f := newConsentWithdrawalFixture(t, user, password)
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(f.consent.Id, 10)
+	resp := makeAPIRequest(t, "DELETE", url, adminToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	f.assertWithdrawn(t, adminToken, adminClient.ClientIdentifier)
 }
 
 func TestAPIUserConsentDelete_NotFound(t *testing.T) {

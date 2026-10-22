@@ -138,11 +138,14 @@ func (s *Server) initRoutes(branches appBranches) {
 	clientErrorResponder := handlers.NewClientErrorResponder(s.database, httpHelper)
 
 	pages.Route("/auth", func(r chi.Router) {
+		// The admission tier ahead of both methods, one budget for the two: the GET writes a
+		// browser-session row and the POST a parked-request row, on every request that passes its
+		// first validation (#504).
 		// A POST is parked and answered with a 303 to a GET, which runs the ceremony from it: the
 		// POST arrives cross-site without the Lax session cookie and must not touch the browser's
 		// own session (#246).
-		r.Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger))))
-		r.Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authflow.NewAuthorizationParking(authorizeValidator, s.database), baseURL))
+		r.With(rateLimiter.LimitAuthorize).Get("/authorize", handlers.HandleAuthorizeGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewAuthorization(s.database, userSessionManager, authorizeValidator, tokenParser, clientErrorResponder, auditLogger, authflow.NewSilentAuthentication(s.database, userSessionManager, permissionChecker, auditLogger))))
+		r.With(rateLimiter.LimitAuthorize).Post("/authorize", handlers.HandleAuthorizePost(httpHelper, authflow.NewAuthorizationParking(authorizeValidator, s.database), baseURL))
 		r.Get("/level1", handlers.HandleAuthLevel1Get(ceremonyBoundary, ceremonyStore))
 		r.Get("/level1completed", handlers.HandleAuthLevel1CompletedGet(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewLevel1Completion(s.database, userSessionManager)))
 		r.Get("/level2", handlers.HandleAuthLevel2Get(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewLevel2Selection(s.database)))

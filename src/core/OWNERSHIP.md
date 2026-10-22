@@ -287,6 +287,7 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertNoGuardInTestsReachedFrom` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoHTMLSinks` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertNoLiteralStackSecrets` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoParentImport` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNoStaleDeferredBodyCloses` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
@@ -577,6 +578,8 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `SelectedNames` | kernel | — |
 | `core/internal/refgraph` | `TableUnder` | kernel | — |
 | `core/internal/refgraph` | `Unparen` | kernel | — |
+| `core/issuerlength` | `Check` | contract | The one bound on an issuer's length. The setup wizard, which is not one of the two applications, writes the auth server URL the first start seeds as the issuer, and the auth server refuses to start on one longer than the general settings save would keep, so the bound is defined once here for the start, the save and the wizard rather than copied into each (#615). |
+| `core/issuerlength` | `Max` | contract | The bound `Check` holds an issuer to, which the start's refusal and the general settings save's message name to the operator, so each says the number the bound holds rather than a copy of it (#615). |
 | `core/locales` | `All` | contract | The list half of the locale table whose lookup the auth server validates against. Moving it would put one locale list in two places. |
 | `core/locales` | `ByID` | contract | The lookup half of the locale table whose list the admin console renders. Moving it would put one locale list in two places. |
 | `core/locales` | `Locale` | contract | The row type both halves of the table share. |
@@ -628,9 +631,11 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `ConfiguredKeys` | both-apps | — |
 | `core/sessionstore` | `CookieLifetime` | reachable | — |
 | `core/sessionstore` | `ErrChanged` | kernel | — |
+| `core/sessionstore` | `ErrCookieValuesTooLong` | own-package | — |
 | `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
 | `core/sessionstore` | `KeyPair` | both-apps | — |
+| `core/sessionstore` | `MaxCookieValuesBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionDataBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionWireBytes` | both-apps | — |
 | `core/sessionstore` | `NewConditionalStore` | contract | The constructor of `ConditionalStore`, beside it for the same reason. Only the auth server builds it; it stays because its two writes seal, open, mint identifiers and set cookies with the keys and codec this package keeps private, which is where #579 decision 1 puts the conditional capability, so the admin console's store never carries it. |
@@ -639,7 +644,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `Options` | own-package | — |
 | `core/sessionstore` | `ParseKeys` | both-apps | — |
 | `core/sessionstore` | `PersistentCookie` | own-package | — |
-| `core/sessionstore` | `PreAuthLifetime` | contract | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
+| `core/sessionstore` | `PreAuthLifetime` | own-package | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
 | `core/sessionstore` | `PreviousKeysError` | both-apps | — |
 | `core/sessionstore` | `Record` | kernel | — |
 | `core/sessionstore` | `ServerSideStore` | own-package | — |

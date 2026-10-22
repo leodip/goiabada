@@ -40,6 +40,10 @@ const flashSessionEnded = "sessionEnded"
 // that administrator on every try. The home page calls no admin API, so nothing loops, and the
 // next console page they open meets the same 401 from this origin and is signed out then, with
 // the notice.
+//
+// A request that arrives with no cookie is sent home the same way without a write: no row
+// exists to end, and the row its save would create is the one an anonymous client could
+// otherwise mint per request, at no limit (#620).
 func HandleSessionEndedGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -58,6 +62,15 @@ func HandleSessionEndedGet(
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to read the session"))
+			return
+		}
+
+		if sess.ID == "" {
+			// No cookie reached the route, so the store returned a fresh session and
+			// nothing has ended. Saving it would insert a row no browser can read back,
+			// one per request at no limit; and the notice is not written either, because
+			// without a cookie there is nothing to carry it to the home page (#620).
+			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
 
