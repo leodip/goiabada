@@ -47,7 +47,7 @@ type Database interface {
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 }
@@ -126,6 +126,14 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// (#550 names the rule this follows).
 	var passwordHash string
 	if req.Password != "" {
+		// A password of spaces and tabs alone is refused before the policy, which counts them like
+		// any other character: the sign-in form refuses one as blank before any lookup, so stored,
+		// it would replace the forgotten password with one nobody can sign in with. It is not
+		// trimmed, so spaces around a real password are kept as typed.
+		if strings.TrimSpace(req.Password) == "" {
+			return Outcome{}, refused("the password is blank: it holds only whitespace, which " +
+				"sign-in refuses")
+		}
 		settings, settingsErr := database.GetSettingsById(ctx, nil, 1)
 		if settingsErr != nil {
 			return Outcome{}, errs.Wrap(settingsErr, "unable to read the settings")
@@ -155,7 +163,11 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// still there and enabled, and which authenticator the removal compares against. Read before
 	// the transaction, a removal and re-enrolment landing in between left an authenticator in
 	// place while the command said none had been enrolled. Every credential change takes the same
-	// row first, so under it the user is what this attempt decides on (#131, #542).
+	// row first, so under it the user is what this attempt decides on (#131, #542). The read under
+	// it is a locking one: on MySQL the grant's read of the manage permission below has already
+	// fixed the snapshot every plain read answers from, before the wait for the user's row, so a
+	// plain read there answered the user as it stood before a disabling or an enrolment the wait
+	// let commit.
 	//
 	// A grant is not a credential change: the Admin API's saves of who holds manage take the
 	// manage permission's row first (lockAdministrators, #402 decision 11) and never the user's,
@@ -180,7 +192,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		if acquireErr := database.AcquireUserRow(ctx, tx, user.Id); acquireErr != nil {
 			return acquireErr
 		}
-		current, readErr := database.GetUserById(ctx, tx, user.Id)
+		current, readErr := database.GetUserByIdForUpdate(ctx, tx, user.Id)
 		if readErr != nil {
 			return readErr
 		}

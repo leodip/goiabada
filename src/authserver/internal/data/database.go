@@ -107,6 +107,11 @@ type Database interface {
 	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	// GetUserByIdForUpdate reads the user as last committed and takes the row until the
+	// transaction ends. Unlike GetUserById it answers what committed while the caller waited on a
+	// lock even after an earlier read in the same transaction, which on MySQL fixes the snapshot
+	// every later consistent read answers from (#498). A transaction is required.
+	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error)
 	GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)

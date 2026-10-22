@@ -36,7 +36,7 @@ func expectTheUserUnderItsRow(database *datamocks.Database, before, under *recor
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(before, nil)
 	stub := datamocks.ExpectRunInTransaction(database, recoveryTx)
 	database.On("AcquireUserRow", mock.Anything, recoveryTx, before.Id).Return(nil)
-	database.On("GetUserById", mock.Anything, recoveryTx, before.Id).Return(under, nil)
+	database.On("GetUserByIdForUpdate", mock.Anything, recoveryTx, before.Id).Return(under, nil)
 	return stub
 }
 
@@ -127,7 +127,7 @@ func TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt(t *testing.T) {
 	stub := datamocks.ExpectRunInTransactionRerun(database, recoveryTx)
 	database.On("AcquireManagePermissionRow", mock.Anything, recoveryTx).Return(manageId, nil).Twice()
 	database.On("AcquireUserRow", mock.Anything, recoveryTx, int64(7)).Return(nil).Twice()
-	database.On("GetUserById", mock.Anything, recoveryTx, int64(7)).Return(user, nil).Twice()
+	database.On("GetUserByIdForUpdate", mock.Anything, recoveryTx, int64(7)).Return(user, nil).Twice()
 	database.On("GetUserPermissionsByUserId", mock.Anything, recoveryTx, int64(7)).
 		Return([]record.UserPermission{}, nil).Once()
 	database.On("GetUserPermissionsByUserId", mock.Anything, recoveryTx, int64(7)).

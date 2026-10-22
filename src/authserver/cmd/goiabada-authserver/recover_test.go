@@ -374,17 +374,27 @@ func TestRecover_FindsTheUserByATrimmedLowercasedAddress(t *testing.T) {
 
 // TestRecover_HoldsThePasswordToTheStoredPolicy: the policy is the one the settings row stores,
 // not a default. "abcdefghij" passes the low policy's six characters and fails the high policy's
-// mixed classes, so only the stored policy tells its two cases apart (#498 round 3 F2).
+// mixed classes, so only the stored policy tells its two cases apart (#498 round 3 F2). A password
+// of whitespace alone is refused before the policy, even the none policy, which would allow it:
+// sign-in refuses it as blank, so stored it could never be signed in with. It is refused from
+// --password and from --password-stdin alike, while spaces around a real password are kept.
 func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
+	const policyRefusal = "the password is refused by the stored password policy"
+	const blankRefusal = "the password is blank"
 	for _, tc := range []struct {
 		name     string
 		policy   record.PasswordPolicy
 		password string
+		stdin    string // when set, the password is read from it through --password-stdin
 		accepted bool
+		refusal  string
 	}{
-		{"a password every policy refuses", record.PasswordPolicyLow, "short", false},
-		{"the stored high policy refuses what the low one allows", record.PasswordPolicyHigh, "abcdefghij", false},
-		{"the stored low policy allows it", record.PasswordPolicyLow, "abcdefghij", true},
+		{"a password every policy refuses", record.PasswordPolicyLow, "short", "", false, policyRefusal},
+		{"the stored high policy refuses what the low one allows", record.PasswordPolicyHigh, "abcdefghij", "", false, policyRefusal},
+		{"the stored low policy allows it", record.PasswordPolicyLow, "abcdefghij", "", true, ""},
+		{"a space alone, under the none policy", record.PasswordPolicyNone, " ", "", false, blankRefusal},
+		{"spaces and tabs alone from stdin, under the none policy", record.PasswordPolicyNone, "", " \t \n", false, blankRefusal},
+		{"spaces around a real password from stdin", record.PasswordPolicyLow, " \tabcdefghij\t ", " \tabcdefghij\t \n", true, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db, _ := newRecoverDatabase(t)
@@ -395,9 +405,15 @@ func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
 			require.NoError(t, db.UpdateSettings(ctx, nil, settings))
 			recorder := &recoverAuditRecorder{}
 
-			code, _, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
-				email: "admin@example.com", password: tc.password,
-			})
+			inv := recoverInvocation{email: "admin@example.com", password: tc.password}
+			if tc.stdin != "" {
+				var readErr bytes.Buffer
+				var ok bool
+				inv, ok = readRecoverCommand([]string{"--email", "admin@example.com", "--password-stdin"},
+					config.DatabaseConfig{Type: "sqlite"}, strings.NewReader(tc.stdin), &readErr)
+				require.True(t, ok, "stderr: %s", readErr.String())
+			}
+			code, _, stderr := runRecoverOn(t, db, recorder, inv)
 
 			after, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
 			require.NoError(t, err)
@@ -410,7 +426,7 @@ func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
 				return
 			}
 			assert.Equal(t, migrateExitError, code)
-			assert.Contains(t, stderr, "the password is refused by the stored password policy")
+			assert.Contains(t, stderr, tc.refusal)
 			assert.Equal(t, "not-a-bcrypt-hash", after.PasswordHash, "the password is as it was")
 			assert.Equal(t, int64(0), after.AuthStateGeneration, "the generation did not move")
 			assert.Empty(t, recorder.events, "a refusal writes no audit event")

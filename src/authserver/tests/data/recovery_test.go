@@ -24,9 +24,10 @@ import (
 // user's authentication generation advances by one and their sessions and refresh tokens end, and
 // each action changes what it names and nothing else (#498, its Done-when: "the data tier shows it
 // on all four engines"), and a call failing inside its transaction commits none of the writes
-// before it. The two forced interleavings at the end show the user and the authenticator are read
+// before it. The forced interleavings at the end show the user and the authenticator are read
 // under the user's row, and the held grant under the manage permission's, so a credential change or
-// a grant holding that row when the recovery starts is what the recovery decides on.
+// a grant holding that row when the recovery starts is what the recovery decides on, a grant asked
+// for beside a credential change included.
 
 // recoveryPassword passes every password policy, so the test does not depend on which policy the
 // shared database's settings row holds.
@@ -412,7 +413,123 @@ func TestRecovery_AFailedGrantRollsBackEarlierActions(t *testing.T) {
 // The recovery waits for the row and removes the authenticator the change left. Read before the
 // transaction, it compared against the generation the change moved past, removed nothing, and said
 // none had been enrolled, leaving the new authenticator in place (#498 review F5).
+//
+// With a grant asked for as well, the recovery reads the manage permission before it waits for the
+// user's row, which on MySQL fixes the snapshot every plain read answers from. Its read of the user
+// under the row is a locking one, so it still finds the authenticator the change left rather than
+// the one the change removed, and the removal neither loses its compare-and-set nor is refused.
 func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) {
+	skipWhereTransactionsCannotOverlap(t)
+
+	for _, grantManage := range []bool{false, true} {
+		name := "removal alone"
+		if grantManage {
+			name = "removal and a grant"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			other := secondDatabase(t)
+			f := seedRecoveryFixture(t)
+
+			holder := beginTx(t)
+			require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
+			removed, err := otpcredential.RemoveTx(ctx, database, holder, f.user)
+			require.NoError(t, err)
+			require.True(t, removed)
+			established, err := database.TryEstablishUserOTP(ctx, holder, f.user.Id, f.user.OtpConfigGeneration+1,
+				[]byte("the new authenticator's seed"))
+			require.NoError(t, err)
+			require.True(t, established)
+			_, err = database.IncrementUserOtpConfigGeneration(ctx, holder, f.user.Id)
+			require.NoError(t, err)
+
+			recorder := &recoveryAuditRecorder{}
+			recovering := goBlocked(t, "the recovery", holder, func(reached func()) error {
+				reached()
+				_, runErr := recovery.Run(ctx, other, recorder, recovery.Request{
+					Email: f.user.Email, RemoveOTP: true, GrantManage: grantManage,
+				})
+				return runErr
+			})
+			recovering.requireBlocked(t)
+			recovering.requireStillWaiting(t)
+			require.NoError(t, database.CommitTransaction(ctx, holder))
+			require.NoError(t, recovering.await(t))
+
+			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			require.NoError(t, err)
+			assert.False(t, after.OTPEnabled, "the authenticator enrolled while the recovery waited is removed")
+			assert.Equal(t, f.user.OtpConfigGeneration+3, after.OtpConfigGeneration)
+			want := []string{audit.EventDisabledOTP}
+			if grantManage {
+				want = append(want, audit.EventAddedUserPermission, audit.EventAdministrativePermissionChanged)
+			}
+			assert.Equal(t, append(want, audit.EventRevokedUserAuthState), recorder.events)
+		})
+	}
+}
+
+// A user with no authenticator enrols one while a recovery asking for a grant and the removal waits
+// for the user's row. The grant's read of the manage permission came first, so on MySQL a plain read
+// of the user under the row answered the snapshot from before the wait, with nothing enrolled: the
+// removal's compare-and-set then lost, the recovery took that for a removal with nothing to remove,
+// and the new authenticator stayed while the operator was told none had been enrolled (#498 round 5
+// F1). Read with a lock, the user is as the enrolment left it, and the authenticator is removed.
+func TestRecovery_AGrantAndARemovalRemoveAnEnrolmentHoldingTheRow(t *testing.T) {
+	skipWhereTransactionsCannotOverlap(t)
+	ctx := context.Background()
+	other := secondDatabase(t)
+	f := seedRecoveryFixture(t)
+	removed, err := otpcredential.Remove(ctx, database, f.user)
+	require.NoError(t, err)
+	require.True(t, removed)
+	f.user, err = database.GetUserById(ctx, nil, f.user.Id)
+	require.NoError(t, err)
+	require.False(t, f.user.OTPEnabled)
+
+	holder := beginTx(t)
+	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
+	established, err := database.TryEstablishUserOTP(ctx, holder, f.user.Id, f.user.OtpConfigGeneration,
+		[]byte("the newly enrolled authenticator's seed"))
+	require.NoError(t, err)
+	require.True(t, established)
+	_, err = database.IncrementUserOtpConfigGeneration(ctx, holder, f.user.Id)
+	require.NoError(t, err)
+
+	recorder := &recoveryAuditRecorder{}
+	type result struct {
+		outcome recovery.Outcome
+		err     error
+	}
+	recovering := goBlocked(t, "the recovery", holder, func(reached func()) result {
+		reached()
+		outcome, runErr := recovery.Run(ctx, other, recorder, recovery.Request{
+			Email: f.user.Email, GrantManage: true, RemoveOTP: true,
+		})
+		return result{outcome, runErr}
+	})
+	recovering.requireBlocked(t)
+	recovering.requireStillWaiting(t)
+	require.NoError(t, database.CommitTransaction(ctx, holder))
+	got := recovering.await(t)
+	require.NoError(t, got.err)
+
+	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	require.NoError(t, err)
+	assert.False(t, after.OTPEnabled, "the authenticator enrolled while the recovery waited is removed")
+	assert.Equal(t, f.user.OtpConfigGeneration+2, after.OtpConfigGeneration)
+	assert.True(t, got.outcome.OTPRemoved, "the operator is told an authenticator was removed")
+	assert.True(t, got.outcome.ManageGranted)
+	assert.Equal(t, []string{audit.EventDisabledOTP, audit.EventAddedUserPermission,
+		audit.EventAdministrativePermissionChanged, audit.EventRevokedUserAuthState}, recorder.events)
+}
+
+// The user is disabled while a recovery asking for a password and a grant waits for the user's row.
+// The grant's read of the manage permission came first, so on MySQL a plain read of the user under
+// the row answered the snapshot from before the wait, with the user enabled, and the password and
+// the grant committed for a disabled user, with their audit events (#498 round 5 F1). Read with a
+// lock, the user is disabled, and the recovery is refused with nothing written and nothing recorded.
+func TestRecovery_AGrantAndAPasswordRefuseAUserDisabledHoldingTheRow(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
 	other := secondDatabase(t)
@@ -420,32 +537,35 @@ func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) 
 
 	holder := beginTx(t)
 	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
-	removed, err := otpcredential.RemoveTx(ctx, database, holder, f.user)
+	changed, err := database.TrySetUserEnabled(ctx, holder, f.user.Id, true, false)
 	require.NoError(t, err)
-	require.True(t, removed)
-	established, err := database.TryEstablishUserOTP(ctx, holder, f.user.Id, f.user.OtpConfigGeneration+1,
-		[]byte("the new authenticator's seed"))
-	require.NoError(t, err)
-	require.True(t, established)
-	_, err = database.IncrementUserOtpConfigGeneration(ctx, holder, f.user.Id)
-	require.NoError(t, err)
+	require.True(t, changed)
 
 	recorder := &recoveryAuditRecorder{}
 	recovering := goBlocked(t, "the recovery", holder, func(reached func()) error {
 		reached()
-		_, runErr := recovery.Run(ctx, other, recorder, recovery.Request{Email: f.user.Email, RemoveOTP: true})
+		_, runErr := recovery.Run(ctx, other, recorder, recovery.Request{
+			Email: f.user.Email, Password: recoveryPassword, GrantManage: true,
+		})
 		return runErr
 	})
 	recovering.requireBlocked(t)
 	recovering.requireStillWaiting(t)
 	require.NoError(t, database.CommitTransaction(ctx, holder))
-	require.NoError(t, recovering.await(t))
+	runErr := recovering.await(t)
 
+	// Refused under the row on MySQL and PostgreSQL. On SQL Server the read before the transaction
+	// already waits for the disabling write, which holds the row, so the refusal is that read's.
+	var refusal *recovery.RefusedError
+	require.ErrorAs(t, runErr, &refusal)
+	assert.Contains(t, refusal.Reason, "disabled")
+	assert.Empty(t, recorder.events, "a refusal writes no audit event")
 	after, err := database.GetUserById(ctx, nil, f.user.Id)
 	require.NoError(t, err)
-	assert.False(t, after.OTPEnabled, "the authenticator enrolled while the recovery waited is removed")
-	assert.Equal(t, f.user.OtpConfigGeneration+3, after.OtpConfigGeneration)
-	assert.Equal(t, []string{audit.EventDisabledOTP, audit.EventRevokedUserAuthState}, recorder.events)
+	assert.False(t, after.Enabled)
+	assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "the password is as it was")
+	assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
+	assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
 }
 
 // A grant of manage is in flight when the recovery starts, holding what the Admin API's save of a
