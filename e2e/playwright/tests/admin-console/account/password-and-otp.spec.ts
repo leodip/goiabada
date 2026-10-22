@@ -50,7 +50,37 @@ test("the user changes their password: the current one must be right, and the ne
   await again.context.close();
 });
 
-test("the user enrols an authenticator, is asked for its code at sign-in, and turns it off", async ({ page, browser, users }) => {
+test("a password of bcrypt's whole bound, 72 bytes, is set and signs in, and nothing appended to it does", async ({ browser, users }) => {
+  const user = await users.create();
+  // As long as the first administrator's may be, and every policy's character classes in it (#550).
+  const longest = "Aa1!" + "a".repeat(68);
+  expect(Buffer.byteLength(longest)).toBe(72);
+
+  const own = await signInToConsole(browser, user, "/account/change-password");
+  await own.page.locator("#currentPassword").fill(user.password);
+  await own.page.locator("#newPassword").fill(longest);
+  await own.page.locator("#newPasswordConfirmation").fill(longest);
+  await own.page.getByRole("button", { name: "Change password" }).click();
+  await expect(own.page.getByText("Password changed.")).toBeVisible();
+  await own.context.close();
+
+  // bcrypt alone reads no further than 72 bytes, so the password with anything after it would
+  // match; the auth server compares the whole submission and refuses it. A throwaway user's one
+  // wrong password.
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const signIn = await context.newPage();
+  await signIn.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(signIn, user.email, longest + "x");
+  await expect(signIn).toHaveURL(new RegExp(`^${env.authUrl}/auth/pwd\\?`));
+  await expect(signIn.locator("#pwd-error")).toHaveText("Authentication failed.");
+  await context.close();
+
+  const again = await signInToConsole(browser, { ...user, password: longest });
+  await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
+  await again.context.close();
+});
+
+test("the user enrols an authenticator, is asked for its code at sign-in, and turns it off",async ({ page, browser, users }) => {
   const user = await users.create();
   const own = await signInToConsole(browser, user, "/account/otp");
   await expect(own.page.getByText("Two-factor authentication is off.")).toBeVisible();

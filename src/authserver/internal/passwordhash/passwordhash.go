@@ -33,10 +33,16 @@ func Hash(password string) (string, error) {
 	return string(hash), nil
 }
 
-// Verify reports whether password matches hashedPassword. bcrypt reads only the first
-// MaxPasswordBytes bytes when it compares, so a longer password matches the hash of its own
-// 72-byte prefix; no stored hash is of a longer one, because Hash refuses those.
+// Verify reports whether password matches hashedPassword, compared whole. bcrypt keys on at most
+// MaxPasswordBytes bytes, so on its own it would match a stored password of exactly that length
+// with anything appended; a password longer than MaxPasswordBytes is therefore refused before
+// comparing. No stored hash is of a longer one, because Hash refuses those, so the refusal costs no
+// one a sign-in. The missing-account path, which compares against DummyHash, takes the same
+// refusal, so it says nothing about which accounts exist (#550).
 func Verify(hashedPassword string, password string) bool {
+	if len(password) > MaxPasswordBytes {
+		return false
+	}
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	return err == nil
 }
