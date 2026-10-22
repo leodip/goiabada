@@ -2,6 +2,7 @@ package guard
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,6 +58,11 @@ func literalStackTree(t *testing.T) string {
 	writeGoFile(t, root, "infra/eu/.gitignore", "!.env.example\n")
 	writeGoFile(t, root, "infra/eu/.env.example", "MYSQL_PASSWORD=devpass\n")
 	writeGoFile(t, root, "e2e/.env.example", "MYSQL_PASSWORD=devpass\n")
+	// A trailing `**` ignores what is inside a directory and not the directory, so `!` takes one
+	// file inside it back.
+	writeGoFile(t, root, "cfg/.gitignore", "conf/**\n!conf/.env.example\n")
+	writeGoFile(t, root, "cfg/conf/.env.example", "MYSQL_PASSWORD=devpass\n")
+	writeGoFile(t, root, "cfg/conf/.env", "MYSQL_PASSWORD=devpass\n")
 	writeGoFile(t, root, "src/.vscode/launch.json", "{\n"+
 		"\t\"env\": {\"GOIABADA_AES_ENCRYPTION_KEY\": \"4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a\"}\n}\n")
 	writeGoFile(t, root, "docs/notes.txt", "the old key was "+strings.ToUpper(publishedDataKey)+"\n")
@@ -96,22 +102,24 @@ func literalStackTree(t *testing.T) string {
 // line, a continued command at its first, and the Markdown prose and a quoted comment left alone.
 // A bare .env and a .env.production are read when no .gitignore ignores them, and so are an
 // example a .gitignore takes back with `!` after ignoring the rest, one a deeper .gitignore takes
-// back from its parent's, a .env one level below a parent's `/.env`, and a file a pattern for a
+// back from its parent's, one a `!` takes back from inside a directory its parent's `conf/**`
+// ignores the contents of, a .env one level below a parent's `/.env`, and a file a pattern for a
 // directory of its name does not reach.
 // The text file holds the published key in upper case and nothing else, so the case-insensitive
 // pre-check is what finds it.
 func TestLiteralStackSecrets_TheRuleTable(t *testing.T) {
 	root := literalStackTree(t)
 
-	findings, files, err := findLiteralStackSecrets(root)
+	findings, files, err := findLiteralStackSecrets(root, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, 20, files, "the test file and the text file are read for published values but are no runnable files")
+	assert.Equal(t, 21, files, "the test file and the text file are read for published values but are no runnable files")
 	assert.Equal(t, []string{
 		".github/workflows/ci.yml:2: GOIABADA_AES_ENCRYPTION_KEY set to a literal: GOIABADA_AES_ENCRYPTION_KEY: 4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a",
 		".github/workflows/ci.yml:6: a literal password to mysql: --health-cmd \"mysqladmin ping -uroot -pdevpass --protocol=tcp\"",
 		".github/workflows/ci.yml:7: a literal password to mysql: run: mysql --password=devpass -e 'select 1'",
 		".github/workflows/ci.yml:8: a literal password to mysql: run: mysqldump -uroot -pdevpass goiabada > backup.sql",
+		"cfg/conf/.env.example:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass",
 		"deploy/.env.production:1: POSTGRES_PASSWORD set to a literal: POSTGRES_PASSWORD=devpass",
 		"deploy/app/.env.example:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass",
 		"deploy/app.Dockerfile:2: MYSQL_PASSWORD set to a literal: ENV MYSQL_PASSWORD devpass",
@@ -232,12 +240,12 @@ func TestLiteralStackSecrets_AnEnvironmentDrawnTreeReportsNothing(t *testing.T) 
 		"    environment:\n"+
 		"      POSTGRES_PASSWORD: "+publishedPasswords[1]+"\n")
 
-	findings, files, err := findLiteralStackSecrets(root)
+	findings, files, err := findLiteralStackSecrets(root, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 10, files, "the ignored env files and the .dockerignore are not read")
 	assert.Empty(t, findings)
 
-	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root) })
+	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, false) })
 	assert.False(t, report.Failed(), "an environment-drawn tree failed the guard: %s", report.Text())
 }
 
@@ -245,11 +253,11 @@ func TestLiteralStackSecrets_AnEnvironmentDrawnTreeReportsNothing(t *testing.T) 
 func TestLiteralStackSecrets_ALiteralTreeFails(t *testing.T) {
 	root := literalStackTree(t)
 
-	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root) })
+	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, false) })
 
 	require.True(t, report.Failed())
 	assert.False(t, report.Stopped, "a literal is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "38 lines supply a data key or a database password by literal")
+	assert.Contains(t, report.Text(), "39 lines supply a data key or a database password by literal")
 	assert.Contains(t, report.Text(), "src/run.sh:5: PGPASSWORD set to a literal")
 }
 
@@ -260,10 +268,10 @@ func TestLiteralStackSecrets_AnUnreadableGitignoreStopsTheWalk(t *testing.T) {
 	writeGoFile(t, root, "deploy/.env", "GOIABADA_DB_PASSWORD=devpass\n")
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "deploy", ".gitignore"), 0o755))
 
-	_, _, err := findLiteralStackSecrets(root)
+	_, _, err := findLiteralStackSecrets(root, nil)
 	require.Error(t, err)
 
-	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root) })
+	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, false) })
 	assert.True(t, report.Stopped)
 	assert.Contains(t, report.Fatal, "walking "+root)
 }
@@ -274,8 +282,71 @@ func TestLiteralStackSecrets_AnEmptyWalkIsFatal(t *testing.T) {
 	root := t.TempDir()
 	writeGoFile(t, root, "src/internal/p.go", "package p\n")
 
-	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root) })
+	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, false) })
 
 	assert.True(t, report.Stopped)
 	assert.Contains(t, report.Fatal, "walked no runnable files")
+}
+
+// gitRepository runs each command as git in root, a repository of its own, and fails the test on
+// the first that git refuses.
+func gitRepository(t *testing.T, root string, commands ...[]string) {
+	t.Helper()
+	for _, args := range commands {
+		cmd := exec.CommandContext(t.Context(), "git", args...)
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com", "GIT_CONFIG_GLOBAL=/dev/null")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %s: %s", strings.Join(args, " "), out)
+	}
+}
+
+// TestLiteralStackSecrets_ATrackedEnvFileIsReadWhateverItsGitignoreSays: git ignores no file it
+// tracks, so an example committed beside a .gitignore later widened to `.env*` still ships, and is
+// still read. Without the tracked list, where git cannot answer, the .gitignore alone decides.
+func TestLiteralStackSecrets_ATrackedEnvFileIsReadWhateverItsGitignoreSays(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	root := t.TempDir()
+	writeGoFile(t, root, "e2e/.gitignore", ".env\n")
+	writeGoFile(t, root, "e2e/.env.example", "MYSQL_PASSWORD=devpass\n")
+	gitRepository(t, root, []string{"init", "-q"}, []string{"add", "-A"}, []string{"commit", "-q", "-m", "example"})
+	writeGoFile(t, root, "e2e/.gitignore", ".env*\n")
+	gitRepository(t, root, []string{"commit", "-q", "-a", "-m", "widen"})
+
+	tracked, err := trackedFiles(root)
+	require.NoError(t, err)
+	assert.True(t, tracked["e2e/.env.example"])
+
+	findings, files, err := findLiteralStackSecrets(root, tracked)
+	require.NoError(t, err)
+	assert.Equal(t, 1, files)
+	assert.Equal(t, []string{"e2e/.env.example:1: MYSQL_PASSWORD set to a literal: MYSQL_PASSWORD=devpass"}, findings)
+
+	_, files, err = findLiteralStackSecrets(root, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 0, files, "with no tracked list the widened .gitignore keeps the example out")
+
+	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, true) })
+	assert.Contains(t, report.Text(), "1 lines supply a data key or a database password by literal")
+}
+
+// TestLiteralStackSecrets_AGitThatCannotAnswerIsFatalOnlyWhereRequired: a tree that is no
+// repository falls back to its .gitignore files, unless git is required, as it is in CI.
+func TestLiteralStackSecrets_AGitThatCannotAnswerIsFatalOnlyWhereRequired(t *testing.T) {
+	root := t.TempDir()
+	writeGoFile(t, root, "src/run.sh", "#!/bin/sh\n")
+
+	_, err := trackedFiles(root)
+	require.Error(t, err)
+
+	report := Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, false) })
+	assert.False(t, report.Failed(), "a tree with no git failed the guard: %s", report.Text())
+
+	report = Run(func(r Reporter) { assertNoLiteralStackSecrets(r, root, true) })
+	assert.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "listing the files git tracks under "+root)
 }

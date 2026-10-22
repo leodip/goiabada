@@ -525,9 +525,9 @@ runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` 
 does. Every guard follows this: those in `core/guard`, the newest
 `AssertNoLiteralStackSecrets`, which refuses a data key or database password supplied by literal in
 any runnable file -- workflows, Compose and other YAML, devcontainer and editor configurations,
-Dockerfiles, Makefiles, env files (`.env` and `.env.*` among them, unless the repository's
-`.gitignore` files, its own directory's or a parent's, read as git reads them, keep it out of the
-repository), shell scripts, Go mains and Markdown code blocks -- and the
+Dockerfiles, Makefiles, env files (`.env` and `.env.*` among them, unless git tracks no copy of
+it and the repository's `.gitignore` files, its own directory's or a parent's, read as git reads
+them, keep it out of the repository), shell scripts, Go mains and Markdown code blocks -- and the
 published sample key and passwords anywhere outside the refusal and its tests (#501), and before it
 `AssertNoStaleDeferredBodyCloses`, which refuses a deferred func-literal close of a response
 body reading a variable the same function reassigns after the defer is registered, in a later

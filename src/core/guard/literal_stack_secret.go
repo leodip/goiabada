@@ -2,15 +2,19 @@ package guard
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // AssertNoLiteralStackSecrets holds every runnable file in the repository to supplying no data key
@@ -35,10 +39,14 @@ import (
 // brackets.
 //
 // The env files are every `.env`, `.env.<anything>` and `<name>.env`, since Compose reads a
-// directory's .env on its own and `env_file:` names any of them. One that the repository's
-// .gitignore files ignore, read as git reads them from the walk's root down, is not read at all:
-// generate-env.sh writes src/.devcontainer/.env with the dev stack's real values, and the e2e
-// suite and the docs site keep local ones the same way, none of them the repository's.
+// directory's .env on its own and `env_file:` names any of them. One that git does not track and
+// that the repository's .gitignore files ignore, read as git reads them from the walk's root down,
+// is not read at all: generate-env.sh writes src/.devcontainer/.env with the dev stack's real
+// values, and the e2e suite and the docs site keep local ones the same way, none of them the
+// repository's. A tracked file is read whatever a .gitignore says, since git ships it all the same.
+// Where git cannot list the tracked files, as in a container whose worktree's git directory lies
+// outside its mount, the .gitignore files alone decide; in CI, where the checkout has git, a git
+// that cannot answer stops the walk instead.
 //
 // Separately, the published data key and the three published passwords are reported in any text
 // file outside the few that name them to refuse them (publishedValueOwners), whatever its kind.
@@ -50,15 +58,20 @@ import (
 func AssertNoLiteralStackSecrets(t *testing.T) {
 	t.Helper()
 
-	assertNoLiteralStackSecrets(t, filepath.Dir(SourceRoot(t)))
+	assertNoLiteralStackSecrets(t, filepath.Dir(SourceRoot(t)), os.Getenv("GITHUB_ACTIONS") == "true")
 }
 
 // assertNoLiteralStackSecrets is the reporting half. See Reporter in guard.go for why both halves
-// exist.
-func assertNoLiteralStackSecrets(r Reporter, repoRoot string) {
+// exist. requireGit makes a git that cannot list the tracked files fatal rather than a fallback to
+// the .gitignore files alone.
+func assertNoLiteralStackSecrets(r Reporter, repoRoot string, requireGit bool) {
 	r.Helper()
 
-	findings, files, err := findLiteralStackSecrets(repoRoot)
+	tracked, gitErr := trackedFiles(repoRoot)
+	if gitErr != nil && requireGit {
+		r.Fatalf("listing the files git tracks under %s: %v", repoRoot, gitErr)
+	}
+	findings, files, err := findLiteralStackSecrets(repoRoot, tracked)
 	if err != nil {
 		r.Fatalf("walking %s: %v", repoRoot, err)
 	}
@@ -176,10 +189,35 @@ var (
 	markdownFence   = regexp.MustCompile("^\\s*(```|~~~)")
 )
 
+// trackedFiles lists the files git tracks under root, as paths relative to it. The parent of root
+// is the ceiling, so a tree that is no repository of its own is never read as part of an enclosing
+// one.
+//
+// The context is Background because the reporting half holds none, as in goListDeps.
+func trackedFiles(root string) (map[string]bool, error) {
+	cmd := exec.CommandContext(context.Background(), "git", "ls-files", "-z")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root))
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, errs.Wrapf(err, "git ls-files: %s", strings.TrimSpace(stderr.String()))
+	}
+	tracked := map[string]bool{}
+	for _, name := range strings.Split(stdout.String(), "\x00") {
+		if name != "" {
+			tracked[name] = true
+		}
+	}
+	return tracked, nil
+}
+
 // findLiteralStackSecrets walks the repository under root and returns one finding per line that
 // supplies a stack secret by literal or spells a published value, as `path:line: text` with the path
-// relative to root, along with the number of runnable files it read.
-func findLiteralStackSecrets(root string) ([]string, int, error) {
+// relative to root, along with the number of runnable files it read. tracked is what trackedFiles
+// listed, an env file in it read whatever the .gitignore files say, or nil where git cannot answer.
+func findLiteralStackSecrets(root string, tracked map[string]bool) ([]string, int, error) {
 	var findings []string
 	files := 0
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -201,7 +239,7 @@ func findLiteralStackSecrets(root string) ([]string, int, error) {
 		if kind == notRunnable && !textExtensions[path.Ext(rel)] {
 			return nil
 		}
-		if isEnvFile(d.Name()) {
+		if isEnvFile(d.Name()) && !tracked[rel] {
 			ignored, ignoreErr := gitignored(root, rel)
 			if ignoreErr != nil {
 				return ignoreErr
@@ -298,13 +336,19 @@ func gitignorePatternMatches(pattern string, components []string, isDir bool) bo
 }
 
 // componentsMatch matches a pattern's components against a path's, one name each, `**` taking any
-// number of them.
+// number of them, except that a `**` ending the pattern takes at least one: `dir/**` matches what is
+// inside dir and not dir itself, so git still looks inside it and `!dir/.env.example` takes the
+// example back.
 func componentsMatch(pattern, components []string) bool {
 	if len(pattern) == 0 {
 		return len(components) == 0
 	}
 	if pattern[0] == "**" {
-		for skip := 0; skip <= len(components); skip++ {
+		first := 0
+		if len(pattern) == 1 {
+			first = 1
+		}
+		for skip := first; skip <= len(components); skip++ {
 			if componentsMatch(pattern[1:], components[skip:]) {
 				return true
 			}
