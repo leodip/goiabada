@@ -163,18 +163,26 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// still there and enabled, and which authenticator the removal compares against. Read before
 	// the transaction, a removal and re-enrolment landing in between left an authenticator in
 	// place while the command said none had been enrolled. Every credential change takes the same
-	// row first, so under it the user is what this attempt decides on (#131, #542). The read under
-	// it is a locking one: on MySQL the grant's read of the manage permission below has already
-	// fixed the snapshot every plain read answers from, before the wait for the user's row, so a
-	// plain read there answered the user as it stood before a disabling or an enrolment the wait
-	// let commit.
+	// row first, so under it the user is what this attempt decides on (#131, #542).
+	//
+	// The user's row is the transaction's first statement, before anything that reads. On MySQL
+	// the first plain read fixes the snapshot every later plain read answers from, the sweep's
+	// reads of the sessions and refresh tokens among them, so a read before the wait for the
+	// user's row hid what the wait let commit: a session a sign-in started, or the child a refresh
+	// rotation wrote, both under that row, stayed out of the sweep and out of its audit record
+	// while the generation advanced past them (#498 round 8 F1). Taken first, the row is held
+	// before any snapshot is, and the sweep reads whatever committed before it. The read of the
+	// user under it is a locking one, which answers the row as committed whatever an engine's
+	// snapshot holds.
 	//
 	// A grant is not a credential change: the Admin API's saves of who holds manage take the
 	// manage permission's row first (lockAdministrators, #402 decision 11) and never the user's,
 	// and on PostgreSQL the user's row lock does not wait for their insert. So a grant asked for
-	// takes that row too, before the user's, in the order those saves take it, and whether manage
-	// is already held is read under it: a grant landing in between is waited for and found rather
-	// than written a second time.
+	// takes that row too, after the user's, and whether manage is already held is read under it: a
+	// grant landing in between is waited for and found rather than written a second time. A save
+	// holding that row can still deadlock with this transaction where its insert's foreign-key
+	// check waits for the user's row; the engine rolls one back whole and RunInTransaction reruns
+	// it, as below, rather than an order imposed against it (#301).
 	//
 	// The body is safe to rerun on a deadlock, for the reason RevokeUserAuthStateTx gives: it
 	// reads afresh, each write is a compare-and-set, an idempotent column write or an insert
@@ -184,13 +192,13 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", func(tx *sql.Tx) error {
 		outcome.PasswordSet, outcome.OTPRemoved, outcome.ManageGranted = false, false, false
 
+		if acquireErr := database.AcquireUserRow(ctx, tx, user.Id); acquireErr != nil {
+			return acquireErr
+		}
 		if req.GrantManage {
 			if _, acquireErr := database.AcquireManagePermissionRow(ctx, tx); acquireErr != nil {
 				return acquireErr
 			}
-		}
-		if acquireErr := database.AcquireUserRow(ctx, tx, user.Id); acquireErr != nil {
-			return acquireErr
 		}
 		current, readErr := database.GetUserByIdForUpdate(ctx, tx, user.Id)
 		if readErr != nil {

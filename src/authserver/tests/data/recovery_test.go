@@ -24,10 +24,11 @@ import (
 // user's authentication generation advances by one and their sessions and refresh tokens end, and
 // each action changes what it names and nothing else (#498, its Done-when: "the data tier shows it
 // on all four engines"), and a call failing inside its transaction commits none of the writes
-// before it. The forced interleavings at the end show the user and the authenticator are read
-// under the user's row, and the held grant under the manage permission's, so a credential change or
-// a grant holding that row when the recovery starts is what the recovery decides on, a grant asked
-// for beside a credential change included.
+// before it. The forced interleavings at the end show the user, the authenticator, the sessions and
+// the refresh tokens are read under the user's row, and the held grant under the manage
+// permission's, so a credential change, a sign-in, a refresh rotation or a grant holding that row
+// when the recovery starts is what the recovery decides on and sweeps, a grant asked for beside a
+// credential change included.
 
 // recoveryPassword passes every password policy, so the test does not depend on which policy the
 // shared database's settings row holds.
@@ -414,10 +415,10 @@ func TestRecovery_AFailedGrantRollsBackEarlierActions(t *testing.T) {
 // transaction, it compared against the generation the change moved past, removed nothing, and said
 // none had been enrolled, leaving the new authenticator in place (#498 review F5).
 //
-// With a grant asked for as well, the recovery reads the manage permission before it waits for the
-// user's row, which on MySQL fixes the snapshot every plain read answers from. Its read of the user
-// under the row is a locking one, so it still finds the authenticator the change left rather than
-// the one the change removed, and the removal neither loses its compare-and-set nor is refused.
+// With a grant asked for as well, the recovery read the manage permission before it waited for the
+// user's row until #498 round 8 F1, which on MySQL fixed the snapshot every plain read answers from.
+// Whatever the order, it finds the authenticator the change left rather than the one the change
+// removed, and the removal neither loses its compare-and-set nor is refused.
 func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 
@@ -470,11 +471,11 @@ func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) 
 }
 
 // A user with no authenticator enrols one while a recovery asking for a grant and the removal waits
-// for the user's row. The grant's read of the manage permission came first, so on MySQL a plain read
-// of the user under the row answered the snapshot from before the wait, with nothing enrolled: the
+// for the user's row. When the grant's read of the manage permission came first, a plain read of the
+// user under the row answered MySQL's snapshot from before the wait, with nothing enrolled: the
 // removal's compare-and-set then lost, the recovery took that for a removal with nothing to remove,
 // and the new authenticator stayed while the operator was told none had been enrolled (#498 round 5
-// F1). Read with a lock, the user is as the enrolment left it, and the authenticator is removed.
+// F1). Read under the row, the user is as the enrolment left it, and the authenticator is removed.
 func TestRecovery_AGrantAndARemovalRemoveAnEnrolmentHoldingTheRow(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
@@ -525,10 +526,10 @@ func TestRecovery_AGrantAndARemovalRemoveAnEnrolmentHoldingTheRow(t *testing.T) 
 }
 
 // The user is disabled while a recovery asking for a password and a grant waits for the user's row.
-// The grant's read of the manage permission came first, so on MySQL a plain read of the user under
-// the row answered the snapshot from before the wait, with the user enabled, and the password and
-// the grant committed for a disabled user, with their audit events (#498 round 5 F1). Read with a
-// lock, the user is disabled, and the recovery is refused with nothing written and nothing recorded.
+// When the grant's read of the manage permission came first, a plain read of the user under the row
+// answered MySQL's snapshot from before the wait, with the user enabled, and the password and the
+// grant committed for a disabled user, with their audit events (#498 round 5 F1). Read under the
+// row, the user is disabled, and the recovery is refused with nothing written and nothing recorded.
 func TestRecovery_AGrantAndAPasswordRefuseAUserDisabledHoldingTheRow(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
@@ -568,12 +569,104 @@ func TestRecovery_AGrantAndAPasswordRefuseAUserDisabledHoldingTheRow(t *testing.
 	assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
 }
 
+// A sign-in starts a session, or a refresh rotation writes an offline token's child, holding the
+// user's row while a recovery asking for a grant alone waits for it. The recovery took the manage
+// permission's row first, whose read fixed MySQL's snapshot before the wait, so the sweep's plain
+// reads answered the sessions and tokens as they stood before it: the new session and the child
+// stayed, unrevoked and missing from the outcome and its audit record, while the generation
+// advanced past them (#498 round 8 F1). Taking the user's row first, the recovery sweeps both.
+func TestRecovery_AGrantSweepsStateCommittedHoldingTheUsersRow(t *testing.T) {
+	skipWhereTransactionsCannotOverlap(t)
+
+	for _, state := range []string{"a new session", "a rotated offline refresh token"} {
+		t.Run(state, func(t *testing.T) {
+			ctx := context.Background()
+			other := secondDatabase(t)
+			f := seedRecoveryFixture(t)
+			if state == "a rotated offline refresh token" {
+				// The fixture's tokens carry generation zero, which no rotation accepts; this
+				// rotation's parent carries the user's current generation, as a usable one does.
+				parent := *f.offlineToken
+				parent.Id = 0
+				parent.RefreshTokenJti = fake.UUID()
+				parent.FirstRefreshTokenJti = parent.RefreshTokenJti
+				parent.AuthStateGeneration = f.user.AuthStateGeneration
+				require.NoError(t, database.CreateRefreshToken(ctx, nil, &parent))
+				f.offlineToken = &parent
+			}
+
+			// The holder makes the writes its production operation makes under the user's row.
+			holder := beginTx(t)
+			require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
+			session := *f.session
+			token := *f.offlineToken
+			if state == "a new session" {
+				session.Id = 0
+				session.SessionIdentifier = fake.UUID()
+				session.AuthStateGeneration = f.user.AuthStateGeneration
+				require.NoError(t, database.CreateUserSession(ctx, holder, &session))
+			} else {
+				retired, err := database.MarkRefreshTokenAsRevoked(ctx, holder, token.Id)
+				require.NoError(t, err)
+				require.True(t, retired)
+				token.Id = 0
+				token.PreviousRefreshTokenJti = token.RefreshTokenJti
+				token.FirstRefreshTokenJti = token.RefreshTokenJti
+				token.RefreshTokenJti = fake.UUID()
+				token.AuthStateGeneration = f.user.AuthStateGeneration
+				require.NoError(t, database.CreateRefreshToken(ctx, holder, &token))
+			}
+
+			recorder := &recoveryAuditRecorder{}
+			type result struct {
+				outcome recovery.Outcome
+				err     error
+			}
+			recovering := goBlocked(t, "the recovery", holder, func(reached func()) result {
+				reached()
+				outcome, runErr := recovery.Run(ctx, other, recorder, recovery.Request{
+					Email: f.user.Email, GrantManage: true,
+				})
+				return result{outcome, runErr}
+			})
+			recovering.requireBlocked(t)
+			recovering.requireStillWaiting(t)
+			require.NoError(t, database.CommitTransaction(ctx, holder))
+			got := recovering.await(t)
+			require.NoError(t, got.err)
+
+			if state == "a new session" {
+				left, err := database.GetUserSessionById(ctx, nil, session.Id)
+				require.NoError(t, err)
+				assert.Nil(t, left, "the session started while the recovery waited is ended")
+				assert.Contains(t, got.outcome.Revocation.TerminatedSessionIdentifiers, session.SessionIdentifier)
+			} else {
+				assertTokenRevoked(t, token.Id, true, "the child written while the recovery waited")
+				assert.Contains(t, got.outcome.Revocation.RevokedRefreshTokenJtis, token.RefreshTokenJti)
+			}
+			assert.Equal(t, f.user.AuthStateGeneration+1, got.outcome.Revocation.NewGeneration)
+			assert.True(t, got.outcome.ManageGranted)
+			assert.Equal(t, []string{audit.EventAddedUserPermission, audit.EventAdministrativePermissionChanged,
+				audit.EventRevokedUserAuthState}, recorder.events)
+		})
+	}
+}
+
 // A grant of manage is in flight when the recovery starts, holding what the Admin API's save of a
-// user's permissions holds: the manage permission's row (lockAdministrators), and never the user's.
-// The recovery waits for the row, finds manage held, and writes no second row. Read before the
+// user's permissions holds and in its order (handler_api_user_permissions.go): the manage
+// permission's row (lockAdministrators), and never the user's, then the held grants read under it,
+// with the insert still to come. The recovery takes the user's row, waits for the manage
+// permission's, finds manage held once the save commits, and writes no second row. Read before the
 // transaction, it found none and wrote a second, since users_permissions has no unique key on the
-// pair (#498 review F5); read under the user's row alone, it did the same on PostgreSQL, where that
-// lock does not wait for the save's insert (#498 round 2 F2).
+// pair (#498 review F5); read under the user's row alone, it does the same, because nothing of the
+// save is on that row until its insert, and the recovery's read comes first (#498 round 2 F2, round
+// 8 F2). The insert is left until the recovery waits so that its foreign-key lock on the user's row
+// cannot stand in for the manage permission's row this measures. On MySQL that check waits for the
+// user's row the recovery holds, so the two deadlock and InnoDB rolls back the recovery, which has
+// written nothing; RunInTransaction reruns it, and the rerun finds the save's grant. On MySQL and
+// SQL Server the recovery's own insert also waits for the manage permission's row, through its
+// foreign-key check, so the test holds the lock itself on PostgreSQL, where that check does not
+// wait: without the lock there, the recovery reads no grant and writes a second manage row.
 func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
@@ -583,9 +676,11 @@ func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 	holder := beginTx(t)
 	_, err := database.AcquireManagePermissionRow(ctx, holder)
 	require.NoError(t, err)
-	require.NoError(t, database.CreateUserPermission(ctx, holder, &record.UserPermission{
-		UserId: f.user.Id, PermissionId: f.manage.Id,
-	}))
+	held, err := database.GetUserPermissionsByUserId(ctx, holder, f.user.Id)
+	require.NoError(t, err)
+	for _, grant := range held {
+		require.NotEqual(t, f.manage.Id, grant.PermissionId, "the save finds manage not yet held")
+	}
 
 	recorder := &recoveryAuditRecorder{}
 	recovering := goBlocked(t, "the recovery", holder, func(reached func()) error {
@@ -593,8 +688,15 @@ func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 		_, runErr := recovery.Run(ctx, other, recorder, recovery.Request{Email: f.user.Email, GrantManage: true})
 		return runErr
 	})
-	recovering.requireBlocked(t)
-	recovering.requireStillWaiting(t)
+	// Asserted rather than required, so a recovery that does not wait also shows the second row.
+	blockedErr := recovering.awaitBlocked()
+	assert.NoError(t, blockedErr, "the recovery waits for the manage permission's row the save holds")
+	if blockedErr == nil {
+		recovering.requireStillWaiting(t)
+	}
+	require.NoError(t, database.CreateUserPermission(ctx, holder, &record.UserPermission{
+		UserId: f.user.Id, PermissionId: f.manage.Id,
+	}))
 	require.NoError(t, database.CommitTransaction(ctx, holder))
 	require.NoError(t, recovering.await(t))
 

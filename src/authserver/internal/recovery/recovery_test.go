@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -146,4 +147,16 @@ func TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt(t *testing.T) {
 	assert.False(t, outcome.ManageGranted, "the grant the aborted attempt made was undone with it")
 	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events,
 		"no grant is recorded: the committing attempt made none")
+
+	// Each attempt takes the user's row before the manage permission's: on MySQL the manage
+	// permission's read fixes the snapshot the sweep reads from, so taken first it hid what the
+	// wait for the user's row let commit (#498 round 8 F1). The data tier shows the sweep itself.
+	var acquired []string
+	for _, call := range database.Calls {
+		if strings.HasPrefix(call.Method, "Acquire") {
+			acquired = append(acquired, call.Method)
+		}
+	}
+	assert.Equal(t, []string{"AcquireUserRow", "AcquireManagePermissionRow",
+		"AcquireUserRow", "AcquireManagePermissionRow"}, acquired)
 }
