@@ -116,6 +116,30 @@ func TestVerify_RefusesAnythingPastTheStoredPassword(t *testing.T) {
 			t.Error("Verify() = true for the stored password plus a two-byte character")
 		}
 	})
+
+	// A stored password of two-byte characters at the bound is 72 bytes but 38 characters, so
+	// only a bound counted in bytes refuses what is appended to it: one counted in characters
+	// would let bcrypt match the first 72 bytes again.
+	t.Run("At the bound in bytes but not in characters", func(t *testing.T) {
+		password := "Aa1!" + strings.Repeat("é", 34)
+		if len(password) != MaxPasswordBytes {
+			t.Fatalf("len(password) = %d, want %d", len(password), MaxPasswordBytes)
+		}
+		hashed, err := Hash(password)
+		if err != nil {
+			t.Fatalf("Hash() error = %v", err)
+		}
+
+		if !Verify(hashed, password) {
+			t.Error("Verify() = false for the stored password")
+		}
+		if Verify(hashed, password+"x") {
+			t.Error("Verify() = true for the stored password plus one byte")
+		}
+		if Verify(hashed, password+"é") {
+			t.Error("Verify() = true for the stored password plus a two-byte character")
+		}
+	})
 }
 
 func TestDummyHash(t *testing.T) {
