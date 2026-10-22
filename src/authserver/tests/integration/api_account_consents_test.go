@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -199,6 +200,30 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	require.NoError(t, err)
 	assert.Nil(t, got)
+}
+
+// Account, Manage consents withdraws a consent through this endpoint, the path #622 names: the
+// withdrawal revokes the refresh tokens the user holds with that client, of a client whose
+// Consent required is off too, while the user's grant with another client keeps refreshing.
+func TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, _ := createAdminClientWithToken(t)
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+
+	// The fixture signs the same user in to two more clients through the password form, so the
+	// user needs a password the test knows. A narrow write of the hash, which revokes nothing.
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	require.NoError(t, err)
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.Id, passwordHashed))
+	f := newConsentWithdrawalFixture(t, u, password)
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", f.consent.Id)
+	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	f.assertWithdrawn(t, adminToken, u.Subject)
 }
 
 func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {

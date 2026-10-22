@@ -640,22 +640,29 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // Access tokens already issued keep working until they expire, exactly as they do under
 // RevokeClientGrants, because nothing in resource validation consults a refresh token.
 //
-// Opened through RunInTransaction, so a deadlock reruns the body together (#301). The
-// body is safe to rerun: the deletion of an already-deleted row matches nothing, the
-// family records are written or found already written, and the sweep reads its rows
-// afresh on each attempt.
+// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the body together
+// (#301), and so does a family record lost to a containment of the same family that
+// overlaps this transaction, as RevokeClientGrantsTx states: the second attempt reads the
+// record the containment committed and leaves it as it is. The body is safe to rerun: the
+// deletion of an already-deleted row matches nothing, the family records are written or
+// found already written, the sweep reads its rows afresh on each attempt, and result is
+// the committing attempt's.
 //
-// The audit events are the CALLER's, unchanged: EventDeletedOwnUserConsent and
-// EventDeletedUserConsent keep their payloads, following decision 9, which left
-// EventDeletedUserSession alone when TerminateUserSessionTx was added beside it.
+// It returns what it revoked for the caller to audit AFTER the commit, through
+// LogRevokedConsentGrants, beside and not instead of EventDeletedOwnUserConsent or
+// EventDeletedUserConsent, whose payloads stay as they were. That is decision 9's shape:
+// TerminateUserSessionTx added EventTerminatedUserSession beside EventDeletedUserSession,
+// one a lifecycle fact and one the security action. On any error the result is the zero
+// value, so a caller cannot audit a rolled-back revocation.
 func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64, clientId int64,
-	withdraw func(tx *sql.Tx) error) error {
+	withdraw func(tx *sql.Tx) error) (ConsentWithdrawalResult, error) {
 
 	if withdraw == nil {
-		return errs.New("revoking on a consent withdrawal requires the withdrawal's own write")
+		return ConsentWithdrawalResult{}, errs.New("revoking on a consent withdrawal requires the withdrawal's own write")
 	}
 
-	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+	var result ConsentWithdrawalResult
+	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		if err := withdraw(tx); err != nil {
 			return err
 		}
@@ -669,10 +676,27 @@ func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64,
 			return err
 		}
 
-		_, err = RevokeRefreshTokens(ctx, db, tx, tokens)
-		return err
+		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+		if err != nil {
+			return err
+		}
+		result = ConsentWithdrawalResult{RevokedRefreshTokenJtis: revokedJtis}
+		return nil
 	})
-	return err
+	if err != nil {
+		return ConsentWithdrawalResult{}, err
+	}
+	return result, nil
+}
+
+// ConsentWithdrawalResult reports what a consent withdrawal's sweep actually did. It is a
+// type of its own rather than ClientGrantResult because the withdrawal sweeps refresh tokens
+// alone and marks no code, so it has no code count to report (#622).
+type ConsentWithdrawalResult struct {
+	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
+	// success path, so a JSON audit payload carries [] rather than null.
+	RevokedRefreshTokenJtis []string
 }
 
 // ClientGrantResult reports what revoking one client's grants actually did. It is
@@ -863,7 +887,7 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 	return result, nil
 }
 
-// AuditLogger records one security event. This package declares only the shape its four Log*
+// AuditLogger records one security event. This package declares only the shape its five Log*
 // helpers need rather than depending on the audit implementation that satisfies it, and rather
 // than importing a handler package to borrow the declaration: the context is first because every
 // audit event raised while serving a request is correlated to that request, so the console record
@@ -896,6 +920,30 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 		// event.
 		"revoked_code_count": result.RevokedCodeCount,
 		// Always a list rather than null: the success path initialises it.
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
+// LogRevokedConsentGrants emits EventRevokedConsentGrants, the security record of what a
+// consent withdrawal revoked (#622). One function rather than a literal at each of its two call
+// sites, the account API's and the admin API's consent deletions, following
+// LogTerminatedUserSession: the payload cannot then differ between sites, and there is a single
+// place to assert its shape field by field.
+//
+// Call this only after RevokeOnConsentWithdrawalTx returned without error, and beside rather
+// than instead of EventDeletedOwnUserConsent or EventDeletedUserConsent, whose fields stay as
+// they were.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedConsentGrants(ctx context.Context, auditLogger AuditLogger, userId int64, clientId int64,
+	loggedInUser string, result ConsentWithdrawalResult) {
+
+	auditLogger.Log(ctx, audit.EventRevokedConsentGrants, map[string]interface{}{
+		"user_id":        userId,
+		"client_id":      clientId,
+		"logged_in_user": loggedInUser,
+		// What this call TRANSITIONED, not what the user held. Always a list rather than null:
+		// the success path fills it from RevokeRefreshTokens.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
 	})
 }

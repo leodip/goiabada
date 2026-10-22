@@ -85,7 +85,10 @@ func (g *manageAccountGrant) storedConsent(t *testing.T) *record.UserConsent {
 	return consent
 }
 
-// withdrawConsent deletes the user's consent to the grant's client, as Account, Manage consents does.
+// withdrawConsent deletes the user's consent row to the grant's client and nothing else, which is
+// the state of a consent never given. It is not what Account, Manage consents does: that withdrawal
+// also revokes the user's refresh tokens with the client (#622), which
+// TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens holds.
 func (g *manageAccountGrant) withdrawConsent(t *testing.T) {
 	t.Helper()
 	require.NoError(t, database.DeleteUserConsent(context.Background(), nil, g.storedConsent(t).Id))
@@ -102,9 +105,10 @@ func assertManageAccountRefreshRefused(t *testing.T, status int, body map[string
 	assert.NotContains(t, body, "refresh_token")
 }
 
-// The user withdraws the consent. The next refresh is refused, and the same token, not spent by the
-// refusal, refreshes once the request leaves manage-account out.
-func TestToken_ManageAccount_RefreshAfterTheConsentWasWithdrawn(t *testing.T) {
+// The consent row is gone, as for a consent never given. The next refresh is refused, and the same
+// token, not spent by the refusal, refreshes once the request leaves manage-account out. A real
+// withdrawal revokes the token instead, so no refresh of it works.
+func TestToken_ManageAccount_RefreshWithTheConsentRowGone(t *testing.T) {
 	g := newManageAccountGrant(t, "openid profile authserver:manage-account")
 
 	// The control: while the consent covers it, the grant refreshes whole.
@@ -144,8 +148,10 @@ func TestToken_ManageAccount_RefreshWithAConsentLeavingItOut(t *testing.T) {
 }
 
 // An offline grant, which a client gets only through the consent screen, is held to the same
-// consent: the user approves the screen, and later withdraws the consent.
-func TestToken_ManageAccount_AnOfflineRefreshAfterTheConsentWasWithdrawn(t *testing.T) {
+// consent: the user approves the screen, and later the consent row is deleted alone. A withdrawal
+// through Account would also revoke the token, and an offline token's refresh still answers with
+// the missing consent, since that check comes first.
+func TestToken_ManageAccount_AnOfflineRefreshWithTheConsentRowGone(t *testing.T) {
 	const scope = "openid offline_access authserver:manage-account"
 	f := newManageAccountConsentFixture(t, false)
 	f.signIn(t)

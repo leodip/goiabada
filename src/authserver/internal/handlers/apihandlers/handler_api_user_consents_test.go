@@ -152,13 +152,26 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["user_id"] == int64(7) && details["consent_id"] == int64(5) &&
 			details["logged_in_user"] == "admin-subject-1"
-	})).Return()
+	})).Return().Once()
+	// What the withdrawal revoked, beside the deletion event: the live token alone, since the
+	// other was revoked before the call.
+	var revokedPayload map[string]interface{}
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedConsentGrants, mock.Anything).
+		Run(func(args mock.Arguments) {
+			revokedPayload = args.Get(2).(map[string]interface{})
+		}).Return().Once()
 
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
+	assert.Equal(t, map[string]interface{}{
+		"user_id":                    int64(7),
+		"client_id":                  int64(3),
+		"logged_in_user":             "admin-subject-1",
+		"revoked_refresh_token_jtis": []string{"rt-live"},
+	}, revokedPayload)
 }
 
 func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {

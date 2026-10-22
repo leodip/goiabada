@@ -116,10 +116,11 @@ func HandleAccountConsentDelete(
 		// The refresh arm consults a stored consent only when the client has Consent required
 		// on or the grant is an offline one, so deleting the row alone would leave a
 		// once-consented client's grant standing (#622).
-		if err := revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
+		result, err := revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
 			func(tx *sql.Tx) error {
 				return database.DeleteUserConsent(r.Context(), tx, consentId)
-			}); err != nil {
+			})
+		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -129,6 +130,10 @@ func HandleAccountConsentDelete(
 			"consent_id":     consentId,
 			"logged_in_user": subject,
 		})
+		// What the withdrawal revoked, beside the deletion event and after the commit, as
+		// TerminateUserSessionTx's callers record EventTerminatedUserSession (#622).
+		revocation.LogRevokedConsentGrants(r.Context(), auditLogger, consent.UserId, consent.ClientId,
+			subject, result)
 
 		resp := api.SuccessResponse{Success: true}
 		writeJSON(w, r, http.StatusOK, resp)
