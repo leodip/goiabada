@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,20 +45,35 @@ func TestLockedOutPage_TheRecoveryNamesTheFlagsTheUsageSpells(t *testing.T) {
 	}
 }
 
+// passwordArgument is a documented command giving the new password as --password's argument,
+// which every documented form must not: the argument reaches the shell's history, the process
+// list, sudo's log and the Kubernetes API server's audit log, and inside the native form's
+// `sh -c '...'` the inner shell rewrote a password holding `$`, a backtick or a backslash into one
+// the operator never typed (#498 review F3 and F4).
+var passwordArgument = regexp.MustCompile(`--password[ =]`)
+
 // TestDeployPages_TheRecoveryRunsInEachDeploymentShape: each deployment page documents the
 // recover command for the shape it installs, so an operator follows the page their deployment
-// came from rather than translating a command between shapes (#498). The Native binaries command
-// is held to the unit the page installs, as the rollback command is, so a changed user, working
-// directory, environment file or binary path fails here until the command follows.
+// came from rather than translating a command between shapes, and the troubleshooting page's tabs
+// hold the same command (#498). The Native binaries command is held to the unit the page installs,
+// as the rollback command is, so a changed user, working directory, environment file or binary path
+// fails here until the command follows. Every documented command reads the password from stdin,
+// the shape's own way of handing a pipe to the command: -T for Compose, -i for kubectl, and
+// sudo's own stdin for the native form.
 func TestDeployPages_TheRecoveryRunsInEachDeploymentShape(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 
+	troubleshooting, err := os.ReadFile(filepath.Join(root, recoverDocsPage))
+	require.NoError(t, err)
+	tabs, found := docsreader.SectionText(string(troubleshooting), "## The last administrator can't sign in")
+	require.Truef(t, found, "%s has no section headed ## The last administrator can't sign in", recoverDocsPage)
+
 	shapes := []struct{ page, command string }{
 		{"site/src/content/docs/deploy/docker-compose.mdx",
-			"docker compose run --rm goiabada-authserver recover --email admin@example.com"},
+			"docker compose run --rm -T goiabada-authserver recover --email admin@example.com"},
 		{"site/src/content/docs/deploy/native-binaries.mdx", ""},
 		{"site/src/content/docs/deploy/kubernetes/overview.mdx",
-			"kubectl exec -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com"},
+			"kubectl exec -i -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com"},
 	}
 
 	for _, shape := range shapes {
@@ -81,5 +97,21 @@ func TestDeployPages_TheRecoveryRunsInEachDeploymentShape(t *testing.T) {
 		}
 		assert.Containsf(t, section, command,
 			"%s: the recovery runs the command for the shape the page installs", shape.page)
+		assert.Containsf(t, tabs, command,
+			"%s: the troubleshooting page's tab runs the command %s does", recoverDocsPage, shape.page)
+
+		for _, text := range []struct{ page, section string }{{shape.page, section}, {recoverDocsPage, tabs}} {
+			for _, line := range strings.Split(text.section, "\n") {
+				if !strings.Contains(line, command) {
+					continue
+				}
+				assert.Containsf(t, line, "--password-stdin",
+					"%s: the documented command reads the new password from stdin", text.page)
+				assert.Falsef(t, passwordArgument.MatchString(line),
+					"%s: the documented command gives the password on the command line: %s", text.page, line)
+				assert.Containsf(t, line, `printf '%s\n' "$RECOVERY_PASSWORD" | `+command,
+					"%s: the password is piped to the command by the shell's own printf", text.page)
+			}
+		}
 	}
 }

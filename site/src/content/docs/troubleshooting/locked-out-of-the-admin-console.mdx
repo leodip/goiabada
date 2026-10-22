@@ -125,36 +125,49 @@ The auth server never lets a change leave no enabled user holding `authserver:ma
 
 ### Recover the user with the auth server
 
-When none of these is left, the auth server's `recover` subcommand restores sign-in for one named user. Its authority is the database credentials it runs with, so it runs where they already are: on the host, in the container or in the pod that runs the auth server. It does only what its flags ask, and whatever is asked, the user's sessions end and their authentication generation advances, so nothing signed in before the recovery survives it. An unknown or disabled user is refused, a new password is held to the stored password policy, and the [audit log](/concepts/audit-log/) records the recovery with the command named as the actor.
+When none of these is left, the auth server's `recover` subcommand restores sign-in for one named user. Its authority is the database credentials it runs with, so it runs where they already are: on the host, in the container or in the pod that runs the auth server. It does only what its flags ask, and whatever is asked, the user's sessions end and their authentication generation advances, so nothing signed in before the recovery survives it. An unknown or disabled user is refused, a new password is held to the stored password policy, and the [audit log](/concepts/audit-log/) records the recovery with the command named as the actor. It also refuses a database whose schema isn't the one its release carries, as the auth server refuses to start on one, so run the `recover` of the release the database is at.
 
 | Flag | What it does |
 |---|---|
 | `--email <address>` | Names the user to recover, by their stored address. Required. |
 | `--grant-manage` | Grants the `authserver:manage` permission |
-| `--password <password>` | Sets a new password, held to the stored password policy |
+| `--password-stdin` | Sets a new password, read from the first line of the command's input and held to the stored password policy. An empty line is refused. |
+| `--password <password>` | Sets a new password given on the command line, held to the same policy. Use `--password-stdin` instead, as below. |
 | `--remove-otp` | Removes the user's OTP authenticator |
 
-One command can ask for several actions, each only as asked, and it's the same command in every deployment shape:
+One command can ask for several actions, each only as asked, and at least one is required. In each deployment shape, type the new password at the first line, where nothing you type is shown, and the second hands it to the command's input. `printf` is built into the shell, so the password never appears in a command line:
 
 <Tabs>
   <TabItem label="Docker Compose">
     ```bash
-    docker compose run --rm goiabada-authserver recover --email admin@example.com --grant-manage --password '<password>'
+    printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+    printf '%s\n' "$RECOVERY_PASSWORD" | docker compose run --rm -T goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
+    unset RECOVERY_PASSWORD
     ```
   </TabItem>
   <TabItem label="Native binaries">
     ```bash
-    sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password "<password>"'
+    printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+    printf '%s\n' "$RECOVERY_PASSWORD" | sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin'
+    unset RECOVERY_PASSWORD
     ```
   </TabItem>
   <TabItem label="Kubernetes">
     ```bash
-    kubectl exec -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com --grant-manage --password '<password>'
+    printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+    printf '%s\n' "$RECOVERY_PASSWORD" | kubectl exec -i -n goiabada deployment/goiabada-authserver -- /app/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin
+    unset RECOVERY_PASSWORD
     ```
   </TabItem>
 </Tabs>
 
-A password given on the command line reaches the shell's history and the process list, so change it under **Account**, **Change password** once the administrator is back in. The deployment pages hold the command for their own shape: [Docker Compose](/deploy/docker-compose/#recover-a-locked-out-administrator), [Native binaries](/deploy/native-binaries/#recover-a-locked-out-administrator) and [Kubernetes](/deploy/kubernetes/overview/#recover-a-locked-out-administrator).
+When no new password is needed, run the command on its own, without the pipe in front of it and without `--password-stdin`. The deployment pages hold the command for their own shape: [Docker Compose](/deploy/docker-compose/#recover-a-locked-out-administrator), [Native binaries](/deploy/native-binaries/#recover-a-locked-out-administrator) and [Kubernetes](/deploy/kubernetes/overview/#recover-a-locked-out-administrator).
+
+<Aside type="danger">
+**Don't give the password with `--password` on a server.** A password on the command line is kept in the shell's history and shown in the process list while the command runs. `sudo` writes its whole command line to the system log, and with an audit policy, the Kubernetes API server writes a `kubectl exec` command to its audit log. Keep `--password` for a script that has no other way to pass it, and when it was used, change the password under **Account**, **Change password** once the administrator is back in.
+</Aside>
+
+The recovery doesn't reset the limits on failed sign-ins. If the sign-in form then answers "Too many attempts", the limits on wrong passwords for the account are still counting the attempts made before the recovery: see [Too many attempts or 429](/troubleshooting/too-many-attempts-or-429/) for which limits a restart of the auth server resets and which only time does, and deal with whatever is still making attempts first.
 
 ## Next steps
 

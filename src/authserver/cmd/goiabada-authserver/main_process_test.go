@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 )
 
 // runMainMarker, set in a child's environment, makes this test binary run the real main instead
@@ -52,6 +53,12 @@ func runMainProcess(t *testing.T, decoy string, args ...string) (int, string) {
 // runMainProcessWith is runMainProcess with env appended to the child's environment.
 func runMainProcessWith(t *testing.T, decoy string, env []string, args ...string) (int, string) {
 	t.Helper()
+	return runMainProcessFeeding(t, decoy, env, "", args...)
+}
+
+// runMainProcessFeeding is runMainProcessWith with stdin as the child's standard input.
+func runMainProcessFeeding(t *testing.T, decoy string, env []string, stdin string, args ...string) (int, string) {
+	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
 	defer cancel()
@@ -62,6 +69,7 @@ func runMainProcessWith(t *testing.T, decoy string, env []string, args ...string
 		"GOIABADA_DB_TYPE=sqlite",
 		"GOIABADA_DB_DSN=file:" + decoy,
 	}, env...)
+	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
@@ -147,6 +155,60 @@ func TestMain_MigrateFindsItsFlagsWhereverTheyAre(t *testing.T) {
 			assert.NoFileExists(t, decoy)
 		})
 	}
+}
+
+// TestMain_RecoverRunsThroughTheRealMain is the recover branch at the process: the real main, its
+// real config.Load over a real command line and stdin, and a SQLite file seeded with the user to
+// recover. These fail if main stops dispatching `recover`, stops handing it the flags after it, or
+// stops handing it its stdin; every function below it can be right while that wiring is wrong.
+func TestMain_RecoverRunsThroughTheRealMain(t *testing.T) {
+	t.Run("a grant, the database named after recover", func(t *testing.T) {
+		dir := t.TempDir()
+		target, decoy := filepath.Join(dir, "f.db"), filepath.Join(dir, "d.db")
+		db, manage := newRecoverDatabaseAt(t, target)
+
+		code, stderr := runMainProcess(t, decoy, "recover", "--db-dsn=file:"+target,
+			"--email", "admin@example.com", "--grant-manage")
+
+		require.Equal(t, migrateExitOK, code, "stderr: %s", stderr)
+		assert.NoFileExists(t, decoy)
+		user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+		require.NoError(t, err)
+		grants, err := db.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+		require.NoError(t, err)
+		require.Len(t, grants, 1)
+		assert.Equal(t, manage.Id, grants[0].PermissionId)
+		assert.Equal(t, int64(1), user.AuthStateGeneration, "the recovery advanced the generation")
+	})
+
+	t.Run("a password read from stdin", func(t *testing.T) {
+		dir := t.TempDir()
+		target, decoy := filepath.Join(dir, "f.db"), filepath.Join(dir, "d.db")
+		db, _ := newRecoverDatabaseAt(t, target)
+		const password = "Aa$$1 23456!`x`"
+
+		code, stderr := runMainProcessFeeding(t, decoy, nil, password+"\n", "-db-dsn=file:"+target,
+			"recover", "--email", "admin@example.com", "--password-stdin")
+
+		require.Equal(t, migrateExitOK, code, "stderr: %s", stderr)
+		user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+		require.NoError(t, err)
+		assert.True(t, passwordhash.Verify(user.PasswordHash, password),
+			"the password set is the line typed, every character kept")
+	})
+
+	t.Run("an empty password from stdin opens nothing", func(t *testing.T) {
+		dir := t.TempDir()
+		target, decoy := filepath.Join(dir, "f.db"), filepath.Join(dir, "d.db")
+
+		code, stderr := runMainProcessFeeding(t, decoy, nil, "\n", "recover", "--db-dsn=file:"+target,
+			"--email", "admin@example.com", "--password-stdin", "--grant-manage")
+
+		require.Equal(t, migrateExitUsage, code, "stderr: %s", stderr)
+		assert.Equal(t, "--password-stdin read an empty line: give the new password as the first line of stdin\n", stderr)
+		assert.NoFileExists(t, target)
+		assert.NoFileExists(t, decoy)
+	})
 }
 
 // TestMain_RefusesAStrayArgumentBeforeOpeningAnything: a typo used to start the server, which

@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"flag"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/recovery"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/builtin"
 )
@@ -38,10 +42,16 @@ func (r *recoverAuditRecorder) Log(_ context.Context, auditEvent string, details
 // with its manage permission, and one user. Those are the parts of the seed the command reads,
 // written through the data tier the same way the seed writes them, so the command is observed
 // against what it will run against in production (#498).
-func newRecoverDatabase(t *testing.T) (data.Database, *record.Permission) {
+func newRecoverDatabase(t *testing.T) (*sqlitedb.Database, *record.Permission) {
+	t.Helper()
+	return newRecoverDatabaseAt(t, filepath.Join(t.TempDir(), "recover_test.db"))
+}
+
+// newRecoverDatabaseAt is newRecoverDatabase at the path the test names, for a test that hands the
+// path to the command rather than the handle.
+func newRecoverDatabaseAt(t *testing.T, path string) (*sqlitedb.Database, *record.Permission) {
 	t.Helper()
 
-	path := filepath.Join(t.TempDir(), "recover_test.db")
 	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
@@ -88,12 +98,25 @@ func newRecoverDatabase(t *testing.T) (data.Database, *record.Permission) {
 	return db, manage
 }
 
-// runRecoverOn runs one invocation against the database and answers the exit code with what the
-// command printed on each stream.
-func runRecoverOn(t *testing.T, db data.Database, audit *recoverAuditRecorder, inv recoverInvocation) (int, string, string) {
+// enrollOTP gives the seeded user an authenticator, the state --remove-otp clears.
+func enrollOTP(t *testing.T, db data.Database) {
 	t.Helper()
+	ctx := context.Background()
+	user, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
+	require.NoError(t, err)
+	user.OTPEnabled = true
+	user.OTPSecretEncrypted = []byte("the-encrypted-seed")
+	require.NoError(t, db.UpdateUser(ctx, nil, user))
+}
+
+// runRecoverOn runs one invocation against the database and its migrator, and answers the exit
+// code with what the command printed on each stream.
+func runRecoverOn(t *testing.T, db *sqlitedb.Database, audit *recoverAuditRecorder, inv recoverInvocation) (int, string, string) {
+	t.Helper()
+	m, err := db.NewMigrator(context.Background(), nil)
+	require.NoError(t, err)
 	var out, errOut bytes.Buffer
-	code := runRecover(context.Background(), db, audit, inv, &out, &errOut)
+	code := runRecover(context.Background(), db, m, audit, inv, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -106,10 +129,19 @@ func TestParseRecoverArgs(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "admin@example.com", inv.email)
 		assert.Equal(t, "alongenoughpassword", inv.password)
+		assert.False(t, inv.passwordStdin)
 		assert.True(t, inv.grantManage)
 		assert.True(t, inv.removeOTP)
 		assert.False(t, inv.help)
 		assert.Equal(t, "sqlite", inv.database.Type)
+	})
+
+	t.Run("reads --password-stdin as an action", func(t *testing.T) {
+		inv, err := parseRecoverArgs([]string{"--email", "admin@example.com", "--password-stdin"},
+			config.DatabaseConfig{Type: "sqlite"})
+		require.NoError(t, err)
+		assert.True(t, inv.passwordStdin)
+		assert.Empty(t, inv.password, "the password is read from stdin, not from the arguments")
 	})
 
 	t.Run("an undefined flag names what recover accepts", func(t *testing.T) {
@@ -117,7 +149,7 @@ func TestParseRecoverArgs(t *testing.T) {
 			config.DatabaseConfig{Type: "sqlite"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--grant is not a flag recover accepts")
-		assert.Contains(t, err.Error(), "--email, --password, --grant-manage and --remove-otp")
+		assert.Contains(t, err.Error(), "--email, --password, --password-stdin, --grant-manage and --remove-otp")
 	})
 
 	t.Run("a positional argument is refused", func(t *testing.T) {
@@ -131,6 +163,161 @@ func TestParseRecoverArgs(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--email is required")
 	})
+
+	// A run with no action is refused here, before anything is opened, rather than after the
+	// database was opened and the user read (#498 review F10).
+	t.Run("an action is required", func(t *testing.T) {
+		_, err := parseRecoverArgs([]string{"--email", "admin@example.com"}, config.DatabaseConfig{Type: "sqlite"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nothing to do")
+		assert.Contains(t, err.Error(), "--grant-manage, --password-stdin, --password or --remove-otp")
+	})
+
+	// An explicit empty --password, as `--password "$PW"` with PW unset gives, is refused whatever
+	// else is asked: read as "no password", the other actions committed and the forgotten password
+	// stayed in place while the command reported success (#498 review F2).
+	for _, others := range [][]string{
+		nil,
+		{"--grant-manage"},
+		{"--remove-otp"},
+		{"--grant-manage", "--remove-otp"},
+	} {
+		for _, spelling := range [][]string{{"--password="}, {"--password", ""}} {
+			args := append(append([]string{"--email", "admin@example.com"}, spelling...), others...)
+			t.Run("an empty password is refused: "+strings.Join(args, " "), func(t *testing.T) {
+				_, err := parseRecoverArgs(args, config.DatabaseConfig{Type: "sqlite"})
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "--password is empty")
+			})
+		}
+	}
+
+	t.Run("the two password flags together are refused", func(t *testing.T) {
+		_, err := parseRecoverArgs([]string{"--email", "admin@example.com", "--password-stdin",
+			"--password", "alongenoughpassword"}, config.DatabaseConfig{Type: "sqlite"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--password and --password-stdin both give the new password")
+	})
+}
+
+// TestParseRecoverArgs_Help: help is answered before the email or an action is required, as
+// `migrate --help` is (#498 review F10).
+func TestParseRecoverArgs_Help(t *testing.T) {
+	for _, args := range [][]string{{"-h"}, {"-help"}, {"--h"}, {"--help"}, {"--email", "a@example.com", "--help"}} {
+		inv, err := parseRecoverArgs(args, migrateArgsBase())
+		require.NoError(t, err, "%#v", args)
+		assert.True(t, inv.help, "%#v", args)
+	}
+}
+
+func TestRecoverCommand_HelpPrintsTheUsageAndOpensNothing(t *testing.T) {
+	a := filepath.Join(t.TempDir(), "a.db")
+
+	var stdout, stderr bytes.Buffer
+	inv, ok := readRecoverCommand([]string{"--help", "--password-stdin"}, sqliteBase(a),
+		strings.NewReader(""), &stderr)
+	require.True(t, ok, "stderr: %s", stderr.String())
+	code := runRecoverCommand(inv, &stdout, &stderr)
+
+	require.Equal(t, migrateExitOK, code)
+	assert.Equal(t, recoverUsage+"\n", stdout.String())
+	assert.Empty(t, stderr.String(), "help reads no password from stdin, and refuses nothing")
+	assert.NoFileExists(t, a)
+}
+
+// TestRecoverCommand_RefusesAUsageMistakeBeforeOpeningAnything: a run with no action, or with an
+// empty password, is refused with the usage and exit 2, and the database named is never created
+// (#498 review F2 and F10).
+func TestRecoverCommand_RefusesAUsageMistakeBeforeOpeningAnything(t *testing.T) {
+	for _, args := range [][]string{
+		{"--email", "admin@example.com"},
+		{"--email", "admin@example.com", "--password=", "--grant-manage"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			a := filepath.Join(t.TempDir(), "a.db")
+
+			var stderr bytes.Buffer
+			_, ok := readRecoverCommand(args, sqliteBase(a), strings.NewReader(""), &stderr)
+
+			require.False(t, ok)
+			assert.Contains(t, stderr.String(), "\n\n"+recoverUsage+"\n")
+			assert.NoFileExists(t, a)
+		})
+	}
+}
+
+// TestReadRecoverCommand_ReadsThePasswordFromStdin: --password-stdin takes the first line of
+// stdin, without its line ending and with every other character kept, and refuses an empty line
+// or none at all, as it refuses an empty --password (#498 review F4).
+func TestReadRecoverCommand_ReadsThePasswordFromStdin(t *testing.T) {
+	args := []string{"--email", "admin@example.com", "--password-stdin"}
+
+	for _, tc := range []struct{ name, stdin, want string }{
+		{"a line", "Aa$$1 23456!`x`\\\nthe next line is not read\n", "Aa$$1 23456!`x`\\"},
+		{"a line ended by CRLF", "alongenoughpassword\r\n", "alongenoughpassword"},
+		{"no line ending", "alongenoughpassword", "alongenoughpassword"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stderr bytes.Buffer
+			inv, ok := readRecoverCommand(args, config.DatabaseConfig{Type: "sqlite"},
+				strings.NewReader(tc.stdin), &stderr)
+			require.True(t, ok, "stderr: %s", stderr.String())
+			assert.Equal(t, tc.want, inv.password)
+		})
+	}
+
+	for _, tc := range []struct{ name, stdin, want string }{
+		{"an empty line", "\nalongenoughpassword\n", "--password-stdin read an empty line"},
+		{"nothing", "", "--password-stdin read nothing"},
+	} {
+		t.Run(tc.name+" is refused", func(t *testing.T) {
+			a := filepath.Join(t.TempDir(), "a.db")
+			var stderr bytes.Buffer
+			_, ok := readRecoverCommand(args, sqliteBase(a), strings.NewReader(tc.stdin), &stderr)
+			require.False(t, ok)
+			assert.Contains(t, stderr.String(), tc.want)
+			assert.NoFileExists(t, a)
+		})
+	}
+}
+
+// TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened: the base names file A, the flag
+// after `recover` names file B, and B is the database the command recovers the user in. A is never
+// created, which is how "not opened" is observed: SQLite creates the file on the first connection.
+func TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a.db"), filepath.Join(dir, "b.db")
+	db, manage := newRecoverDatabaseAt(t, b)
+
+	var stdout, stderr bytes.Buffer
+	inv, ok := readRecoverCommand([]string{"--email", "admin@example.com", "--grant-manage",
+		"--db-dsn=file:" + b}, sqliteBase(a), strings.NewReader(""), &stderr)
+	require.True(t, ok, "stderr: %s", stderr.String())
+	code := runRecoverCommand(inv, &stdout, &stderr)
+
+	require.Equal(t, migrateExitOK, code, "stderr: %s", stderr.String())
+	assert.NoFileExists(t, a)
+	user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+	require.NoError(t, err)
+	grants, err := db.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+	require.NoError(t, err)
+	require.Len(t, grants, 1, "the grant was written in the database the flag after recover named")
+	assert.Equal(t, manage.Id, grants[0].PermissionId)
+}
+
+// TestRecoverUsage_NamesEveryDatabaseFlag: every flag config.RegisterDatabaseFlags registers can
+// follow recover, so the usage, the only place they are spelled out, names each one, as migrate's
+// does.
+func TestRecoverUsage_NamesEveryDatabaseFlag(t *testing.T) {
+	fs := flag.NewFlagSet("recover", flag.ContinueOnError)
+	config.RegisterDatabaseFlags(fs, &config.DatabaseConfig{})
+	var names []string
+	fs.VisitAll(func(f *flag.Flag) { names = append(names, f.Name) })
+	require.NotEmpty(t, names)
+	for _, name := range names {
+		named := regexp.MustCompile(`--` + regexp.QuoteMeta(name) + `([^-a-z]|$)`)
+		assert.Truef(t, named.MatchString(recoverUsage), "the recover usage does not name --%s", name)
+	}
 }
 
 func TestRecover_RefusesAnUnknownUser(t *testing.T) {
@@ -167,16 +354,18 @@ func TestRecover_RefusesADisabledUser(t *testing.T) {
 	assert.Empty(t, recorder.events, "a refusal writes no audit event")
 }
 
-func TestRecover_NeedsAnAction(t *testing.T) {
+// TestRecover_FindsTheUserByATrimmedLowercasedAddress: the address is looked up as every write
+// path stores one, so one typed with capitals or padding names the stored user.
+func TestRecover_FindsTheUserByATrimmedLowercasedAddress(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
 	recorder := &recoverAuditRecorder{}
 
-	code, _, stderr := runRecoverOn(t, db, recorder, recoverInvocation{email: "admin@example.com"})
+	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
+		email: "  Admin@Example.COM \t", grantManage: true,
+	})
 
-	assert.Equal(t, migrateExitUsage, code)
-	assert.Contains(t, stderr, "nothing to do")
-	assert.Contains(t, stderr, "--grant-manage")
-	assert.Empty(t, recorder.events, "a usage refusal writes no audit event")
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.Contains(t, stdout, "recovered admin@example.com")
 }
 
 func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
@@ -192,17 +381,73 @@ func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
 	assert.Empty(t, recorder.events, "a refusal writes no audit event")
 }
 
+// TestRecover_RefusesASchemaThisBinaryDoesNotCarry: the server refuses to start on a database a
+// newer release migrated or a migration left dirty, and the recovery, which writes credentials and
+// a permission through this binary's data tier, refuses both too, writing nothing (#498 review F9).
+func TestRecover_RefusesASchemaThisBinaryDoesNotCarry(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		place func(t *testing.T, sqlDB *sql.DB, head int)
+		want  string
+	}{
+		{"a newer schema", func(t *testing.T, sqlDB *sql.DB, head int) {
+			_, err := sqlDB.Exec("UPDATE schema_migrations SET version = ?", head+1)
+			require.NoError(t, err)
+		}, "and this binary carries"},
+		{"a dirty schema", func(t *testing.T, sqlDB *sql.DB, _ int) {
+			_, err := sqlDB.Exec("UPDATE schema_migrations SET dirty = 1")
+			require.NoError(t, err)
+		}, "DIRTY: a migration did not finish"},
+		{"an older schema", func(t *testing.T, sqlDB *sql.DB, head int) {
+			_, err := sqlDB.Exec("UPDATE schema_migrations SET version = ?", head-1)
+			require.NoError(t, err)
+		}, "and this binary carries"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, _ := newRecoverDatabase(t)
+			enrollOTP(t, db)
+			m, err := db.NewMigrator(context.Background(), nil)
+			require.NoError(t, err)
+			tc.place(t, db.DB, m.Head())
+			recorder := &recoverAuditRecorder{}
+
+			code, _, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
+				email: "admin@example.com", grantManage: true, removeOTP: true,
+			})
+
+			assert.Equal(t, migrateExitError, code)
+			assert.Contains(t, stderr, "refusing to recover: the database records schema version")
+			assert.Contains(t, stderr, tc.want)
+			assert.Empty(t, recorder.events)
+			user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+			require.NoError(t, err)
+			assert.True(t, user.OTPEnabled, "nothing was removed")
+			assert.Zero(t, user.AuthStateGeneration, "the generation did not move")
+			grants, err := db.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+			require.NoError(t, err)
+			assert.Empty(t, grants, "nothing was granted")
+		})
+	}
+
+	t.Run("a database never migrated", func(t *testing.T) {
+		db, err := sqlitedb.New(context.Background(), "file:"+filepath.Join(t.TempDir(), "empty.db"), false)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = db.DB.Close() })
+
+		code, _, stderr := runRecoverOn(t, db, &recoverAuditRecorder{}, recoverInvocation{
+			email: "admin@example.com", grantManage: true,
+		})
+
+		assert.Equal(t, migrateExitError, code)
+		assert.Contains(t, stderr, "refusing to recover: the database records no schema version")
+	})
+}
+
 func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 	db, manage := newRecoverDatabase(t)
 	recorder := &recoverAuditRecorder{}
 	ctx := context.Background()
-
-	// The user holds an enrolled authenticator, the state --remove-otp clears.
-	enrolled, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
-	require.NoError(t, err)
-	enrolled.OTPEnabled = true
-	enrolled.OTPSecretEncrypted = []byte("the-encrypted-seed")
-	require.NoError(t, db.UpdateUser(ctx, nil, enrolled))
+	enrollOTP(t, db)
 
 	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
 		email:       "admin@example.com",
@@ -216,7 +461,7 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 	assert.Contains(t, stdout, "password set")
 	assert.Contains(t, stdout, "otp authenticator removed")
 	assert.Contains(t, stdout, "granted")
-	assert.Contains(t, stdout, "authentication generation")
+	assert.Contains(t, stdout, "authentication generation 0 to 1")
 
 	after, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
 	require.NoError(t, err)
@@ -227,8 +472,9 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 	assert.False(t, passwordhash.Verify(after.PasswordHash, "not-a-bcrypt-hash"),
 		"the password the user had before the recovery no longer verifies")
 
-	// The authenticator is gone.
+	// The authenticator is gone, and the generation moved.
 	assert.False(t, after.OTPEnabled, "the OTP authenticator was removed")
+	assert.Equal(t, int64(1), after.AuthStateGeneration)
 
 	// The permission is granted.
 	grants, err := db.GetUserPermissionsByUserId(ctx, nil, after.Id)
@@ -236,16 +482,91 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 	require.Len(t, grants, 1)
 	assert.Equal(t, manage.Id, grants[0].PermissionId)
 
-	// The audit trail names the command as the actor.
+	// The audit trail: one record per thing done, in the Admin API's order, each naming the
+	// command as the actor under one key (#498 review F6, F7 and F11).
 	assert.Equal(t, []string{
 		audit.EventUpdatedUserAuthentication,
+		audit.EventDisabledOTP,
 		audit.EventAddedUserPermission,
+		audit.EventAdministrativePermissionChanged,
 		audit.EventRevokedUserAuthState,
 	}, recorder.events)
-	revoked := recorder.details[len(recorder.details)-1]
+	assert.Equal(t, map[string]interface{}{"user_id": after.Id, "command": recovery.Actor}, recorder.details[0])
+	assert.Equal(t, map[string]interface{}{"user_id": after.Id, "command": recovery.Actor}, recorder.details[1])
+	assert.Equal(t, map[string]interface{}{
+		"user_id": after.Id, "permission_id": manage.Id, "command": recovery.Actor,
+	}, recorder.details[2])
+	assert.Equal(t, map[string]interface{}{
+		"change":                 "granted",
+		"target_kind":            "user",
+		"target_id":              after.Id,
+		"permission_identifiers": []string{"authserver:manage"},
+		"command":                recovery.Actor,
+	}, recorder.details[3])
+	revoked := recorder.details[4]
 	assert.Equal(t, revocation.ReasonRecoveryCommand, revoked["reason"])
-	assert.Equal(t, recoverActor, revoked["logged_in_user"])
+	assert.Equal(t, recovery.Actor, revoked["command"])
+	assert.Empty(t, revoked["logged_in_user"], "no token made the recovery")
+	assert.Contains(t, revoked, "logged_in_user", "the key is present, empty, as at the sign-in sites")
 	assert.Equal(t, after.Id, revoked["user_id"])
+	assert.Equal(t, int64(0), revoked["old_generation"])
+	assert.Equal(t, int64(1), revoked["new_generation"])
+}
+
+// TestRecover_ARemovalWithNothingEnrolledRecordsNoAuthenticationChange: --remove-otp on a user
+// with no authenticator removes nothing, says so, and records neither a password set nor an
+// authenticator removed, only the revocation every recovery makes (#498 review F7).
+func TestRecover_ARemovalWithNothingEnrolledRecordsNoAuthenticationChange(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	recorder := &recoverAuditRecorder{}
+
+	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
+		email: "admin@example.com", removeOTP: true,
+	})
+
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.Contains(t, stdout, "no otp authenticator was enrolled, so nothing was removed")
+	assert.NotContains(t, stdout, "password set")
+	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events)
+}
+
+// TestRecover_ARemovalAloneRecordsTheAuthenticatorRemoved: a real removal with no password asked
+// is recorded as disabled_otp, the event the Admin API and the account API write for it, and not
+// as a password set (#498 review F7).
+func TestRecover_ARemovalAloneRecordsTheAuthenticatorRemoved(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	recorder := &recoverAuditRecorder{}
+	enrollOTP(t, db)
+
+	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
+		email: "admin@example.com", removeOTP: true,
+	})
+
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.Contains(t, stdout, "otp authenticator removed")
+	assert.Equal(t, []string{audit.EventDisabledOTP, audit.EventRevokedUserAuthState}, recorder.events)
+	user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+	require.NoError(t, err)
+	assert.False(t, user.OTPEnabled)
+	assert.Equal(t, "not-a-bcrypt-hash", user.PasswordHash, "the password is untouched")
+}
+
+// TestRecover_AnotherActionLeavesTheAuthenticatorAlone: an authenticator is removed only when
+// --remove-otp asks, however much else the recovery does.
+func TestRecover_AnotherActionLeavesTheAuthenticatorAlone(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	enrollOTP(t, db)
+
+	code, stdout, stderr := runRecoverOn(t, db, &recoverAuditRecorder{}, recoverInvocation{
+		email: "admin@example.com", password: "alongenoughpassword", grantManage: true,
+	})
+
+	require.Equal(t, migrateExitOK, code, stderr)
+	assert.NotContains(t, stdout, "otp")
+	user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
+	require.NoError(t, err)
+	assert.True(t, user.OTPEnabled, "the authenticator is still enrolled")
+	assert.Equal(t, []byte("the-encrypted-seed"), user.OTPSecretEncrypted)
 }
 
 func TestRecover_ReportsManageAlreadyHeldAndGrantsNothing(t *testing.T) {

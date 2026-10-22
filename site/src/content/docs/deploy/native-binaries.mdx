@@ -139,10 +139,12 @@ The releases include macOS and Windows binaries, which read the same variables. 
 When nobody who holds `authserver:manage` can sign in any more, the auth server's `recover` subcommand restores sign-in for one named user. Run it as the service's user, from its working directory and with its `goiabada.env`, as [the rollback command](/deploy/upgrade-goiabada/#roll-back-to-an-earlier-release) does, so the database the command reaches is the one the service uses:
 
 ```bash
-sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password "<password>"'
+printf 'New password: ' && read -rs RECOVERY_PASSWORD && echo
+printf '%s\n' "$RECOVERY_PASSWORD" | sudo -u goiabada sh -c 'cd /var/lib/goiabada && set -a && . /etc/goiabada/goiabada.env && set +a && exec /opt/goiabada/goiabada-authserver recover --email admin@example.com --grant-manage --password-stdin'
+unset RECOVERY_PASSWORD
 ```
 
-Each action is its own flag, `--grant-manage`, `--password` and `--remove-otp`, applied only as asked, and whatever is asked, the user's sessions end and the [audit log](/concepts/audit-log/) records the recovery. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers every flag and the other deployment shapes.
+The first line asks for the new password without showing it, and the second hands it to the command's input, so it never appears in a command line, the shell's history or a log. Each action is its own flag, `--grant-manage`, `--password-stdin` and `--remove-otp`, applied only as asked, and whatever is asked, the user's sessions end and the [audit log](/concepts/audit-log/) records the recovery. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers every flag and the other deployment shapes.
 
 ## Next steps
 

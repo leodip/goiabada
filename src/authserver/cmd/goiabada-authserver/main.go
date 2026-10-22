@@ -103,7 +103,7 @@ func run() int {
 	var recovery recoverInvocation
 	if command == "recover" {
 		var ok bool
-		if recovery, ok = readRecoverCommand(commandArgs, cfg.Database, os.Stderr); !ok {
+		if recovery, ok = readRecoverCommand(commandArgs, cfg.Database, os.Stdin, os.Stderr); !ok {
 			return migrateExitUsage
 		}
 	}

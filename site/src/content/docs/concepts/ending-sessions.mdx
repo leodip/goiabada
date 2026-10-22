@@ -63,6 +63,7 @@ When a user's credentials change, their sessions and refresh tokens stop being u
 | The user changes their own password | The same, except the session they're changing it from | `password_change` |
 | An administrator sets the user's password | Every session of theirs is ended and every refresh token revoked | `admin_password_set` |
 | An administrator disables the user | The same. Enabling them again doesn't bring the sessions back | `account_disabled` |
+| The auth server's [`recover` command](/troubleshooting/locked-out-of-the-admin-console/#recover-the-user-with-the-auth-server) recovers the user, whatever it was asked to do | Every session of theirs is ended and every refresh token revoked | `recovery_command` |
 
 That covers every grant, offline refresh tokens whose session has already expired and tokens from the [password grant](/legacy-flows/ropc/) included, and an authorization code that was issued but not redeemed yet can't be exchanged any more. Each change leaves a `revoked_user_auth_state` entry in the audit log, with the `reason` above and the sessions and refresh tokens it ended.
 

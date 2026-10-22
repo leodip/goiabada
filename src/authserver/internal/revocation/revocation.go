@@ -262,7 +262,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 }
 
 // Reasons a revocation records. The first five are recorded on EventRevokedUserAuthState, one
-// per credential site (#106 decision 7), the fifth naming the recovery command that holds the
+// per credential site (#106 decision 7), the fourth naming the recovery command that holds the
 // database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
 // is recorded on EventRevokedClientGrants, and is also the reason a family's revocation record
 // carries when RevokeClientGrants wrote it (#245, #259). Constants rather than inline strings so
@@ -287,8 +287,8 @@ const (
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
 // transaction and commits it, returning the result for the caller to audit AFTER the commit.
 //
-// It exists so the four credential sites cannot each get the transaction discipline subtly
-// wrong. Three properties are easy to lose when this is open-coded four times, and all three
+// It exists so the five credential sites cannot each get the transaction discipline subtly
+// wrong. Three properties are easy to lose when this is open-coded five times, and all three
 // are what the tests assert:
 //
 //   - the credential write and the sweep are in the same transaction, so a user can never end
@@ -837,7 +837,28 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
 	loggedInUser string, result UserAuthStateResult) {
 
-	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, revokedUserAuthStateDetails(userId, reason,
+		loggedInUser, result))
+}
+
+// LogRevokedUserAuthStateByCommand is LogRevokedUserAuthState for a site no token makes, the
+// `recover` subcommand: logged_in_user is empty, as at the sign-in sites, and the command is
+// named under `command`, the key the recovery's other entries name it under, so one recovery
+// names its actor under one key (#498).
+func LogRevokedUserAuthStateByCommand(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
+	command string, result UserAuthStateResult) {
+
+	details := revokedUserAuthStateDetails(userId, reason, "", result)
+	details["command"] = command
+	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, details)
+}
+
+// revokedUserAuthStateDetails is EventRevokedUserAuthState's payload, the one shape both of its
+// writers log.
+func revokedUserAuthStateDetails(userId int64, reason string, loggedInUser string,
+	result UserAuthStateResult) map[string]interface{} {
+
+	return map[string]interface{}{
 		"user_id":        userId,
 		"reason":         reason,
 		"logged_in_user": loggedInUser,
@@ -849,7 +870,7 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 		"preserved_session_identifier": result.PreservedSessionIdentifier,
 		"old_generation":               result.OldGeneration,
 		"new_generation":               result.NewGeneration,
-	})
+	}
 }
 
 // LogAuthCodeReuse emits EventAuthCodeReuseDetected, the security record of the RFC 6749 section
