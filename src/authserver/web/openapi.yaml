@@ -4377,7 +4377,10 @@ components:
             True while the user's authenticator is disabled because 100 one-time codes in a row
             were refused. `otpEnabled` stays true, and every code is refused, the right one
             included, until two-factor authentication is turned off for the user and they set up
-            a new authenticator. Only someone who knew the user's password could send those codes.
+            a new authenticator. Someone who knew the user's password, or held one of their
+            sessions, sent those codes, so set a new password (`PUT /api/v1/admin/users/{id}/password`)
+            before turning two-factor authentication off (`PUT /api/v1/admin/users/{id}/otp`):
+            otherwise the old password alone signs in.
       required:
         - id
         - createdAt

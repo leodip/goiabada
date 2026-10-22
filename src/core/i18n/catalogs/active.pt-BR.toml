@@ -944,7 +944,7 @@
 "adminconsole.admin_users.authentication.otp_title" = "Autenticação de dois fatores"
 "adminconsole.admin_users.authentication.otp_enabled_hint" = "Desmarque para desativar a autenticação de dois fatores. Só o usuário pode ativá-la de novo, na conta dele."
 "adminconsole.admin_users.authentication.otp_disable_warning" = "Você está desativando a autenticação de dois fatores do usuário, então só a senha bastará para ele entrar até que a configure de novo."
-"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "O autenticador do usuário foi desativado depois de 100 códigos de uso único errados seguidos, então todo código é recusado, até o certo. Só quem sabia a senha dele poderia enviar esses códigos, então considere a senha conhecida. Para que o usuário volte a entrar, desative a autenticação de dois fatores e salve. Depois ele pode configurar um novo autenticador."
+"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "O autenticador do usuário foi desativado depois de 100 códigos de uso único errados seguidos, então todo código é recusado, até o certo. Alguém que sabia a senha dele, ou tinha uma das sessões dele, enviou esses códigos, então considere a senha conhecida. Para que o usuário volte a entrar, defina uma nova senha e desative a autenticação de dois fatores no mesmo salvamento. Depois ele pode entrar com a nova senha e configurar um novo autenticador."
 "adminconsole.admin_users.authentication.otp_not_set_up" = "O usuário não configurou a autenticação de dois fatores. Só ele pode fazer isso, na conta dele."
 
 "adminconsole.admin_users.consents.modal_confirm_title" = "Revogar este consentimento?"

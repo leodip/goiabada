@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/pquerna/otp/totp"
@@ -20,9 +24,10 @@ import (
 // through /auth/otp: a user one refusal short of record.OtpConsecutiveFailureLimit sends a wrong
 // code, which disables the authenticator and is audited once as otp_authenticator_disabled. The
 // right code is then refused like any wrong one, and the admin API says the authenticator is
-// disabled. An administrator turns two-factor authentication off, which is the way back the docs
-// give; the user's next sign-in sets up a new authenticator, which starts with no failures against
-// it, and the sign-in after that is accepted on the new authenticator's code.
+// disabled. An administrator sets a new password and then turns two-factor authentication off, which
+// is the way back the docs give: the old password, which whoever sent the codes knew, is refused, and
+// the user's next sign-in with the new one sets up a new authenticator, which starts with no failures
+// against it, and the sign-in after that is accepted on the new authenticator's code.
 func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetUp(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, _ := createAdminClientWithToken(t)
@@ -64,19 +69,28 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	assert.True(t, shown.OTPEnabled, "the authenticator is still there")
 	assert.True(t, shown.OTPAuthenticatorDisabled, "and the admin API says it is disabled")
 
-	// The way back: an administrator turns two-factor authentication off.
+	// The way back: an administrator sets a new password, since whoever sent the codes knew the old
+	// one, and then turns two-factor authentication off, as the console's one save does.
+	newPassword := fake.Password(16)
+	resp, _ := sendAdmin(t, adminToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", user.Id),
+		map[string]any{"newPassword": newPassword})
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	removeAuthenticatorAsAdministrator(t, user.Id)
 	shown = adminUser(t, adminToken, user.Id)
 	assert.False(t, shown.OTPEnabled)
 	assert.False(t, shown.OTPAuthenticatorDisabled, "with no authenticator, nothing is disabled")
 
-	// At a level 3 client, the next sign-in sets up a new authenticator.
-	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password, "")
+	// Whoever sent the codes can no longer sign in with the old password.
+	assertPasswordRefusedAt(t, client, redirectUri, user, password)
+
+	// At a level 3 client, the next sign-in, with the new password, sets up a new authenticator.
+	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, newPassword, "")
 	newSecret := getOtpSecretFromEnrollmentPage(t, otpPage)
 	require.NotEqual(t, otpSecret, newSecret)
 	enrolmentCode, err := totp.GenerateCode(newSecret, time.Now())
 	require.NoError(t, err)
-	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode)
+	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode)
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -88,11 +102,39 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	assert.False(t, adminUser(t, adminToken, user.Id).OTPAuthenticatorDisabled)
 
 	// And the new authenticator's code verifies at the next sign-in.
-	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, password, "")
+	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, newPassword, "")
 	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, nextStepCode(t, newSecret, enrolmentCode))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
+}
+
+// assertPasswordRefusedAt asserts that a fresh browser signing in to client with password is answered
+// "Authentication failed." at /auth/pwd.
+func assertPasswordRefusedAt(t *testing.T, client *record.Client, redirectUri *record.RedirectURI,
+	user *record.User, password string) {
+	t.Helper()
+
+	httpClient := createHttpClient(t)
+	resp, err := httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&response_type=code&code_challenge_method=S256&code_challenge=" + fake.LetterN(43) +
+		"&scope=openid&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8))
+	require.NoError(t, err)
+	location := assertRedirect(t, resp, "/auth/level1")
+	_ = resp.Body.Close()
+	resp = loadPage(t, httpClient, location)
+	location = assertRedirect(t, resp, "/auth/pwd")
+	_ = resp.Body.Close()
+	pwdPage := loadPage(t, httpClient, location)
+	resp = authenticateWithPassword(t, httpClient, location, pwdPage, user.Email, password)
+	_ = pwdPage.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode, "the password form is shown again, not passed")
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "Authentication failed.", strings.TrimSpace(doc.Find(`[role="alert"]`).Text()))
 }
 
 // wrongCodeBeside returns a six-digit code that is not code.

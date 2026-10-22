@@ -242,7 +242,9 @@ func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 
 // The Authentication tab says when the user's authenticator is disabled after 100 wrong codes in a
 // row, beside the switch that is the remedy, which the switch names in its description: otpEnabled
-// alone still reads on, and every code is refused (#489). It says nothing of the kind otherwise.
+// alone still reads on, and every code is refused (#489). The remedy it gives sets a new password in
+// the same save, since turning the switch off alone lets the known password sign in. It says nothing
+// of the kind otherwise.
 func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *testing.T) {
 	const notice = `id="otpAuthenticatorDisabled"`
 	for _, tc := range []struct {
@@ -269,6 +271,10 @@ func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *t
 			}
 			assert.Contains(t, out, notice)
 			assert.Contains(t, out, "100 wrong one-time codes in a row")
+			assert.Contains(t, out, "set a new password and turn two-factor authentication off in the same save",
+				"the password whoever sent the codes knew is replaced before the password alone signs in")
+			assert.NotContains(t, out, "Only someone who knew their password",
+				"a browser holding one of the user's sessions reaches the code form without the password")
 			assert.Contains(t, out, `aria-describedby="otpAuthenticatorDisabled otpEnabledHint"`,
 				"the switch that is the remedy is described by the notice")
 		})
