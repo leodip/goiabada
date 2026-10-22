@@ -58,10 +58,30 @@ test("the profile is saved, shown again, and reaches the profile claims", async 
   expect(typeof id.updated_at).toBe("number");
 });
 
+test("one-character names are saved, shown again, and reach the profile claims", async ({ page, request, clients, users }) => {
+  const user = await users.create();
+  await page.goto(userUrl(user.id, "profile"));
+  await page.locator('input[name="givenName"]').fill("김");
+  await page.locator('input[name="middleName"]').fill("J");
+  await page.locator('input[name="familyName"]').fill("王");
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('input[name="givenName"]')).toHaveValue("김");
+  await expect(page.locator('input[name="middleName"]')).toHaveValue("J");
+  await expect(page.locator('input[name="familyName"]')).toHaveValue("王");
+
+  const { client, secret } = await passwordGrantClient(page, clients);
+  const { id } = await userTokens(request, client.identifier, secret, user, "openid profile");
+  expect(id).toMatchObject({ given_name: "김", middle_name: "J", family_name: "王", name: "김 J 王" });
+});
+
 for (const { field, value, message } of [
   { field: "username", value: "1abc", message: "Usernames must start with a letter" },
   { field: "givenName", value: "M4ry", message: "Please enter a valid given name." },
-  { field: "familyName", value: "x", message: "Please enter a valid family name." },
+  // A name needs a letter, so a lone hyphen is refused where a lone letter is not.
+  { field: "familyName", value: "-", message: "Please enter a valid family name." },
   { field: "nickname", value: "has space", message: "Nicknames must start with a letter" },
   { field: "website", value: "not a url", message: "Please enter a valid website URL." },
   { field: "dateOfBirth", value: "17/05/1990", message: "The date of birth is invalid. Please use the format YYYY-MM-DD." },
