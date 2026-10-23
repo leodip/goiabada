@@ -4,16 +4,13 @@ package accountvalidation
 // built to meet exactly what PasswordRulesFor answers passes, one short of the length, one byte
 // past the maximum or missing a required kind of character fails, one lacking a kind that is not
 // required passes, a listed password and the account's words fail only where the rules refuse
-// them, and the sentence DescribePasswordRules shows names the length and the kinds.
+// them. The sentence a form shows from these rules is apimapping's and core/passwordrules' to test.
 
 import (
-	"context"
 	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/core/i18n"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -103,27 +100,4 @@ func TestPasswordRules_TheValidatorAppliesWhatTheFormDescribes(t *testing.T) {
 				"the validator and the rules disagree on whether the app name padded is refused")
 		})
 	}
-}
-
-func TestPasswordRules_TheSentenceNamesEachRule(t *testing.T) {
-	english := map[record.PasswordPolicy]string{
-		record.PasswordPolicyNone:   "",
-		record.PasswordPolicyLow:    "At least 6 characters.",
-		record.PasswordPolicyMedium: "At least 8 characters, with a lowercase letter, an uppercase letter and a number.",
-		record.PasswordPolicyHigh:   "At least 10 characters, with a lowercase letter, an uppercase letter, a number and a symbol.",
-		// #550 decision 10's hint, word for word.
-		record.PasswordPolicyNist: "At least 15 characters. A few unrelated words make a long password that's easy to " +
-			"remember. Common passwords, and the account's email address or the app's name, are refused.",
-	}
-	for _, policy := range everyPasswordPolicy {
-		assert.Equal(t, english[policy], DescribePasswordRules(context.Background(), policy), "policy %s", policy)
-	}
-
-	portuguese := i18n.WithLocale(context.Background(), true, "pt-BR")
-	assert.Equal(t, "Pelo menos 6 caracteres.", DescribePasswordRules(portuguese, record.PasswordPolicyLow))
-	assert.Equal(t, "Pelo menos 10 caracteres, com uma letra minúscula, uma letra maiúscula, um número e um símbolo.",
-		DescribePasswordRules(portuguese, record.PasswordPolicyHigh))
-	assert.Equal(t, "Pelo menos 15 caracteres. Algumas palavras sem relação entre si formam uma senha longa e "+
-		"fácil de lembrar. Senhas comuns, o endereço de e-mail da conta e o nome do aplicativo são recusados.",
-		DescribePasswordRules(portuguese, record.PasswordPolicyNist))
 }

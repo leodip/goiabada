@@ -29,7 +29,11 @@
     <div class="form-grid">
       <div class="field">
         <label class="field-label" for="newPassword">{{ T $.ctx "adminconsole.admin_users.authentication.field.set_password" }}</label>
-        <input class="control" id="newPassword" type="password" name="newPassword" value="" autocomplete="new-password" aria-describedby="{{ if .error }}authentication-error {{ end }}newPasswordHint"{{ if .error }} aria-invalid="true" autofocus{{ end }}>
+        <input class="control" id="newPassword" type="password" name="newPassword" value="" autocomplete="new-password"
+          {{- if .passwordRules }} aria-describedby="{{ if .error }}authentication-error {{ end }}password-rules newPasswordHint"
+          {{- else }} aria-describedby="{{ if .error }}authentication-error {{ end }}newPasswordHint"{{ end }}
+          {{- if .error }} aria-invalid="true" autofocus{{ end }}>
+        {{ if .passwordRules }}<p class="field-hint" id="password-rules">{{ .passwordRules }}</p>{{ end }}
         <p class="field-hint" id="newPasswordHint">{{ T $.ctx "adminconsole.admin_users.authentication.field.set_password_hint" }}</p>
       </div>
     </div>

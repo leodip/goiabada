@@ -19,8 +19,10 @@
 "common.field.password_confirmation" = "Confirm password"
 "common.link.sign_in_to_account" = "Sign in to your account"
 
-# The password rules a form that sets a password shows under its field. accountvalidation.DescribePasswordRules
-# builds the sentence from the rules the password validator applies, so these pieces change with them.
+# The password rules a form that sets a password shows under its field, on the auth server's registration,
+# activation and reset forms and the admin console's change-password, new user and Authentication tab pages.
+# passwordrules.Describe builds the sentence from the rules the password validator applies, as the public
+# settings carry them, so these pieces change with them.
 "password_rules.length" = "At least {{.min}} characters."
 "password_rules.length_with" = "At least {{.min}} characters, with {{.requirements}}."
 "password_rules.lowercase" = "a lowercase letter"

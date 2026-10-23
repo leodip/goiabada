@@ -1,5 +1,5 @@
 import type { Browser } from "@playwright/test";
-import { cancelDialog, confirmDialog, expectRefusal, userUrl } from "../../../lib/admin-console";
+import { cancelDialog, confirmDialog, expectPasswordRules, expectRefusal, nistPasswordRules, userUrl } from "../../../lib/admin-console";
 import { submitPassword } from "../../../lib/browser-sign-in";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
@@ -30,6 +30,11 @@ test("a password set here replaces the old one", async ({ page, request, clients
   // A new user has no authenticator: there is no switch, and it cannot be turned on from here.
   await expect(page.getByText(notSetUp)).toBeVisible();
   await expect(page.locator("#otpEnabled")).toHaveCount(0);
+  // The stored policy's rule is stated under the field, beside what a blank field does (#550).
+  await expectPasswordRules(page, "newPassword");
+  await expect(page.locator("#newPassword")).toHaveAccessibleDescription(
+    `${nistPasswordRules} Leave it blank to keep the current password.`,
+  );
   await page.locator("#newPassword").fill("a-brand-new-password");
   await page.locator("#btnSave").click();
   await expect(page.getByText("Changes saved.")).toBeVisible();
@@ -47,6 +52,7 @@ test("a password under the policy is refused, and the old one still works", asyn
   await page.locator("#newPassword").fill("abc");
   await page.locator("#btnSave").click();
   await expectRefusal(page, "authentication-error", "newPassword", "Use at least 15 characters for the password.");
+  await expectPasswordRules(page, "newPassword");
 
   const { client, secret } = await passwordGrantClient(page, clients);
   expect((await passwordToken(request, client.identifier, secret, user.email, user.password, "openid")).status).toBe(200);

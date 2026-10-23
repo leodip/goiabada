@@ -116,6 +116,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
 | `core/passwordblocklist` | kernel | — |
+| `core/passwordrules` | kernel | — |
 | `core/phonecountries` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
@@ -190,6 +191,12 @@ Notes on rows that are not self-evident:
   holds the generated list of commonly used passwords and the check against the account's own
   words, and imports the standard library alone, for `core/adminpassword`'s reason: the wizard links
   whatever it imports, and `core/guard`'s `imports_only_lint_test.go` holds it there (#550).
+- `core/passwordrules` is kernel because both applications show the stored password policy's
+  rules under a new password's field, the auth server on its registration, activation and reset
+  forms and the admin console on its change-password, new user and Authentication tab pages, and
+  both word them through its one function from the rules the public settings carry, so the two
+  cannot word the same rules differently. It is a package of its own rather than part of `core/api`,
+  which declares and does nothing, and of `core/i18n`, which owns no message of a domain (#550).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are

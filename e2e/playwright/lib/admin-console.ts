@@ -38,6 +38,22 @@ export async function cancelDialog(page: Page, expectedText?: string | RegExp) {
   await expect(dialog).toBeHidden();
 }
 
+// The hint the baseline's nist password policy draws under a new password's field, on the console's
+// change-password, new user and Authentication tab pages as on the auth server's forms (#550
+// decisions 10 and 11).
+export const nistPasswordRules =
+  "At least 15 characters. A few unrelated words make a long password that's easy to remember. Common passwords, and the account's email address or the app's name, are refused.";
+
+// The stored policy's rules stated under the new password's field (#password-rules), and the field
+// described by them, so a screen reader reads them on reaching it.
+export async function expectPasswordRules(page: Page, fieldId: string) {
+  await expect(page.locator("#password-rules")).toHaveText(nistPasswordRules);
+  await expect(page.locator(`#${fieldId}`)).toHaveAttribute("aria-describedby", /(^| )password-rules( |$)/);
+  // The description holds the rules whole, beside a refusal or another hint the field names too.
+  const rules = new RegExp(nistPasswordRules.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  await expect(page.locator(`#${fieldId}`)).toHaveAccessibleDescription(rules);
+}
+
 // A refusal a form is drawn again with: the message in the form's notice (#<noticeId>), and the field
 // it is about marked invalid and focused. A form whose refusal leaves every password to be typed again
 // focuses the first password field instead, so its caller says focused: false.

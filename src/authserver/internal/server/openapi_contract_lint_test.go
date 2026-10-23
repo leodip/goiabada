@@ -1114,6 +1114,8 @@ var apiStructsWithNoSchema = map[string]string{
 	// there is not a gap this map can be exempting, and the loop below fails an entry that
 	// names one.
 	"PublicSettingsResponse": "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
+	// Carried by PublicSettingsResponse alone, as its passwordRules (#550 decision 11).
+	"PasswordRulesResponse": "the password rules the unauthenticated /api/public/settings carries, outside the Admin and Account API scope this document declares",
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {

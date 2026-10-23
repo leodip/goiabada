@@ -65,8 +65,9 @@ type PasswordRules struct {
 }
 
 // PasswordRulesFor answers the rules policy holds a new password to: what ValidatePassword checks,
-// and what DescribePasswordRules tells the person choosing one, so the form never states a rule
-// the server does not apply, nor applies one it does not state (#617).
+// and, through apimapping.ToPasswordRulesResponse and core/passwordrules, what a form tells the
+// person choosing one, so the form never states a rule the server does not apply, nor applies one it
+// does not state (#617, #550 decision 11).
 func PasswordRulesFor(policy record.PasswordPolicy) PasswordRules {
 	switch policy {
 	case record.PasswordPolicyLow:

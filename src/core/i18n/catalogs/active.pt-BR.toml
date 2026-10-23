@@ -17,8 +17,10 @@
 "common.field.password_confirmation" = "Confirme a senha"
 "common.link.sign_in_to_account" = "Entrar na sua conta"
 
-# As regras de senha que um formulário que define uma senha mostra sob o campo. accountvalidation.DescribePasswordRules
-# monta a frase a partir das regras que o validador de senha aplica, então estas partes mudam com elas.
+# As regras de senha que um formulário que define uma senha mostra sob o campo, nos formulários de cadastro,
+# ativação e redefinição do servidor de autenticação e nas páginas de alteração de senha, novo usuário e aba
+# Autenticação do console de administração. passwordrules.Describe monta a frase a partir das regras que o
+# validador de senha aplica, como as configurações públicas as levam, então estas partes mudam com elas.
 "password_rules.length" = "Pelo menos {{.min}} caracteres."
 "password_rules.length_with" = "Pelo menos {{.min}} caracteres, com {{.requirements}}."
 "password_rules.lowercase" = "uma letra minúscula"

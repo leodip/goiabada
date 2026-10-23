@@ -1,6 +1,6 @@
 // The user's own password and authenticator, and what each changes at sign-in.
 import type { Page } from "@playwright/test";
-import { expectRefusal, userUrl } from "../../../lib/admin-console";
+import { expectPasswordRules, expectRefusal, userUrl } from "../../../lib/admin-console";
 import { submitPassword } from "../../../lib/browser-sign-in";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
@@ -31,6 +31,8 @@ test("the user changes their password: the current one must be right, and the ne
     await own.page.locator("#newPasswordConfirmation").fill(confirmation);
     await own.page.getByRole("button", { name: "Change password" }).click();
   };
+  // The stored policy's rule is stated under the new password before anything is refused (#550).
+  await expectPasswordRules(own.page, "newPassword");
 
   await submit(user.password, "a-new-passphrase", "a-different-one");
   await expectRefusal(own.page, "password-error", "newPasswordConfirmation", "The passwords don't match.", { focused: false });
@@ -40,6 +42,9 @@ test("the user changes their password: the current one must be right, and the ne
   await expectRefusal(own.page, "password-error", "currentPassword", wrongPassword);
   await submit(user.password, "abc", "abc");
   await expectRefusal(own.page, "password-error", "newPassword", "Use at least 15 characters for the password.", { focused: false });
+  // The refused field names the notice and still the rule.
+  await expectPasswordRules(own.page, "newPassword");
+  await expect(own.page.locator("#newPassword")).toHaveAccessibleDescription(/^Use at least 15 characters for the password\. At least 15 characters\./);
   await submit(user.password, "a-new-passphrase", "a-new-passphrase");
   await expect(own.page.getByText("Password changed.")).toBeVisible();
   await own.context.close();
