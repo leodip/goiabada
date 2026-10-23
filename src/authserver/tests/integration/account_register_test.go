@@ -237,6 +237,54 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	assert.Nil(t, preReg)
 }
 
+// TestSelfRegister_Post_AddressLengths holds self-registration to the limits every path that sets
+// an address applies (#632): an address of 254 characters, or with 64 before the @, registers and
+// is stored as typed; one of 255, or with 65 before the @, redraws the form with the reason and
+// registers nothing.
+func TestSelfRegister_Post_AddressLengths(t *testing.T) {
+	setRegSettings(t, true, false, false)
+
+	for _, tc := range []struct{ name, email string }{
+		{"254 characters", uniqueAddressOfLength(254)},
+		{"a local part of 64 characters", uniqueLocalPartOfLength(64) + "@example.com"},
+	} {
+		t.Run(tc.name+" registers", func(t *testing.T) {
+			httpClient := createHttpClient(t)
+			loadRegisterPage(t, httpClient)
+
+			resp := postRegister(t, httpClient, tc.email, "Password123!", "Password123!")
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Contains(t, bodyString(t, resp), "Your account is ready.")
+			user, err := database.GetUserByEmail(context.Background(), nil, tc.email)
+			require.NoError(t, err)
+			require.NotNil(t, user)
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			assert.Equal(t, tc.email, user.Email)
+		})
+	}
+
+	for _, tc := range []struct{ name, email, reason string }{
+		{"255 characters", uniqueAddressOfLength(255), "The email address cannot exceed a maximum length of 254 characters."},
+		{"a local part of 65 characters", uniqueLocalPartOfLength(65) + "@example.com", "Please enter a valid email address."},
+	} {
+		t.Run(tc.name+" is refused", func(t *testing.T) {
+			httpClient := createHttpClient(t)
+			loadRegisterPage(t, httpClient)
+
+			resp := postRegister(t, httpClient, tc.email, "Password123!", "Password123!")
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Contains(t, html.UnescapeString(bodyString(t, resp)), tc.reason)
+			user, err := database.GetUserByEmail(context.Background(), nil, tc.email)
+			require.NoError(t, err)
+			assert.Nil(t, user, "a refused address registers nothing")
+		})
+	}
+}
+
 // registerPlusAddress returns a unique address containing a '+', which is the class #112
 // reports as broken: the activation link used to carry the address, Go parses a query with
 // form-urlencoded rules where '+' decodes to a space, so the pre-registration was never found

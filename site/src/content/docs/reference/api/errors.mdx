@@ -43,7 +43,7 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `VALIDATION_ERROR` | `400` | A value was refused. `error_description` says which and why. |
 | `INVALID_REQUEST_BODY` | `400` | The body isn't the JSON the operation expects. |
 | `INVALID_REQUEST` | `400` | The `Authorization` header or the `access_token` parameter was sent twice, the token was sent two ways at once, or a form body doesn't parse. |
-| `EMAIL_TOO_LONG` | `400` | The new user's email address is longer than 60 characters. |
+| `EMAIL_TOO_LONG` | `400` | The new user's email address is longer than 254 characters. |
 | `VALUE_TOO_LONG` | `400` | A user attribute's value is longer than 250 characters. |
 | `FILE_TOO_LARGE` | `400` | The uploaded picture or logo is over the size limit, or the form doesn't parse. |
 | `NO_FILE` | `400` | The upload has no `picture` field. |

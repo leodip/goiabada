@@ -30,9 +30,16 @@ func NewEmailValidator(database emailValidatorDatabase) *EmailValidator {
 }
 
 // MaxEmailLength is the longest address an account may hold, in characters: every place that sets
-// one applies it, the administrator's and the self-service change through ValidateEmailChange and
-// self-registration in its own handler, so all four engines store the same addresses (#207).
-const MaxEmailLength = 60
+// one applies it, the administrator's and the self-service change through ValidateEmailChange, and
+// creating a user and self-registration in their own handlers, so all four engines store the same
+// addresses (#207). It is 254, the longest address SMTP can carry: RFC 5321 section 4.5.3.1.3
+// bounds a path at 256 octets, its angle brackets included (#632).
+const MaxEmailLength = 254
+
+// maxLocalPartLength is the longest part of an address before the @, in characters: RFC 5321
+// section 4.5.3.1.1 caps it at 64 octets, and a compliant server will not deliver to a longer one.
+// The shape admits ASCII alone, so octets and characters are the same count (#632).
+const maxLocalPartLength = 64
 
 // emailShape is the basic shape of an address: a local part, one @, and a domain ending in a label
 // of two or more letters.
@@ -52,6 +59,10 @@ func (val *EmailValidator) ValidateEmailAddress(emailAddress string) error {
 	}
 
 	if localPart[0] == '.' || localPart[len(localPart)-1] == '.' {
+		return i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)
+	}
+
+	if len(localPart) > maxLocalPartLength {
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil)
 	}
 

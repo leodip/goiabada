@@ -811,10 +811,35 @@ func uniqueEmail(addr string) string {
 	if !found {
 		panic("uniqueEmail: " + addr + " is not an address")
 	}
-	// The API rejects an address over 60 bytes (accountvalidation.EmailValidator), and
-	// fixtures reach that endpoint, so the run added here is short and the
-	// longest address in the tier stays well inside the limit.
+	// The API rejects a local part over 64 characters and an address over 254
+	// (accountvalidation.EmailValidator), and fixtures reach that endpoint, so the
+	// run added here is short and the longest address in the tier stays well inside
+	// both limits.
 	return local + "-" + strings.ToLower(fake.LetterN(8)) + "@" + domain
+}
+
+// uniqueAddressOfLength is a well-formed address of exactly n characters, n at
+// least 70, that no other call returns: a local part of 64, the most RFC 5321
+// allows, opening with a random run, and a domain of labels of 61 characters or
+// fewer ending in .com. It is what the length limits are tested with: 254 is the
+// longest address an account holds (#632).
+func uniqueAddressOfLength(n int) string {
+	local := uniqueLocalPartOfLength(64)
+	remaining := n - len(local) - len("@.com")
+	var labels []string
+	for remaining > 63 {
+		labels = append(labels, strings.Repeat("d", 61))
+		remaining -= 62
+	}
+	labels = append(labels, strings.Repeat("d", remaining), "com")
+	return local + "@" + strings.Join(labels, ".")
+}
+
+// uniqueLocalPartOfLength is a local part of exactly n characters, n at least 14,
+// that no other call returns, for the 64-character bound on the part before the @.
+func uniqueLocalPartOfLength(n int) string {
+	run := "long-" + strings.ToLower(fake.LetterN(8)) + "-"
+	return run + strings.Repeat("a", n-len(run))
 }
 
 // Helper function to create a test group

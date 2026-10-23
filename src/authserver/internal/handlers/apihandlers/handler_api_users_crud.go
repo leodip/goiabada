@@ -351,10 +351,9 @@ func HandleUserCreatePost(
 			return
 		}
 
-		// Email length validation
-		const maxLengthEmail = 60
-		if inputvalidation.TextLength(req.Email) > maxLengthEmail {
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailTooLong, map[string]any{"max": maxLengthEmail}), "EMAIL_TOO_LONG", http.StatusBadRequest)
+		// Email length validation, at the limit every path that sets an address applies (#632)
+		if inputvalidation.TextLength(req.Email) > accountvalidation.MaxEmailLength {
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserEmailTooLong, map[string]any{"max": accountvalidation.MaxEmailLength}), "EMAIL_TOO_LONG", http.StatusBadRequest)
 			return
 		}
 

@@ -1035,15 +1035,27 @@ func TestHandleRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing.T) {
 	}
 }
 
-// TestHandleRegisterPost_RefusesAnAddressOverSixtyCharacters holds registration to the limit the
-// administrator's and the self-service email change already apply: an address over 60
-// characters redraws the form with the "too long" message, in both modes, before either lookup,
-// so the database is never asked about it (#207 decision 11). The addresses are well formed, so
-// it is the length and nothing else that refuses them.
-func TestHandleRegisterPost_RefusesAnAddressOverSixtyCharacters(t *testing.T) {
-	// 49 + len("@example.com") = 61 characters.
-	const tooLong = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com"
-	require.Len(t, tooLong, 61)
+// registerAddressOfLength is a well-formed address of exactly n characters, n at least 70: a local
+// part of 64, the most RFC 5321 allows, and a domain of labels of 61 characters or fewer.
+func registerAddressOfLength(n int) string {
+	remaining := n - 64 - len("@.com")
+	var labels []string
+	for remaining > 63 {
+		labels = append(labels, strings.Repeat("d", 61))
+		remaining -= 62
+	}
+	labels = append(labels, strings.Repeat("d", remaining), "com")
+	return strings.Repeat("a", 64) + "@" + strings.Join(labels, ".")
+}
+
+// TestHandleRegisterPost_RefusesAnAddressOverTheLimit holds registration to the limit the
+// administrator's and the self-service email change already apply: an address over 254
+// characters, the longest SMTP carries, redraws the form with the "too long" message, in both
+// modes, before either lookup, so the database is never asked about it (#207 decision 11, #632).
+// The addresses are well formed, so it is the length and nothing else that refuses them.
+func TestHandleRegisterPost_RefusesAnAddressOverTheLimit(t *testing.T) {
+	tooLong := registerAddressOfLength(255)
+	require.Len(t, tooLong, 255)
 
 	modes := []struct {
 		name     string
@@ -1103,7 +1115,7 @@ func TestHandleRegisterPost_RefusesAnAddressOverSixtyCharacters(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code)
 			pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html",
 				"/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-					return data["error"] == "The email address cannot exceed a maximum length of 60 characters." &&
+					return data["error"] == "The email address cannot exceed a maximum length of 254 characters." &&
 						data["email"] == tooLong
 				}))
 			database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
@@ -1118,13 +1130,12 @@ func TestHandleRegisterPost_RefusesAnAddressOverSixtyCharacters(t *testing.T) {
 	}
 }
 
-// TestHandleRegisterPost_AcceptsAnAddressOfExactlySixtyCharacters is the boundary beside it: 60
-// characters is within the limit, so the address goes on to the lookup, here finding an account
-// and answering as an address already registered does in this mode.
-func TestHandleRegisterPost_AcceptsAnAddressOfExactlySixtyCharacters(t *testing.T) {
-	// 48 + len("@example.com") = 60 characters.
-	const atTheLimit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com"
-	require.Len(t, atTheLimit, 60)
+// TestHandleRegisterPost_AcceptsAnAddressAtTheLimit is the boundary beside it: 254 characters is
+// within the limit, so the address goes on to the lookup, here finding an account and answering as
+// an address already registered does in this mode.
+func TestHandleRegisterPost_AcceptsAnAddressAtTheLimit(t *testing.T) {
+	atTheLimit := registerAddressOfLength(254)
+	require.Len(t, atTheLimit, 254)
 
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
