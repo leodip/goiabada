@@ -54,7 +54,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	// other's settings; each server's unit tier holds its container to that (#396 decision 13).
 	writeConfigMapHead(&sb, ns, "goiabada-authserver-config", "What the auth server reads.")
 	writeSharedURLs(&sb, config)
-	sb.WriteString("  GOIABADA_APPNAME: \"Goiabada\"\n")
+	fmt.Fprintf(&sb, "  GOIABADA_APPNAME: %s\n", yamlQuote(seededAppName))
 	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: %s\n", yamlQuote(config.AdminEmail))
 	writeKubernetesTrust(&sb, "AUTHSERVER", config.GatewayTrafficPolicy)
 	for _, line := range config.rateLimiterComment() {

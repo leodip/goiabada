@@ -236,7 +236,7 @@ func TestPasswordValidator_AcceptsTheFirstAdministratorsPassword(t *testing.T) {
 	// the first start seeds.
 	seeded := "Aa1!" + strings.Repeat("a", passwordhash.MaxPasswordBytes-4)
 	require.Len(t, seeded, passwordhash.MaxPasswordBytes)
-	require.NoError(t, adminpassword.Check(seeded), "the first start seeds a password of bcrypt's bound")
+	require.NoError(t, adminpassword.Check(seeded, "admin@example.com", "Goiabada"), "the first start seeds a password of bcrypt's bound")
 
 	for _, policy := range []record.PasswordPolicy{
 		record.PasswordPolicyNone, record.PasswordPolicyLow, record.PasswordPolicyMedium, record.PasswordPolicyHigh,

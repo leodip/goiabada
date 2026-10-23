@@ -171,9 +171,10 @@ Notes on rows that are not self-evident:
   its one rule, and it is a package of its own rather than a file in `core/inputvalidation` because
   the wizard links whatever its home imports: there, the identifier validator's `core/i18n` import
   brought the message catalogs, `core/oauth`, a TOML parser and a JWT library into a binary that
-  uses none of them. `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs` and the
-  standard library through `AssertImportsOnly`, the rule `authserver/internal/record` is held by
-  too. The call is made from there rather than beside the package because `go mod tidy` reads the
+  uses none of them. `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs`,
+  `core/passwordblocklist`, itself a standard-library leaf whose list and context-word check the
+  rule applies (#550), and the standard library through `AssertImportsOnly`, the rule
+  `authserver/internal/record` is held by too. The call is made from there rather than beside the package because `go mod tidy` reads the
   tests of every package the wizard imports, and a test in `core/adminpassword` importing
   `core/guard` put chi and TOML in the wizard's `go.sum`. `AssertNoGuardInTestsReachedFrom` refuses
   any test the wizard reaches that does so (#500).

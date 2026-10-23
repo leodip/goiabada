@@ -623,8 +623,8 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
-| `core/passwordblocklist` | `IsCommon` | contract | The one blocklist check of the `nist` password policy. The setup wizard, which is not one of the two applications, holds the first administrator's password to it through `core/adminpassword`, and the auth server's account validator every other password, so the list and the comparison are defined once here rather than copied into each (#550 decisions 5 and 7). |
-| `core/passwordblocklist` | `IsTooClose` | contract | The one context-word check of the `nist` password policy, the password against the account's email, its local part, its username and the app name. The setup wizard, which is not one of the two applications, holds the first administrator's password to it through `core/adminpassword`, and the auth server's account validator every other password, so what counts as a derivative is defined once here rather than copied into each (#550 decisions 6 and 7). |
+| `core/passwordblocklist` | `IsCommon` | kernel | — |
+| `core/passwordblocklist` | `IsTooClose` | kernel | — |
 | `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
 | `core/phonecountries` | `PhoneCountry` | own-package | — |

@@ -105,7 +105,7 @@ With `--output`, the files go into the directory it names. When it names a file 
 
 The wizard never prints a password. The summary says only whether each one was set or generated, and the last message tells you where the admin password is.
 
-When you type a password at a terminal, the wizard doesn't show it. The admin password must be at least 15 characters and at most 72 bytes. The wizard refuses any other and asks again, because the auth server would refuse to start with it. A password without an uppercase letter, a lowercase letter, a digit and a symbol gets a warning, and you choose whether to keep it.
+When you type a password at a terminal, the wizard doesn't show it. The admin password must be at least 15 characters and at most 72 bytes, and it can't be a commonly used password, the admin email, the part of the email before the `@`, or the app name, Goiabada, nor one of those with digits and symbols added or written twice. The wizard refuses any other and asks again, or stops when you gave it with `--admin-password` or `--admin-password-file`, because the auth server would refuse to start with it. It doesn't ask for any particular kind of character: a few unrelated words make a long password that's easy to remember.
 
 ## Answering with flags
 

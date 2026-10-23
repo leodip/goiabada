@@ -266,11 +266,12 @@ func TestRun_AdminPasswordAtAndPastTheBound(t *testing.T) {
 	})
 }
 
-// A first run refuses an admin password that is empty, the published changeme, or under 15
-// characters, in both bootstrap modes alike: before any write and before the bootstrap file is
-// staged, naming the variable, with the database left empty; and the next start, with the
-// variable fixed, seeds that same database (#500 decisions 1 and 2). Unset reaches the seed as
-// empty, since the configuration no longer supplies a default.
+// A first run refuses an admin password that is empty, the published changeme, under 15
+// characters, a commonly used password, or the admin email or the app name or a derivative of them,
+// in both bootstrap modes alike: before any write and before the bootstrap file is staged, naming
+// the variable, with the database left empty; and the next start, with the variable fixed, seeds
+// that same database (#500 decisions 1 and 2, #550 decision 7). Unset reaches the seed as empty,
+// since the configuration no longer supplies a default.
 func TestRun_RefusesAnUnusableAdminPasswordInBothModes(t *testing.T) {
 	passwords := []struct {
 		name     string
@@ -281,6 +282,11 @@ func TestRun_RefusesAnUnusableAdminPasswordInBothModes(t *testing.T) {
 		{"the published changeme", "changeme", "published"},
 		{"14 characters", strings.Repeat("a", 14), "at least 15 characters"},
 		{"14 two-byte characters, 28 bytes", strings.Repeat("é", 14), "at least 15 characters"},
+		{"a commonly used password", "PasswordPassword", "commonly used passwords"},
+		// The configurations' admin email is Admin@Example.com, which the seed lowercases.
+		{"the admin email", "admin@example.com", "too close to the admin email"},
+		{"the admin email's local part padded", "Admin2026!!!!!!!!!!", "too close to the admin email"},
+		{"the app name repeated", "GoiabadaGoiabada", "too close to the admin email"},
 	}
 	modes := []struct {
 		name    string
@@ -338,7 +344,7 @@ func TestRun_RefusesAnUnusableAdminPasswordInBothModes(t *testing.T) {
 // do, though 14 of either do not (above).
 func TestRun_AdminPasswordOfFifteenCharactersSeeds(t *testing.T) {
 	for name, password := range map[string]string{
-		"15 ASCII characters":              strings.Repeat("a", 15),
+		"15 ASCII characters":              "tqvmzrkwplxhbnd",
 		"15 two-byte characters, 30 bytes": strings.Repeat("é", 15),
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -353,6 +359,49 @@ func TestRun_AdminPasswordOfFifteenCharactersSeeds(t *testing.T) {
 			assertSeeded(t, db, cfg)
 		})
 	}
+}
+
+// The words the seed compares the password with are the ones it seeds: the configured app name, or
+// Goiabada when none is, and the configured admin email, or admin@example.com when none is (#550
+// decision 7).
+func TestRun_RefusesTheAppNameAndAdminEmailItSeeds(t *testing.T) {
+	cases := []struct {
+		name     string
+		appName  string
+		email    string
+		password string
+	}{
+		{"a configured app name", "Orchard Keeper", "Admin@Example.com", "Orchard Keeper 2026!"},
+		{"the app name defaulted", "", "Admin@Example.com", "goiabadagoiabada"},
+		{"a configured admin email", "Goiabada", "Jane.Doe@Example.org", "jane.doe2026!!!!!!"},
+		{"the admin email defaulted", "Goiabada", "", "admin@example.com2026"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newSeedDB(t)
+			cfg := singleStepConfig()
+			cfg.AppName, cfg.AdminEmail, cfg.AdminPassword = tc.appName, tc.email, tc.password
+
+			outcome, err := testRunner(db, cfg).run(context.Background())
+
+			require.Error(t, err)
+			assert.Equal(t, Refused, outcome)
+			assert.Contains(t, err.Error(), "GOIABADA_ADMIN_PASSWORD")
+			assert.Contains(t, err.Error(), "too close to the admin email")
+			isEmpty, err := db.IsEmpty(context.Background())
+			require.NoError(t, err)
+			assert.True(t, isEmpty)
+		})
+	}
+
+	// The same password seeds under another app name: the name compared is the configured one.
+	db := newSeedDB(t)
+	cfg := singleStepConfig()
+	cfg.AppName, cfg.AdminPassword = "Goiabada", "Orchard Keeper 2026!"
+	outcome, err := testRunner(db, cfg).run(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, Continue, outcome)
+	assertSeeded(t, db, cfg)
 }
 
 // adminAddressOfLength is an address of exactly n characters, n at least 70: a local part of 64 and

@@ -510,18 +510,45 @@ func TestWizard_EveryGeneratedPasswordHoldsThreeClasses(t *testing.T) {
 	}
 }
 
-// A password the operator gave is still judged: the warning moved off generated passwords only. One
-// the first start would seed is only warned about, however weak its character classes.
-func TestWizard_AChosenAdminPasswordIsJudged(t *testing.T) {
-	w, _, out, _ := testWizard(t, &CLIFlags{DeploymentType: "local", DBType: "sqlite", AdminPassword: "weakpassphraseonly"}, nil)
+// A password the operator gave is judged only by the first administrator's rule, never by its
+// character classes: a passphrase of lowercase words the first start seeds is written with no
+// warning (#550 decision 12).
+func TestWizard_AChosenAdminPasswordIsNotJudgedByItsCharacterClasses(t *testing.T) {
+	w, _, out, _ := testWizard(t, &CLIFlags{DeploymentType: "local", DBType: "sqlite", AdminPassword: "lowercase words only here"}, nil)
 	if err := w.setup(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "Weak password: no uppercase letter, no digit, no special character") {
-		t.Errorf("a weak chosen password is not warned about:\n%s", out)
+	if strings.Contains(out.String(), "Weak password") {
+		t.Errorf("a passphrase is warned about:\n%s", out)
 	}
-	if w.config.AdminPassword != "weakpassphraseonly" {
+	if w.config.AdminPassword != "lowercase words only here" {
 		t.Errorf("admin password %q, want the one given", w.config.AdminPassword)
+	}
+}
+
+// The admin password is compared with the admin email typed before it, which the first start seeds
+// beside it: one too close to that address is refused and asked again (#550 decision 7).
+func TestWizard_TheAdminPasswordIsComparedWithTheAdminEmailTyped(t *testing.T) {
+	var steps []scriptedStep
+	for _, step := range interactiveScript(deployments[deploymentLocal], testEngine("sqlite")) {
+		switch {
+		case strings.HasPrefix(step.prompt, "Admin email ["):
+			step.answer = "jane.doe@example.org"
+		case step.prompt == "Admin password [generated]: ":
+			steps = append(steps, scriptedStep{prompt: step.prompt, hidden: true, answer: "jane.doe2026!!!!!!"})
+		}
+		steps = append(steps, step)
+	}
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if !strings.Contains(out.String(), "Invalid admin password: it is too close to the admin email") {
+		t.Errorf("the local part padded is not refused:\n%s", out)
+	}
+	if w.config.AdminEmail != "jane.doe@example.org" || w.config.AdminPassword != "Str0ng-Passw0rd!" {
+		t.Errorf("admin %q with password %q, want jane.doe@example.org with the second password", w.config.AdminEmail, w.config.AdminPassword)
 	}
 }
 
@@ -1019,6 +1046,19 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"--admin-password of only spaces":                      {native(func(f *CLIFlags) { f.AdminPassword = "   " }), "invalid --admin-password: it is empty"},
 		"--admin-password-file of 14 characters inside spaces": {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile(" Abcdefgh-12345 \n") }), "invalid --admin-password-file: it is 14 characters long"},
 		"--admin-password-file of only spaces":                 {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("  \t\n") }), "invalid --admin-password-file: it is empty"},
+		// The first start refuses a commonly used password, and the admin email it seeds, its local
+		// part and the app name the wizard writes, and their derivatives, so the wizard writes none of
+		// them, from either flag (#550 decision 7).
+		"--admin-password commonly used":      {native(func(f *CLIFlags) { f.AdminPassword = "PasswordPassword" }), "invalid --admin-password: it is on a list of commonly used passwords"},
+		"--admin-password-file commonly used": {native(func(f *CLIFlags) { f.AdminPasswordFile = passwordFile("passwordpassword\n") }), "invalid --admin-password-file: it is on a list of commonly used passwords"},
+		"--admin-password the admin email": {native(func(f *CLIFlags) {
+			f.AdminEmail, f.AdminPassword = "jane.doe@example.org", "Jane.Doe@Example.org"
+		}), "invalid --admin-password: it is too close to the admin email"},
+		"--admin-password-file the local part padded": {native(func(f *CLIFlags) {
+			f.AdminEmail, f.AdminPasswordFile = "jane.doe@example.org", passwordFile("jane.doe2026!!!!!!\n")
+		}), "invalid --admin-password-file: it is too close to the admin email"},
+		"--admin-password the default admin email": {native(func(f *CLIFlags) { f.AdminPassword = "admin@example.org2026" }), "invalid --admin-password: it is too close to the admin email"},
+		"--admin-password the app name repeated":   {native(func(f *CLIFlags) { f.AdminPassword = "GoiabadaGoiabada" }), "invalid --admin-password: it is too close to the admin email, its local part or the app name Goiabada"},
 	}
 	// Every flag whose value is written into the file, refused by its name when it is not UTF-8 or
 	// holds NUL, before a step reads it (#430). Each would otherwise be refused, if at all, by a
