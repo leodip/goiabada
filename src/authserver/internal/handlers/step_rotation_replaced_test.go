@@ -11,7 +11,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -107,10 +107,8 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 		auditLogger:   auditLogger,
 	})
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-	require.NoError(t, err)
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	require.NoError(t, err)
+	otpSecret := otpTestMintedSecret(t)
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	form := url.Values{}
 	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("otp", otpCode)
@@ -126,7 +124,7 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 		ClientId:   "test-client",
 	}, nil)
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-		Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()), OtpConfigGeneration: 3,
+		Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, otpSecret), OtpConfigGeneration: 3,
 	}, nil)
 	database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 		Return(true, nil)

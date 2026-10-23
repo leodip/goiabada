@@ -16,11 +16,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -55,6 +55,19 @@ var otpEnrolTx = &sql.Tx{}
 func otpTestKeyURL(secret string) string {
 	return "otpauth://totp/TestApp:test@example.com" +
 		"?algorithm=SHA1&digits=6&issuer=TestApp&period=30&secret=" + secret
+}
+
+// otpTestMintedSecret is a secret in the server's own shape: minted by the production generator
+// and read back off the key URL it writes, as an enrolment derives it. The codes a case sends for
+// it come from otptest, a second implementation, so the verifier the handler calls is checked
+// against an answer it did not compute (#646 decision 2).
+func otpTestMintedSecret(t *testing.T) string {
+	t.Helper()
+	keyURL, err := otp.NewKeyGenerator().GenerateKeyURL("test@test.com", "TestApp")
+	require.NoError(t, err)
+	secret, err := otp.SecretFromKeyURL(keyURL)
+	require.NoError(t, err)
+	return secret
 }
 
 // otpTestRenderedQR is the QR code the handler will draw for a key URL. Computed with the same
@@ -801,14 +814,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		// The ceremony id is in the body, so the gate above passes and the credential read is
 		// what answers. The passcode is in the query and nowhere else.
@@ -832,7 +840,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Id:                 1,
 			Enabled:            true,
 			OTPEnabled:         true,
-			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
+			OTPSecretEncrypted: encryptOTPForTest(t, otpSecret),
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
@@ -1062,14 +1070,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1087,7 +1090,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		otpSecret := key.Secret()
 		user := &record.User{
 			Id:                  1,
 			Enabled:             true,
@@ -1156,14 +1158,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1183,7 +1180,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Id:                  1,
 			Enabled:             true,
 			OTPEnabled:          true,
-			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
+			OTPSecretEncrypted:  encryptOTPForTest(t, otpSecret),
 			OtpConfigGeneration: 3,
 		}, nil)
 		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
@@ -1214,14 +1211,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1239,7 +1231,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		otpSecret := key.Secret()
 		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
 		user := &record.User{
@@ -1348,14 +1339,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1373,7 +1359,6 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		otpSecret := key.Secret()
 		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
 		user := &record.User{
@@ -1427,14 +1412,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1452,7 +1432,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authContext.OTPKeyURL = otpTestKeyURL(key.Secret())
+		authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 
 		user := &record.User{Id: 1, Enabled: true, OTPEnabled: false}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1502,14 +1482,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1531,7 +1506,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Id:                  1,
 			Enabled:             true,
 			OTPEnabled:          true,
-			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
+			OTPSecretEncrypted:  encryptOTPForTest(t, otpSecret),
 			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1607,14 +1582,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1626,7 +1596,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		// The seed is on the ceremony rather than on the user row, which is what makes this
 		// the enrolling arm: the user has no authenticator yet.
-		keyURL := otpTestKeyURL(key.Secret())
+		keyURL := otpTestKeyURL(otpSecret)
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
@@ -1673,7 +1643,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			"/auth_otp_enrollment.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
 				return bind["error"] == expectedError &&
 					bind["ceremonyId"] == testCeremonyId &&
-					bind["secretKey"] == key.Secret() &&
+					bind["secretKey"] == otpSecret &&
 					bind["base64Image"] == otpTestRenderedQR(t, keyURL)
 			})).Return(nil)
 
@@ -1706,14 +1676,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1735,7 +1700,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Id:                  1,
 			Enabled:             true,
 			OTPEnabled:          true,
-			OTPSecretEncrypted:  encryptOTPForTest(t, key.Secret()),
+			OTPSecretEncrypted:  encryptOTPForTest(t, otpSecret),
 			OtpConfigGeneration: 3,
 		}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1770,14 +1735,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		key, err := totp.Generate(totp.GenerateOpts{
-			Issuer:      "TestApp",
-			AccountName: "test@test.com",
-		})
-		require.NoError(t, err)
+		otpSecret := otpTestMintedSecret(t)
 
-		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 
 		form := url.Values{}
 		form.Add(ceremony.IdField, testCeremonyId)
@@ -1863,10 +1823,8 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 				auditLogger:   auditLogger,
 			})
 
-			key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-			require.NoError(t, err)
-			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-			require.NoError(t, err)
+			otpSecret := otpTestMintedSecret(t)
+			otpCode := otptest.Code(t, otpSecret, time.Now())
 
 			form := url.Values{}
 			form.Add(ceremony.IdField, testCeremonyId)
@@ -1882,7 +1840,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 				CeremonyId: testCeremonyId,
 				UserId:     1,
 				ClientId:   "test-client",
-				OTPKeyURL:  otpTestKeyURL(key.Secret()),
+				OTPKeyURL:  otpTestKeyURL(otpSecret),
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -1941,10 +1899,8 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 		auditLogger:   auditLogger,
 	})
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-	require.NoError(t, err)
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	require.NoError(t, err)
+	otpSecret := otpTestMintedSecret(t)
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 
 	form := url.Values{}
 	form.Add(ceremony.IdField, testCeremonyId)
@@ -1959,7 +1915,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 		CeremonyId: testCeremonyId,
 		UserId:     1,
 		ClientId:   "test-client",
-		OTPKeyURL:  otpTestKeyURL(key.Secret()),
+		OTPKeyURL:  otpTestKeyURL(otpSecret),
 	}, nil)
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
@@ -1990,8 +1946,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	const budget = 5 // failures per 15 minutes, keyed on the user id
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-	require.NoError(t, err)
+	otpSecret := otpTestMintedSecret(t)
 
 	// newHandler wires one handler and its limiter together, the way routes.go does.
 	//
@@ -2020,12 +1975,12 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		user := &record.User{Id: 1, Enabled: true, OTPEnabled: enrolled, OtpConfigGeneration: 3}
 		template := "/auth_otp.html"
 		if enrolled {
-			user.OTPSecretEncrypted = encryptOTPForTest(t, key.Secret())
+			user.OTPSecretEncrypted = encryptOTPForTest(t, otpSecret)
 		} else {
 			// What HandleAuthOtpGet leaves on the ceremony for an enrolling user, and what
 			// puts the handler on its enrollment branch: the secret it verifies against comes
 			// from the auth context rather than from the user row.
-			authContext.OTPKeyURL = otpTestKeyURL(key.Secret())
+			authContext.OTPKeyURL = otpTestKeyURL(otpSecret)
 			template = "/auth_otp_enrollment.html"
 		}
 
@@ -2082,8 +2037,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// instead of it.
 	currentCode := func(t *testing.T) string {
 		t.Helper()
-		code, err := totp.GenerateCode(key.Secret(), time.Now())
-		assert.NoError(t, err)
+		code := otptest.Code(t, otpSecret, time.Now())
 		return code
 	}
 
@@ -2096,7 +2050,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	wrongCode := func(t *testing.T) string {
 		t.Helper()
 		for _, candidate := range []string{"000000", "111111", "222222"} {
-			if _, matched := otp.MatchStep(candidate, key.Secret(), time.Now().UTC()); !matched {
+			if _, matched := otp.MatchStep(candidate, otpSecret, time.Now().UTC()); !matched {
 				return candidate
 			}
 		}
@@ -2151,8 +2105,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// Well past the budget. The same limiter covers enrollment, where a user pointing
 		// an authenticator at the form legitimately submits several codes in a row.
 		for i := 0; i < budget*3; i++ {
-			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-			require.NoError(t, err)
+			otpCode := otptest.Code(t, otpSecret, time.Now())
 			authContext.AuthState = ceremony.AuthStateLevel2OTP
 			assert.Equal(t, http.StatusSeeOther, post(handler, otpCode), "verification %d should succeed", i+1)
 		}

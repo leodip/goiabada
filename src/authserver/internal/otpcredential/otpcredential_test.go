@@ -11,8 +11,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -65,9 +65,7 @@ func isEncryptedOTPSeed(stored []byte) bool {
 func codeFor(t *testing.T, seed string, now time.Time) string {
 	t.Helper()
 
-	code, err := totp.GenerateCode(seed, now)
-	require.NoError(t, err)
-	return code
+	return otptest.Code(t, seed, now)
 }
 
 // Seam 2, the establish half. The compare-and-set, the generation advance and the pending clear are

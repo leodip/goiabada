@@ -484,7 +484,13 @@ Three test types:
 
 **Test fixtures**: tests draw random values from `authserver/internal/fake`, a test-only package
 over `crypto/rand` that replaced a third-party faker in #272 and left `internal/testutil` in #442.
-Reach for it rather than adding a dependency the next time a test needs a random string.
+Reach for it rather than adding a dependency the next time a test needs a random string. Beside it,
+a test that sends a one-time code gets it from `authserver/internal/otp/otptest`, test support like
+`fake`, whose `Code` computes what an authenticator shows for a base32 secret at an instant with an
+RFC 6238 implementation of its own, importing nothing from `otp`, so the verifier is checked against
+an answer it did not compute. A secret or key URL in the server's own shape comes from the
+production generator, `otp.KeyGenerator.GenerateKeyURL` and then `otp.SecretFromKeyURL`; `otptest`'s
+`NewSecret` is for a test that only needs a random one (#646).
 
 **Settings row in the integration tier**: every integration test runs against one server and one
 settings row, which the server reads on every request, so a value a test leaves there is what every
