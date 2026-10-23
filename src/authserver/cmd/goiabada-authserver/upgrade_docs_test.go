@@ -134,8 +134,8 @@ func TestUpgradePage_APinnedDeploymentChangesTheTagAndTheDigestTogether(t *testi
 	require.Truef(t, found, "%s has no section headed ## Update to a new release", page)
 
 	for _, tab := range []string{"Docker Compose", "Kubernetes"} {
-		_, in, found := strings.Cut(update, `<TabItem label="`+tab+`">`)
-		require.Truef(t, found, "%s: the update holds a %s tab", page, tab)
+		_, in, hasTab := strings.Cut(update, `<TabItem label="`+tab+`">`)
+		require.Truef(t, hasTab, "%s: the update holds a %s tab", page, tab)
 		in, _, _ = strings.Cut(in, "</TabItem>")
 		assert.Containsf(t, in, "changes the tag and the digest together",
 			"%s: the update's %s tab names the rule a pinned deployment follows", page, tab)
