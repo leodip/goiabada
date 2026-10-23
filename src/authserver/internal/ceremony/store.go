@@ -195,22 +195,6 @@ func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremon
 	})
 }
 
-// DiscardAuthContext is /auth/authorize's clear, before it answers a request it refused at once. It
-// ends whatever ceremony the browser session held, without a condition, as /auth/authorize's saves
-// replace it. A browser with no stored session holds nothing to end, so nothing is written for it:
-// no row holding nothing for the session's lifetime, and no cookie naming one (#579 decision 6).
-func (s *Store) DiscardAuthContext(w http.ResponseWriter, r *http.Request) error {
-	sess, err := s.sessionStore.Get(r, s.sessionName)
-	if err != nil {
-		return err
-	}
-	if sess.ID == "" {
-		return nil
-	}
-	delete(sess.Values, sessionkeys.AuthContext)
-	return s.sessionStore.Save(r, w, sess)
-}
-
 // RegenerateSession replaces the browser session's identifier, keeping its contents, only while the
 // session still holds the ceremony named (#579). The step loaded its context when its request began,
 // and another tab's /auth/authorize may have replaced it since, so the session is read afresh, its

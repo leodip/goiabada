@@ -136,34 +136,6 @@ func TestBrowserSession_ReplaceAuthContextReturnsTheStoresFailure(t *testing.T) 
 	require.ErrorIs(t, err, assert.AnError)
 }
 
-func TestBrowserSession_DiscardAuthContextCarriesTheHandlersWriterAndRequest(t *testing.T) {
-	ceremonyStore := handlersmocks.NewCeremonyStore(t)
-	rr := httptest.NewRecorder()
-	req := adapterRequest()
-
-	ceremonyStore.On("DiscardAuthContext", theWriter(rr), theRequest(req)).
-		Run(func(args mock.Arguments) {
-			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
-		}).Return(nil).Once()
-
-	err := newBrowserSession(rr, req, ceremonyStore).DiscardAuthContext()
-
-	require.NoError(t, err)
-	ceremonyStore.AssertExpectations(t)
-}
-
-func TestBrowserSession_DiscardAuthContextReturnsTheStoresFailure(t *testing.T) {
-	ceremonyStore := handlersmocks.NewCeremonyStore(t)
-	rr := httptest.NewRecorder()
-	req := adapterRequest()
-
-	ceremonyStore.On("DiscardAuthContext", theWriter(rr), theRequest(req)).Return(assert.AnError).Once()
-
-	err := newBrowserSession(rr, req, ceremonyStore).DiscardAuthContext()
-
-	require.ErrorIs(t, err, assert.AnError)
-}
-
 // Two adapters built for two requests each reach the store with their own pair: an adapter holds
 // nothing shared, so one request's writes never land on another's response.
 func TestBrowserSession_TwoRequestsKeepTheirOwnWritersAndRequests(t *testing.T) {

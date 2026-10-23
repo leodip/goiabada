@@ -81,13 +81,14 @@ func HandleAuthorizeGet(
 			answerAuthorizePageRefusal(pageRenderer, w, r, result.PageRefusal)
 
 		case result.ClientRefusal != nil:
-			// A failed discard answers server_error. On the silent path that is worth naming: a
-			// silent-renewal iframe reads it as "retry later" rather than "start an interactive login",
-			// the accurate instruction on a server fault (#141).
+			// Nothing was written for it, so there is no clear to answer server_error for: the
+			// sign-in the browser holds is left as it was (#246).
 			input := redirectErrorFromAuthContext(result.AuthContext, result.ClientRefusal.Client,
 				result.ClientRefusal.Code, result.ClientRefusal.Description)
 			input.redirectAlreadyWithheld = result.RedirectWithheld
-			responder.answerClientAfterClear(w, r, input, result.DiscardErr)
+			if err := responder.redirToClientWithError(w, r, input); err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+			}
 
 		case result.SaveErr != nil:
 			pageRenderer.InternalServerError(w, r, result.SaveErr)

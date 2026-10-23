@@ -127,7 +127,6 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 			userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
-			ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil)
 
 			handler.ServeHTTP(rr, req)
 
@@ -269,7 +268,6 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Empty(t, rr.Header().Get("Location"), "a fault answers the client nothing")
-			ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -358,7 +356,6 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			} else {
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
 				stubRegisteredRedirectURI(database, "https://example.com")
-				ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil)
 			}
 
 			handler.ServeHTTP(rr, req)
@@ -494,23 +491,18 @@ func TestHandlePromptNone_ASessionWithNoAuthTimeIsRefused(t *testing.T) {
 		mock.Anything, mock.Anything, mock.Anything)
 	f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	f.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
-	f.ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
 }
 
-// A silent request over a disabled user's session records user_disabled against the session's user,
-// then ends the ceremony and answers the client access_denied, reading nothing past the check and
-// bumping nothing.
+// A silent request over a disabled user's session records user_disabled against the session's user
+// and answers the client access_denied, reading nothing past the check, bumping nothing and storing
+// nothing.
 func TestHandlePromptNone_ADisabledUserIsAuditedAndRefused(t *testing.T) {
 	f := newSilentSessionFixture(t, time.Date(2026, 10, 14, 8, 15, 0, 0, time.UTC))
 	f.userSession.User.Enabled = false
 	stubRegisteredRedirectURI(f.database, "https://example.com")
-	var audited, discarded bool
+	var audited bool
 	f.auditLogger.On("Log", theRequestsContext(), audit.EventUserDisabled, map[string]interface{}{"user_id": int64(7)}).
-		Run(func(mock.Arguments) {
-			assert.False(t, discarded, "user_disabled is recorded before the ceremony is discarded")
-			audited = true
-		}).Return().Once()
-	f.ceremonyStore.On("DiscardAuthContext", f.rr, f.req).Run(func(mock.Arguments) { discarded = true }).Return(nil).Once()
+		Run(func(mock.Arguments) { audited = true }).Return().Once()
 
 	f.handler.ServeHTTP(f.rr, f.req)
 

@@ -178,63 +178,6 @@ func (_c *CeremonyStore_ConfirmCeremony_Call) RunAndReturn(run func(w http.Respo
 	return _c
 }
 
-// DiscardAuthContext provides a mock function for the type CeremonyStore
-func (_mock *CeremonyStore) DiscardAuthContext(w http.ResponseWriter, r *http.Request) error {
-	ret := _mock.Called(w, r)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DiscardAuthContext")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request) error); ok {
-		r0 = returnFunc(w, r)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// CeremonyStore_DiscardAuthContext_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DiscardAuthContext'
-type CeremonyStore_DiscardAuthContext_Call struct {
-	*mock.Call
-}
-
-// DiscardAuthContext is a helper method to define mock.On call
-//   - w http.ResponseWriter
-//   - r *http.Request
-func (_e *CeremonyStore_Expecter) DiscardAuthContext(w any, r any) *CeremonyStore_DiscardAuthContext_Call {
-	return &CeremonyStore_DiscardAuthContext_Call{Call: _e.mock.On("DiscardAuthContext", w, r)}
-}
-
-func (_c *CeremonyStore_DiscardAuthContext_Call) Run(run func(w http.ResponseWriter, r *http.Request)) *CeremonyStore_DiscardAuthContext_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 http.ResponseWriter
-		if args[0] != nil {
-			arg0 = args[0].(http.ResponseWriter)
-		}
-		var arg1 *http.Request
-		if args[1] != nil {
-			arg1 = args[1].(*http.Request)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *CeremonyStore_DiscardAuthContext_Call) Return(err error) *CeremonyStore_DiscardAuthContext_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *CeremonyStore_DiscardAuthContext_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request) error) *CeremonyStore_DiscardAuthContext_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetAuthContext provides a mock function for the type CeremonyStore
 func (_mock *CeremonyStore) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
 	ret := _mock.Called(r)

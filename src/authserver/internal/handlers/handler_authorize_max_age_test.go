@@ -104,7 +104,6 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.userSessionManager.On("HasValidUserSession", userSession,
 			testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(true)
 		refuseMaxAge(f, "abc")
-		f.ceremonyStore.On("DiscardAuthContext", f.rr, f.req).Return(nil)
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
@@ -121,7 +120,6 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	t.Run("a silent request's malformed max_age is refused at once, with no session read", func(t *testing.T) {
 		f := arrange(t, "max_age=abc&prompt=none")
 		refuseMaxAge(f, "abc")
-		f.ceremonyStore.On("DiscardAuthContext", f.rr, f.req).Return(nil)
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
@@ -172,7 +170,6 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 			})).Return(false)
 		f.userSessionManager.On("HasValidUserSession", userSession,
 			testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(true)
-		f.ceremonyStore.On("DiscardAuthContext", f.rr, f.req).Return(nil)
 
 		f.handler.ServeHTTP(f.rr, f.req)
 

@@ -8,7 +8,7 @@
 // not offer.
 import type { Request, Response } from "@playwright/test";
 import { addRedirectUri, clientUrl, setImplicitGrant } from "../../lib/admin-console";
-import { signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
+import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { codeToken } from "../../lib/oauth";
@@ -16,6 +16,7 @@ import {
   authorizeEndpoint,
   codeRequest,
   emptyBrowser,
+  expectAuthorizeError,
   expectRefusedOnPage,
   followAuthorize,
   getAuthorize,
@@ -282,4 +283,36 @@ test("form_post to a custom-scheme redirect URI is refused on the page, signed i
 
   await signedOut.close();
   await signIn.context.close();
+});
+
+// Any page the user has open, of any site, can send the browser to the authorization endpoint, and
+// the browser sends its session cookie with that navigation. A request the auth server answers at
+// once with an error stores nothing and removes nothing, so it cannot end the sign-in the user is
+// in the middle of: here a prompt=none request from another tab, answered login_required at its
+// redirect URI, while the first tab shows the password form (#246).
+test("a sign-in in progress finishes after a prompt=none request in another tab of the same browser is answered with login_required (#246)", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
+  const user = await users.create();
+  const { client, secret } = await browserSignInClient(page, clients);
+  const { context, page: signingIn, codeVerifier } = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+  await expect(signingIn).toHaveURL(/\/auth\/pwd/);
+
+  const other = await context.newPage();
+  const silent = codeRequest(client.identifier, { prompt: "none" });
+  await other.goto(`${authorizeEndpoint}?${new URLSearchParams(silent.params)}`);
+  await other.waitForURL((url) => url.href.startsWith(testRedirectUri));
+  expectAuthorizeError(new URL(other.url()), "login_required", silent.params.state);
+
+  await submitPassword(signingIn, user.email, user.password);
+  await signingIn.waitForURL((url) => url.href.startsWith(testRedirectUri));
+  const code = new URL(signingIn.url()).searchParams.get("code");
+  expect(code, "the first tab's sign-in reached its client with a code").toBeTruthy();
+  const tokens = await codeToken(request, client.identifier, secret, code!, codeVerifier, testRedirectUri);
+  expect(tokens.status, "and the code is the first tab's own").toBe(200);
+  await context.close();
 });

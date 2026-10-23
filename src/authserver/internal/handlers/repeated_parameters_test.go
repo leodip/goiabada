@@ -221,7 +221,6 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 		e := newAuthorizeEndpoint(t)
 		e.passesDeliveryChecks()
 		stubAuthenticatedBrowser(e.database, e.userSessionManager)
-		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, query)
 
@@ -293,7 +292,6 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 	t.Run("a copy of prompt asking for none is answered at once", func(t *testing.T) {
 		e := newAuthorizeEndpoint(t)
 		e.passesDeliveryChecks()
-		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, validAuthorizeQuery+"&prompt=login&prompt=none")
 
@@ -308,7 +306,6 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 	t.Run("two copies of prompt asking for none are answered at once", func(t *testing.T) {
 		e := newAuthorizeEndpoint(t)
 		e.passesDeliveryChecks()
-		e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := e.get(t, validAuthorizeQuery+"&prompt=none&prompt=none")
 

@@ -126,7 +126,6 @@ func TestHandleAuthorizeGet_AnOverlongValueIsRefusedThroughTheDeferralPath(t *te
 		t.Run(tc.name+", answered at once to a session holder", func(t *testing.T) {
 			e := newBoundedAuthorizeEndpoint(t)
 			stubAuthenticatedBrowser(e.database, e.userSessionManager)
-			e.ceremonyStore.On("DiscardAuthContext", mock.Anything, mock.Anything).Return(nil).Once()
 
 			rr := e.get(t, boundedQuery(tc.overrides))
 

@@ -61,12 +61,6 @@ func (b *browserSession) ReplaceAuthContext(authContext *ceremony.AuthContext) e
 	return b.ceremonyStore.ReplaceAuthContext(b.w, b.r, authContext)
 }
 
-// DiscardAuthContext is CeremonyStore.DiscardAuthContext, /auth/authorize's clear, which ends
-// whatever ceremony the browser session held.
-func (b *browserSession) DiscardAuthContext() error {
-	return b.ceremonyStore.DiscardAuthContext(b.w, b.r)
-}
-
 // RegenerateSession is CeremonyStore.RegenerateSession, a step's conditional rotation of the browser
 // session's identifier.
 func (b *browserSession) RegenerateSession(ceremonyId string) error {
