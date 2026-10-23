@@ -17,6 +17,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/core/buildinfo"
 )
 
 // runMainMarker, set in a child's environment, makes this test binary run the real main instead
@@ -539,4 +540,18 @@ func TestMain_LeavesAnUnsetOrEmptyTimeZoneAsItWas(t *testing.T) {
 			assert.Regexp(t, `^time=\S+Z level=INFO msg="auth server started"`, first)
 		})
 	}
+}
+
+// TestMain_TheBuildInformationRecordNamesTheVersion: Upgrade Goiabada's "Check the start" has the
+// reader confirm the release actually running from the `version` attribute of the `build
+// information` record, which is where a deployment pinned to a stale digest shows (#491). The
+// record and its attribute are what that page names, so renaming either here fails rather than
+// leaving the page pointing at a record no start writes.
+func TestMain_TheBuildInformationRecordNamesTheVersion(t *testing.T) {
+	decoy := filepath.Join(t.TempDir(), "d.db")
+
+	code, stderr := runMainProcess(t, decoy)
+
+	require.Equal(t, 1, code, "stderr: %s", stderr)
+	assert.Contains(t, stderr, `level=INFO msg="build information" version=`+buildinfo.Version+" ")
 }
