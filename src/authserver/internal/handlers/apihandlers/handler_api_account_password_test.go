@@ -58,12 +58,14 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 	req.Header.Set("Content-Type", "application/json")
 	// The handler reads the password policy off the request's settings and passes it to the
 	// validator, so settings must be there or it panics on the type assertion.
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{PasswordPolicy: record.PasswordPolicyLow})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Goiabada", PasswordPolicy: record.PasswordPolicyLow})
 	return setTokenContextWithClaims(req.WithContext(ctx), claims)
 }
 
 // The new password is held to the request's policy: the handler passes settings.PasswordPolicy,
-// and a refusal answers the validator's localized message with nothing written (#433).
+// and a refusal answers the validator's localized message with nothing written (#433). The words
+// it is held to beside it are the caller's email and username and the request's app name (#550
+// decision 6).
 func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -73,11 +75,12 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
-		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+		Return(&record.User{Id: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true, PasswordHash: currentHash}, nil).Once()
 
-	// accountPasswordRequest carries PasswordPolicyLow; matching that value, not any, is the
-	// assertion.
-	passwordValidator.On("ValidatePassword", record.PasswordPolicyLow, "next").
+	// accountPasswordRequest carries PasswordPolicyLow and the app name Goiabada; matching those
+	// values, not any, is the assertion.
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyLow, "next",
+		accountvalidation.AccountWords{Email: "jane.doe@example.com", Username: "janedoe", AppName: "Goiabada"}).
 		Return(i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": 6})).Once()
 
 	rr := httptest.NewRecorder()

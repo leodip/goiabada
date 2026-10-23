@@ -270,12 +270,13 @@ func (a asker) generatedPassword(prompt, generated string) (string, error) {
 }
 
 // adminPassword asks for the first administrator's password read hidden, offering one generated as
-// generatedPassword does, and judges one typed instead. One the first start refuses to seed is
-// refused here with its reason and asked again, with no "use anyway": the wizard must not write a
-// configuration whose first start is refused (#500). Above that floor, weak character classes are
-// the operator's call. The generated one is not judged: it holds the classes SQL Server asks for and
-// no symbol, and was warned about as weak (#430).
-func (a asker) adminPassword(prompt, generated string) (string, error) {
+// generatedPassword does, and judges one typed instead against adminEmail, the admin email asked for
+// before it. One the first start refuses to seed is refused here with its reason and asked again,
+// with no "use anyway": the wizard must not write a configuration whose first start is refused
+// (#500). Nothing else is judged: composition rules are what NIST SP 800-63B-4 section 3.1.1.2 says
+// "SHALL NOT be imposed", and a passphrase of lowercase words is what the nist policy recommends
+// (#550 decision 12). The generated one is not judged either.
+func (a asker) adminPassword(prompt, generated, adminEmail string) (string, error) {
 	for {
 		value, err := a.generatedPassword(prompt, generated)
 		if err != nil {
@@ -284,19 +285,9 @@ func (a asker) adminPassword(prompt, generated string) (string, error) {
 		if value == generated {
 			return value, nil
 		}
-		if refused := adminpassword.Check(value); refused != nil {
+		if refused := adminpassword.Check(value, adminEmail, seededAppName); refused != nil {
 			a.out.printf("Invalid admin password: %s. Please try again.\n", refused)
 			continue
-		}
-		if issues := checkPasswordStrength(value); len(issues) > 0 {
-			a.out.warning("Weak password: %s", strings.Join(issues, ", "))
-			useAnyway, askErr := a.yesNo("Use this password anyway?", false)
-			if askErr != nil {
-				return "", askErr
-			}
-			if !useAnyway {
-				continue
-			}
 		}
 		return value, nil
 	}

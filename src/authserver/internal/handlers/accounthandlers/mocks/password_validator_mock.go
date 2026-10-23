@@ -10,6 +10,7 @@
 package accounthandlersmocks
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -51,16 +52,16 @@ func (_m *PasswordValidator) EXPECT() *PasswordValidator_Expecter {
 }
 
 // ValidatePassword provides a mock function for the type PasswordValidator
-func (_mock *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string) error {
-	ret := _mock.Called(policy, password)
+func (_mock *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string, words accountvalidation.AccountWords) error {
+	ret := _mock.Called(policy, password, words)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidatePassword")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(record.PasswordPolicy, string) error); ok {
-		r0 = returnFunc(policy, password)
+	if returnFunc, ok := ret.Get(0).(func(record.PasswordPolicy, string, accountvalidation.AccountWords) error); ok {
+		r0 = returnFunc(policy, password, words)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -75,11 +76,12 @@ type PasswordValidator_ValidatePassword_Call struct {
 // ValidatePassword is a helper method to define mock.On call
 //   - policy record.PasswordPolicy
 //   - password string
-func (_e *PasswordValidator_Expecter) ValidatePassword(policy any, password any) *PasswordValidator_ValidatePassword_Call {
-	return &PasswordValidator_ValidatePassword_Call{Call: _e.mock.On("ValidatePassword", policy, password)}
+//   - words accountvalidation.AccountWords
+func (_e *PasswordValidator_Expecter) ValidatePassword(policy any, password any, words any) *PasswordValidator_ValidatePassword_Call {
+	return &PasswordValidator_ValidatePassword_Call{Call: _e.mock.On("ValidatePassword", policy, password, words)}
 }
 
-func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(policy record.PasswordPolicy, password string)) *PasswordValidator_ValidatePassword_Call {
+func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(policy record.PasswordPolicy, password string, words accountvalidation.AccountWords)) *PasswordValidator_ValidatePassword_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 record.PasswordPolicy
 		if args[0] != nil {
@@ -89,9 +91,14 @@ func (_c *PasswordValidator_ValidatePassword_Call) Run(run func(policy record.Pa
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 accountvalidation.AccountWords
+		if args[2] != nil {
+			arg2 = args[2].(accountvalidation.AccountWords)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -102,7 +109,7 @@ func (_c *PasswordValidator_ValidatePassword_Call) Return(err error) *PasswordVa
 	return _c
 }
 
-func (_c *PasswordValidator_ValidatePassword_Call) RunAndReturn(run func(policy record.PasswordPolicy, password string) error) *PasswordValidator_ValidatePassword_Call {
+func (_c *PasswordValidator_ValidatePassword_Call) RunAndReturn(run func(policy record.PasswordPolicy, password string, words accountvalidation.AccountWords) error) *PasswordValidator_ValidatePassword_Call {
 	_c.Call.Return(run)
 	return _c
 }

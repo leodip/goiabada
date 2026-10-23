@@ -140,7 +140,7 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("    environment:\n")
 	writeComposeVariable(&sb, "TZ", "UTC")
 	writeComposeVariable(&sb, "GOIABADA_ADMIN_EMAIL", config.AdminEmail)
-	writeComposeVariable(&sb, "GOIABADA_APPNAME", "Goiabada")
+	writeComposeVariable(&sb, "GOIABADA_APPNAME", seededAppName)
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_BASEURL", config.AuthServerURL)
 	writeComposeInternalURL(&sb, authInternalURL)
 	writeComposeVariable(&sb, "GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0")

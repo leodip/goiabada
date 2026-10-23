@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -58,7 +59,7 @@ func TestAPIUserCreatePost_TheSetupEmailLinkSetsThePassword(t *testing.T) {
 	cleanURL := followResetLink(t, client, link)
 	continuationId := loadResetForm(t, client, cleanURL)
 
-	const newPassword = "N3wP4ss!word"
+	newPassword := fake.Password(20)
 	resp = postCleanReset(t, client, cleanURL, newPassword, continuationId)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()

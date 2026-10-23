@@ -81,6 +81,7 @@ func HandleAuthenticationGet(
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,
+			"passwordRules":     render.PasswordRulesHint(r),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_authentication.html", bind)
@@ -132,11 +133,12 @@ func HandleAuthenticationPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"user":       user,
-				"otpEnabled": r.FormValue("otpEnabled") == "on",
-				"page":       r.URL.Query().Get("page"),
-				"query":      r.URL.Query().Get("query"),
-				"error":      message,
+				"user":          user,
+				"otpEnabled":    r.FormValue("otpEnabled") == "on",
+				"page":          r.URL.Query().Get("page"),
+				"query":         r.URL.Query().Get("query"),
+				"error":         message,
+				"passwordRules": render.PasswordRulesHint(r),
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_authentication.html", bind)

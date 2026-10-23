@@ -17,8 +17,10 @@
 "common.field.password_confirmation" = "Confirme a senha"
 "common.link.sign_in_to_account" = "Entrar na sua conta"
 
-# As regras de senha que um formulário que define uma senha mostra sob o campo. accountvalidation.DescribePasswordRules
-# monta a frase a partir das regras que o validador de senha aplica, então estas partes mudam com elas.
+# As regras de senha que um formulário que define uma senha mostra sob o campo, nos formulários de cadastro,
+# ativação e redefinição do servidor de autenticação e nas páginas de alteração de senha, novo usuário e aba
+# Autenticação do console de administração. passwordrules.Describe monta a frase a partir das regras que o
+# validador de senha aplica, como as configurações públicas as levam, então estas partes mudam com elas.
 "password_rules.length" = "Pelo menos {{.min}} caracteres."
 "password_rules.length_with" = "Pelo menos {{.min}} caracteres, com {{.requirements}}."
 "password_rules.lowercase" = "uma letra minúscula"
@@ -26,6 +28,8 @@
 "password_rules.number" = "um número"
 "password_rules.symbol" = "um símbolo"
 "password_rules.list" = "{{.items}} e {{.last}}"
+"password_rules.passphrase_guidance" = "Algumas palavras sem relação entre si formam uma senha longa e fácil de lembrar."
+"password_rules.common_and_account_refused" = "Senhas comuns, o endereço de e-mail da conta e o nome do aplicativo são recusados."
 
 # --- Datas e durações --------------------------------------------------------
 #
@@ -1283,6 +1287,11 @@
 "adminconsole.admin_settings.general.issuer_change_warning" = "Você está alterando o issuer. Clientes e APIs que o verificam terão de ser atualizados para o novo, os tokens emitidos antes manterão o antigo, e você será desconectado."
 "adminconsole.admin_settings.general.field.password_policy" = "Política de senhas"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Vale sempre que uma senha é definida ou alterada. Senhas já definidas não são verificadas de novo."
+# O cartão da política nist, o primeiro dos cinco, e a linha que cada cartão mais antigo ganha (#550 decisão 3).
+"adminconsole.admin_settings.general.password_policy_nist" = "NIST SP 800-63B"
+"adminconsole.admin_settings.general.password_policy_nist_hint" = "Pelo menos 15 caracteres, de qualquer tipo. Uma senha comum é recusada, assim como o endereço de e-mail da conta, o nome de usuário ou o nome do aplicativo, ou uma variação simples deles."
+"adminconsole.admin_settings.general.password_policy_nist_why" = "Recomendada. Segue a diretriz do Instituto Nacional de Padrões e Tecnologia dos EUA (NIST) para uma senha que pode ser a única coisa verificada ao entrar: comprimento, e uma verificação contra as senhas que atacantes tentam primeiro, em vez de tipos de caractere obrigatórios, que tornam uma senha mais difícil de lembrar sem torná-la mais difícil de adivinhar."
+"adminconsole.admin_settings.general.password_policy_short_of_nist" = "Não atende ao NIST SP 800-63B."
 "adminconsole.admin_settings.general.password_policy_none" = "Sem política"
 "adminconsole.admin_settings.general.password_policy_none_hint" = "Pelo menos 1 caractere."
 "adminconsole.admin_settings.general.password_policy_low" = "Baixa"
@@ -1660,6 +1669,8 @@
 "validator.password.uppercase_required" = "Adicione uma letra maiúscula à senha."
 "validator.password.number_required" = "Adicione um número à senha."
 "validator.password.special_char_required" = "Adicione um símbolo à senha."
+"validator.password.too_common" = "Esta senha é uma das primeiras que os atacantes tentam. Escolha outra: algumas palavras sem relação entre si formam uma senha longa e fácil de lembrar."
+"validator.password.too_close_to_account" = "Esta senha é parecida demais com o endereço de e-mail ou o nome de usuário da conta, ou com o nome do aplicativo. Escolha outra."
 
 "validator.profile.username_taken" = "Desculpe, este nome de usuário já está em uso."
 "validator.profile.username_invalid" = "Nomes de usuário precisam começar com uma letra e conter apenas letras, números e sublinhados. Devem ter entre 2 e 24 caracteres."

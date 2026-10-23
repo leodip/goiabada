@@ -57,6 +57,38 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, "https://issuer.example", body.Issuer)
 }
 
+// The stored policy's rules ride with the public settings, as data, so the admin console states
+// them under its password fields without keeping its own copy of each policy's numbers (#550
+// decision 11).
+func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
+	for _, tc := range []struct {
+		policy record.PasswordPolicy
+		want   string
+	}{
+		{record.PasswordPolicyNist, `{"minLength":15,"requiresLowercase":false,"requiresUppercase":false,` +
+			`"requiresNumber":false,"requiresSymbol":false,"refusesCommon":true,"refusesAccountWords":true}`},
+		{record.PasswordPolicyHigh, `{"minLength":10,"requiresLowercase":true,"requiresUppercase":true,` +
+			`"requiresNumber":true,"requiresSymbol":true,"refusesCommon":false,"refusesAccountWords":false}`},
+		{record.PasswordPolicyNone, `{"minLength":1,"requiresLowercase":false,"requiresUppercase":false,` +
+			`"requiresNumber":false,"requiresSymbol":false,"refusesCommon":false,"refusesAccountWords":false}`},
+	} {
+		t.Run(tc.policy.String(), func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+				Id: 1, AppName: "Goiabada", PasswordPolicy: tc.policy,
+			}, nil).Once()
+
+			recorder := httptest.NewRecorder()
+			NewPublicSettings(database).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
+
+			require.Equal(t, http.StatusOK, recorder.Code)
+			var body map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
+			assert.JSONEq(t, tc.want, string(body["passwordRules"]))
+		})
+	}
+}
+
 func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := NewPublicSettings(database)
@@ -141,24 +173,46 @@ var publicSettingsAllowedFields = map[string]string{
 	// Already world-readable: /.well-known/openid-configuration serves the same
 	// value to anonymous callers, as OIDC Discovery 1.0 section 3 requires.
 	"Issuer": "issuer",
+	// The stored password policy's rules, which the admin console states under its password
+	// fields (#550 decision 11). Already readable by anyone who opens the registration form
+	// while registration is on, and NIST SP 800-63B assumes an attacker knows them.
+	"PasswordRules": "passwordRules",
+}
+
+// publicPasswordRulesAllowedFields is the complete set of fields the password rules carry: the
+// minimum, the kinds of character required, and whether common passwords and the account's words
+// are refused, and nothing else about the settings row.
+var publicPasswordRulesAllowedFields = map[string]string{
+	"MinLength":           "minLength",
+	"RequiresLowercase":   "requiresLowercase",
+	"RequiresUppercase":   "requiresUppercase",
+	"RequiresNumber":      "requiresNumber",
+	"RequiresSymbol":      "requiresSymbol",
+	"RefusesCommon":       "refusesCommon",
+	"RefusesAccountWords": "refusesAccountWords",
 }
 
 // This fails if a field is added to PublicSettingsResponse without being added to
 // the allowlist above, which forces the question "should this really be public?"
 // into review.
 func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
-	responseType := reflect.TypeOf(api.PublicSettingsResponse{})
+	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PublicSettingsResponse{}), publicSettingsAllowedFields)
+	assertOnlyAllowlistedFields(t, reflect.TypeOf(api.PasswordRulesResponse{}), publicPasswordRulesAllowedFields)
+}
 
-	assert.Equal(t, len(publicSettingsAllowedFields), responseType.NumField(),
+// assertOnlyAllowlistedFields holds responseType to the fields allowed, each under its JSON name.
+func assertOnlyAllowlistedFields(t *testing.T, responseType reflect.Type, allowed map[string]string) {
+	t.Helper()
+	assert.Equal(t, len(allowed), responseType.NumField(),
 		"PublicSettingsResponse gained or lost a field; this endpoint needs no "+
 			"authentication, so update publicSettingsAllowedFields only if the new "+
 			"field is genuinely safe to expose to anonymous callers")
 
 	for i := 0; i < responseType.NumField(); i++ {
 		field := responseType.Field(i)
-		wantJSON, allowed := publicSettingsAllowedFields[field.Name]
-		assert.True(t, allowed, "field %q is not in the allowlist", field.Name)
-		if allowed {
+		wantJSON, isAllowed := allowed[field.Name]
+		assert.True(t, isAllowed, "field %q of %s is not in the allowlist", field.Name, responseType.Name())
+		if isAllowed {
 			gotJSON := strings.Split(field.Tag.Get("json"), ",")[0]
 			assert.Equal(t, wantJSON, gotJSON, "field %q changed its JSON name", field.Name)
 		}

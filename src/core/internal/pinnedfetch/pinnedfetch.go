@@ -1,13 +1,14 @@
-// Package pinnedfetch is the download the two reference-data generators share: a GET through an
+// Package pinnedfetch is the download the three reference-data generators share: a GET through an
 // injectable doer, read under a ceiling, and a SHA-256 check against a digest pinned in the
 // generator's source.
 //
-// The countries generator fetches its CSV at a pinned dataset commit and the timezones generator
-// its tzdata tarball at a pinned release, and each refuses bytes whose digest is not the one it
-// pins, so the same source always renders the same table and a changed upstream stops the run for a
-// human to review. What differs between them -- the URL, the ceiling, the parsing -- stays in each
-// generator; what is here is only what both do the same way. It lives under core/internal because
-// nothing outside core has a reason to name it (#432).
+// The countries generator fetches its CSV at a pinned dataset commit, the timezones generator its
+// tzdata tarball at a pinned release and the password blocklist generator its three lists at a
+// pinned SecLists commit (#550), and each refuses bytes whose digest is not the one it pins, so the
+// same source always renders the same table and a changed upstream stops the run for a human to
+// review. What differs between them -- the URL, the ceiling, the parsing -- stays in each
+// generator; what is here is only what all three do the same way. It lives under core/internal
+// because nothing outside core has a reason to name it (#432).
 package pinnedfetch
 
 import (

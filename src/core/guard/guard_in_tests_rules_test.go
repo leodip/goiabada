@@ -120,7 +120,7 @@ func TestGuardInTests_FailsOnALeak(t *testing.T) {
 	assert.Contains(t, report.Text(), "go.sum")
 	assert.Contains(t, report.Text(), "#500")
 	// The failure says what to do instead.
-	assert.Contains(t, report.Text(), "TestAdminPassword_ImportsNothingButErrsAndTheStandardLibrary")
+	assert.Contains(t, report.Text(), "TestAdminPassword_ImportsNothingButErrsTheBlocklistAndTheStandardLibrary")
 }
 
 // TestGuardInTests_PassesACleanTree is the other direction, over the shape the real wizard has: its

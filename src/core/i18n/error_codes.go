@@ -74,13 +74,17 @@ const (
 
 	// Password validator — settings-driven policy enforcement. Used by
 	// account self-service password change, admin user CRUD, registration,
-	// and reset-password.
+	// activation, reset-password and the recover command. The last two codes
+	// are the nist policy's: a listed password, and one too close to the
+	// account's words or the app's name (#550 decision 10).
 	ErrCodePasswordTooShort            = "validator.password.too_short" // Args: {"min": int}
 	ErrCodePasswordTooLong             = "validator.password.too_long"  // Args: {"max": int}
 	ErrCodePasswordLowercaseRequired   = "validator.password.lowercase_required"
 	ErrCodePasswordUppercaseRequired   = "validator.password.uppercase_required"
 	ErrCodePasswordNumberRequired      = "validator.password.number_required"
 	ErrCodePasswordSpecialCharRequired = "validator.password.special_char_required"
+	ErrCodePasswordTooCommon           = "validator.password.too_common"
+	ErrCodePasswordTooCloseToAccount   = "validator.password.too_close_to_account"
 
 	// Browser-flow handler errors that mirror UI form validation but are
 	// emitted from handler-side checks rather than validators (so they

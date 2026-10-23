@@ -73,6 +73,11 @@ const (
 	trafficPolicyLocal   trafficPolicy = "Local"
 )
 
+// seededAppName is the app name every configuration the wizard writes sets in GOIABADA_APPNAME,
+// which the first start seeds, and so one of the words the first administrator's password is
+// compared with (#550 decision 7).
+const seededAppName = "Goiabada"
+
 // rateLimitsDocsURL is where the auth server's limits are listed, those the rate limiter turns on
 // and those that apply either way.
 const rateLimitsDocsURL = "https://goiabada.dev/reference/environment-variables/#rate-limits"

@@ -16,6 +16,11 @@ import (
 // discloses nothing new: OIDC Discovery 1.0 section 3 already requires the same value to be served
 // to anonymous callers at /.well-known/openid-configuration (#285).
 //
+// PasswordRules is here because the admin console states the stored password policy's rules under
+// its password fields, as the auth server's registration, activation and reset forms do (#550
+// decision 11). It discloses nothing new: the registration form states the same rules to anyone
+// while registration is on, and NIST SP 800-63B assumes an attacker knows them.
+//
 // It was declared twice until #350, once per module, field for field, with nothing in the build
 // checking that the two agreed: a field added on one side and forgotten on the other decoded to its
 // zero value in the console, silently. One declaration in the package both modules already share is
@@ -25,6 +30,23 @@ type PublicSettingsResponse struct {
 	UITheme     string `json:"uiTheme"`
 	SMTPEnabled bool   `json:"smtpEnabled"`
 	Issuer      string `json:"issuer"`
+
+	PasswordRules PasswordRulesResponse `json:"passwordRules"`
+}
+
+// PasswordRulesResponse is what the stored password policy asks of a new password, as data: the
+// minimum length in characters, the kinds of character it requires, and whether it refuses a
+// commonly used password and one too close to the account's email address, username or the app's
+// name. core/passwordrules builds the sentence a page shows from it, so the two applications word
+// the same rules alike. The maximum is left out, as the sentence leaves it to its refusal.
+type PasswordRulesResponse struct {
+	MinLength           int  `json:"minLength"`
+	RequiresLowercase   bool `json:"requiresLowercase"`
+	RequiresUppercase   bool `json:"requiresUppercase"`
+	RequiresNumber      bool `json:"requiresNumber"`
+	RequiresSymbol      bool `json:"requiresSymbol"`
+	RefusesCommon       bool `json:"refusesCommon"`
+	RefusesAccountWords bool `json:"refusesAccountWords"`
 }
 
 // SettingsGeneralResponse represents the general settings returned by the API

@@ -1,4 +1,4 @@
-import { deleteUser, detail, expectRefusal, idFromListLink, rowWithCell, submitNewUser, userUrl } from "../../../lib/admin-console";
+import { deleteUser, detail, expectPasswordRules, expectRefusal, idFromListLink, nistPasswordRules, rowWithCell, submitNewUser, userUrl } from "../../../lib/admin-console";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { passwordToken } from "../../../lib/oauth";
@@ -134,12 +134,19 @@ test("choosing to email a link hides the password field, and setting it now show
   // The baseline sends mail, so the new user page offers the choice.
   await page.goto(`${list}/new`);
   const password = page.locator("#password");
+  const rules = page.locator("#password-rules");
   await expect(page.getByRole("radio", { name: "Set the password now" })).toBeChecked();
   await expect(password).toBeVisible();
+  // The stored policy's rule is stated under the field, and goes with it (#550).
+  await expectPasswordRules(page, "password");
+  await expect(password).toHaveAccessibleDescription(nistPasswordRules);
+  await expect(rules).toBeVisible();
   await page.getByRole("radio", { name: "Email a link to set it" }).check();
   await expect(password).toBeHidden();
+  await expect(rules).toBeHidden();
   await page.getByRole("radio", { name: "Set the password now" }).check();
   await expect(password).toBeVisible();
+  await expect(rules).toBeVisible();
 });
 
 for (const { name, user, field, message } of [
@@ -147,7 +154,7 @@ for (const { name, user, field, message } of [
   { name: "a malformed email", user: { email: "not-an-email" }, field: "email", message: "Please enter a valid email address." },
   { name: "a given name with digits", user: { givenName: "R2D2" }, field: "givenName", message: "Please enter a valid given name." },
   { name: "no password", user: { password: "" }, field: "password", message: "Password is required" },
-  { name: "a password under the policy's 6 characters", user: { password: "abc" }, field: "password", message: "Use at least 6 characters for the password." },
+  { name: "a password under the policy's 15 characters", user: { password: "abc" }, field: "password", message: "Use at least 15 characters for the password." },
 ]) {
   test(`a user with ${name} is refused, and the form keeps what was typed`, async ({ page }) => {
     const email = `${uniqueIdentifier("u")}@example.com`;
@@ -158,6 +165,8 @@ for (const { name, user, field, message } of [
     await expect(page).toHaveURL(`${list}/new`);
     // The notice says why, at the top of the form, and the field it is about is marked.
     await expectRefusal(page, "user-error", field, message);
+    // The refused form still states the password rule under its field.
+    await expectPasswordRules(page, "password");
     await expect(page.locator("#email")).toHaveValue(submitted.email);
     await expect(page.locator("#givenName")).toHaveValue(submitted.givenName);
     await expect(page.locator("#familyName")).toHaveValue(submitted.familyName);

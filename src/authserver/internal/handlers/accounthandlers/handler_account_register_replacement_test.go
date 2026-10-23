@@ -259,7 +259,7 @@ func TestHandleRegisterPost_WithoutVerificationADeadPendingRegistrationIsAbsent(
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), registerSomeoneEmail).Return(nil, nil).Once()
 		database.On("GetPreRegistrationByEmail", mock.Anything, (*sql.Tx)(nil), registerSomeoneEmail).
 			Return(pendingRegistrationIssuedAgo(pendingRegistrationLifetime+30*time.Second), nil).Once()
-		passwordValidator.On("ValidatePassword", mock.Anything, "Str0ngP4ss!").Return(nil).Once()
+		passwordValidator.On("ValidatePassword", mock.Anything, "Str0ngP4ss!", mock.Anything).Return(nil).Once()
 		var input *usercreation.Input
 		userCreator.On("CreateUser", mock.Anything, mock.AnythingOfType("*usercreation.Input")).
 			Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).

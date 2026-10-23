@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -789,7 +790,7 @@ func TestRefuseActivationLink_AuditPayload(t *testing.T) {
 
 // activationSettings is what middleware.Settings puts on an activation request: self-registration
 // on, and the policy the chosen password is held to, which the stubs pin by matching it.
-var activationSettings = &record.Settings{SelfRegistrationEnabled: true, PasswordPolicy: record.PasswordPolicyMedium}
+var activationSettings = &record.Settings{AppName: "Goiabada", SelfRegistrationEnabled: true, PasswordPolicy: record.PasswordPolicyMedium}
 
 // postActivationRequest builds the form submission, to the clean URL the template's empty action
 // re-submits to. continuationId is the hidden field the rendered form carries; pass "" for none.
@@ -870,7 +871,10 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 	preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 	database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+	// The words the password is held to are the address registered and the request's app name;
+	// an account being activated has no username yet (#550 decision 6).
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword,
+		accountvalidation.AccountWords{Email: activateTestEmail, AppName: "Goiabada"}).Return(nil).Once()
 
 	// The account and the consumption are written on the one transaction, and both success
 	// entries are recorded after it commits (AGENTS.md pattern 9).
@@ -955,7 +959,7 @@ func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
 			name:     "the policy refuses the password",
 			password: "weak", passwordConfirmation: "weak",
 			arrange: func(passwordValidator *accounthandlersmocks.PasswordValidator) {
-				passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, "weak").
+				passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, "weak", mock.Anything).
 					Return(errs.New("too weak")).Once()
 			},
 		},
@@ -1056,7 +1060,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&record.PreRegistration{Id: 7, Email: activateTestEmail}, nil).Once()
 				database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-				passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+				passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 			},
 			reason:                "continuation_mismatch",
 			wantPreRegistrationId: 7,
@@ -1121,7 +1125,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		handler.ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, 7, codeHash))
 
 		userCreator.AssertNotCalled(t, "CreateUserInTransaction", mock.Anything, mock.Anything, mock.Anything)
-		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
 		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -1139,7 +1143,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 		stub := datamocks.ExpectRunInTransaction(database, activationTx)
 		userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
 			Return(nil, errs.Wrap(data.ErrUniqueViolation, "unable to insert user")).Once()
@@ -1237,7 +1241,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 			preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 			database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 			database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-			passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+			passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 			stub := tc.arrange(database, userCreator, codeHash)
 			pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
@@ -1275,7 +1279,7 @@ func TestHandleActivatePost_DeletedMeanwhile(t *testing.T) {
 	preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 	database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, activationTx)
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
 		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()

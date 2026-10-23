@@ -84,20 +84,21 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 		return err
 	}
 
-	// Checked before anything is generated or written, so a refused password costs no key
-	// generation and leaves the database empty for the next start, with the variable fixed (#409).
-	// There is no default: an unset or empty password is refused like the published changeme the
-	// configuration and this seed used to supply, which made whoever reached the sign-in page a
-	// full administrator (#500).
-	adminPassword := r.cfg.AdminPassword
-	if err := checkAdminPassword(adminPassword); err != nil {
-		return err
-	}
-
 	appName := r.cfg.AppName
 	if len(appName) == 0 {
 		appName = "Goiabada"
 		slog.WarnContext(ctx, "app name is not set, defaulting it", "app_name", appName)
+	}
+
+	// Checked before anything is generated or written, so a refused password costs no key
+	// generation and leaves the database empty for the next start, with the variable fixed (#409).
+	// There is no default: an unset or empty password is refused like the published changeme the
+	// configuration and this seed used to supply, which made whoever reached the sign-in page a
+	// full administrator (#500). It is compared with the admin email and app name seeded beside it
+	// (#550 decision 7).
+	adminPassword := r.cfg.AdminPassword
+	if err := checkAdminPassword(adminPassword, adminEmail, appName); err != nil {
+		return err
 	}
 
 	// Generate session keys for both auth server and admin console
@@ -331,7 +332,9 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		// unless they turn verification off on purpose (#526).
 		SelfRegistrationEnabled:                   false,
 		SelfRegistrationRequiresEmailVerification: true,
-		PasswordPolicy:                            record.PasswordPolicyLow,
+		// NIST SP 800-63B-4 section 3.1.1.2, which every password set from the first start is held
+		// to; an upgrade keeps the policy it had, since no migration runs (#550).
+		PasswordPolicy: record.PasswordPolicyNist,
 		// The data key is supplied from the environment (issue #83); the legacy
 		// aes_encryption_key column is left empty on fresh installs. It is NOT NULL,
 		// so store an empty (non-nil) blob rather than nil.
@@ -443,8 +446,8 @@ func checkAdminEmail(email string) error {
 // refusal has only the startup log to go on. The seed is the one path that hashes a password no
 // validator has seen, so without this a password bcrypt cannot hash surfaced as a hashing failure,
 // and before #409 not at all, and any weak one, changeme included, seeded (#500).
-func checkAdminPassword(password string) error {
-	if err := adminpassword.Check(password); err != nil {
+func checkAdminPassword(password, adminEmail, appName string) error {
+	if err := adminpassword.Check(password, adminEmail, appName); err != nil {
 		return errs.Wrap(err, "GOIABADA_ADMIN_PASSWORD cannot be the first administrator's password")
 	}
 	return nil

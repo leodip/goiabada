@@ -142,7 +142,8 @@ func TestSelfRegister_WithoutVerificationADeadRegistrationDoesNotTakeTheAddress(
 		httpClient := createHttpClient(t)
 		loadRegisterPage(t, httpClient)
 
-		resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+		password := fake.Password(20)
+		resp := postRegister(t, httpClient, email, password, password)
 		body := bodyString(t, resp)
 		_ = resp.Body.Close()
 
@@ -158,7 +159,8 @@ func TestSelfRegister_WithoutVerificationADeadRegistrationDoesNotTakeTheAddress(
 		httpClient := createHttpClient(t)
 		loadRegisterPage(t, httpClient)
 
-		resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+		password := fake.Password(20)
+		resp := postRegister(t, httpClient, email, password, password)
 		body := bodyString(t, resp)
 		_ = resp.Body.Close()
 

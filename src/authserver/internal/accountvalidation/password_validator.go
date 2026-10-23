@@ -1,12 +1,14 @@
 package accountvalidation
 
 import (
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/passwordblocklist"
 )
 
 // maxPasswordBytes is the longest password any form or API accepts: passwordhash.MaxPasswordBytes
@@ -25,20 +27,47 @@ func NewPasswordValidator() *PasswordValidator {
 	return &PasswordValidator{}
 }
 
+// AccountWords are what a new password must not be, nor a simple derivative of, under a policy
+// that refuses the account's details: the account's email address and username and the app's name,
+// the "context-specific words, such as the name of the service, the username, and derivatives
+// thereof" NIST SP 800-63B-4 section 3.1.1.2 counts among expected passwords (#550 decision 6).
+// Each path that sets a password hands in the words it has: a registration has no username yet.
+// The email's local part is derived here rather than by each caller, so no two derive it
+// differently. An empty word refuses nothing.
+type AccountWords struct {
+	Email    string
+	Username string
+	AppName  string
+}
+
+// list answers the words a password is compared with: the email, its local part, the username and
+// the app name.
+func (w AccountWords) list() []string {
+	words := []string{w.Email, w.Username, w.AppName}
+	if at := strings.LastIndex(w.Email, "@"); at > 0 {
+		words = append(words, w.Email[:at])
+	}
+	return words
+}
+
 // PasswordRules is what a password policy asks of a new password. MinLength counts characters and
-// MaxBytes bytes.
+// MaxBytes bytes. RefusesCommon refuses a password on core/passwordblocklist's list, and
+// RefusesAccountWords one that is the account's words or a simple derivative of them.
 type PasswordRules struct {
-	MinLength        int
-	MaxBytes         int
-	LowerCase        bool
-	UpperCase        bool
-	Number           bool
-	SpecialCharacter bool
+	MinLength           int
+	MaxBytes            int
+	LowerCase           bool
+	UpperCase           bool
+	Number              bool
+	SpecialCharacter    bool
+	RefusesCommon       bool
+	RefusesAccountWords bool
 }
 
 // PasswordRulesFor answers the rules policy holds a new password to: what ValidatePassword checks,
-// and what DescribePasswordRules tells the person choosing one, so the form never states a rule
-// the server does not apply, nor applies one it does not state (#617).
+// and, through apimapping.ToPasswordRulesResponse and core/passwordrules, what a form tells the
+// person choosing one, so the form never states a rule the server does not apply, nor applies one it
+// does not state (#617, #550 decision 11).
 func PasswordRulesFor(policy record.PasswordPolicy) PasswordRules {
 	switch policy {
 	case record.PasswordPolicyLow:
@@ -47,14 +76,20 @@ func PasswordRulesFor(policy record.PasswordPolicy) PasswordRules {
 		return PasswordRules{MinLength: 8, MaxBytes: maxPasswordBytes, LowerCase: true, UpperCase: true, Number: true}
 	case record.PasswordPolicyHigh:
 		return PasswordRules{MinLength: 10, MaxBytes: maxPasswordBytes, LowerCase: true, UpperCase: true, Number: true, SpecialCharacter: true}
+	case record.PasswordPolicyNist:
+		// NIST SP 800-63B-4 section 3.1.1.2: 15 characters for a password that may be the only
+		// factor, no other composition rule, and a comparison against commonly used, expected or
+		// compromised passwords (#550 decision 1).
+		return PasswordRules{MinLength: 15, MaxBytes: maxPasswordBytes, RefusesCommon: true, RefusesAccountWords: true}
 	default:
 		return PasswordRules{MinLength: 1, MaxBytes: maxPasswordBytes}
 	}
 }
 
-// ValidatePassword checks password against policy's rules. The caller reads the policy off its
-// settings, so this reads nothing from the request (#433).
-func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string) error {
+// ValidatePassword checks password against policy's rules, words being the account's that a policy
+// refusing them compares it with. The caller reads the policy and the app name off its settings,
+// so this reads nothing from the request (#433).
+func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, password string, words AccountWords) error {
 	rules := PasswordRulesFor(policy)
 
 	// i18n surface: A | C — registration, reset-password, account API,
@@ -85,6 +120,16 @@ func (val *PasswordValidator) ValidatePassword(policy record.PasswordPolicy, pas
 
 	if rules.SpecialCharacter && !val.containsSpecialChar(password) {
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordSpecialCharRequired, nil)
+	}
+
+	// The two refusals ask for different remedies, choosing something less common against leaving
+	// the account's details out, so each has its own message and code (#550 decision 10).
+	if rules.RefusesCommon && passwordblocklist.IsCommon(password) {
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooCommon, nil)
+	}
+
+	if rules.RefusesAccountWords && passwordblocklist.IsTooClose(password, words.list()...) {
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooCloseToAccount, nil)
 	}
 
 	return nil

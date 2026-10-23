@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -459,7 +460,10 @@ func HandleActivatePost(
 			return
 		}
 
-		err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
+		// The account being created has no username yet: the words are the address registered and
+		// the app name (#550 decision 6).
+		err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password,
+			accountvalidation.AccountWords{Email: preRegistration.Email, AppName: settings.AppName})
 		if err != nil {
 			// i18n surface: A — browser-flow form rerender.
 			var locErr *i18n.LocalizedError

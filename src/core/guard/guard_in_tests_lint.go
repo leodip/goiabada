@@ -70,7 +70,7 @@ func assertNoGuardInTestsReachedFrom(r Reporter, root, moduleDir string) {
 		"go mod tidy reads the tests of every package a module imports, so each of these puts "+
 		"core/guard's dependencies, chi and TOML among them, in %s's go.sum, for modules none of its "+
 		"packages use (#500). Call the guard from a test in core/guard, as "+
-		"TestAdminPassword_ImportsNothingButErrsAndTheStandardLibrary does, or from a module that "+
+		"TestAdminPassword_ImportsNothingButErrsTheBlocklistAndTheStandardLibrary does, or from a module that "+
 		"needs core/guard anyway.",
 		len(found), moduleDir, strings.Join(lines, "\n\t"), moduleDir)
 }
