@@ -464,6 +464,49 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 	}
 }
 
+// PUT: an App name that is empty once trimmed is refused with its own code and nothing is written,
+// and the name is measured once trimmed, so 30 characters with spaces around them are stored
+// trimmed (#646 decisions 3 and 7).
+func TestAPISettingsGeneralPut_TheAppNameIsRequiredAndMeasuredTrimmed(t *testing.T) {
+	before := restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
+
+	for _, appName := range []string{"", "    "} {
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+			AppName:        appName,
+			Issuer:         "https://example.org",
+			PasswordPolicy: "low",
+		})
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "%q", appName)
+		var errResp api.ErrorResponse
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = resp.Body.Close()
+		assert.Equal(t, "handler.settings_general.app_name_required", errResp.ErrorCode, "%q", appName)
+		assert.Equal(t, "App name is required.", errResp.ErrorDescription, "%q", appName)
+
+		stored, err := database.GetSettingsById(context.Background(), nil, 1)
+		require.NoError(t, err)
+		assert.Equal(t, before.AppName, stored.AppName, "nothing is written for %q", appName)
+		assert.Equal(t, before.Issuer, stored.Issuer, "nothing is written for %q", appName)
+	}
+
+	thirty := strings.Repeat("é", 30)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsGeneralRequest{
+		AppName:        "   " + thirty + "  ",
+		Issuer:         before.Issuer,
+		PasswordPolicy: "low",
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.SettingsGeneralResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, thirty, body.AppName)
+	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, thirty, stored.AppName)
+}
+
 // TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim is the accepted twin.
 func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	restoreSettings(t)

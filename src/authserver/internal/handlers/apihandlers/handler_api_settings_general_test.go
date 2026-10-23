@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -122,4 +123,70 @@ func TestHandleSettingsGeneral_NistIsStoredAsFour(t *testing.T) {
 		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
 		assert.Equal(t, "nist", resp.PasswordPolicy)
 	})
+}
+
+// putSettingsGeneral serves one general settings save of appName over database, and answers the
+// response.
+func putSettingsGeneral(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, appName string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(api.UpdateSettingsGeneralRequest{
+		AppName: appName, Issuer: "https://auth.example.com", PasswordPolicy: "low",
+	})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))
+	req = req.WithContext(reqctx.WithSettings(req.Context(),
+		&record.Settings{Id: 1, AppName: "Before", Issuer: "https://auth.example.com", PasswordPolicy: record.PasswordPolicyLow}))
+	rr := httptest.NewRecorder()
+	HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090").ServeHTTP(rr, req)
+	return rr
+}
+
+// An App name that is empty once trimmed is refused at the field with its own code, and nothing is
+// written: stored, it left page titles reading "Sign in – " and every authenticator enrolment
+// failing with a 500 (#646 decision 7). The database mock expects no call, so a write fails it.
+func TestHandleSettingsGeneralPut_RefusesABlankAppName(t *testing.T) {
+	for name, appName := range map[string]string{"empty": "", "spaces alone": "   \t "} {
+		t.Run(name, func(t *testing.T) {
+			rr := putSettingsGeneral(t, datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), appName)
+
+			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "handler.settings_general.app_name_required", code)
+			assert.Equal(t, "App name is required.", description)
+		})
+	}
+}
+
+// The App name is measured once trimmed, as the first start measures GOIABADA_APPNAME: 30
+// characters with spaces around them are accepted and stored trimmed, where the spaces used to count
+// against the 30; 31 once trimmed and an angle bracket keep their codes (#646 decision 3).
+func TestHandleSettingsGeneralPut_MeasuresTheAppNameTrimmed(t *testing.T) {
+	t.Run("30 characters inside surrounding space are stored trimmed", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		var saved *record.Settings
+		expectSettingsSave(database)
+		database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.Anything).
+			Run(func(args mock.Arguments) { saved = args.Get(2).(*record.Settings) }).Return(nil).Once()
+		auditLogger.On("Log", mock.Anything, audit.EventUpdatedGeneralSettings, mock.Anything).Return().Once()
+
+		rr := putSettingsGeneral(t, database, auditLogger, "  "+strings.Repeat("é", 30)+"\t")
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		require.NotNil(t, saved)
+		assert.Equal(t, strings.Repeat("é", 30), saved.AppName)
+	})
+
+	for name, refusal := range map[string]struct{ appName, code string }{
+		"31 characters inside surrounding space": {"  " + strings.Repeat("a", 31) + " ", "handler.settings_general.app_name_too_long"},
+		"an angle bracket":                       {"Acme <Corp>", "validator.settings.app_name_angle_brackets"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rr := putSettingsGeneral(t, datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), refusal.appName)
+
+			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			code, _ := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, refusal.code, code)
+		})
+	}
 }

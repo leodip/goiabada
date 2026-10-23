@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/issuerlength"
 )
 
@@ -66,14 +65,9 @@ func HandleSettingsGeneralPut(
 			return
 		}
 
-		// Validation: AppName
-		const appNameMaxLength = 30
-		if inputvalidation.TextLength(req.AppName) > appNameMaxLength {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsGeneralAppNameTooLong, map[string]any{"max": appNameMaxLength}))
-			return
-		}
-
-		if err := accountvalidation.ValidateNoAngleBrackets(req.AppName, i18n.ErrCodeSettingsAppNameAngleBrackets); err != nil {
+		// Validation: AppName, the rule the first start holds GOIABADA_APPNAME to (#646)
+		appName, err := accountvalidation.ValidateAppName(req.AppName)
+		if err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -94,7 +88,7 @@ func HandleSettingsGeneralPut(
 		}
 		// The rule accepts "<" in a path or a host, and the issuer is copied into the iss claim of
 		// every token this server signs (#275).
-		if err := accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
+		if err = accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -107,7 +101,6 @@ func HandleSettingsGeneralPut(
 		}
 
 		// Apply updates, onto the row as stored when the save runs (#407)
-		appName := strings.TrimSpace(req.AppName)
 		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
 			stored.AppName = appName
 			stored.Issuer = issuer

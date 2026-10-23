@@ -6067,6 +6067,14 @@ components:
       properties:
         appName:
           type: string
+          maxLength: 30
+          description: >-
+            The App name, required: surrounding spaces are removed, and it is stored that way. One
+            that is empty once they are is refused with 400
+            handler.settings_general.app_name_required, one longer than 30 characters once they
+            are with 400 handler.settings_general.app_name_too_long, and one holding < or > with
+            400 validator.settings.app_name_angle_brackets. The auth server's first start holds
+            GOIABADA_APPNAME to the same rule.
         issuer:
           type: string
           maxLength: 60

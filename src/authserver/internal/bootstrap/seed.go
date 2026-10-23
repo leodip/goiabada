@@ -84,10 +84,13 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 		return err
 	}
 
-	appName := r.cfg.AppName
+	appName := strings.TrimSpace(r.cfg.AppName)
 	if len(appName) == 0 {
 		appName = "Goiabada"
 		slog.WarnContext(ctx, "app name is not set, defaulting it", "app_name", appName)
+	}
+	if err := checkAppName(appName); err != nil {
+		return err
 	}
 
 	// Checked before anything is generated or written, so a refused password costs no key
@@ -437,6 +440,19 @@ func checkAdminEmail(email string) error {
 	if inputvalidation.TextLength(email) > accountvalidation.MaxEmailLength {
 		return errs.Errorf("GOIABADA_ADMIN_EMAIL cannot be the first administrator's email address: it is longer than %d characters",
 			accountvalidation.MaxEmailLength)
+	}
+	return nil
+}
+
+// checkAppName refuses an app name the general settings save would refuse, under the one rule both
+// apply, naming the variable it came from. Checked before anything is generated or written, so the
+// database stays empty for the next start, with the variable fixed; without it a name over 32
+// characters, or of spaces alone, seeded, and every authenticator enrolment then failed with a 500
+// until an administrator shortened it (#646 decision 3). appName is already trimmed and never
+// blank: an unset variable means the default.
+func checkAppName(appName string) error {
+	if _, err := accountvalidation.ValidateAppName(appName); err != nil {
+		return errs.Wrap(err, "GOIABADA_APPNAME cannot be the app name")
 	}
 	return nil
 }

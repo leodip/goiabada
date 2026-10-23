@@ -1694,6 +1694,7 @@
 "handler.account_logout.client_identifier_invalid" = "Invalid client identifier"
 "handler.account_logout.client_unresolved" = "Unable to resolve client from postLogoutRedirectUri; supply clientIdentifier."
 "handler.account_logout.post_logout_redirect_uri_not_registered" = "postLogoutRedirectUri is not registered for the client"
+"handler.settings_general.app_name_required" = "App name is required."
 "handler.settings_general.app_name_too_long" = "App name is too long. The maximum length is {{.max}} characters."
 "handler.settings_general.issuer_uri_invalid" = "Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL."
 "handler.settings_general.issuer_too_long" = "Issuer is too long. The maximum length is {{.max}} characters."
