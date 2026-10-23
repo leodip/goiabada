@@ -257,7 +257,7 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 		{
 			"email too long",
 			api.CreateUserAdminRequest{
-				Email:           "verylongemailaddressthatexceedsthemaximumlengthof60chars@test.com",
+				Email:           uniqueAddressOfLength(255),
 				GivenName:       "Test",
 				FamilyName:      "User",
 				SetPasswordType: "now",
@@ -284,6 +284,80 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
+		})
+	}
+}
+
+// TestAPIUserCreatePost_AddressLengths holds the new user's address to the limits every path that
+// sets one applies (#632): 254 characters in all, the longest SMTP carries (RFC 5321 section
+// 4.5.3.1.3), and 64 before the @ (section 4.5.3.1.1). An address within both is created and stored
+// as sent; one past either is refused and creates nothing.
+func TestAPIUserCreatePost_AddressLengths(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
+
+	create := func(t *testing.T, email string) (*http.Response, api.ErrorResponse, api.CreateUserResponse) {
+		t.Helper()
+		resp := makeAPIRequest(t, "POST", url, accessToken, api.CreateUserAdminRequest{
+			Email:           email,
+			GivenName:       "Long",
+			FamilyName:      "Address",
+			SetPasswordType: "now",
+			Password:        "password123",
+		})
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		var refusal api.ErrorResponse
+		var created api.CreateUserResponse
+		if resp.StatusCode == http.StatusCreated {
+			require.NoError(t, json.Unmarshal(body, &created))
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+		} else {
+			require.NoError(t, json.Unmarshal(body, &refusal), string(body))
+		}
+		return resp, refusal, created
+	}
+
+	for _, tc := range []struct {
+		name  string
+		email string
+	}{
+		{"254 characters", uniqueAddressOfLength(254)},
+		{"a local part of 64 characters", uniqueLocalPartOfLength(64) + "@example.com"},
+	} {
+		t.Run(tc.name+" is created", func(t *testing.T) {
+			resp, refusal, created := create(t, tc.email)
+
+			require.Equal(t, http.StatusCreated, resp.StatusCode, refusal.ErrorDescription)
+			assert.Equal(t, tc.email, created.User.Email)
+			stored, err := database.GetUserById(context.Background(), nil, created.User.Id)
+			require.NoError(t, err)
+			require.NotNil(t, stored)
+			assert.Equal(t, tc.email, stored.Email)
+		})
+	}
+
+	for _, tc := range []struct {
+		name        string
+		email       string
+		code        string
+		description string
+	}{
+		{"255 characters", uniqueAddressOfLength(255),
+			"EMAIL_TOO_LONG", "The email address cannot exceed a maximum length of 254 characters"},
+		{"a local part of 65 characters", uniqueLocalPartOfLength(65) + "@example.com",
+			"validator.email.invalid_format", "Please enter a valid email address."},
+	} {
+		t.Run(tc.name+" is refused", func(t *testing.T) {
+			resp, refusal, _ := create(t, tc.email)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Equal(t, tc.code, refusal.ErrorCode)
+			assert.Equal(t, tc.description, refusal.ErrorDescription)
+			stored, err := database.GetUserByEmail(context.Background(), nil, tc.email)
+			require.NoError(t, err)
+			assert.Nil(t, stored, "a refused address creates no user")
 		})
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -135,11 +134,6 @@ func HandleDeletePost(
 			return
 		}
 
-		if client.IsSystemLevelClient {
-			httpHelper.InternalServerError(w, r, errs.New("cannot delete system level client"))
-			return
-		}
-
 		// A refusal draws the page again from the view its first draw binds: the template reads the
 		// permissions, which the API's client alone does not carry (#562).
 		renderError := func(message string) {
@@ -152,6 +146,14 @@ func HandleDeletePost(
 			if renderErr != nil {
 				httpHelper.InternalServerError(w, r, renderErr)
 			}
+		}
+
+		// The page offers no delete of the admin console's own client, so only a hand-made request
+		// reaches this; it is refused first, before the identifier, as the resource page refuses
+		// the auth server's own resource (#632).
+		if client.IsSystemLevelClient {
+			renderError(i18n.T(r.Context(), "adminconsole.refusal.client_delete.system_level"))
+			return
 		}
 
 		clientIdentifier := r.FormValue("clientIdentifier")

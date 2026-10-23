@@ -70,6 +70,56 @@ func expectCeremonyMismatch(t *testing.T, pageRenderer *handlersmocks.PageRender
 		})).Return(nil).Once()
 }
 
+// holdingCeremony is the ceremony store as the auth server builds it, over an in-memory backend, with
+// held stored in a browser session as /auth/authorize stores it, and the cookies naming that session.
+// A case whose request is refused for the ceremony it names is driven through it, so the rule that
+// decides which ceremony a request names is the store's own (ceremony.RequestedId) and not a mock's.
+func holdingCeremony(t *testing.T, held *ceremony.AuthContext) (*ceremony.Store, []*http.Cookie) {
+	t.Helper()
+	ceremonyStore, _ := newRealCeremonyStore(t)
+	seed := httptest.NewRecorder()
+	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), held))
+	cookies := seed.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return ceremonyStore, cookies
+}
+
+// expectCeremonyMismatchOf is expectCeremonyMismatch with the audit event's details pinned to the
+// ceremony the browser most recently wrote, which is what the event records whatever the request
+// named (#246 decision 5).
+func expectCeremonyMismatchOf(t *testing.T, pageRenderer *handlersmocks.PageRenderer,
+	auditLogger *handlersmocks.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request,
+	latest *ceremony.AuthContext) {
+	t.Helper()
+
+	auditLogger.On("Log", mock.Anything, audit.EventAuthCeremonyMismatch,
+		mock.MatchedBy(func(details map[string]interface{}) bool {
+			userId, named := details["user_id"]
+			return details["client_identifier"] == latest.ClientId &&
+				details["auth_state"] == string(latest.AuthState) &&
+				named == (latest.UserId != 0) && (!named || userId == latest.UserId)
+		})).Return().Once()
+	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
+		mock.MatchedBy(func(data map[string]interface{}) bool {
+			return data["_httpStatus"] == http.StatusBadRequest &&
+				data["title"] == i18n.T(req.Context(), "auth_error.ceremony_mismatch.title") &&
+				data["error"] == i18n.T(req.Context(), "auth_error.ceremony_mismatch.message")
+		})).Return(nil).Once()
+}
+
+// assertStillHeld asserts that the browser session still holds want as it was, which is what a
+// refused request leaves it: the ceremony the user is working on in another tab, untouched.
+func assertStillHeld(t *testing.T, ceremonyStore *ceremony.Store, cookies []*http.Cookie, want *ceremony.AuthContext) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/auth/level1", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	held, err := ceremonyStore.LatestAuthContext(req)
+	require.NoError(t, err)
+	assert.Equal(t, want, held)
+}
+
 // expectCeremonyNoLongerActive sets the one call renderCeremonyNoLongerActive makes, and asserts it
 // is the ceremony mismatch pair at 400. It sets no audit expectation: /auth/completed answers a stale
 // bind with this page and records no ceremony mismatch, because the request named its ceremony
@@ -91,8 +141,8 @@ func expectCeremonyNoLongerActive(t *testing.T, pageRenderer *handlersmocks.Page
 // eleven sites answered before #279 decision 21 and /auth/level1completed until #436.
 //
 // It asserts the state_mismatch pair specifically and not merely "some title": the ceremony
-// mismatch page beside it says another sign-in was started in this browser, which is not what the
-// Back button did, and a helper that accepted either would let the two pages be confused.
+// mismatch page beside it says the sign-in can no longer continue, which is not what the Back button
+// did, and a helper that accepted either would let the two pages be confused.
 func expectAuthStateMismatch(t *testing.T, pageRenderer *handlersmocks.PageRenderer,
 	rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
@@ -103,80 +153,6 @@ func expectAuthStateMismatch(t *testing.T, pageRenderer *handlersmocks.PageRende
 				data["title"] == i18n.T(req.Context(), "auth_error.state_mismatch.title") &&
 				data["error"] == i18n.T(req.Context(), "auth_error.state_mismatch.message")
 		})).Return(nil).Once()
-}
-
-// The whole comparison table for the ceremony binding. The function is pure, so the table costs
-// nothing and every caller then needs only one accept and one reject (#79 seam 3).
-func TestCeremonyMatches(t *testing.T) {
-	const stored = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
-
-	testCases := []struct {
-		name      string
-		stored    string
-		submitted string
-		want      bool
-	}{
-		{
-			name:      "Equal ids",
-			stored:    stored,
-			submitted: stored,
-			want:      true,
-		},
-		{
-			name:      "Different ids of the same length",
-			stored:    stored,
-			submitted: "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa",
-			want:      false,
-		},
-		{
-			// The upgrade case. An auth context written before #79 carries no id, and matching
-			// "" against "" would make it accept a form naming no ceremony at all.
-			name:      "Empty stored id against an empty submission",
-			stored:    "",
-			submitted: "",
-			want:      false,
-		},
-		{
-			name:      "Empty stored id against a real submission",
-			stored:    "",
-			submitted: stored,
-			want:      false,
-		},
-		{
-			// What an absent form field looks like: r.PostFormValue answers "".
-			name:      "Real stored id against an absent field",
-			stored:    stored,
-			submitted: "",
-			want:      false,
-		},
-		{
-			name:      "Near miss, one byte differs",
-			stored:    stored,
-			submitted: "aBcDeFgHiJkLmNoPqRsTuVwXyZ012346",
-			want:      false,
-		},
-		{
-			// A prefix must not match, which is the family of defect #79 is about: the
-			// consent selection granted a scope because "consent1" was a prefix of
-			// "consent10".
-			name:      "Near miss, the submission is a prefix of the stored id",
-			stored:    stored,
-			submitted: stored[:len(stored)-1],
-			want:      false,
-		},
-		{
-			name:      "Near miss, the submission extends the stored id",
-			stored:    stored,
-			submitted: stored + "x",
-			want:      false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, ceremonyMatches(tc.stored, tc.submitted))
-		})
-	}
 }
 
 // stateMismatchPageRenderer is a real render.Renderer over the two templates the state-mismatch page
@@ -250,7 +226,7 @@ func TestRequireAuthState(t *testing.T) {
 		body := rr.Body.String()
 		assert.Contains(t, body, i18n.T(req.Context(), "auth_error.state_mismatch.title"))
 		assert.Contains(t, body, i18n.T(req.Context(), "auth_error.state_mismatch.message"))
-		// The page beside it, which says a different thing: another sign-in was started here.
+		// The page beside it, which says a different thing: the sign-in can no longer continue.
 		assert.NotContains(t, body, i18n.T(req.Context(), "auth_error.ceremony_mismatch.message"))
 		// Untouched: the state belongs to the step the user is actually on.
 		assert.Equal(t, ceremony.AuthStateLevel1PasswordCompleted, authContext.AuthState)
@@ -389,6 +365,49 @@ func TestLoadAuthContext(t *testing.T) {
 	})
 }
 
+// The arm the store answers with a ceremony held but not named: the loader reads the ceremony the
+// browser most recently wrote for the audit event, and answers the 400 page. A read of it that fails
+// is a 500, and nothing is audited.
+func TestLoadAuthContext_ACeremonyNotNamed(t *testing.T) {
+	t.Run("audits the most recently written ceremony and answers 400", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		rr := httptest.NewRecorder()
+		req := renderableRequest("/auth/level2?ceremony=" + testCeremonyId)
+
+		latest := &ceremony.AuthContext{
+			CeremonyId: "another-ceremony", ClientId: "latest-client", AuthState: ceremony.AuthStateRequiresConsent, UserId: 7,
+		}
+		ceremonyStore.On("GetAuthContext", req).Return(nil, errs.WithStack(ceremony.ErrCeremonyNotHeld)).Once()
+		ceremonyStore.On("LatestAuthContext", req).Return(latest, nil).Once()
+		expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, latest)
+
+		authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
+
+		assert.False(t, ok)
+		assert.Nil(t, authContext)
+		assert.Empty(t, rr.Header().Get("Location"), "a browser holding a ceremony is not sent to the account page")
+	})
+
+	t.Run("a failed read of the latest ceremony is a 500, audited nowhere", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		rr := httptest.NewRecorder()
+		req := renderableRequest("/auth/level2?ceremony=" + testCeremonyId)
+
+		ceremonyStore.On("GetAuthContext", req).Return(nil, ceremony.ErrCeremonyNotHeld).Once()
+		ceremonyStore.On("LatestAuthContext", req).Return(nil, assert.AnError).Once()
+		pageRenderer.On("InternalServerError", rr, req, assert.AnError).Return().Once()
+
+		authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
+
+		assert.False(t, ok)
+		assert.Nil(t, authContext)
+	})
+}
+
 // stepRequestFor builds the request a browser sends to a step: a GET naming the ceremony in the URL
 // when idInQuery is set, or a POST carrying it in the body when idInForm is set, and in the URL when
 // idInQuery is. Anything a case leaves unset is absent from the request.
@@ -400,7 +419,7 @@ func stepRequestFor(method string, target string, idInQuery string, idInForm str
 	if method == http.MethodPost {
 		form := url.Values{}
 		if idInForm != "" {
-			form.Set(ceremonyIdField, idInForm)
+			form.Set(ceremony.IdField, idInForm)
 		}
 		req = httptest.NewRequest(method, target, strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -410,11 +429,12 @@ func stepRequestFor(method string, target string, idInQuery string, idInForm str
 	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
-// The comparison every gated route now makes in the loader, once, for a page load and for a
-// submission (#246 decision 22, #437 seam 4). Each case varies one thing from a passing case and
-// names the gate that refuses it. A refusal is the 400 page and the audit event, and it never
-// touches the stored context: the ceremony that is current is the one the user is working on in
-// another tab.
+// The comparison every gated route makes in the loader, once, for a page load and for a submission
+// (#246 decision 22, #437 seam 4), over the real ceremony store, whose read of the ceremony a request
+// names is the rule. Each case varies one thing from a passing case and names the gate that refuses
+// it. A refusal is the 400 page and the audit event recording the ceremony the browser most recently
+// wrote, and it never touches the stored context: the ceremony that is current is the one the user is
+// working on in another tab.
 func TestLoadAuthContext_CeremonyId(t *testing.T) {
 	const otherId = "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa"
 
@@ -460,32 +480,31 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
-			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			rr := httptest.NewRecorder()
-			req := stepRequestFor(tc.method, "/auth/pwd", tc.inQuery, tc.inForm)
 
 			stored := &ceremony.AuthContext{
 				CeremonyId: tc.stored, ClientId: "test-client", AuthState: ceremony.AuthStateLevel1Password,
 			}
-			ceremonyStore.On("GetAuthContext", req).Return(stored, nil).Once()
+			ceremonyStore, cookies := holdingCeremony(t, stored)
+			req := withCookies(stepRequestFor(tc.method, "/auth/pwd", tc.inQuery, tc.inForm), cookies)
 			if !tc.accept {
-				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
+				expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, stored)
 			}
 
 			authContext, ok := testCeremonyBoundary(pageRenderer, ceremonyStore, auditLogger).loadAuthContext(rr, req)
 
 			assert.Equal(t, tc.accept, ok)
 			if tc.accept {
-				assert.Same(t, stored, authContext)
+				assert.Equal(t, stored, authContext)
 			} else {
 				assert.Nil(t, authContext)
 				// The refusal is the page, so no redirect, and the stored context is not touched:
-				// nothing was saved or cleared, which the strict mock would report as an unexpected
-				// call, and its state is what the other tab left it in.
+				// its state is what the other tab left it in.
 				assert.Empty(t, rr.Header().Get("Location"))
-				assert.Equal(t, ceremony.AuthStateLevel1Password, stored.AuthState)
+				assert.Empty(t, rr.Result().Cookies(), "a refusal writes nothing to the browser session")
 			}
+			assertStillHeld(t, ceremonyStore, cookies, stored)
 		})
 	}
 
@@ -510,44 +529,6 @@ func TestLoadAuthContext_CeremonyId(t *testing.T) {
 				assert.Equal(t, testAdminConsoleBaseURL+"/account/profile", rr.Header().Get("Location"))
 			})
 		}
-	})
-}
-
-// submittedCeremonyId is a pure function of the request's method and its two sources, so its table
-// pins which source counts for which method and nothing else (#437 seam 1).
-func TestSubmittedCeremonyId(t *testing.T) {
-	testCases := []struct {
-		name    string
-		method  string
-		inQuery string
-		inForm  string
-		want    string
-	}{
-		{"a GET reads the URL's parameter", http.MethodGet, "from-the-url", "", "from-the-url"},
-		{"a GET with no parameter names nothing", http.MethodGet, "", "", ""},
-		{"a POST reads the body's field", http.MethodPost, "", "from-the-form", "from-the-form"},
-		{"a POST ignores the URL's parameter", http.MethodPost, "from-the-url", "", ""},
-		{"a POST prefers nothing from the URL over the body", http.MethodPost, "from-the-url", "from-the-form", "from-the-form"},
-		// Any method that is not a POST reads the URL, so a HEAD asking for a step is judged as the GET is.
-		{"a HEAD reads the URL's parameter", http.MethodHead, "from-the-url", "", "from-the-url"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			req := stepRequestFor(tc.method, "/auth/pwd", tc.inQuery, tc.inForm)
-			assert.Equal(t, tc.want, submittedCeremonyId(req))
-		})
-	}
-
-	t.Run("the form field's name in the URL is not the URL's parameter", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/auth/pwd?"+ceremonyIdField+"="+testCeremonyId, nil)
-		assert.Empty(t, submittedCeremonyId(req),
-			"the two names differ on purpose, so a URL can never be spelled as the field")
-	})
-
-	t.Run("a repeated parameter reads the first copy", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony=first&ceremony=second", nil)
-		assert.Equal(t, "first", submittedCeremonyId(req))
 	})
 }
 

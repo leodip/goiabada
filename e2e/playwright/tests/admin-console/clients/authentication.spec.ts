@@ -103,3 +103,28 @@ test("making a client public asks first, and Cancel keeps it confidential with i
   expect(await readClientSecret(page, client.id)).toBe(secret);
   await expect(page.getByRole("radio", { name: "Confidential", exact: true })).toBeChecked();
 });
+
+test("a save made by hand with a client type that is neither is refused, the client kept as it was", async ({ page, clients }) => {
+  const client = await clients.create();
+  const secret = await readClientSecret(page, client.id);
+
+  // The page's radios always send public or confidential, so the form is posted by hand, past the
+  // confirmation the page asks, with a type that is neither and a secret typed beside it.
+  await page.locator("form.panel").evaluate((form: HTMLFormElement) => {
+    for (const radio of form.querySelectorAll<HTMLInputElement>('input[name="publicConfidential"]')) radio.value = "neither";
+    form.querySelector<HTMLInputElement>("#clientSecret")!.value = "a-secret-typed-by-hand";
+    HTMLFormElement.prototype.submit.call(form);
+  });
+  await expect(page).toHaveURL(clientUrl(client.id, "authentication"));
+  await expect(page.locator("#authentication-error")).toHaveText("Choose the client type: public or confidential.");
+  await expect(page.locator("#authentication-error")).toHaveAttribute("role", "alert");
+  await expect(page.getByText(saved)).toHaveCount(0);
+  // The tab is drawn as stored, and the refusal marks no field.
+  await expect(page.getByRole("radio", { name: "Confidential", exact: true })).toBeChecked();
+  await expect(page.locator("#clientSecret")).toHaveValue(secret);
+  await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
+
+  expect(await readClientSecret(page, client.id)).toBe(secret);
+  await page.goto(`${env.adminUrl}/admin/clients`);
+  await expect(clientRow(page, client.identifier).getByRole("cell", { name: "Confidential", exact: true })).toBeVisible();
+});

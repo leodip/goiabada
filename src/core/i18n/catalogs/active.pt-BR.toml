@@ -131,7 +131,7 @@
 
 "auth_error.page_title" = "Erro"
 "auth_error.ceremony_mismatch.title" = "Esta solicitação não está mais ativa"
-"auth_error.ceremony_mismatch.message" = "Esta página pertence a uma solicitação de acesso que não é mais a que está em andamento. Outra foi iniciada neste navegador, portanto esta não pode mais continuar. Volte para o aplicativo em que você estava entrando e comece de novo."
+"auth_error.ceremony_mismatch.message" = "Esta página pertence a um acesso que não pode mais continuar. Ele pode já ter sido concluído, ou um acesso ou uma saída posterior neste navegador o encerrou. Volte para o aplicativo em que você estava entrando e comece de novo."
 "auth_error.state_mismatch.title" = "Esta etapa não está mais disponível"
 "auth_error.state_mismatch.message" = "Esta página pertence a uma etapa do acesso pela qual você já passou, portanto não pode mais ser usada. Voltar no navegador leva a uma página que o servidor já concluiu. Volte para o aplicativo em que você estava entrando e comece de novo."
 "auth_error.otp_changed.title" = "Suas configurações de dois fatores mudaram"
@@ -354,7 +354,9 @@
 "adminconsole.refusal.concurrent_update" = "Este item foi alterado depois que a página foi carregada. Recarregue a página e tente novamente."
 "adminconsole.refusal.invalid_request_body" = "O corpo da requisição não é um JSON válido, ou não contém informações que este endpoint exige."
 "adminconsole.refusal.account_email.confirmation_mismatch" = "Os endereços de e-mail não conferem."
+"adminconsole.refusal.client_authentication.type_required" = "Escolha o tipo de cliente: público ou confidencial."
 "adminconsole.refusal.client_delete.identifier_mismatch" = "Esse não é o identificador deste cliente. Digite-o como aparece acima."
+"adminconsole.refusal.client_delete.system_level" = "Este é o cliente do próprio console de administração, então não pode ser excluído."
 "adminconsole.refusal.client_tokens.token_expiration_invalid" = "Informe a duração do token como um número inteiro de segundos."
 "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid" = "Informe o tempo ocioso offline como um número inteiro de segundos."
 "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid" = "Informe a duração máxima offline como um número inteiro de segundos."

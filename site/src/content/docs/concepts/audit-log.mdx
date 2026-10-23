@@ -110,7 +110,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
-| `auth_state` | The step the browser's sign-in was on when a page from another sign-in, or from none, was refused. |
+| `auth_state` | The step of the sign-in the browser most recently moved, when a page of a sign-in it no longer holds, or of none, was refused. |
 | `ceiling` | Which rule refused an administrator change: `grant`, `target` or `settings`. |
 | `change` | `granted` or `revoked`. |
 | `checkpoint` | Where an administrative scope was refused: `authorize`, `issue`, or the token endpoint's `authorization_code`, `refresh_token` or `password` grant. |
@@ -222,7 +222,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `otp_authenticator_disabled` | A user's authenticator was disabled at sign-in, because 100 codes in a row were refused. Written once, beside that 100th refusal's `auth_failed_otp`. |
 | `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |
 | `rate_limit_exceeded` | A rate limiter started refusing requests from an IP address block, for an email address or for a user. Each instance writes it at most once per key per window. |
-| `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser had since replaced, or named none. |
+| `auth_ceremony_mismatch` | A sign-in step was refused because its page belonged to a sign-in the browser no longer holds, or named none. Its details describe the sign-in the browser most recently moved. |
 | `started_new_user_session` | A user signed in and a new session was created for them. |
 | `bumped_user_session` | A user's existing session was reused and kept alive, by single sign-on, a `prompt=none` request or a refresh token grant. |
 | `cross_user_session_replaced` | A user signed in on a browser that still held another user's session, so that session was ended. |

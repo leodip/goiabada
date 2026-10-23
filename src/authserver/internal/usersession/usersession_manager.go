@@ -103,7 +103,7 @@ type Authentication struct {
 // sign-ins the session should describe. The instants do: a ceremony whose credential predates the
 // session's current auth_time, or whose adopted session holds neither the auth_time it adopted nor
 // the ceremony's own, writes nothing -- not its level, not its methods, not its auth_time -- and
-// /auth/completed answers it as a ceremony the browser has replaced.
+// /auth/completed answers it with the "no longer active" page.
 var ErrStaleAuthentication = errors.New("a newer authentication has already reached this session")
 
 // SessionLimits is what the settings bound a user's sessions to when a sign-in starts a new one. The

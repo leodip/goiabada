@@ -203,7 +203,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 			form := url.Values{}
 			form.Add("btnSubmit", "submit")
-			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add(ceremony.IdField, testCeremonyId)
 			form.Add("consent0", "on")
 			req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 			req = withSettings(req, &record.Settings{})
@@ -251,7 +251,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "on")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})

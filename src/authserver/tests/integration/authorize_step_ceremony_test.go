@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Every step of a sign-in names the sign-in it belongs to, and a request that names another one, or
-// none, is answered with the "no longer active" page. A browser holds ONE auth context, so a second
-// /auth/authorize replaces the first; before this a page load acted on whatever context the browser
-// held, and a tab of the replaced sign-in that reached its next step finished the other application's
-// authorization (#246 decision 22). What is asserted here is what a user sees, over HTTP against the
-// running server.
+// Every step of a sign-in names the sign-in it belongs to, and a request that names one the browser
+// does not hold, or none, is answered with the "no longer active" page. A browser holds up to five
+// sign-ins side by side, and a sixth pushes out the one least recently moved; before the steps named
+// their sign-in, a page load acted on whatever context the browser held, and a tab of a sign-in the
+// browser no longer held that reached its next step finished another application's authorization
+// (#246). What is asserted here is what a user sees, over HTTP against the running server.
 
 // assertCeremonyNoLongerActive asserts the page a request naming the wrong ceremony is answered with:
 // 400, no redirect, and the ceremony mismatch text rather than the state mismatch one, which says a
@@ -29,10 +29,11 @@ func assertCeremonyNoLongerActive(t *testing.T, resp *http.Response, what string
 
 	body := parseHTMLResponse(t, resp).Text()
 	assert.Contains(t, body, "This request is no longer active", what)
-	assert.Contains(t, body, "so this one can no longer continue",
-		"%s: the message reads for a page load as well as for a form", what)
-	assert.NotContains(t, body, "so this form can no longer be submitted",
-		"%s: the message no longer says only forms are refused", what)
+	assert.Contains(t, body, "This page belongs to a sign-in that can no longer continue.", what)
+	assert.Contains(t, body, "It may have finished already, or a later sign-in or sign-out in this browser ended it.",
+		"%s: the message names what ends a sign-in, not only a newer one", what)
+	assert.NotContains(t, body, "Another one was started in this browser",
+		"%s: the message no longer blames a new sign-in", what)
 }
 
 // walkToPasswordPage starts one authorization request on the caller's browser and follows it to its
@@ -53,11 +54,11 @@ func walkToPasswordPage(t *testing.T, httpClient *http.Client, client *record.Cl
 	return pwdLocation, loadPage(t, httpClient, pwdLocation)
 }
 
-// TestAuthorize_APageOfAReplacedSignInIsRefusedAtItsNextStep is the defect end to end for a page
-// load rather than a form. Tab A's sign-in is replaced by tab B's in the same browser, and tab A then
-// loads a step. It gets the page, and B's sign-in, the one that is actually current, is untouched and
-// finishes in its own tab.
-func TestAuthorize_APageOfAReplacedSignInIsRefusedAtItsNextStep(t *testing.T) {
+// TestAuthorize_APageOfASignInPushedOutByFiveNewerIsRefusedAtItsNextStep: tab A is at its login
+// screen when five other sign-ins start in the same browser, which pushes A's out (#246 decision
+// 2). Tab A then loads a step and gets the "no longer active" page, and the five newer sign-ins are
+// untouched: the first of them, the one least recently moved now, still finishes.
+func TestAuthorize_APageOfASignInPushedOutByFiveNewerIsRefusedAtItsNextStep(t *testing.T) {
 	clientA, redirectUriA := createConsentClient(t)
 	clientB, redirectUriB := createLevel1Client(t, false)
 	user, password := createCeremonyUser(t)
@@ -73,19 +74,31 @@ func TestAuthorize_APageOfAReplacedSignInIsRefusedAtItsNextStep(t *testing.T) {
 	defer func() { _ = pwdPageB.Body.Close() }()
 	assert.Equal(t, http.StatusOK, pwdPageB.StatusCode)
 
-	// Tab A reloads its own login screen. It names A's ceremony, the browser now holds B's.
+	// With four more sign-ins, A's is the sixth from the latest.
+	for i := 0; i < 4; i++ {
+		_, page := walkToPasswordPage(t, httpClient, clientB, redirectUriB, fake.LetterN(8))
+		_ = page.Body.Close()
+	}
+
+	// Tab A reloads its own login screen. It names A's ceremony, which the browser no longer holds.
 	reload := loadPage(t, httpClient, pwdUrlA)
 	defer func() { _ = reload.Body.Close() }()
-	assertCeremonyNoLongerActive(t, reload, "a page load of the replaced sign-in")
+	assertCeremonyNoLongerActive(t, reload, "a page load of the pushed-out sign-in")
 
 	// And it does not get to the step after either, which is the load a tab that followed a redirect
 	// makes. Reached by the URL it would have been sent to, naming its own ceremony.
 	next := loadPage(t, httpClient, stepURLOfTheSameCeremony(t, pwdUrlA, "/auth/level1completed"))
 	defer func() { _ = next.Body.Close() }()
-	assertCeremonyNoLongerActive(t, next, "the step after the login of the replaced sign-in")
+	assertCeremonyNoLongerActive(t, next, "the step after the login of the pushed-out sign-in")
+
+	// Nor does its form, submitted with the right password.
+	submitted := authenticateWithPassword(t, httpClient, pwdUrlA, pwdPageA, user.Email, password)
+	defer func() { _ = submitted.Body.Close() }()
+	assertCeremonyNoLongerActive(t, submitted, "the login form of the pushed-out sign-in")
 	assertNothingWasCompleted(t, user.Id)
 
-	// B's sign-in was not disturbed by any of it: its own screen signs in and receives its code.
+	// B's sign-in, the oldest of the five newer ones, was not disturbed by any of it: its own screen
+	// signs in and receives its code.
 	resp := authenticateWithPassword(t, httpClient, pwdUrlB, pwdPageB, user.Email, password)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -97,13 +110,42 @@ func TestAuthorize_APageOfAReplacedSignInIsRefusedAtItsNextStep(t *testing.T) {
 	resp = loadPage(t, httpClient, location)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	location = assertRedirect(t, resp, "/auth/issue")
-	resp = loadPage(t, httpClient, location)
-	defer func() { _ = resp.Body.Close() }()
+	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
+}
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
-	assert.Equal(t, stateB, stateVal, "the code belongs to the sign-in that is current, and to no other")
-	assert.Equal(t, clientB.ClientIdentifier, loadCodeFromDatabase(t, codeVal).Client.ClientIdentifier)
+// TestAuthorize_AStepOfASignInHeldBesideANewerOneFinishes: tab A's sign-in is at its login screen
+// when tab B's starts in the same browser. Tab A reloads its screen, signs in and receives its own
+// code: a newer sign-in no longer ends one in progress (#246).
+func TestAuthorize_AStepOfASignInHeldBesideANewerOneFinishes(t *testing.T) {
+	clientA, redirectUriA := createLevel1Client(t, false)
+	clientB, redirectUriB := createLevel1Client(t, false)
+	user, password := createCeremonyUser(t)
+
+	httpClient := createHttpClient(t)
+
+	stateA := fake.LetterN(8)
+	pwdUrlA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectUriA, stateA)
+	_ = pwdPageA.Body.Close()
+
+	_, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectUriB, fake.LetterN(8))
+	_ = pwdPageB.Body.Close()
+
+	reload := loadPage(t, httpClient, pwdUrlA)
+	defer func() { _ = reload.Body.Close() }()
+	require.Equal(t, http.StatusOK, reload.StatusCode, "tab A's own login screen still loads")
+
+	resp := authenticateWithPassword(t, httpClient, pwdUrlA, reload, user.Email, password)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	location := assertRedirect(t, resp, "/auth/level1completed")
+	resp = loadPage(t, httpClient, location)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	location = assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, location)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientA, redirectUriA, stateA)
 }
 
 // TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused is every way a step's URL can fail to name

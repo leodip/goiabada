@@ -488,7 +488,7 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 	}
 }
 
-// A malformed address, or one over 60 characters, redraws the form at once, as it always has, and
+// A malformed address, or one over 254 characters, redraws the form at once, as it always has, and
 // is recorded as invalid_address with the digest of the address as submitted, lowercased and
 // trimmed. It looks nothing up and leaves nothing for after the response (#207 decisions 8 and 11).
 func TestHandleRegisterPost_WithVerificationAnInvalidAddressIsRecordedAndRedrawn(t *testing.T) {
@@ -505,11 +505,11 @@ func TestHandleRegisterPost_WithVerificationAnInvalidAddressIsRecordedAndRedrawn
 		{name: "a malformed address", submitted: " Not-An-Address ", normalized: "not-an-address",
 			validator: i18n.NewLocalizedError(i18n.ErrCodeEmailInvalidFormat, nil),
 			wantError: "Please enter a valid email address.", wantDigest: notAnAddressDigest},
-		{name: "an address over 60 characters",
-			submitted:  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com",
-			normalized: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@example.com",
-			wantError:  "The email address cannot exceed a maximum length of 60 characters.",
-			wantDigest: "668eb6ae99d19dca4cd41e4c10b4d123ad2eecd27fb6a483c1c23a5af15240a4"},
+		{name: "an address over 254 characters",
+			submitted:  registerAddressOfLength(255),
+			normalized: registerAddressOfLength(255),
+			wantError:  "The email address cannot exceed a maximum length of 254 characters.",
+			wantDigest: "3606e74ec8034d527de22f538ddb36919bbfc37b1c8ca22bdd731d8e754f5251"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newRegisterHarness(t)

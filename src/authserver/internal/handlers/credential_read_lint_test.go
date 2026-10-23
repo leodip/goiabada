@@ -94,8 +94,10 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		// The form-binding markers, read through their constants rather than a literal.
 		// They authorize nothing alone, but a marker supplied by a URL is not a submission,
 		// and reading one from a URL reintroduces the shape #201 removed from the reset
-		// link one indirection later.
-		"ceremonyIdField",
+		// link one indirection later. The ceremony's is read in its own package, by
+		// ceremony.RequestedId, and is listed under both the names a read could spell it with.
+		"IdField",
+		"ceremony.IdField",
 		"continuationIdField",
 	}
 

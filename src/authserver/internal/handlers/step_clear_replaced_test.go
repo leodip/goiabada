@@ -134,9 +134,10 @@ func (b *lastComparisonBackend) UpdateIfUnchanged(ctx context.Context, id string
 }
 
 // The shared error answer over the real ceremony store, when the clear loses its first two
-// comparisons to unrelated writes of the browser and its last to another tab's /auth/authorize. It
-// is the same replaced ceremony as on a first attempt, and answered the same: the page, with
-// neither the error nor its state sent to the client, and ceremony B kept. Read as a clear that ran
+// comparisons to unrelated writes of the browser and its last to five other tabs' /auth/authorize,
+// which push its ceremony out. It is the same replaced ceremony as on a first attempt, and answered
+// the same: the page, with neither the error nor its state sent to the client, and the five newer
+// ceremonies kept. Read as a clear that ran
 // out of attempts, it answered server_error by redirect (#579 decision 2).
 func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLongerActive(t *testing.T) {
 	backend := &lastComparisonBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
@@ -151,7 +152,7 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 	ceremonyStore := ceremony.NewStore(conditional, stepSaveSessionName)
 
 	seed := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.ReplaceAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
+	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
 		&ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateRequiresConsent}))
 	cookies := seed.Result().Cookies()
 	req := withCookies(httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil), cookies)
@@ -159,12 +160,22 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 	require.NoError(t, err)
 
 	comparisons := 0
+	newer := []string{"newer-1", "newer-2", "newer-3", "newer-4", "newer-5"}
+	pushing := false
 	backend.beforeConditional = func() {
+		if pushing {
+			// The newer tabs' own adds are conditional writes too, and land as they come.
+			return
+		}
 		comparisons++
 		other := withCookies(httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), cookies)
 		if comparisons == 3 {
-			require.NoError(t, ceremonyStore.ReplaceAuthContext(httptest.NewRecorder(), other,
-				&ceremony.AuthContext{CeremonyId: "ceremony-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+			pushing = true
+			for _, id := range newer {
+				require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), other,
+					&ceremony.AuthContext{CeremonyId: id, AuthState: ceremony.AuthStateRequiresLevel1}))
+			}
+			pushing = false
 			return
 		}
 		sess, getErr := store.Get(other, stepSaveSessionName)
@@ -187,9 +198,10 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 	assertAnsweredNoLongerActive(t, rr)
 	assertReplacedAnsweredAtWarn(t, logged)
 	assert.Empty(t, rr.Result().Cookies())
-	stored, err := ceremonyStore.GetAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
-	require.NoError(t, err)
-	assert.Equal(t, "ceremony-b", stored.CeremonyId)
+	for _, id := range newer {
+		_, err := heldCeremony(ceremonyStore, cookies, id)
+		require.NoError(t, err, "the newer ceremony %s is kept", id)
+	}
 	pageRenderer.AssertExpectations(t)
 }
 
@@ -305,7 +317,7 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	require.NoError(t, err)
 
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")

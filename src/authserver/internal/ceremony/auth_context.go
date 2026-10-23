@@ -110,12 +110,14 @@ type AuthContext struct {
 	// only when this field carries no usable key makes that GET idempotent (#242 part 3).
 	//
 	// The binding to the ceremony is structural rather than compared, which is the second
-	// half of it: a second /auth/authorize mints a new auth context and takes the old key
-	// with it, so there is no shared slot for one ceremony's seed to be read out of by
-	// another and no ceremony id to check it against. ClearAuthContext at /auth/issue removes
-	// it, and RecordOTPVerified blanks it once the enrolment has succeeded, so a spent
-	// credential neither travels through the rest of the ceremony nor sits in the cookie of
-	// one abandoned after enrolling (#247).
+	// half of it: each /auth/authorize mints its own auth context, carrying its own key or
+	// none, so there is no shared slot for one ceremony's seed to be read out of by another
+	// and no ceremony id to check it against. ClearAuthContext at /auth/issue removes it, and
+	// RecordOTPVerified blanks it once the enrolment has succeeded, so a spent credential
+	// neither travels through the rest of the ceremony nor sits in the session of one
+	// abandoned after enrolling (#247). An enrolment abandoned before that ends with the
+	// ceremony: pushed out by newer ones, removed by the rotation of another user's sign-in
+	// in the same browser (Store), or gone with the browser session (#246).
 	//
 	// Absent from a context written by an older binary it unmarshals as "", which reads as
 	// "this ceremony has generated nothing" and makes the next render generate. So does a
@@ -124,23 +126,23 @@ type AuthContext struct {
 	// seed they can no longer prove they were shown is accepted.
 	OTPKeyURL string
 	// CeremonyId names this authorization ceremony, so a form this ceremony rendered, or a step
-	// it redirected to, can say which ceremony it belongs to and be refused once the browser's
-	// single auth context slot holds another one.
+	// it redirected to, can say which ceremony it belongs to, and is read as that ceremony and no
+	// other of the ones the browser holds.
 	//
-	// A browser holds ONE auth context, so a second /auth/authorize replaces it while every
-	// form already on screen still posts to the same URL. No rule about WRITING the context
-	// can bind a page that is already rendered, which is why the page has to carry the id and
-	// the POST has to check it: without that, a consent screen naming client A resolves its
-	// checkbox indices against client B's scope list, and a password submitted at A's screen
-	// finishes B's authorization outright (#79, the shape #112 records for emailed links). A
-	// page load is bound the same way: every redirect between steps carries the id in the URL
-	// (QueryParameter) and loadAuthContext compares it before anything else, so a tab of a
-	// replaced sign-in that reaches its next step gets the "no longer active" page instead of
-	// acting on the newer one (#246, #437).
+	// A browser holds several auth contexts side by side (Store, MaxHeldCeremonies), while every
+	// form on screen posts to the same URL. No rule about WRITING the context can bind a page
+	// that is already rendered, which is why the page has to carry the id and the POST has to
+	// look it up: without that, a consent screen naming client A resolves its checkbox indices
+	// against client B's scope list, and a password submitted at A's screen finishes B's
+	// authorization outright (#79, the shape #112 records for emailed links). A page load is
+	// bound the same way: every redirect between steps carries the id in the URL
+	// (QueryParameter) and loadAuthContext reads that ceremony before anything else, so each
+	// sign-in's tab moves its own sign-in, and one the browser no longer holds, finished or
+	// pushed out, gets the "no longer active" page instead of acting on another (#246, #437).
 	//
 	// Generated only in authflow.Authorization.Run, through NewId, the sole creation site, so no other
 	// path can mint one. Absent from a context written by an older binary it unmarshals as "", which
-	// ceremonyMatches refuses rather than matching against an empty submission: a user mid-flow
+	// idMatches refuses rather than matching against an empty submission: a user mid-flow
 	// across a deploy is refused once and restarts the authorization, bounded by the session
 	// cookie's life. That is the fail-closed direction.
 	CeremonyId string

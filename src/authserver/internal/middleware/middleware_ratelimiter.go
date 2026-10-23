@@ -24,7 +24,8 @@ import (
 	"github.com/leodip/goiabada/core/metrics"
 )
 
-// authContextGetter reads the ceremony a browser is in, whose user keys the OTP budget.
+// authContextGetter reads the ceremony a request names (ceremony.RequestedId), whose user keys the OTP
+// budget: the ceremony the step boundary loads, and so the one whose code the step checks.
 //
 // The limiter's three ports are unexported, like every other port in this module: the handler
 // helper, the renderer and the audit logger satisfy them structurally, and nothing outside this
@@ -129,7 +130,7 @@ const (
 	// countedByIPAndAccount is an account as seen from one client block, as
 	// accountNetworkRateLimitKey draws it.
 	countedByIPAndAccount
-	// countedBySigningInUser is the user of the sign-in ceremony the browser is in, whom the
+	// countedBySigningInUser is the user of the sign-in ceremony the request names, whom the
 	// ceremony has already authenticated with a password.
 	countedBySigningInUser
 	// countedByTokenUser is the subject of the access token the API authentication middleware
@@ -863,13 +864,19 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 	})
 }
 
-// LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the browser is in:
+// LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the submitted form names:
 // the user the ceremony has already authenticated with a password. Single tier, unlike the
 // password gate: reaching the OTP form at all requires having already passed the password, so a
 // third party cannot spend this budget without already holding the account's password.
 //
-// No readable auth context means no user to key a bucket on, and the handler rejects that
-// request before reaching the OTP secret or the database.
+// The ceremony is read through the store's one rule for which ceremony a request names
+// (ceremony.RequestedId), the rule the step boundary loads the step's ceremony by, so the budget a
+// submission spends belongs to the user whose code the step checks (#246). Reading the form here
+// leaves it parsed for the handler.
+//
+// No readable auth context, or a form naming a ceremony the browser does not hold, means no user to
+// key a bucket on, and the handler rejects that request before reaching the OTP secret or the
+// database.
 func (m *RateLimiter) LimitOtp(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.otp, rejectBrowser)
 }

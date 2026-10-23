@@ -33,11 +33,10 @@ import (
 //
 // The rule is deliberately scoped to record.User composite literals, which is
 // what reaches database.CreateUser. An address in an api.*Request literal is
-// exempt, because the five that remain in this tier all sit in requests asserted
-// to be rejected (400, 401, 404): nothing reaches the database, and in two of
-// them the literal text -- 65 bytes, over the validator's limit of 60 -- is the
-// thing under test. A request that is expected to succeed persists its address
-// like any fixture and is written with uniqueEmail by hand.
+// exempt, because those that remain in this tier all sit in requests asserted to
+// be rejected (400, 401, 404): nothing reaches the database. A request that is
+// expected to succeed persists its address like any fixture and is written with
+// uniqueEmail, or uniqueAddressOfLength, by hand.
 //
 // The instrument's limit, stated because it decides what this file is worth: it
 // asserts a spelling is absent, not that the replacement is correct. An address

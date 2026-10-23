@@ -76,8 +76,8 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 // browsers would get different secrets under any storage at all; one browser is where a shared
 // slot and a per-ceremony field disagree, because everything the seed used to be kept in is the
 // same object across these two requests. A second /auth/authorize mints a new auth context in
-// authflow.Authorization.Run and the old seed leaves with the old context, so the second enrolment page
-// cannot be showing the first ceremony's secret.
+// authflow.Authorization.Run, held beside the first, which keeps its own seed, so the second
+// enrolment page cannot be showing the first ceremony's secret.
 func TestAuthOtp_SecondAuthorizeInTheSameBrowserGetsANewSecret(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
 
@@ -86,7 +86,7 @@ func TestAuthOtp_SecondAuthorizeInTheSameBrowserGetsANewSecret(t *testing.T) {
 	_ = otpPage.Body.Close()
 	assert.NotEmpty(t, first)
 
-	// Same jar, so the first ceremony's cookie is still there to be replaced. It never reached
+	// Same jar, so the first ceremony is still held beside the second. It never reached
 	// /auth/completed, so no session exists and this request runs level 1 again.
 	_, secondPage, _ := startOtpCeremonyOn(t, httpClient, client, redirectUri, user, password, "")
 	second := getOtpSecretFromEnrollmentPage(t, secondPage)

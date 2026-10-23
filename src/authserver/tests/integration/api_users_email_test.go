@@ -256,6 +256,78 @@ func TestAPIUserEmailPut_InvalidEmail(t *testing.T) {
 	}
 }
 
+// TestAPIUserEmailPut_AddressLengths holds an administrator's change of a user's address to the
+// limits every path that sets one applies (#632): 254 characters in all and 64 before the @. An
+// address within both is stored; one past either is refused and the stored address kept.
+func TestAPIUserEmailPut_AddressLengths(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &record.User{
+		Subject:    fake.UUID(),
+		Enabled:    true,
+		Email:      uniqueEmail("testuser@lengths.test"),
+		GivenName:  "Test",
+		FamilyName: "User",
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+	}()
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/email"
+
+	change := func(t *testing.T, email string) (int, api.ErrorResponse) {
+		t.Helper()
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserEmailRequest{Email: email})
+		defer func() { _ = resp.Body.Close() }()
+		var refusal api.ErrorResponse
+		if resp.StatusCode != http.StatusOK {
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
+		}
+		return resp.StatusCode, refusal
+	}
+	storedEmail := func(t *testing.T) string {
+		t.Helper()
+		stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+		require.NoError(t, err)
+		require.NotNil(t, stored)
+		return stored.Email
+	}
+
+	for _, tc := range []struct{ name, email string }{
+		{"254 characters", uniqueAddressOfLength(254)},
+		{"a local part of 64 characters", uniqueLocalPartOfLength(64) + "@example.com"},
+	} {
+		email := tc.email
+		t.Run("accepts "+tc.name, func(t *testing.T) {
+			status, refusal := change(t, email)
+
+			require.Equal(t, http.StatusOK, status, refusal.ErrorDescription)
+			assert.Equal(t, email, storedEmail(t))
+		})
+	}
+
+	for _, tc := range []struct {
+		name        string
+		email       string
+		description string
+	}{
+		{"255 characters", uniqueAddressOfLength(255),
+			"The email address cannot exceed a maximum length of 254 characters."},
+		{"a local part of 65 characters", uniqueLocalPartOfLength(65) + "@example.com",
+			"Please enter a valid email address."},
+	} {
+		t.Run("refuses "+tc.name, func(t *testing.T) {
+			before := storedEmail(t)
+
+			status, refusal := change(t, tc.email)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, tc.description, refusal.ErrorDescription)
+			assert.Equal(t, before, storedEmail(t), "a refused address leaves the stored one")
+		})
+	}
+}
+
 func TestAPIUserEmailPut_SetEmailVerified(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)

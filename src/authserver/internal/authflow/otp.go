@@ -348,7 +348,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 
 	result.Answer = OTPAccepted
 	result.NextStep = "/auth/completed"
-	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId); result.SaveErr != nil {
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
 		return result, nil
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)

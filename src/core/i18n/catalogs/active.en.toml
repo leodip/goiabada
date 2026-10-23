@@ -133,7 +133,7 @@
 
 "auth_error.page_title" = "Error"
 "auth_error.ceremony_mismatch.title" = "This request is no longer active"
-"auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in request that is no longer the one in progress. Another one was started in this browser, so this one can no longer continue. Go back to the application you were signing in to and start again."
+"auth_error.ceremony_mismatch.message" = "This page belongs to a sign-in that can no longer continue. It may have finished already, or a later sign-in or sign-out in this browser ended it. Go back to the application you were signing in to and start again."
 "auth_error.state_mismatch.title" = "This step is no longer available"
 "auth_error.state_mismatch.message" = "This page belongs to a step of the sign-in you have already moved past, so it can no longer be used. Going back in the browser reaches a page the server has finished with. Go back to the application you were signing in to and start again."
 # An enrolment at /auth/otp that lost to another change of the account's authenticator ends the
@@ -380,7 +380,9 @@
 "adminconsole.refusal.concurrent_update" = "This item was changed after the page was loaded. Reload the page and try again."
 "adminconsole.refusal.invalid_request_body" = "The request body is not valid JSON, or is missing information this endpoint requires."
 "adminconsole.refusal.account_email.confirmation_mismatch" = "The email addresses don't match."
+"adminconsole.refusal.client_authentication.type_required" = "Choose the client type: public or confidential."
 "adminconsole.refusal.client_delete.identifier_mismatch" = "That isn't this client's identifier. Type it as shown above."
+"adminconsole.refusal.client_delete.system_level" = "This is the admin console's own client, so it can't be deleted."
 "adminconsole.refusal.client_tokens.token_expiration_invalid" = "Enter the token lifetime as a whole number of seconds."
 "adminconsole.refusal.client_tokens.offline_idle_timeout_invalid" = "Enter the offline idle timeout as a whole number of seconds."
 "adminconsole.refusal.client_tokens.offline_max_lifetime_invalid" = "Enter the offline maximum lifetime as a whole number of seconds."
