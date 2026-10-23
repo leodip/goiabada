@@ -361,8 +361,9 @@ func anyOf[K comparable, T any](m map[K]T, err error) (any, error) {
 	return nil, fmt.Errorf("the read answered no record")
 }
 
-// userMapping covers every read answering whole users, the group members' page among them, which
-// joins users_groups and so selects each column qualified by its table.
+// userMapping covers every read answering whole users, the group members' page and the permission
+// holders' page among them, which join users_groups and users_permissions and so select each column
+// qualified by its table.
 func userMapping() mappingCase {
 	return mappingCase{
 		name:   "user",
@@ -409,12 +410,85 @@ func userMapping() mappingCase {
 				users, _, err := d.GetGroupMembersPaginated(ctx, nil, 1, 2, 10)
 				return firstOf(users, err)
 			},
+			"GetUsersByPermissionIdPaginated": func(ctx context.Context, d *Database) (any, error) {
+				users, _, err := d.GetUsersByPermissionIdPaginated(ctx, nil, 1, 2, 10)
+				return firstOf(users, err)
+			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
 			return d.CreateUser(ctx, nil, rec.(*record.User))
 		},
 		update: func(ctx context.Context, d *Database, rec any) error {
 			return d.UpdateUser(ctx, nil, rec.(*record.User))
+		},
+	}
+}
+
+func userAttributeMapping() mappingCase {
+	return mappingCase{
+		name:   "user attribute",
+		table:  "user_attributes",
+		record: reflect.TypeOf(record.UserAttribute{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserAttributeById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserAttributeById(ctx, nil, 1)
+			},
+			"GetUserAttributesByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserAttributesByUserId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserAttribute(ctx, nil, rec.(*record.UserAttribute))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserAttribute(ctx, nil, rec.(*record.UserAttribute))
+		},
+	}
+}
+
+func userPermissionMapping() mappingCase {
+	return mappingCase{
+		name:   "user permission",
+		table:  "users_permissions",
+		record: reflect.TypeOf(record.UserPermission{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserPermissionById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserPermissionById(ctx, nil, 1)
+			},
+			"GetUserPermissionByUserIdAndPermissionId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserPermissionByUserIdAndPermissionId(ctx, nil, 1, 2)
+			},
+			"GetUserPermissionsByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserPermissionsByUserId(ctx, nil, 1))
+			},
+			"GetUserPermissionsByUserIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserPermissionsByUserIds(ctx, nil, []int64{1, 2}))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserPermission(ctx, nil, rec.(*record.UserPermission))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserPermission(ctx, nil, rec.(*record.UserPermission))
+		},
+	}
+}
+
+func userProfilePictureMapping() mappingCase {
+	return mappingCase{
+		name:   "user profile picture",
+		table:  "user_profile_pictures",
+		record: reflect.TypeOf(record.UserProfilePicture{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserProfilePictureByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserProfilePictureByUserId(ctx, nil, 1)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserProfilePicture(ctx, nil, rec.(*record.UserProfilePicture))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserProfilePicture(ctx, nil, rec.(*record.UserProfilePicture))
 		},
 	}
 }
@@ -426,7 +500,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), redirectURIMapping(), webOriginMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
-		userMapping(),
+		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
