@@ -368,6 +368,60 @@ func TestHandleSettingsEmailPut_APasswordTogetherWithItsRemovalIsRefused(t *test
 	}
 }
 
+// The sender address and the SMTP username each take up to 254 characters, the longest address
+// SMTP can carry, since for the hosted providers the username is the mailbox's own address; the
+// sender name, a display name, keeps its 60. The username stays free text, and the sender address
+// keeps the address shape, its part before the @ at most 64 (#632 decisions 2 and 3).
+func TestHandleSettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters(t *testing.T) {
+	address254 := addressOfLength(254)
+	require.Len(t, address254, 254)
+	username254 := strings.Repeat("u", 254)
+
+	t.Run("254 characters each, and a 60-character sender name, save", func(t *testing.T) {
+		rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", false),
+			emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), map[string]interface{}{
+				"smtpUsername":  username254,
+				"smtpFromEmail": address254,
+				"smtpFromName":  strings.Repeat("n", 60),
+			}))
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		require.NotNil(t, written)
+		assert.Equal(t, username254, written.SMTPUsername)
+		assert.Equal(t, address254, written.SMTPFromEmail)
+		assert.Equal(t, strings.Repeat("n", 60), written.SMTPFromName)
+	})
+
+	refusals := []struct {
+		name        string
+		extra       map[string]interface{}
+		code        string
+		description string
+	}{
+		{"a 255-character username", map[string]interface{}{"smtpUsername": strings.Repeat("u", 255)},
+			"handler.settings_email.smtp_username_too_long", "The SMTP username can't be longer than 254 characters."},
+		{"a 255-character sender address", map[string]interface{}{"smtpFromEmail": addressOfLength(255)},
+			"handler.settings_email.smtp_from_email_too_long", "The sender email can't be longer than 254 characters."},
+		{"a 61-character sender name", map[string]interface{}{"smtpFromName": strings.Repeat("n", 61)},
+			"handler.settings_email.smtp_from_name_too_long", "The sender name can't be longer than 60 characters."},
+		{"a sender address whose part before the @ is 65 characters",
+			map[string]interface{}{"smtpFromEmail": strings.Repeat("a", 65) + "@example.com"},
+			"validator.email.invalid_format", "Please enter a valid email address."},
+	}
+	for _, c := range refusals {
+		t.Run(c.name+" is refused", func(t *testing.T) {
+			rr, written := serveEmailSave(t, emailSaveSettings(t, "127.0.0.1", false),
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), c.extra))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, c.code, code)
+			assert.Equal(t, c.description, description)
+			assert.Nil(t, written)
+		})
+	}
+}
+
 // Pointing a stored password at another host needs the password again, or its removal, so a
 // stored password only ever reaches the host it was entered for. The refusal is answered before
 // the dial: the port here is one nothing listens on, which the dial would have answered instead

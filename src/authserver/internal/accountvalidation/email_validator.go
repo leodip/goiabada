@@ -32,8 +32,9 @@ func NewEmailValidator(database emailValidatorDatabase) *EmailValidator {
 // MaxEmailLength is the longest address an account may hold, in characters: every place that sets
 // one applies it, the administrator's and the self-service change through ValidateEmailChange, and
 // creating a user and self-registration in their own handlers, so all four engines store the same
-// addresses (#207). It is 254, the longest address SMTP can carry: RFC 5321 section 4.5.3.1.3
-// bounds a path at 256 octets, its angle brackets included (#632).
+// addresses (#207). The email settings' sender address and the first start's GOIABADA_ADMIN_EMAIL
+// read it too. It is 254, the longest address SMTP can carry: RFC 5321 section 4.5.3.1.3 bounds a
+// path at 256 octets, its angle brackets included (#632).
 const MaxEmailLength = 254
 
 // maxLocalPartLength is the longest part of an address before the @, in characters: RFC 5321

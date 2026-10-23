@@ -452,11 +452,11 @@ func TestSettingsEmailRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "an SMTP username past the bound",
-			serve:      save(unchanged, map[string]any{"smtpUsername": strings.Repeat("u", 61)}),
+			serve:      save(unchanged, map[string]any{"smtpUsername": strings.Repeat("u", 255)}),
 			status:     http.StatusBadRequest,
 			code:       "handler.settings_email.smtp_username_too_long",
-			english:    "The SMTP username can't be longer than 60 characters.",
-			portuguese: "O nome de usuário SMTP não pode ter mais de 60 caracteres.",
+			english:    "The SMTP username can't be longer than 254 characters.",
+			portuguese: "O nome de usuário SMTP não pode ter mais de 254 caracteres.",
 		},
 		{
 			name:       "an SMTP password past the bound",
@@ -476,11 +476,11 @@ func TestSettingsEmailRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "an SMTP from email past the bound",
-			serve:      save(unchanged, map[string]any{"smtpFromEmail": strings.Repeat("e", 50) + "@example.com"}),
+			serve:      save(unchanged, map[string]any{"smtpFromEmail": addressOfLength(255)}),
 			status:     http.StatusBadRequest,
 			code:       "handler.settings_email.smtp_from_email_too_long",
-			english:    "The sender email can't be longer than 60 characters.",
-			portuguese: "O e-mail do remetente não pode ter mais de 60 caracteres.",
+			english:    "The sender email can't be longer than 254 characters.",
+			portuguese: "O e-mail do remetente não pode ter mais de 254 caracteres.",
 		},
 		{
 			name:       "a new SMTP password and its removal at once",
