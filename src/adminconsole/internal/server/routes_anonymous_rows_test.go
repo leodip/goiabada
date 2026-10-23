@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -59,7 +59,7 @@ func TestInitRoutes_AnAnonymousRequestWritesNoBrowserSessionRow(t *testing.T) {
 	registry := metrics.NewRegistry()
 	upstream := upstreammetrics.Register(registry)
 	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, upstream), publicsettings.DefaultTTL, registry)
-	s := NewServer(chi.NewRouter(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(nil), nil, nil, registry, upstream)
+	s := NewServer(routing.New(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(nil), nil, nil, registry, upstream)
 	s.registerRoutes()
 
 	staleSession := &http.Cookie{Name: store.CookieName(builtin.AdminConsoleSessionName), Value: "garbage"}

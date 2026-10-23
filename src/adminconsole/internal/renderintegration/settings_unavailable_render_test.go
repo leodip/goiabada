@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ import (
 // the stylesheet, with no layout and no application name, since both read the settings it lacks.
 func TestRender_SettingsUnavailable(t *testing.T) {
 	var requestID string
-	router := chi.NewRouter()
+	router := routing.New()
 	router.Use(requestid.Middleware)
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		requestID = requestid.FromContext(r.Context())

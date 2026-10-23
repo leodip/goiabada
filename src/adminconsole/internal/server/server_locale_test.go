@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // TestInitMiddleware_RefusalsAreLocalized makes the claim no unit test of any one
@@ -37,7 +37,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 	// application branch, and the settings cache is only on that branch.
 	newServer := func() *Server {
 		s := &Server{
-			router:        chi.NewRouter(),
+			router:        routing.New(),
 			sessionStore:  newTestSessionStore(),
 			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},

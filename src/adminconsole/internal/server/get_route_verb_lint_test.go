@@ -226,7 +226,7 @@ func TestCamelWords_SplitsWholeWords(t *testing.T) {
 func getRouteFixture(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "routes.go")
-	require.NoError(t, os.WriteFile(path, []byte("package server\n\nfunc (s *Server) initRoutes(root chi.Router) {\n"+body+"}\n"), 0o644))
+	require.NoError(t, os.WriteFile(path, []byte("package server\n\nfunc (s *Server) initRoutes(root *routing.Router) {\n"+body+"}\n"), 0o644))
 	return path
 }
 

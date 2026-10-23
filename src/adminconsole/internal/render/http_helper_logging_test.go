@@ -11,11 +11,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,10 +63,10 @@ func loggedErrorOf(t *testing.T, record logtest.CapturedRecord) (error, bool) {
 	return logged, true
 }
 
-// errorRouter is the harness these rows share: a chi router carrying the request id middleware,
+// errorRouter is the harness these rows share: a router carrying the request id middleware,
 // calling handle for GET /. The settings the renderer reads ride on each request, from newRequest.
-func errorRouter(handle http.HandlerFunc) *chi.Mux {
-	r := chi.NewRouter()
+func errorRouter(handle http.HandlerFunc) *routing.Router {
+	r := routing.New()
 	r.Use(requestid.Middleware)
 	r.Get("/", handle)
 	return r

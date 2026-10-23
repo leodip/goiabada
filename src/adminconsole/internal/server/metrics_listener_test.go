@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -48,7 +48,7 @@ func newMetricsTestServer(t *testing.T) *Server {
 	upstream := upstreammetrics.Register(registry)
 	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, upstream), publicsettings.DefaultTTL, registry)
 
-	s := NewServer(chi.NewRouter(), newTestSessionStore(), cache, nil, cfg, nil, nil, nil, registry, upstream)
+	s := NewServer(routing.New(), newTestSessionStore(), cache, nil, cfg, nil, nil, nil, registry, upstream)
 	s.registerRoutes()
 	return s
 }

@@ -29,7 +29,6 @@ import (
 	"time"
 	_ "time/tzdata" // embeds the zone database localzone.Install resolves TZ against (#49, #331, #432)
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
@@ -44,6 +43,7 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -260,7 +260,7 @@ func run() int {
 	}
 	slog.Info("the auth server issued the admin console's token")
 
-	r := chi.NewRouter()
+	r := routing.New()
 	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies, cfg, authServerHTTPClient, internalRoots, tokenClient, registry, upstream)
 
 	// Start logs none of its errors: this is the one record, and the one exit, for all of them.

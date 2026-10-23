@@ -321,8 +321,8 @@ command itself and fails on a tree it changed.
 | `core/hostport` | `Join` | both-apps | — |
 | `core/hostport` | `Unbracket` | own-package | — |
 | `core/hostport/hostporttest` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/hostport/hostporttest` names it in production. |
-| `core/httpmw` | `BodyLimit` | both-apps | — |
-| `core/httpmw` | `BodyLimitOn` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: nothing outside core names it yet. It is the router's body-limit lookup, the twin of `BodyLimit` that reads chi, so a later slice that moves the servers turns this row into a computed one. |
+| `core/httpmw` | `BodyLimit` | moving | The body-limit lookup that reads chi, which only the auth server names now that the admin console reads routes from `core/routing` through `BodyLimitOn`. #462 removes it with chi once the auth server's route table moves too. |
+| `core/httpmw` | `BodyLimitOn` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: the admin console names it, the auth server not yet. It is the router's body-limit lookup, the twin of `BodyLimit` that reads chi, so the slice that moves the auth server turns this row into a computed one. |
 | `core/httpmw` | `BodyLimitPolicy` | both-apps | — |
 | `core/httpmw` | `CSRF` | both-apps | — |
 | `core/httpmw` | `CSRFPolicy` | both-apps | — |
@@ -603,12 +603,12 @@ command itself and fails on a tree it changed.
 | `core/logging/logtest` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/metrics` | `Counter` | both-apps | — |
 | `core/metrics` | `Described` | own-package | — |
-| `core/metrics` | `DurationBuckets` | own-package | — |
+| `core/metrics` | `DurationBuckets` | contract | The bounds of every request duration histogram both servers expose, the admin console's upstream calls among them, so one dashboard reads every duration on the same buckets. It was `own-package` through `HTTPRequests` while both servers named that, and is again once the auth server names `HTTPRequestsOn` in #462's last slice. |
 | `core/metrics` | `Enum` | both-apps | — |
 | `core/metrics` | `Family` | kernel | — |
 | `core/metrics` | `Gauge` | own-package | — |
-| `core/metrics` | `HTTPRequests` | both-apps | — |
-| `core/metrics` | `HTTPRequestsOn` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: nothing outside core names it yet. It is the router's request metrics, the twin of `HTTPRequests` that reads chi, so a later slice that moves the servers turns this row into a computed one. |
+| `core/metrics` | `HTTPRequests` | moving | The request metrics that read chi, which only the auth server names now that the admin console reads routes from `core/routing` through `HTTPRequestsOn`. #462 removes it with chi once the auth server's route table moves too. |
+| `core/metrics` | `HTTPRequestsOn` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: the admin console names it, the auth server not yet. It is the router's request metrics, the twin of `HTTPRequests` that reads chi, so the slice that moves the auth server turns this row into a computed one. |
 | `core/metrics` | `Histogram` | own-package | — |
 | `core/metrics` | `Label` | kernel | — |
 | `core/metrics` | `NewRegistry` | both-apps | — |
@@ -634,7 +634,7 @@ command itself and fails on a tree it changed.
 | `core/requestid` | `Header` | own-package | — |
 | `core/requestid` | `Middleware` | both-apps | — |
 | `core/requestid` | `NewContext` | own-package | — |
-| `core/routing` | `New` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: nothing outside core names it yet. It is the router's constructor, the one way to a router, so a later slice that moves the servers turns this row into a computed one. |
+| `core/routing` | `New` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: the admin console names it, the auth server not yet. It is the router's constructor, the one way to a router, so the slice that moves the auth server turns this row into a computed one. |
 | `core/routing` | `RouteName` | kernel | — |
 | `core/routing` | `Router` | kernel | — |
 | `core/routing` | `WalkFunc` | reachable | — |

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,7 @@ func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
 	s.initRoutes(s.initMiddleware())
 
 	var registered []string
-	err := chi.Walk(s.router, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		registered = append(registered, method+" "+route)
 		return nil
 	})
@@ -105,7 +104,7 @@ func TestInitMiddleware_TheBodyLimitSitsAfterTheSlashStrip(t *testing.T) {
 	s.serveStaticFiles()
 
 	var root []string
-	err := chi.Walk(s.router, func(_ string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(_ string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		if route == "/static/*" {
 			for _, mounted := range middlewares {
 				root = append(root, runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name())
@@ -118,7 +117,7 @@ func TestInitMiddleware_TheBodyLimitSitsAfterTheSlashStrip(t *testing.T) {
 	strip := slices.Index(root, "github.com/leodip/goiabada/core/httpmw.StripTrailingSlash")
 	require.GreaterOrEqual(t, strip, 0, "StripTrailingSlash must be on the root chain: %v", root)
 	require.Less(t, strip+2, len(root), "the root chain ends too early: %v", root)
-	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.BodyLimit.func1", root[strip+1])
+	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.BodyLimitOn.func1", root[strip+1])
 	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1", root[strip+2])
 }
 

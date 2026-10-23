@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // TestInitMiddleware_RequestLoggerIsRegistered makes the claim the unit table in
@@ -54,7 +54,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 
 	// The flag is read from the configuration the server was built with, when initMiddleware runs.
 	s := &Server{
-		router:        chi.NewRouter(),
+		router:        routing.New(),
 		sessionStore:  newTestSessionStore(),
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{AdminConsole: config.AdminConsoleConfig{LogHttpRequests: logHttpRequests}},

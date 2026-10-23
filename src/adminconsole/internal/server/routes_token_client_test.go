@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -79,7 +79,7 @@ func TestInitRoutes_TheSignInUsesTheTokenClientTheServerWasHanded(t *testing.T) 
 	httpClient := &http.Client{Transport: transport, Timeout: oauthclient.TokenExchangeTimeout}
 	tokenClient := oauthclient.NewTokenClient(oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()), builtin.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, httpClient, nil)
 
-	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, httpClient, nil, tokenClient, metrics.NewRegistry(), nil)
+	s := NewServer(routing.New(), newTestSessionStore(), nil, nil, cfg, httpClient, nil, tokenClient, metrics.NewRegistry(), nil)
 	s.initRoutes(s.router)
 
 	start := httptest.NewRecorder()

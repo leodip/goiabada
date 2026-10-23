@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // TestInitMiddleware_CsrfIsRegistered makes the claim the CSRF unit tables in
@@ -39,7 +39,7 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 
 	newServer := func() *Server {
 		s := &Server{
-			router:        chi.NewRouter(),
+			router:        routing.New(),
 			sessionStore:  newTestSessionStore(),
 			settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 			cfg:           &config.Config{},
@@ -202,7 +202,7 @@ func csrfProbe(t *testing.T, path string, headers map[string]string) *httptest.R
 	const unreachableAuthServer = "http://127.0.0.1:1"
 
 	s := &Server{
-		router:        chi.NewRouter(),
+		router:        routing.New(),
 		sessionStore:  newTestSessionStore(),
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(unreachableAuthServer, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{},

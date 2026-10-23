@@ -4,7 +4,7 @@
 //
 // It is composition and nothing else. A handler is handed the configuration it reads when the route
 // table builds it, so nothing reads the configuration at request time (#441); every root Use comes
-// before the static and application branches are split, because chi refuses a Use after a route;
+// before the static and application branches are split, because the router refuses a Use after a route;
 // and Start logs none of its errors and ends nothing, leaving the one record and the exit to main
 // (#426).
 package server

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,7 +83,7 @@ func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.Handle
 	upstream := upstreammetrics.Register(registry)
 	cache := publicsettings.NewCache(publicsettings.NewClient(authServer.URL, roots, upstream), publicsettings.DefaultTTL, registry)
 	store := newTestSessionStore()
-	s := NewServer(chi.NewRouter(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(roots), roots, nil, registry, upstream)
+	s := NewServer(routing.New(), store, cache, nil, cfg, oauthclient.NewAuthServerHTTPClient(roots), roots, nil, registry, upstream)
 	s.registerRoutes()
 
 	claims := oauthclienttest.ValidClaims()

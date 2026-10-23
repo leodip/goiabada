@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +20,6 @@ import (
 
 	"log/slog"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
@@ -33,10 +33,11 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 type Server struct {
-	router *chi.Mux
+	router *routing.Router
 	// The concrete store rather than sessionstore.Store: routes.go hands it to the sign-in
 	// callback, whose port names Regenerate, which is what proves at compile time that the
 	// store this console runs rotates the session identifier at sign-in (#431).
@@ -73,7 +74,7 @@ type Server struct {
 	upstream *upstreammetrics.Recorder
 }
 
-func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
+func NewServer(router *routing.Router, sessionStore *sessionstore.ServerSideStore, settingsCache *publicsettings.Cache,
 	trustedProxies []*net.IPNet, cfg *config.Config, authServerHTTPClient *http.Client,
 	rootCAs *x509.CertPool, tokenClient *oauthclient.TokenClient, registry *metrics.Registry,
 	upstream *upstreammetrics.Recorder) *Server {
@@ -233,7 +234,7 @@ type listener struct {
 // http.Redirect answer HEAD on their own. It is for the read-only resources a cache, a monitor or a
 // link checker may probe, and only those; every page stays GET-only, so a HEAD there is 405 with
 // Allow naming GET. The auth server registers its own the same way.
-func getAndHead(r chi.Router, pattern string, handler http.HandlerFunc) {
+func getAndHead(r *routing.Router, pattern string, handler http.HandlerFunc) {
 	r.Get(pattern, handler)
 	r.Head(pattern, handler)
 }
@@ -390,10 +391,10 @@ const (
 // a 302 back to the request target, which is not a sensible answer to a request for a
 // stylesheet.
 //
-// chi refuses Use after a route has been registered on the same router, and With freezes the
-// parent's chain, so this is a restructure rather than a reorder: every root Use happens
+// The router refuses Use after a route has been registered on the same router, and With freezes
+// the parent's chain, so this is a restructure rather than a reorder: every root Use happens
 // here, before the branch, and both branches register their routes afterwards.
-func (s *Server) initMiddleware() chi.Router {
+func (s *Server) initMiddleware() *routing.Router {
 
 	slog.Info("initializing middleware")
 
@@ -442,7 +443,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// request logger and for the same reason, above Recoverer, so a panicking request is counted as
 	// the 500 its client received (#400). The route label's set is this router's own table, read
 	// once at the first request, by which time registerRoutes has registered every route.
-	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
+	s.router.Use(metrics.HTTPRequestsOn(s.metrics, s.router))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203). It writes the panic's one ERROR record, with
@@ -456,7 +457,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripTrailingSlash,
 	// because the lookup resolves the route by the path it stripped, and before anything else
 	// at the root, so no body is read without a bound.
-	s.router.Use(httpmw.BodyLimit(s.router, bodyLimitPolicy()))
+	s.router.Use(httpmw.BodyLimitOn(s.router, bodyLimitPolicy()))
 
 	// CSRF
 	// Note: CSRF runs before the locale middleware below, so there is no localizer on the
@@ -475,7 +476,18 @@ func (s *Server) initMiddleware() chi.Router {
 
 	// Everything below is on the application branch, not the root.
 
-	app := s.router.With(
+	app := s.router.With(s.applicationChain()...)
+
+	slog.Info("finished initializing middleware")
+
+	return app
+}
+
+// applicationChain is the application branch's own middleware, beneath the root's: what a page
+// needs and a file does not. initMiddleware mounts it on the branch, and the static branch puts it
+// in front of the 404 page it answers a directory with, the one request there that needs it.
+func (s *Server) applicationChain() []func(http.Handler) http.Handler {
+	return []func(http.Handler) http.Handler{
 		// Global locale middleware: resolves a tentative localizer from
 		// ?ui_locales, Accept-Language, or English. Adminconsole has no
 		// AuthContext concept (identity comes from the JWT later in the chain),
@@ -501,11 +513,7 @@ func (s *Server) initMiddleware() chi.Router {
 		// Clear the session cookie and redirect if unable to decode it, and delete
 		// whatever the chunked cookie store left in this browser
 		httpmw.CookieReset(s.sessionStore, builtin.AdminConsoleSessionName),
-	)
-
-	slog.Info("finished initializing middleware")
-
-	return app
+	}
 }
 
 // csrfPolicy is the admin console's CSRF exemption policy: the endpoints this binary serves that
@@ -592,23 +600,52 @@ func bodyLimitPolicy() httpmw.BodyLimitPolicy {
 	}
 }
 
-// serveStaticFiles serves the embedded static files under /static/ and redirects /static to
-// /static/. They are mounted nowhere else, so neither the path nor the file system is a parameter.
-func (s *Server) serveStaticFiles() {
-	getAndHead(s.router, "/static", http.RedirectHandler("/static/", http.StatusMovedPermanently).ServeHTTP)
+// staticPrefix is where the static files are served, and what is stripped from a request's path to
+// name the file.
+const staticPrefix = "/static"
 
-	getAndHead(s.router, "/static/*", func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fsHandler := http.StripPrefix(pathPrefix, http.FileServer(http.FS(s.staticFS)))
+// serveStaticFiles serves the embedded static files under /static/. They are mounted nowhere else,
+// so neither the path nor the file system is a parameter.
+//
+// A directory is the 404 page, /static/ itself included, where Go's file server answered one with
+// a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
+// too: it redirected to /static/, which looped for ever once its trailing slash was stripped back to
+// /static. The 404 page is drawn behind the application chain, which it reads its settings and
+// language from, so a directory costs what an unmatched path costs; a file still costs neither.
+func (s *Server) serveStaticFiles() {
+	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
+	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS))
+	directory := http.Handler(notFound)
+	chain := s.applicationChain()
+	for i := len(chain) - 1; i >= 0; i-- {
+		directory = chain[i](directory)
+	}
+
+	getAndHead(s.router, staticPrefix+"/*", func(w http.ResponseWriter, r *http.Request) {
+		if s.isStaticDirectory(r.URL.Path) {
+			directory.ServeHTTP(w, r)
+			return
+		}
 
 		cacheInSeconds := 5 * 60
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
 		w.Header().Set("Expires", time.Now().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		fsHandler.ServeHTTP(w, r)
+		files.ServeHTTP(w, r)
 	})
+}
+
+// isStaticDirectory reports whether urlPath, under /static, names a directory of the static files,
+// the root among them. The name is read as http.FileServer reads it, so the two agree on what is
+// opened; a name that is not there is no directory, and the file server answers its 404.
+func (s *Server) isStaticDirectory(urlPath string) bool {
+	name := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(urlPath, staticPrefix)), "/")
+	if name == "" {
+		return true
+	}
+	info, err := fs.Stat(s.staticFS, name)
+	return err == nil && info.IsDir()
 }
 
 // logPlainHTTP reports a deployment listening on HTTP with no HTTPS listener. Behind a proxy

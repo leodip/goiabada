@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -45,7 +45,7 @@ func (c *permissionsByResourceClient) GetPermissionsByResource(ctx context.Conte
 	return c.permissions, c.err
 }
 
-// permissionRecords runs the handler over a chi router carrying the request id middleware, and
+// permissionRecords runs the handler over a router carrying the request id middleware, and
 // returns the response together with every ERROR line the whole chain wrote.
 func permissionRecords(t *testing.T, client *permissionsByResourceClient, query string) (*httptest.ResponseRecorder, []string) {
 	t.Helper()
@@ -54,7 +54,7 @@ func permissionRecords(t *testing.T, client *permissionsByResourceClient, query 
 
 	httpHelper := render.New(fstest.MapFS{}, nil)
 
-	router := chi.NewRouter()
+	router := routing.New()
 	router.Use(requestid.Middleware)
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +182,7 @@ func TestAdminGetPermissions_WithoutATokenSetAnswersTheSentinel(t *testing.T) {
 	capture := logtest.CaptureSlog(t)
 	client := &permissionsByResourceClient{}
 
-	router := chi.NewRouter()
+	router := routing.New()
 	router.Use(requestid.Middleware)
 	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(render.New(fstest.MapFS{}, nil), client))
 
