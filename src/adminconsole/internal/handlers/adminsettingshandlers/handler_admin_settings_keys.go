@@ -100,8 +100,10 @@ func HandleKeysGet(
 }
 
 // HandleKeysRotatePost rotates the keys and answers with the page again: through a redirect that
-// says it rotated, or drawn at once with the reason it did not, such as the 409 another rotation
-// winning the race answers, "Another key rotation is in progress" (#251).
+// says it rotated, or drawn at once with the API's sentence when it refused. A refusal is a 409:
+// another rotation winning the race, "Another key rotation is in progress", which rotated nothing
+// (#251), or a commit whose outcome is unknown, which may have rotated, and whose sentence asks the
+// administrator to check the keys the page draws beside it (#371).
 func HandleKeysRotatePost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,

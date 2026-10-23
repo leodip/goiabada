@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -143,6 +144,8 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 
 	require.Error(t, err)
 	assert.Equal(t, boom, err, "the body's error comes back IDENTICAL, not wrapped: callers match it with errors.Is and read it as they wrote it")
+	require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"the body's failure was rolled back, so its outcome is known")
 	assert.Equal(t, 1, ran, "an error that is not a deadlock is not retried")
 	c := d.settled(t)
 	assert.Equal(t, 1, c.rollbacks, "the transaction is rolled back")
@@ -184,6 +187,8 @@ func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, errDeadlock, "the error unwraps to the last deadlock, so the caller can still see what it was")
+	require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"every declared abort was rolled back, so the outcome is known")
 	assert.Contains(t, err.Error(), "all 3 attempts", "and says the attempts were spent")
 	assert.Equal(t, 3, ran, "three attempts, no more")
 	c := d.settled(t)
@@ -251,6 +256,8 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, errDeadlock)
+	require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"the exhausted reruns were rolled back, so the outcome is known")
 	assert.Equal(t, 3, ran)
 	assert.Equal(t, 3, d.settled(t).commits)
 }
@@ -271,6 +278,8 @@ func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *test
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, boom, "the commit's own failure comes back")
+	require.ErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+		"the one exit whose outcome the caller cannot know is tagged, so a caller matches the sentinel rather than the driver's text (#371)")
 	assert.NotContains(t, err.Error(), "attempts", "with no retry wrapping, because there was no retry")
 	assert.Equal(t, 1, ran, "ONE attempt")
 	assert.Equal(t, 1, d.settled(t).commits)

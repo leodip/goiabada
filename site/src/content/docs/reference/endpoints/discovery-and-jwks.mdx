@@ -114,6 +114,8 @@ Each key is a 4096-bit RSA key with `alg` `RS256`, `use` `sig`, and a `kid` that
 
 To rotate, choose **Rotate keys** under **Admin**, **Signing keys** in the admin console. The next key becomes the current one, the current one becomes the previous one, the old previous key is deleted, and a new next key is created. A token signed by the deleted key no longer verifies, refresh tokens included, so don't rotate twice within the lifetime of your longest-lived token.
 
+A rotation can fail at its very end, when the connection to the database is lost while the change is being saved, and then the page says the rotation may or may not have happened. To tell which, compare the keys listed now with the ones you saw before pressing **Rotate keys**: the rotation happened if the key that was next is now current, and didn't if the current key is the same. Don't go by when a key was created, which can't say which press created it, and don't rotate again until you know, since a second rotation deletes the key that was current a moment ago.
+
 ## Calling them from a browser
 
 The discovery document, at both its addresses, and `/certs` answer cross-origin requests from any origin, with nothing to register, so JavaScript in a browser can read them. See [web origins](/concepts/clients/#web-origins) for the endpoints that need one.

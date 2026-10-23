@@ -155,3 +155,69 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 		assert.NotNil(t, got, "both rows are still there after both parties committed")
 	}
 }
+
+// cancelledCommitRuns is how many runs the next test cancels. On SQL Server, a run whose commit
+// rolled back on the caller's goroutine failed the next BEGIN in one or two runs of every hundred,
+// so this many leave such a regression almost no chance of passing once the test runs there again.
+const cancelledCommitRuns = 500
+
+// TestRunInTransaction_ARunCancelledBeforeItsCommitLeavesTheNextTransactionAWorkingConnection
+// cancels each run between its body and its commit, then opens the next transaction at once on
+// the same goroutine, as a caller carrying on with a live context would. database/sql's goroutine
+// rolls the cancelled run back while it holds the connection. When commondb rolled back on the
+// caller's goroutine instead, go-mssqldb answered that rollback with the context's error before it
+// had read the reply and kept the connection, so the next transaction drew it and its BEGIN failed
+// with "Read: EOF" (#371). Every engine owes the same answer, but it is skipped on SQL Server until
+// the driver is fixed; see the skip below.
+func TestRunInTransaction_ARunCancelledBeforeItsCommitLeavesTheNextTransactionAWorkingConnection(t *testing.T) {
+	// Skipped on SQL Server because of a driver bug that no Goiabada code can avoid.
+	//
+	// What happened: removing commondb's own rollback (#371) put this path back to what the code
+	// did before #371. Commit does not ask the driver when the context is already done, and
+	// database/sql's awaitDone goroutine makes the one rollback. In that state the test passed
+	// 3,000 runs on the dev container's SQL Server, but CI's failed at run 110 with the same
+	// "unable to begin transaction: Read: EOF". The driver still has the race: awaitDone's
+	// (*mssql.Conn).Rollback returns before its response reader has finished, database/sql puts
+	// the connection back in the pool, and the next checkout collides with that reader. Here that
+	// checkout is the next BEGIN. It depends on timing, so a slower runner hits it and a faster
+	// one rarely does. The code before #371 has the same exposure, since database/sql's Tx.Commit
+	// never asks the driver on a done context either.
+	//
+	// Upstream: https://github.com/microsoft/go-mssqldb/issues/390 reports the race, still open
+	// and still reproduced on v1.11.2, the version src/authserver/go.mod pins.
+	// https://github.com/microsoft/go-mssqldb/pull/486 fixes it: Rollback drains the reply on
+	// context.Canceled, and on a deadline it marks the connection bad.
+	//
+	// To re-enable: once a go-mssqldb release includes #486, or an equivalent fix, bump it in
+	// go.mod and delete this skip. Then run the test on SQL Server several times
+	// (stack.sh run --type data --db mssql --run '<this test>'), and once in CI, before trusting
+	// it. Do not make the test pass on SQL Server by retrying the BEGIN or tolerating EOF: that
+	// would also hide the regression it exists to catch, a rollback on the caller's goroutine,
+	// which hits the same EOF far more often.
+	if dbType() == data.MSSQL {
+		t.Skip("go-mssqldb v1.11.2 returns a connection to the pool while a cancelled rollback's reply " +
+			"is still being read, so the next BEGIN can fail with EOF whatever commondb does: " +
+			"https://github.com/microsoft/go-mssqldb/issues/390, fixed by " +
+			"https://github.com/microsoft/go-mssqldb/pull/486, not yet released")
+	}
+	for i := range cancelledCommitRuns {
+		ctx, cancel := context.WithCancel(context.Background())
+		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+			if _, readErr := database.GetSettingsById(ctx, tx, 1); readErr != nil {
+				return readErr
+			}
+			cancel()
+			return nil
+		})
+		cancel()
+		require.ErrorIs(t, err, context.Canceled, "run %d: the cancelled run answers with the context's error", i)
+		require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+			"run %d: its commit was refused before the driver was asked, so its outcome is known", i)
+
+		err = database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
+			_, readErr := database.GetSettingsById(context.Background(), tx, 1)
+			return readErr
+		})
+		require.NoError(t, err, "run %d: the transaction after a cancelled one opens and runs", i)
+	}
+}

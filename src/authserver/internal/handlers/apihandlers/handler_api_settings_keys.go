@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -132,6 +134,20 @@ func HandleSettingsKeysRotatePost(
 			writeInternalServerErrorWithCode(w, r,
 				errs.Wrap(err, "unable to rotate the signing keys"),
 				"Expected current and next keys to exist", "KEY_SET_INCOMPLETE")
+
+		case errors.Is(err, data.ErrCommitOutcomeUnknown):
+			// A 409, because the rotation may have happened: the commit that would end it failed
+			// for a reason other than a deadlock, the one failure whose outcome the caller cannot
+			// know. The generic 500 would be the one status the published docs call retry-reasonable,
+			// and a retry that lands deletes the key the rotation may just have demoted to previous.
+			// No audit entry either way: whether this rotation happened is exactly what is unknown
+			// (#371). It still owes what KEY_SET_INCOMPLETE writes, one Error record carrying the
+			// driver's error and the same request id on the wire, because an operator has to
+			// inspect the keys and that record is what joins the refusal to its cause (#279).
+			requestId := apiresponse.LogInternalServerError(r, errs.Wrap(err, "unable to rotate the signing keys"))
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsKeysCommitOutcomeUnknown,
+				map[string]any{"requestId": requestId}),
+				"ROTATION_OUTCOME_UNKNOWN", http.StatusConflict)
 
 		default:
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to rotate signing keys"))

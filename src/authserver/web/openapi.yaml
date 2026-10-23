@@ -3010,9 +3010,17 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: |
-            Another rotation won the race and this call rotated nothing.
-            error_code is ROTATION_IN_PROGRESS. Do not retry: the rotation
-            it conflicted with already happened.
+            error_code is ROTATION_IN_PROGRESS when another rotation won the
+            race: this call rotated nothing. Do not retry: the rotation it
+            conflicted with already happened.
+
+            error_code is ROTATION_OUTCOME_UNKNOWN when the commit that would
+            end the rotation failed for a reason other than a deadlock: the
+            rotation may or may not have happened. Compare the key set with
+            the one listed before the attempt before rotating again: the
+            rotation landed if the key that was next is now current. The
+            description ends with the request id of the log line that records
+            the failure.
           content:
             application/json:
               schema:

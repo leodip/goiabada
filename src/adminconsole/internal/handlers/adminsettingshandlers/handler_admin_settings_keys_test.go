@@ -43,14 +43,22 @@ func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
 // A refused rotation answers with the keys page again, beside the API's sentence. The auth server
 // answers 409 ROTATION_IN_PROGRESS when another rotation won the race, which is a fact about the
 // administrator's own request and something they can act on, so its sentence is what the page says
-// (#251). A genuine server fault stays the error page, its detail in the log rather than on the
-// screen.
+// (#251). It answers 409 ROTATION_OUTCOME_UNKNOWN when the commit failed and the rotation may have
+// happened, and that sentence goes on the page too, beside the keys it asks the administrator to
+// check, with the request id of the auth server's record of the failure (#371). Any other server
+// fault stays the error page, its detail in the log rather than on the screen.
 func TestHandleKeysRotatePost_ARefusalRedrawsThePageWithItsSentence(t *testing.T) {
-	const refusal = "Another key rotation is in progress"
-	for _, apiErr := range []error{
-		&apiclient.APIError{Code: "ROTATION_IN_PROGRESS", Message: refusal, StatusCode: http.StatusConflict},
-		&apiclient.APIError{Code: "handler.settings_keys.rotation_in_progress", Message: refusal, StatusCode: http.StatusBadRequest},
+	const inProgress = "Another key rotation is in progress"
+	const outcomeUnknown = "The key rotation may or may not have happened. Check the signing keys before you rotate again. Request Id: req-1"
+	for _, refused := range []struct {
+		apiErr  error
+		refusal string
+	}{
+		{&apiclient.APIError{Code: "ROTATION_IN_PROGRESS", Message: inProgress, StatusCode: http.StatusConflict}, inProgress},
+		{&apiclient.APIError{Code: "handler.settings_keys.rotation_in_progress", Message: inProgress, StatusCode: http.StatusBadRequest}, inProgress},
+		{&apiclient.APIError{Code: "ROTATION_OUTCOME_UNKNOWN", Message: outcomeUnknown, StatusCode: http.StatusConflict}, outcomeUnknown},
 	} {
+		apiErr, refusal := refused.apiErr, refused.refusal
 		httpHelper := handlersmocks.NewHttpHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_keys.html").Once()

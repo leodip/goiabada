@@ -81,6 +81,10 @@ type scriptedDriver struct {
 	// the commit untested, and a helper that returned each commit error immediately would pass
 	// every callback case while never retrying the one deadlock that surfaces at COMMIT (#301).
 	commitErrs []error
+	// duringCommit, when set, runs inside every Commit the driver is asked for, before it
+	// answers. It is how a test plays a driver whose COMMIT is in flight when the context is
+	// cancelled, which database/sql cannot refuse because it has already asked the driver (#371).
+	duringCommit func()
 	// rollbackErrs is consumed one entry per Rollback, in order. It is how a test plays MySQL's
 	// already-rolled-back deadlock victim, whose ROLLBACK the server answers with an error
 	// because it has nothing left to roll back.
@@ -176,6 +180,9 @@ func (c *scriptedConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driv
 type scriptedTx struct{ c *scriptedConn }
 
 func (t *scriptedTx) Commit() error {
+	if t.c.d.duringCommit != nil {
+		t.c.d.duringCommit()
+	}
 	t.c.d.mu.Lock()
 	defer t.c.d.mu.Unlock()
 	t.c.inTx = false

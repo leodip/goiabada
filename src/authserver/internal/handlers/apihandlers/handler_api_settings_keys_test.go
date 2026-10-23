@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,10 +12,12 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -176,6 +179,60 @@ func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 		"the id on the wire and the id in the log have to be the same string")
 
 	require.Error(t, stub.BodyErr, "the refusal reached the helper, which rolls back")
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+}
+
+// TestHandleSettingsKeysRotatePost_CommitOutcomeUnknown is #371's case: the rotation's body ran
+// in full and the COMMIT failed for a reason no dialect classifies as a deadlock, the one failure
+// whose outcome the caller cannot know. The answer is 409 ROTATION_OUTCOME_UNKNOWN rather than
+// the generic 500, which is the one status the published docs call retry-reasonable and whose
+// OpenAPI text promises nothing was rotated. No audit entry: whether the rotation happened is
+// exactly what is unknown, and the log carries exactly one entry per rotation that actually did.
+// It still writes what KEY_SET_INCOMPLETE writes, one Error record with the driver's error and the
+// same request id on the wire, since an operator must inspect the keys and that record is the only
+// trace of why (#279).
+func TestHandleSettingsKeysRotatePost_CommitOutcomeUnknown(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	// What commondb hands back when the engine refuses the commit for a reason other than a
+	// deadlock: the commit's own wrap, tagged with the data layer's sentinel.
+	datamocks.ExpectRunInTransactionThenFail(database, rotateTx,
+		errs.Errorf("%w: %w", data.ErrCommitOutcomeUnknown,
+			errs.Wrap(errors.New("connection reset by peer"), "unable to commit transaction")))
+	database.On("GetAllSigningKeys", mock.Anything, rotateTx).Return([]record.KeyPair{
+		signingKey(1, record.KeyStatePrevious),
+		signingKey(2, record.KeyStateCurrent),
+		signingKey(3, record.KeyStateNext),
+	}, nil).Once()
+	database.On("DeleteKeyPair", mock.Anything, rotateTx, int64(1)).Return(nil).Once()
+	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(2),
+		record.KeyStateCurrent.String(), record.KeyStatePrevious.String()).Return(true, nil).Once()
+	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(3),
+		record.KeyStateNext.String(), record.KeyStateCurrent.String()).Return(true, nil).Once()
+	database.On("CreateKeyPair", mock.Anything, rotateTx, mock.Anything).Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	capture := logtest.CaptureSlog(t)
+
+	HandleSettingsKeysRotatePost(database, auditLogger, testDataCipher).ServeHTTP(rr, rotateRequest())
+
+	logged := capture.Text()
+
+	assert.Equal(t, http.StatusConflict, rr.Code)
+	body := decodeErrorBody(t, rr)
+	assert.Equal(t, "ROTATION_OUTCOME_UNKNOWN", body.ErrorCode)
+	assert.Equal(t, "The key rotation may or may not have happened. Check the signing keys before you rotate again. "+
+		"Request Id: "+rotateKeysRequestId, body.ErrorDescription,
+		"the id on the wire and the id in the log have to be the same string")
+
+	assert.Equal(t, 1, strings.Count(logged, "level=ERROR"), "one record, not none and not two")
+	assert.Contains(t, logged, "request_id="+rotateKeysRequestId)
+	assert.Contains(t, logged, "connection reset by peer", "the driver's error is what the operator needs")
+	assert.Contains(t, logged, "unable to rotate the signing keys")
+	// auditLogger has no expectation at all, which NewAuditLogger's cleanup turns into a failure
+	// on any Log call: whether this rotation happened is exactly what is unknown.
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }

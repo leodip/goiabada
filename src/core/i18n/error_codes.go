@@ -285,6 +285,7 @@ const (
 	ErrCodeSettingsEmailMessageRefused         = "handler.settings_email.message_refused"
 
 	ErrCodeSettingsKeysRotationInProgress    = "handler.settings_keys.rotation_in_progress"
+	ErrCodeSettingsKeysCommitOutcomeUnknown  = "handler.settings_keys.commit_outcome_unknown"
 	ErrCodeSettingsKeysKeyNotFound           = "handler.settings_keys.key_not_found"
 	ErrCodeSettingsKeysOnlyPreviousRevocable = "handler.settings_keys.only_previous_revocable"
 

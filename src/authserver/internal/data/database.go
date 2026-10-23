@@ -820,6 +820,28 @@ type Database interface {
 // below this.
 var ErrUniqueViolation = errors.New("unique constraint violation")
 
+// ErrCommitOutcomeUnknown is what RunInTransaction returns when a commit fails for a reason other
+// than a deadlock: the one exit whose outcome the caller cannot know, because the server may have
+// committed before the failure reached it. Replaying such a transaction would apply the body
+// twice, so a caller that receives this must inspect what the transaction changed before it
+// tries again (#371). A commit whose context was already done does not carry it: the driver is
+// never asked, the transaction is rolled back, and the run answers with the context's error. A
+// cancellation that lands while the driver's COMMIT is in flight does carry it, even when the
+// driver answers with the context's own error, as pgx and go-mssqldb do, since the server may
+// have committed.
+//
+// It exists for the same reason ErrUniqueViolation does: the driver's own text cannot be matched.
+// Every engine phrases a commit failure its own way and none of them says whether the server had
+// already committed, so commondb tags such a commit error with this sentinel on the way out of
+// the data layer and a caller above asks errors.Is and nothing else. The commit's own error stays
+// in the tree and is still reachable through errors.As below this.
+//
+// Like ErrUniqueViolation it is a plain stdlib errors.New, the one shape guard.AssertNoLegacyErrors
+// exempts: a package-level sentinel must carry no stack, because a stack captured at init records
+// the program's startup rather than the failure, and would then masquerade as the origin of every
+// error wrapping it.
+var ErrCommitOutcomeUnknown = errors.New("the transaction commit's outcome is unknown")
+
 // ErrRateLimitWindowMoved is ReserveRateLimitHit finding a row for a window later than the one it
 // was asked to charge: another pod has opened that window for the key, and may have admitted
 // against a count this charge would change after the fact, so nothing is charged. The caller
