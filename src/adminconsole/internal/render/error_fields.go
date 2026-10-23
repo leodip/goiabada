@@ -54,13 +54,17 @@ var ProfileErrorFields = map[string]string{
 	i18n.ErrCodeProfileMiddleNameInvalid: "middleName",
 	i18n.ErrCodeProfileFamilyNameInvalid: "familyName",
 	i18n.ErrCodeProfileNicknameInvalid:   "nickname",
-	i18n.ErrCodeProfileWebsiteInvalid:    "website",
-	i18n.ErrCodeProfileWebsiteTooLong:    "website",
-	i18n.ErrCodeProfileGenderInvalid:     "gender",
-	i18n.ErrCodeProfileDobInvalidFormat:  "dateOfBirth",
-	i18n.ErrCodeProfileDobInFuture:       "dateOfBirth",
-	i18n.ErrCodeProfileZoneInfoInvalid:   "zoneInfo",
-	i18n.ErrCodeProfileLocaleInvalid:     "locale",
+	i18n.ErrCodeProfileNicknameTooLong:   "nickname",
+	// The nickname is the profile form's one field the angle-bracket rule guards, so
+	// its refusal names it, unlike the address family's shared code.
+	i18n.ErrCodeProfileNicknameAngleBrackets: "nickname",
+	i18n.ErrCodeProfileWebsiteInvalid:        "website",
+	i18n.ErrCodeProfileWebsiteTooLong:        "website",
+	i18n.ErrCodeProfileGenderInvalid:         "gender",
+	i18n.ErrCodeProfileDobInvalidFormat:      "dateOfBirth",
+	i18n.ErrCodeProfileDobInFuture:           "dateOfBirth",
+	i18n.ErrCodeProfileZoneInfoInvalid:       "zoneInfo",
+	i18n.ErrCodeProfileLocaleInvalid:         "locale",
 }
 
 // AddressErrorFields are the address form's. Angle brackets are refused in whichever field holds

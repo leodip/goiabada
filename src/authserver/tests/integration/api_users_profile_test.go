@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
@@ -279,6 +280,98 @@ func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	require.NoError(t, err)
 	assert.Equal(t, "female", stored.Gender)
+}
+
+// The nickname is free text (#632 item 4): a casual name with spaces, dots, apostrophes, letters
+// of any script, or 24 characters outside the Basic Multilingual Plane, the 48 UTF-16 code units
+// of its bound, comes back from the admin API, from the database and in the ID token's nickname
+// claim exactly as it was sent. Issuance reads the user at the exchange, so the profile is saved
+// between the code and its redemption.
+func TestAPIUserProfilePut_NicknameFreeTextStoredVerbatim(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) {
+		settings.IncludeOpenIDConnectClaimsInIdToken = true
+	})
+	accessToken, _ := createAdminClientWithToken(t)
+
+	for _, nickname := range []string{"Amazing Grace", "Dr. G", "D'Arcy", "미키", strings.Repeat("🙂", 24)} {
+		t.Run(nickname, func(t *testing.T) {
+			var updateResponse api.UpdateUserResponse
+			data, code, _, _ := userTokenResponseWithScope(t, "openid profile", func(user *record.User) {
+				url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/profile"
+				resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{Nickname: nickname})
+				defer func() { _ = resp.Body.Close() }()
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&updateResponse))
+			})
+
+			assert.Equal(t, nickname, updateResponse.User.Nickname)
+
+			stored, err := database.GetUserById(context.Background(), nil, code.User.Id)
+			require.NoError(t, err)
+			assert.Equal(t, nickname, stored.Nickname)
+
+			idToken, ok := data["id_token"].(string)
+			require.True(t, ok, "the grant carries openid, so an id_token is issued")
+			assert.Equal(t, nickname, decodeJWTPayload(t, idToken)["nickname"])
+		})
+	}
+}
+
+// The nickname's refusals reach the admin API as 400s with their own codes, and nothing is
+// written: angle brackets, refused rather than stripped since nothing sanitizes (decision 3 of
+// #275), a line separator, which would break the single-line value, and a right-to-left
+// override, which would show the claim reordered in a relying party.
+func TestAPIUserProfilePut_NicknameAngleBracketsAndLineBreaksRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &record.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("testuser@nickname-refused.test"),
+		GivenName:     "Test",
+		FamilyName:    "User",
+		Nickname:      "Grace",
+		EmailVerified: true,
+	}
+	err := database.CreateUser(context.Background(), nil, testUser)
+	require.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+	}()
+
+	testCases := []struct {
+		name        string
+		nickname    string
+		code        string
+		description string
+	}{
+		{"less-than", "ni<ck", "validator.profile.nickname_angle_brackets", "The nickname cannot contain the characters < or >."},
+		{"greater-than", "ni>ck", "validator.profile.nickname_angle_brackets", "The nickname cannot contain the characters < or >."},
+		{"line separator", "Amazing\u2028Grace", "validator.profile.nickname_invalid", "Nicknames cannot contain control characters, such as tabs or line breaks."},
+		{"right-to-left override", "\u202Enimda", "validator.profile.nickname_invalid", "Nicknames cannot contain control characters, such as tabs or line breaks."},
+	}
+
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{
+				GivenName: "Changed",
+				Nickname:  tc.nickname,
+			})
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errResp api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+			assert.Equal(t, tc.code, errResp.ErrorCode)
+			assert.Equal(t, tc.description, errResp.ErrorDescription)
+
+			unchanged, err := database.GetUserById(context.Background(), nil, testUser.Id)
+			require.NoError(t, err)
+			assert.Equal(t, "Grace", unchanged.Nickname)
+			assert.Equal(t, "Test", unchanged.GivenName)
+		})
+	}
 }
 
 func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {

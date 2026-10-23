@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+// OtpConsecutiveFailureLimit is the number of consecutive failed attempts against one
+// enrolled authenticator that NIST SP 800-63B section 3.2.2 allows before the verifier
+// SHALL disable it, which in Goiabada is the count a wrong or replayed code advances, a
+// successful verification clears, and a fresh enrolment -- the rebind -- clears too
+// (#489). The password is deliberately outside it: the account-wide password budget
+// stays a rate, because a count a stranger can trip by knowing an email address would
+// turn a one-hour denial into an indefinite one (#89, #489).
+const OtpConsecutiveFailureLimit = 100
+
 type User struct {
 	Id                             int64        `db:"id" fieldtag:"pk"`
 	CreatedAt                      sql.NullTime `db:"created_at" fieldtag:"dont-update"`
@@ -79,6 +88,22 @@ type User struct {
 	// counter and silently discharge every session's obligation. It advances only through
 	// IncrementUserOtpConfigGeneration.
 	OtpConfigGeneration int64 `db:"otp_config_generation" fieldtag:"dont-update"`
+	// OtpConsecutiveFailures is how many attempts against the enrolled authenticator have
+	// failed without a successful verification between them, and at
+	// OtpConsecutiveFailureLimit the authenticator is disabled until it is rebound
+	// (NIST SP 800-63B section 3.2.2, #489). A successful verification clears it, that
+	// section's "disregard any previous failed attempts", and so does the fresh enrolment
+	// that rebinding is. Only a failed attempt against the enrolled authenticator advances
+	// it: the OTP prompt sits behind the password, so a stranger cannot trip it, which is
+	// what keeps the lockout-DoS of #89 from applying.
+	//
+	// Tagged dont-update for the same reason OtpConfigGeneration is: in the ordinary
+	// update set, a whole-row write from a model read before a verification would write
+	// the pre-attempt count back over the row's, silently unlocking a disabled
+	// authenticator. It moves only through TryConsumeEnrolledUserOTPStep, which clears it
+	// in the same statement that claims the step, IncrementUserOtpConsecutiveFailures, and
+	// ClearUserOtpConsecutiveFailures, which a fresh enrolment calls.
+	OtpConsecutiveFailures int64 `db:"otp_consecutive_failures" fieldtag:"dont-update"`
 	// OtpEnrollmentSecretEncrypted is the AES-GCM ciphertext of a TOTP enrolment the server
 	// has issued but the user has not yet confirmed, and OtpEnrollmentIssuedAt is when it was
 	// issued. NULL in both means no enrolment is pending, which is the state of every user who
@@ -110,6 +135,15 @@ type User struct {
 	Groups      []Group         `db:"-"`
 	Permissions []Permission    `db:"-"`
 	Attributes  []UserAttribute `db:"-"`
+}
+
+// OtpAuthenticatorDisabled reports whether the user has an authenticator that the
+// consecutive-failure count has disabled: OTPEnabled still reads true, and every code is
+// refused until it is removed and a new one set up (#489). A count left at the limit after
+// a removal disables nothing, since there is no authenticator, and the next one set up
+// clears it.
+func (u *User) OtpAuthenticatorDisabled() bool {
+	return u.OTPEnabled && u.OtpConsecutiveFailures >= OtpConsecutiveFailureLimit
 }
 
 func (u *User) FullName() string {

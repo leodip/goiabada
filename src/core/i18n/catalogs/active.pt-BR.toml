@@ -344,6 +344,7 @@
 "adminconsole.sign_in_error.failed.title" = "Falha no acesso"
 "adminconsole.sign_in_error.exchange.body" = "O console de administração não conseguiu concluir o acesso com o servidor de autenticação. Isso normalmente significa que o segredo do cliente do console ou o endereço do servidor de autenticação está errado."
 "adminconsole.sign_in_error.unverified.body" = "Não foi possível verificar a resposta do servidor de autenticação. Isso normalmente significa que o console de administração e o servidor de autenticação discordam sobre o emissor (issuer) ou o cliente."
+"adminconsole.sign_in_error.wrong_method.body" = "Este endereço é para onde o servidor de autenticação envia a resposta de um acesso, portanto não pode ser aberto por si só."
 "adminconsole.sign_in_error.start_again" = "Começar de novo"
 "adminconsole.sign_in_error.log_line" = "O log do servidor registra a causa sob este ID de requisição:"
 
@@ -944,6 +945,7 @@
 "adminconsole.admin_users.authentication.otp_title" = "Autenticação de dois fatores"
 "adminconsole.admin_users.authentication.otp_enabled_hint" = "Desmarque para desativar a autenticação de dois fatores. Só o usuário pode ativá-la de novo, na conta dele."
 "adminconsole.admin_users.authentication.otp_disable_warning" = "Você está desativando a autenticação de dois fatores do usuário, então só a senha bastará para ele entrar até que a configure de novo."
+"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "O autenticador do usuário foi desativado depois de 100 códigos de uso único errados seguidos, então todo código é recusado, até o certo. Alguém que sabia a senha dele, ou tinha uma das sessões dele, enviou esses códigos, então considere a senha conhecida. Para que o usuário volte a entrar, defina uma nova senha e desative a autenticação de dois fatores no mesmo salvamento. Depois ele pode entrar com a nova senha e configurar um novo autenticador."
 "adminconsole.admin_users.authentication.otp_not_set_up" = "O usuário não configurou a autenticação de dois fatores. Só ele pode fazer isso, na conta dele."
 
 "adminconsole.admin_users.consents.modal_confirm_title" = "Revogar este consentimento?"
@@ -1662,7 +1664,9 @@
 "validator.profile.given_name_invalid" = "Informe um nome válido. Deve conter apenas letras, espaços, hífens e apóstrofos, com 1 a 48 caracteres."
 "validator.profile.middle_name_invalid" = "Informe um nome do meio válido. Deve conter apenas letras, espaços, hífens e apóstrofos, com 1 a 48 caracteres."
 "validator.profile.family_name_invalid" = "Informe um sobrenome válido. Deve conter apenas letras, espaços, hífens e apóstrofos, com 1 a 48 caracteres."
-"validator.profile.nickname_invalid" = "Apelidos precisam começar com uma letra e conter apenas letras, números e sublinhados. Devem ter entre 2 e 24 caracteres."
+"validator.profile.nickname_invalid" = "Apelidos não podem conter caracteres de controle, como tabulações ou quebras de linha."
+"validator.profile.nickname_too_long" = "Garanta que o apelido não tenha mais que {{.max}} caracteres."
+"validator.profile.nickname_angle_brackets" = "O apelido não pode conter os caracteres < ou >."
 "validator.profile.website_invalid" = "Informe uma URL de site válida."
 "validator.profile.website_too_long" = "Garanta que a URL do site não tenha mais que {{.max}} caracteres."
 "validator.profile.gender_invalid" = "Gênero inválido."

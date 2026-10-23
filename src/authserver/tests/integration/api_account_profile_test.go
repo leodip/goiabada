@@ -177,6 +177,40 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "Unknown language and region.", err4.ErrorDescription)
 }
 
+// The self-service twin of TestAPIUserProfilePut_NicknameFreeTextStoredVerbatim and its refusal:
+// a person saves a casual name as their own nickname, and the account API refuses angle brackets
+// with the nickname's own code, writing nothing.
+func TestAPIAccountProfilePut_NicknameFreeText(t *testing.T) {
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{Nickname: "Amazing Grace"})
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
+	}
+	var updated api.UpdateUserResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&updated))
+	assert.Equal(t, "Amazing Grace", updated.User.Nickname)
+
+	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "Amazing Grace", stored.Nickname)
+
+	refused := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{Nickname: "ni<ck"})
+	defer func() { _ = refused.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, refused.StatusCode)
+	var errResp api.ErrorResponse
+	require.NoError(t, json.NewDecoder(refused.Body).Decode(&errResp))
+	assert.Equal(t, "validator.profile.nickname_angle_brackets", errResp.ErrorCode)
+	assert.Equal(t, "The nickname cannot contain the characters < or >.", errResp.ErrorDescription)
+
+	stored, err = database.GetUserById(context.Background(), nil, u.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "Amazing Grace", stored.Nickname)
+}
+
 // A zone and a country name are saved as a pair, and the pair must be a row of the timezones
 // table: Europe/Berlin is a real zone and Brazil a real country, but Europe/Berlin is not listed
 // under Brazil. The refusal must leave the stored profile as it was.

@@ -34,6 +34,10 @@ type UserResponse struct {
 	AddressPostalCode             string     `json:"addressPostalCode"`
 	AddressCountry                string     `json:"addressCountry"`
 	OTPEnabled                    bool       `json:"otpEnabled"`
+	// OTPAuthenticatorDisabled is true while the user's authenticator is disabled after
+	// 100 wrong codes in a row: OTPEnabled still reads true, every code is refused, and
+	// turning OTP off is the way back, after which the user sets up a new one (#489).
+	OTPAuthenticatorDisabled bool `json:"otpAuthenticatorDisabled"`
 }
 
 type SearchUsersResponse struct {

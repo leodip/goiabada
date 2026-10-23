@@ -1,0 +1,23 @@
+-- Per-user count of consecutive failed attempts against the enrolled authenticator
+-- (#489).
+--
+-- NIST SP 800-63B section 3.2.2 requires the verifier to limit consecutive failed
+-- authentication attempts with a specific authenticator on one account to no more than
+-- 100 by disabling that authenticator, to require rebinding before it is used again, and
+-- (SHOULD) to disregard failed attempts once an authentication succeeds. The otp rate
+-- tier can do none of that: its count decays with the window, so a patient attacker
+-- keeps a fresh budget, and it disables nothing. A wrong or replayed code advances this
+-- column (otpcredential.VerifyStored), a successful verification clears it in the same
+-- statement that claims the step, and a fresh enrolment -- the rebind -- clears it in
+-- the establish's transaction. At 100 the verification claim refuses, so the
+-- authenticator is disabled until it is rebound. Only the OTP is counted: the password
+-- keeps the account-wide rate, because a count a stranger can trip by knowing an email
+-- address would turn the one-hour denial of #89 into an indefinite one.
+--
+-- NOT NULL DEFAULT 0 rather than nullable, for last_otp_step's reason: 0 is
+-- unambiguously "no failed attempt has been counted", no read site needs NULL handling,
+-- and existing rows land at 0, which is that state, so nobody's authenticator is born
+-- disabled.
+--
+-- No index. Every read and write is by users.id, which is the primary key.
+ALTER TABLE users ADD COLUMN otp_consecutive_failures INTEGER NOT NULL DEFAULT 0;

@@ -221,6 +221,29 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 	// bytes, naming the three keys it refuses to find (#350).
 }
 
+// otpAuthenticatorDisabled says the authenticator is on and refusing every code because the
+// consecutive-failure count reached its limit, which otpEnabled alone does not (#489). A count left
+// at the limit after the authenticator was removed disables nothing, so it reads false.
+func TestToUserResponse_OTPAuthenticatorDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		otpEnabled bool
+		failures   int64
+		want       bool
+	}{
+		{name: "on, under the limit", otpEnabled: true, failures: record.OtpConsecutiveFailureLimit - 1, want: false},
+		{name: "on, at the limit", otpEnabled: true, failures: record.OtpConsecutiveFailureLimit, want: true},
+		{name: "removed, the count left at the limit", otpEnabled: false,
+			failures: record.OtpConsecutiveFailureLimit, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := ToUserResponse(&record.User{Id: 1, OTPEnabled: tc.otpEnabled, OtpConsecutiveFailures: tc.failures})
+			assert.Equal(t, tc.want, resp.OTPAuthenticatorDisabled)
+			assert.Equal(t, tc.otpEnabled, resp.OTPEnabled)
+		})
+	}
+}
+
 // Invalid sql.NullTime values must become nil pointers rather than the zero time.
 func TestToUserResponse_InvalidNullTimesBecomeNil(t *testing.T) {
 	resp := ToUserResponse(&record.User{

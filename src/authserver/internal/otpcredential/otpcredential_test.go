@@ -102,6 +102,13 @@ func TestEstablish_WritesTheAuthenticatorTheGenerationAndTheClearInOneTransactio
 			return nil
 		}).Once()
 
+	// The rebind's clear, in the same transaction (#489).
+	database.EXPECT().ClearUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId).
+		RunAndReturn(func(context.Context, *sql.Tx, int64) error {
+			calls = append(calls, "clear-count")
+			return nil
+		}).Once()
+
 	generation, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 
 	require.NoError(t, err)
@@ -109,8 +116,8 @@ func TestEstablish_WritesTheAuthenticatorTheGenerationAndTheClearInOneTransactio
 	assert.EqualValues(t, 9, generation,
 		"the caller gets the value the increment read back: the browser ceremony overwrites the "+
 			"pre-enrollment snapshot with it, and computing N+1 here would launder a concurrent change into it")
-	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "commit"}, calls,
-		"all three writes belong to one transaction; committed separately, an authenticator can be "+
+	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "clear-count", "commit"}, calls,
+		"all four writes belong to one transaction; committed separately, an authenticator can be "+
 			"on with the counter unmoved and every live session still satisfied (#242 decision 2)")
 	assert.True(t, user.OTPEnabled)
 	assert.True(t, isEncryptedOTPSeed(user.OTPSecretEncrypted), "the user carries what landed")
@@ -174,6 +181,7 @@ func TestEstablish_ACommitFailureYieldsNoGeneration(t *testing.T) {
 		Return(true, nil).Once()
 	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).Return(11, nil).Once()
 	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
+	database.EXPECT().ClearUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId).Return(nil).Once()
 
 	user := enrollableUser()
 	generation, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
@@ -335,6 +343,9 @@ func TestVerifyStored(t *testing.T) {
 
 	t.Run("a wrong code is refused without claiming anything", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		database.EXPECT().
+			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
+			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), "000000", now)
 
@@ -351,6 +362,9 @@ func TestVerifyStored(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
 			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
+			Return(false, nil).Once()
+		database.EXPECT().
+			IncrementUserOtpConsecutiveFailures(mock.Anything, (*sql.Tx)(nil), otpUserId, otpReadGeneration).
 			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)

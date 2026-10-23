@@ -365,6 +365,7 @@
 "adminconsole.sign_in_error.failed.title" = "Sign-in failed"
 "adminconsole.sign_in_error.exchange.body" = "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong."
 "adminconsole.sign_in_error.unverified.body" = "The auth server's answer could not be verified. This usually means the admin console and the auth server disagree about the issuer or the client."
+"adminconsole.sign_in_error.wrong_method.body" = "This address receives the auth server's answer to a sign-in, posted to it, so it cannot be opened on its own."
 "adminconsole.sign_in_error.start_again" = "Start again"
 "adminconsole.sign_in_error.log_line" = "The server log records the cause under this request id:"
 
@@ -1001,6 +1002,7 @@
 "adminconsole.admin_users.authentication.otp_title" = "Two-factor authentication"
 "adminconsole.admin_users.authentication.otp_enabled_hint" = "Clear it to turn two-factor authentication off. Only the user can turn it on again, from their account."
 "adminconsole.admin_users.authentication.otp_disable_warning" = "You're turning off the user's two-factor authentication, so their password alone will sign them in until they set it up again."
+"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "The user's authenticator was disabled after 100 wrong one-time codes in a row, so every code is refused, the right one included. Someone who knew their password, or held one of their sessions, sent those codes, so treat the password as known. To let the user back in, set a new password and turn two-factor authentication off in the same save. They can then sign in with the new password and set up a new authenticator."
 "adminconsole.admin_users.authentication.otp_not_set_up" = "The user hasn't set up two-factor authentication. Only they can, from their account."
 
 "adminconsole.admin_users.consents.modal_confirm_title" = "Revoke this consent?"
@@ -1755,7 +1757,9 @@
 "validator.profile.given_name_invalid" = "Please enter a valid given name. It should contain only letters, spaces, hyphens, and apostrophes and be between 1 and 48 characters in length."
 "validator.profile.middle_name_invalid" = "Please enter a valid middle name. It should contain only letters, spaces, hyphens, and apostrophes and be between 1 and 48 characters in length."
 "validator.profile.family_name_invalid" = "Please enter a valid family name. It should contain only letters, spaces, hyphens, and apostrophes and be between 1 and 48 characters in length."
-"validator.profile.nickname_invalid" = "Nicknames must start with a letter and consist only of letters, numbers, and underscores. They must be between 2 and 24 characters long."
+"validator.profile.nickname_invalid" = "Nicknames cannot contain control characters, such as tabs or line breaks."
+"validator.profile.nickname_too_long" = "Please ensure the nickname is no longer than {{.max}} characters."
+"validator.profile.nickname_angle_brackets" = "The nickname cannot contain the characters < or >."
 "validator.profile.website_invalid" = "Please enter a valid website URL."
 "validator.profile.website_too_long" = "Please ensure the website URL is no longer than {{.max}} characters."
 "validator.profile.gender_invalid" = "Gender is invalid."

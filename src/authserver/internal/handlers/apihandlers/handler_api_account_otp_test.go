@@ -263,6 +263,8 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.Id).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
+	// The rebind's clear, in the enable's own transaction (#489).
+	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, map[string]interface{}{
@@ -851,6 +853,8 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	// The clear rides in the enable's own transaction, so no committed state has OTP on with a
 	// live seed still installed behind it.
 	database.On("ClearPendingOTPEnrollment", mock.Anything, tx, user.Id).Return(nil).Once()
+	// The rebind's clear, in the enable's own transaction (#489).
+	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, tx, user.Id).Return(nil).Once()
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 

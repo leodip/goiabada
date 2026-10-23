@@ -1,5 +1,6 @@
 import type { Browser } from "@playwright/test";
 import { cancelDialog, confirmDialog, expectRefusal, userUrl } from "../../../lib/admin-console";
+import { submitPassword } from "../../../lib/browser-sign-in";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
@@ -73,6 +74,36 @@ test("turning off a user's two-factor authentication asks first: Cancel keeps it
 
   // Signing in no longer asks for a code.
   const again = await signInToConsole(browser, user);
+  await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
+  await again.context.close();
+});
+
+// The recovery the docs give for a disabled authenticator: a new password and two-factor turned off,
+// in one save. An enrolled authenticator takes the same save, so the disable need not be reached.
+test("a new password and two-factor turned off in one save: the old password no longer signs in", async ({ page, browser, users }) => {
+  const user = await users.create();
+  await enrolAuthenticator(browser, user);
+
+  await page.goto(userUrl(user.id, "authentication"));
+  await expect(page.locator("#otpEnabled")).toBeChecked();
+  await page.locator("#newPassword").fill("a-brand-new-password");
+  await page.locator("#otpEnabled").uncheck();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're turning off the user's two-factor authentication");
+  await expect(page.getByText("Changes saved.")).toBeVisible();
+  await expect(page.getByText(notSetUp)).toBeVisible();
+
+  // The old password is refused at the password page, with no session at the console.
+  const old = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const oldPage = await old.newPage();
+  await oldPage.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(oldPage, user.email, user.password);
+  await expect(oldPage).toHaveURL(new RegExp(`^${env.authUrl}/auth/pwd\\?`));
+  await expect(oldPage.locator("#pwd-error")).toHaveText("Authentication failed.");
+  await old.close();
+
+  // The new one signs in, and no code is asked.
+  const again = await signInToConsole(browser, { email: user.email, password: "a-brand-new-password" });
   await expect(again.page).toHaveURL(`${env.adminUrl}/account/profile`);
   await again.context.close();
 });

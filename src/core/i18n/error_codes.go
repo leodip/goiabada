@@ -308,13 +308,17 @@ const (
 	ErrCodeProfileMiddleNameInvalid = "validator.profile.middle_name_invalid"
 	ErrCodeProfileFamilyNameInvalid = "validator.profile.family_name_invalid"
 	ErrCodeProfileNicknameInvalid   = "validator.profile.nickname_invalid"
-	ErrCodeProfileWebsiteInvalid    = "validator.profile.website_invalid"
-	ErrCodeProfileWebsiteTooLong    = "validator.profile.website_too_long" // Args: {"max": int}
-	ErrCodeProfileGenderInvalid     = "validator.profile.gender_invalid"
-	ErrCodeProfileDobInvalidFormat  = "validator.profile.dob_invalid_format"
-	ErrCodeProfileDobInFuture       = "validator.profile.dob_in_future"
-	ErrCodeProfileZoneInfoInvalid   = "validator.profile.zone_info_invalid"
-	ErrCodeProfileLocaleInvalid     = "validator.profile.locale_invalid"
+	ErrCodeProfileNicknameTooLong   = "validator.profile.nickname_too_long" // Args: {"max": int}
+	// The nickname's angle-brackets refusal is emitted by ValidateNoAngleBrackets and
+	// lives here with its family, as the address family's does (#275).
+	ErrCodeProfileNicknameAngleBrackets = "validator.profile.nickname_angle_brackets"
+	ErrCodeProfileWebsiteInvalid        = "validator.profile.website_invalid"
+	ErrCodeProfileWebsiteTooLong        = "validator.profile.website_too_long" // Args: {"max": int}
+	ErrCodeProfileGenderInvalid         = "validator.profile.gender_invalid"
+	ErrCodeProfileDobInvalidFormat      = "validator.profile.dob_invalid_format"
+	ErrCodeProfileDobInFuture           = "validator.profile.dob_in_future"
+	ErrCodeProfileZoneInfoInvalid       = "validator.profile.zone_info_invalid"
+	ErrCodeProfileLocaleInvalid         = "validator.profile.locale_invalid"
 
 	// Image validator — profile picture and client logo uploads, from
 	// authserver/internal/imageupload.

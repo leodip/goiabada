@@ -120,3 +120,25 @@ test("without signing in, the admin console's pages stay out of reach", async ({
     );
   }
 });
+
+// The console's callback takes the auth server's form_post, so a browser that opens its address on
+// its own, from a bookmark or the history, carries no answer to a sign-in. It gets the sign-in error
+// page at 405, naming POST as the one method the address takes, and Start again leads back to the
+// console's home, from where a sign-in starts as it always does (#632 item 3).
+test("the callback's address opened on its own explains itself, and Start again leads to a sign-in", async ({ page }) => {
+  const response = await page.goto(`${env.adminUrl}/auth/callback`);
+  expect(response?.status()).toBe(405);
+  expect(response?.headers()["allow"]).toBe("POST");
+  await expect(page.getByRole("heading", { level: 1, name: "This sign-in can't be finished", exact: true })).toBeVisible();
+  await expect(
+    page.getByText("This address receives the auth server's answer to a sign-in, posted to it, so it cannot be opened on its own."),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Start again", exact: true }).click();
+  await expect(page).toHaveURL(`${env.adminUrl}/`);
+  await expect(page.getByRole("heading", { level: 1, name: "Admin console", exact: true })).toBeVisible();
+
+  await page.getByRole("link", { name: /^Administration/ }).click();
+  await expect(page).toHaveURL(new RegExp(`^${env.authUrl}/auth/pwd\\?`));
+  await expect(page).toHaveTitle(/^Sign in – /);
+});

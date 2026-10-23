@@ -109,6 +109,10 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 		require.NoError(t, err, "migrate to head")
 	}
 	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back to 000046")
+	// The downs from head drop the users columns the ups after 000046 added, and the
+	// read-back below stays the ORM's, so the head-only ones come back as scaffolding
+	// (#510, #489).
+	scaffoldHeadUsersColumns(t, h)
 
 	cases := lowercaseCases000047()
 	ids := make([]int64, len(cases))
