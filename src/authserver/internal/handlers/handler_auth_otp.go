@@ -104,7 +104,8 @@ func HandleAuthOtpPost(
 }
 
 // otpFormBind is the data both OTP forms render with. The form names its ceremony, so the boundary
-// can refuse a submission of a form another /auth/authorize has replaced since (#79).
+// reads the submission as that ceremony's, and refuses it once the browser no longer holds it (#79,
+// #246).
 func otpFormBind(authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,
 	message interface{}) map[string]interface{} {
 
@@ -145,12 +146,13 @@ func renderOTPFormAgain(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 }
 
 // answerLostEnrolment answers authflow.OTPEnrolmentLost, whose ceremony the operation has cleared
-// (#471 decision 2). A clear that found the ceremony replaced is answerCeremonyReplaced's: the
-// browser has moved on to another sign-in, not the one whose authenticator changed (#579). Otherwise
+// (#471 decision 2). A clear that found the ceremony no longer held is answerCeremonyReplaced's: the
+// browser has moved on from this sign-in for another reason than the authenticator change (#579).
+// Otherwise
 // the page says the account's two-factor settings changed, at 409, since the request conflicted with
 // the account's current state (RFC 9110 section 15.5.10), in the visitor's language. Not the
 // enrolment form again, whose QR code is for an authenticator that was never stored, and not the "no
-// longer active" page, which says another sign-in started in this browser. A clear that failed
+// longer active" page, which says a later sign-in or sign-out ended this one. A clear that failed
 // otherwise does not change the page: a replay of the context left behind meets the same refusal or
 // a state gate.
 func answerLostEnrolment(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,

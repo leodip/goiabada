@@ -76,8 +76,12 @@ func HandleConsentPost(
 			return
 		}
 
-		// r.PostForm, the body alone, which the boundary's read of the ceremony id parsed: r.Form
-		// would merge the URL query in (#79).
+		// r.PostForm, the body alone: r.Form would merge the URL query in (#79). The store's read of
+		// the ceremony the body names parsed it already, and parsing it here keeps the submission
+		// from depending on that. Its error is not read, as r.PostFormValue reads none: a body that
+		// would not parse named no ceremony and was refused above, and a malformed query is no part
+		// of the submission.
+		_ = r.ParseForm()
 		result, err := submission.Run(r.Context(), newBrowserSession(w, r, ceremonyStore), authContext, r.PostForm)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)

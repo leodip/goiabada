@@ -59,7 +59,7 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 			})
 
 			form := url.Values{}
-			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add(ceremony.IdField, testCeremonyId)
 			form.Add("otp", tc.code)
 			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")

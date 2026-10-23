@@ -182,7 +182,7 @@ func TestSessionIdentifier(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
 			sessionkeys.SessionIdentifier: "invalid-session-id",
-			sessionkeys.AuthContext:       `{"authState":"level1_password"}`,
+			sessionkeys.AuthContexts:      `{"authState":"level1_password"}`,
 		})
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "invalid-session-id").Return(nil, nil)
@@ -192,7 +192,7 @@ func TestSessionIdentifier(t *testing.T) {
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).ServeHTTP(httptest.NewRecorder(), browserRequest(cookies))
 
 		values := storedBrowserSession(t, store, cookies)
-		assert.Equal(t, `{"authState":"level1_password"}`, values[sessionkeys.AuthContext])
+		assert.Equal(t, `{"authState":"level1_password"}`, values[sessionkeys.AuthContexts])
 		assert.NotContains(t, values, sessionkeys.SessionIdentifier)
 	})
 
@@ -222,13 +222,13 @@ func TestSessionIdentifier_RemovingADanglingPointerKeepsWhatAnotherRequestWroteM
 		mockDB := datamocks.NewDatabase(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
 			sessionkeys.SessionIdentifier: "gone-session-id",
-			sessionkeys.AuthContext:       "ceremony A",
+			sessionkeys.AuthContexts:      "ceremony A",
 		})
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "gone-session-id").
 			Run(func(mock.Arguments) {
 				writeBrowserSessionMeanwhile(t, store, cookies, func(sess *sessionstore.Session) {
-					sess.Values[sessionkeys.AuthContext] = "ceremony B"
+					sess.Values[sessionkeys.AuthContexts] = "ceremony B"
 				})
 			}).Return(nil, nil).Once()
 
@@ -240,7 +240,7 @@ func TestSessionIdentifier_RemovingADanglingPointerKeepsWhatAnotherRequestWroteM
 
 		require.True(t, reached, rr.Body.String())
 		values := storedBrowserSession(t, store, cookies)
-		assert.Equal(t, "ceremony B", values[sessionkeys.AuthContext],
+		assert.Equal(t, "ceremony B", values[sessionkeys.AuthContexts],
 			"the removal must not put back the ceremony its request began with")
 		assert.NotContains(t, values, sessionkeys.SessionIdentifier)
 	})
@@ -274,7 +274,7 @@ func TestSessionIdentifier_RemovingADanglingPointerKeepsWhatAnotherRequestWroteM
 		mockDB := datamocks.NewDatabase(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
 			sessionkeys.SessionIdentifier: "gone-session-id",
-			sessionkeys.AuthContext:       "ceremony A",
+			sessionkeys.AuthContexts:      "ceremony A",
 		})
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "gone-session-id").

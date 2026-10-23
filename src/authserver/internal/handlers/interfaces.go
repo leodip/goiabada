@@ -40,31 +40,37 @@ type JSONWriter interface {
 // on the concrete type and not here: only the locale middleware reads it, and no handler does
 // (#435).
 type CeremonyStore interface {
+	// GetAuthContext reads the ceremony the request names (ceremony.RequestedId). It answers
+	// ceremony.ErrCeremonyNotHeld when the browser session holds a ceremony but not that one, and
+	// ceremony.ErrNoAuthContext when it holds none.
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
+	// LatestAuthContext reads the ceremony the browser most recently wrote, whatever the request
+	// names, which the ceremony mismatch audit event records.
+	LatestAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 	// SaveAuthContext is a step's save, which writes only while the browser session still holds
-	// the step's ceremony and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing
-	// (#579). Every step after /auth/authorize saves through it, and answers that error through
+	// the step's ceremony, making it the most recently written, and otherwise answers
+	// ceremony.ErrCeremonyReplaced, writing nothing (#579, #246). Every step after /auth/authorize saves through it, and answers that error through
 	// CeremonyBoundary.answerStepSaveFailure.
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
-	// ReplaceAuthContext is /auth/authorize's save, which starts a ceremony and so replaces
-	// whatever the browser session held.
-	ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
+	// AddAuthContext is /auth/authorize's save, which starts a ceremony beside the ones the
+	// browser session holds, pushing out the least recently written beyond
+	// ceremony.MaxHeldCeremonies (#246).
+	AddAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 	// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session
 	// still holds it and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
 	ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error
-	// DiscardAuthContext is /auth/authorize's clear, which ends whatever ceremony the browser
-	// session held, and writes nothing for a browser with no stored session.
-	DiscardAuthContext(w http.ResponseWriter, r *http.Request) error
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
 	// change to match a cookie store's structural immunity to session fixation (#266). It
 	// rotates only while the browser session still holds the ceremony named, and otherwise
-	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
-	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579). It keeps no ceremony held for a
+	// user other than userId, the user the rotation is for (#246).
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error
 	// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm, which also
 	// writes the new user session's identifier into the browser session as it rotates it (#266),
 	// on the same condition (#579 decision 4).
-	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error
+	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64,
+		userSessionIdentifier string) error
 	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
 	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
 	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error

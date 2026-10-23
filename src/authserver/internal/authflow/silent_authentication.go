@@ -50,12 +50,9 @@ func NewSilentAuthentication(database silentAuthenticationDatabase, sessions sil
 // SilentAuthenticationResult is what SilentAuthentication.Run did. When Refusal is nil, the
 // ceremony was saved in ready_to_issue_code.
 type SilentAuthenticationResult struct {
-	// Refusal is the error the client is answered with. The ceremony ends with it: it was discarded,
-	// and no session was bumped.
+	// Refusal is the error the client is answered with. The ceremony ends with it: it was never
+	// stored, whatever sign-in the browser holds is left as it was (#246), and no session was bumped.
 	Refusal *ClientError
-	// DiscardErr is the discard's failure, which answers the client server_error in place of Refusal
-	// (#141).
-	DiscardErr error
 
 	// SaveErr is the failure of the save that sends the ceremony to /auth/issue. The handler
 	// redirects there only when it is nil, and answers 500 otherwise.
@@ -69,9 +66,9 @@ type SilentAuthenticationResult struct {
 //     with and without max_age, the scope narrowed to what the user holds, and the user's consent to
 //     the client. A failed read is returned as an error, never taken for "no session" or "no
 //     consent", so a database fault is no login_required or consent_required.
-//  2. A refusal: records user_disabled when it is for a disabled account, discards the ceremony and
-//     returns Refusal. Nothing past the check that refused is read, and nothing but the discard is
-//     written.
+//  2. A refusal: records user_disabled when it is for a disabled account and returns Refusal.
+//     Nothing past the check that refused is read, and nothing is written, so a silent request
+//     refused in a browser holding a sign-in in progress leaves that sign-in alone (#246).
 //  3. Otherwise adopts the session onto the ceremony, with the narrowed scope and the session's
 //     AuthTime as the ceremony's AuthenticatedAt. A session with a zero AuthTime is returned as an
 //     error before anything is written: no auth_time is invented for it (#580 decision 5).
@@ -150,8 +147,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 			})
 		}
 		return SilentAuthenticationResult{
-			Refusal:    &ClientError{Client: client, Code: answer.ErrorCode, Description: answer.ErrorDescription},
-			DiscardErr: browser.DiscardAuthContext(),
+			Refusal: &ClientError{Client: client, Code: answer.ErrorCode, Description: answer.ErrorDescription},
 		}, nil
 	}
 
@@ -178,5 +174,5 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	})
 
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-	return SilentAuthenticationResult{SaveErr: browser.ReplaceAuthContext(authContext)}, nil
+	return SilentAuthenticationResult{SaveErr: browser.AddAuthContext(authContext)}, nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 // stepUnderTest is one gated route, built over strict mocks that expect nothing, so any read or write
@@ -23,14 +22,14 @@ type stepUnderTest struct {
 	// accepted is a state the route accepts, so a request that got past the comparison would go on
 	// and read from the strict mocks.
 	accepted ceremony.AuthState
-	build    func(t *testing.T, pageRenderer *handlersmocks.PageRenderer, ceremonyStore *handlersmocks.CeremonyStore,
+	build    func(t *testing.T, pageRenderer *handlersmocks.PageRenderer, ceremonyStore CeremonyStore,
 		auditLogger *handlersmocks.AuditLogger) http.Handler
 }
 
 func everyGatedStep() []stepUnderTest {
 	return []stepUnderTest{
 		{name: "level1", method: http.MethodGet, path: "/auth/level1", accepted: ceremony.AuthStateRequiresLevel1,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthLevel1Get(authLevel1GetDeps{
 					pageRenderer:  pr,
@@ -40,7 +39,7 @@ func everyGatedStep() []stepUnderTest {
 			}},
 		{name: "level1completed", method: http.MethodGet, path: "/auth/level1completed",
 			accepted: ceremony.AuthStateLevel1PasswordCompleted,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthLevel1CompletedGet(authLevel1CompletedGetDeps{
 					pageRenderer:       pr,
@@ -52,7 +51,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "level2", method: http.MethodGet, path: "/auth/level2", accepted: ceremony.AuthStateRequiresLevel2,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthLevel2Get(authLevel2GetDeps{
 					pageRenderer:  pr,
@@ -62,7 +61,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "pwd GET", method: http.MethodGet, path: "/auth/pwd", accepted: ceremony.AuthStateLevel1Password,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthPwdGet(authPwdGetDeps{
 					pageRenderer:  pr,
@@ -72,7 +71,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "pwd POST", method: http.MethodPost, path: "/auth/pwd", accepted: ceremony.AuthStateLevel1Password,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthPwdPost(authPwdPostDeps{
 					pageRenderer:  pr,
@@ -82,7 +81,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "otp GET", method: http.MethodGet, path: "/auth/otp", accepted: ceremony.AuthStateLevel2OTP,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthOtpGet(authOtpGetDeps{
 					pageRenderer:       pr,
@@ -93,7 +92,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "otp POST", method: http.MethodPost, path: "/auth/otp", accepted: ceremony.AuthStateLevel2OTP,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthOtpPost(authOtpPostDeps{
 					pageRenderer:  pr,
@@ -104,7 +103,7 @@ func everyGatedStep() []stepUnderTest {
 			}},
 		{name: "completed", method: http.MethodGet, path: "/auth/completed",
 			accepted: ceremony.AuthStateAuthenticationCompleted,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildAuthCompletedGet(authCompletedGetDeps{
 					pageRenderer:       pr,
@@ -117,7 +116,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "consent GET", method: http.MethodGet, path: "/auth/consent", accepted: ceremony.AuthStateRequiresConsent,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildConsentGet(consentGetDeps{
 					pageRenderer:  pr,
@@ -127,7 +126,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "consent POST", method: http.MethodPost, path: "/auth/consent", accepted: ceremony.AuthStateRequiresConsent,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildConsentPost(consentPostDeps{
 					pageRenderer:      pr,
@@ -139,7 +138,7 @@ func everyGatedStep() []stepUnderTest {
 				})
 			}},
 		{name: "issue", method: http.MethodGet, path: "/auth/issue", accepted: ceremony.AuthStateReadyToIssueCode,
-			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs *handlersmocks.CeremonyStore,
+			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
 				return buildIssueGet(issueGetDeps{
 					pageRenderer:        pr,
@@ -156,9 +155,10 @@ func everyGatedStep() []stepUnderTest {
 	}
 }
 
-// Every gated route is judged by the ceremony it names, through loadAuthContext, before its state is
-// looked at and before anything else is read: eleven handlers, each in the state it accepts, so the
-// only thing that can refuse them is the id (#246 decision 22). Each case varies one thing from a
+// Every gated route is judged by the ceremony it names, through loadAuthContext and the real ceremony
+// store's read of it, before its state is looked at and before anything else is read: eleven
+// handlers, each in the state it accepts, so the only thing that can refuse them is the id (#246
+// decision 22). Each case varies one thing from a
 // request that passes; the passing one is the last subtest, which reaches the state gate instead.
 func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
 	const otherId = "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa"
@@ -180,19 +180,18 @@ func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
 		for name, req := range refused {
 			t.Run(step.name+" "+name, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)
-				ceremonyStore := handlersmocks.NewCeremonyStore(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				rr := httptest.NewRecorder()
 
 				stored := &ceremony.AuthContext{CeremonyId: testCeremonyId, ClientId: "test-client", AuthState: step.accepted}
-				ceremonyStore.On("GetAuthContext", req).Return(stored, nil).Once()
-				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
+				ceremonyStore, cookies := holdingCeremony(t, stored)
+				req = withCookies(req, cookies)
+				expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, stored)
 
 				step.build(t, pageRenderer, ceremonyStore, auditLogger).ServeHTTP(rr, req)
 
-				assert.Equal(t, step.accepted, stored.AuthState, "a refused request leaves the ceremony as it was")
-				ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-				ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
+				assert.Empty(t, rr.Result().Cookies(), "a refused request writes nothing to the browser session")
+				assertStillHeld(t, ceremonyStore, cookies, stored)
 			})
 		}
 

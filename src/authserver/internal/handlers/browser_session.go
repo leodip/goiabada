@@ -55,22 +55,16 @@ func (b *browserSession) ClearAuthContext(ceremonyId string) error {
 	return b.ceremonyStore.ClearAuthContext(b.w, b.r, ceremonyId)
 }
 
-// ReplaceAuthContext is CeremonyStore.ReplaceAuthContext, /auth/authorize's save, which replaces
-// whatever ceremony the browser session held.
-func (b *browserSession) ReplaceAuthContext(authContext *ceremony.AuthContext) error {
-	return b.ceremonyStore.ReplaceAuthContext(b.w, b.r, authContext)
-}
-
-// DiscardAuthContext is CeremonyStore.DiscardAuthContext, /auth/authorize's clear, which ends
-// whatever ceremony the browser session held.
-func (b *browserSession) DiscardAuthContext() error {
-	return b.ceremonyStore.DiscardAuthContext(b.w, b.r)
+// AddAuthContext is CeremonyStore.AddAuthContext, /auth/authorize's save, which starts a ceremony
+// beside the ones the browser session holds.
+func (b *browserSession) AddAuthContext(authContext *ceremony.AuthContext) error {
+	return b.ceremonyStore.AddAuthContext(b.w, b.r, authContext)
 }
 
 // RegenerateSession is CeremonyStore.RegenerateSession, a step's conditional rotation of the browser
 // session's identifier.
-func (b *browserSession) RegenerateSession(ceremonyId string) error {
-	return b.ceremonyStore.RegenerateSession(b.w, b.r, ceremonyId)
+func (b *browserSession) RegenerateSession(ceremonyId string, userId int64) error {
+	return b.ceremonyStore.RegenerateSession(b.w, b.r, ceremonyId, userId)
 }
 
 // ConfirmCeremony is CeremonyStore.ConfirmCeremony, which writes nothing.
@@ -80,8 +74,8 @@ func (b *browserSession) ConfirmCeremony(ceremonyId string) error {
 
 // RegenerateSessionAndBind is CeremonyStore.RegenerateSessionAndBind, the create arm's conditional
 // rotation, which binds the user session it started to the browser session.
-func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userSessionIdentifier string) error {
-	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userSessionIdentifier)
+func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string) error {
+	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userId, userSessionIdentifier)
 }
 
 // Device is the browser this request comes from, as its device cookie and headers say.

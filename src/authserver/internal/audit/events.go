@@ -378,10 +378,12 @@ const (
 	EventDeletedClientLogo              = "deleted_client_logo"
 	EventGeneratedEmailVerificationCode = "generated_email_verification_code"
 	// EventAuthCeremonyMismatch records a step of the authorization flow requested with a
-	// ceremony id the browser's auth context does not hold, or with none: a form submitted with
-	// its ceremonyId field, or a page loaded with the ceremony query parameter, from a ceremony a
-	// second /auth/authorize has since replaced. The request is refused with a 400 and the current
-	// ceremony is left alone (#79 for the forms, #246 and #437 for the pages).
+	// ceremony id the browser does not hold while it holds others, or with none: a form submitted
+	// with its ceremonyId field, or a page loaded with the ceremony query parameter, from a
+	// ceremony that has finished, been pushed out by newer sign-ins, or was never this browser's.
+	// The request is refused with a 400 and the ceremonies the browser holds are left alone (#79
+	// for the forms, #246 and #437 for the pages). Its details describe the ceremony the browser
+	// most recently wrote (#246 decision 5).
 	//
 	// Ordinary in a browser the user runs two authorizations in, so a row on its own is not an
 	// attack. A run of them against one client is worth looking at: this is the event that

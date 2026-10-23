@@ -1,6 +1,7 @@
 // The auth server's own pages a user of the test app meets beyond the steps the other files drive:
 // the two-factor setup page's key, for an authenticator app that cannot scan the QR code, and its
-// Copy key; the page an older tab of a sign-in started again meets; and the not found page.
+// Copy key; two tabs signing in side by side, and the page a sign-in pushed out meets; and the not
+// found page.
 import type { Browser, BrowserContextOptions } from "@playwright/test";
 import { submitPassword } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
@@ -54,9 +55,31 @@ test("a copy the browser refuses selects the key instead, and says so", async ({
   await context.close();
 });
 
-// A browser holds one sign-in at a time: starting another replaces it, and a tab of the first one
-// can no longer go on, so it cannot finish the newer one's authorization either.
-test("a sign-in started again in another tab leaves the first tab saying its request is no longer active, and the new one goes on", async ({
+// A browser holds up to five sign-ins side by side, each finishing on its own, so a user signing in
+// to two applications from two tabs finishes both (#246). Two applications, since each keeps one
+// sign-in of its own per browser.
+test("sign-ins started in two tabs both finish", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: first } = await userBrowser(browser);
+  await first.goto(`${testapp.web.url}/login`);
+  await expect(first).toHaveURL(/\/auth\/pwd/);
+  const second = await context.newPage();
+  await second.goto(`${testapp.web2.url}/login`);
+  await expect(second).toHaveURL(/\/auth\/pwd/);
+
+  await submitPassword(first, user.email, user.password);
+  await first.waitForURL(testapp.web.url);
+  await expectResult(first, "Signed in");
+
+  await submitPassword(second, user.email, user.password);
+  await second.waitForURL(testapp.web2.url);
+  await expectResult(second, "Signed in");
+  await context.close();
+});
+
+// A sixth sign-in pushes out the one least recently moved, and that sign-in's next page says its
+// request is no longer active, in words that do not blame a newer sign-in; the newer ones go on.
+test("a sign-in pushed out by five newer ones says its request is no longer active, and the newer ones go on", async ({
   browser,
   users,
 }) => {
@@ -64,18 +87,22 @@ test("a sign-in started again in another tab leaves the first tab saying its req
   const { context, page: first } = await userBrowser(browser);
   await first.goto(`${testapp.web.url}/login`);
   await expect(first).toHaveURL(/\/auth\/pwd/);
-  const second = await context.newPage();
-  await second.goto(`${testapp.web.url}/login`);
-  await expect(second).toHaveURL(/\/auth\/pwd/);
+  const newer = await context.newPage();
+  for (let i = 0; i < 5; i++) {
+    await newer.goto(`${testapp.web2.url}/login`);
+    await expect(newer).toHaveURL(/\/auth\/pwd/);
+  }
 
   await submitPassword(first, user.email, user.password);
   await expect(first.getByRole("heading", { name: "This request is no longer active" })).toBeVisible();
   await expect(first).toHaveTitle(/^This request is no longer active – /);
-  await expect(first.locator("#errorMsg")).toContainText("Another one was started in this browser, so this one can no longer continue.");
+  await expect(first.locator("#errorMsg")).toHaveText(
+    "This page belongs to a sign-in that can no longer continue. It may have finished already, or a later sign-in or sign-out in this browser ended it. Go back to the application you were signing in to and start again.",
+  );
 
-  await submitPassword(second, user.email, user.password);
-  await second.waitForURL(testapp.web.url);
-  await expectResult(second, "Signed in");
+  await submitPassword(newer, user.email, user.password);
+  await newer.waitForURL(testapp.web2.url);
+  await expectResult(newer, "Signed in");
   await context.close();
 });
 

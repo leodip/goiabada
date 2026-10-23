@@ -107,15 +107,14 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 
 			switch tc.want {
 			case deferToLogin:
-				ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1 &&
 						ac.DeferredErrorCode == "invalid_scope" &&
 						ac.DeferredErrorDescription == administrativeScopeRefusedDescription
 				})).Return(nil).Once()
 			case answerClient:
-				ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil).Once()
+				// Answered at once, which writes nothing to the browser session (#246).
 			case blockedPage:
-				ceremonyStore.On("DiscardAuthContext", rr, req).Return(nil).Once()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 					"/auth_redirect_blocked.html", mock.Anything).Return(nil).Once()
 			}
@@ -218,7 +217,7 @@ func TestHandleAuthorizeGet_AnAllowedClientIsNotRefusedAnAdministrativeScope(t *
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(false)
-			ceremonyStore.On("ReplaceAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.DeferredErrorCode == "" &&
 					ac.Scope == "openid authserver:manage"
 			})).Return(nil).Once()

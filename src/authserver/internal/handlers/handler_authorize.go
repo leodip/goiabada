@@ -81,13 +81,14 @@ func HandleAuthorizeGet(
 			answerAuthorizePageRefusal(pageRenderer, w, r, result.PageRefusal)
 
 		case result.ClientRefusal != nil:
-			// A failed discard answers server_error. On the silent path that is worth naming: a
-			// silent-renewal iframe reads it as "retry later" rather than "start an interactive login",
-			// the accurate instruction on a server fault (#141).
+			// Nothing was written for it, so there is no clear to answer server_error for: the
+			// sign-in the browser holds is left as it was (#246).
 			input := redirectErrorFromAuthContext(result.AuthContext, result.ClientRefusal.Client,
 				result.ClientRefusal.Code, result.ClientRefusal.Description)
 			input.redirectAlreadyWithheld = result.RedirectWithheld
-			responder.answerClientAfterClear(w, r, input, result.DiscardErr)
+			if err := responder.redirToClientWithError(w, r, input); err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+			}
 
 		case result.SaveErr != nil:
 			pageRenderer.InternalServerError(w, r, result.SaveErr)
@@ -177,10 +178,11 @@ func withUILocales(r *http.Request, uiLocales []string) *http.Request {
 
 // answerClientAfterStepClear answers the client with an error once the step's authflow operation
 // has made its clear, which comes first because every response mode commits the response and the
-// clear persists through a Set-Cookie on w (#141). A clear that found the ceremony replaced, by
-// another /auth/authorize or a session gone, wrote nothing, and the client is not answered: the
-// browser has abandoned this ceremony, and a client keeping one pending state per browser could take
-// this error as the answer to the newer request, so the step answers the "no longer active" page
+// clear persists through a Set-Cookie on w (#141). A clear that found the ceremony no longer held,
+// ended by another request of it, pushed out by newer sign-ins or its session gone, wrote nothing,
+// and the client is not answered: the browser has abandoned this ceremony, and a client keeping one
+// pending state per browser could take this error as the answer to a newer request, so the step
+// answers the "no longer active" page
 // (#579 decision 2, #79 decision 5). Otherwise the responder answers, with server_error when the
 // clear failed (ClientErrorResponder.answerClientAfterClear).
 func answerClientAfterStepClear(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,

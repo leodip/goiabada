@@ -72,7 +72,8 @@
 //     loads the client before every answer that can redirect (#108), asks the responder's emission
 //     gate before the session and the session before the validations, and reads the session only
 //     when the route turns on it: never for prompt=login, and a failed read is an error, never "no
-//     session" (#213). A refusal answered now discards the ceremony before the answer (#141).
+//     session" (#213). A refusal answered now writes nothing, so the sign-in the browser holds
+//     carries on (#246).
 //   - A parked error reads the client's provenance before the ceremony is cleared, and the clear
 //     comes before the answer (Level1Completion); so does every access_denied Completion owes.
 //   - A step saves its next state before the handler redirects to it.

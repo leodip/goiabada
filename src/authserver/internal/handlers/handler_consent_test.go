@@ -513,7 +513,7 @@ func TestHandleConsentPost(t *testing.T) {
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -597,19 +597,20 @@ func TestHandleConsentPost(t *testing.T) {
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)
-				ceremonyStore := handlersmocks.NewCeremonyStore(t)
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
 				permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-				handler := buildConsentPost(consentPostDeps{
-					pageRenderer:      pageRenderer,
-					ceremonyStore:     ceremonyStore,
-					database:          database,
-					auditLogger:       auditLogger,
-					permissionChecker: permissionChecker,
-				})
+				buildHandler := func(ceremonyStore CeremonyStore) http.Handler {
+					return buildConsentPost(consentPostDeps{
+						pageRenderer:      pageRenderer,
+						ceremonyStore:     ceremonyStore,
+						database:          database,
+						auditLogger:       auditLogger,
+						permissionChecker: permissionChecker,
+					})
+				}
 
 				form := url.Values{}
 				if tc.btn == "btnSubmit" {
@@ -621,9 +622,9 @@ func TestHandleConsentPost(t *testing.T) {
 				target := "/auth/consent"
 				if tc.submitted != "" {
 					if tc.inQuery {
-						target += "?" + url.Values{ceremonyIdField: {tc.submitted}}.Encode()
+						target += "?" + url.Values{ceremony.IdField: {tc.submitted}}.Encode()
 					} else {
-						form.Add(ceremonyIdField, tc.submitted)
+						form.Add(ceremony.IdField, tc.submitted)
 					}
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
@@ -641,18 +642,18 @@ func TestHandleConsentPost(t *testing.T) {
 					RedirectURI:  "https://example.com/callback",
 					State:        "test-state",
 				}
-				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore, cookies := holdingCeremony(t, authContext)
+				req = withCookies(req, cookies)
+				expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, authContext)
 
-				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
-
-				handler.ServeHTTP(rr, req)
+				buildHandler(ceremonyStore).ServeHTTP(rr, req)
 
 				// Nothing was cleared, nothing was saved and no consent was written: the mocks
 				// have no expectation for any of it, and database is empty besides.
 				assert.Empty(t, rr.Header().Get("Location"))
 
 				pageRenderer.AssertExpectations(t)
-				ceremonyStore.AssertExpectations(t)
+				assertStillHeld(t, ceremonyStore, cookies, authContext)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
 			})
@@ -678,7 +679,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -734,7 +735,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -797,7 +798,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -856,7 +857,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnCancel", "cancel")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -909,7 +910,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "openid")
 		form.Add("consent1", "profile")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
@@ -979,7 +980,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "openid")
 		form.Add("consent1", "profile")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
@@ -1036,7 +1037,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "openid")
 		form.Add("consent1", "profile")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
@@ -1114,7 +1115,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "openid")
 		form.Add("consent1", "backend:read")
 		form.Add("consent2", "backend:write")
@@ -1209,7 +1210,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "openid")
 		form.Add("consent1", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
@@ -1273,7 +1274,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
@@ -1355,7 +1356,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
@@ -1436,7 +1437,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
@@ -1508,7 +1509,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent0", "backend:read")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
@@ -1574,7 +1575,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1635,7 +1636,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1691,7 +1692,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1745,7 +1746,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1820,7 +1821,7 @@ func TestHandleConsentPost(t *testing.T) {
 		checked := func(indices ...int) url.Values {
 			form := url.Values{}
 			form.Add("btnSubmit", "submit")
-			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add(ceremony.IdField, testCeremonyId)
 			for _, idx := range indices {
 				form.Add(fmt.Sprintf("consent%d", idx), "[on]")
 			}
@@ -1881,7 +1882,7 @@ func TestHandleConsentPost(t *testing.T) {
 			{
 				// Fails closed: nothing beginning consent arrived at all.
 				name: "no box checked", scopeCount: 11,
-				body: url.Values{"btnSubmit": {"submit"}, ceremonyIdField: {testCeremonyId}}, granted: nil,
+				body: url.Values{"btnSubmit": {"submit"}, ceremony.IdField: {testCeremonyId}}, granted: nil,
 			},
 			{
 				// A key naming no index used to pass the refusal gate, persist an empty consent
@@ -1891,7 +1892,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 			{
 				name: "a non-numeric consent key", scopeCount: 3,
-				body:    url.Values{"btnSubmit": {"submit"}, "consentX": {"[on]"}, ceremonyIdField: {testCeremonyId}},
+				body:    url.Values{"btnSubmit": {"submit"}, "consentX": {"[on]"}, ceremony.IdField: {testCeremonyId}},
 				granted: nil,
 			},
 			{
@@ -1899,7 +1900,7 @@ func TestHandleConsentPost(t *testing.T) {
 				// would have merged /auth/consent?consent1=on into the submission.
 				name: "a consent key in the query alone", scopeCount: 3,
 				query: url.Values{"consent1": {"[on]"}},
-				body:  url.Values{"btnSubmit": {"submit"}, ceremonyIdField: {testCeremonyId}}, granted: nil,
+				body:  url.Values{"btnSubmit": {"submit"}, ceremony.IdField: {testCeremonyId}}, granted: nil,
 			},
 			{
 				// The other direction: a real submission does not launder the query key
@@ -1918,7 +1919,7 @@ func TestHandleConsentPost(t *testing.T) {
 				name: "a cancel submission with btnSubmit in the query", scopeCount: 3,
 				query: url.Values{"btnSubmit": {"submit"}},
 				body: url.Values{
-					"btnCancel": {"cancel"}, ceremonyIdField: {testCeremonyId},
+					"btnCancel": {"cancel"}, ceremony.IdField: {testCeremonyId},
 					"consent0": {"[on]"}, "consent1": {"[on]"}, "consent2": {"[on]"},
 				},
 				granted: nil,
@@ -1930,7 +1931,7 @@ func TestHandleConsentPost(t *testing.T) {
 				name: "both action buttons in the body", scopeCount: 3,
 				body: url.Values{
 					"btnSubmit": {"submit"}, "btnCancel": {"cancel"},
-					ceremonyIdField: {testCeremonyId}, "consent0": {"[on]"},
+					ceremony.IdField: {testCeremonyId}, "consent0": {"[on]"},
 				},
 				granted: nil,
 			},
@@ -1941,7 +1942,7 @@ func TestHandleConsentPost(t *testing.T) {
 				// weakens to PostForm.Has("btnSubmit") and the suite stays green (#79).
 				name: "btnSubmit carrying a value no button sends", scopeCount: 3,
 				body: url.Values{
-					"btnSubmit": {"yes"}, ceremonyIdField: {testCeremonyId}, "consent0": {"[on]"},
+					"btnSubmit": {"yes"}, ceremony.IdField: {testCeremonyId}, "consent0": {"[on]"},
 				},
 				granted: nil,
 			},
@@ -1952,7 +1953,7 @@ func TestHandleConsentPost(t *testing.T) {
 				// are absent stays green (#79).
 				name: "neither action button in the body", scopeCount: 3,
 				body: url.Values{
-					ceremonyIdField: {testCeremonyId}, "consent0": {"[on]"},
+					ceremony.IdField: {testCeremonyId}, "consent0": {"[on]"},
 				},
 				granted: nil,
 			},
@@ -2039,17 +2040,28 @@ func TestHandleConsentPost(t *testing.T) {
 					RedirectURI:  "https://example.com/callback",
 					State:        "test-state",
 				}
-				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				if !tc.ceremonyMismatch {
+					ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				}
 
 				switch {
 				case tc.ceremonyMismatch:
-					expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
+					// The real store, whose read of the ceremony the body names is what refuses it.
+					heldStore, cookies := holdingCeremony(t, authContext)
+					req = withCookies(req, cookies)
+					expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, authContext)
 
-					handler.ServeHTTP(rr, req)
+					buildConsentPost(consentPostDeps{
+						pageRenderer:      pageRenderer,
+						ceremonyStore:     heldStore,
+						database:          database,
+						auditLogger:       auditLogger,
+						permissionChecker: permissionChecker,
+					}).ServeHTTP(rr, req)
 
-					// Nothing was cleared and nothing was saved, which the mocks enforce by
-					// having no expectation for either call.
+					// Nothing was cleared and nothing was saved: the ceremony is held as it was.
 					assert.Empty(t, rr.Header().Get("Location"))
+					assertStillHeld(t, heldStore, cookies, authContext)
 				case tc.granted == nil:
 					stubClientProvenanceLookup(database)
 					// Only this branch emits, so only this branch reaches the emitter's
@@ -2141,7 +2153,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("consent2", "[on]")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})

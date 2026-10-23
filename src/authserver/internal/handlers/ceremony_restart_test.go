@@ -240,7 +240,7 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 		signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(0), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
 		Return(&record.UserSession{Id: 1, SessionIdentifier: "new-session-of-user-1", UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: pwdAuthTime}, nil, nil)
-	expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+	expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1, Enabled: true}, nil)
 

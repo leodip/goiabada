@@ -109,8 +109,7 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Empty(t, rr.Header().Get("Location"), "a refusal sends the browser nowhere")
-			ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
-			ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "AddAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertExpectations(t)
 			authorizeValidator.AssertExpectations(t)
 		})
@@ -238,7 +237,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 				Return(tc.hasSession).Maybe()
 
 			var saves []ceremony.AuthContext
-			ceremonyStore.On("ReplaceAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).
+			ceremonyStore.On("AddAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).
 				Run(func(args mock.Arguments) {
 					saves = append(saves, *args.Get(2).(*ceremony.AuthContext))
 				}).Return(nil)
@@ -267,7 +266,6 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 					"the target is fixed before the exit saves")
 			}
 
-			ceremonyStore.AssertNotCalled(t, "DiscardAuthContext", mock.Anything, mock.Anything)
 			authorizeValidator.AssertExpectations(t)
 		})
 	}

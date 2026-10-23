@@ -85,8 +85,8 @@ type completionBrowser interface {
 	// holds the ceremony, the create arm's check before it ends or creates anything.
 	ConfirmCeremony(ceremonyId string) error
 	// RegenerateSessionAndBind rotates the browser session's identifier and writes the user session
-	// named into it, the create arm's rotation.
-	RegenerateSessionAndBind(ceremonyId string, userSessionIdentifier string) error
+	// named into it, the create arm's rotation, keeping no ceremony held for a user other than userId.
+	RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string) error
 	// Device is the browser the request comes from: its device cookie's identifier, or a new one,
 	// and its display labels.
 	Device() usersession.Device
@@ -408,7 +408,7 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 		if stale {
 			return nil, errs.WithStack(usersession.ErrStaleAuthentication)
 		}
-		if err = browser.RegenerateSession(authContext.CeremonyId); err != nil {
+		if err = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); err != nil {
 			return nil, err
 		}
 	}
@@ -504,7 +504,8 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 		OTPClaim:         otpClaimOf(authContext),
 	}, authContext.AuthStateGeneration, authContext.OtpConfigGeneration, device, ipAddress, replacing, limits)
 	if err == nil {
-		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyId, newSession.SessionIdentifier); rotateErr != nil {
+		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyId, authContext.UserId,
+			newSession.SessionIdentifier); rotateErr != nil {
 			err = o.sessions.AbandonUserSession(ctx, newSession,
 				errs.Wrap(rotateErr, "unable to rotate the browser session identifier"))
 		} else {

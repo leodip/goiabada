@@ -206,7 +206,7 @@ func TestHandleAuthCompletedGet_ALoadFailingBeforeTheDecisionAnswers500(t *testi
 		f.pageRenderer.AssertExpectations(t)
 		f.userSessionManager.AssertNotCalled(t, "BindUserSession", mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything, mock.Anything)
-		f.ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+		f.ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		f.assertNothingSaved(t)
 	})
@@ -383,7 +383,7 @@ func TestHandleAuthCompletedGet_ABoundSessionWithNoAuthTimeIsRefused(t *testing.
 		f.userSessionManager.On("StartNewUserSession", theContextOf(f.req), int64(1),
 			signedInAs(int64(1), "pwd", record.AcrLevel1, &passwordAt), int64(0), (*int64)(nil), aNewDeviceOf(f.req, &minted), "",
 			(*record.UserSession)(nil), testSessionLimits).Return(started, nil, nil).Once()
-		expectNewSessionBound(f.ceremonyStore, f.rr, f.req, "new-session-of-user-1")
+		expectNewSessionBound(f.ceremonyStore, f.rr, f.req, 1, "new-session-of-user-1")
 		f.auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()
 		f.expect500(mock.MatchedBy(hasNoAuthTime))
 

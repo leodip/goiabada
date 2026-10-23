@@ -122,7 +122,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// target ACR is the one the session already holds. Rotating here would replace the
 		// identifier on every page a signed-in user visits, and two concurrent requests
 		// from one browser would each strand the other's cookie (#266 decision 6).
-		ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+		ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -312,7 +312,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
 			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
 			Return(newSession, nil, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-2")
+		expectNewSessionBound(ceremonyStore, rr, req, 2, "new-session-of-user-2")
 
 		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
@@ -485,7 +485,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-2")
+		expectNewSessionBound(ceremonyStore, rr, req, 2, "new-session-of-user-2")
 
 		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
@@ -614,7 +614,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 			Return(newSession, []usersession.Removal{{Session: *ownSession, Reason: "replaced_by_sign_in"}}, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -744,7 +744,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 				Return(started, tc.removed, nil)
 			rotateError := errors.New("the backend refused the write")
-			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, "new-session-of-user-1").
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "new-session-of-user-1").
 				Return(rotateError).Once()
 			// The rotation's failure, wrapped, is the cause the abandonment is handed; what it answers is
 			// what the 500 carries.
@@ -1427,7 +1427,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -1545,7 +1545,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd otp", record.AcrLevel2Optional), mock.Anything, "").Return(userSession, nil)
@@ -1655,7 +1655,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
@@ -1762,7 +1762,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd otp", record.AcrLevel2Optional), mock.Anything, "").Return(userSession, nil)
@@ -1872,7 +1872,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				AuthTime: &pwdAuthTime, PasswordAuthTime: &pwdAuthTime,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &captured},
 			}), int64(7), &captured, aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -2885,7 +2885,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -2993,7 +2993,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
-		expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
@@ -3286,7 +3286,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier,
 				boundWith("pwd otp", record.AcrLevel2Optional)).Return(false, errAt(precheck)).Once()
 			if tc.failedAt > precheck {
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(errAt(regenerate)).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(errAt(regenerate)).Once()
 			}
 			if tc.failedAt > regenerate {
 				bindErr := errAt(bind)
@@ -3309,7 +3309,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
 			if tc.failedAt < regenerate {
-				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
 			if tc.failedAt < bind {
 				userSessionManager.AssertNotCalled(t, "BindUserSession", mock.Anything, mock.Anything, mock.Anything,
@@ -3909,7 +3909,7 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 
 			// The newer ceremony's auth context, stored in this browser's session, is left as it is.
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
@@ -3997,7 +3997,7 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, handed).
 				Return(tc.staleAtCheck, nil).Once()
 			if tc.wantRotationAndBind {
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 				userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), handed, false, "").
 					Return(nil, errs.WithStack(usersession.ErrStaleAuthentication)).Once()
 			}
@@ -4006,7 +4006,7 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			handler.ServeHTTP(rr, req)
 
 			if !tc.wantRotationAndBind {
-				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+				ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 				userSessionManager.AssertNotCalled(t, "BindUserSession", mock.Anything, mock.Anything, mock.Anything,
 					mock.Anything, mock.Anything, mock.Anything)
 			}
@@ -4079,7 +4079,7 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			var minted string
 			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), mock.Anything, int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
 				Return(&record.UserSession{Id: 1, SessionIdentifier: "new-session-of-user-1", UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: time.Now().UTC()}, nil, nil)
-			expectNewSessionBound(ceremonyStore, rr, req, "new-session-of-user-1")
+			expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 			auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()
 			user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 7}
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)

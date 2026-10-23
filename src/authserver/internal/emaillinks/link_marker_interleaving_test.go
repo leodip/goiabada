@@ -64,14 +64,14 @@ func storedValues(t *testing.T, store *sessionstore.ConditionalStore, seed *http
 
 func TestSaveLinkMarker_KeepsWhatAnotherRequestWroteMeanwhile(t *testing.T) {
 	store := newMarkerTestStore()
-	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContext: "ceremony A"})
+	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContexts: "ceremony A"})
 
 	reqA := loadedRequest(t, store, seed)
-	writeMeanwhile(t, store, seed, sessionkeys.AuthContext, "ceremony B")
+	writeMeanwhile(t, store, seed, sessionkeys.AuthContexts, "ceremony B")
 	requireMarkerSaved(t, store, httptest.NewRecorder(), reqA, LinkMarkerFlowResetPassword, 42, "hash-a")
 
 	values := storedValues(t, store, seed)
-	assert.Equal(t, "ceremony B", values[sessionkeys.AuthContext],
+	assert.Equal(t, "ceremony B", values[sessionkeys.AuthContexts],
 		"the marker's save must not put back the copy its request began with")
 	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, seed), LinkMarkerFlowResetPassword)
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestSaveLinkMarker_KeepsWhatAnotherRequestWroteMeanwhile(t *testing.T) {
 // the first continuation because the request's own copy held none.
 func TestSaveLinkMarker_DecidesTheContinuationInFlightOnTheStoredSession(t *testing.T) {
 	store := newMarkerTestStore()
-	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContext: "ceremony A"})
+	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContexts: "ceremony A"})
 
 	reqA := loadedRequest(t, store, seed)
 	requireMarkerSaved(t, store, httptest.NewRecorder(), requestCarrying(t, seed),
@@ -109,7 +109,7 @@ func TestSaveLinkMarker_DecidesTheContinuationInFlightOnTheStoredSession(t *test
 // id the stored marker carries is kept, as the form that follow rendered names it.
 func TestSaveLinkMarker_KeepsTheStoredContinuationIdOfTheSameLink(t *testing.T) {
 	store := newMarkerTestStore()
-	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContext: "ceremony A"})
+	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContexts: "ceremony A"})
 
 	reqA := loadedRequest(t, store, seed)
 	requireMarkerSaved(t, store, httptest.NewRecorder(), requestCarrying(t, seed),
@@ -130,17 +130,17 @@ func TestSaveLinkMarker_KeepsTheStoredContinuationIdOfTheSameLink(t *testing.T) 
 
 func TestClearLinkMarker_KeepsWhatAnotherRequestWroteMeanwhile(t *testing.T) {
 	store := newMarkerTestStore()
-	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContext: "ceremony A"})
+	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContexts: "ceremony A"})
 	requireMarkerSaved(t, store, httptest.NewRecorder(), requestCarrying(t, seed),
 		LinkMarkerFlowResetPassword, 42, "hash-a")
 
 	reqA := loadedRequest(t, store, seed)
 	consumed := consumeMarker(t, store, reqA, LinkMarkerFlowResetPassword)
-	writeMeanwhile(t, store, seed, sessionkeys.AuthContext, "ceremony B")
+	writeMeanwhile(t, store, seed, sessionkeys.AuthContexts, "ceremony B")
 	require.NoError(t, ClearLinkMarker(store, httptest.NewRecorder(), reqA, consumed.ContinuationId))
 
 	values := storedValues(t, store, seed)
-	assert.Equal(t, "ceremony B", values[sessionkeys.AuthContext],
+	assert.Equal(t, "ceremony B", values[sessionkeys.AuthContexts],
 		"the marker's clear must not put back the copy its request began with")
 	assert.NotContains(t, values, sessionkeys.LinkMarker)
 }
@@ -195,7 +195,7 @@ func TestClearLinkMarker_KeepsANewerContinuationsMarker(t *testing.T) {
 // remove, so it writes nothing.
 func TestClearLinkMarker_WritesNothingWhenNoMarkerIsStored(t *testing.T) {
 	store := newMarkerTestStore()
-	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContext: "ceremony A"})
+	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContexts: "ceremony A"})
 	requireMarkerSaved(t, store, httptest.NewRecorder(), requestCarrying(t, seed),
 		LinkMarkerFlowResetPassword, 42, "hash-a")
 
@@ -217,7 +217,7 @@ func TestClearLinkMarker_WritesNothingWhenNoMarkerIsStored(t *testing.T) {
 // it: nothing to remove, so no error, and the session is not put back.
 func TestClearLinkMarker_ASessionGoneMeanwhileIsCleared(t *testing.T) {
 	store := newMarkerTestStore()
-	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContext: "ceremony A"})
+	seed := seedSession(t, store, map[string]any{sessionkeys.AuthContexts: "ceremony A"})
 	requireMarkerSaved(t, store, httptest.NewRecorder(), requestCarrying(t, seed),
 		LinkMarkerFlowResetPassword, 42, "hash-a")
 

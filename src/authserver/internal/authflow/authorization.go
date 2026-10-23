@@ -98,13 +98,13 @@ type redirectEmission interface {
 		site string) bool
 }
 
-// authorizeBrowser is the two browser-session writes /auth/authorize makes. It starts a ceremony, so
-// both write without a condition (#579 decision 6): the save replaces whatever ceremony the browser
-// session held, and the discard ends it before the client is answered with an error. The handler's
+// authorizeBrowser is the one browser-session write /auth/authorize makes. It starts a ceremony
+// beside the ones the browser session holds, pushing out the least recently written when it holds
+// ceremony.MaxHeldCeremonies already, and leaves every other alone (#246). A request answered at
+// once with an error writes nothing, so it leaves every sign-in in progress alone. The handler's
 // per-request adapter satisfies it.
 type authorizeBrowser interface {
-	ReplaceAuthContext(authContext *ceremony.AuthContext) error
-	DiscardAuthContext() error
+	AddAuthContext(authContext *ceremony.AuthContext) error
 }
 
 // Authorization is GET /auth/authorize: it accepts or refuses an authorization request, starts the
@@ -190,11 +190,8 @@ type AuthorizationResult struct {
 	AuthContext *ceremony.AuthContext
 
 	// ClientRefusal is the error the client is answered with now. The ceremony ends with it: it was
-	// discarded.
+	// never stored, and whatever sign-in the browser holds is left as it was (#246).
 	ClientRefusal *ClientError
-	// DiscardErr is the discard's failure, which answers the client server_error in place of
-	// ClientRefusal (#141).
-	DiscardErr error
 	// RedirectWithheld says the client-error responder's gates already answered that a redirect
 	// to this client would be withheld. The responder takes it as a floor and asks no more
 	// permissively when it writes the answer: two live reads of a table an administrator can change
@@ -264,15 +261,15 @@ func (o *Authorization) ResolveParked(ctx context.Context, params url.Values) (u
 //     ceremony's target ACR is fixed from the client (SetTargetAcrLevel). A failed read is returned
 //     as an error, never taken for "no session".
 //  5. Acts on the route:
-//     - answer now: records a refusal of administrative scopes, discards the ceremony and returns
-//     ClientRefusal;
+//     - answer now: records a refusal of administrative scopes and returns ClientRefusal, writing
+//     nothing;
 //     - park: records a refusal of administrative scopes, parks the error on the ceremony (#213)
 //     and saves it in requires_level_1, for /auth/level1;
 //     - silence: SilentAuthentication answers the request;
 //     - login, forced or for want of a valid session: saves the ceremony in requires_level_1, for
 //     /auth/level1;
-//     - a disabled user: records user_disabled, discards the ceremony and returns ClientRefusal
-//     with access_denied;
+//     - a disabled user: records user_disabled and returns ClientRefusal with access_denied,
+//     writing nothing;
 //     - SSO: adopts the session and saves the ceremony in level1_existing_session, for
 //     /auth/level1completed.
 //
@@ -291,8 +288,8 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 	}
 
 	// The ceremony id is minted here and nowhere else. Every form the ceremony renders carries it and
-	// every redirect between its steps names it, so a page left open in another tab cannot act on the
-	// request that replaced it (#79, #246).
+	// every redirect between its steps names it, so a page left open in another tab acts on its own
+	// request and on no other the browser holds (#79, #246).
 	authContext := &ceremony.AuthContext{
 		CeremonyId:                    ceremony.NewId(),
 		ClientId:                      params.Get("client_id"),
@@ -436,17 +433,18 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 
 	result := AuthorizationResult{AuthContext: authContext}
 
-	// answerClient ends the ceremony and answers the client with an error now, whoever is at the
-	// browser. A silent request never asked the emission gate, which is "nothing has withheld it yet".
+	// answerClient answers the client with an error now, whoever is at the browser, and stores
+	// nothing: a link or redirect that is not even a valid sign-in, sent to this browser from
+	// anywhere, must not end the sign-in it holds (#246). A silent request never asked the emission
+	// gate, which is "nothing has withheld it yet".
 	answerClient := func(code, description string) AuthorizationResult {
 		result.ClientRefusal = &ClientError{Client: client, Code: code, Description: description}
 		result.RedirectWithheld = facts.redirectEmitted != nil && !*facts.redirectEmitted
-		result.DiscardErr = browser.DiscardAuthContext()
 		return result
 	}
 	saveFor := func(nextStep string) AuthorizationResult {
 		result.NextStep = nextStep
-		result.SaveErr = browser.ReplaceAuthContext(authContext)
+		result.SaveErr = browser.AddAuthContext(authContext)
 		return result
 	}
 
@@ -492,7 +490,6 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 		}
 		if silent.Refusal != nil {
 			result.ClientRefusal = silent.Refusal
-			result.DiscardErr = silent.DiscardErr
 			return result, nil
 		}
 		result.NextStep = "/auth/issue"
