@@ -5,10 +5,277 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// refreshTokenColumns is the refresh_tokens table as scanRefreshToken reads it, each column
+// qualified by its table so the list reads the same in a join with codes, whose own id, created_at,
+// updated_at, user_id, client_id, scope, session_identifier, revoked and auth_state_generation it
+// would otherwise name ambiguously.
+var refreshTokenColumns = columnList{
+	sqlite: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
+		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
+		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
+		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
+		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+	mysql: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
+		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
+		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
+		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
+		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+	postgres: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
+		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
+		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
+		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
+		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+	mssql: "refresh_tokens.id, refresh_tokens.created_at, refresh_tokens.updated_at, refresh_tokens.code_id, " +
+		"refresh_tokens.user_id, refresh_tokens.client_id, refresh_tokens.refresh_token_jti, " +
+		"refresh_tokens.previous_refresh_token_jti, refresh_tokens.first_refresh_token_jti, " +
+		"refresh_tokens.session_identifier, refresh_tokens.refresh_token_type, refresh_tokens.scope, " +
+		"refresh_tokens.issued_at, refresh_tokens.expires_at, refresh_tokens.max_lifetime, " +
+		"refresh_tokens.revoked, refresh_tokens.auth_state_generation, refresh_tokens.authenticated_at",
+}
+
+// scanRefreshToken reads one row selected with refreshTokenColumns.
+func scanRefreshToken(row rowScanner, refreshToken *record.RefreshToken) error {
+	return row.Scan(
+		&refreshToken.Id,
+		&refreshToken.CreatedAt,
+		&refreshToken.UpdatedAt,
+		&refreshToken.CodeId,
+		&refreshToken.UserId,
+		&refreshToken.ClientId,
+		&refreshToken.RefreshTokenJti,
+		&refreshToken.PreviousRefreshTokenJti,
+		&refreshToken.FirstRefreshTokenJti,
+		&refreshToken.SessionIdentifier,
+		&refreshToken.RefreshTokenType,
+		&refreshToken.Scope,
+		&refreshToken.IssuedAt,
+		&refreshToken.ExpiresAt,
+		&refreshToken.MaxLifetime,
+		&refreshToken.Revoked,
+		&refreshToken.AuthStateGeneration,
+		&refreshToken.AuthenticatedAt,
+	)
+}
+
+// queryRefreshTokens runs a read of any number of refresh tokens and answers them as pointers, nil
+// when no row comes back. A failure part way through the result set is an error, never a partial
+// list: a revocation sweep committed over a partial list would miss the rows it never saw.
+func queryRefreshTokens(ctx context.Context, d *Database, tx *sql.Tx, query string, args []any) ([]*record.RefreshToken, error) {
+	list, err := queryAll(ctx, d, tx, nil, query, args, scanRefreshToken, "refreshToken")
+	if err != nil {
+		return nil, err
+	}
+
+	var refreshTokens []*record.RefreshToken
+	for i := range list {
+		refreshTokens = append(refreshTokens, &list[i])
+	}
+	return refreshTokens, nil
+}
+
+// insertRefreshToken writes every column but id, the dont-update ones included: a new token is
+// born with its code, user and client, and the generation and instant its grant was authenticated at.
+var insertRefreshToken = statement{
+	sqlite: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
+		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
+		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
+		"authenticated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
+		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
+		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
+		"authenticated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
+		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
+		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
+		"authenticated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
+		"$17) RETURNING id",
+	mssql: "INSERT INTO refresh_tokens (created_at, updated_at, code_id, user_id, client_id, " +
+		"refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti, session_identifier, " +
+		"refresh_token_type, scope, issued_at, expires_at, max_lifetime, revoked, auth_state_generation, " +
+		"authenticated_at) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
+		"@p11, @p12, @p13, @p14, @p15, @p16, @p17)",
+}
+
+// updateRefreshToken writes the whole row but created_at, code_id, user_id, client_id,
+// auth_state_generation and authenticated_at, which are dont-update. Leaving the three foreign keys
+// out of the SET list is what keeps SQL Server from re-checking them, and so from taking a shared
+// lock on the parent rows (#139); see record.RefreshToken.
+var updateRefreshToken = statement{
+	sqlite: "UPDATE refresh_tokens SET updated_at = ?, refresh_token_jti = ?, previous_refresh_token_jti = ?, " +
+		"first_refresh_token_jti = ?, session_identifier = ?, refresh_token_type = ?, scope = ?, " +
+		"issued_at = ?, expires_at = ?, max_lifetime = ?, revoked = ? WHERE id = ?",
+	mysql: "UPDATE refresh_tokens SET updated_at = ?, refresh_token_jti = ?, previous_refresh_token_jti = ?, " +
+		"first_refresh_token_jti = ?, session_identifier = ?, refresh_token_type = ?, scope = ?, " +
+		"issued_at = ?, expires_at = ?, max_lifetime = ?, revoked = ? WHERE id = ?",
+	postgres: "UPDATE refresh_tokens SET updated_at = $1, refresh_token_jti = $2, " +
+		"previous_refresh_token_jti = $3, first_refresh_token_jti = $4, session_identifier = $5, " +
+		"refresh_token_type = $6, scope = $7, issued_at = $8, expires_at = $9, max_lifetime = $10, " +
+		"revoked = $11 WHERE id = $12",
+	mssql: "UPDATE refresh_tokens SET updated_at = @p1, refresh_token_jti = @p2, " +
+		"previous_refresh_token_jti = @p3, first_refresh_token_jti = @p4, session_identifier = @p5, " +
+		"refresh_token_type = @p6, scope = @p7, issued_at = @p8, expires_at = @p9, max_lifetime = @p10, " +
+		"revoked = @p11 WHERE id = @p12",
+}
+
+var selectRefreshTokenById = statement{
+	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE id = ?",
+	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE id = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE id = $1",
+	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE id = @p1",
+}
+
+var selectRefreshTokenByJti = statement{
+	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE refresh_token_jti = ?",
+	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE refresh_token_jti = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE refresh_token_jti = $1",
+	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE refresh_token_jti = @p1",
+}
+
+var selectRefreshTokensByCodeId = statement{
+	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE code_id = ?",
+	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE code_id = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE code_id = $1",
+	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE code_id = @p1",
+}
+
+var selectRefreshTokensBySessionIdentifier = statement{
+	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = ?",
+	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = $1",
+	mssql: "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = @p1",
+}
+
+// selectRefreshTokensByUserId binds the user id once per branch: the code's user, then the token's.
+var selectRefreshTokensByUserId = statement{
+	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? " +
+		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ?",
+	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? " +
+		"UNION ALL SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = $1 " +
+		"UNION ALL SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = $2",
+	mssql: "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = @p1 " +
+		"UNION ALL SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = @p2",
+}
+
+// selectRefreshTokensByUserIdAndClientId binds the user id and the client id once per branch: the
+// code's, then the token's.
+var selectRefreshTokensByUserIdAndClientId = statement{
+	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND codes.client_id = ? " +
+		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ?",
+	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND codes.client_id = ? " +
+		"UNION ALL SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = $1 AND codes.client_id = $2 " +
+		"UNION ALL SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = $3 AND refresh_tokens.client_id = $4",
+	mssql: "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = @p1 AND codes.client_id = @p2 " +
+		"UNION ALL SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = @p3 AND refresh_tokens.client_id = @p4",
+}
+
+// selectRefreshTokensByClientId binds the client id once per branch: the code's, then the token's.
+var selectRefreshTokensByClientId = statement{
+	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.client_id = ? " +
+		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.client_id = ?",
+	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.client_id = ? " +
+		"UNION ALL SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.client_id = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.client_id = $1 " +
+		"UNION ALL SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.client_id = $2",
+	mssql: "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.client_id = @p1 " +
+		"UNION ALL SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.client_id = @p2",
+}
+
+var markRefreshTokenAsRevoked = statement{
+	sqlite:   "UPDATE refresh_tokens SET revoked = ?, updated_at = ? WHERE id = ? AND revoked = ?",
+	mysql:    "UPDATE refresh_tokens SET revoked = ?, updated_at = ? WHERE id = ? AND revoked = ?",
+	postgres: "UPDATE refresh_tokens SET revoked = $1, updated_at = $2 WHERE id = $3 AND revoked = $4",
+	mssql:    "UPDATE refresh_tokens SET revoked = @p1, updated_at = @p2 WHERE id = @p3 AND revoked = @p4",
+}
+
+var revokeRefreshTokenFamily = statement{
+	sqlite: "UPDATE refresh_tokens SET revoked = ?, updated_at = ? " +
+		"WHERE first_refresh_token_jti = ? AND revoked = ?",
+	mysql: "UPDATE refresh_tokens SET revoked = ?, updated_at = ? " +
+		"WHERE first_refresh_token_jti = ? AND revoked = ?",
+	postgres: "UPDATE refresh_tokens SET revoked = $1, updated_at = $2 " +
+		"WHERE first_refresh_token_jti = $3 AND revoked = $4",
+	mssql: "UPDATE refresh_tokens SET revoked = @p1, updated_at = @p2 " +
+		"WHERE first_refresh_token_jti = @p3 AND revoked = @p4",
+}
+
+// promoteRefreshTokenGenerationsWhere is completed by an IN list of refresh token ids, numbered from
+// the fourth argument.
+var promoteRefreshTokenGenerationsWhere = statement{
+	sqlite: "UPDATE refresh_tokens SET auth_state_generation = ?, updated_at = ? " +
+		"WHERE revoked = ? AND ",
+	mysql: "UPDATE refresh_tokens SET auth_state_generation = ?, updated_at = ? " +
+		"WHERE revoked = ? AND ",
+	postgres: "UPDATE refresh_tokens SET auth_state_generation = $1, updated_at = $2 " +
+		"WHERE revoked = $3 AND ",
+	mssql: "UPDATE refresh_tokens SET auth_state_generation = @p1, updated_at = @p2 " +
+		"WHERE revoked = @p3 AND ",
+}
+
+var deleteRefreshToken = statement{
+	sqlite:   "DELETE FROM refresh_tokens WHERE id = ?",
+	mysql:    "DELETE FROM refresh_tokens WHERE id = ?",
+	postgres: "DELETE FROM refresh_tokens WHERE id = $1",
+	mssql:    "DELETE FROM refresh_tokens WHERE id = @p1",
+}
+
+var deleteRefreshTokensByUserId = statement{
+	sqlite:   "DELETE FROM refresh_tokens WHERE user_id = ?",
+	mysql:    "DELETE FROM refresh_tokens WHERE user_id = ?",
+	postgres: "DELETE FROM refresh_tokens WHERE user_id = $1",
+	mssql:    "DELETE FROM refresh_tokens WHERE user_id = @p1",
+}
+
+var deleteRefreshTokensByClientId = statement{
+	sqlite:   "DELETE FROM refresh_tokens WHERE client_id = ?",
+	mysql:    "DELETE FROM refresh_tokens WHERE client_id = ?",
+	postgres: "DELETE FROM refresh_tokens WHERE client_id = $1",
+	mssql:    "DELETE FROM refresh_tokens WHERE client_id = @p1",
+}
+
+// deleteExpiredRefreshTokens binds the same instant twice, once per column.
+var deleteExpiredRefreshTokens = statement{
+	sqlite:   "DELETE FROM refresh_tokens WHERE (expires_at < ? OR max_lifetime < ?)",
+	mysql:    "DELETE FROM refresh_tokens WHERE (expires_at < ? OR max_lifetime < ?)",
+	postgres: "DELETE FROM refresh_tokens WHERE (expires_at < $1 OR max_lifetime < $2)",
+	mssql:    "DELETE FROM refresh_tokens WHERE (expires_at < @p1 OR max_lifetime < @p2)",
+}
 
 func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 
@@ -19,12 +286,12 @@ func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	refreshToken.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	refreshToken.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	insertBuilder := refreshTokenStruct.WithoutTag("pk").InsertInto("refresh_tokens", refreshToken)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "refreshToken")
+	id, err := d.insert(ctx, tx, insertRefreshToken, "refreshToken",
+		refreshToken.CreatedAt, refreshToken.UpdatedAt, refreshToken.CodeId, refreshToken.UserId,
+		refreshToken.ClientId, refreshToken.RefreshTokenJti, refreshToken.PreviousRefreshTokenJti,
+		refreshToken.FirstRefreshTokenJti, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
+		refreshToken.Scope, refreshToken.IssuedAt, refreshToken.ExpiresAt, refreshToken.MaxLifetime,
+		refreshToken.Revoked, refreshToken.AuthStateGeneration, refreshToken.AuthenticatedAt)
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
@@ -44,14 +311,11 @@ func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	originalUpdatedAt := refreshToken.UpdatedAt
 	refreshToken.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	updateBuilder := refreshTokenStruct.WithoutTag("pk").WithoutTag("dont-update").Update("refresh_tokens", refreshToken)
-	updateBuilder.Where(updateBuilder.Equal("id", refreshToken.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateRefreshToken.text(d.Dialect),
+		refreshToken.UpdatedAt, refreshToken.RefreshTokenJti, refreshToken.PreviousRefreshTokenJti,
+		refreshToken.FirstRefreshTokenJti, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
+		refreshToken.Scope, refreshToken.IssuedAt, refreshToken.ExpiresAt, refreshToken.MaxLifetime,
+		refreshToken.Revoked, refreshToken.Id)
 	if err != nil {
 		refreshToken.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update refreshToken")
@@ -82,19 +346,8 @@ func (d *Database) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, re
 		return false, errs.New("can't mark refresh token with id 0 as revoked")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("refresh_tokens")
-	ub.Set(
-		ub.Assign("revoked", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", refreshTokenId),
-		ub.Equal("revoked", false),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, markRefreshTokenAsRevoked.text(d.Dialect),
+		true, time.Now().UTC(), refreshTokenId, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark refresh token as revoked")
 	}
@@ -134,19 +387,8 @@ func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, fir
 		return 0, errs.New("can't revoke a refresh token family with an empty first refresh token jti")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("refresh_tokens")
-	ub.Set(
-		ub.Assign("revoked", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("first_refresh_token_jti", firstRefreshTokenJti),
-		ub.Equal("revoked", false),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, revokeRefreshTokenFamily.text(d.Dialect),
+		true, time.Now().UTC(), firstRefreshTokenJti, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke refresh token family")
 	}
@@ -159,46 +401,9 @@ func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, fir
 	return rowsAffected, nil
 }
 
-func (d *Database) getRefreshTokenCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	refreshTokenStruct *sqlbuilder.Struct) (*record.RefreshToken, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var refreshToken record.RefreshToken
-	if rows.Next() {
-		addr := refreshTokenStruct.Addr(&refreshToken)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan refreshToken")
-		}
-		return &refreshToken, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error) {
-
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
-	selectBuilder.Where(selectBuilder.Equal("id", refreshTokenId))
-
-	refreshToken, err := d.getRefreshTokenCommon(ctx, tx, selectBuilder, refreshTokenStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return refreshToken, nil
+	return queryOne(ctx, d, tx, selectRefreshTokenById.text(d.Dialect), []any{refreshTokenId}, scanRefreshToken,
+		"refreshToken")
 }
 
 func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
@@ -273,52 +478,11 @@ func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refre
 }
 
 func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error) {
-
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
-	selectBuilder.Where(selectBuilder.Equal("refresh_token_jti", jti))
-
-	refreshToken, err := d.getRefreshTokenCommon(ctx, tx, selectBuilder, refreshTokenStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return refreshToken, nil
+	return queryOne(ctx, d, tx, selectRefreshTokenByJti.text(d.Dialect), []any{jti}, scanRefreshToken, "refreshToken")
 }
 
 func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error) {
-
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
-	selectBuilder.Where(selectBuilder.Equal("code_id", codeId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var refreshTokens []*record.RefreshToken
-	for rows.Next() {
-		var refreshToken record.RefreshToken
-		addr := refreshTokenStruct.Addr(&refreshToken)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan refreshToken")
-		}
-		refreshTokens = append(refreshTokens, &refreshToken)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return refreshTokens, nil
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByCodeId.text(d.Dialect), []any{codeId})
 }
 
 // GetRefreshTokensBySessionIdentifier returns every refresh token whose
@@ -334,48 +498,13 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
-	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
-	selectBuilder.Where(selectBuilder.Equal("codes.session_identifier", sessionIdentifier))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var refreshTokens []*record.RefreshToken
-	for rows.Next() {
-		var refreshToken record.RefreshToken
-		addr := refreshTokenStruct.Addr(&refreshToken)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan refreshToken")
-		}
-		refreshTokens = append(refreshTokens, &refreshToken)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return refreshTokens, nil
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensBySessionIdentifier.text(d.Dialect),
+		[]any{sessionIdentifier})
 }
 
 func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	deleteBuilder := userConsentStruct.DeleteFrom("refresh_tokens")
-	deleteBuilder.Where(deleteBuilder.Equal("id", refreshTokenId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteRefreshToken.text(d.Dialect), refreshTokenId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete refreshToken")
 	}
@@ -405,12 +534,17 @@ func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 // have cascaded these rows anyway, so the result is identical, and one code path
 // that all four exercise is worth more than the statement it saves.
 func (d *Database) deleteRefreshTokensByColumn(ctx context.Context, tx *sql.Tx, column string, value int64) error {
-	deleteBuilder := d.Flavor.NewDeleteBuilder()
-	deleteBuilder.DeleteFrom("refresh_tokens")
-	deleteBuilder.Where(deleteBuilder.Equal(column, value))
+	var s statement
+	switch column {
+	case "user_id":
+		s = deleteRefreshTokensByUserId
+	case "client_id":
+		s = deleteRefreshTokensByClientId
+	default:
+		return errs.Errorf("can't delete refresh tokens by %v", column)
+	}
 
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, s.text(d.Dialect), value)
 	if err != nil {
 		return errs.Wrapf(err, "unable to delete refresh tokens by %v", column)
 	}
@@ -443,19 +577,8 @@ func (d *Database) deleteRefreshTokensByColumn(ctx context.Context, tx *sql.Tx, 
 // The storage cost is accepted: with the default 30-day offline idle timeout, a grant
 // rotated every five minutes retains roughly 8,640 detection-relevant revoked rows.
 func (d *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error {
-	deleteBuilder := d.Flavor.NewDeleteBuilder()
-	deleteBuilder.DeleteFrom("refresh_tokens")
-
 	now := time.Now().UTC()
-	deleteBuilder.Where(
-		deleteBuilder.Or(
-			deleteBuilder.LessThan("expires_at", now),
-			deleteBuilder.LessThan("max_lifetime", now),
-		),
-	)
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteExpiredRefreshTokens.text(d.Dialect), now, now)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired refresh tokens")
 	}
@@ -481,42 +604,7 @@ func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, use
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	// Authorization code flow: the user is on the code, not the token.
-	viaCode := refreshTokenStruct.SelectFrom("refresh_tokens")
-	viaCode.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
-	viaCode.Where(viaCode.Equal("codes.user_id", userId))
-
-	// ROPC: the user is on the token itself and there is no code at all.
-	direct := refreshTokenStruct.SelectFrom("refresh_tokens")
-	direct.Where(direct.Equal("refresh_tokens.user_id", userId))
-
-	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var refreshTokens []*record.RefreshToken
-	for rows.Next() {
-		var refreshToken record.RefreshToken
-		addr := refreshTokenStruct.Addr(&refreshToken)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan refreshToken")
-		}
-		refreshTokens = append(refreshTokens, &refreshToken)
-	}
-	// Without this a mid-stream failure would return a PARTIAL token set as success,
-	// and the caller would commit a revocation sweep that missed rows it never saw.
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return refreshTokens, nil
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserId.text(d.Dialect), []any{userId, userId})
 }
 
 // GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds with one
@@ -548,42 +636,8 @@ func (d *Database) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	// Authorization code flow: the user and the client are both on the code, not the token.
-	viaCode := refreshTokenStruct.SelectFrom("refresh_tokens")
-	viaCode.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
-	viaCode.Where(viaCode.Equal("codes.user_id", userId), viaCode.Equal("codes.client_id", clientId))
-
-	// ROPC: the user and the client are both on the token itself and there is no code at all.
-	direct := refreshTokenStruct.SelectFrom("refresh_tokens")
-	direct.Where(direct.Equal("refresh_tokens.user_id", userId), direct.Equal("refresh_tokens.client_id", clientId))
-
-	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var refreshTokens []*record.RefreshToken
-	for rows.Next() {
-		var refreshToken record.RefreshToken
-		addr := refreshTokenStruct.Addr(&refreshToken)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan refreshToken")
-		}
-		refreshTokens = append(refreshTokens, &refreshToken)
-	}
-	// Without this a mid-stream failure would return a PARTIAL token set as success,
-	// and the caller would commit a revocation sweep that missed rows it never saw.
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return refreshTokens, nil
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserIdAndClientId.text(d.Dialect),
+		[]any{userId, clientId, userId, clientId})
 }
 
 // GetRefreshTokensByClientId returns every refresh token belonging to a client,
@@ -606,42 +660,7 @@ func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, c
 		return nil, nil
 	}
 
-	refreshTokenStruct := sqlbuilder.NewStruct(new(record.RefreshToken)).
-		For(d.Flavor)
-
-	// Authorization code flow: the client is on the code, not the token.
-	viaCode := refreshTokenStruct.SelectFrom("refresh_tokens")
-	viaCode.JoinWithOption(sqlbuilder.InnerJoin, "codes", "codes.id = refresh_tokens.code_id")
-	viaCode.Where(viaCode.Equal("codes.client_id", clientId))
-
-	// ROPC: the client is on the token itself and there is no code at all.
-	direct := refreshTokenStruct.SelectFrom("refresh_tokens")
-	direct.Where(direct.Equal("refresh_tokens.client_id", clientId))
-
-	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var refreshTokens []*record.RefreshToken
-	for rows.Next() {
-		var refreshToken record.RefreshToken
-		addr := refreshTokenStruct.Addr(&refreshToken)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan refreshToken")
-		}
-		refreshTokens = append(refreshTokens, &refreshToken)
-	}
-	// Without this a mid-stream failure would return a PARTIAL token set as success,
-	// and the flip would commit a revocation sweep that missed rows it never saw.
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return refreshTokens, nil
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByClientId.text(d.Dialect), []any{clientId, clientId})
 }
 
 // PromoteRefreshTokenGenerations moves the named refresh tokens to a new
@@ -653,9 +672,7 @@ func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, c
 // carry that session's surviving tokens forward rather than leaving them behind on the
 // superseded generation. (#106)
 //
-// An empty id list is a no-op. That is not a formality: an empty IN () is a syntax
-// error on some engines and matches everything on others, so it is handled here rather
-// than left to the builder.
+// An empty id list is a no-op, and sends no statement: there is nothing to promote.
 func (d *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
 
 	if len(refreshTokenIds) == 0 {
@@ -670,24 +687,9 @@ func (d *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.T
 	// holds a transaction -- this is only reachable from the revocation sweep -- so the several
 	// statements commit or roll back together, exactly as the one did.
 	return forEachIdBatch(refreshTokenIds, func(batch []int64) error {
-		ids := make([]interface{}, 0, len(batch))
-		for _, id := range batch {
-			ids = append(ids, id)
-		}
-
-		ub := d.Flavor.NewUpdateBuilder()
-		ub.Update("refresh_tokens")
-		ub.Set(
-			ub.Assign("auth_state_generation", generation),
-			ub.Assign("updated_at", updatedAt),
-		)
-		ub.Where(
-			ub.In("id", ids...),
-			ub.Equal("revoked", false),
-		)
-
-		sql, args := ub.BuildWithFlavor(d.Flavor)
-		_, err := d.ExecSQL(ctx, tx, sql, args...)
+		query := promoteRefreshTokenGenerationsWhere.text(d.Dialect) + inList(d.Dialect, "id", 4, len(batch))
+		args := append([]any{generation, updatedAt, false}, int64Args(batch)...)
+		_, err := d.ExecSQL(ctx, tx, query, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to promote refresh token generations")
 		}

@@ -5,10 +5,66 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// authorizeRequestColumns is the authorize_requests table as scanAuthorizeRequest reads it.
+var authorizeRequestColumns = columnList{
+	sqlite:   "id, created_at, updated_at, handle_hash, request_form, expires_at",
+	mysql:    "id, created_at, updated_at, handle_hash, request_form, expires_at",
+	postgres: "id, created_at, updated_at, handle_hash, request_form, expires_at",
+	mssql:    "id, created_at, updated_at, handle_hash, request_form, expires_at",
+}
+
+// scanAuthorizeRequest reads one row selected with authorizeRequestColumns.
+func scanAuthorizeRequest(row rowScanner, authorizeRequest *record.AuthorizeRequest) error {
+	return row.Scan(
+		&authorizeRequest.Id,
+		&authorizeRequest.CreatedAt,
+		&authorizeRequest.UpdatedAt,
+		&authorizeRequest.HandleHash,
+		&authorizeRequest.RequestForm,
+		&authorizeRequest.ExpiresAt,
+	)
+}
+
+var insertAuthorizeRequest = statement{
+	sqlite: "INSERT INTO authorize_requests (created_at, updated_at, handle_hash, request_form, " +
+		"expires_at) VALUES (?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO authorize_requests (created_at, updated_at, handle_hash, request_form, " +
+		"expires_at) VALUES (?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO authorize_requests (created_at, updated_at, handle_hash, request_form, " +
+		"expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+	mssql: "INSERT INTO authorize_requests (created_at, updated_at, handle_hash, request_form, " +
+		"expires_at) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5)",
+}
+
+// selectLiveAuthorizeRequest binds the hash, then the instant the request must expire after.
+var selectLiveAuthorizeRequest = statement{
+	sqlite: "SELECT " + authorizeRequestColumns.sqlite + " FROM authorize_requests " +
+		"WHERE handle_hash = ? AND expires_at > ?",
+	mysql: "SELECT " + authorizeRequestColumns.mysql + " FROM authorize_requests " +
+		"WHERE handle_hash = ? AND expires_at > ?",
+	postgres: "SELECT " + authorizeRequestColumns.postgres + " FROM authorize_requests " +
+		"WHERE handle_hash = $1 AND expires_at > $2",
+	mssql: "SELECT " + authorizeRequestColumns.mssql + " FROM authorize_requests " +
+		"WHERE handle_hash = @p1 AND expires_at > @p2",
+}
+
+var claimAuthorizeRequest = statement{
+	sqlite:   "DELETE FROM authorize_requests WHERE id = ?",
+	mysql:    "DELETE FROM authorize_requests WHERE id = ?",
+	postgres: "DELETE FROM authorize_requests WHERE id = $1",
+	mssql:    "DELETE FROM authorize_requests WHERE id = @p1",
+}
+
+var deleteExpiredAuthorizeRequests = statement{
+	sqlite:   "DELETE FROM authorize_requests WHERE expires_at < ?",
+	mysql:    "DELETE FROM authorize_requests WHERE expires_at < ?",
+	postgres: "DELETE FROM authorize_requests WHERE expires_at < $1",
+	mssql:    "DELETE FROM authorize_requests WHERE expires_at < @p1",
+}
 
 // A parked authorization request is found by handle_hash, the table's unique index, because the
 // GET that consumes it holds only the handle the redirect carried, and the row keeps its digest
@@ -33,12 +89,9 @@ func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, autho
 	authorizeRequest.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	authorizeRequest.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
-		For(d.Flavor)
-
-	insertBuilder := authorizeRequestStruct.WithoutTag("pk").InsertInto("authorize_requests", authorizeRequest)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "authorize request")
+	id, err := d.insert(ctx, tx, insertAuthorizeRequest, "authorize request",
+		authorizeRequest.CreatedAt, authorizeRequest.UpdatedAt, authorizeRequest.HandleHash,
+		authorizeRequest.RequestForm, authorizeRequest.ExpiresAt)
 	if err != nil {
 		authorizeRequest.CreatedAt = originalCreatedAt
 		authorizeRequest.UpdatedAt = originalUpdatedAt
@@ -71,39 +124,16 @@ func (d *Database) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.
 		return nil, errs.New("can't get an authorize request with an empty handle hash")
 	}
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
-		For(d.Flavor)
-
-	selectBuilder := authorizeRequestStruct.SelectFrom("authorize_requests")
-	selectBuilder.Where(
-		selectBuilder.Equal("handle_hash", handleHash),
-		selectBuilder.GreaterThan("expires_at", now),
-	)
-
-	query, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	authorizeRequest, err := queryOne(ctx, d, tx, selectLiveAuthorizeRequest.text(d.Dialect),
+		[]any{handleHash, now}, scanAuthorizeRequest, "authorize request")
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
+		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-
-	var authorizeRequest record.AuthorizeRequest
-	if rows.Next() {
-		addr := authorizeRequestStruct.Addr(&authorizeRequest)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan authorize request")
-		}
-		if authorizeRequest.HandleHash != handleHash {
-			return nil, nil
-		}
-		return &authorizeRequest, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	if authorizeRequest == nil || authorizeRequest.HandleHash != handleHash {
+		return nil, nil
 	}
 
-	return nil, nil
+	return authorizeRequest, nil
 }
 
 // ClaimAuthorizeRequest consumes one parked request, and reports whether THIS call deleted it. It
@@ -124,14 +154,7 @@ func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, author
 		return false, errs.New("can't claim the authorize request with id 0")
 	}
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
-		For(d.Flavor)
-
-	deleteBuilder := authorizeRequestStruct.DeleteFrom("authorize_requests")
-	deleteBuilder.Where(deleteBuilder.Equal("id", authorizeRequestId))
-
-	query, args := deleteBuilder.Build()
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, claimAuthorizeRequest.text(d.Dialect), authorizeRequestId)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim authorize request")
 	}
@@ -149,14 +172,7 @@ func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, author
 // rather than what makes a request expire.
 func (d *Database) DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
-	authorizeRequestStruct := sqlbuilder.NewStruct(new(record.AuthorizeRequest)).
-		For(d.Flavor)
-
-	deleteBuilder := authorizeRequestStruct.DeleteFrom("authorize_requests")
-	deleteBuilder.Where(deleteBuilder.LessThan("expires_at", now))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteExpiredAuthorizeRequests.text(d.Dialect), now)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired authorize requests")
 	}

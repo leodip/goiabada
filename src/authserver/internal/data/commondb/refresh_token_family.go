@@ -5,10 +5,44 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// insertRefreshTokenFamilyRevocation writes the whole record, which has no id: the first token's
+// jti is its key.
+var insertRefreshTokenFamilyRevocation = statement{
+	sqlite: "INSERT INTO refresh_token_family_revocations (first_refresh_token_jti, reason, revoked_at) " +
+		"VALUES (?, ?, ?)",
+	mysql: "INSERT INTO refresh_token_family_revocations (first_refresh_token_jti, reason, revoked_at) " +
+		"VALUES (?, ?, ?)",
+	postgres: "INSERT INTO refresh_token_family_revocations (first_refresh_token_jti, reason, revoked_at) " +
+		"VALUES ($1, $2, $3)",
+	mssql: "INSERT INTO refresh_token_family_revocations (first_refresh_token_jti, reason, revoked_at) " +
+		"VALUES (@p1, @p2, @p3)",
+}
+
+var selectRefreshTokenFamilyRevocation = statement{
+	sqlite: "SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = ?",
+	mysql: "SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = ?",
+	postgres: "SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = $1",
+	mssql: "SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = @p1",
+}
+
+var deleteOrphanedRefreshTokenFamilyRevocations = statement{
+	sqlite: "DELETE FROM refresh_token_family_revocations WHERE NOT EXISTS (SELECT 1 FROM refresh_tokens " +
+		"WHERE refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti)",
+	mysql: "DELETE FROM refresh_token_family_revocations WHERE NOT EXISTS (SELECT 1 FROM refresh_tokens " +
+		"WHERE refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti)",
+	postgres: "DELETE FROM refresh_token_family_revocations WHERE NOT EXISTS (SELECT 1 FROM refresh_tokens " +
+		"WHERE refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti)",
+	mssql: "DELETE FROM refresh_token_family_revocations WHERE NOT EXISTS (SELECT 1 FROM refresh_tokens " +
+		"WHERE refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti)",
+}
 
 // A revoked rotation family is one row keyed by first_refresh_token_jti, written in the same
 // transaction as the revocation it records and read by the refresh validator and by the
@@ -54,12 +88,8 @@ func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.
 		Reason:               reason,
 		RevokedAt:            time.Now().UTC(),
 	}
-	insertBuilder := sqlbuilder.NewStruct(new(record.RefreshTokenFamilyRevocation)).
-		For(d.Flavor).
-		InsertInto("refresh_token_family_revocations", revocation)
-
-	query, args := insertBuilder.Build()
-	_, err = d.ExecSQL(ctx, tx, query, args...)
+	_, err = d.ExecSQL(ctx, tx, insertRefreshTokenFamilyRevocation.text(d.Dialect),
+		revocation.FirstRefreshTokenJti, revocation.Reason, revocation.RevokedAt)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to record revoked refresh token family")
 	}
@@ -82,12 +112,7 @@ func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, 
 		return false, errs.New("can't look up a refresh token family with an empty first refresh token jti")
 	}
 
-	selectBuilder := d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("first_refresh_token_jti").From("refresh_token_family_revocations")
-	selectBuilder.Where(selectBuilder.Equal("first_refresh_token_jti", firstRefreshTokenJti))
-
-	query, args := selectBuilder.BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, selectRefreshTokenFamilyRevocation.text(d.Dialect), firstRefreshTokenJti)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -114,16 +139,7 @@ func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, 
 // sweep can never remove the record of a family a rotation in flight still holds the parent of.
 func (d *Database) DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error {
 
-	members := d.Flavor.NewSelectBuilder()
-	members.Select("1").From("refresh_tokens")
-	members.Where("refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti")
-
-	deleteBuilder := d.Flavor.NewDeleteBuilder()
-	deleteBuilder.DeleteFrom("refresh_token_family_revocations")
-	deleteBuilder.Where(deleteBuilder.NotExists(members))
-
-	query, args := deleteBuilder.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSQL(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteOrphanedRefreshTokenFamilyRevocations.text(d.Dialect))
 	if err != nil {
 		return errs.Wrap(err, "unable to delete orphaned refresh token family revocations")
 	}

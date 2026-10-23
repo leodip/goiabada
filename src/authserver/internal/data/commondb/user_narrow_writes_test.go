@@ -42,6 +42,7 @@ var (
 	staleBefore    = time.Date(2003, 3, 3, 0, 0, 0, 0, time.UTC)
 
 	anyPlaceholder = regexp.MustCompile(`\?|\$[0-9]+|@p[0-9]+`)
+	severalColumns = regexp.MustCompile(`SELECT (\S+, )+\S+ FROM`)
 )
 
 // narrowWrite is one call of a narrow write and the statements it must send, rendered.
@@ -433,7 +434,17 @@ func renderValue(v driver.Value, started time.Time) string {
 }
 
 func TestUserNarrowWrites_SendTheirStatementOnEveryEngine(t *testing.T) {
-	for _, w := range narrowWrites() {
+	assertNarrowWritesOnEveryEngine(t, narrowWrites(), false)
+}
+
+// assertNarrowWritesOnEveryEngine runs each write on all four engines and holds what it sent,
+// rendered, to its expected statements. With elideColumns, a select list of several columns is
+// rendered as <columns>, so a read of whole records can be written out by its table and condition
+// while its columns are left to the record mapping test, which holds each list to its record's
+// tags.
+func assertNarrowWritesOnEveryEngine(t *testing.T, writes []narrowWrite, elideColumns bool) {
+	t.Helper()
+	for _, w := range writes {
 		for _, dialect := range allDialects {
 			t.Run(w.name+"/"+string(dialect), func(t *testing.T) {
 				script := &scriptedDriver{execs: w.execs, rows: w.rows}
@@ -457,6 +468,9 @@ func TestUserNarrowWrites_SendTheirStatementOnEveryEngine(t *testing.T) {
 						execs++
 					}
 					rendered, found := renderStatement(dialect, query, args, started)
+					if elideColumns {
+						rendered = severalColumns.ReplaceAllString(rendered, "SELECT <columns> FROM")
+					}
 					got = append(got, rendered)
 					problems = append(problems, found...)
 				}

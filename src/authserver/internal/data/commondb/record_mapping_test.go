@@ -493,6 +493,99 @@ func userProfilePictureMapping() mappingCase {
 	}
 }
 
+// firstPointerOf answers the first record of a read returning a list of pointers.
+func firstPointerOf[T any](list []*T, err error) (any, error) {
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, fmt.Errorf("the read answered no record")
+	}
+	return list[0], nil
+}
+
+// codeMapping's whole-row UPDATE leaves created_at, revoked and auth_state_generation alone, the
+// three dont-update columns.
+func codeMapping() mappingCase {
+	return mappingCase{
+		name:   "code",
+		table:  "codes",
+		record: reflect.TypeOf(record.Code{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetCodeById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetCodeById(ctx, nil, 1)
+			},
+			"GetCodeByCodeHash": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetCodeByCodeHash(ctx, nil, distinctString("code_hash"), false)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateCode(ctx, nil, rec.(*record.Code))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateCode(ctx, nil, rec.(*record.Code))
+		},
+	}
+}
+
+// refreshTokenMapping covers every read answering whole refresh tokens, the joins with codes and
+// the two-branch unions among them, which select each column qualified by its table.
+func refreshTokenMapping() mappingCase {
+	return mappingCase{
+		name:   "refresh token",
+		table:  "refresh_tokens",
+		record: reflect.TypeOf(record.RefreshToken{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetRefreshTokenById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetRefreshTokenById(ctx, nil, 1)
+			},
+			"GetRefreshTokenByJti": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetRefreshTokenByJti(ctx, nil, distinctString("refresh_token_jti"))
+			},
+			"GetRefreshTokensByCodeId": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByCodeId(ctx, nil, 1))
+			},
+			"GetRefreshTokensBySessionIdentifier": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensBySessionIdentifier(ctx, nil, distinctString("session_identifier")))
+			},
+			"GetRefreshTokensByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByUserId(ctx, nil, 1))
+			},
+			"GetRefreshTokensByUserIdAndClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByUserIdAndClientId(ctx, nil, 1, 2))
+			},
+			"GetRefreshTokensByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateRefreshToken(ctx, nil, rec.(*record.RefreshToken))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateRefreshToken(ctx, nil, rec.(*record.RefreshToken))
+		},
+	}
+}
+
+// authorizeRequestMapping has no update: a parked request is created and claimed, never rewritten.
+func authorizeRequestMapping() mappingCase {
+	return mappingCase{
+		name:   "authorize request",
+		table:  "authorize_requests",
+		record: reflect.TypeOf(record.AuthorizeRequest{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetAuthorizeRequestByHandleHash": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetAuthorizeRequestByHandleHash(ctx, nil, distinctString("handle_hash"),
+					time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateAuthorizeRequest(ctx, nil, rec.(*record.AuthorizeRequest))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -501,6 +594,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), redirectURIMapping(), webOriginMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
+		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
@@ -754,6 +848,7 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 
 	script := &scriptedDriver{}
 	script.answer = func(query string, _ []driver.Value) *scriptedRows {
+		problems = append(problems, unionProblems(where, query)...)
 		m := selectList.FindStringSubmatch(query)
 		if m == nil {
 			problems = append(problems, fmt.Sprintf("%s: the statement is not a SELECT this test reads: %q", where, query))
@@ -810,6 +905,25 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 		if have := rv.Field(f.index).Interface(); !reflect.DeepEqual(have, want.Interface()) {
 			problems = append(problems, fmt.Sprintf("%s: field %s holds %v, want %v, the value of column %s",
 				where, c.record.Field(f.index).Name, have, want.Interface(), f.column))
+		}
+	}
+	return problems
+}
+
+// unionProblems holds every branch of a UNION ALL to selecting the list its first branch selects,
+// from the same table. The scripted row follows the first branch's list, so a later branch naming
+// the same columns in another order would land its values in the wrong fields unseen.
+func unionProblems(where string, query string) []string {
+	branches := strings.Split(query, " UNION ALL ")
+	first := selectList.FindStringSubmatch(branches[0])
+	var problems []string
+	for i, branch := range branches[1:] {
+		m := selectList.FindStringSubmatch(branch)
+		switch {
+		case m == nil:
+			problems = append(problems, fmt.Sprintf("%s: branch %d of the union is not a SELECT this test reads: %q", where, i+2, branch))
+		case first == nil || m[1] != first[1] || m[2] != first[2]:
+			problems = append(problems, fmt.Sprintf("%s: branch %d of the union selects another list than the first", where, i+2))
 		}
 	}
 	return problems
@@ -1193,4 +1307,27 @@ func TestRecordMapping_TheCheckerRefusesTwoBoolValuesWrittenSwapped(t *testing.T
 	joined := strings.Join(problems, "\n")
 	assert.Contains(t, joined, "sqlite update: column enabled is written")
 	assert.Contains(t, joined, "sqlite update: column visible is written")
+}
+
+func TestRecordMapping_TheCheckerRefusesAUnionBranchSelectingAnotherList(t *testing.T) {
+	w := rightWidgetSQL()
+	broken := widgetMapping(w)
+	broken.reads = map[string]func(ctx context.Context, d *Database) (any, error){
+		"read": func(ctx context.Context, d *Database) (any, error) {
+			rows, err := d.QuerySQL(ctx, nil, "SELECT "+w.columns.text(d.Dialect)+" FROM widgets WHERE id = 1 UNION ALL "+
+				`SELECT id, created_at, label, name, "key", enabled, visible FROM widgets WHERE id = 2`)
+			if err != nil {
+				return nil, err
+			}
+			defer func() { _ = rows.Close() }()
+			var got widget
+			if !rows.Next() {
+				return nil, rows.Err()
+			}
+			return &got, w.scan(rows, &got)
+		},
+	}
+
+	problems := checkMapping(t, data.Postgres, broken)
+	assert.Contains(t, strings.Join(problems, "\n"), "postgres read: branch 2 of the union selects another list than the first")
 }

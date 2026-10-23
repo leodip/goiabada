@@ -5,10 +5,164 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// codeColumns is the codes table as scanCode reads it.
+var codeColumns = columnList{
+	sqlite: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
+		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+	mysql: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
+		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+	postgres: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
+		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+	mssql: "id, created_at, updated_at, code_hash, client_id, code_challenge, code_challenge_method, scope, " +
+		"state, nonce, redirect_uri, user_id, ip_address, user_agent, response_mode, authenticated_at, " +
+		"session_identifier, acr_level, auth_methods, used, revoked, auth_state_generation",
+}
+
+// scanCode reads one row selected with codeColumns.
+func scanCode(row rowScanner, code *record.Code) error {
+	return row.Scan(
+		&code.Id,
+		&code.CreatedAt,
+		&code.UpdatedAt,
+		&code.CodeHash,
+		&code.ClientId,
+		&code.CodeChallenge,
+		&code.CodeChallengeMethod,
+		&code.Scope,
+		&code.State,
+		&code.Nonce,
+		&code.RedirectURI,
+		&code.UserId,
+		&code.IpAddress,
+		&code.UserAgent,
+		&code.ResponseMode,
+		&code.AuthenticatedAt,
+		&code.SessionIdentifier,
+		&code.AcrLevel,
+		&code.AuthMethods,
+		&code.Used,
+		&code.Revoked,
+		&code.AuthStateGeneration,
+	)
+}
+
+// insertCode writes every column but id, the dont-update ones included: a new code starts unrevoked
+// and carries the generation it was issued under.
+var insertCode = statement{
+	sqlite: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
+		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
+		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
+		"auth_state_generation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
+		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
+		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
+		"auth_state_generation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
+		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
+		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
+		"auth_state_generation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, " +
+		"$16, $17, $18, $19, $20, $21) RETURNING id",
+	mssql: "INSERT INTO codes (created_at, updated_at, code_hash, client_id, code_challenge, " +
+		"code_challenge_method, scope, state, nonce, redirect_uri, user_id, ip_address, user_agent, " +
+		"response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used, revoked, " +
+		"auth_state_generation) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, " +
+		"@p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21)",
+}
+
+// updateCode writes the whole row but created_at, revoked and auth_state_generation, which are
+// dont-update: a stale record written back cannot unrevoke a code or move its generation.
+var updateCode = statement{
+	sqlite: "UPDATE codes SET updated_at = ?, code_hash = ?, client_id = ?, code_challenge = ?, " +
+		"code_challenge_method = ?, scope = ?, state = ?, nonce = ?, redirect_uri = ?, user_id = ?, " +
+		"ip_address = ?, user_agent = ?, response_mode = ?, authenticated_at = ?, session_identifier = ?, " +
+		"acr_level = ?, auth_methods = ?, used = ? WHERE id = ?",
+	mysql: "UPDATE codes SET updated_at = ?, code_hash = ?, client_id = ?, code_challenge = ?, " +
+		"code_challenge_method = ?, scope = ?, state = ?, nonce = ?, redirect_uri = ?, user_id = ?, " +
+		"ip_address = ?, user_agent = ?, response_mode = ?, authenticated_at = ?, session_identifier = ?, " +
+		"acr_level = ?, auth_methods = ?, used = ? WHERE id = ?",
+	postgres: "UPDATE codes SET updated_at = $1, code_hash = $2, client_id = $3, code_challenge = $4, " +
+		"code_challenge_method = $5, scope = $6, state = $7, nonce = $8, redirect_uri = $9, " +
+		"user_id = $10, ip_address = $11, user_agent = $12, response_mode = $13, authenticated_at = $14, " +
+		"session_identifier = $15, acr_level = $16, auth_methods = $17, used = $18 WHERE id = $19",
+	mssql: "UPDATE codes SET updated_at = @p1, code_hash = @p2, client_id = @p3, code_challenge = @p4, " +
+		"code_challenge_method = @p5, scope = @p6, state = @p7, nonce = @p8, redirect_uri = @p9, " +
+		"user_id = @p10, ip_address = @p11, user_agent = @p12, response_mode = @p13, " +
+		"authenticated_at = @p14, session_identifier = @p15, acr_level = @p16, auth_methods = @p17, " +
+		"used = @p18 WHERE id = @p19",
+}
+
+var selectCodeById = statement{
+	sqlite:   "SELECT " + codeColumns.sqlite + " FROM codes WHERE id = ?",
+	mysql:    "SELECT " + codeColumns.mysql + " FROM codes WHERE id = ?",
+	postgres: "SELECT " + codeColumns.postgres + " FROM codes WHERE id = $1",
+	mssql:    "SELECT " + codeColumns.mssql + " FROM codes WHERE id = @p1",
+}
+
+var selectCodeByCodeHash = statement{
+	sqlite:   "SELECT " + codeColumns.sqlite + " FROM codes WHERE code_hash = ? AND used = ?",
+	mysql:    "SELECT " + codeColumns.mysql + " FROM codes WHERE code_hash = ? AND used = ?",
+	postgres: "SELECT " + codeColumns.postgres + " FROM codes WHERE code_hash = $1 AND used = $2",
+	mssql:    "SELECT " + codeColumns.mssql + " FROM codes WHERE code_hash = @p1 AND used = @p2",
+}
+
+// markCodeAsUsed binds used, updated_at, the id, then used and revoked as the row must still hold
+// them.
+var markCodeAsUsed = statement{
+	sqlite:   "UPDATE codes SET used = ?, updated_at = ? WHERE id = ? AND used = ? AND revoked = ?",
+	mysql:    "UPDATE codes SET used = ?, updated_at = ? WHERE id = ? AND used = ? AND revoked = ?",
+	postgres: "UPDATE codes SET used = $1, updated_at = $2 WHERE id = $3 AND used = $4 AND revoked = $5",
+	mssql:    "UPDATE codes SET used = @p1, updated_at = @p2 WHERE id = @p3 AND used = @p4 AND revoked = @p5",
+}
+
+var revokeCodesBySessionIdentifier = statement{
+	sqlite:   "UPDATE codes SET revoked = ?, updated_at = ? WHERE session_identifier = ? AND revoked = ?",
+	mysql:    "UPDATE codes SET revoked = ?, updated_at = ? WHERE session_identifier = ? AND revoked = ?",
+	postgres: "UPDATE codes SET revoked = $1, updated_at = $2 WHERE session_identifier = $3 AND revoked = $4",
+	mssql:    "UPDATE codes SET revoked = @p1, updated_at = @p2 WHERE session_identifier = @p3 AND revoked = @p4",
+}
+
+var revokeCodesByClientId = statement{
+	sqlite:   "UPDATE codes SET revoked = ?, updated_at = ? WHERE client_id = ? AND revoked = ?",
+	mysql:    "UPDATE codes SET revoked = ?, updated_at = ? WHERE client_id = ? AND revoked = ?",
+	postgres: "UPDATE codes SET revoked = $1, updated_at = $2 WHERE client_id = $3 AND revoked = $4",
+	mssql:    "UPDATE codes SET revoked = @p1, updated_at = @p2 WHERE client_id = @p3 AND revoked = @p4",
+}
+
+var revokeUnusedCodesByUserIdAndClientId = statement{
+	sqlite: "UPDATE codes SET revoked = ?, updated_at = ? " +
+		"WHERE user_id = ? AND client_id = ? AND used = ? AND revoked = ?",
+	mysql: "UPDATE codes SET revoked = ?, updated_at = ? " +
+		"WHERE user_id = ? AND client_id = ? AND used = ? AND revoked = ?",
+	postgres: "UPDATE codes SET revoked = $1, updated_at = $2 " +
+		"WHERE user_id = $3 AND client_id = $4 AND used = $5 AND revoked = $6",
+	mssql: "UPDATE codes SET revoked = @p1, updated_at = @p2 " +
+		"WHERE user_id = @p3 AND client_id = @p4 AND used = @p5 AND revoked = @p6",
+}
+
+var deleteCode = statement{
+	sqlite:   "DELETE FROM codes WHERE id = ?",
+	mysql:    "DELETE FROM codes WHERE id = ?",
+	postgres: "DELETE FROM codes WHERE id = $1",
+	mssql:    "DELETE FROM codes WHERE id = @p1",
+}
+
+var deleteCodesWithoutRefreshTokens = statement{
+	sqlite: "DELETE FROM codes WHERE created_at < ? " +
+		"AND NOT EXISTS (SELECT 1 FROM refresh_tokens WHERE refresh_tokens.code_id = codes.id)",
+	mysql: "DELETE FROM codes WHERE created_at < ? " +
+		"AND NOT EXISTS (SELECT 1 FROM refresh_tokens WHERE refresh_tokens.code_id = codes.id)",
+	postgres: "DELETE FROM codes WHERE created_at < $1 " +
+		"AND NOT EXISTS (SELECT 1 FROM refresh_tokens WHERE refresh_tokens.code_id = codes.id)",
+	mssql: "DELETE FROM codes WHERE created_at < @p1 " +
+		"AND NOT EXISTS (SELECT 1 FROM refresh_tokens WHERE refresh_tokens.code_id = codes.id)",
+}
 
 func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
@@ -27,12 +181,11 @@ func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code
 	code.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	code.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
-		For(d.Flavor)
-
-	insertBuilder := codeStruct.WithoutTag("pk").InsertInto("codes", code)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "code")
+	id, err := d.insert(ctx, tx, insertCode, "code",
+		code.CreatedAt, code.UpdatedAt, code.CodeHash, code.ClientId, code.CodeChallenge,
+		code.CodeChallengeMethod, code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserId,
+		code.IpAddress, code.UserAgent, code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier,
+		code.AcrLevel, code.AuthMethods, code.Used, code.Revoked, code.AuthStateGeneration)
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
@@ -52,14 +205,11 @@ func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *record.Code
 	originalUpdatedAt := code.UpdatedAt
 	code.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
-		For(d.Flavor)
-
-	updateBuilder := codeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("codes", code)
-	updateBuilder.Where(updateBuilder.Equal("id", code.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateCode.text(d.Dialect),
+		code.UpdatedAt, code.CodeHash, code.ClientId, code.CodeChallenge, code.CodeChallengeMethod,
+		code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserId, code.IpAddress, code.UserAgent,
+		code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier, code.AcrLevel, code.AuthMethods,
+		code.Used, code.Id)
 	if err != nil {
 		code.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update code")
@@ -90,20 +240,8 @@ func (d *Database) MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64)
 		return false, errs.New("can't mark code with id 0 as used")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("codes")
-	ub.Set(
-		ub.Assign("used", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", codeId),
-		ub.Equal("used", false),
-		ub.Equal("revoked", false),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, markCodeAsUsed.text(d.Dialect),
+		true, time.Now().UTC(), codeId, false, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark code as used")
 	}
@@ -137,19 +275,8 @@ func (d *Database) RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.T
 		return 0, errs.New("can't revoke codes with an empty session identifier")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("codes")
-	ub.Set(
-		ub.Assign("revoked", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("session_identifier", sessionIdentifier),
-		ub.Equal("revoked", false),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, revokeCodesBySessionIdentifier.text(d.Dialect),
+		true, time.Now().UTC(), sessionIdentifier, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by session identifier")
 	}
@@ -184,19 +311,8 @@ func (d *Database) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, client
 		return 0, errs.New("can't revoke codes with a client id of 0")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("codes")
-	ub.Set(
-		ub.Assign("revoked", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("client_id", clientId),
-		ub.Equal("revoked", false),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, revokeCodesByClientId.text(d.Dialect),
+		true, time.Now().UTC(), clientId, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by client id")
 	}
@@ -230,21 +346,8 @@ func (d *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx 
 		return 0, errs.New("can't revoke codes with a user id or a client id of 0")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("codes")
-	ub.Set(
-		ub.Assign("revoked", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("user_id", userId),
-		ub.Equal("client_id", clientId),
-		ub.Equal("used", false),
-		ub.Equal("revoked", false),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, revokeUnusedCodesByUserIdAndClientId.text(d.Dialect),
+		true, time.Now().UTC(), userId, clientId, false, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke unused codes by user id and client id")
 	}
@@ -257,46 +360,8 @@ func (d *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx 
 	return rowsAffected, nil
 }
 
-func (d *Database) getCodeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	codeStruct *sqlbuilder.Struct) (*record.Code, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var code record.Code
-	if rows.Next() {
-		addr := codeStruct.Addr(&code)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan code")
-		}
-		return &code, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error) {
-
-	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
-		For(d.Flavor)
-
-	selectBuilder := codeStruct.SelectFrom("codes")
-	selectBuilder.Where(selectBuilder.Equal("id", codeId))
-
-	code, err := d.getCodeCommon(ctx, tx, selectBuilder, codeStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return code, nil
+	return queryOne(ctx, d, tx, selectCodeById.text(d.Dialect), []any{codeId}, scanCode, "code")
 }
 
 func (d *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error {
@@ -334,31 +399,12 @@ func (d *Database) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Co
 }
 
 func (d *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error) {
-	codeStruct := sqlbuilder.NewStruct(new(record.Code)).
-		For(d.Flavor)
-
-	selectBuilder := codeStruct.SelectFrom("codes")
-	selectBuilder.Where(selectBuilder.Equal("code_hash", codeHash))
-	selectBuilder.Where(selectBuilder.Equal("used", used))
-
-	code, err := d.getCodeCommon(ctx, tx, selectBuilder, codeStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return code, nil
+	return queryOne(ctx, d, tx, selectCodeByCodeHash.text(d.Dialect), []any{codeHash, used}, scanCode, "code")
 }
 
 func (d *Database) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.Code)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom("codes")
-	deleteBuilder.Where(deleteBuilder.Equal("id", codeId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteCode.text(d.Dialect), codeId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete code")
 	}
@@ -394,19 +440,7 @@ func (d *Database) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) err
 // losing a replay marker: fk_refresh_tokens_code is ON DELETE CASCADE, so reaching a code
 // with a refresh token would delete the very descendant the marker exists to reject.
 func (d *Database) DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
-	descendants := d.Flavor.NewSelectBuilder()
-	descendants.Select("1").From("refresh_tokens")
-	descendants.Where("refresh_tokens.code_id = codes.id")
-
-	deleteBuilder := d.Flavor.NewDeleteBuilder()
-	deleteBuilder.DeleteFrom("codes")
-	deleteBuilder.Where(
-		deleteBuilder.LessThan("created_at", createdBefore),
-		deleteBuilder.NotExists(descendants),
-	)
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteCodesWithoutRefreshTokens.text(d.Dialect), createdBefore)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete codes without refresh tokens")
 	}
