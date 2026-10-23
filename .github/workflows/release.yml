@@ -279,7 +279,7 @@ jobs:
           ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
         run: |
           set -euo pipefail
-          # The notes open with the two images as full references, tag and digest together, so
+          # The draft opens with the two images as full references, tag and digest together, so
           # an operator pinning a deployment names the exact image content this release pushed
           # and attested (#491). gh puts the notes file above the changelog --generate-notes
           # writes, and both reach the draft in the one write that creates it, so no draft
@@ -300,4 +300,4 @@ jobs:
           # last stable release (constraint A).
           [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
           gh release create "v$VERSION" "${args[@]}" dist/*
-          echo "Draft created. Write the notes, then publish to move 'latest'."
+          echo "Draft created. Write the notes, keeping the Pinned image references section, then publish to move 'latest'."
