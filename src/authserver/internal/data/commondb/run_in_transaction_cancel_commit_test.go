@@ -258,6 +258,12 @@ func TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver(t
 		{name: "a rollback that succeeds is silent", rollbackErr: nil, wantWarnings: 0},
 		{name: "a rollback that fails is warned about and not returned", rollbackErr: errors.New("connection reset"), wantWarnings: 1},
 		{name: "a rollback database/sql had already done is silent", rollbackErr: sql.ErrTxDone, wantWarnings: 0},
+		// pgx and go-mssqldb refuse any statement on a done context, the rollback included,
+		// with the context's own error: pgx wrapped, go-mssqldb bare. Nothing failed there, the
+		// transaction is rolled back either way, so a warning would be one for every cancelled
+		// request that was inside a transaction.
+		{name: "a rollback refused with the bare context error is silent", rollbackErr: context.Canceled, wantWarnings: 0},
+		{name: "a rollback refused with a driver error wrapping the context error is silent", rollbackErr: fmt.Errorf("timeout: context already done: %w", context.Canceled), wantWarnings: 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
@@ -280,7 +286,7 @@ func TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver(t
 			require.ErrorIs(t, err, context.Canceled, "the context's error is the answer")
 			require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
 				"no COMMIT reached the engine, so the transaction is known to be rolled back")
-			if tc.rollbackErr != nil {
+			if tc.rollbackErr != nil && !errors.Is(tc.rollbackErr, context.Canceled) {
 				require.NotErrorIs(t, err, tc.rollbackErr, "and the rollback's own error is not returned")
 			}
 			assert.Equal(t, 1, ran, "a cancelled run is not rerun")
