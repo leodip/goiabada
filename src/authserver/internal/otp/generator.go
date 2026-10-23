@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/inputvalidation"
 	pquernaotp "github.com/pquerna/otp"
@@ -46,7 +47,8 @@ func (g *KeyGenerator) GenerateKeyURL(email string, appName string) (string, err
 		return "", errs.New("app name is empty")
 	}
 
-	if inputvalidation.TextLength(email) > 64 {
+	// The longest address an account holds, so every account can enrol (#632).
+	if inputvalidation.TextLength(email) > accountvalidation.MaxEmailLength {
 		return "", errs.New("email is too long")
 	}
 

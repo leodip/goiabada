@@ -353,6 +353,100 @@ func TestRun_AdminPasswordOfFifteenCharactersSeeds(t *testing.T) {
 	}
 }
 
+// adminAddressOfLength is an address of exactly n characters, n at least 70: a local part of 64 and
+// a domain of labels of 61 characters or fewer ending in .com.
+func adminAddressOfLength(n int) string {
+	remaining := n - 64 - len("@.com")
+	var labels []string
+	for remaining > 63 {
+		labels = append(labels, strings.Repeat("d", 61))
+		remaining -= 62
+	}
+	labels = append(labels, strings.Repeat("d", remaining), "com")
+	return strings.Repeat("a", 64) + "@" + strings.Join(labels, ".")
+}
+
+// GOIABADA_ADMIN_EMAIL may be up to 254 characters, the longest address an account holds, counted
+// after the seed trims it, and only its length is checked: an address with no dot in its domain
+// seeds as it always has (#632 decision 4).
+func TestRun_AdminEmailOfUpTo254CharactersSeeds(t *testing.T) {
+	address254 := adminAddressOfLength(254)
+	require.Len(t, address254, 254)
+	cases := []struct {
+		name   string
+		email  string
+		stored string
+	}{
+		{"254 characters", address254, address254},
+		{"254 characters inside surrounding space, in capitals", "  " + strings.ToUpper(address254) + "\t", address254},
+		{"an address with no dot in its domain", "admin@localhost", "admin@localhost"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := newSeedDB(t)
+			cfg := singleStepConfig()
+			cfg.AdminEmail = c.email
+
+			outcome, err := testRunner(db, cfg).run(context.Background())
+
+			require.NoError(t, err)
+			assert.Equal(t, Continue, outcome)
+			user, err := db.GetUserByEmail(context.Background(), nil, c.stored)
+			require.NoError(t, err)
+			require.NotNil(t, user, "the first administrator is stored under the trimmed address")
+			assert.Equal(t, c.stored, user.Email)
+		})
+	}
+}
+
+// A first start refuses a GOIABADA_ADMIN_EMAIL past 254 characters in both bootstrap modes, as it
+// refuses an unusable password: before any write and before the bootstrap file is staged, naming
+// the variable and the limit, with the database left empty for the next start, which, with the
+// variable fixed, seeds it. Without it such an address failed the first start with a database
+// error on MySQL, PostgreSQL and SQL Server, and seeded on SQLite (#632 decision 4).
+func TestRun_RefusesAnAdminEmailPast254CharactersInBothModes(t *testing.T) {
+	modes := []struct {
+		name    string
+		config  func(t *testing.T) Config
+		outcome Outcome
+	}{
+		{"single-step", func(*testing.T) Config { return singleStepConfig() }, Continue},
+		{"two-step", twoStepConfig, Exit},
+	}
+	for _, mode := range modes {
+		t.Run(mode.name, func(t *testing.T) {
+			db := newSeedDB(t)
+			cfg := mode.config(t)
+			cfg.AdminEmail = adminAddressOfLength(255)
+			before := db.counts(t)
+			faults := &faultDB{runDatabase: db}
+
+			outcome, err := testRunner(faults, cfg).run(context.Background())
+
+			require.Error(t, err)
+			assert.Equal(t, Refused, outcome)
+			assert.Contains(t, err.Error(), "GOIABADA_ADMIN_EMAIL")
+			assert.Contains(t, err.Error(), "254 characters")
+			assert.Zero(t, faults.writes, "no write was attempted")
+			isEmpty, err := db.IsEmpty(context.Background())
+			require.NoError(t, err)
+			assert.True(t, isEmpty, "the next start sees an empty database")
+			assert.Equal(t, before, db.counts(t))
+			if cfg.BootstrapEnvOutFile != "" {
+				assert.NoDirExists(t, filepath.Dir(cfg.BootstrapEnvOutFile),
+					"refused before the bootstrap file is staged, so not even its directory exists")
+			}
+
+			cfg.AdminEmail = "Admin@Example.com"
+			outcome, err = testRunner(db, cfg).run(context.Background())
+
+			require.NoError(t, err, "the next start, with the variable fixed, seeds")
+			assert.Equal(t, mode.outcome, outcome)
+			assertSeeded(t, db, cfg)
+		})
+	}
+}
+
 var errInjected = errors.New("injected failure")
 
 // faultDB wraps the real database and fails one of the seed's writes, counted across the nine

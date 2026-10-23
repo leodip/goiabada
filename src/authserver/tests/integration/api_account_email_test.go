@@ -99,15 +99,47 @@ func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
 	assert.Equal(t, "Please enter a valid email address.", err2.ErrorDescription)
 
-	// Too long (> 60 chars)
-	longLocal := strings.Repeat("a", 49)     // 49 + 1 + 10 = 60; use 50 to exceed
-	longEmail := longLocal + "1@example.com" // 50 + 1 + 10 = 61
-	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: longEmail, CurrentPassword: accountEmailPassword})
+	// Too long: over 254 characters, the longest SMTP carries (#632)
+	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: uniqueAddressOfLength(255), CurrentPassword: accountEmailPassword})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "The email address cannot exceed a maximum length of 60 characters.", err3.ErrorDescription)
+	assert.Equal(t, "The email address cannot exceed a maximum length of 254 characters.", err3.ErrorDescription)
+
+	// A local part over 64 characters, which RFC 5321 section 4.5.3.1.1 refuses (#632)
+	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: uniqueLocalPartOfLength(65) + "@example.com", CurrentPassword: accountEmailPassword})
+	defer func() { _ = resp4.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
+	var err4 api.ErrorResponse
+	_ = json.NewDecoder(resp4.Body).Decode(&err4)
+	assert.Equal(t, "Please enter a valid email address.", err4.ErrorDescription)
+}
+
+// TestAPIAccountEmailPut_AnAddressAtTheLimits is the boundary beside the refusals above: the
+// person's own change stores an address of 254 characters, and one with 64 before the @ (#632).
+func TestAPIAccountEmailPut_AnAddressAtTheLimits(t *testing.T) {
+	for _, tc := range []struct{ name, email string }{
+		{"254 characters", uniqueAddressOfLength(254)},
+		{"a local part of 64 characters", uniqueLocalPartOfLength(64) + "@example.com"},
+	} {
+		newEmail := tc.email
+		t.Run(""+tc.name, func(t *testing.T) {
+			accessToken, u := accountEmailUserWithPassword(t)
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
+			resp := makeAPIRequest(t, "PUT", url, accessToken,
+				api.UpdateAccountEmailRequest{Email: newEmail, CurrentPassword: accountEmailPassword})
+			defer func() { _ = resp.Body.Close() }()
+			body, _ := io.ReadAll(resp.Body)
+			require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
+
+			updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+			require.NoError(t, err)
+			require.NotNil(t, updatedUser)
+			assert.Equal(t, newEmail, updatedUser.Email)
+		})
+	}
 }
 
 func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {

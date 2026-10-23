@@ -48,7 +48,7 @@ Now give the group what its members need: permissions on its **Permissions** tab
 
 Each user has a **subject**, a random identifier the auth server gives them when they're created. It never changes, and it's the `sub` claim in every token about them, so key your app's records on it rather than on the email address, which can change.
 
-The email address is the user's sign-in name. Two users can't share one, it's stored in lowercase, and it's at most 60 characters long.
+The email address is the user's sign-in name. Two users can't share one, it's stored in lowercase, and it's at most 254 characters long, with at most 64 before the @, the longest that email can deliver to.
 
 Every new user gets the `authserver:manage-account` permission, which lets them manage their own account in the admin console's **Account** pages. Nothing else: a new user holds no other permission and is in no group.
 

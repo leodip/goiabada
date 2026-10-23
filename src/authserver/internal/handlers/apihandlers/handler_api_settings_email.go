@@ -106,11 +106,14 @@ func HandleSettingsEmailPut(
 		// stored bare (#424).
 		smtpHost := hostport.Unbracket(strings.TrimSpace(req.SMTPHost))
 
-		// Validation when enabled
+		// Validation when enabled. The sender address is an email address, so it takes the limit an
+		// account's address does; the username takes the same, since for the hosted providers it is
+		// the mailbox's own address, but stays free text. The sender name is a display name (#632).
 		const (
-			smtpHostMaxLength    = 120
-			smtpFieldMaxLength   = 60
-			smtpPasswordMaxBytes = 256
+			smtpHostMaxLength     = 120
+			smtpUsernameMaxLength = accountvalidation.MaxEmailLength
+			smtpFromNameMaxLength = 60
+			smtpPasswordMaxBytes  = 256
 		)
 		if smtpHost == "" {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostRequired, nil))
@@ -142,19 +145,19 @@ func HandleSettingsEmailPut(
 			return
 		}
 
-		if inputvalidation.TextLength(req.SMTPUsername) > smtpFieldMaxLength {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameTooLong, map[string]any{"max": smtpFieldMaxLength}))
+		if inputvalidation.TextLength(req.SMTPUsername) > smtpUsernameMaxLength {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPUsernameTooLong, map[string]any{"max": smtpUsernameMaxLength}))
 			return
 		}
 		// An application bound, measured in bytes because len(string) counts bytes. No
 		// PLAIN or LOGIN provider credential is known to exceed it, and it must not shrink
-		// to the neighbours' 60: SendGrid's SMTP password is its 69-character API key.
+		// to the sender name's 60: SendGrid's SMTP password is its 69-character API key.
 		if len(req.SMTPPassword) > smtpPasswordMaxBytes {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPPasswordTooLong, map[string]any{"max": smtpPasswordMaxBytes}))
 			return
 		}
-		if inputvalidation.TextLength(req.SMTPFromName) > smtpFieldMaxLength {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromNameTooLong, map[string]any{"max": smtpFieldMaxLength}))
+		if inputvalidation.TextLength(req.SMTPFromName) > smtpFromNameMaxLength {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromNameTooLong, map[string]any{"max": smtpFromNameMaxLength}))
 			return
 		}
 
@@ -162,8 +165,8 @@ func HandleSettingsEmailPut(
 			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
-		if inputvalidation.TextLength(req.SMTPFromEmail) > smtpFieldMaxLength {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong, map[string]any{"max": smtpFieldMaxLength}))
+		if inputvalidation.TextLength(req.SMTPFromEmail) > accountvalidation.MaxEmailLength {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong, map[string]any{"max": accountvalidation.MaxEmailLength}))
 			return
 		}
 

@@ -267,6 +267,73 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 	assert.Equal(t, strings.Repeat("p", 256), stored)
 }
 
+// PUT: the sender address and the SMTP username each take up to 254 characters, stored whole in
+// the widened columns, and 255 is refused; the sender name keeps its 60 (#632 decision 3).
+func TestAPISettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters(t *testing.T) {
+	restoreSettings(t)
+	accessToken, _ := createAdminClientWithToken(t)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
+	save := func(username, fromName, fromEmail string) *http.Response {
+		return makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+			SMTPEnabled:    true,
+			SMTPHost:       "mailpit",
+			SMTPPort:       1025,
+			SMTPEncryption: "none",
+			SMTPUsername:   username,
+			SMTPFromName:   fromName,
+			SMTPFromEmail:  fromEmail,
+		})
+	}
+
+	address254 := uniqueAddressOfLength(254)
+	require.Len(t, address254, 254)
+	username254 := strings.Repeat("u", 254)
+	name60 := strings.Repeat("n", 60)
+
+	resp := save(username254, name60, address254)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.SettingsEmailResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, username254, body.SMTPUsername)
+	assert.Equal(t, address254, body.SMTPFromEmail)
+
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, username254, settings.SMTPUsername, "stored whole")
+	assert.Equal(t, address254, settings.SMTPFromEmail, "stored whole")
+	assert.Equal(t, name60, settings.SMTPFromName)
+
+	refusals := []struct {
+		name                         string
+		username, fromName, fromMail string
+		code, description            string
+	}{
+		{"a 255-character username", strings.Repeat("u", 255), "Acme", "noreply@goiabada.dev",
+			"handler.settings_email.smtp_username_too_long", "The SMTP username can't be longer than 254 characters."},
+		{"a 255-character sender address", "user", "Acme", uniqueAddressOfLength(255),
+			"handler.settings_email.smtp_from_email_too_long", "The sender email can't be longer than 254 characters."},
+		{"a 61-character sender name", "user", strings.Repeat("n", 61), "noreply@goiabada.dev",
+			"handler.settings_email.smtp_from_name_too_long", "The sender name can't be longer than 60 characters."},
+	}
+	for _, c := range refusals {
+		t.Run(c.name, func(t *testing.T) {
+			resp := save(c.username, c.fromName, c.fromMail)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errBody api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errBody))
+			assert.Equal(t, c.code, errBody.ErrorCode)
+			assert.Equal(t, c.description, errBody.ErrorDescription)
+
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, address254, after.SMTPFromEmail, "nothing is written")
+			assert.Equal(t, username254, after.SMTPUsername, "nothing is written")
+		})
+	}
+}
+
 // PUT: a refused dial answers the fixed message and its coarse cause, and names neither the address
 // nor the port it dialled (#410 decision 4). The server under test runs on this machine, so a port
 // closed here is closed to its dial.

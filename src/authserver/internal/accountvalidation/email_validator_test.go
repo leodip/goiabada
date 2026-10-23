@@ -20,12 +20,12 @@ import (
 // src/core/i18n/catalogs/active.en.toml. Stated once per code because the
 // tables below carry many rows per code; a code reaching a table without an
 // entry here asserts against the empty string and fails. The one argument in
-// the group, the 60-character cap, is fixed in the validator, so the rendered
+// the group, the 254-character cap, is fixed in the validator, so the rendered
 // sentence is constant.
 var emailErrorMessages = map[string]string{
 	i18n.ErrCodeEmailRequired:          "Please enter an email address.",
 	i18n.ErrCodeEmailInvalidFormat:     "Please enter a valid email address.",
-	i18n.ErrCodeEmailTooLong:           "The email address cannot exceed a maximum length of 60 characters.",
+	i18n.ErrCodeEmailTooLong:           "The email address cannot exceed a maximum length of 254 characters.",
 	i18n.ErrCodeEmailAlreadyRegistered: "Apologies, but this email address is already registered.",
 }
 
@@ -49,6 +49,10 @@ func TestValidateEmailAddress(t *testing.T) {
 		// in an email address once nothing sanitizes.
 		{"Pins decision 3 of #275 - no less-than", "a<b@example.com", i18n.ErrCodeEmailInvalidFormat},
 		{"Pins decision 3 of #275 - no greater-than", "a>b@example.com", i18n.ErrCodeEmailInvalidFormat},
+		// RFC 5321 section 4.5.3.1.1 caps a local part at 64 octets, and the shape admits ASCII
+		// alone, so 64 characters is the most a deliverable address holds before the @ (#632).
+		{"a local part of 64 characters", strings.Repeat("a", 64) + "@example.com", ""},
+		{"a local part of 65 characters", strings.Repeat("a", 65) + "@example.com", i18n.ErrCodeEmailInvalidFormat},
 	}
 
 	for _, tt := range tests {
@@ -129,12 +133,12 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		assert.NoError(t, err, "keeping your own address must not be reported as taken")
 	})
 
-	t.Run("exactly 60 characters", func(t *testing.T) {
+	t.Run("exactly 254 characters", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		email := strings.Repeat("a", 60-len("@example.com")) + "@example.com"
-		assert.Len(t, email, 60)
+		email := addressOfLength(254)
+		assert.Len(t, email, 254)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 			&record.User{Id: 1, Subject: subject}, nil).Once()
@@ -144,6 +148,20 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 
 		assert.NoError(t, err)
 	})
+}
+
+// addressOfLength is a well-formed address of exactly n characters, n at least 70: a local part of
+// 64, the most RFC 5321 allows, and a domain of labels no longer than 63 ending in .com.
+func addressOfLength(n int) string {
+	// What is left for the domain's labels and the dots between them, beside its final "com".
+	remaining := n - 64 - len("@.com")
+	var labels []string
+	for remaining > 63 {
+		labels = append(labels, strings.Repeat("d", 61))
+		remaining -= 62
+	}
+	labels = append(labels, strings.Repeat("d", remaining), "com")
+	return strings.Repeat("a", 64) + "@" + strings.Join(labels, ".")
 }
 
 func TestValidateEmailChange_AddressTakenByAnotherUser(t *testing.T) {
@@ -198,8 +216,9 @@ func TestValidateEmailChange_RejectedBeforeAnyLookup(t *testing.T) {
 func TestValidateEmailChange_TooLong(t *testing.T) {
 	validator := NewEmailValidator(datamocks.NewDatabase(t))
 
-	email := strings.Repeat("a", 50) + "@example.com"
-	assert.Greater(t, len(email), 60)
+	email := addressOfLength(255)
+	require.Len(t, email, 255)
+	require.NoError(t, validator.ValidateEmailAddress(email), "only the length may refuse it")
 
 	err := validator.ValidateEmailChange(context.Background(), email, fake.UUID())
 
@@ -210,7 +229,7 @@ func TestValidateEmailChange_TooLong(t *testing.T) {
 	ok := errors.As(err, &locErr)
 	assert.True(t, ok)
 	if ok {
-		assert.Equal(t, 60, locErr.Args["max"], "the message must carry the limit for interpolation")
+		assert.Equal(t, 254, locErr.Args["max"], "the message must carry the limit for interpolation")
 	}
 }
 

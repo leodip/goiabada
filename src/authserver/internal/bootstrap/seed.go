@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -18,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -78,6 +80,9 @@ func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 	// PostgreSQL, on first run: both compare "=" exactly, and the password handler and
 	// the ROPC grant each look the account up by the lowercased address (#221, #283).
 	adminEmail = strings.ToLower(strings.TrimSpace(adminEmail))
+	if err := checkAdminEmail(adminEmail); err != nil {
+		return err
+	}
 
 	// Checked before anything is generated or written, so a refused password costs no key
 	// generation and leaves the database empty for the next start, with the variable fixed (#409).
@@ -417,6 +422,20 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 		adminConsoleAuthKey,
 		adminConsoleEncKey,
 	)
+}
+
+// checkAdminEmail refuses an admin email longer than an account's address may be, counted after the
+// seed's trimming as every other path counts one, naming the variable it came from. Only the length
+// is checked: the shape is left as the seed has always taken it, so admin@localhost seeds. Checked
+// before anything is generated or written, so the database stays empty for the next start, with
+// the variable fixed; without it such an address failed the first start with a database error on
+// MySQL, PostgreSQL and SQL Server, and seeded on SQLite (#632).
+func checkAdminEmail(email string) error {
+	if inputvalidation.TextLength(email) > accountvalidation.MaxEmailLength {
+		return errs.Errorf("GOIABADA_ADMIN_EMAIL cannot be the first administrator's email address: it is longer than %d characters",
+			accountvalidation.MaxEmailLength)
+	}
+	return nil
 }
 
 // checkAdminPassword refuses an admin password the first administrator may not have, under the

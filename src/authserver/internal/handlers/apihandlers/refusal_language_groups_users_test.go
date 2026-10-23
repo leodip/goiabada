@@ -269,6 +269,19 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	})
 }
 
+// addressOfLength is a well-formed address of exactly n characters, n at least 70: a local part of
+// 64, the most RFC 5321 allows, and a domain of labels of 61 characters or fewer.
+func addressOfLength(n int) string {
+	remaining := n - 64 - len("@.com")
+	var labels []string
+	for remaining > 63 {
+		labels = append(labels, strings.Repeat("d", 61))
+		remaining -= 62
+	}
+	labels = append(labels, strings.Repeat("d", remaining), "com")
+	return strings.Repeat("a", 64) + "@" + strings.Join(labels, ".")
+}
+
 // TestUserRefusals_AreInTheRequestsLanguage covers creating a user, setting a password, disabling
 // two-factor authentication, saving a user's groups and generating an email verification code.
 func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
@@ -329,11 +342,29 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "a user created with an email past the bound",
-			serve:      createUser(map[string]any{"email": strings.Repeat("a", 49) + "@example.com"}, nil),
+			serve:      createUser(map[string]any{"email": addressOfLength(255)}, nil),
 			status:     http.StatusBadRequest,
 			code:       "EMAIL_TOO_LONG",
-			english:    "The email address cannot exceed a maximum length of 60 characters",
-			portuguese: "O endereço de e-mail não pode ter mais que 60 caracteres",
+			english:    "The email address cannot exceed a maximum length of 254 characters",
+			portuguese: "O endereço de e-mail não pode ter mais que 254 caracteres",
+		},
+		{
+			// An address at the bound passes it, which the next refusal down the handler shows.
+			name:       "a user created with an email at the bound and an unknown setPasswordType",
+			serve:      createUser(map[string]any{"email": addressOfLength(254), "setPasswordType": "later"}, noUserHolds(addressOfLength(254))),
+			status:     http.StatusBadRequest,
+			code:       "handler.user.set_password_type_invalid",
+			english:    `setPasswordType must be "now" or "email"`,
+			portuguese: `setPasswordType deve ser "now" ou "email"`,
+		},
+		{
+			// RFC 5321 section 4.5.3.1.1 caps the part before the @ at 64 (#632).
+			name:       "a user created with an email whose local part is 65 characters",
+			serve:      createUser(map[string]any{"email": strings.Repeat("a", 65) + "@example.com"}, nil),
+			status:     http.StatusBadRequest,
+			code:       "validator.email.invalid_format",
+			english:    "Please enter a valid email address.",
+			portuguese: "Informe um endereço de e-mail válido.",
 		},
 		{
 			name:       "a user created with an unknown setPasswordType",

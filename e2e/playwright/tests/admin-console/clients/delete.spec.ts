@@ -69,6 +69,24 @@ test("the system client cannot be deleted", async ({ page }) => {
   await expect(page.getByText("This is the admin console's own client, so it can't be deleted.")).toBeVisible();
   await expect(page.locator("#clientIdentifier")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Delete client", exact: true })).toHaveCount(0);
+
+  // A delete made by hand, the page's own form posted with the identifier typed correctly, is
+  // refused on the page, and the client is still there.
+  await page.locator("form.panel").evaluate((form: HTMLFormElement) => {
+    const identifier = document.createElement("input");
+    identifier.type = "hidden";
+    identifier.name = "clientIdentifier";
+    identifier.value = "admin-console-client";
+    form.append(identifier);
+    HTMLFormElement.prototype.submit.call(form);
+  });
+  await expect(page).toHaveURL(clientUrl(id, "delete"));
+  await expect(page.locator("#delete-error")).toHaveText("This is the admin console's own client, so it can't be deleted.");
+  await expect(page.locator("#delete-error")).toHaveAttribute("role", "alert");
+  await expect(page.getByRole("heading", { level: 1, name: "Delete client" })).toBeVisible();
+  await expect(detail(page, "Client identifier")).toHaveText("admin-console-client");
+
   await page.getByRole("link", { name: "Back to clients" }).click();
   await expect(page).toHaveURL(`${env.adminUrl}/admin/clients`);
+  await expect(clientRow(page, "admin-console-client")).toHaveCount(1);
 });

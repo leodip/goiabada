@@ -92,7 +92,9 @@ func TestGenerateKeyURL(t *testing.T) {
 
 	t.Run("Input length restrictions", func(t *testing.T) {
 		t.Run("Valid lengths", func(t *testing.T) {
-			email := fake.LetterN(58) + "@b.com" // 64 characters
+			// The longest address an account holds, 254 characters (#632).
+			email := fake.LetterN(64) + "@" + strings.Repeat("d", 185) + ".com"
+			require.Len(t, email, 254)
 			appName := fake.LetterN(32)
 
 			keyURL, err := generator.GenerateKeyURL(email, appName)
@@ -103,15 +105,21 @@ func TestGenerateKeyURL(t *testing.T) {
 			secret, err := SecretFromKeyURL(keyURL)
 			require.NoError(t, err)
 			assert.NotEmpty(t, secret, "Secret key should not be empty for maximum valid lengths")
+
+			// The QR code still fits the image the enrolling user scans.
+			image, err := RenderQRCodeImage(keyURL)
+			require.NoError(t, err)
+			assert.NotEmpty(t, image)
 		})
 
 		t.Run("Email too long", func(t *testing.T) {
-			longEmail := strings.Repeat("a", 61) + "@b.com" // 65 characters
+			longEmail := fake.LetterN(64) + "@" + strings.Repeat("d", 186) + ".com"
+			require.Len(t, longEmail, 255)
 			appName := "TestApp"
 
 			_, err := generator.GenerateKeyURL(longEmail, appName)
 
-			require.Error(t, err, "GenerateKeyURL should return an error for email longer than 64 characters")
+			require.Error(t, err, "GenerateKeyURL should return an error for email longer than 254 characters")
 			assert.Contains(t, err.Error(), "email is too long", "Error message should mention email is too long")
 		})
 

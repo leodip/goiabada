@@ -40,6 +40,33 @@ test("a user is created, shown on their page, found by search, and can sign in",
   await expect(page.getByText("No users found.")).toBeVisible();
 });
 
+test("a user with a 92-character address, the one #632 reported, is created, found by search, and can sign in", async ({ page, request, clients }) => {
+  // Fixed rather than generated, since it is the address the issue was refused with. Longer than the
+  // 60 characters an address was once held to, under the 254 it may now be.
+  const email = "maximiliano.bartholomew.montgomery-fitzgerald-worthington@subsidiary.example-enterprises.com";
+  expect(email).toHaveLength(92);
+  // A run that failed before its cleanup leaves the user behind; a retry starts without it.
+  await page.goto(`${list}?query=${encodeURIComponent(email)}`);
+  if ((await rowWithCell(page, email).count()) > 0) await deleteUser(page, await idFromListLink(page, `${list}?query=${encodeURIComponent(email)}`, email));
+
+  await submitNewUser(page, { email, givenName: "Maximiliano", familyName: "Worthington", password: "a-good-password" });
+  await expect(page).toHaveURL(/\/admin\/users\/\d+\/details/);
+  const id = Number(page.url().match(/\/admin\/users\/(\d+)\/details/)![1]);
+  try {
+    await expect(page.getByText("User created.")).toBeVisible();
+    await expect(detail(page, "Email")).toHaveText(email);
+
+    await page.goto(`${list}?query=${encodeURIComponent(email)}`);
+    await expect(rowWithCell(page, email)).toHaveCount(1);
+
+    const { client, secret } = await passwordGrantClient(page, clients);
+    const answer = await passwordToken(request, client.identifier, secret, email, "a-good-password", "openid");
+    expect(answer.status, JSON.stringify(answer.body)).toBe(200);
+  } finally {
+    await deleteUser(page, id);
+  }
+});
+
 test("a search that matches nobody says so", async ({ page }) => {
   await page.goto(`${list}?query=nobody-matches-this-e2e-search`);
   await expect(page.getByText("No users found.")).toBeVisible();
