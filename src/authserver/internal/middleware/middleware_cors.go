@@ -110,12 +110,13 @@ func corsMethodAllowed(method string) bool {
 	return slices.Contains(corsAllowedMethods, strings.ToUpper(method))
 }
 
-// corsRequestedHeaders splits an Access-Control-Request-Headers value on commas and spaces into
-// canonical header names, in the order asked. A name that is not a valid token stays as sent, so it
+// corsRequestedHeaders splits an Access-Control-Request-Headers value on commas, spaces and tabs
+// into canonical header names, in the order asked: RFC 9110 section 5.6.1 lets a list put optional
+// whitespace, SP or HTAB, around each comma. A name that is not a valid token stays as sent, so it
 // matches nothing allowed and the preflight is refused.
 func corsRequestedHeaders(value string) []string {
 	var names []string
-	for _, name := range strings.FieldsFunc(value, func(c rune) bool { return c == ',' || c == ' ' }) {
+	for _, name := range strings.FieldsFunc(value, func(c rune) bool { return c == ',' || c == ' ' || c == '\t' }) {
 		names = append(names, http.CanonicalHeaderKey(name))
 	}
 	return names

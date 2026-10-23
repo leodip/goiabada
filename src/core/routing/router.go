@@ -526,10 +526,15 @@ func (ep *endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.name = m.route.name
 	// ServeMux set the path values under the endpoint's names; a route naming them otherwise reads
 	// them under its own. ServeMux hands its handler the request it was given, so they are set on
-	// the one the route's chain is served.
+	// the one the route's chain is served. Every value is read before any is set, since the two may
+	// give one name different places.
 	if !slices.Equal(m.route.params, ep.params) {
+		values := make([]string, len(ep.params))
+		for i, param := range ep.params {
+			values[i] = r.PathValue(param)
+		}
 		for i, param := range m.route.params {
-			r.SetPathValue(param, r.PathValue(ep.params[i]))
+			r.SetPathValue(param, values[i])
 		}
 	}
 	m.route.served.ServeHTTP(w, r)

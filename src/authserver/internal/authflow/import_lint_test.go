@@ -37,6 +37,8 @@ type refusedImport struct {
 var authflowRefusedImports = []refusedImport{
 	{"net/http", "the request and the response writer; the browser session is reached through the handler's per-request adapter"},
 	{"github.com/leodip/goiabada/core/routing", "the router, its route table and the route a request reached"},
+	{"github.com/leodip/goiabada/core/httpmw", "the request middleware both servers mount, and the response writer it wraps"},
+	{"github.com/leodip/goiabada/core/requestid", "the request id, which the handler reads off the request and hands over as a plain value"},
 	{"github.com/leodip/goiabada/authserver/internal/handlers", "the handlers, which import authflow and write the response"},
 	{"github.com/leodip/goiabada/authserver/internal/middleware", "the request middleware"},
 	{"github.com/leodip/goiabada/authserver/internal/reqctx", "the request-scoped values, which the handler reads and hands over as plain values"},
@@ -158,6 +160,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/httpmw"
+	"github.com/leodip/goiabada/core/httpmw/statuswriter"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/routing"
 )
 `)
@@ -170,6 +175,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/handlersx"
+	"github.com/leodip/goiabada/core/httpmwx"
+	"github.com/leodip/goiabada/core/requestidx"
 	"github.com/leodip/goiabada/core/routingx"
 )
 
@@ -199,7 +206,10 @@ import "net/http"
 		authflowDir + "/refused.go:8: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers",
 		authflowDir + "/refused.go:9: github.com/leodip/goiabada/authserver/internal/middleware",
 		authflowDir + "/refused.go:10: github.com/leodip/goiabada/authserver/internal/reqctx",
-		authflowDir + "/refused.go:11: github.com/leodip/goiabada/core/routing",
+		authflowDir + "/refused.go:11: github.com/leodip/goiabada/core/httpmw",
+		authflowDir + "/refused.go:12: github.com/leodip/goiabada/core/httpmw/statuswriter",
+		authflowDir + "/refused.go:13: github.com/leodip/goiabada/core/requestid",
+		authflowDir + "/refused.go:14: github.com/leodip/goiabada/core/routing",
 	}, got)
 }
 
@@ -218,6 +228,24 @@ import "github.com/leodip/goiabada/authserver/internal/reqctx"
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
 	assert.Contains(t, report.Text(), authflowDir+"/operation.go:3: github.com/leodip/goiabada/authserver/internal/reqctx")
 	assert.Contains(t, report.Text(), "plain value")
+}
+
+// The request middleware and the request id moved from chi into core with #462; the guard refuses
+// them where it refused chi.
+func TestAuthflow_ReachesNoHTTP_TheGuardFailsOnTheCoreRequestPackages(t *testing.T) {
+	for _, path := range []string{"github.com/leodip/goiabada/core/httpmw", "github.com/leodip/goiabada/core/requestid"} {
+		t.Run(path, func(t *testing.T) {
+			root := t.TempDir()
+			writeImportFixture(t, root, authflowDir+"/operation.go", "package authflow\n\nimport \""+path+"\"\n")
+
+			report := guard.Run(func(r guard.Reporter) {
+				assertAuthflowReachesNoHTTP(r, root, authflowDir)
+			})
+
+			require.True(t, report.Failed(), "an import of %s passed the guard", path)
+			assert.Contains(t, report.Text(), authflowDir+"/operation.go:3: "+path)
+		})
+	}
 }
 
 func TestAuthflow_ReachesNoHTTP_TheGuardPassesAPackageOffHTTP(t *testing.T) {

@@ -604,6 +604,16 @@ func TestRouter_EachMethodNamesItsOwnParameters(t *testing.T) {
 		return nil
 	}))
 	assert.Equal(t, []string{"GET /sessions/{sessionIdentifier}", "DELETE /sessions/{id}"}, walked)
+
+	// Two methods may name the same parameters in a different order: each reads the values its own
+	// pattern puts under each name, none overwritten by a name the other pattern gives another place.
+	pair := func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprintf(w, "first=%s second=%s", r.PathValue("first"), r.PathValue("second"))
+	}
+	r.Get("/pairs/{first}/{second}", pair)
+	r.Delete("/pairs/{second}/{first}", pair)
+	assert.Equal(t, "first=left second=right", serve(t, r, http.MethodGet, "/pairs/left/right").body)
+	assert.Equal(t, "first=right second=left", serve(t, r, http.MethodDelete, "/pairs/left/right").body)
 }
 
 // What would be silently wrong panics at registration: ServeMux's own conflicts, a route registered

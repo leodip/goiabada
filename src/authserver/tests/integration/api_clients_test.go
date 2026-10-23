@@ -150,8 +150,8 @@ func TestAPIClientGet_EmptyId(t *testing.T) {
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
-	// Assert: Due to chi router behavior, this hits the listing endpoint and returns 200
-	// This is actually correct behavior - empty ID paths should go to the listing
+	// Assert: one trailing slash is stripped before routing, so this is the listing endpoint's path
+	// and returns 200
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 

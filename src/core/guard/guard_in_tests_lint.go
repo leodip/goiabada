@@ -20,9 +20,9 @@ import (
 //
 // go mod tidy reads the tests of every package a module imports, not only that module's own, and
 // records a checksum in its go.sum for every module those tests need. A test anywhere in that set
-// importing core/guard therefore puts core/guard's own dependencies in the module's go.sum: TOML,
-// which it reads ARCHITECTURE.md's tables with, and chi, through core/metrics. The auth server and
-// the admin console call the guards from their own tiers and need those modules anyway. The setup
+// importing core/guard therefore puts core/guard's own dependencies in the module's go.sum, among
+// them TOML, which it reads ARCHITECTURE.md's tables with. The auth server and the admin console
+// call the guards from their own tiers and need those modules anyway. The setup
 // wizard does not: its tier calls none of the tree-wide guards, and it imports four core packages
 // and needs nothing of theirs but what they compile. #500 moved the admin password rule into a leaf
 // package to keep i18n, TOML and JWT out of the wizard, and then put the leak straight back through
@@ -68,7 +68,7 @@ func assertNoGuardInTestsReachedFrom(r Reporter, root, moduleDir string) {
 
 	r.Errorf("%d test import(s) reach core/guard from a package %s reaches:\n\t%s\n\n"+
 		"go mod tidy reads the tests of every package a module imports, so each of these puts "+
-		"core/guard's dependencies, chi and TOML among them, in %s's go.sum, for modules none of its "+
+		"core/guard's dependencies, TOML among them, in %s's go.sum, for modules none of its "+
 		"packages use (#500). Call the guard from a test in core/guard, as "+
 		"TestAdminPassword_ImportsNothingButErrsAndTheStandardLibrary does, or from a module that "+
 		"needs core/guard anyway.",

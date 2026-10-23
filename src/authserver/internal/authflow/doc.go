@@ -51,10 +51,10 @@
 //
 // Rules every operation keeps:
 //
-//   - No HTTP. Nothing here imports net/http, core/routing, internal/handlers, internal/middleware
-//     or internal/reqctx (import_lint_test.go). What the request carries, its settings, its session
-//     identifier, the browser's address and a form's submitted body, reaches an operation as a plain
-//     value the handler read.
+//   - No HTTP. Nothing here imports net/http, core/routing, core/httpmw, core/requestid,
+//     internal/handlers, internal/middleware or internal/reqctx (import_lint_test.go). What the
+//     request carries, its settings, its session identifier, its request id, the browser's address
+//     and a form's submitted body, reaches an operation as a plain value the handler read.
 //   - Every browser-session write goes through the port an operation declares for it, which the
 //     handler satisfies with an adapter built for that one request (handlers.browserSession), holding
 //     the request and the response writer the handler holds. An operation never stores one.
