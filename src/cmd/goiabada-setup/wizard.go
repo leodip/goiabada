@@ -654,7 +654,7 @@ func (w *wizard) askAdmin() error {
 		// A generated default, where the prompt offered changeme, the password the docs and the
 		// samples printed, to every operator who pressed Enter.
 		generated := generatePassword()
-		adminPassword, err := w.adminPassword("Admin password", generated)
+		adminPassword, err := w.adminPassword("Admin password", generated, adminEmail)
 		if err != nil {
 			return err
 		}
@@ -674,8 +674,7 @@ func (w *wizard) askAdmin() error {
 	if err := validateEmail(adminEmail); err != nil {
 		return errs.Wrap(err, "invalid admin email")
 	}
-	// Only a password the operator chose is judged: a generated one holds the classes SQL Server
-	// asks for and no symbol, and was warned about as weak (#430).
+	// Only a password the operator chose is judged, and only by the first administrator's rule.
 	adminPassword, err := w.givenPassword(w.flags.AdminPassword, "--admin-password-file", w.flags.AdminPasswordFile)
 	if err != nil {
 		return err
@@ -689,16 +688,14 @@ func (w *wizard) askAdmin() error {
 		// seeds, and the one the administrator signs in with (#500).
 		adminPassword = strings.TrimSpace(adminPassword)
 		// The first start refuses to seed what this refuses, so writing it would ship a deployment
-		// that cannot start (#500).
-		if err := adminpassword.Check(adminPassword); err != nil {
+		// that cannot start (#500). It is compared with the admin email and the app name this run
+		// writes, which that start seeds beside it (#550 decision 7).
+		if err := adminpassword.Check(adminPassword, adminEmail, seededAppName); err != nil {
 			flag := "--admin-password"
 			if w.flags.AdminPasswordFile != "" {
 				flag = "--admin-password-file"
 			}
 			return errs.Wrapf(err, "invalid %s", flag)
-		}
-		if issues := checkPasswordStrength(adminPassword); len(issues) > 0 {
-			w.out.warning("Weak password: %s", strings.Join(issues, ", "))
 		}
 	}
 	w.reportPassword("Admin password", generated)

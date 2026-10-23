@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
@@ -28,7 +29,7 @@ func NewPublicSettings(database publicSettingsDatabase) *PublicSettings {
 
 // ServeHTTP answers GET /api/public/settings, which needs no authentication: the settings the
 // admin console needs before anyone holds a token, the application name, the UI theme, whether
-// SMTP is configured and the issuer, as JSON, or the API's JSON 500 when the settings row cannot
+// SMTP is configured, the issuer and the stored password policy's rules, as JSON, or the API's JSON 500 when the settings row cannot
 // be read (#279 decision 17).
 //
 // The route is registered for GET only, so the router answers any other method itself, 405 with
@@ -60,11 +61,16 @@ func (h *PublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// /.well-known/openid-configuration, which OIDC Discovery 1.0 section 3
 	// requires ("REQUIRED. URL using the https scheme ... that the OP asserts
 	// as its Issuer Identifier").
+	//
+	// PasswordRules is here because the admin console states them under its password fields
+	// (#550 decision 11). The registration form already states them to anyone while registration
+	// is on, and NIST SP 800-63B assumes an attacker knows them.
 	response := api.PublicSettingsResponse{
-		AppName:     settings.AppName,
-		UITheme:     settings.UITheme,
-		SMTPEnabled: settings.SMTPEnabled,
-		Issuer:      settings.Issuer,
+		AppName:       settings.AppName,
+		UITheme:       settings.UITheme,
+		SMTPEnabled:   settings.SMTPEnabled,
+		Issuer:        settings.Issuer,
+		PasswordRules: apimapping.ToPasswordRulesResponse(settings.PasswordPolicy),
 	}
 
 	apiresponse.WriteJSON(w, r, http.StatusOK, response)

@@ -171,7 +171,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
-		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.Anything).Return().Once()
 		pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
@@ -205,7 +205,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		passwordValidator := accounthandlersmocks.NewPasswordValidator(t)
-		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword).Return(nil).Once()
+		passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
 		store := newMarkerTestStore()

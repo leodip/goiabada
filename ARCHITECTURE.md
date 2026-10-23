@@ -115,6 +115,8 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/logging` | kernel | — |
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
+| `core/passwordblocklist` | kernel | — |
+| `core/passwordrules` | kernel | — |
 | `core/phonecountries` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
@@ -170,9 +172,10 @@ Notes on rows that are not self-evident:
   its one rule, and it is a package of its own rather than a file in `core/inputvalidation` because
   the wizard links whatever its home imports: there, the identifier validator's `core/i18n` import
   brought the message catalogs, `core/oauth`, a TOML parser and a JWT library into a binary that
-  uses none of them. `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs` and the
-  standard library through `AssertImportsOnly`, the rule `authserver/internal/record` is held by
-  too. The call is made from there rather than beside the package because `go mod tidy` reads the
+  uses none of them. `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs`,
+  `core/passwordblocklist`, itself a standard-library leaf whose list and context-word check the
+  rule applies (#550), and the standard library through `AssertImportsOnly`, the rule
+  `authserver/internal/record` is held by too. The call is made from there rather than beside the package because `go mod tidy` reads the
   tests of every package the wizard imports, and a test in `core/adminpassword` importing
   `core/guard` put chi and TOML in the wizard's `go.sum`. `AssertNoGuardInTestsReachedFrom` refuses
   any test the wizard reaches that does so (#500).
@@ -182,6 +185,18 @@ Notes on rows that are not self-evident:
   URL the wizard writes is one the start accepts and the save keeps. `inputvalidation.TextLength`
   counts the same unit, but the wizard cannot link that package, so the leaf counts it itself, and
   `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs` and the standard library (#615).
+- `core/passwordblocklist` is kernel because it is written for the two places the `nist` password
+  policy is applied, which must agree: the auth server's account validator, on every path that sets
+  a password, and `core/adminpassword`, the first administrator's rule the setup wizard shares. It
+  holds the generated list of commonly used passwords and the check against the account's own
+  words, and imports the standard library alone, for `core/adminpassword`'s reason: the wizard links
+  whatever it imports, and `core/guard`'s `imports_only_lint_test.go` holds it there (#550).
+- `core/passwordrules` is kernel because both applications show the stored password policy's
+  rules under a new password's field, the auth server on its registration, activation and reset
+  forms and the admin console on its change-password, new user and Authentication tab pages, and
+  both word them through its one function from the rules the public settings carry, so the two
+  cannot word the same rules differently. It is a package of its own rather than part of `core/api`,
+  which declares and does nothing, and of `core/i18n`, which owns no message of a domain (#550).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are

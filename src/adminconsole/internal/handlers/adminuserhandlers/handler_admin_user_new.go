@@ -28,6 +28,7 @@ func HandleNewGet(
 
 		bind := map[string]interface{}{
 			"smtpEnabled":     settings.SMTPEnabled,
+			"passwordRules":   render.PasswordRulesHint(r),
 			"setPasswordType": api.SetPasswordTypeNow,
 			"page":            r.URL.Query().Get("page"),
 			"query":           r.URL.Query().Get("query"),
@@ -66,6 +67,7 @@ func HandleNewPost(
 				"error":           message,
 				"errorField":      errorField,
 				"smtpEnabled":     settings.SMTPEnabled,
+				"passwordRules":   render.PasswordRulesHint(r),
 				"setPasswordType": r.FormValue("setPasswordType"),
 				"page":            r.URL.Query().Get("page"),
 				"query":           r.URL.Query().Get("query"),

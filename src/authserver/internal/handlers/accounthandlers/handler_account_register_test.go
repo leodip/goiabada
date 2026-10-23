@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
@@ -515,7 +516,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password is required."
 		}))
-		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything, mock.Anything)
 		userCreator.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -566,7 +567,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		pageRenderer.AssertCalled(t, "RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Confirm your password."
 		}))
-		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything, mock.Anything)
 		userCreator.AssertExpectations(t)
 		emailSender.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
@@ -678,7 +679,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
-		passwordValidator.On("ValidatePassword", mock.Anything, "short").Return(oauth.NewErrorDetail("", "The minimum length for the password is 8 characters"))
+		passwordValidator.On("ValidatePassword", mock.Anything, "short", mock.Anything).Return(oauth.NewErrorDetail("", "The minimum length for the password is 8 characters"))
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -732,7 +733,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailValidator.AssertNotCalled(t, "ValidateEmailAddress", mock.Anything)
 		database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "GetPreRegistrationByEmail", mock.Anything, mock.Anything, mock.Anything)
-		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Direct registration without email verification", func(t *testing.T) {
@@ -765,7 +766,7 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
-		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
+		passwordValidator.On("ValidatePassword", mock.Anything, "password123", mock.Anything).Return(nil)
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
@@ -824,6 +825,7 @@ func TestHandleRegisterPost(t *testing.T) {
 			SMTPHost:                "smtp.example.com",
 			SMTPPort:                2525,
 			PasswordPolicy:          record.PasswordPolicyHigh,
+			AppName:                 "Goiabada",
 			SelfRegistrationRequiresEmailVerification: false,
 		}
 		ctx := reqctx.WithSettings(req.Context(), settings)
@@ -832,8 +834,11 @@ func TestHandleRegisterPost(t *testing.T) {
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
-		// The policy is the request's settings', passed by the handler (#433).
-		passwordValidator.On("ValidatePassword", record.PasswordPolicyHigh, "password123").Return(nil)
+		// The policy is the request's settings', passed by the handler (#433), and the words
+		// beside it the address typed and the app name; a registering account has no username
+		// (#550 decision 6).
+		passwordValidator.On("ValidatePassword", record.PasswordPolicyHigh, "password123",
+			accountvalidation.AccountWords{Email: "test@example.com", AppName: "Goiabada"}).Return(nil)
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
@@ -941,7 +946,7 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 			emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 			database.On("GetPreRegistrationByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
-			passwordValidator.On("ValidatePassword", record.PasswordPolicyHigh, "password123").Return(nil)
+			passwordValidator.On("ValidatePassword", record.PasswordPolicyHigh, "password123", mock.Anything).Return(nil)
 			userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 				return input.Email == "test@example.com" && !input.EmailVerified
 			})).Return(&record.User{}, nil)

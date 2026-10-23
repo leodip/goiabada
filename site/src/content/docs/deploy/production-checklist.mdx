@@ -14,7 +14,7 @@ Each item links to the page that explains it. A deployment the [setup wizard](/d
 - [ ] **The AES key is backed up,** apart from the database backups. Without it, a restored database decrypts nothing. See [Back up the AES key](/deploy/secrets/#back-up-the-aes-key).
 - [ ] **Every secret is your own,** generated for this deployment and never copied from an example. See [What each secret protects](/deploy/secrets/#what-each-secret-protects).
 - [ ] **The secrets are readable only by what needs them:** out of version control and shared directories. See [Where your setup keeps them](/deploy/secrets/#where-your-setup-keeps-them).
-- [ ] **The administrator's password is strong,** at least 15 characters. Changing `GOIABADA_ADMIN_PASSWORD` after the first start does nothing; see [The admin password](/deploy/rotate-secrets/#the-admin-password).
+- [ ] **The administrator's password is strong,** at least 15 characters and not a commonly used password, which the first start requires. Changing `GOIABADA_ADMIN_PASSWORD` after the first start does nothing; see [The admin password](/deploy/rotate-secrets/#the-admin-password).
 - [ ] **The administrator has two-factor authentication,** set up from their account in the admin console.
 
 ## Network
@@ -50,6 +50,7 @@ With `GOIABADA_DB_TLS_MODE` unset, Goiabada encrypts its connection to PostgreSQ
 ## Abuse
 
 - [ ] **The rate limiter is on,** `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=true`. The limits counted by a user or an email, 100 wrong passwords an hour for one account among them, apply either way, and it adds the limits counted by an IP address, on password sign-in among them. The setup wizard asks. See [Rate limits](/reference/environment-variables/#rate-limits).
+- [ ] **The password policy is NIST SP 800-63B,** under **Admin**, **General**, so the passwords attackers try first are refused. A new installation starts with it; one upgraded from an earlier release keeps the policy it had. See [Password policy](/concepts/password-policy/).
 
 ## Monitoring and logs
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -89,7 +90,8 @@ func HandleAccountPasswordPut(
 			writeInternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		if validatePasswordErr := passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword); validatePasswordErr != nil {
+		words := accountvalidation.AccountWords{Email: user.Email, Username: user.Username, AppName: settings.AppName}
+		if validatePasswordErr := passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword, words); validatePasswordErr != nil {
 			writeValidationError(w, r, validatePasswordErr)
 			return
 		}

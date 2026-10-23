@@ -12,6 +12,7 @@ import {
   addRedirectUri,
   clientIdFromList,
   clientUrl,
+  expectPasswordRules,
   grantUserPermission,
   groupUrl,
   idFromListLink,
@@ -38,6 +39,17 @@ test.describe.configure({ timeout: 300_000 });
 
 // A browser with nobody signed in, for the pages reached without a session.
 const signedOut = { storageState: { cookies: [], origins: [] } };
+
+// A page that sets a password, checked with the stored policy's rule drawn under the field (#550).
+function withPasswordRules(page: Page, field: string, state: State): State {
+  return {
+    ...state,
+    reach: async () => {
+      await state.reach();
+      await expectPasswordRules(page, field);
+    },
+  };
+}
 
 // A user search (Add members, Grant to a user) answered with the user, and with no one.
 function searchFinds(page: Page, name: string, url: () => Promise<unknown>, email: string): State[] {
@@ -381,7 +393,18 @@ test("a user's account pages", async ({ page, browser, clients, users }) => {
       },
     },
     asks(own, "picture, deleting it asking first", () => own.locator("#deleteImageBtn").click()),
-    at(own, "change password", account("change-password")),
+    withPasswordRules(own, "newPassword", at(own, "change password", account("change-password"))),
+    withPasswordRules(
+      own,
+      "newPassword",
+      refused(own, "change password, the new password refused", "newPassword", async () => {
+        await own.goto(account("change-password"));
+        await own.locator("#currentPassword").fill(user.password);
+        await own.locator("#newPassword").fill("abc");
+        await own.locator("#newPasswordConfirmation").fill("abc");
+        await submit();
+      }),
+    ),
     refused(own, "change password, the passwords not matching", "newPasswordConfirmation", async () => {
       await own.goto(account("change-password"));
       await own.locator("#currentPassword").fill(user.password);
@@ -724,8 +747,18 @@ test("the users' list, new and delete pages, and a user's details, profile and c
         await expect(page.locator(".empty-state")).toBeVisible();
       },
     },
-    at(page, "a new user", `${list}/new`),
+    withPasswordRules(page, "password", at(page, "a new user", `${list}/new`)),
     refused(page, "a new user with no email", "email", () => page.locator("#btnCreate").click()),
+    withPasswordRules(
+      page,
+      "password",
+      refused(page, "a new user, the password refused", "password", async () => {
+        await page.goto(`${list}/new`);
+        await page.locator("#email").fill(`${uniqueIdentifier("u")}@example.com`);
+        await page.locator("#password").fill("abc");
+        await page.locator("#btnCreate").click();
+      }),
+    ),
     {
       // Offered while email is set up, as it is in the baseline.
       name: "a new user, the password link to be emailed",
@@ -771,11 +804,15 @@ test("the users' list, new and delete pages, and a user's details, profile and c
       await page.locator("#btnSave").click();
     }),
     at(page, "a user's picture", tab("picture")),
-    at(page, "a user's authentication, without two-factor authentication", tab("authentication")),
-    refused(page, "a user's authentication, the new password refused", "newPassword", async () => {
-      await page.locator("#newPassword").fill("abc");
-      await page.locator("#btnSave").click();
-    }),
+    withPasswordRules(page, "newPassword", at(page, "a user's authentication, without two-factor authentication", tab("authentication"))),
+    withPasswordRules(
+      page,
+      "newPassword",
+      refused(page, "a user's authentication, the new password refused", "newPassword", async () => {
+        await page.locator("#newPassword").fill("abc");
+        await page.locator("#btnSave").click();
+      }),
+    ),
   ]);
 });
 

@@ -156,6 +156,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GroupAttributeResponse` | both-apps | — |
 | `core/api` | `GroupResponse` | both-apps | — |
 | `core/api` | `GroupWithPermissionResponse` | both-apps | — |
+| `core/api` | `PasswordRulesResponse` | kernel | — |
 | `core/api` | `PermissionResponse` | both-apps | — |
 | `core/api` | `PhoneCountryResponse` | contract | The element of `GET /api/v1/admin/phone-countries`, a published admin API route that stays when the admin console stops calling it, because its pages build the list from `core/phonecountries` (#563 decisions 1 and 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `ProfilePictureInfoResponse` | both-apps | — |
@@ -444,6 +445,8 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordNumberRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordSpecialCharRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordTooCloseToAccount` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordTooCommon` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordTooShort` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordUppercaseRequired` | both-apps | — |
@@ -621,6 +624,9 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
+| `core/passwordblocklist` | `IsCommon` | kernel | — |
+| `core/passwordblocklist` | `IsTooClose` | kernel | — |
+| `core/passwordrules` | `Describe` | both-apps | — |
 | `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
 | `core/phonecountries` | `PhoneCountry` | own-package | — |

@@ -87,6 +87,23 @@ func TestRender_AccountChangePassword_ABlankFieldIsTheOneMarked(t *testing.T) {
 	}
 }
 
+// The nist policy's two refusals are about the new password, so they mark it (#550 decision 10).
+func TestRender_AccountChangePassword_TheNistRefusalsMarkTheNewPassword(t *testing.T) {
+	form := url.Values{"currentPassword": {"the-old-one"}, "newPassword": {"PasswordPassword"},
+		"newPasswordConfirmation": {"PasswordPassword"}}
+	for _, code := range []string{"validator.password.too_common", "validator.password.too_close_to_account"} {
+		t.Run(code, func(t *testing.T) {
+			refusal := &apiclient.APIError{Code: code, Message: "Escolha outra.", StatusCode: http.StatusBadRequest}
+			out := serveRefusal(t,
+				accounthandlers.HandleChangePasswordPost(render.New(web.TemplateFS(), web.StaticFS()), nil,
+					&refusingPasswordAPI{refusal: refusal}, "https://console.example"),
+				"/account/change-password", form)
+
+			assertMarked(t, out, "newPassword", "password-error", "currentPassword", "newPassword", "newPasswordConfirmation")
+		})
+	}
+}
+
 func TestRender_AccountEmail_TheRefusedFieldIsMarked(t *testing.T) {
 	for _, tc := range []struct {
 		name    string

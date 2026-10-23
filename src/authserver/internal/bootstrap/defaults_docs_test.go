@@ -2,9 +2,10 @@ package bootstrap
 
 // The defaults the concept pages state, held to the settings row a first start seeds (#522, #526).
 //
-// Tokens, Refresh tokens and Sessions each state how long the thing lasts, and Self-registration
-// who can register, in a table of the settings that decide it, named as the admin console names
-// them, with the value a new install starts with. An operator sizing or opening a deployment reads
+// Tokens, Refresh tokens and Sessions each state how long the thing lasts, Self-registration who
+// can register, and Password policy which rule new passwords start under (#550), in a table of the
+// settings that decide it, named as the admin console names them, with the value a new install
+// starts with. An operator sizing or opening a deployment reads
 // those values there, so each table is held to the row the seed writes, in both directions: a value
 // the seed does not write fails, and so does a setting the page owes and leaves out.
 
@@ -50,10 +51,23 @@ var defaultsSections = []defaultsSection{
 		"User registration",
 		"Require email verification",
 	}},
+	{"site/src/content/docs/concepts/password-policy.mdx", "## What a new installation starts with", []string{
+		"Password policy",
+	}},
+}
+
+// passwordPolicyNames is each password policy's name on its card under Admin, General, which is
+// how a page names a policy.
+var passwordPolicyNames = map[record.PasswordPolicy]string{
+	record.PasswordPolicyNone:   "No policy",
+	record.PasswordPolicyLow:    "Low",
+	record.PasswordPolicyMedium: "Medium",
+	record.PasswordPolicyHigh:   "High",
+	record.PasswordPolicyNist:   "NIST SP 800-63B",
 }
 
 // seededDefaults is the value a seeded settings row holds for each admin console label: a number
-// of seconds as digits, a switch as On or Off.
+// of seconds as digits, a switch as On or Off, a password policy as its card's name.
 func seededDefaults(settings *record.Settings) map[string]string {
 	onOff := map[bool]string{false: "Off", true: "On"}
 	return map[string]string{
@@ -67,11 +81,12 @@ func seededDefaults(settings *record.Settings) map[string]string {
 		"Maximum sessions per user":                         strconv.Itoa(settings.MaxUserSessionsPerUser),
 		"User registration":                                 onOff[settings.SelfRegistrationEnabled],
 		"Require email verification":                        onOff[settings.SelfRegistrationRequiresEmailVerification],
+		"Password policy":                                   passwordPolicyNames[settings.PasswordPolicy],
 	}
 }
 
-// The tables of default settings on Tokens, Refresh tokens, Sessions and Self-registration are the
-// values a new install starts with. Each row's default is what the seed writes, and each page names every
+// The tables of default settings on Tokens, Refresh tokens, Sessions, Self-registration and Password
+// policy are the values a new install starts with. Each row's default is what the seed writes, and each page names every
 // setting it owes.
 func TestConceptDocs_TheDefaultsAreWhatTheSeedWrites(t *testing.T) {
 	db := newSeedDB(t)
@@ -140,6 +155,25 @@ func TestConceptDocs_ADefaultsTableAgreeingWithTheSeedPasses(t *testing.T) {
 	}
 }
 
+// A default of several words is read whole, up to its parenthesis, so a policy is told from
+// another that shares its first word.
+func TestConceptDocs_ADefaultOfSeveralWordsIsReadWhole(t *testing.T) {
+	root := t.TempDir()
+	writeDefaultsFixture(t, root, "site/passwords.mdx", "## What a new installation starts with\n\n"+
+		"| Setting | Default |\n|---|---|\n"+
+		"| **Password policy** | NIST SP 800-63A (`nist` in the API) |\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertDefaultsTable(r, root, defaultsSection{"site/passwords.mdx", "## What a new installation starts with",
+			[]string{"Password policy"}}, map[string]string{"Password policy": "NIST SP 800-63B"})
+	})
+
+	want := []string{"site/passwords.mdx: ## What a new installation starts with row 1 says Password policy starts at NIST SP 800-63A, the seed writes NIST SP 800-63B"}
+	if report.Stopped || !slices.Equal(report.Errors, want) {
+		t.Errorf("a default differing after its first word was not refused\n%+v\nwant\n%q", report, want)
+	}
+}
+
 func TestConceptDocs_AMissingDefaultsSectionStops(t *testing.T) {
 	root := t.TempDir()
 	writeDefaultsFixture(t, root, "site/tokens.mdx", "## Lifetimes\n\n"+
@@ -190,7 +224,8 @@ func TestConceptDocs_ADefaultsSectionWithNoTableStops(t *testing.T) {
 // assertDefaultsTable is the reporting half of the defaults check: one failure per row whose
 // default is not the seed's, per row naming a setting the section does not owe, and per owed
 // setting with no row; a stop for a section or table not found, or a row that cannot be read. A
-// default is read as its first word, so "300 (5 minutes)" is 300.
+// default is read up to the parenthesis that explains it, so "300 (5 minutes)" is 300 and
+// "NIST SP 800-63B (`nist` in the API)" is NIST SP 800-63B.
 func assertDefaultsTable(r guard.Reporter, root string, section defaultsSection, seeded map[string]string) {
 	r.Helper()
 	rows, err := defaultsTableRows(root, section)
@@ -241,7 +276,7 @@ func defaultsTableRows(root string, section defaultsSection) ([][2]string, error
 				return nil, fmt.Errorf("%s: %s has a row of %d cells under a header of %d: %q",
 					section.page, section.heading, len(cells), len(table.Header), cells)
 			}
-			value, _, _ := strings.Cut(cells[1], " ")
+			value, _, _ := strings.Cut(cells[1], " (")
 			rows = append(rows, [2]string{strings.Trim(cells[0], "*"), value})
 		}
 	}

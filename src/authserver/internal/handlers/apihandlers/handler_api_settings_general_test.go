@@ -78,3 +78,48 @@ func TestHandleSettingsGeneralPut_KeepsEmailVerificationWhileSelfRegistrationIsO
 			"the verification choice is kept while self-registration is off")
 	}
 }
+
+// nist is the fifth policy, stored as 4 after high, so the stored 0 to 3 keep their meaning: the
+// API reads a stored 4 back as nist, and saves nist as 4 and answers it (#550 decision 3).
+func TestHandleSettingsGeneral_NistIsStoredAsFour(t *testing.T) {
+	t.Run("a stored 4 reads as nist", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/general", nil)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, PasswordPolicy: record.PasswordPolicy(4)}))
+		rr := httptest.NewRecorder()
+
+		HandleSettingsGeneralGet().ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		var resp api.SettingsGeneralResponse
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+		assert.Equal(t, "nist", resp.PasswordPolicy)
+	})
+
+	t.Run("nist is saved as 4 and answered", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		var saved *record.Settings
+		expectSettingsSave(database)
+		database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.Anything).
+			Run(func(args mock.Arguments) { saved = args.Get(2).(*record.Settings) }).Return(nil).Once()
+		auditLogger.On("Log", mock.Anything, audit.EventUpdatedGeneralSettings, mock.Anything).Return().Once()
+
+		body, err := json.Marshal(api.UpdateSettingsGeneralRequest{
+			AppName: "Goiabada", Issuer: "https://auth.example.com", PasswordPolicy: " nist ",
+		})
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, PasswordPolicy: record.PasswordPolicyLow}))
+		rr := httptest.NewRecorder()
+
+		HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090").ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		require.NotNil(t, saved)
+		assert.Equal(t, record.PasswordPolicy(4), saved.PasswordPolicy)
+		var resp api.SettingsGeneralResponse
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+		assert.Equal(t, "nist", resp.PasswordPolicy)
+	})
+}

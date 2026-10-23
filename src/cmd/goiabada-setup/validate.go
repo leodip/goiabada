@@ -4,7 +4,6 @@ import (
 	"net"
 	"net/url"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -280,40 +279,4 @@ func validateDatabaseName(name string) error {
 		return errs.Errorf("database name must start with a letter")
 	}
 	return nil
-}
-
-// checkPasswordStrength names the character classes a chosen admin password lacks, which the
-// operator may accept. Its length is not judged here: adminpassword.Check refuses one the first
-// start would not seed before this is asked (#500).
-func checkPasswordStrength(password string) []string {
-	var issues []string
-	hasUpper := false
-	hasLower := false
-	hasDigit := false
-	hasSpecial := false
-	for _, c := range password {
-		switch {
-		case unicode.IsUpper(c):
-			hasUpper = true
-		case unicode.IsLower(c):
-			hasLower = true
-		case unicode.IsDigit(c):
-			hasDigit = true
-		default:
-			hasSpecial = true
-		}
-	}
-	if !hasUpper {
-		issues = append(issues, "no uppercase letter")
-	}
-	if !hasLower {
-		issues = append(issues, "no lowercase letter")
-	}
-	if !hasDigit {
-		issues = append(issues, "no digit")
-	}
-	if !hasSpecial {
-		issues = append(issues, "no special character")
-	}
-	return issues
 }
