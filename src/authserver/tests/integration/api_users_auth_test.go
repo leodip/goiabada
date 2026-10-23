@@ -68,6 +68,45 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, updateReq.NewPassword))
 }
 
+// TestAPIUserPasswordPut_AtBcryptsBound sets a password of bcrypt's whole bound, which the first
+// start may seed for the first administrator and which every password form accepts with it (#550),
+// and checks that the stored hash verifies that password and nothing appended to it.
+func TestAPIUserPasswordPut_AtBcryptsBound(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &record.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("testuser@password-bound.test"),
+		GivenName:     "Test",
+		FamilyName:    "User",
+		EmailVerified: true,
+		PasswordHash:  "old-password-hash",
+	}
+	err := database.CreateUser(context.Background(), nil, testUser)
+	require.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+	}()
+
+	// Every policy's character classes, at exactly the bound.
+	password := "Aa1!" + strings.Repeat("a", passwordhash.MaxPasswordBytes-4)
+	require.Len(t, password, passwordhash.MaxPasswordBytes)
+
+	updateReq := api.UpdateUserPasswordRequest{NewPassword: password}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	require.NoError(t, err)
+	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, password), "the password set verifies")
+	assert.False(t, passwordhash.Verify(updatedUser.PasswordHash, password+"x"),
+		"bcrypt reads only the first 72 bytes, and Verify refuses what it would not read")
+}
+
 func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
@@ -93,7 +132,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 	}{
 		{"empty password", ""},
 		{"too short password", "123"},
-		{"too long password", strings.Repeat("a", 65)}, // Over 64 char limit
+		{"too long password", strings.Repeat("a", passwordhash.MaxPasswordBytes+1)}, // One past bcrypt's bound, the cap every password form applies
 	}
 
 	for _, tc := range testCases {

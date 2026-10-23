@@ -6,6 +6,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/adminpassword"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		})
 
 		t.Run("TooLong", func(t *testing.T) {
-			err := validator.ValidatePassword(policy, strings.Repeat("a", 65))
+			err := validator.ValidatePassword(policy, strings.Repeat("a", maxPasswordBytes+1))
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
 		})
 
@@ -46,16 +47,16 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		})
 
 		t.Run("AccentedAtMaximum", func(t *testing.T) {
-			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("é", 32)))
+			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("é", maxPasswordBytes/2)))
 		})
 
 		t.Run("AccentedOverMaximum", func(t *testing.T) {
-			err := validator.ValidatePassword(policy, strings.Repeat("é", 33))
+			err := validator.ValidatePassword(policy, strings.Repeat("é", maxPasswordBytes/2+1))
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
 		})
 
 		t.Run("ASCIIAtMaximum", func(t *testing.T) {
-			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("a", 64)))
+			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("a", maxPasswordBytes)))
 		})
 	})
 
@@ -129,9 +130,31 @@ func TestPasswordValidator_MaximumIsWithinBcrypt(t *testing.T) {
 	}
 }
 
+// TestPasswordValidator_AcceptsTheFirstAdministratorsPassword holds #550's correction: the first
+// administrator's password is held to bcrypt's bound, in bytes, by core/adminpassword, and the
+// first start seeds one that satisfies it; every form and API that sets a password afterwards must
+// take that password again, so the two caps cannot disagree silently.
+func TestPasswordValidator_AcceptsTheFirstAdministratorsPassword(t *testing.T) {
+	validator := NewPasswordValidator()
+	// Bcrypt's whole bound, satisfying every policy's character classes: the longest password
+	// the first start seeds.
+	seeded := "Aa1!" + strings.Repeat("a", passwordhash.MaxPasswordBytes-4)
+	require.Len(t, seeded, passwordhash.MaxPasswordBytes)
+	require.NoError(t, adminpassword.Check(seeded), "the first start seeds a password of bcrypt's bound")
+
+	for _, policy := range []record.PasswordPolicy{
+		record.PasswordPolicyNone, record.PasswordPolicyLow, record.PasswordPolicyMedium, record.PasswordPolicyHigh,
+	} {
+		t.Run(policy.String(), func(t *testing.T) {
+			assert.NoError(t, validator.ValidatePassword(policy, seeded),
+				"a password the first start seeded is refused on the paths that set one later")
+		})
+	}
+}
+
 // tooLongSentence is the English catalog's too-long message at the validator's maximum. It says
 // bytes, because the maximum counts them.
-const tooLongSentence = "Use at most 64 bytes for the password. " +
+const tooLongSentence = "Use at most 72 bytes for the password. " +
 	"Accented and other non-English characters count as two or more bytes each."
 
 func TestPasswordValidator_ContainsLowerCase(t *testing.T) {
