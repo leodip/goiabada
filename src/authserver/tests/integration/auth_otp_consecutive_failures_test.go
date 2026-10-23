@@ -13,9 +13,9 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,8 +43,7 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	}
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	right, err := totp.GenerateCode(otpSecret, time.Now())
-	require.NoError(t, err)
+	right := otptest.Code(t, otpSecret, time.Now())
 
 	// The 100th refusal disables the authenticator.
 	refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, wrongCodeBeside(right))
@@ -88,8 +87,7 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, newPassword, "")
 	newSecret := getOtpSecretFromEnrollmentPage(t, otpPage)
 	require.NotEqual(t, otpSecret, newSecret)
-	enrolmentCode, err := totp.GenerateCode(newSecret, time.Now())
-	require.NoError(t, err)
+	enrolmentCode := otptest.Code(t, newSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode)
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")

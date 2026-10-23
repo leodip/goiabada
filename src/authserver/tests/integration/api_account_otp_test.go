@@ -12,10 +12,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -180,14 +180,27 @@ func installPendingEnrollmentForTest(t *testing.T, userId int64, keyURL string, 
 	assert.True(t, installed, "the fixture must have installed the pending enrollment")
 }
 
-// newOTPKeyURLForTest mints a key the same way the server does, for the cases that need to know the
-// seed before the endpoint issues one.
+// newOTPKeyURLForTest mints a key with the server's own generator, for the cases that need to know
+// the seed before the endpoint issues one. The secret is read back off the URL as an enrolment reads
+// it, and the codes a case sends for it come from otptest, a second implementation, so the verifier
+// is checked against an answer it did not compute (#646 decision 2).
 func newOTPKeyURLForTest(t *testing.T, account string) (keyURL string, secret string) {
 	t.Helper()
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: account})
+	keyURL, err := otp.NewKeyGenerator().GenerateKeyURL(account, "Goiabada")
 	require.NoError(t, err)
-	return key.URL(), key.Secret()
+	secret, err = otp.SecretFromKeyURL(keyURL)
+	require.NoError(t, err)
+	return keyURL, secret
+}
+
+// newOTPSecretForTest is newOTPKeyURLForTest's secret alone, for the cases that store the
+// authenticator directly rather than stage an enrolment.
+func newOTPSecretForTest(t *testing.T, account string) string {
+	t.Helper()
+
+	_, secret := newOTPKeyURLForTest(t, account)
+	return secret
 }
 
 func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
@@ -276,8 +289,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	// The seed comes from the issuing endpoint, which is the only one the PUT will accept.
 	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
 	secret := getOTPEnrollment(t, accessToken).SecretKey
-	code, err := totp.GenerateCode(secret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, secret, time.Now())
 
 	reqBody := api.UpdateAccountOTPRequest{
 		Enabled:  true,
@@ -411,8 +423,7 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	// a different one, so the pending enrollment is staged directly here instead (#247).
 	keyURL, secret := newOTPKeyURLForTest(t, "reset@otp.test")
 
-	code, err := totp.GenerateCode(secret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, secret, time.Now())
 
 	enable := api.UpdateAccountOTPRequest{
 		Enabled:  true,
@@ -532,8 +543,7 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	// Prepare valid enable request, against the seed the server issues for it
 	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
 	secret := getOTPEnrollment(t, accessToken).SecretKey
-	code, err := totp.GenerateCode(secret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, secret, time.Now())
 	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -695,8 +705,7 @@ func TestAPIAccountOTPPut_Enable_RefusesACallerSuppliedSecret(t *testing.T) {
 	resetOTPStateForTest(t, userId)
 
 	issued := getOTPEnrollment(t, accessToken)
-	code, err := totp.GenerateCode(issued.SecretKey, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, issued.SecretKey, time.Now())
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, map[string]interface{}{
@@ -734,8 +743,7 @@ func TestAPIAccountOTPPut_Enable_RefusedWithNoPendingEnrollment(t *testing.T) {
 	// A well-formed code for a secret the server never issued, which is precisely what must not
 	// be enrollable.
 	_, strangerSecret := newOTPKeyURLForTest(t, "stranger@otp.test")
-	code, err := totp.GenerateCode(strangerSecret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, strangerSecret, time.Now())
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
 		Enabled: true, Password: "Correct1!", OtpCode: code,
@@ -760,8 +768,7 @@ func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 	keyURL, secret := newOTPKeyURLForTest(t, "expired-put@otp.test")
 	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC().Add(-20*time.Minute))
 
-	code, err := totp.GenerateCode(secret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, secret, time.Now())
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
 		Enabled: true, Password: "Correct1!", OtpCode: code,
@@ -791,8 +798,7 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	resetOTPStateForTest(t, userId)
 
 	issued := getOTPEnrollment(t, accessToken)
-	code, err := totp.GenerateCode(issued.SecretKey, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, issued.SecretKey, time.Now())
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
 		Enabled: true, Password: "Correct1!", OtpCode: code,
@@ -850,8 +856,7 @@ func TestAPIOTPPut_EachChangeMatchesTheAuthenticatorItRead(t *testing.T) {
 		t.Helper()
 		require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, user.Id))
 		secret := getOTPEnrollment(t, accessToken).SecretKey
-		code, codeErr := totp.GenerateCode(secret, time.Now())
-		require.NoError(t, codeErr)
+		code := otptest.Code(t, secret, time.Now())
 		status, body := putAccountOTP(t, accessToken,
 			api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code})
 		if status != http.StatusOK {

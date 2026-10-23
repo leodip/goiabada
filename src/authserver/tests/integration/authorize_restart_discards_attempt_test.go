@@ -12,11 +12,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,8 +84,7 @@ func createRestartUser(t *testing.T) (*record.User, string, string) {
 	require.NoError(t, err)
 
 	email := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: email})
-	require.NoError(t, err)
+	otpSecret := newOTPSecretForTest(t, email)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
@@ -93,10 +92,10 @@ func createRestartUser(t *testing.T) (*record.User, string, string) {
 		Email:              email,
 		PasswordHash:       passwordHashed,
 		OTPEnabled:         true,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	return user, password, key.Secret()
+	return user, password, otpSecret
 }
 
 // authorizeURL is an authorization request for the fixture's client. acrValues may be empty.
@@ -137,8 +136,7 @@ func (f *restartFixture) signInWithPasswordAndOtp(t *testing.T, httpClient *http
 	otpURL := assertRedirect(t, resp, "/auth/otp")
 	resp = loadPage(t, httpClient, otpURL)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-	otpCode, err := totp.GenerateCode(f.otpSecret, time.Now())
-	require.NoError(t, err)
+	otpCode := otptest.Code(t, f.otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, otpURL, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/completed"))

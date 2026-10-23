@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -352,16 +352,10 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 
 	// Give the user OTP, so /auth/level2 sends the step-up to the OTP form rather than
 	// to enrollment. Either arrives at the same gate; this is the shorter route.
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -412,10 +406,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	err = database.DeleteUserSession(context.Background(), nil, userSession.Id)
 	require.NoError(t, err)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 

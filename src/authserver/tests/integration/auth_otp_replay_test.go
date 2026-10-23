@@ -12,10 +12,10 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -81,14 +81,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*record.Client, *
 
 	otpSecret := ""
 	if otpEnabled {
-		key, generateErr := totp.Generate(totp.GenerateOpts{
-			Issuer:      "Goiabada",
-			AccountName: user.Email,
-		})
-		if generateErr != nil {
-			t.Fatal(generateErr)
-		}
-		otpSecret = key.Secret()
+		otpSecret = newOTPSecretForTest(t, user.Email)
 		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 		user.OTPEnabled = true
 	}
@@ -231,10 +224,7 @@ func nextStepCode(t *testing.T, secret string, consumed string) string {
 	t.Helper()
 
 	now := time.Now().UTC()
-	code, err := totp.GenerateCode(secret, now.Add(time.Duration(otp.StepSeconds)*time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
+	code := otptest.Code(t, secret, now.Add(time.Duration(otp.StepSeconds)*time.Second))
 
 	consumedStep, consumedMatched := otp.MatchStep(consumed, secret, now)
 	controlStep, controlMatched := otp.MatchStep(code, secret, now)
@@ -264,10 +254,7 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 
-	codeC, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	codeC := otptest.Code(t, otpSecret, time.Now())
 
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -305,10 +292,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 
-	codeC, err := totp.GenerateCode(secret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	codeC := otptest.Code(t, secret, time.Now())
 
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -350,22 +334,15 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 	setUserPasswordForOTP(t, user.Id, "Correct1!")
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: user.Email})
-	if err != nil {
-		t.Fatal(err)
-	}
-	secret := key.Secret()
+	keyURL, secret := newOTPKeyURLForTest(t, user.Email)
 
-	codeC, err := totp.GenerateCode(secret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	codeC := otptest.Code(t, secret, time.Now())
 
 	// Enroll through the account API, which consumes codeC's step. The seed has to be staged as
 	// a pending enrollment first: the API enrolls the one the server issued and no longer accepts
 	// one named in the request, and this case needs to know the secret in advance so the browser
 	// prompt below can be driven against it (#247).
-	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
+	installPendingEnrollmentForTest(t, user.Id, keyURL, time.Now().UTC())
 
 	enableUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", enableUrl, accessToken, api.UpdateAccountOTPRequest{

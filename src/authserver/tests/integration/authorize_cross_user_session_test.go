@@ -11,10 +11,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,9 +81,7 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*record.User, string, stri
 
 	otpSecret := ""
 	if withOtp {
-		key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: user.Email})
-		require.NoError(t, err)
-		otpSecret = key.Secret()
+		otpSecret = newOTPSecretForTest(t, user.Email)
 		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 		user.OTPEnabled = true
 	}
@@ -253,8 +251,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 		resp = loadPage(t, jar, loc)
 		defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-		otpCode, err := totp.GenerateCode(otpSecret, time.Now())
-		require.NoError(t, err)
+		otpCode := otptest.Code(t, otpSecret, time.Now())
 		resp = authenticateWithOtp(t, jar, loc, resp, otpCode)
 		defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 	}

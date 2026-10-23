@@ -4,13 +4,13 @@ go 1.27.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/boombuler/barcode v1.1.0
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/huandu/go-sqlbuilder v1.44.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/leodip/goiabada/core v0.0.0
 	github.com/microsoft/go-mssqldb v1.11.2
-	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
@@ -25,7 +25,6 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/andybalholm/cascadia v1.3.4 // indirect
-	github.com/boombuler/barcode v1.1.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect

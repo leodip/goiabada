@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -96,10 +96,7 @@ func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
 
 	// Ceremony one: password and OTP, which leaves a live level 2 session on this jar.
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	firstCode, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstCode := otptest.Code(t, otpSecret, time.Now())
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, firstCode)
 	_ = otpPage.Body.Close()
 
@@ -150,10 +147,7 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 
-	code, err := totp.GenerateCode(secret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	code := otptest.Code(t, secret, time.Now())
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, code)
 	_ = otpPage.Body.Close()
 
@@ -197,10 +191,7 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 
 	// Ceremony one: password and OTP, which leaves a live level 3 session on this jar.
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	firstCode, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstCode := otptest.Code(t, otpSecret, time.Now())
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, firstCode)
 	_ = otpPage.Body.Close()
 	redirectLocation := assertRedirect(t, resp, "/auth/completed")
@@ -221,11 +212,11 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		DefaultAcrLevel:          record.AcrLevel2Optional,
 	}
-	if err = database.CreateClient(context.Background(), nil, optionalClient); err != nil {
+	if err := database.CreateClient(context.Background(), nil, optionalClient); err != nil {
 		t.Fatal(err)
 	}
 	optionalRedirectUri := &record.RedirectURI{ClientId: optionalClient.Id, URI: fake.URL()}
-	if err = database.CreateRedirectURI(context.Background(), nil, optionalRedirectUri); err != nil {
+	if err := database.CreateRedirectURI(context.Background(), nil, optionalRedirectUri); err != nil {
 		t.Fatal(err)
 	}
 	where, page, _ := authorizeOnExistingSession(t, httpClient, optionalClient, optionalRedirectUri)

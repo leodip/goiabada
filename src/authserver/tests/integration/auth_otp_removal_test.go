@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,8 +29,7 @@ func signInAtLevel3(t *testing.T) (*http.Client, *record.Client, *record.Redirec
 
 	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	code, err := totp.GenerateCode(otpSecret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, otpSecret, time.Now())
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, code)
 	_ = otpPage.Body.Close()
 	location := assertRedirect(t, resp, "/auth/completed")

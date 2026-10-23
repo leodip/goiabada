@@ -13,12 +13,12 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -353,20 +353,14 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	}
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 
@@ -420,10 +414,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 

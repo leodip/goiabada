@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,9 +66,7 @@ func newReauthFixture(t *testing.T) *reauthFixture {
 	fx.level1Client, fx.level1URI = newClient(record.AcrLevel1)
 
 	email := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: email})
-	require.NoError(t, err)
-	fx.otpSecret = key.Secret()
+	fx.otpSecret = newOTPSecretForTest(t, email)
 	passwordHashed, err := passwordhash.Hash(fx.password)
 	require.NoError(t, err)
 	fx.user = &record.User{
@@ -88,8 +86,7 @@ func newReauthFixture(t *testing.T) *reauthFixture {
 func (fx *reauthFixture) nextOtpCode(t *testing.T) string {
 	t.Helper()
 	require.Less(t, fx.otpStepsTaken, 2, "a third code would be outside the one-step window")
-	code, err := totp.GenerateCode(fx.otpSecret, time.Now().Add(time.Duration(fx.otpStepsTaken)*30*time.Second))
-	require.NoError(t, err)
+	code := otptest.Code(t, fx.otpSecret, time.Now().Add(time.Duration(fx.otpStepsTaken)*30*time.Second))
 	fx.otpStepsTaken++
 	return code
 }
