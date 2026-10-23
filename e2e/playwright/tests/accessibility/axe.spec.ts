@@ -205,19 +205,27 @@ test("the auth server's forgot password and reset pages", async ({ browser, requ
   await context.close();
 });
 
-test("the pages reached with no session: errors, not found, and the console signed out", async ({ browser }) => {
+test("the pages reached with no session: errors, not found, and the console signed out", async ({ browser, users }) => {
   const context = await browser.newContext(signedOut);
   const own = await context.newPage();
+  const user = await users.create();
 
   await checkStates(own, [
     at(own, "the console's home, signed out", `${env.adminUrl}/`),
     {
+      // Only a console session can end: a browser with none holds no cookie to carry the notice home
+      // (#620). So the user signs in first, and the cookies go after, for the states below, which
+      // need no session at the console or the auth server.
       name: "the console's home, the session ended",
       reach: async () => {
+        await own.goto(`${env.adminUrl}/account/profile`);
+        await submitPassword(own, user.email, user.password);
+        await own.waitForURL((url) => url.origin === env.adminUrl);
         await own.goto(`${env.adminUrl}/auth/session-ended`);
         await expect(own).toHaveURL(`${env.adminUrl}/`);
         await expect(own.locator(".notice-caution[role=status]")).toBeVisible();
       },
+      leave: () => context.clearCookies(),
     },
     {
       // The console's callback takes the form_post response mode, so a refusal is posted to it.
