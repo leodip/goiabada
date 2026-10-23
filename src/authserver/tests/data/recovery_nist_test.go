@@ -2,30 +2,37 @@ package datatests
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/recovery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// nistSettingsReader answers the stored settings row with the nist policy and the app name
-// Goiabada, and passes every other call through: the tier's settings row is shared by every test,
-// so the policy is put on the one read the recovery makes rather than written to the row.
-type nistSettingsReader struct {
-	data.Database
-}
+// storeNistPolicy writes the nist policy and the app name Goiabada to settings row 1 and reads
+// them back, and puts the row back as it was when the test ends: the tier's settings row is
+// shared by every test, so what this one stores must not outlive it.
+func storeNistPolicy(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	snapshot, err := database.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	t.Cleanup(func() {
+		require.NoError(t, database.UpdateSettings(context.Background(), nil, snapshot))
+	})
 
-func (d nistSettingsReader) GetSettingsById(ctx context.Context, tx *sql.Tx, id int64) (*record.Settings, error) {
-	settings, err := d.Database.GetSettingsById(ctx, tx, id)
-	if settings != nil {
-		settings.PasswordPolicy = record.PasswordPolicyNist
-		settings.AppName = "Goiabada"
-	}
-	return settings, err
+	changed := *snapshot
+	changed.PasswordPolicy = record.PasswordPolicyNist
+	changed.AppName = "Goiabada"
+	require.NoError(t, database.UpdateSettings(ctx, nil, &changed))
+
+	stored, err := database.GetSettingsById(ctx, nil, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 4, int(stored.PasswordPolicy), "nist is stored as 4")
+	assert.Equal(t, "nist", stored.PasswordPolicy.String())
+	assert.Equal(t, "Goiabada", stored.AppName)
 }
 
 // `recover --password-stdin` holds the password to a stored nist policy with the words of the
@@ -35,6 +42,7 @@ func TestRecovery_HoldsThePasswordToAStoredNistPolicy(t *testing.T) {
 	ctx := context.Background()
 	f := seedRecoveryFixture(t)
 	require.NotEmpty(t, f.user.Username)
+	storeNistPolicy(t)
 
 	for name, tc := range map[string]struct {
 		password string
@@ -47,7 +55,7 @@ func TestRecovery_HoldsThePasswordToAStoredNistPolicy(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			recorder := &recoveryAuditRecorder{}
-			_, err := recovery.Run(ctx, nistSettingsReader{database}, recorder, recovery.Request{
+			_, err := recovery.Run(ctx, database, recorder, recovery.Request{
 				Email: f.user.Email, Password: tc.password,
 			})
 
