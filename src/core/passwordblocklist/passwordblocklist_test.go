@@ -130,11 +130,10 @@ func TestIsTooClose_AWordWithNothingInItRefusesNothing(t *testing.T) {
 
 // The committed list, held to what the generator promises of it (#550 decisions 4 and 5): the 16,043
 // entries of the three sources that the nist policy could otherwise accept, each lowercase, unique,
-// sorted, at least 15 characters and at most bcrypt's 72 bytes.
+// sorted, which the binary search IsCommon makes depends on, at least 15 characters and at most
+// bcrypt's 72 bytes.
 func TestList_HoldsItsInvariants(t *testing.T) {
-	require.True(t, strings.HasPrefix(list, "\n"), "the list opens with the newline every entry is matched after")
-	require.True(t, strings.HasSuffix(list, "\n"), "the list closes with the newline every entry is matched before")
-	entries := strings.Split(strings.Trim(list, "\n"), "\n")
+	entries := list
 
 	assert.Len(t, entries, 16043)
 	seen := make(map[string]bool, len(entries))
@@ -154,9 +153,8 @@ func TestList_HoldsItsInvariants(t *testing.T) {
 
 // Every entry is refused by IsCommon, so nothing in how the list is held hides one from the check.
 func TestList_EveryEntryIsCommon(t *testing.T) {
-	entries := strings.Split(strings.Trim(list, "\n"), "\n")
-	require.NotEmpty(t, entries)
-	for _, e := range entries {
+	require.NotEmpty(t, list)
+	for _, e := range list {
 		if !IsCommon(e) {
 			t.Errorf("IsCommon(%q) = false for a listed entry", e)
 		}

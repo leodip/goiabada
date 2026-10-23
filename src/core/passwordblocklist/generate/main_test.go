@@ -279,7 +279,6 @@ func TestValidate(t *testing.T) {
 		"73 bytes":  {strings.Repeat("a", 73)},
 		// What build keeps when a narrower password lowercases to an entry over 72 bytes.
 		"75 bytes a narrower password reaches": {strings.Repeat("ⱥ", 25)},
-		"a newline":                            {"aaaaaaa\naaaaaaa"},
 		"not utf-8":                            {"aaaaaaaaaaaaaa\xff"},
 		"empty entry":                          {""},
 	} {
@@ -310,7 +309,7 @@ func TestRender(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	s := string(out)
-	wants := []string{"// Code generated", "DO NOT EDIT", "package passwordblocklist", fixtureCommit, "const list = "}
+	wants := []string{"// Code generated", "DO NOT EDIT", "package passwordblocklist", fixtureCommit, "var list = []string{"}
 	for _, prov := range provs {
 		wants = append(wants, prov.Name, prov.Licence, prov.SourceURL, prov.SHA256)
 	}
@@ -320,7 +319,7 @@ func TestRender(t *testing.T) {
 		}
 	}
 	for _, e := range entries {
-		if !strings.Contains(s, fmt.Sprintf("%q", e+"\n")) {
+		if !strings.Contains(s, fmt.Sprintf("\t%q,\n", e)) {
 			t.Errorf("render output does not hold %q as one quoted line", e)
 		}
 	}

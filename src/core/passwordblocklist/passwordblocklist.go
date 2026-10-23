@@ -14,6 +14,7 @@
 package passwordblocklist
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -23,13 +24,8 @@ import (
 // SHALL be subject to comparison, not substrings or words that might be contained therein"), and
 // case is ignored, so the capitalised variants attackers try beside each entry are refused too.
 func IsCommon(password string) bool {
-	entry := strings.ToLower(password)
-	// The list's entries are delimited by newlines, so a password holding one would otherwise be
-	// matched against two entries and the newline between them.
-	if entry == "" || strings.Contains(entry, "\n") {
-		return false
-	}
-	return strings.Contains(list, "\n"+entry+"\n")
+	_, found := slices.BinarySearch(list, strings.ToLower(password))
+	return found
 }
 
 // IsTooClose reports whether password is one of words or a simple derivative of one, the
