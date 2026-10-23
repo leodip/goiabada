@@ -66,23 +66,80 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-// TestVerify_ReadsTheFirstMaxPasswordBytes pins what Verify's doc comment says bcrypt does past
-// the bound: the comparison reads the first MaxPasswordBytes bytes and no more, so a longer input
-// matches the hash of its own prefix. Nothing stores a hash of a longer password, which is why
-// every path that hashes one checks the bound first rather than relying on this (#409).
-func TestVerify_ReadsTheFirstMaxPasswordBytes(t *testing.T) {
-	prefix := fake.LetterN(MaxPasswordBytes)
-	hashed, err := Hash(prefix)
-	if err != nil {
-		t.Fatalf("Hash() error = %v", err)
+// TestVerify_RefusesAnythingPastTheStoredPassword pins that Verify compares the whole submitted
+// password. bcrypt keys on at most MaxPasswordBytes bytes plus a trailing NUL: below the bound the
+// NUL is part of the key, so a suffix never matched, but at exactly the bound it falls off, and
+// bcrypt alone would accept the stored password with anything appended. Verify refuses a password
+// past the bound before comparing, which NIST SP 800-63B-4 3.1.1.2 asks ("SHALL verify the entire
+// submitted password") and which no stored hash can lose by, since Hash refuses those (#550).
+func TestVerify_RefusesAnythingPastTheStoredPassword(t *testing.T) {
+	tests := []struct {
+		name   string
+		length uint
+	}{
+		{"At the bound", MaxPasswordBytes},
+		{"One byte below the bound", MaxPasswordBytes - 1},
 	}
 
-	if !Verify(hashed, prefix+"x") {
-		t.Error("Verify() = false for the stored password plus one byte; bcrypt compares only the first 72")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			password := fake.LetterN(tt.length)
+			hashed, err := Hash(password)
+			if err != nil {
+				t.Fatalf("Hash() error = %v", err)
+			}
+
+			if !Verify(hashed, password) {
+				t.Error("Verify() = false for the stored password")
+			}
+			if Verify(hashed, password+"x") {
+				t.Error("Verify() = true for the stored password plus one byte")
+			}
+			if Verify(hashed, password+strings.Repeat("x", MaxPasswordBytes)) {
+				t.Error("Verify() = true for the stored password plus a long suffix")
+			}
+			if Verify(hashed, password[:tt.length-1]) {
+				t.Error("Verify() = true for the stored password less its last byte")
+			}
+		})
 	}
-	if Verify(hashed, prefix[:MaxPasswordBytes-1]) {
-		t.Error("Verify() = true for the stored password less its last byte")
-	}
+
+	// A two-byte character appended to a password at the bound is refused like any other
+	// suffix: the bound is in bytes, as Hash's is.
+	t.Run("Past the bound by a multi-byte character", func(t *testing.T) {
+		password := fake.LetterN(MaxPasswordBytes)
+		hashed, err := Hash(password)
+		if err != nil {
+			t.Fatalf("Hash() error = %v", err)
+		}
+		if Verify(hashed, password+"é") {
+			t.Error("Verify() = true for the stored password plus a two-byte character")
+		}
+	})
+
+	// A stored password of two-byte characters at the bound is 72 bytes but 38 characters, so
+	// only a bound counted in bytes refuses what is appended to it: one counted in characters
+	// would let bcrypt match the first 72 bytes again.
+	t.Run("At the bound in bytes but not in characters", func(t *testing.T) {
+		password := "Aa1!" + strings.Repeat("é", 34)
+		if len(password) != MaxPasswordBytes {
+			t.Fatalf("len(password) = %d, want %d", len(password), MaxPasswordBytes)
+		}
+		hashed, err := Hash(password)
+		if err != nil {
+			t.Fatalf("Hash() error = %v", err)
+		}
+
+		if !Verify(hashed, password) {
+			t.Error("Verify() = false for the stored password")
+		}
+		if Verify(hashed, password+"x") {
+			t.Error("Verify() = true for the stored password plus one byte")
+		}
+		if Verify(hashed, password+"é") {
+			t.Error("Verify() = true for the stored password plus a two-byte character")
+		}
+	})
 }
 
 func TestDummyHash(t *testing.T) {
