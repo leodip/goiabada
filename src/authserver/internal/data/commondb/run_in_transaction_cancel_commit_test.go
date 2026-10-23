@@ -3,8 +3,8 @@ package commondb
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -133,9 +133,9 @@ func TestRunInTransaction_ACommitThatFindsTheTransactionDoneOnALiveContextIsStil
 
 // TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutcome leaves the race
 // in, where the two tests above remove it: the body cancels and returns at once, racing
-// database/sql's rollback goroutine. commit finds the context done and rolls back without asking
-// the driver, its rollback or the goroutine's finishing the transaction, so it is known to be
-// rolled back whichever wins, and the run may not carry data.ErrCommitOutcomeUnknown. Before the
+// database/sql's rollback goroutine. commit finds the context done and answers without asking the
+// driver, and the goroutine rolls the transaction back, so it is known to be rolled back whichever
+// wins, and the run may not carry data.ErrCommitOutcomeUnknown. Before the
 // tag looked at whether the driver was asked, Tx.Commit's context's-error arm carried it, and that
 // arm wins nearly every time (#371).
 func TestRunInTransaction_ACancellationAfterASuccessfulBodyIsNeverAnUnknownOutcome(t *testing.T) {
@@ -242,34 +242,52 @@ func TestRunInTransaction_ACancellationDuringTheDriversCommitIsStillAnUnknownOut
 	}
 }
 
-// TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver pins the rollback
-// commit owes a context that is done before it is asked to commit. The deferred rollback in
-// runTransactionOnce stands down once committing is set, so this one is commit's. The context
-// ends quietly, its Done left open, so database/sql's own rollback goroutine never wakes and the
-// one rollback the driver sees is commit's: whether it happened and what is done with its error
-// are both observable, where with a real cancellation they race that goroutine (#371).
-func TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver(t *testing.T) {
-	const doneBeforeCommitWarning = "rolling back a transaction whose context was done before its commit reported an error"
+// TestRunInTransaction_ACommitOnADoneContextLeavesTheRollbackToDatabaseSQL pins what commit does
+// with a context that is done before it is asked to commit: it answers the context's error without
+// asking the driver, and rolls nothing back itself, leaving that to the goroutine database/sql
+// started at BeginTx, which rolls back every transaction whose context's Done closes. A rollback
+// of commit's own ran on the caller's goroutine, and go-mssqldb answers one on a cancelled context
+// before it has read the reply, keeping the connection: the caller's next transaction drew that
+// connection and its BEGIN failed with "Read: EOF" (#371). With logSQL on, RollbackTransaction is
+// the one place the helper rolls back that writes a record, and database/sql's goroutine writes
+// none, so the record's absence is what says commit did not roll back. The rows are both ways a
+// real context ends: cancelled, and a deadline, which FailureLimiter.reserveShared's WithTimeout
+// reaches this path with.
+func TestRunInTransaction_ACommitOnADoneContextLeavesTheRollbackToDatabaseSQL(t *testing.T) {
 	for _, tc := range []struct {
-		name         string
-		rollbackErr  error
-		wantWarnings int
+		name string
+		// start returns a live context and the function the body calls to end it.
+		start  func() (context.Context, func())
+		ctxErr error
 	}{
-		{name: "a rollback that succeeds is silent", rollbackErr: nil, wantWarnings: 0},
-		{name: "a rollback that fails is warned about and not returned", rollbackErr: errors.New("connection reset"), wantWarnings: 1},
-		{name: "a rollback database/sql had already done is silent", rollbackErr: sql.ErrTxDone, wantWarnings: 0},
-		// pgx and go-mssqldb refuse any statement on a done context, the rollback included,
-		// with the context's own error: pgx wrapped, go-mssqldb bare. Nothing failed there, the
-		// transaction is rolled back either way, so a warning would be one for every cancelled
-		// request that was inside a transaction.
-		{name: "a rollback refused with the bare context error is silent", rollbackErr: context.Canceled, wantWarnings: 0},
-		{name: "a rollback refused with a driver error wrapping the context error is silent", rollbackErr: fmt.Errorf("timeout: context already done: %w", context.Canceled), wantWarnings: 0},
+		{
+			name: "cancelled",
+			start: func() (context.Context, func()) {
+				ctx, cancel := context.WithCancel(context.Background())
+				t.Cleanup(cancel)
+				return ctx, cancel
+			},
+			ctxErr: context.Canceled,
+		},
+		{
+			name: "past its deadline",
+			start: func() (context.Context, func()) {
+				// Long enough that the statement, which the scripted driver answers at once, runs
+				// well inside it; the body then waits the timer out, so the context ends with the
+				// error a timer firing leaves rather than one a test chose.
+				ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+				t.Cleanup(cancel)
+				return ctx, func() {}
+			},
+			ctxErr: context.DeadlineExceeded,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
-			ctx := newHandCtx()
-			d := &scriptedDriver{rollbackErrs: []error{tc.rollbackErr}}
+			ctx, end := tc.start()
+			d := &scriptedDriver{}
 			db := retryingDB(t, d)
+			db.logSQL = true
 			requested := recordBackoff(db)
 			ran := 0
 
@@ -278,24 +296,27 @@ func TestRunInTransaction_ACommitOnADoneContextRollsBackWithoutAskingTheDriver(t
 				if _, execErr := db.ExecSQL(ctx, tx, "UPDATE settings SET updated_at = updated_at"); execErr != nil {
 					return execErr
 				}
-				ctx.end(context.Canceled, false)
+				end()
+				<-ctx.Done()
 				return nil
 			})
 
 			require.Error(t, err)
-			require.ErrorIs(t, err, context.Canceled, "the context's error is the answer")
+			require.ErrorIs(t, err, tc.ctxErr, "the context's own error is the answer")
 			require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
 				"no COMMIT reached the engine, so the transaction is known to be rolled back")
-			if tc.rollbackErr != nil && !errors.Is(tc.rollbackErr, context.Canceled) {
-				require.NotErrorIs(t, err, tc.rollbackErr, "and the rollback's own error is not returned")
-			}
 			assert.Equal(t, 1, ran, "a cancelled run is not rerun")
 			assert.Empty(t, *requested)
+			require.Eventually(t, func() bool { return d.counts().rollbacks == 1 },
+				2*time.Second, time.Millisecond,
+				"database/sql's goroutine rolled the transaction back")
 			c := d.settled(t)
 			assert.Zero(t, c.commits, "the driver was never asked to commit")
-			assert.Equal(t, 1, c.rollbacks, "commit rolled the transaction back itself")
-			assert.Equal(t, tc.wantWarnings, warningsContaining(logs, doneBeforeCommitWarning))
-			assert.Zero(t, rollbackWarnings(logs), "and the deferred rollback stood down")
+			assert.Equal(t, 1, c.rollbacks, "and the one rollback is database/sql's")
+			assert.Zero(t, c.openTx, "nothing was left open")
+			assert.NotContains(t, messagesAt(logs, slog.LevelInfo), "rolling back transaction",
+				"commit did not roll back on the caller's goroutine")
+			assert.Empty(t, messagesAt(logs, slog.LevelWarn), "and nothing was warned about")
 		})
 	}
 }
@@ -337,9 +358,9 @@ func TestCommit_AfterTheDriverWasAskedOnlyTheTransactionDoneSentinelIsARefusal(t
 // handCtx is a context a test ends by hand, choosing the error it ends with and whether its Done
 // channel closes. Ended with context.DeadlineExceeded, it is a deadline firing at the instant the
 // test picks, which no timer promises. Ended quietly, Err set and Done left open, it keeps
-// database/sql's rollback goroutine asleep, so a rollback commit owes is the only one the driver
-// sees. No real context is ever quiet; that half exists only to make commit's own rollback
-// observable rather than a race against database/sql's.
+// database/sql's rollback goroutine asleep, so what Tx.Commit answers is the driver's scripted
+// answer and not a race against that goroutine. No real context is ever quiet; that half exists
+// only for commit's flag below RunInTransaction.
 type handCtx struct {
 	context.Context
 	done chan struct{}

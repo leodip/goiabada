@@ -155,3 +155,38 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 		assert.NotNil(t, got, "both rows are still there after both parties committed")
 	}
 }
+
+// cancelledCommitRuns is how many runs the next test cancels. On SQL Server, a run whose commit
+// rolled back on the caller's goroutine failed the next BEGIN in one or two runs of every hundred,
+// so this many leave such a regression almost no chance of passing.
+const cancelledCommitRuns = 500
+
+// TestRunInTransaction_ARunCancelledBeforeItsCommitLeavesTheNextTransactionAWorkingConnection
+// cancels each run between its body and its commit, then opens the next transaction at once on
+// the same goroutine, as a caller carrying on with a live context would. database/sql's goroutine
+// rolls the cancelled run back while it holds the connection. When commondb rolled back on the
+// caller's goroutine instead, go-mssqldb answered that rollback with the context's error before it
+// had read the reply and kept the connection, so the next transaction drew it and its BEGIN failed
+// with "Read: EOF" (#371). It runs on every engine, since every one owes the same answer.
+func TestRunInTransaction_ARunCancelledBeforeItsCommitLeavesTheNextTransactionAWorkingConnection(t *testing.T) {
+	for i := range cancelledCommitRuns {
+		ctx, cancel := context.WithCancel(context.Background())
+		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+			if _, readErr := database.GetSettingsById(ctx, tx, 1); readErr != nil {
+				return readErr
+			}
+			cancel()
+			return nil
+		})
+		cancel()
+		require.ErrorIs(t, err, context.Canceled, "run %d: the cancelled run answers with the context's error", i)
+		require.NotErrorIs(t, err, data.ErrCommitOutcomeUnknown,
+			"run %d: its commit was refused before the driver was asked, so its outcome is known", i)
+
+		err = database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
+			_, readErr := database.GetSettingsById(context.Background(), tx, 1)
+			return readErr
+		})
+		require.NoError(t, err, "run %d: the transaction after a cancelled one opens and runs", i)
+	}
+}

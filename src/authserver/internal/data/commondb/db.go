@@ -134,24 +134,17 @@ func (d *Database) CommitTransaction(ctx context.Context, tx *sql.Tx) error {
 // driver cancelled while its COMMIT is in flight may answer the context's own error, bare, as pgx
 // and go-mssqldb do, and that commit's outcome is unknown (#371).
 //
-// So a context already done is not asked to commit at all: the transaction is rolled back here,
-// since the caller's deferred rollback stands down once committing is set (database/sql's own
-// goroutine rolls it back too, for any context whose Done closes), and the context's error comes
-// back refused. After Tx.Commit, only sql.ErrTxDone on a done context is refused,
-// because that is database/sql's rollback goroutine having finished the transaction first. A
+// So a context already done is not asked to commit at all, and its error comes back refused. Nor
+// is the transaction rolled back here: database/sql's own goroutine, started at BeginTx, rolls back
+// every transaction whose context's Done closes, holding the connection while it does. A rollback
+// of commit's own ran on the caller's goroutine, and go-mssqldb answers one on a cancelled context
+// before it has read the reply and keeps the connection, so the caller's next transaction drew it
+// and its BEGIN failed with "Read: EOF". After Tx.Commit, only sql.ErrTxDone on a done context is
+// refused, because that is database/sql's rollback goroutine having finished the transaction first. A
 // cancellation landing between the check and Tx.Commit's own is answered as unknown, which only
 // asks the caller to look before it retries.
 func (d *Database) commit(ctx context.Context, tx *sql.Tx) (refusedBeforeTheDriver bool, err error) {
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		// database/sql's own goroutine may have rolled it back already, which is the
-		// sql.ErrTxDone the deferred rollback in runTransactionOnce suppresses the same way. And
-		// pgx and go-mssqldb refuse the rollback itself on a done context with the context's own
-		// error; nothing failed there either, so neither is worth a record for every cancelled
-		// request that was inside a transaction.
-		if rollbackErr := d.RollbackTransaction(ctx, tx); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) && !errors.Is(rollbackErr, ctxErr) {
-			slog.WarnContext(ctx, "rolling back a transaction whose context was done before its commit reported an error, which is ignored because the context's error is the one the caller needs",
-				"error", rollbackErr)
-		}
 		return true, errs.Wrap(ctxErr, "unable to commit transaction")
 	}
 
