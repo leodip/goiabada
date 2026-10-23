@@ -138,7 +138,7 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			target:     "/admin/clients/3/authentication",
 			form:       url.Values{"clientSecret": {"a-new-secret"}},
 			english:    "Choose the client type: public or confidential.",
-			portuguese: "Escolha o tipo de cliente: público ou confidencial.",
+			portuguese: "Escolha o tipo de cliente: público ou confidencial.", //nolint:misspell // the pt-BR catalog's text: "confidencial" is Portuguese, not a misspelling of "confidential"
 		},
 		{
 			name:     "an authentication save with a client type that is neither",
@@ -149,7 +149,7 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			target:     "/admin/clients/3/authentication",
 			form:       url.Values{"publicConfidential": {"Public"}, "clientSecret": {"a-new-secret"}},
 			english:    "Choose the client type: public or confidential.",
-			portuguese: "Escolha o tipo de cliente: público ou confidencial.",
+			portuguese: "Escolha o tipo de cliente: público ou confidencial.", //nolint:misspell // the pt-BR catalog's text: "confidencial" is Portuguese, not a misspelling of "confidential"
 		},
 		{
 			name:     "a token expiration that is not a number",
