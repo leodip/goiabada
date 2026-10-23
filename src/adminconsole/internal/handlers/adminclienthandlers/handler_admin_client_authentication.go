@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
-	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/securerandom"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -163,9 +163,41 @@ func HandleAuthenticationPost(
 			return
 		}
 
-		isSystemLevelClient := client.IsSystemLevelClient
+		// The stored secret is read only for a refusal, as the first draw reads it, so a save that
+		// succeeds records no viewed_client_secret of its own; a public client holds none. The
+		// inputs show what was submitted, or the client as stored when submitted is nil.
+		renderPage := func(submitted *ClientAuthentication, message, errorField string) {
+			storedSecret := ""
+			if !client.IsPublic {
+				var secretErr error
+				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
+				if secretErr != nil {
+					render.HandleAPIError(httpHelper, w, r, secretErr)
+					return
+				}
+			}
+			storedClient := clientAuthenticationFrom(client, storedSecret)
+			shown := storedClient
+			if submitted != nil {
+				shown = *submitted
+			}
 
-		// Process publicConfidential for all clients
+			bind := map[string]interface{}{
+				"client":       shown,
+				"storedClient": storedClient,
+				"error":        message,
+				"errorField":   errorField,
+			}
+
+			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)
+			if renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
+			}
+		}
+
+		// The page's radios always send one of the two types, so only a hand-made request reaches
+		// the default. With no type to draw the submission under, the tab is drawn as stored, and
+		// the refusal marks no field (#632).
 		publicConfidential := r.FormValue("publicConfidential")
 		var isPublic bool
 		switch publicConfidential {
@@ -174,7 +206,7 @@ func HandleAuthenticationPost(
 		case "confidential":
 			isPublic = false
 		default:
-			httpHelper.InternalServerError(w, r, errs.New("invalid value for publicConfidential"))
+			renderPage(nil, i18n.T(r.Context(), "adminconsole.refusal.client_authentication.type_required"), "")
 			return
 		}
 
@@ -189,33 +221,12 @@ func HandleAuthenticationPost(
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            isPublic,
 			ClientSecret:        r.PostFormValue("clientSecret"),
-			IsSystemLevelClient: isSystemLevelClient,
+			IsSystemLevelClient: client.IsSystemLevelClient,
 		}
 
-		// The stored secret is read only for a refusal, as the first draw reads it, so a save that
-		// succeeds records no viewed_client_secret of its own; a public client holds none.
+		// A refusal of the save keeps what was submitted in the inputs.
 		renderError := func(message, errorField string) {
-			storedSecret := ""
-			if !client.IsPublic {
-				var secretErr error
-				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
-				if secretErr != nil {
-					render.HandleAPIError(httpHelper, w, r, secretErr)
-					return
-				}
-			}
-
-			bind := map[string]interface{}{
-				"client":       adminClientAuthentication,
-				"storedClient": clientAuthenticationFrom(client, storedSecret),
-				"error":        message,
-				"errorField":   errorField,
-			}
-
-			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_authentication.html", bind)
-			if renderErr != nil {
-				httpHelper.InternalServerError(w, r, renderErr)
-			}
+			renderPage(&adminClientAuthentication, message, errorField)
 		}
 
 		// Build API request

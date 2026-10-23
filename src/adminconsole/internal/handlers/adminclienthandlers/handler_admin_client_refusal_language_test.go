@@ -18,14 +18,26 @@ import (
 // refusingClientApiClient answers the reads the client pages make before they refuse a form, and
 // panics on every write: each refusal below happens before the console calls the API to change
 // anything.
-type refusingClientApiClient struct{}
-
-func (*refusingClientApiClient) GetClientPermissions(_ context.Context, _ string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app"}, nil, nil
+type refusingClientApiClient struct {
+	// isSystemLevel answers the client as the admin console's own.
+	isSystemLevel bool
 }
 
-func (*refusingClientApiClient) GetClientById(_ context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app"}, nil
+func (c *refusingClientApiClient) GetClientPermissions(_ context.Context, _ string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil, nil
+}
+
+func (c *refusingClientApiClient) GetClientById(_ context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
+	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil
+}
+
+// GetClientSecret answers the stored secret, which a refused Authentication tab is drawn with.
+func (*refusingClientApiClient) GetClientSecret(context.Context, string, int64) (string, error) {
+	return "the-stored-secret", nil
+}
+
+func (*refusingClientApiClient) UpdateClientAuthentication(context.Context, string, int64, *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
+	panic("unexpected call to UpdateClientAuthentication")
 }
 
 func (*refusingClientApiClient) DeleteClient(context.Context, string, int64) error {
@@ -85,6 +97,17 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			portuguese: "O identificador do cliente é obrigatório.",
 		},
 		{
+			name:     "a delete of the admin console's own client",
+			template: "/admin_clients_delete.html",
+			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
+				return HandleDeletePost(h, &refusingClientApiClient{isSystemLevel: true}, consoleBaseURL)
+			},
+			target:     "/admin/clients/3/delete",
+			form:       url.Values{"clientIdentifier": {"billing-app"}},
+			english:    "This is the admin console's own client, so it can't be deleted.",
+			portuguese: "Este é o cliente do próprio console de administração, então não pode ser excluído.",
+		},
+		{
 			name:     "a delete with no identifier",
 			template: "/admin_clients_delete.html",
 			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
@@ -105,6 +128,28 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			form:       url.Values{"clientIdentifier": {"shipping-app"}},
 			english:    "That isn't this client's identifier. Type it as shown above.",
 			portuguese: "Esse não é o identificador deste cliente. Digite-o como aparece acima.",
+		},
+		{
+			name:     "an authentication save with no client type",
+			template: "/admin_clients_authentication.html",
+			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
+				return HandleAuthenticationPost(h, newTestSessionStore(), &refusingClientApiClient{}, consoleBaseURL)
+			},
+			target:     "/admin/clients/3/authentication",
+			form:       url.Values{"clientSecret": {"a-new-secret"}},
+			english:    "Choose the client type: public or confidential.",
+			portuguese: "Escolha o tipo de cliente: público ou confidencial.",
+		},
+		{
+			name:     "an authentication save with a client type that is neither",
+			template: "/admin_clients_authentication.html",
+			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
+				return HandleAuthenticationPost(h, newTestSessionStore(), &refusingClientApiClient{}, consoleBaseURL)
+			},
+			target:     "/admin/clients/3/authentication",
+			form:       url.Values{"publicConfidential": {"Public"}, "clientSecret": {"a-new-secret"}},
+			english:    "Choose the client type: public or confidential.",
+			portuguese: "Escolha o tipo de cliente: público ou confidencial.",
 		},
 		{
 			name:     "a token expiration that is not a number",
