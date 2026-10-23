@@ -322,6 +322,7 @@ command itself and fails on a tree it changed.
 | `core/hostport` | `Unbracket` | own-package | — |
 | `core/hostport/hostporttest` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/hostport/hostporttest` names it in production. |
 | `core/httpmw` | `BodyLimit` | both-apps | — |
+| `core/httpmw` | `BodyLimitOn` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: nothing outside core names it yet. It is the router's body-limit lookup, the twin of `BodyLimit` that reads chi, so a later slice that moves the servers turns this row into a computed one. |
 | `core/httpmw` | `BodyLimitPolicy` | both-apps | — |
 | `core/httpmw` | `CSRF` | both-apps | — |
 | `core/httpmw` | `CSRFPolicy` | both-apps | — |
@@ -607,6 +608,7 @@ command itself and fails on a tree it changed.
 | `core/metrics` | `Family` | kernel | — |
 | `core/metrics` | `Gauge` | own-package | — |
 | `core/metrics` | `HTTPRequests` | both-apps | — |
+| `core/metrics` | `HTTPRequestsOn` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: nothing outside core names it yet. It is the router's request metrics, the twin of `HTTPRequests` that reads chi, so a later slice that moves the servers turns this row into a computed one. |
 | `core/metrics` | `Histogram` | own-package | — |
 | `core/metrics` | `Label` | kernel | — |
 | `core/metrics` | `NewRegistry` | both-apps | — |
@@ -632,6 +634,10 @@ command itself and fails on a tree it changed.
 | `core/requestid` | `Header` | own-package | — |
 | `core/requestid` | `Middleware` | both-apps | — |
 | `core/requestid` | `NewContext` | own-package | — |
+| `core/routing` | `New` | contract | Both servers' route tables move onto `core/routing` in #462's slices 7 and 8, the admin console's first, and until the auth server's does the reference graph cannot back it: nothing outside core names it yet. It is the router's constructor, the one way to a router, so a later slice that moves the servers turns this row into a computed one. |
+| `core/routing` | `RouteName` | kernel | — |
+| `core/routing` | `Router` | kernel | — |
+| `core/routing` | `WalkFunc` | reachable | — |
 | `core/securerandom` | `String` | both-apps | — |
 | `core/securerandom` | `StringFromAlphabet` | kernel | — |
 | `core/sessionstore` | `Backend` | both-apps | — |

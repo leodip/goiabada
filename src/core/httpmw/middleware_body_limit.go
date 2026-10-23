@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // BodyLimitPolicy is one application's table of how many request-body bytes each of its routes may
@@ -130,6 +132,25 @@ func BodyLimit(routes chi.Routes, policy BodyLimitPolicy) func(next http.Handler
 				// the one it is given, and the request's own must reach the router untouched.
 				pattern := routes.Find(chi.NewRouteContext(), r.Method, routingPath(r))
 				r.Body = http.MaxBytesReader(w, r.Body, limiter.limitFor(r.Method, pattern))
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// BodyLimitOn is BodyLimit for a core/routing router, which names its routes in chi's spelling, so
+// the policy's keys are the same (#462 decision 5). The route is the one the router will answer the
+// request with, read from the path the middleware above left, so it is mounted the same way: with
+// Use on router itself, after StripTrailingSlash. A request the router will answer 404 or 405 gets
+// Default, as on chi.
+func BodyLimitOn(router *routing.Router, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
+	limiter := newBodyLimiter(policy)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// net/http gives a request with no body http.NoBody, so every GET skips the lookup.
+			if r.Body != nil && r.Body != http.NoBody {
+				r.Body = http.MaxBytesReader(w, r.Body, limiter.limitFor(r.Method, router.RouteFor(r)))
 			}
 			next.ServeHTTP(w, r)
 		})

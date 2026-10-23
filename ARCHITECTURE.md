@@ -117,6 +117,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/oauth` | kernel | — |
 | `core/phonecountries` | kernel | — |
 | `core/requestid` | kernel | — |
+| `core/routing` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
 | `core/sourceroot` | kernel | — |
@@ -167,6 +168,12 @@ Notes on rows that are not self-evident:
   as chi's middleware made it until #462 replaced it. `core/logging`'s handler reads it onto every
   record, so it sits below `core/logging` and `core/httpmw`, which mounts nothing of it: the
   middleware is `requestid.Middleware` itself.
+- `core/routing` is kernel because both servers register their routes on it: a router on
+  `net/http.ServeMux` offering the part of chi's surface the two route tables use, with the rules
+  every route follows decided once, there: a group's middleware meets an unmatched path under it,
+  the 404 and the 405 with its `Allow`, HEAD only where registered, non-canonical paths, and route
+  names in chi's spelling, which the metrics' `route` label and the audit log read (#462). It
+  imports nothing but the standard library, so `core/metrics` and `core/httpmw` read routes from it.
 - `core/phonecountries` is kernel because both applications offer a user the same phone country
   list: the auth server validates and stores its ids on the user row, and the admin console's two
   phone pages build their list from it rather than ask the admin API, which refuses a token carrying

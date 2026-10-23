@@ -57,7 +57,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",
 		"github.com/leodip/goiabada/core/httpmw.RequestLogger.func1",
 		// Above Recoverer, as the logger is, so a panic is counted as the 500 its client got (#400).
-		"github.com/leodip/goiabada/core/metrics.HTTPRequests.func3",
+		"github.com/leodip/goiabada/core/metrics.httpRequests.func2",
 		"github.com/leodip/goiabada/core/httpmw.Recoverer",
 		"github.com/leodip/goiabada/core/httpmw.StripTrailingSlash",
 		// After StripTrailingSlash, whose path it routes by, and before the /auth/logout exemption

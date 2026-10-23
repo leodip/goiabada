@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/core/httpmw/statuswriter"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // unmatched is the route a request no route answered is recorded under.
@@ -41,7 +42,30 @@ func DurationBuckets() []float64 {
 // the route, is not on the request above it. Mount it above the panic recovery, as the request
 // logger is, so a panicking request is counted as the 500 its client received.
 func HTTPRequests(reg *Registry, router chi.Routes) func(http.Handler) http.Handler {
-	routes := sync.OnceValue(func() map[string]bool { return routeTable(router) })
+	return httpRequests(reg, func() map[string]bool { return routeTable(router) }, routePattern)
+}
+
+// HTTPRequestsOn is HTTPRequests for a core/routing router, which names its routes in chi's
+// spelling, so the label values are the same (#462 decision 5). It is mounted the same way: with
+// Use on router itself, above httpmw.Recoverer. A request a group's middleware answers before any
+// route, a 404 and a 405 are all unmatched, as they were on chi.
+func HTTPRequestsOn(reg *Registry, router *routing.Router) func(http.Handler) http.Handler {
+	return httpRequests(reg, func() map[string]bool {
+		table := map[string]bool{}
+		// The walk function returns no error, so Walk returns none.
+		_ = router.Walk(func(_ string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+			table[route] = true
+			return nil
+		})
+		return table
+	}, routing.RouteName)
+}
+
+// httpRequests registers the two families and returns the middleware recording into them, with
+// the route label's set read from table once and each request's route read by routeOf after its
+// handler ran.
+func httpRequests(reg *Registry, table func() map[string]bool, routeOf func(*http.Request) string) func(http.Handler) http.Handler {
+	routes := sync.OnceValue(table)
 	route := Label{
 		name:        "route",
 		description: "the route table, `unmatched`",
@@ -72,7 +96,7 @@ func HTTPRequests(reg *Registry, router chi.Routes) func(http.Handler) http.Hand
 
 			// Deferred, so a request whose handler panics past this middleware is still counted.
 			defer func() {
-				pattern := routePattern(r)
+				pattern := routeOf(r)
 				if !routes()[pattern] {
 					pattern = unmatched
 				}
