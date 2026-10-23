@@ -46,7 +46,7 @@ test("a password under the policy is refused, and the old one still works", asyn
   await page.goto(userUrl(user.id, "authentication"));
   await page.locator("#newPassword").fill("abc");
   await page.locator("#btnSave").click();
-  await expectRefusal(page, "authentication-error", "newPassword", "Use at least 6 characters for the password.");
+  await expectRefusal(page, "authentication-error", "newPassword", "Use at least 15 characters for the password.");
 
   const { client, secret } = await passwordGrantClient(page, clients);
   expect((await passwordToken(request, client.identifier, secret, user.email, user.password, "openid")).status).toBe(200);

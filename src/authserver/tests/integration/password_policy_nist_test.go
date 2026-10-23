@@ -88,3 +88,17 @@ func TestAPIUserCreatePost_HoldsThePasswordToNist(t *testing.T) {
 		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
 	})
 }
+
+// The settings row the tier runs against is the one the first start seeded, so the general
+// settings API answering nist here is a new installation starting with it.
+func TestAPISettingsGeneralGet_ANewInstallationAnswersNist(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/settings/general", accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.SettingsGeneralResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "nist", body.PasswordPolicy)
+}

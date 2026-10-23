@@ -139,7 +139,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 		FamilyName:      "User",
 		EmailVerified:   true,
 		SetPasswordType: "now",
-		Password:        "password123",
+		Password:        fake.Password(20),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
@@ -213,7 +213,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 		FamilyName:      "User",
 		EmailVerified:   true,
 		SetPasswordType: "now",
-		Password:        "password123",
+		Password:        fake.Password(20),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
@@ -239,7 +239,7 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 				GivenName:       "Test",
 				FamilyName:      "User",
 				SetPasswordType: "now",
-				Password:        "password123",
+				Password:        fake.Password(20),
 			},
 			http.StatusBadRequest,
 		},
@@ -250,7 +250,7 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 				GivenName:       "Test",
 				FamilyName:      "User",
 				SetPasswordType: "now",
-				Password:        "password123",
+				Password:        fake.Password(20),
 			},
 			http.StatusBadRequest,
 		},
@@ -261,7 +261,7 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 				GivenName:       "Test",
 				FamilyName:      "User",
 				SetPasswordType: "now",
-				Password:        "password123",
+				Password:        fake.Password(20),
 			},
 			http.StatusBadRequest,
 		},
@@ -389,7 +389,7 @@ func TestAPIUserCreatePost_Unauthorized(t *testing.T) {
 		GivenName:       "Test",
 		FamilyName:      "User",
 		SetPasswordType: "now",
-		Password:        "password123",
+		Password:        fake.Password(20),
 	}
 
 	reqBody, err := json.Marshal(createReq)
@@ -696,19 +696,20 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 func TestAPIUserCreatePost_SetPasswordTypeIsEnforced(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
+	password := fake.Password(20)
 	for _, tc := range []struct {
 		name            string
 		setPasswordType string
 		password        string
 		expectedStatus  int
 	}{
-		{"a third value", "later", "password123", http.StatusBadRequest},
-		{"a near miss on email", "e-mail", "password123", http.StatusBadRequest},
-		{"the right word in the wrong case", "Email", "password123", http.StatusBadRequest},
+		{"a third value", "later", password, http.StatusBadRequest},
+		{"a near miss on email", "e-mail", password, http.StatusBadRequest},
+		{"the right word in the wrong case", "Email", password, http.StatusBadRequest},
 		// Absent is permitted by the schema and means "now", so it is accepted with a password
 		// and refused without one. It is refused here for the missing password, not for the
 		// missing field, which is the distinction the default exists to make.
-		{"absent with a password", "", "password123", http.StatusCreated},
+		{"absent with a password", "", password, http.StatusCreated},
 		{"absent without a password", "", "", http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

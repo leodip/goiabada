@@ -115,6 +115,8 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	assert.Equal(t, cfg.AuthServerBaseURL, settings.Issuer)
 	assert.Equal(t, 20, settings.MaxUserSessionsPerUser,
 		"a new installation caps a user at 20 sessions, as migration 000063 gives an existing one (#564)")
+	assert.Equal(t, record.PasswordPolicyNist, settings.PasswordPolicy,
+		"a new installation holds every password to NIST SP 800-63B (#550)")
 
 	user, err := db.GetUserByEmail(ctx, nil, strings.ToLower(cfg.AdminEmail))
 	require.NoError(t, err)

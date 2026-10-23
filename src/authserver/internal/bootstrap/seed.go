@@ -331,7 +331,9 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		// unless they turn verification off on purpose (#526).
 		SelfRegistrationEnabled:                   false,
 		SelfRegistrationRequiresEmailVerification: true,
-		PasswordPolicy:                            record.PasswordPolicyLow,
+		// NIST SP 800-63B-4 section 3.1.1.2, which every password set from the first start is held
+		// to; an upgrade keeps the policy it had, since no migration runs (#550).
+		PasswordPolicy: record.PasswordPolicyNist,
 		// The data key is supplied from the environment (issue #83); the legacy
 		// aes_encryption_key column is left empty on fresh installs. It is NOT NULL,
 		// so store an empty (non-nil) blob rather than nil.

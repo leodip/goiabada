@@ -147,7 +147,7 @@ for (const { name, user, field, message } of [
   { name: "a malformed email", user: { email: "not-an-email" }, field: "email", message: "Please enter a valid email address." },
   { name: "a given name with digits", user: { givenName: "R2D2" }, field: "givenName", message: "Please enter a valid given name." },
   { name: "no password", user: { password: "" }, field: "password", message: "Password is required" },
-  { name: "a password under the policy's 6 characters", user: { password: "abc" }, field: "password", message: "Use at least 6 characters for the password." },
+  { name: "a password under the policy's 15 characters", user: { password: "abc" }, field: "password", message: "Use at least 15 characters for the password." },
 ]) {
   test(`a user with ${name} is refused, and the form keeps what was typed`, async ({ page }) => {
     const email = `${uniqueIdentifier("u")}@example.com`;

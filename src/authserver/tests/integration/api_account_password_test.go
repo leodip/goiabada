@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
@@ -35,7 +36,7 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 	// Prepare request
 	reqBody := api.UpdateAccountPasswordRequest{
 		CurrentPassword: current,
-		NewPassword:     "NewPass2$",
+		NewPassword:     fake.Password(20),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
@@ -68,7 +69,7 @@ func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {
 
 	reqBody := api.UpdateAccountPasswordRequest{
 		CurrentPassword: "WrongPwd1!",
-		NewPassword:     "NewPass2$",
+		NewPassword:     fake.Password(20),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
@@ -89,7 +90,7 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/password"
 
 	// Missing current password
-	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "", NewPassword: "NewPass2$"})
+	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "", NewPassword: fake.Password(20)})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
@@ -104,13 +105,13 @@ func TestAPIAccountPasswordPut_ValidationErrors(t *testing.T) {
 	_ = json.NewDecoder(resp2.Body).Decode(&err2)
 	assert.Equal(t, "New password is required.", err2.ErrorDescription)
 
-	// Too short per default policy (low => min 6)
+	// Too short for the policy a new installation seeds (nist => min 15)
 	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPasswordRequest{CurrentPassword: "Correct1!", NewPassword: "123"})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
 	_ = json.NewDecoder(resp3.Body).Decode(&err3)
-	assert.Equal(t, "Use at least 6 characters for the password.", err3.ErrorDescription)
+	assert.Equal(t, "Use at least 15 characters for the password.", err3.ErrorDescription)
 }
 
 func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {

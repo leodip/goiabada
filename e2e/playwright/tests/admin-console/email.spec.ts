@@ -140,7 +140,9 @@ test("forgot password: the emailed link sets a new password, and the old one sto
   const link = linksIn(mail).find((l) => l.startsWith(env.authUrl))!;
   await forgot.goto(link);
   // The password's rules, under the seeded policy, are said under its field.
-  await expect(forgot.locator("#password-rules")).toHaveText("At least 6 characters.");
+  await expect(forgot.locator("#password-rules")).toHaveText(
+    "At least 15 characters. A few unrelated words make a long password that's easy to remember. Common passwords, and the account's email address or the app's name, are refused.",
+  );
   await setPasswordOnForm(forgot, user.email, "a-reset-password");
   await context.close();
 
@@ -160,7 +162,7 @@ test("the reset form refuses a password too short or not confirmed, and the link
   const link = await mailedResetLink(reset, request, user.email);
   await reset.goto(link);
   for (const { password, confirmation, field, message } of [
-    { password: "abc", confirmation: "abc", field: "password", message: "Use at least 6 characters for the password." },
+    { password: "abc", confirmation: "abc", field: "password", message: "Use at least 15 characters for the password." },
     { password: "a-reset-password", confirmation: "another-password", field: "passwordConfirmation", message: "The passwords don't match." },
   ]) {
     await reset.locator("#password").fill(password);

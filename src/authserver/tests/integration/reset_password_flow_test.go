@@ -336,7 +336,7 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 	assert.Contains(t, formBody, `name="passwordConfirmation"`)
 	assert.NotContains(t, formBody, resetCodeInvalidText)
 
-	const newPassword = "N3wP4ss!word"
+	newPassword := fake.Password(20)
 	resp := postCleanReset(t, client, cleanURL, newPassword, continuationIdIn(t, formBody))
 	defer func() { _ = resp.Body.Close() }()
 
@@ -366,7 +366,7 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	// Taken while the marker is still live and usable.
 	captured := capturedSessionCookies(t, client)
 
-	const newPassword = "N3wP4ss!word"
+	newPassword := fake.Password(20)
 	resp := postCleanReset(t, client, cleanURL, newPassword, continuationId)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
@@ -474,7 +474,7 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	assert.Contains(t, steeredBody, resetCodeInvalidText)
 
 	// The victim submits the form they were already looking at.
-	const newPassword = "V1ctim!Choice"
+	newPassword := fake.Password(20)
 	resp := postCleanReset(t, browser, cleanURL, newPassword, continuationId)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
@@ -523,7 +523,7 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 	require.Equal(t, staleTabContinuationId, activeTabContinuationId,
 		"one link followed once is one continuation, however many times its form is rendered")
 
-	const victimPassword = "V1ctim!Choice"
+	victimPassword := fake.Password(20)
 	resp := postCleanReset(t, browser, cleanURL, victimPassword, activeTabContinuationId)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
@@ -573,8 +573,8 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 
 	copied := clientCarrying(t, capturedSessionCookies(t, client))
 
-	const firstPassword = "F1rst!Winner"
-	const secondPassword = "S3cond!Loser"
+	firstPassword := fake.Password(20)
+	secondPassword := fake.Password(20)
 
 	// Both submissions name the same continuation, because both hold the same marker. What
 	// separates them is the conditional claim, which is the subject here.

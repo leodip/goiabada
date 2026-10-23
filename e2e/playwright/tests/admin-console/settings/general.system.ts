@@ -27,6 +27,9 @@ const general = "/admin/settings/general";
 const registerUrl = `${env.authUrl}/account/register`;
 const issuerRule = "Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL.";
 const issuerChange = "You're changing the issuer";
+// What the auth server's password forms say under the field while the policy is nist, as seeded.
+const nistRules =
+  "At least 15 characters. A few unrelated words make a long password that's easy to remember. Common passwords, and the account's email address or the app's name, are refused.";
 
 test("the app name is saved and names the console's and the sign-in pages", async ({ page, browser }) => {
   await withSettingsRestored(page, general, async () => {
@@ -140,6 +143,8 @@ test("the password policy applies to passwords set from then on", async ({ page 
 test("the NIST SP 800-63B card says what it asks, and registration holds a password to it", async ({ page, browser }) => {
   await withSettingsRestored(page, general, async () => {
     const nist = page.getByRole("radio", { name: "NIST SP 800-63B", exact: true });
+    // A new installation starts with it (#550).
+    await expect(nist).toBeChecked();
     await expect(page.locator('input[name="passwordPolicy"]').first()).toHaveAttribute("value", "nist");
     await expect(nist).toHaveAccessibleDescription(/^At least 15 characters, any characters at all\..* Recommended\. It follows the US National Institute of Standards and Technology's guideline/);
     await expect(page.getByRole("radio", { name: "Low", exact: true })).toHaveAccessibleDescription("At least 6 characters. Falls short of NIST SP 800-63B.");
@@ -154,9 +159,7 @@ test("the NIST SP 800-63B card says what it asks, and registration holds a passw
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const register = await context.newPage();
     await register.goto(registerUrl);
-    await expect(register.locator("#password-rules")).toHaveText(
-      "At least 15 characters. A few unrelated words make a long password that's easy to remember. Common passwords, and the account's email address or the app's name, are refused.",
-    );
+    await expect(register.locator("#password-rules")).toHaveText(nistRules);
     const submit = async (password: string) => {
       await register.locator("#email").fill(email);
       await register.locator("#password").fill(password);
@@ -200,7 +203,7 @@ test("self-registration opens the register page; without email verification it c
     await register.goto(registerUrl);
     await expect(register).toHaveTitle(/^Create an account – /);
     // The password's rules, under the seeded policy, are said under its field.
-    await expect(register.locator("#password-rules")).toHaveText("At least 6 characters.");
+    await expect(register.locator("#password-rules")).toHaveText(nistRules);
     await register.locator("#email").fill(email);
     await register.locator("#password").fill("a-good-password");
     await register.locator("#passwordConfirmation").fill("a-good-password");
