@@ -120,7 +120,8 @@ func HandleAuthPwdPost(
 
 // renderPasswordForm renders the password form for the ceremony, with a refusal, the field it is
 // about, and the address the user typed when it is shown again. The form names its ceremony, so the
-// boundary can refuse a submission of a form another /auth/authorize has replaced since (#79).
+// boundary reads the submission as that ceremony's, and refuses it once the browser no longer holds
+// it (#79, #246).
 func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
 	settings *record.Settings, authContext *ceremony.AuthContext, displayInfo *authflow.ClientDisplayInfo,
 	refusal *i18n.LocalizedError, errorField, email string) {

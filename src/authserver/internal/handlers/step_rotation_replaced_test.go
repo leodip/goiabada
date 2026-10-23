@@ -21,7 +21,6 @@ import (
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
@@ -360,112 +359,120 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 }
 
 // The issue's interleaving at the password step, with the real ceremony store: tab A's password
-// submission has loaded ceremony A and is held in its read of the user, tab B's /auth/authorize runs
-// to its save in the same browser session, and tab A resumes. Its rotation used to write ceremony A
-// under a new identifier and delete the row holding ceremony B. Now tab A answers the "no longer
-// active" page, and the browser's identifier still names its session, which keeps ceremony B.
-func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremonyAlone(t *testing.T) {
-	ceremonyStore, _ := newRealCeremonyStore(t)
+// submission has loaded ceremony A and is held in its read of the user, other tabs' /auth/authorize
+// run to their saves in the same browser session, and tab A resumes. After one newer sign-in, tab A
+// rotates the session with both ceremonies in it and carries on (#246). After five, ceremony A has
+// been pushed out: its rotation used to write ceremony A under a new identifier and delete the row
+// holding the newer ones, and now tab A answers the "no longer active" page, and the browser's
+// identifier still names its session, which keeps the five newer ceremonies.
+func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorize(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		newer     int
+		carriesOn bool
+	}{
+		{name: "one newer sign-in leaves it to carry on", newer: 1, carriesOn: true},
+		{name: "five newer sign-ins push it out", newer: 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ceremonyStore, _ := newRealCeremonyStore(t)
 
-	seed := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.ReplaceAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
-		&ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
-			AuthState:  ceremony.AuthStateLevel1Password,
-			ClientId:   "test-client",
-		}))
-	cookies := seed.Result().Cookies()
-	require.Len(t, cookies, 1)
+			seed := httptest.NewRecorder()
+			require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
+				&ceremony.AuthContext{
+					CeremonyId: testCeremonyId,
+					AuthState:  ceremony.AuthStateLevel1Password,
+					ClientId:   "test-client",
+				}))
+			cookies := seed.Result().Cookies()
+			require.Len(t, cookies, 1)
 
-	passwordHash, err := passwordhash.Hash("testpassword")
-	require.NoError(t, err)
+			passwordHash, err := passwordhash.Hash("testpassword")
+			require.NoError(t, err)
 
-	pageRendererA := handlersmocks.NewPageRenderer(t)
-	databaseA := datamocks.NewDatabase(t)
-	auditLoggerA := handlersmocks.NewAuditLogger(t)
-	reached := make(chan struct{})
-	release := make(chan struct{})
-	defer func() {
-		select {
-		case <-release:
-		default:
+			pageRendererA := handlersmocks.NewPageRenderer(t)
+			databaseA := datamocks.NewDatabase(t)
+			auditLoggerA := handlersmocks.NewAuditLogger(t)
+			reached := make(chan struct{})
+			release := make(chan struct{})
+			defer func() {
+				select {
+				case <-release:
+				default:
+					close(release)
+				}
+			}()
+			databaseA.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Run(func(mock.Arguments) {
+				close(reached)
+				<-release
+			}).Return(&record.User{Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
+			auditLoggerA.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
+
+			form := url.Values{}
+			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add("email", "test@example.com")
+			form.Add("password", "testpassword")
+			reqA := withCookies(httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode())), cookies)
+			reqA.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+			reqA = reqA.WithContext(reqctx.WithSettings(reqA.Context(), &record.Settings{}))
+			rrA := httptest.NewRecorder()
+			if !tc.carriesOn {
+				expectCeremonyNoLongerActiveOnAnyRequest(pageRendererA, rrA, reqA)
+			}
+
+			tabADone := make(chan struct{})
+			go func() {
+				defer close(tabADone)
+				buildAuthPwdPost(authPwdPostDeps{
+					pageRenderer:  pageRendererA,
+					ceremonyStore: ceremonyStore,
+					database:      databaseA,
+					auditLogger:   auditLoggerA,
+				}).ServeHTTP(rrA, reqA)
+			}()
+			select {
+			case <-reached:
+			case <-tabADone:
+				t.Fatal("tab A's step returned before it reached its read of the user")
+			case <-time.After(10 * time.Second):
+				t.Fatal("tab A's step never reached its read of the user")
+			}
+
+			newer := newerAuthorizes(t, ceremonyStore, cookies, tc.newer)
+
 			close(release)
-		}
-	}()
-	databaseA.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Run(func(mock.Arguments) {
-		close(reached)
-		<-release
-	}).Return(&record.User{Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
-	auditLoggerA.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
+			select {
+			case <-tabADone:
+			case <-time.After(10 * time.Second):
+				t.Fatal("tab A's step never returned")
+			}
 
-	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
-	form.Add("email", "test@example.com")
-	form.Add("password", "testpassword")
-	reqA := withCookies(httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode())), cookies)
-	reqA.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	reqA = reqA.WithContext(reqctx.WithSettings(reqA.Context(), &record.Settings{}))
-	rrA := httptest.NewRecorder()
-	expectCeremonyNoLongerActiveOnAnyRequest(pageRendererA, rrA, reqA)
+			if tc.carriesOn {
+				require.Equal(t, http.StatusSeeOther, rrA.Code, rrA.Body.String())
+				assertStepLocation(t, rrA.Header().Get("Location"), "/auth/level1completed")
+				written := rrA.Result().Cookies()
+				require.NotEmpty(t, written, "tab A rotated the browser session")
+				rotated := written[len(written)-1:]
+				storedA, err := heldCeremony(ceremonyStore, rotated, testCeremonyId)
+				require.NoError(t, err, "tab A's ceremony is held under the new identifier")
+				assert.Equal(t, ceremony.AuthStateLevel1PasswordCompleted, storedA.AuthState)
+				storedB, err := heldCeremony(ceremonyStore, rotated, newer[0])
+				require.NoError(t, err, "and so is the newer one, which the rotation carried")
+				assert.Equal(t, ceremony.AuthStateRequiresLevel1, storedB.AuthState)
+				return
+			}
 
-	tabADone := make(chan struct{})
-	go func() {
-		defer close(tabADone)
-		buildAuthPwdPost(authPwdPostDeps{
-			pageRenderer:  pageRendererA,
-			ceremonyStore: ceremonyStore,
-			database:      databaseA,
-			auditLogger:   auditLoggerA,
-		}).ServeHTTP(rrA, reqA)
-	}()
-	select {
-	case <-reached:
-	case <-tabADone:
-		t.Fatal("tab A's step returned before it reached its read of the user")
-	case <-time.After(10 * time.Second):
-		t.Fatal("tab A's step never reached its read of the user")
+			assertAnsweredNoLongerActive(t, rrA)
+			assert.Empty(t, rrA.Result().Cookies(), "tab A rotated nothing, so it tells the browser nothing")
+			pageRendererA.AssertExpectations(t)
+
+			for _, id := range newer {
+				stored, err := heldCeremony(ceremonyStore, cookies, id)
+				require.NoError(t, err, "the browser's identifier still names its session, with the newer ceremony %s", id)
+				assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState)
+			}
+		})
 	}
-
-	// Tab B's /auth/authorize, carrying the same cookie, through to its save.
-	e := newSyntaxAuthorizeEndpoint(t)
-	e.stubLoggedOutBrowser()
-	tabB := buildAuthorizeGet(authorizeGetDeps{
-		pageRenderer:       e.pageRenderer,
-		ceremonyStore:      ceremonyStore,
-		userSessionManager: e.userSessionManager,
-		database:           e.database,
-		authorizeValidator: protocolvalidation.NewAuthorizeValidator(e.database),
-		auditLogger:        handlersmocks.NewAuditLogger(t),
-		permissionChecker:  handlersmocks.NewPermissionChecker(t),
-		tokenParser:        handlersmocks.NewTokenParser(t),
-	})
-	reqB := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
-		"/auth/authorize?"+syntaxQuery(nil), nil)), cookies)
-	rrB := httptest.NewRecorder()
-	tabB.ServeHTTP(rrB, reqB)
-
-	require.Equal(t, http.StatusFound, rrB.Code)
-	locationB, err := url.Parse(rrB.Header().Get("Location"))
-	require.NoError(t, err)
-	ceremonyB := locationB.Query().Get(ceremony.QueryParameter)
-	require.NotEmpty(t, ceremonyB)
-	require.NotEqual(t, testCeremonyId, ceremonyB)
-
-	close(release)
-	select {
-	case <-tabADone:
-	case <-time.After(10 * time.Second):
-		t.Fatal("tab A's step never returned")
-	}
-
-	assertAnsweredNoLongerActive(t, rrA)
-	assert.Empty(t, rrA.Result().Cookies(), "tab A rotated nothing, so it tells the browser nothing")
-	pageRendererA.AssertExpectations(t)
-
-	stored, err := ceremonyStore.LatestAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
-	require.NoError(t, err, "the browser's identifier still names its session")
-	assert.Equal(t, ceremonyB, stored.CeremonyId, "the browser session keeps the newer ceremony")
-	assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState)
 }
 
 // theContextOf matches req's own context, which /auth/completed's operation runs under.

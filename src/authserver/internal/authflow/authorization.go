@@ -98,12 +98,13 @@ type redirectEmission interface {
 		site string) bool
 }
 
-// authorizeBrowser is the one browser-session write /auth/authorize makes. It starts a ceremony, so
-// it writes without a condition (#579 decision 6): the save replaces whatever ceremony the browser
-// session held. A request answered at once with an error writes nothing, so it leaves the sign-in
-// in progress alone (#246). The handler's per-request adapter satisfies it.
+// authorizeBrowser is the one browser-session write /auth/authorize makes. It starts a ceremony
+// beside the ones the browser session holds, pushing out the least recently written when it holds
+// ceremony.MaxHeldCeremonies already, and leaves every other alone (#246). A request answered at
+// once with an error writes nothing, so it leaves every sign-in in progress alone. The handler's
+// per-request adapter satisfies it.
 type authorizeBrowser interface {
-	ReplaceAuthContext(authContext *ceremony.AuthContext) error
+	AddAuthContext(authContext *ceremony.AuthContext) error
 }
 
 // Authorization is GET /auth/authorize: it accepts or refuses an authorization request, starts the
@@ -287,8 +288,8 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 	}
 
 	// The ceremony id is minted here and nowhere else. Every form the ceremony renders carries it and
-	// every redirect between its steps names it, so a page left open in another tab cannot act on the
-	// request that replaced it (#79, #246).
+	// every redirect between its steps names it, so a page left open in another tab acts on its own
+	// request and on no other the browser holds (#79, #246).
 	authContext := &ceremony.AuthContext{
 		CeremonyId:                    ceremony.NewId(),
 		ClientId:                      params.Get("client_id"),
@@ -443,7 +444,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 	}
 	saveFor := func(nextStep string) AuthorizationResult {
 		result.NextStep = nextStep
-		result.SaveErr = browser.ReplaceAuthContext(authContext)
+		result.SaveErr = browser.AddAuthContext(authContext)
 		return result
 	}
 

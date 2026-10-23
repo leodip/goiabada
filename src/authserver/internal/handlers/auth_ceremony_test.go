@@ -78,7 +78,7 @@ func holdingCeremony(t *testing.T, held *ceremony.AuthContext) (*ceremony.Store,
 	t.Helper()
 	ceremonyStore, _ := newRealCeremonyStore(t)
 	seed := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.ReplaceAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), held))
+	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), held))
 	cookies := seed.Result().Cookies()
 	require.Len(t, cookies, 1)
 	return ceremonyStore, cookies
@@ -141,8 +141,8 @@ func expectCeremonyNoLongerActive(t *testing.T, pageRenderer *handlersmocks.Page
 // eleven sites answered before #279 decision 21 and /auth/level1completed until #436.
 //
 // It asserts the state_mismatch pair specifically and not merely "some title": the ceremony
-// mismatch page beside it says another sign-in was started in this browser, which is not what the
-// Back button did, and a helper that accepted either would let the two pages be confused.
+// mismatch page beside it says the sign-in can no longer continue, which is not what the Back button
+// did, and a helper that accepted either would let the two pages be confused.
 func expectAuthStateMismatch(t *testing.T, pageRenderer *handlersmocks.PageRenderer,
 	rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
@@ -226,7 +226,7 @@ func TestRequireAuthState(t *testing.T) {
 		body := rr.Body.String()
 		assert.Contains(t, body, i18n.T(req.Context(), "auth_error.state_mismatch.title"))
 		assert.Contains(t, body, i18n.T(req.Context(), "auth_error.state_mismatch.message"))
-		// The page beside it, which says a different thing: another sign-in was started here.
+		// The page beside it, which says a different thing: the sign-in can no longer continue.
 		assert.NotContains(t, body, i18n.T(req.Context(), "auth_error.ceremony_mismatch.message"))
 		// Untouched: the state belongs to the step the user is actually on.
 		assert.Equal(t, ceremony.AuthStateLevel1PasswordCompleted, authContext.AuthState)

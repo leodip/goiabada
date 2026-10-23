@@ -37,7 +37,7 @@ func otpCeremonyBrowser(t *testing.T, held *ceremony.AuthContext) (*ceremony.Sto
 	ceremonyStore := ceremony.NewStore(conditional, "goiabada-auth-test")
 
 	seed := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.ReplaceAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), held))
+	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil), held))
 	cookies := seed.Result().Cookies()
 	require.Len(t, cookies, 1)
 	return ceremonyStore, cookies

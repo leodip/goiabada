@@ -174,5 +174,5 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	})
 
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
-	return SilentAuthenticationResult{SaveErr: browser.ReplaceAuthContext(authContext)}, nil
+	return SilentAuthenticationResult{SaveErr: browser.AddAuthContext(authContext)}, nil
 }

@@ -1828,8 +1828,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 // an enable and a disable, landed in between. Nothing is stored, so the sign-in cannot claim a
 // second factor it never installed. It ends on a page of its own saying so, at 409, in the
 // visitor's language: not the enrolment form again, whose QR code is for an authenticator that was
-// never stored, and not the "no longer active" page, which says another sign-in was started in this
-// browser. The ceremony is cleared first, so nothing can continue it, and nothing is audited as an
+// never stored, and not the "no longer active" page, which says a later sign-in or sign-out ended
+// this one. The ceremony is cleared first, so nothing can continue it, and nothing is audited as an
 // enable or as a successful second factor.
 func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 	testCases := []struct {

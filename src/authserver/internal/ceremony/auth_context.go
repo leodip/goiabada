@@ -124,19 +124,19 @@ type AuthContext struct {
 	// seed they can no longer prove they were shown is accepted.
 	OTPKeyURL string
 	// CeremonyId names this authorization ceremony, so a form this ceremony rendered, or a step
-	// it redirected to, can say which ceremony it belongs to and be refused once the browser's
-	// single auth context slot holds another one.
+	// it redirected to, can say which ceremony it belongs to, and is read as that ceremony and no
+	// other of the ones the browser holds.
 	//
-	// A browser holds ONE auth context, so a second /auth/authorize replaces it while every
-	// form already on screen still posts to the same URL. No rule about WRITING the context
-	// can bind a page that is already rendered, which is why the page has to carry the id and
-	// the POST has to check it: without that, a consent screen naming client A resolves its
-	// checkbox indices against client B's scope list, and a password submitted at A's screen
-	// finishes B's authorization outright (#79, the shape #112 records for emailed links). A
-	// page load is bound the same way: every redirect between steps carries the id in the URL
-	// (QueryParameter) and loadAuthContext compares it before anything else, so a tab of a
-	// replaced sign-in that reaches its next step gets the "no longer active" page instead of
-	// acting on the newer one (#246, #437).
+	// A browser holds several auth contexts side by side (Store, MaxHeldCeremonies), while every
+	// form on screen posts to the same URL. No rule about WRITING the context can bind a page
+	// that is already rendered, which is why the page has to carry the id and the POST has to
+	// look it up: without that, a consent screen naming client A resolves its checkbox indices
+	// against client B's scope list, and a password submitted at A's screen finishes B's
+	// authorization outright (#79, the shape #112 records for emailed links). A page load is
+	// bound the same way: every redirect between steps carries the id in the URL
+	// (QueryParameter) and loadAuthContext reads that ceremony before anything else, so each
+	// sign-in's tab moves its own sign-in, and one the browser no longer holds, finished or
+	// pushed out, gets the "no longer active" page instead of acting on another (#246, #437).
 	//
 	// Generated only in authflow.Authorization.Run, through NewId, the sole creation site, so no other
 	// path can mint one. Absent from a context written by an older binary it unmarshals as "", which

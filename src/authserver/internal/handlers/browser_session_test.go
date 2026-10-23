@@ -105,33 +105,33 @@ func TestBrowserSession_ClearAuthContextReturnsTheStoresRefusal(t *testing.T) {
 	require.ErrorIs(t, err, assert.AnError)
 }
 
-func TestBrowserSession_ReplaceAuthContextCarriesTheHandlersWriterAndRequest(t *testing.T) {
+func TestBrowserSession_AddAuthContextCarriesTheHandlersWriterAndRequest(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 	authContext := &ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateReadyToIssueCode}
 
-	ceremonyStore.On("ReplaceAuthContext", theWriter(rr), theRequest(req), authContext).
+	ceremonyStore.On("AddAuthContext", theWriter(rr), theRequest(req), authContext).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(nil).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).ReplaceAuthContext(authContext)
+	err := newBrowserSession(rr, req, ceremonyStore).AddAuthContext(authContext)
 
 	require.NoError(t, err)
 	ceremonyStore.AssertExpectations(t)
 }
 
-func TestBrowserSession_ReplaceAuthContextReturnsTheStoresFailure(t *testing.T) {
+func TestBrowserSession_AddAuthContextReturnsTheStoresFailure(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 	authContext := &ceremony.AuthContext{CeremonyId: testCeremonyId}
 
-	ceremonyStore.On("ReplaceAuthContext", theWriter(rr), theRequest(req), authContext).
+	ceremonyStore.On("AddAuthContext", theWriter(rr), theRequest(req), authContext).
 		Return(assert.AnError).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).ReplaceAuthContext(authContext)
+	err := newBrowserSession(rr, req, ceremonyStore).AddAuthContext(authContext)
 
 	require.ErrorIs(t, err, assert.AnError)
 }

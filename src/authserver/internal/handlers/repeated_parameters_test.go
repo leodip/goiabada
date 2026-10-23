@@ -274,7 +274,7 @@ func TestHandleAuthorizeGet_ARepeatedRequestParameterIsInvalidRequest(t *testing
 		e.passesDeliveryChecks()
 		e.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		e.userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
-		e.ceremonyStore.On("ReplaceAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+		e.ceremonyStore.On("AddAuthContext", mock.Anything, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.DeferredErrorCode == "invalid_request" &&
 				strings.Contains(ac.DeferredErrorDescription, "'state'") &&
 				ac.State == ""

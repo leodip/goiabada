@@ -55,10 +55,10 @@ func (b *browserSession) ClearAuthContext(ceremonyId string) error {
 	return b.ceremonyStore.ClearAuthContext(b.w, b.r, ceremonyId)
 }
 
-// ReplaceAuthContext is CeremonyStore.ReplaceAuthContext, /auth/authorize's save, which replaces
-// whatever ceremony the browser session held.
-func (b *browserSession) ReplaceAuthContext(authContext *ceremony.AuthContext) error {
-	return b.ceremonyStore.ReplaceAuthContext(b.w, b.r, authContext)
+// AddAuthContext is CeremonyStore.AddAuthContext, /auth/authorize's save, which starts a ceremony
+// beside the ones the browser session holds.
+func (b *browserSession) AddAuthContext(authContext *ceremony.AuthContext) error {
+	return b.ceremonyStore.AddAuthContext(b.w, b.r, authContext)
 }
 
 // RegenerateSession is CeremonyStore.RegenerateSession, a step's conditional rotation of the browser

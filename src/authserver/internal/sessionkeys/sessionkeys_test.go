@@ -23,6 +23,7 @@ func TestSessionKeys_PinTheValuesCoreWritesOut(t *testing.T) {
 // every logged-in user out at deploy rather than failing anywhere visible (#266).
 func TestSessionKeys_AreStoredData(t *testing.T) {
 	assert.Equal(t, "SessionIdentifier", SessionIdentifier)
-	assert.Equal(t, "AuthContext", AuthContext)
+	assert.Equal(t, "AuthContexts", AuthContexts)
+	assert.Equal(t, "AuthContext", RetiredAuthContext)
 	assert.Equal(t, "LinkMarker", LinkMarker)
 }

@@ -15,9 +15,10 @@ import (
 // Store that returns it.
 var ErrNoAuthContext = oauth.NewErrorDetail("no_auth_context", "no auth context in session")
 
-// ErrCeremonyReplaced is SaveAuthContext's and ClearAuthContext's answer when the browser session no
-// longer holds the ceremony the request loaded: another /auth/authorize replaced it, it ended, or the session is
-// gone. Nothing was written, so the newer sign-in carries on (#579).
+// ErrCeremonyReplaced is a step's write's answer when the browser session no longer holds the
+// ceremony the request loaded: another request of it ended it, newer sign-ins pushed it out
+// (MaxHeldCeremonies), or the session is gone. Nothing was written, so the sign-ins the browser holds
+// carry on (#579, #246).
 //
 // A sentinel on stdlib errors.New, for the reason pattern 7 gives.
 var ErrCeremonyReplaced = errors.New("the browser session no longer holds this ceremony")

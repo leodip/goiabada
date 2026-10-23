@@ -27,10 +27,11 @@ import (
 // the ceremony the step loaded, and a step whose ceremony was replaced answers the "no longer
 // active" page at 400 and goes no further (#579). The cases at each save site are beside that
 // site's other tests and arm the CeremonyStore mock with expectStepSaveReplaced; the case here is
-// the issue's interleaving at one step, with the real ceremony store.
+// the issue's interleaving at one step, with the real ceremony store, where a ceremony is no longer
+// held because newer sign-ins pushed it out (#246).
 
-// expectStepSaveReplaced arms a step's save to find the browser session holding another ceremony,
-// and the one page that answers it. The save is matched on its request and recorder, so a save made
+// expectStepSaveReplaced arms a step's save to find the browser session no longer holding its
+// ceremony, and the one page that answers it. The save is matched on its request and recorder, so a save made
 // anywhere else does not satisfy it.
 func expectStepSaveReplaced(t *testing.T, ceremonyStore *handlersmocks.CeremonyStore,
 	pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
@@ -71,73 +72,13 @@ func withCookies(req *http.Request, cookies []*http.Cookie) *http.Request {
 	return req
 }
 
-// The issue's interleaving at /auth/level2: tab A's step has loaded ceremony A and is held inside
-// its read of the user, tab B's /auth/authorize runs to its save in the same browser session, and
-// tab A resumes. Tab A answers the "no longer active" page, logged at warn and audited nowhere, and
-// the browser session keeps ceremony B, so tab B's next step finds the sign-in it started.
-func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorizeLeavesItsCeremonyAlone(t *testing.T) {
-	ceremonyStore, _ := newRealCeremonyStore(t)
-
-	// Ceremony A, as /auth/authorize left it when it reached /auth/level2.
-	seed := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.ReplaceAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
-		&ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
-			AuthState:  ceremony.AuthStateRequiresLevel2,
-			ClientId:   "test-client",
-			UserId:     1,
-		}))
-	cookies := seed.Result().Cookies()
-	require.Len(t, cookies, 1)
-
-	// Tab A, held in GetUserById until tab B has saved.
-	pageRendererA := handlersmocks.NewPageRenderer(t)
-	databaseA := datamocks.NewDatabase(t)
-	auditLoggerA := handlersmocks.NewAuditLogger(t)
-	reached := make(chan struct{})
-	release := make(chan struct{})
-	defer func() {
-		select {
-		case <-release:
-		default:
-			close(release)
-		}
-	}()
-	databaseA.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil)
-	databaseA.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Run(func(mock.Arguments) {
-		close(reached)
-		<-release
-	}).Return(&record.User{Id: 1, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
-
-	reqA := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
-		"/auth/level2?ceremony="+testCeremonyId, nil)), cookies)
-	rrA := httptest.NewRecorder()
-	expectCeremonyNoLongerActive(t, pageRendererA, rrA, reqA)
-
-	logged := logtest.CaptureSlog(t)
-	tabADone := make(chan struct{})
-	go func() {
-		defer close(tabADone)
-		buildAuthLevel2Get(authLevel2GetDeps{
-			pageRenderer:  pageRendererA,
-			ceremonyStore: ceremonyStore,
-			database:      databaseA,
-			auditLogger:   auditLoggerA,
-		}).ServeHTTP(rrA, reqA)
-	}()
-	select {
-	case <-reached:
-	case <-tabADone:
-		t.Fatal("tab A's step returned before it reached its read of the user")
-	case <-time.After(10 * time.Second):
-		t.Fatal("tab A's step never reached its read of the user")
-	}
-
-	// Tab B's /auth/authorize, carrying the same cookie, through to its save.
+// newerAuthorizes runs /auth/authorize n times in the browser cookies name, as n other tabs starting
+// a sign-in would, each through to its save, and answers the ceremonies they started.
+func newerAuthorizes(t *testing.T, ceremonyStore *ceremony.Store, cookies []*http.Cookie, n int) []string {
+	t.Helper()
 	e := newSyntaxAuthorizeEndpoint(t)
 	e.stubLoggedOutBrowser()
-	tabB := buildAuthorizeGet(authorizeGetDeps{
+	authorize := buildAuthorizeGet(authorizeGetDeps{
 		pageRenderer:       e.pageRenderer,
 		ceremonyStore:      ceremonyStore,
 		userSessionManager: e.userSessionManager,
@@ -147,44 +88,149 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorizeLeavesItsCeremonyA
 		permissionChecker:  handlersmocks.NewPermissionChecker(t),
 		tokenParser:        handlersmocks.NewTokenParser(t),
 	})
-	reqB := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
-		"/auth/authorize?"+syntaxQuery(nil), nil)), cookies)
-	rrB := httptest.NewRecorder()
-	tabB.ServeHTTP(rrB, reqB)
 
-	require.Equal(t, http.StatusFound, rrB.Code)
-	locationB, err := url.Parse(rrB.Header().Get("Location"))
-	require.NoError(t, err)
-	require.Equal(t, "/auth/level1", locationB.Path)
-	ceremonyB := locationB.Query().Get(ceremony.QueryParameter)
-	require.NotEmpty(t, ceremonyB)
-	require.NotEqual(t, testCeremonyId, ceremonyB)
+	var started []string
+	for i := 0; i < n; i++ {
+		req := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
+			"/auth/authorize?"+syntaxQuery(nil), nil)), cookies)
+		rr := httptest.NewRecorder()
+		authorize.ServeHTTP(rr, req)
 
-	close(release)
-	select {
-	case <-tabADone:
-	case <-time.After(10 * time.Second):
-		t.Fatal("tab A's step never returned")
+		require.Equal(t, http.StatusFound, rr.Code)
+		location, err := url.Parse(rr.Header().Get("Location"))
+		require.NoError(t, err)
+		require.Equal(t, "/auth/level1", location.Path)
+		id := location.Query().Get(ceremony.QueryParameter)
+		require.NotEmpty(t, id)
+		started = append(started, id)
 	}
+	return started
+}
 
-	assertAnsweredNoLongerActive(t, rrA)
-	assert.Empty(t, rrA.Result().Cookies(), "tab A wrote nothing, so it tells the browser nothing")
-	pageRendererA.AssertExpectations(t)
+// heldCeremony reads the ceremony id names from the browser cookies name, as that ceremony's next
+// step would.
+func heldCeremony(ceremonyStore *ceremony.Store, cookies []*http.Cookie, id string) (*ceremony.AuthContext, error) {
+	return ceremonyStore.GetAuthContext(withCookies(httptest.NewRequest(http.MethodGet,
+		"/auth/level1?"+url.Values{ceremony.QueryParameter: {id}}.Encode(), nil), cookies))
+}
 
-	var warned bool
-	for _, r := range logged.Records() {
-		if r.Message == "the browser session no longer holds this ceremony, answering it as no longer active" {
-			assert.Equal(t, slog.LevelWarn, r.Level)
-			warned = true
-		}
+// The issue's interleaving at /auth/level2: tab A's step has loaded ceremony A and is held inside
+// its read of the user, other tabs' /auth/authorize run to their saves in the same browser session,
+// and tab A resumes. After one newer sign-in, both carry on: tab A goes to its next step and the
+// newer one is still held (#246). After five, ceremony A has been pushed out: tab A answers the "no
+// longer active" page, logged at warn and audited nowhere, and the browser session keeps the five
+// newer ones, so each of their next steps finds the sign-in it started.
+func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		newer     int
+		carriesOn bool
+	}{
+		{name: "one newer sign-in leaves it to carry on", newer: 1, carriesOn: true},
+		{name: "five newer sign-ins push it out", newer: 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ceremonyStore, _ := newRealCeremonyStore(t)
+
+			// Ceremony A, as /auth/authorize left it when it reached /auth/level2.
+			seed := httptest.NewRecorder()
+			require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
+				&ceremony.AuthContext{
+					CeremonyId: testCeremonyId,
+					AuthState:  ceremony.AuthStateRequiresLevel2,
+					ClientId:   "test-client",
+					UserId:     1,
+				}))
+			cookies := seed.Result().Cookies()
+			require.Len(t, cookies, 1)
+
+			// Tab A, held in GetUserById until the other tabs have saved.
+			pageRendererA := handlersmocks.NewPageRenderer(t)
+			databaseA := datamocks.NewDatabase(t)
+			auditLoggerA := handlersmocks.NewAuditLogger(t)
+			reached := make(chan struct{})
+			release := make(chan struct{})
+			defer func() {
+				select {
+				case <-release:
+				default:
+					close(release)
+				}
+			}()
+			databaseA.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
+				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil).Maybe()
+			databaseA.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Run(func(mock.Arguments) {
+				close(reached)
+				<-release
+			}).Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+
+			reqA := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
+				"/auth/level2?ceremony="+testCeremonyId, nil)), cookies)
+			rrA := httptest.NewRecorder()
+			if !tc.carriesOn {
+				expectCeremonyNoLongerActive(t, pageRendererA, rrA, reqA)
+			}
+
+			logged := logtest.CaptureSlog(t)
+			tabADone := make(chan struct{})
+			go func() {
+				defer close(tabADone)
+				buildAuthLevel2Get(authLevel2GetDeps{
+					pageRenderer:  pageRendererA,
+					ceremonyStore: ceremonyStore,
+					database:      databaseA,
+					auditLogger:   auditLoggerA,
+				}).ServeHTTP(rrA, reqA)
+			}()
+			select {
+			case <-reached:
+			case <-tabADone:
+				t.Fatal("tab A's step returned before it reached its read of the user")
+			case <-time.After(10 * time.Second):
+				t.Fatal("tab A's step never reached its read of the user")
+			}
+
+			newer := newerAuthorizes(t, ceremonyStore, cookies, tc.newer)
+
+			close(release)
+			select {
+			case <-tabADone:
+			case <-time.After(10 * time.Second):
+				t.Fatal("tab A's step never returned")
+			}
+
+			// Each newer tab's next step finds the ceremony it started.
+			for _, id := range newer {
+				stored, err := heldCeremony(ceremonyStore, cookies, id)
+				require.NoError(t, err, "the newer ceremony %s is held", id)
+				assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState, "tab A's state did not land on it")
+			}
+
+			if tc.carriesOn {
+				require.Equal(t, http.StatusFound, rrA.Code, rrA.Body.String())
+				assertStepLocation(t, rrA.Header().Get("Location"), "/auth/otp")
+				storedA, err := heldCeremony(ceremonyStore, cookies, testCeremonyId)
+				require.NoError(t, err, "tab A's ceremony is still held")
+				assert.Equal(t, ceremony.AuthStateLevel2OTP, storedA.AuthState, "and tab A's save landed on it")
+				return
+			}
+
+			assertAnsweredNoLongerActive(t, rrA)
+			assert.Empty(t, rrA.Result().Cookies(), "tab A wrote nothing, so it tells the browser nothing")
+			pageRendererA.AssertExpectations(t)
+
+			var warned bool
+			for _, r := range logged.Records() {
+				if r.Message == "the browser session no longer holds this ceremony, answering it as no longer active" {
+					assert.Equal(t, slog.LevelWarn, r.Level)
+					warned = true
+				}
+			}
+			assert.True(t, warned, "the pushed-out step is logged at warn:\n%s", logged.Text())
+			_, err := heldCeremony(ceremonyStore, cookies, testCeremonyId)
+			require.ErrorIs(t, err, ceremony.ErrCeremonyNotHeld, "ceremony A is not put back")
+		})
 	}
-	assert.True(t, warned, "the replaced step is logged at warn:\n%s", logged.Text())
-
-	// Tab B's next step finds the ceremony it started.
-	stored, err := ceremonyStore.LatestAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
-	require.NoError(t, err)
-	assert.Equal(t, ceremonyB, stored.CeremonyId, "the browser session keeps the newer ceremony")
-	assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState, "tab A's state did not land on it")
 }
 
 // The cases below arm each of these handlers' saves to find the ceremony replaced, one per save

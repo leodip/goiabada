@@ -156,7 +156,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 		{"the effective scope", "FilterOutScopesWhereUserIsNotAuthorized"},
 		{"the consent", "GetConsentByUserIdAndClientId"},
 		{"the session bump", "BumpUserSession"},
-		{"the save", "ReplaceAuthContext"},
+		{"the save", "AddAuthContext"},
 	}
 
 	for _, tc := range testCases {
@@ -250,8 +250,8 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
 					auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				}},
-				{"ReplaceAuthContext", func(fail bool) {
-					ceremonyStore.On("ReplaceAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(fault)
+				{"AddAuthContext", func(fail bool) {
+					ceremonyStore.On("AddAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(fault)
 				}},
 			}
 			for _, step := range steps {
@@ -352,7 +352,7 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			if tc.wantIssue {
 				userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
-				ceremonyStore.On("ReplaceAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
+				ceremonyStore.On("AddAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 			} else {
 				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
 				stubRegisteredRedirectURI(database, "https://example.com")
@@ -460,7 +460,7 @@ func TestHandlePromptNone_TheCeremonyCarriesTheSessionsAuthTime(t *testing.T) {
 	f.userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(f.userSession, nil)
 	f.auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 	var saved *ceremony.AuthContext
-	f.ceremonyStore.On("ReplaceAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
+	f.ceremonyStore.On("AddAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
 		Run(func(args mock.Arguments) { saved = args.Get(2).(*ceremony.AuthContext) }).Return(nil).Once()
 
 	f.handler.ServeHTTP(f.rr, f.req)
@@ -490,7 +490,7 @@ func TestHandlePromptNone_ASessionWithNoAuthTimeIsRefused(t *testing.T) {
 	f.userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything, mock.Anything)
 	f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-	f.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
+	f.ceremonyStore.AssertNotCalled(t, "AddAuthContext", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A silent request over a disabled user's session records user_disabled against the session's user
@@ -516,5 +516,5 @@ func TestHandlePromptNone_ADisabledUserIsAuditedAndRefused(t *testing.T) {
 		mock.Anything)
 	f.userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything, mock.Anything)
-	f.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
+	f.ceremonyStore.AssertNotCalled(t, "AddAuthContext", mock.Anything, mock.Anything, mock.Anything)
 }

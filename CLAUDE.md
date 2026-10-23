@@ -147,7 +147,7 @@ Programmatic client registration for MCP clients, native apps, etc.
 
 ## Authentication Flow (Authorization Code)
 
-The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)).
+The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)). A browser holds up to five ceremonies side by side, each its own `AuthContext`, under the session key `AuthContexts` (`ceremony.Store`, `ceremony.MaxHeldCeremonies`), so two tabs signing in to two applications both finish, and a link or redirect from another site starts its own ceremony and ends none. `/auth/authorize` adds its ceremony beside the others, a step's save makes its ceremony the most recently written, and an add beyond five pushes out the least recently written. The key the one ceremony was held under before, `AuthContext`, is never read, and the store's first write to a session removes it (#246).
 
 ### ACR Levels (Authentication Context Class Reference)
 Defined in `src/authserver/internal/record/acr_level.go`:
@@ -189,10 +189,13 @@ query, fragment and `form_post` encodings, the refusal interstitial and the `ser
 and clears nothing; the route table builds one of each. Every step but `/auth/authorize` begins
 with the boundary's `beginStep`, which reads the request's settings before anything else (a request
 without them is the 500 page carrying `reqctx.ErrNoSettings`, as it is at `/auth/authorize`, which
-reads them first too), then loads the ceremony and gates its state as below. It first checks,
-in the boundary's `loadAuthContext`, that the request names the sign-in the browser holds: the
-`ceremony` query parameter on a GET, built into every redirect between steps by `stepRedirect`, and
-the `ceremonyId` form field on a POST. A missing or differing id gets the "no longer active" page, 400.
+reads them first too), then loads the ceremony and gates its state as below. It first reads, in
+the boundary's `loadAuthContext`, the ceremony the request names, through the one rule
+`ceremony.RequestedId`: the `ceremony` query parameter on a GET, built into every redirect between
+steps by `stepRedirect`, and the `ceremonyId` form field on a POST. A browser holding no ceremony at
+all goes to the account page. An id missing, or naming a ceremony the browser does not hold while
+it holds others, gets the "no longer active" page, 400, and the `auth_ceremony_mismatch` audit
+event, whose details describe the ceremony the browser most recently wrote.
 Each route then gates on the state it finds through `requireAuthState`, which answers 400 when it is
 not one it accepts (#246, #437):
 
@@ -241,22 +244,26 @@ list. Request fields are written only in `authflow.Authorization.Run`, which
 `TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`. A bind that finds a
 newer authentication already on the session is not a restart: it writes nothing
 (`ErrStaleAuthentication`, #538) and `/auth/completed` answers it with the "no longer active"
-page, saving no auth context, because the newer sign-in's own `/auth/authorize` had already
-replaced the ceremony. A restart would make it verify the password itself, so its bind would
+page, saving no auth context: a newer sign-in's authentication has reached the session since this
+ceremony adopted it. A restart would make it verify the password itself, so its bind would
 replace the session's authentication, asking an SSO ceremony for a password nobody requested. A
 reuse arm that rotates the browser session's identifier asks the same rule first
 (`AuthenticationIsStale`) and answers the same page without rotating. Beyond that rule, every write
 a step after `/auth/authorize` makes to the browser session lands only while the session still
 holds that step's ceremony (#579): the ceremony store's save, clear and rotation read the session
-afresh, refuse when it holds another ceremony, none, or is gone (signed out, expired, or rotated
-away by another request of the browser), apply only their own change to what they read, and write
-on condition the stored row is unchanged, trying again at most three times in all when an unrelated
-write lands between. A step so refused writes nothing and answers the "no longer active" page
-(`ceremony.ErrCeremonyReplaced`), so a ceremony started after the step loaded carries on. The
-create arm of `/auth/completed` asks first (`ConfirmCeremony`), before it ends a foreign session or
-commits a new one, and its rotation carries the same condition. `/auth/authorize` still replaces
-whatever ceremony the session held, and logout still deletes it whole; two requests of one ceremony
-stay last-writer-wins between themselves, so a double-submitted consent form works. The
+afresh, refuse when it does not hold the ceremony (ended by another request of it, or pushed out
+by newer ones) or is gone (signed out, expired, or rotated away by another request of the browser),
+apply only their own change to what they read, touching no other ceremony, and write on condition
+the stored row is unchanged, trying again at most three times in all when another write lands
+between. A step so refused writes nothing and answers the "no longer active" page
+(`ceremony.ErrCeremonyReplaced`), so the ceremonies the browser holds carry on. The create arm of
+`/auth/completed` asks first (`ConfirmCeremony`), before it ends a foreign session or commits a new
+one, and its rotation carries the same condition and every held ceremony. `/auth/authorize`'s add
+is made the same way, on a fresh read and on condition, so a step's write landing meanwhile is
+kept, and when the session it loaded is gone it starts a new one holding its ceremony alone. A
+request `/auth/authorize` answers at once with an error stores nothing and removes nothing. Logout
+still deletes the session whole, every ceremony with it; two requests of one ceremony stay
+last-writer-wins between themselves, so a double-submitted consent form works. The
 session-identifier middleware and the emailed-link marker write only their own key the same way, and
 the marker's clear removes only the marker of the continuation that consumed it, so a flow finishing
 after its marker expired leaves a newer link's in place.
@@ -311,7 +318,7 @@ When user has valid session (`UserSession` in DB + session cookie):
 - If valid → uses existing `AcrLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
 - Reuse never lowers a session: `BumpUserSession` only raises its ACR and only adds methods (#537)
-- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime`, or whose ceremony adopted the session and the row holds neither the `AuthTime` it adopted (`AdoptedAuthTime`, the SSO case, which enters no credential of its own) nor the ceremony's own credential instant (its own earlier bind, which a reload after a later failure binds again), compared at the column's microsecond, writes nothing and returns `ErrStaleAuthentication` (#538): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that ceremony with the "no longer active" page, since the newer sign-in's own `/auth/authorize` had already replaced it
+- Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it after, in one transaction: `BumpUserSession`, and `BindUserSession`, which is `/auth/completed`'s reuse arm and also writes a replacing authentication and the auth time there rather than in a second write. Read without the lock, a concurrent removal's lowering was written back over (#542). The token endpoint and `prompt=none` bump with no methods and no level. A bind whose sign-in is older than the session's current `AuthTime`, or whose ceremony adopted the session and the row holds neither the `AuthTime` it adopted (`AdoptedAuthTime`, the SSO case, which enters no credential of its own) nor the ceremony's own credential instant (its own earlier bind, which a reload after a later failure binds again), compared at the column's microsecond, writes nothing and returns `ErrStaleAuthentication` (#538): a newer sign-in's level, methods and auth_time are not overwritten by an older ceremony that resumed after it, and `/auth/completed` answers that ceremony with the "no longer active" page, since a newer authentication already describes the session
 
 ## SSO and ACR/AMR Details
 

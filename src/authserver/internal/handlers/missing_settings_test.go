@@ -55,7 +55,7 @@ func TestMissingSettings_TheAuthorizationEndpointAnswersBeforeReadingItsRequest(
 				mock.Anything, mock.Anything)
 			e.database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 			e.validator.AssertNotCalled(t, "ValidateClientAndRedirectURI", mock.Anything, mock.Anything)
-			e.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			e.ceremonyStore.AssertNotCalled(t, "AddAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }

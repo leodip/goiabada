@@ -91,10 +91,10 @@ func (b *CeremonyBoundary) redirectAfterSave(w http.ResponseWriter, r *http.Requ
 // none: audit it, recording authContext, the ceremony the browser most recently wrote, then render the
 // "no longer active" page at 400.
 //
-// The auth context is not touched. The ceremony that is current is the one the user is working on,
-// in another tab, and clearing or advancing it here would let a forgotten tab cancel a live
-// authorization. The client is not told either: the client that would receive an error is the
-// current one, whose authorization the user still wants (#79 decision 5).
+// No auth context is touched. The ceremonies the browser holds are the ones the user is working on,
+// in other tabs, and clearing or advancing one here would let a forgotten tab cancel a live
+// authorization. The client is not told either: the client that would receive an error is one whose
+// authorization the user still wants (#79 decision 5).
 func (b *CeremonyBoundary) rejectCeremonyMismatch(w http.ResponseWriter, r *http.Request,
 	authContext *ceremony.AuthContext) {
 
@@ -152,9 +152,9 @@ func (b *CeremonyBoundary) answerStepSaveFailure(w http.ResponseWriter, r *http.
 }
 
 // answerCeremonyReplaced answers a step whose save or clear found the browser session no longer
-// holding its ceremony: another /auth/authorize replaced it, it ended, or the session is gone. That
-// write changed nothing, and the answer is the "no longer active" page at 400, so the newer sign-in
-// carries on (#579). Whatever the step would otherwise have answered, an error redirect, a refusal
+// holding its ceremony: another request of it ended it, newer sign-ins pushed it out, or the session
+// is gone. That write changed nothing, and the answer is the "no longer active" page at 400, so the
+// sign-ins the browser holds carry on (#579, #246). Whatever the step would otherwise have answered, an error redirect, a refusal
 // page or a code, is not sent: nothing goes to the client, for rejectCeremonyMismatch's reason. Logged
 // at warn and audited nowhere, because the request named its ceremony correctly and so is no ceremony
 // mismatch (#578).
@@ -176,7 +176,7 @@ func (b *CeremonyBoundary) answerCeremonyReplaced(w http.ResponseWriter, r *http
 //   - A browser holding no ceremony at all is redirected to the account page with a warn line: a
 //     visitor who reaches a step after the ceremony ended has nothing to resume, whatever the
 //     request names.
-//   - A request naming a ceremony the browser does not hold, or none, while it holds another, is
+//   - A request naming a ceremony the browser does not hold, or none, while it holds others, is
 //     rejectCeremonyMismatch's 400, before the state gate and before anything else is read: a
 //     submission never reaches a credential check and a page load never reaches a step's loads (#79
 //     for the forms, #246 and #437 for the pages). The audit event records the ceremony the browser

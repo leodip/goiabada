@@ -178,10 +178,11 @@ func withUILocales(r *http.Request, uiLocales []string) *http.Request {
 
 // answerClientAfterStepClear answers the client with an error once the step's authflow operation
 // has made its clear, which comes first because every response mode commits the response and the
-// clear persists through a Set-Cookie on w (#141). A clear that found the ceremony replaced, by
-// another /auth/authorize or a session gone, wrote nothing, and the client is not answered: the
-// browser has abandoned this ceremony, and a client keeping one pending state per browser could take
-// this error as the answer to the newer request, so the step answers the "no longer active" page
+// clear persists through a Set-Cookie on w (#141). A clear that found the ceremony no longer held,
+// ended by another request of it, pushed out by newer sign-ins or its session gone, wrote nothing,
+// and the client is not answered: the browser has abandoned this ceremony, and a client keeping one
+// pending state per browser could take this error as the answer to a newer request, so the step
+// answers the "no longer active" page
 // (#579 decision 2, #79 decision 5). Otherwise the responder answers, with server_error when the
 // clear failed (ClientErrorResponder.answerClientAfterClear).
 func answerClientAfterStepClear(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,

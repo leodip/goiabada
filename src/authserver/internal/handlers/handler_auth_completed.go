@@ -42,10 +42,10 @@ func HandleAuthCompletedGet(
 
 		switch {
 		case result.Stale:
-			// The newer sign-in began with its own /auth/authorize, which replaced this ceremony, so
-			// this one is answered as replaced and puts nothing back (#538). It is not restarted: a
-			// restart verifies the password itself and would replace the session's authentication
-			// (#537), asking an SSO ceremony for a password nobody requested.
+			// A newer sign-in's authentication has reached the session since this ceremony adopted
+			// it, so this one is answered as no longer active and writes nothing (#538). It is not
+			// restarted: a restart verifies the password itself and would replace the session's
+			// authentication (#537), asking an SSO ceremony for a password nobody requested.
 			boundary.renderCeremonyNoLongerActive(w, r)
 		case result.Replaced:
 			boundary.answerCeremonyReplaced(w, r)

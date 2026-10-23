@@ -48,13 +48,14 @@ type CeremonyStore interface {
 	// names, which the ceremony mismatch audit event records.
 	LatestAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 	// SaveAuthContext is a step's save, which writes only while the browser session still holds
-	// the step's ceremony and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing
-	// (#579). Every step after /auth/authorize saves through it, and answers that error through
+	// the step's ceremony, making it the most recently written, and otherwise answers
+	// ceremony.ErrCeremonyReplaced, writing nothing (#579, #246). Every step after /auth/authorize saves through it, and answers that error through
 	// CeremonyBoundary.answerStepSaveFailure.
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
-	// ReplaceAuthContext is /auth/authorize's save, which starts a ceremony and so replaces
-	// whatever the browser session held.
-	ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
+	// AddAuthContext is /auth/authorize's save, which starts a ceremony beside the ones the
+	// browser session holds, pushing out the least recently written beyond
+	// ceremony.MaxHeldCeremonies (#246).
+	AddAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 	// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session
 	// still holds it and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
 	ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error

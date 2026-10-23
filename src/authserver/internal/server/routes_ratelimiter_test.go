@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -260,28 +259,21 @@ func accountAPIToken() oauth.JwtToken {
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:
 // an auth context at the level 2 state carrying the enrollment secret HandleAuthOtpGet left
-// on it. Written through the server's own session store, so what the handler reads back is
-// what the store wrote rather than a shape this test invented.
+// on it. Written through the ceremony store over the server's own session store, so what the
+// handler reads back is what the store wrote rather than a shape this test invented.
 func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	t.Helper()
 
 	r := httptest.NewRequest(http.MethodGet, "/auth/otp", nil)
-	sess, err := s.sessionStore.Get(r, sessionkeys.AuthServerSessionName)
-	require.NoError(t, err)
-
-	authContext, err := json.Marshal(ceremony.AuthContext{
-		AuthState:  ceremony.AuthStateLevel2OTP,
-		CeremonyId: routesTestCeremonyId,
-		UserId:     1,
-		ClientId:   routesTestClientId,
-		OTPKeyURL:  routesTestOTPKeyURL,
-	})
-	require.NoError(t, err)
-
-	sess.Values[sessionkeys.AuthContext] = string(authContext)
-
 	recorder := httptest.NewRecorder()
-	require.NoError(t, s.sessionStore.Save(r, recorder, sess))
+	require.NoError(t, ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName).AddAuthContext(recorder, r,
+		&ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
+			CeremonyId: routesTestCeremonyId,
+			UserId:     1,
+			ClientId:   routesTestClientId,
+			OTPKeyURL:  routesTestOTPKeyURL,
+		}))
 
 	cookies := recorder.Result().Cookies()
 	assert.Len(t, cookies, 1)
@@ -911,19 +903,13 @@ func pwdCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	t.Helper()
 
 	r := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
-	sess, err := s.sessionStore.Get(r, sessionkeys.AuthServerSessionName)
-	require.NoError(t, err)
-
-	authContext, err := json.Marshal(ceremony.AuthContext{
-		AuthState:  ceremony.AuthStateLevel1Password,
-		CeremonyId: routesTestCeremonyId,
-		ClientId:   routesTestClientId,
-	})
-	require.NoError(t, err)
-	sess.Values[sessionkeys.AuthContext] = string(authContext)
-
 	recorder := httptest.NewRecorder()
-	require.NoError(t, s.sessionStore.Save(r, recorder, sess))
+	require.NoError(t, ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName).AddAuthContext(recorder, r,
+		&ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
+			CeremonyId: routesTestCeremonyId,
+			ClientId:   routesTestClientId,
+		}))
 	cookies := recorder.Result().Cookies()
 	require.Len(t, cookies, 1)
 	return cookies[0]

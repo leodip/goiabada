@@ -24,12 +24,23 @@ type authSessionStore interface {
 		change func(values map[string]any) error) error
 }
 
-// Store keeps a browser's AuthContext in the server-side session, under
-// sessionkeys.AuthContext, between the hops of one authorization ceremony. Every reader reads the
-// ceremony the request names (GetAuthContext, UILocales), and every write names the ceremony it
-// writes. It was
-// handlerhelpers.AuthHelper until #435 moved it beside the type it persists; the handlers reach it
-// through their CeremonyStore port, and server.go's locale middleware through UILocales.
+// MaxHeldCeremonies is how many sign-ins a browser session holds at once. A sixth pushes out the one
+// least recently written, so a sign-in the user is moving through outlives the tabs they abandoned,
+// and a page sending the browser to sign in again and again pushes one out only by starting more
+// than this many (#246 decision 2).
+const MaxHeldCeremonies = 5
+
+// Store keeps a browser's sign-ins in progress in the server-side session, each an AuthContext,
+// under sessionkeys.AuthContexts, up to MaxHeldCeremonies of them, between the hops of each
+// authorization ceremony. Every reader reads the ceremony the request names (GetAuthContext,
+// UILocales), and every write names the ceremony it writes and changes no other, so two sign-ins of
+// one browser each finish on their own (#246). It was handlerhelpers.AuthHelper until #435 moved it
+// beside the type it persists; the handlers reach it through their CeremonyStore port, and
+// server.go's locale middleware through UILocales.
+//
+// The held ceremonies are stored least recently written first: an add puts its ceremony last, a
+// save moves its ceremony last, and an add that makes one too many removes the first. Every write
+// also removes sessionkeys.RetiredAuthContext, which nothing reads (#246 decision 3).
 type Store struct {
 	sessionStore authSessionStore
 	sessionName  string
@@ -48,90 +59,144 @@ func NewStore(sessionStore authSessionStore, sessionName string) *Store {
 // submission spends, so the two always read the same ceremony.
 //
 // It answers ErrNoAuthContext when the browser session holds no ceremony at all, whatever the request
-// names, and ErrCeremonyNotHeld when it holds a ceremony but not the one named, or the request names
+// names, and ErrCeremonyNotHeld when it holds ceremonies but not the one named, or the request names
 // none.
 func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 	return s.authContextNamed(r, RequestedId(r))
 }
 
 // authContextNamed reads the ceremony the browser session holds under ceremonyId: ErrNoAuthContext
-// when it holds none, and ErrCeremonyNotHeld when it holds another, or a context naming none, since
-// an empty id is never held (idMatches).
+// when it holds none, and ErrCeremonyNotHeld when it holds others, or contexts naming none, since an
+// empty id is never held (idMatches).
 func (s *Store) authContextNamed(r *http.Request, ceremonyId string) (*AuthContext, error) {
-	authContext, err := s.LatestAuthContext(r)
+	held, err := s.heldNow(r)
 	if err != nil {
 		return nil, err
 	}
-	if !idMatches(authContext.CeremonyId, ceremonyId) {
+	if len(held) == 0 {
+		return nil, ErrNoAuthContext
+	}
+	i := indexOf(held, ceremonyId)
+	if i < 0 {
 		return nil, errs.WithStack(ErrCeremonyNotHeld)
 	}
-	return authContext, nil
+	return &held[i], nil
 }
 
 // LatestAuthContext reads the ceremony the browser most recently wrote, whichever one the request
-// names, which while a browser holds one ceremony is the one it holds. It answers ErrNoAuthContext
-// when the session holds none. The ceremony mismatch audit event records it, and the page language
-// falls back to it when the URL names no ceremony the browser holds.
+// names. It answers ErrNoAuthContext when the session holds none. The ceremony mismatch audit event
+// records it, and the page language falls back to it when the URL names no ceremony the browser
+// holds.
 func (s *Store) LatestAuthContext(r *http.Request) (*AuthContext, error) {
+	held, err := s.heldNow(r)
+	if err != nil {
+		return nil, err
+	}
+	if len(held) == 0 {
+		return nil, ErrNoAuthContext
+	}
+	return &held[len(held)-1], nil
+}
+
+// heldNow is the ceremonies the browser session holds as the request read it.
+func (s *Store) heldNow(r *http.Request) ([]AuthContext, error) {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return nil, err
 	}
-	jsonData, ok := sess.Values[sessionkeys.AuthContext].(string)
-	if !ok {
-		return nil, ErrNoAuthContext
-	}
+	return heldIn(sess.Values)
+}
 
-	var authContext AuthContext
-	err = json.Unmarshal([]byte(jsonData), &authContext)
-	if err != nil {
-		return nil, err
+// heldIn decodes the ceremonies values hold, least recently written first, and none when they hold
+// none. A list that is there but does not decode is a fault and is returned as one.
+func heldIn(values map[string]any) ([]AuthContext, error) {
+	jsonData, ok := values[sessionkeys.AuthContexts].(string)
+	if !ok {
+		return nil, nil
 	}
-	return &authContext, nil
+	var held []AuthContext
+	if err := json.Unmarshal([]byte(jsonData), &held); err != nil {
+		return nil, errs.Wrap(err, "unable to read the sign-ins the browser session holds")
+	}
+	return held, nil
+}
+
+// putHeld writes held into values, least recently written first, and removes the key before #246's,
+// which every write of the store does (#246 decision 3). A session left holding no ceremony has no
+// key for them.
+func putHeld(values map[string]any, held []AuthContext) error {
+	delete(values, sessionkeys.RetiredAuthContext)
+	if len(held) == 0 {
+		delete(values, sessionkeys.AuthContexts)
+		return nil
+	}
+	jsonData, err := json.Marshal(held)
+	if err != nil {
+		return err
+	}
+	values[sessionkeys.AuthContexts] = string(jsonData)
+	return nil
+}
+
+// indexOf is where held holds the ceremony ceremonyId names, and -1 when it holds none by that id.
+// An empty id is never held, as idMatches refuses it.
+func indexOf(held []AuthContext, ceremonyId string) int {
+	for i := range held {
+		if idMatches(held[i].CeremonyId, ceremonyId) {
+			return i
+		}
+	}
+	return -1
+}
+
+// without is held less the ceremony at i, in the same order.
+func without(held []AuthContext, i int) []AuthContext {
+	return append(held[:i:i], held[i+1:]...)
 }
 
 // SaveAuthContext is every step's save after /auth/authorize, and it writes only while the
 // browser session still holds the ceremony authContext names (#579). The step loaded its context
-// when its request began, and another tab's /auth/authorize may have replaced it since, so the
-// session is read afresh, its ceremony compared with this one, and the context written on
-// condition nothing wrote the session in between, through ChangeAndSave. Anything else the session
-// holds is kept as the fresh read found it, rather than put back as the request read it.
+// when its request began, and since then another tab's step may have ended it, five newer sign-ins
+// may have pushed it out, or the browser may have signed out, so the session is read afresh, the
+// ceremony looked for in what it holds, and the context written on condition nothing wrote the
+// session in between, through ChangeAndSave. Every other ceremony, and anything else the session
+// holds, is kept as the fresh read found it, rather than put back as the request read it. The saved
+// ceremony becomes the most recently written (#246 decision 2).
 //
-// It answers ErrCeremonyReplaced, writing nothing, when the session holds another ceremony, none,
-// or is gone: the browser has moved on from this ceremony, and the newer one carries on. Ownership
-// is the ceremony id, not the state, so two requests of one ceremony stay last-writer-wins between
-// themselves, as a double-submitted consent form needs. An empty stored id is never owned, as
-// idMatches refuses it.
+// It answers ErrCeremonyReplaced, writing nothing, when the session no longer holds the ceremony, or
+// is gone. Ownership is the ceremony id, not the state, so two requests of one ceremony stay
+// last-writer-wins between themselves, as a double-submitted consent form needs. An empty id is
+// never held, as idMatches refuses it.
 func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
-	jsonData, err := json.Marshal(authContext)
-	if err != nil {
-		return err
-	}
-
-	return s.changeOwnCeremony(w, r, authContext.CeremonyId, func(values map[string]any) {
-		values[sessionkeys.AuthContext] = string(jsonData)
+	return s.changeOwnCeremony(w, r, authContext.CeremonyId, func(held []AuthContext, i int) []AuthContext {
+		return append(without(held, i), *authContext)
 	})
 }
 
-// changeOwnCeremony applies change to the browser session as it is stored now, only while it holds
-// the ceremony named, through ChangeAndSave: the one write SaveAuthContext and ClearAuthContext are
-// made with. It answers ErrCeremonyReplaced, having written nothing, when the session holds another
-// ceremony, none, or is gone.
+// changeOwnCeremony applies change to the ceremonies the browser session holds as it is stored now,
+// only while it holds the ceremony named, through ChangeAndSave: the one write SaveAuthContext and
+// ClearAuthContext are made with. change is handed the held ceremonies, least recently written
+// first, and where the one named is, and answers the ceremonies to store. It answers
+// ErrCeremonyReplaced, having written nothing, when the session does not hold the ceremony, or is
+// gone.
 func (s *Store) changeOwnCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string,
-	change func(values map[string]any)) error {
+	change func(held []AuthContext, i int) []AuthContext) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	isHeld := held(ceremonyId)
 	return goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
-		if err := isHeld(values); err != nil {
-			return err
+		ceremonies, readErr := heldIn(values)
+		if readErr != nil {
+			return readErr
 		}
-		change(values)
-		return nil
+		i := indexOf(ceremonies, ceremonyId)
+		if i < 0 {
+			return errs.WithStack(ErrCeremonyReplaced)
+		}
+		return putHeld(values, change(ceremonies, i))
 	}))
 }
 
@@ -146,65 +211,98 @@ func goneIsReplaced(err error) error {
 	return err
 }
 
-// held is the condition every write of the ceremony named makes on the browser session, applied to
-// the session's values as a fresh read found them: nil while they hold that ceremony, and
-// ErrCeremonyReplaced when they hold another, none, or a context naming none, since an empty id is
-// never held, as idMatches refuses it (#579). A context that does not decode is a fault and
-// is returned as one.
-func held(ceremonyId string) func(values map[string]any) error {
+// heldRotation is the change every rotation of the ceremony named makes to the browser session,
+// applied to the session's values as a fresh read found them: ErrCeremonyReplaced when they do not
+// hold that ceremony, and otherwise only the removal of the key before #246's, since a rotation is a
+// write of the session (#246 decision 3). It moves no ceremony: a rotation writes none. A list
+// that does not decode is a fault and is returned as one.
+func heldRotation(ceremonyId string) func(values map[string]any) error {
 	return func(values map[string]any) error {
-		jsonData, ok := values[sessionkeys.AuthContext].(string)
-		if !ok || ceremonyId == "" {
-			return errs.WithStack(ErrCeremonyReplaced)
+		if err := holds(ceremonyId)(values); err != nil {
+			return err
 		}
-		var stored AuthContext
-		if err := json.Unmarshal([]byte(jsonData), &stored); err != nil {
-			return errs.Wrap(err, "unable to read the auth context the browser session holds")
+		delete(values, sessionkeys.RetiredAuthContext)
+		return nil
+	}
+}
+
+// holds is the condition every write of the ceremony named makes on the browser session, applied to
+// the session's values as a fresh read found them: nil while they hold that ceremony among the
+// others, and ErrCeremonyReplaced when they do not, or name none, since an empty id is never held,
+// as idMatches refuses it (#579). A list that does not decode is a fault and is returned as one.
+func holds(ceremonyId string) func(values map[string]any) error {
+	return func(values map[string]any) error {
+		ceremonies, err := heldIn(values)
+		if err != nil {
+			return err
 		}
-		if stored.CeremonyId != ceremonyId {
+		if indexOf(ceremonies, ceremonyId) < 0 {
 			return errs.WithStack(ErrCeremonyReplaced)
 		}
 		return nil
 	}
 }
 
-// ReplaceAuthContext is /auth/authorize's save. It starts a ceremony, so it replaces whatever the
-// browser session held, the session's other values included, as every save did before #579.
-func (s *Store) ReplaceAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
+// AddAuthContext is /auth/authorize's save. It starts a ceremony beside the ones the browser session
+// holds, as the most recently written, and when that makes one too many it removes the one least
+// recently written (#246 decisions 1 and 2). Like a step's write, it is applied to the session as it
+// is stored now and written on condition nothing wrote it in between, so a step's save or rotation
+// that lands meanwhile is kept.
+//
+// A session the request loaded that is gone by then, signed out in another tab or expired, is not
+// put back: the new ceremony is stored as in a browser holding none, in a new session holding it
+// alone.
+func (s *Store) AddAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	jsonData, err := json.Marshal(authContext)
-	if err != nil {
-		return err
+	add := func(values map[string]any) error {
+		ceremonies, readErr := heldIn(values)
+		if readErr != nil {
+			return readErr
+		}
+		if i := indexOf(ceremonies, authContext.CeremonyId); i >= 0 {
+			ceremonies = without(ceremonies, i)
+		}
+		ceremonies = append(ceremonies, *authContext)
+		if len(ceremonies) > MaxHeldCeremonies {
+			ceremonies = ceremonies[len(ceremonies)-MaxHeldCeremonies:]
+		}
+		return putHeld(values, ceremonies)
 	}
-	sess.Values[sessionkeys.AuthContext] = string(jsonData)
-	return s.sessionStore.Save(r, w, sess)
+
+	err = s.sessionStore.ChangeAndSave(r, w, sess, add)
+	if errors.Is(err, sessionstore.ErrNotFound) {
+		// A session with no identifier is one never stored, which ChangeAndSave creates from empty
+		// values under a new identifier, as for a browser that arrived holding none.
+		sess.ID = ""
+		sess.Values = make(map[string]any)
+		return s.sessionStore.ChangeAndSave(r, w, sess, add)
+	}
+	return err
 }
 
 // ClearAuthContext is a step's clear, which ends the ceremony only while the browser session still
-// holds it, for SaveAuthContext's reason (#579). It answers ErrCeremonyReplaced, writing nothing, when
-// the session holds another ceremony, none, or is gone, and a session never stored is one holding
-// none, so the clear of a ceremony the browser does not hold creates no row and no cookie. Anything
-// else the session holds is kept as the fresh read found it.
+// holds it, for SaveAuthContext's reason (#579), and ends no other. It answers ErrCeremonyReplaced,
+// writing nothing, when the session does not hold it, or is gone, and a session never stored is one
+// holding none, so the clear of a ceremony the browser does not hold creates no row and no cookie.
+// Every other ceremony, and anything else the session holds, is kept as the fresh read found it.
 func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
-	return s.changeOwnCeremony(w, r, ceremonyId, func(values map[string]any) {
-		delete(values, sessionkeys.AuthContext)
-	})
+	return s.changeOwnCeremony(w, r, ceremonyId, without)
 }
 
-// RegenerateSession replaces the browser session's identifier, keeping its contents, only while the
-// session still holds the ceremony named (#579). The step loaded its context when its request began,
-// and another tab's /auth/authorize may have replaced it since, so the session is read afresh, its
-// ceremony compared with this one, and the new row written from what that read found; the old row
-// is removed on condition nothing wrote it in between, through ChangeAndRegenerate. A rotation from
-// the request's own copy put the replaced ceremony back under the new identifier and deleted the row
-// holding the newer one.
+// RegenerateSession replaces the browser session's identifier, keeping its contents, every held
+// ceremony among them, only while the session still holds the ceremony named (#579). The step
+// loaded its context when its request began, and the ceremony may have ended or been pushed out
+// since, so the session is read afresh, the ceremony looked for in what it holds, and the new row
+// written from what that read found; the old row is removed on condition nothing wrote it in
+// between, through ChangeAndRegenerate. A rotation from the request's own copy put an ended ceremony
+// back under the new identifier and deleted the row holding the newer ones.
 //
-// It answers ErrCeremonyReplaced, having written nothing and set no cookie, when the session holds
-// another ceremony, none, or is gone. A gone session is not re-created under a new name: that is
+// It answers ErrCeremonyReplaced, having written nothing and set no cookie, when the session does
+// not hold the ceremony, or is gone. A gone session is not re-created under a new name: that is
 // what would let a stalled step end a newer ceremony that has passed its own rotation meanwhile
 // (#579 decision 3).
 //
@@ -217,7 +315,7 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 		return err
 	}
 
-	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, held(ceremonyId)))
+	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, heldRotation(ceremonyId)))
 }
 
 // RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm: the rotation also
@@ -227,9 +325,8 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 // the victim's sign-in fills in (session fixation, #266).
 //
 // It writes, as RegenerateSession does, only while the browser session still holds the ceremony
-// named, and answers ErrCeremonyReplaced, having written nothing and set no cookie, when it holds
-// another, none, or is gone (#579 decision 4). The caller then abandons the user session it bound
-// nothing to.
+// named, and answers ErrCeremonyReplaced, having written nothing and set no cookie, when it does
+// not, or is gone (#579 decision 4). The caller then abandons the user session it bound nothing to.
 func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string,
 	userSessionIdentifier string) error {
 
@@ -238,9 +335,9 @@ func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request,
 		return err
 	}
 
-	isHeld := held(ceremonyId)
+	rotation := heldRotation(ceremonyId)
 	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, func(values map[string]any) error {
-		if err := isHeld(values); err != nil {
+		if err := rotation(values); err != nil {
 			return err
 		}
 		values[sessionkeys.SessionIdentifier] = userSessionIdentifier
@@ -253,10 +350,10 @@ func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request,
 var errCeremonyConfirmed = errors.New("the browser session holds this ceremony")
 
 // ConfirmCeremony reads the browser session afresh and answers nil while it holds the ceremony
-// named, and ErrCeremonyReplaced when it holds another, none, or is gone. It writes nothing and sets
-// no cookie, whatever it answers. /auth/completed's create arm asks it before it ends a foreign
-// session or opens the transaction that creates the new one, so a ceremony the browser has
-// abandoned ends and creates nothing (#579 decision 4).
+// named, and ErrCeremonyReplaced when it does not, or is gone. It writes nothing and sets no cookie,
+// whatever it answers. /auth/completed's create arm asks it before it ends a foreign session or
+// opens the transaction that creates the new one, so a ceremony the browser has abandoned ends and
+// creates nothing (#579 decision 4).
 //
 // The read is ChangeAndSave's fresh read, through a change that refuses in every case, since a
 // refused change writes nothing.
@@ -266,7 +363,7 @@ func (s *Store) ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremony
 		return err
 	}
 
-	isHeld := held(ceremonyId)
+	isHeld := holds(ceremonyId)
 	err = goneIsReplaced(s.sessionStore.ChangeAndSave(r, w, sess, func(values map[string]any) error {
 		if heldErr := isHeld(values); heldErr != nil {
 			return heldErr

@@ -77,7 +77,7 @@ func (e *authorizeFaultEndpoint) assertNothingAnswered(t *testing.T) {
 	t.Helper()
 	e.pageRenderer.AssertExpectations(t)
 	assert.Empty(t, e.rr.Header().Get("Location"), "a fault answers nobody")
-	e.ceremonyStore.AssertNotCalled(t, "ReplaceAuthContext", mock.Anything, mock.Anything, mock.Anything)
+	e.ceremonyStore.AssertNotCalled(t, "AddAuthContext", mock.Anything, mock.Anything, mock.Anything)
 	e.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 

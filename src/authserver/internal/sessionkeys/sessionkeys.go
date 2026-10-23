@@ -14,7 +14,15 @@ package sessionkeys
 const AuthServerSessionName string = "authserver"
 
 const SessionIdentifier string = "SessionIdentifier"
-const AuthContext string = "AuthContext"
+
+// AuthContexts holds the sign-ins a browser has in progress, up to ceremony.MaxHeldCeremonies of
+// them, least recently written first. Only ceremony.Store reads or writes it (#246).
+const AuthContexts string = "AuthContexts"
+
+// RetiredAuthContext is the key a browser's one sign-in in progress was held under before #246,
+// in a shape this binary does not read. Nothing reads it: ceremony.Store removes it the first time
+// it writes a browser's session, so a sign-in in progress at the upgrade starts again.
+const RetiredAuthContext string = "AuthContext"
 
 // LinkMarker holds the marker written once an emailed reset or activation
 // link has been validated, so the rest of the flow runs on a URL carrying no

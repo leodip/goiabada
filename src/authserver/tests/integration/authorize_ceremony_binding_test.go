@@ -70,7 +70,7 @@ func assertCeremonyMismatchPage(t *testing.T, resp *http.Response, what string) 
 	t.Helper()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode,
-		"%s from a replaced ceremony must be refused", what)
+		"%s of a sign-in the browser no longer holds must be refused", what)
 	assert.Empty(t, resp.Header.Get("Location"),
 		"the refusal must not redirect anywhere, least of all to /auth/issue")
 
@@ -103,18 +103,34 @@ func authorizeUrlFor(client *record.Client, redirectUri *record.RedirectURI, sco
 		"&nonce=" + fake.LetterN(8)
 }
 
-// TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused walks the defect end to end.
+// assertCodeFor follows a step's redirect to /auth/issue and asserts the code it issues answers the
+// request state was sent with, for client at redirectUri, and nothing else.
+func assertCodeFor(t *testing.T, httpClient *http.Client, issueLocation string, client *record.Client,
+	redirectUri *record.RedirectURI, state string) *record.Code {
+	t.Helper()
+
+	resp := loadPage(t, httpClient, issueLocation)
+	defer func() { _ = resp.Body.Close() }()
+
+	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	assert.Equal(t, state, stateVal, "the code answers its own request, and no other")
+
+	code := loadCodeFromDatabase(t, codeVal)
+	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
+	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	return code
+}
+
+// TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn walks two consent screens of
+// one browser end to end.
 //
-// A browser holds ONE auth context, so a second /auth/authorize replaces the first while the first
-// client's consent screen is still on the user's screen. Both screens post to the same URL, and the
-// checkbox names are positional, so before this change the boxes the user ticked on client A's
-// screen resolved against client B's scope list: B was granted, and a consent row was persisted for
-// B, off a screen naming A that the user never saw for B (#79 decision 7).
-//
-// The three things this asserts are the three decision 5 promises: the stale submission is refused
-// with a 400, nothing at all is issued or persisted for it, and the ceremony that is actually
-// current is untouched and still completable in its own tab.
-func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
+// Client A's consent screen is on the user's screen when client B's authorization runs in another
+// tab of the same browser and reaches its own. Both screens post to the same URL, and the checkbox
+// names are positional, so the boxes ticked on A's screen must resolve against A's scope list and
+// no other: before #79 a browser held one sign-in and A's ticks were applied to B's request. Now the
+// browser holds both, and each form finishes the sign-in it belongs to, with the scopes ticked on
+// its own screen (#246).
+func TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
 	clientA, redirectUriA := createConsentClient(t)
 	clientB, redirectUriB := createConsentClient(t)
 
@@ -156,7 +172,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	ceremonyA := getCeremonyIdFromPage(t, consentPageA)
 
 	// The second tab. Client B's authorization runs on the same browser, reusing the session A's
-	// ceremony created, and its auth context replaces A's. A's consent screen is still on screen.
+	// ceremony created, and its sign-in is held beside A's. A's consent screen is still on screen.
 	stateB := fake.LetterN(8)
 	resp, err = httpClient.Get(authorizeUrlFor(clientB, redirectUriB, "openid profile", stateB))
 	if err != nil {
@@ -180,146 +196,85 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
-	// The user, still looking at A's screen, submits it. Two boxes ticked, which under the defect
-	// would have granted client B the scopes at those positions.
-	resp = postConsent(t, httpClient, consentUrl, consentPageA, []int{0, 1})
+	// The user, still looking at A's screen, submits it, with the first and third boxes ticked: on
+	// A's list openid and email, a position B's two-scope list does not even have.
+	resp = postConsent(t, httpClient, consentUrl, consentPageA, []int{0, 2})
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode,
-		"a consent form from a replaced ceremony must be refused")
-	assert.Empty(t, resp.Header.Get("Location"),
-		"the refusal must not redirect anywhere, least of all to /auth/issue")
+	codeA := assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientA, redirectUriA, stateA)
+	assert.Equal(t, "openid email", codeA.Scope, "A's ticks resolved against A's own scope list")
 
-	doc := parseHTMLResponse(t, resp)
-	assert.NotEmpty(t, doc.Find("#errorMsg").Text(), "the refusal renders the auth error page")
-
-	// Nothing was issued and nothing was persisted, for either client.
-	for _, c := range []*record.Client{clientA, clientB} {
-		consent, getConsentErr := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, c.Id)
-		if getConsentErr != nil {
-			t.Fatal(getConsentErr)
-		}
-		assert.Nil(t, consent, "the refused submission must persist no consent for %s", c.ClientIdentifier)
-	}
-
-	// And the ceremony that is actually current is untouched: B's own screen still completes, in
-	// its own tab, with exactly the scopes ticked on it.
+	// And B's own screen completes, in its own tab, with exactly the scopes ticked on it.
 	resp = postConsent(t, httpClient, consentUrlB, consentPageB, []int{0, 1})
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/issue")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
+	codeB := assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
+	assert.Equal(t, "openid profile", codeB.Scope)
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
-	assert.Equal(t, stateB, stateVal, "the code belongs to client B's request, not to A's")
-
-	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, clientB.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, "openid profile", code.Scope)
-	assert.Equal(t, redirectUriB.URI, code.RedirectURI)
-
-	consentA, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, clientA.Id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Nil(t, consentA, "client A was never consented to, so it must hold no consent row")
-
-	consentB, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, clientB.Id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if assert.NotNil(t, consentB) {
-		assert.Equal(t, "openid profile", consentB.Scope)
+	for client, scope := range map[*record.Client]string{clientA: "openid email", clientB: "openid profile"} {
+		consent, getConsentErr := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+		if getConsentErr != nil {
+			t.Fatal(getConsentErr)
+		}
+		if assert.NotNil(t, consent, "%s was consented to on its own screen", client.ClientIdentifier) {
+			assert.Equal(t, scope, consent.Scope, "%s holds the scopes ticked on its own screen", client.ClientIdentifier)
+		}
 	}
 }
 
-// TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused is the more direct path decision 6 was
-// settled on, and the reason the binding is not the consent form's alone.
+// TestAuthorize_PasswordFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn is the more direct path #79
+// decision 6 was settled on, and the reason the binding is not the consent form's alone.
 //
-// The user is at client A's login screen. Client B opens in another tab and its auth context
-// replaces A's. The user types their password into A's screen and submits it. Before this change
-// that authenticated them against B's request: B requires no consent, so the flow ran straight
-// through to /auth/issue and B was handed a code with no screen ever shown for it.
-//
-// The password submitted here is the correct one, deliberately. A refusal that only held for wrong
-// credentials would be no refusal at all.
-func TestAuthorize_PasswordFormFromAReplacedCeremonyIsRefused(t *testing.T) {
-	clientA, redirectUriA := createConsentClient(t)
+// The user is at client A's login screen when client B opens in another tab of the same browser and
+// reaches its own. The user types their password into A's screen. Before #79 that authenticated them
+// against B's request, the one the browser then held, and B was handed a code with no screen ever
+// shown for it. Now the browser holds both: A's form finishes A's request, and B's own form, loaded
+// before A's was submitted, still finishes B's (#246).
+func TestAuthorize_PasswordFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
+	clientA, redirectUriA := createLevel1Client(t, false)
 	clientB, redirectUriB := createLevel1Client(t, false)
 	user, password := createCeremonyUser(t)
 
 	httpClient := createHttpClient(t)
 
-	// Client A's authorization, as far as its login screen.
 	stateA := fake.LetterN(8)
-	resp, err := httpClient.Get(authorizeUrlFor(clientA, redirectUriA, "openid profile email", stateA))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	redirectLocation := assertRedirect(t, resp, "/auth/level1")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	pwdUrlA := assertRedirect(t, resp, "/auth/pwd")
-	pwdPageA := loadPage(t, httpClient, pwdUrlA)
+	pwdUrlA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectUriA, stateA)
 	defer func() { _ = pwdPageA.Body.Close() }()
-
 	ceremonyA := getCeremonyIdFromPage(t, pwdPageA)
 
-	// The second tab. Client B's authorization replaces A's context, and A's login screen is still
-	// on the user's screen.
+	// The second tab, on the same browser. A's login screen is still on the user's screen.
 	stateB := fake.LetterN(8)
-	resp, err = httpClient.Get(authorizeUrlFor(clientB, redirectUriB, "openid profile", stateB))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	redirectLocation = assertRedirect(t, resp, "/auth/level1")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	pwdUrlB := assertRedirect(t, resp, "/auth/pwd")
-	pwdPageB := loadPage(t, httpClient, pwdUrlB)
+	pwdUrlB, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectUriB, stateB)
 	defer func() { _ = pwdPageB.Body.Close() }()
 
 	ceremonyB := getCeremonyIdFromPage(t, pwdPageB)
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
-	// The user, still looking at A's screen, signs in there.
-	resp = authenticateWithPassword(t, httpClient, pwdUrlA, pwdPageA, user.Email, password)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+	// The user, still looking at A's screen, signs in there, and A's request gets its code.
+	for _, signIn := range []struct {
+		pwdUrl      string
+		pwdPage     *http.Response
+		client      *record.Client
+		redirectUri *record.RedirectURI
+		state       string
+	}{
+		{pwdUrlA, pwdPageA, clientA, redirectUriA, stateA},
+		{pwdUrlB, pwdPageB, clientB, redirectUriB, stateB},
+	} {
+		resp := authenticateWithPassword(t, httpClient, signIn.pwdUrl, signIn.pwdPage, user.Email, password)
+		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	assertCeremonyMismatchPage(t, resp, "a login form")
-	assertNothingWasCompleted(t, user.Id)
+		location := assertRedirect(t, resp, "/auth/level1completed")
+		resp = loadPage(t, httpClient, location)
+		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	// And the ceremony that is actually current is untouched: B's own screen still signs in, in its
-	// own tab, and receives a code for B's request.
-	resp = authenticateWithPassword(t, httpClient, pwdUrlB, pwdPageB, user.Email, password)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+		location = assertRedirect(t, resp, "/auth/completed")
+		resp = loadPage(t, httpClient, location)
+		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	redirectLocation = assertRedirect(t, resp, "/auth/completed")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	redirectLocation = assertRedirect(t, resp, "/auth/issue")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
-
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
-	assert.Equal(t, stateB, stateVal, "the code belongs to client B's request, and to no other")
-
-	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, clientB.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, redirectUriB.URI, code.RedirectURI)
+		assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), signIn.client, signIn.redirectUri, signIn.state)
+	}
 }
 
 // walkToOtpPrompt drives one authorization request from /auth/authorize to the OTP prompt, on an
@@ -361,16 +316,12 @@ func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *record.Clien
 	return otpUrl, loadPage(t, httpClient, otpUrl)
 }
 
-// TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused is the same defect one factor up, and it
-// carries the assertion neither other case can make.
+// TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn is the same one factor up.
 //
-// The user is at client A's OTP prompt when client B's authorization replaces the context. They
-// enter a valid code on A's prompt: that is refused. The same code is then entered on B's prompt,
-// in its own tab, and it works. That is what pins the refusal running before otp.MatchStep and
-// TryConsumeUserOTPStep: if the stale submission had reached the claim it would have consumed the
-// step, and the passcode in front of the user would have stopped working for the request they were
-// actually on, which is a forgotten tab breaking a live sign-in (#79 decision 5, #111 decision 3).
-func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
+// The user is at client A's OTP prompt when client B's authorization reaches its own in another tab
+// of the same browser. A code entered on A's prompt finishes A's request, and the next code, entered
+// on B's prompt, finishes B's: neither tab took anything away from the other (#246).
+func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
 	clientA, redirectUriA, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 	clientB, redirectUriB := createLevel2MandatoryClient(t)
 
@@ -391,35 +342,87 @@ func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
-	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
+	// Two codes of two steps, since a step's code is spent once: the current one, and the next,
+	// which the server's one-step window accepts.
+	now := time.Now()
+	for i, signIn := range []struct {
+		otpUrl      string
+		otpPage     *http.Response
+		client      *record.Client
+		redirectUri *record.RedirectURI
+		state       string
+	}{
+		{otpUrlA, otpPageA, clientA, redirectUriA, stateA},
+		{otpUrlB, otpPageB, clientB, redirectUriB, stateB},
+	} {
+		otpCode, err := totp.GenerateCode(otpSecret, now.Add(time.Duration(i)*30*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp := authenticateWithOtp(t, httpClient, signIn.otpUrl, signIn.otpPage, otpCode)
+		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+		location := assertRedirect(t, resp, "/auth/completed")
+		resp = loadPage(t, httpClient, location)
+		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+
+		assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), signIn.client, signIn.redirectUri, signIn.state)
+	}
+}
+
+// TestAuthorize_WrongCodesInOneUsersSignInSpendOnlyThatUsersBudget: two users' sign-ins at their
+// OTP prompts in one browser, the second started after the first. Wrong codes entered on the first
+// user's prompt spend that user's one-time-code budget, which refuses the sixth, and none of the
+// second user's, whose sign-in, the one the browser most recently wrote, still finishes with a
+// code. The budget counts against the user of the sign-in the submitted form names, which is the
+// user whose code is checked (#246 decision 1).
+func TestAuthorize_WrongCodesInOneUsersSignInSpendOnlyThatUsersBudget(t *testing.T) {
+	clientA, redirectUriA, userA, passwordA, otpSecretA := createLevel2MandatoryUser(t, true)
+	clientB, redirectUriB, userB, passwordB, otpSecretB := createLevel2MandatoryUser(t, true)
+
+	httpClient := createHttpClient(t)
+
+	otpUrlA, otpPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, fake.LetterN(8), userA, passwordA)
+	defer func() { _ = otpPageA.Body.Close() }()
+
+	stateB := fake.LetterN(8)
+	otpUrlB, otpPageB := walkToOtpPrompt(t, httpClient, clientB, redirectUriB, stateB, userB, passwordB)
+	defer func() { _ = otpPageB.Body.Close() }()
+
+	// A code that is wrong for user A: user B's.
+	wrongForA, err := totp.GenerateCode(otpSecretB, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
+	rightForA, err := totp.GenerateCode(otpSecretA, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wrongForA == rightForA {
+		t.Skip("the two users' current codes collide, one time in a million")
+	}
 
-	// The user, still looking at A's prompt, enters the code there.
-	resp := authenticateWithOtp(t, httpClient, otpUrlA, otpPageA, otpCode)
+	for attempt := 1; attempt <= 5; attempt++ {
+		resp := authenticateWithOtp(t, httpClient, otpUrlA, otpPageA, wrongForA)
+		assert.Equal(t, http.StatusOK, resp.StatusCode, "wrong code %d is refused on A's prompt and not limited", attempt)
+		_ = resp.Body.Close()
+	}
+	resp := authenticateWithOtp(t, httpClient, otpUrlA, otpPageA, wrongForA)
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode, "the sixth spends past user A's budget")
+	_ = resp.Body.Close()
+
+	// User B's budget is untouched: B's own prompt takes B's code.
+	rightForB, err := totp.GenerateCode(otpSecretB, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp = authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, rightForB)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	assertCeremonyMismatchPage(t, resp, "an OTP prompt")
-	assertNothingWasCompleted(t, user.Id)
-
-	// The same code, on the prompt the user is actually on. It still works, so the refusal took
-	// nothing away from the live ceremony.
-	resp = authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, otpCode)
+	location := assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, location)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	redirectLocation := assertRedirect(t, resp, "/auth/completed")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
-	redirectLocation = assertRedirect(t, resp, "/auth/issue")
-	resp = loadPage(t, httpClient, redirectLocation)
-	defer func() { _ = resp.Body.Close() }()
-
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
-	assert.Equal(t, stateB, stateVal, "the code belongs to client B's request, and to no other")
-
-	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, clientB.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, redirectUriB.URI, code.RedirectURI)
+	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
 }

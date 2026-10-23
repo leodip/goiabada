@@ -127,8 +127,8 @@ func assertClientWebsiteUrlInHTML(t *testing.T, doc *goquery.Document, expectedU
 // assertStateMismatchPage reads the page a state mismatch renders and holds it to the catalog
 // entry that belongs to the condition, not merely to "some error page".
 //
-// The distinction is the point. The ceremony-mismatch page beside it says another sign-in was
-// started in this browser, which is a different diagnosis and a different remedy from "you went
+// The distinction is the point. The ceremony-mismatch page beside it says the sign-in can no longer
+// continue, which is a different diagnosis and a different remedy from "you went
 // back to a step the server has finished with", and a check that accepted either would let the
 // two be confused (#279 decision 21).
 func assertStateMismatchPage(t *testing.T, resp *http.Response) {

@@ -316,3 +316,40 @@ test("a sign-in in progress finishes after a prompt=none request in another tab 
   expect(tokens.status, "and the code is the first tab's own").toBe(200);
   await context.close();
 });
+
+// The same with a valid authorization request: a link from any site, or a page sending the browser
+// to sign in, starts a sign-in of its own, held beside the one in progress, and ends none. Here the
+// other tab's request reaches its own password form while the first tab shows the password form,
+// and both finish, each with its own code (#246).
+test("a sign-in in progress finishes after a valid authorization request in another tab of the same browser (#246)", async ({
+  page,
+  browser,
+  clients,
+  users,
+  request,
+}) => {
+  const user = await users.create();
+  const { client, secret } = await browserSignInClient(page, clients);
+  const { context, page: signingIn, codeVerifier } = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+  await expect(signingIn).toHaveURL(/\/auth\/pwd/);
+
+  const other = await context.newPage();
+  const another = codeRequest(client.identifier);
+  await other.goto(`${authorizeEndpoint}?${new URLSearchParams(another.params)}`);
+  await expect(other).toHaveURL(/\/auth\/pwd/);
+
+  await submitPassword(signingIn, user.email, user.password);
+  await signingIn.waitForURL((url) => url.href.startsWith(testRedirectUri));
+  const code = new URL(signingIn.url()).searchParams.get("code");
+  expect(code, "the first tab's sign-in reached its client with a code").toBeTruthy();
+  const tokens = await codeToken(request, client.identifier, secret, code!, codeVerifier, testRedirectUri);
+  expect(tokens.status, "and the code is the first tab's own").toBe(200);
+
+  await submitPassword(other, user.email, user.password);
+  await other.waitForURL((url) => url.href.startsWith(testRedirectUri));
+  const answer = new URL(other.url()).searchParams;
+  expect(answer.get("state"), "the other tab's sign-in answers its own request").toBe(another.params.state);
+  const otherTokens = await codeToken(request, client.identifier, secret, answer.get("code")!, another.verifier, testRedirectUri);
+  expect(otherTokens.status, "with a code of its own").toBe(200);
+  await context.close();
+});
