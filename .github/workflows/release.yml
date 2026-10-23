@@ -275,36 +275,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.verify.outputs.version }}
           PRERELEASE: ${{ needs.verify.outputs.prerelease }}
-        run: |
-          set -euo pipefail
-          args=(--draft --title "Release $VERSION" --generate-notes)
-          # A prerelease MUST be flagged: /releases/latest/ skips prereleases and
-          # drafts, which is what keeps the docs' download links pointing at the
-          # last stable release (constraint A).
-          [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
-          gh release create "v$VERSION" "${args[@]}" dist/*
-          echo "Draft created. Write the notes, then publish to move 'latest'."
-
-      - name: Write the image digests into the draft notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.verify.outputs.version }}
           AUTHSERVER_DIGEST: ${{ needs.images.outputs.authserver }}
           ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
         run: |
           set -euo pipefail
-          # --generate-notes wrote the changelog into the draft; the digests follow it,
-          # so the notes an operator reads to pin a deployment name the exact image
-          # content this release pushed and attested (#491). The notes are still a
-          # draft: the publish step is whatever the maintainer writes on top of them.
-          gh release view "v$VERSION" --json body --jq .body > notes.md
+          # The notes open with the two images as full references, tag and digest together, so
+          # an operator pinning a deployment names the exact image content this release pushed
+          # and attested (#491). gh puts the notes file above the changelog --generate-notes
+          # writes, and both reach the draft in the one write that creates it, so no draft
+          # exists without them.
+          [[ "$AUTHSERVER_DIGEST" == sha256:* && "$ADMINCONSOLE_DIGEST" == sha256:* ]] ||
+            { echo "::error::the images job gave no digest for one of the images"; exit 1; }
           {
-            echo ""
             echo "## Pinned image references"
             echo ""
             echo "The multi-platform image index digests this release pushed and attested, one per image. The same digests name the images at \`ghcr.io/leodip/goiabada\`, which the same push wrote."
             echo ""
             echo "- Auth server: \`leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST\`"
             echo "- Admin console: \`leodip/goiabada:adminconsole-$VERSION@$ADMINCONSOLE_DIGEST\`"
-          } >> notes.md
-          gh release edit "v$VERSION" --notes-file notes.md
+          } > pinned.md
+          args=(--draft --title "Release $VERSION" --generate-notes --notes-file pinned.md)
+          # A prerelease MUST be flagged: /releases/latest/ skips prereleases and
+          # drafts, which is what keeps the docs' download links pointing at the
+          # last stable release (constraint A).
+          [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
+          gh release create "v$VERSION" "${args[@]}" dist/*
+          echo "Draft created. Write the notes, then publish to move 'latest'."

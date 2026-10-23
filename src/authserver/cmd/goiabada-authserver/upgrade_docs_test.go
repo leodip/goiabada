@@ -158,7 +158,8 @@ func TestUpgradePage_APinnedDeploymentChangesTheTagAndTheDigestTogether(t *testi
 // operator learns what a digest buys and takes one from, and it names the forms the release and
 // the tooling spell: the full reference the release's notes list, tag and digest together, the
 // buildx command that prints the multi-platform index digest rather than a per-platform one, and
-// the gh command that verifies a digest against the release's attestation (#491).
+// the gh command that verifies a digest against the attestation of the release being installed,
+// not of any release of this repository (#491).
 func TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells(t *testing.T) {
 	const page = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
 	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
@@ -171,7 +172,8 @@ func TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells(t *testing.T
 		"`docker buildx imagetools inspect leodip/goiabada:authserver-<version>`",
 		"multi-platform image index",
 		"per-platform digest",
-		"gh attestation verify oci://docker.io/leodip/goiabada@sha256:<digest> --repo leodip/goiabada",
+		"gh attestation verify oci://docker.io/leodip/goiabada@sha256:<digest> --repo leodip/goiabada " +
+			"--source-ref refs/tags/v<version> --signer-workflow leodip/goiabada/.github/workflows/release.yml",
 	} {
 		assert.Containsf(t, section, want, "%s: the pinning section names %q as the release and the tooling spell it", page, want)
 	}

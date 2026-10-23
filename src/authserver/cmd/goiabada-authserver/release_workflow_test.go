@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,9 +54,9 @@ var digestImages = []struct{ output, env string }{
 
 // checkDraftNamesTheDigests holds the release workflow to the contract the pinning docs rest on
 // (#491): the images job exposes the two digests its digests step read as job outputs, and the
-// draft rewrites its notes to append them as two full references, tag and digest together, wired
-// from those outputs, so the references a release's notes list cannot drift from the image content
-// it pushed and attested. It returns what does not hold.
+// step that creates the draft gives it notes naming them as two full references, tag and digest
+// together, wired from those outputs, so the references a release's notes list cannot drift from
+// the image content it pushed and attested. It returns what does not hold.
 func checkDraftNamesTheDigests(jobs map[string]workflowJob) []string {
 	var findings []string
 	images, ok := jobs["images"]
@@ -73,17 +74,10 @@ func checkDraftNamesTheDigests(jobs map[string]workflowJob) []string {
 	if !ok {
 		return append(findings, "release workflow: there is no draft job")
 	}
-	var notes *workflowStep
-	for i := range draft.Steps {
-		if strings.Contains(draft.Steps[i].Run, "gh release edit") &&
-			strings.Contains(draft.Steps[i].Run, "--notes-file") {
-			notes = &draft.Steps[i]
-			break
-		}
-	}
-	if notes == nil {
+	notes := draftCreateStep(draft)
+	if notes == nil || !strings.Contains(notes.Run, "--notes-file") {
 		return append(findings,
-			"release workflow: no draft step rewrites the notes with gh release edit --notes-file")
+			"release workflow: no draft step creates the release with gh release create --notes-file")
 	}
 	for _, image := range digestImages {
 		if got, want := notes.Env[image.env+"_DIGEST"], "${{ needs.images.outputs."+image.output+" }}"; got != want {
@@ -101,8 +95,19 @@ func checkDraftNamesTheDigests(jobs map[string]workflowJob) []string {
 	return findings
 }
 
+// draftCreateStep is the draft job's step that creates the release, or nil when it has none.
+func draftCreateStep(draft workflowJob) *workflowStep {
+	for i := range draft.Steps {
+		if strings.Contains(draft.Steps[i].Run, "gh release create") {
+			return &draft.Steps[i]
+		}
+	}
+	return nil
+}
+
 // releaseNotesFixture is a workflow shaped like the release's digest path: an images job exposing
-// the digests its digests step read, and a draft appending them to the generated notes.
+// the digests its digests step read, and a draft created with notes naming them above the
+// generated ones.
 const releaseNotesFixture = `name: Release
 on:
   push:
@@ -131,23 +136,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.verify.outputs.version }}
-        run: |
-          gh release create "v$VERSION" --draft --generate-notes dist/*
-      - name: Write the image digests into the draft notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.verify.outputs.version }}
           AUTHSERVER_DIGEST: ${{ needs.images.outputs.authserver }}
           ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
         run: |
-          gh release view "v$VERSION" --json body --jq .body > notes.md
-          echo "- Auth server: leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST" >> notes.md
-          echo "- Admin console: leodip/goiabada:adminconsole-$VERSION@$ADMINCONSOLE_DIGEST" >> notes.md
-          gh release edit "v$VERSION" --notes-file notes.md
+          echo "- Auth server: leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST" > pinned.md
+          echo "- Admin console: leodip/goiabada:adminconsole-$VERSION@$ADMINCONSOLE_DIGEST" >> pinned.md
+          gh release create "v$VERSION" --draft --generate-notes --notes-file pinned.md dist/*
 `
 
 func TestReleaseWorkflow_TheDraftNamesTheDigests(t *testing.T) {
-	t.Run("a draft appending both references wired from the images job passes", func(t *testing.T) {
+	t.Run("a draft created with both references wired from the images job passes", func(t *testing.T) {
 		jobs, err := readWorkflow(releaseNotesFixture)
 		require.NoError(t, err)
 		assert.Empty(t, checkDraftNamesTheDigests(jobs))
@@ -175,9 +173,18 @@ func TestReleaseWorkflow_TheDraftNamesTheDigests(t *testing.T) {
 		}, checkDraftNamesTheDigests(jobs))
 	})
 
+	t.Run("a draft created with no notes file fails", func(t *testing.T) {
+		text := strings.Replace(releaseNotesFixture, " --notes-file pinned.md", "", 1)
+		jobs, err := readWorkflow(text)
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"release workflow: no draft step creates the release with gh release create --notes-file",
+		}, checkDraftNamesTheDigests(jobs))
+	})
+
 	t.Run("notes naming no reference fail", func(t *testing.T) {
 		text := strings.Replace(releaseNotesFixture,
-			"          echo \"- Auth server: leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST\" >> notes.md\n", "", 1)
+			"          echo \"- Auth server: leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST\" > pinned.md\n", "", 1)
 		jobs, err := readWorkflow(text)
 		require.NoError(t, err)
 		assert.Equal(t, []string{
@@ -196,4 +203,114 @@ func TestReleaseWorkflow_TheRealDraftNamesTheDigestsTheImagesJobPushed(t *testin
 	jobs, err := readWorkflow(string(body))
 	require.NoErrorf(t, err, "%s cannot be read as YAML", releaseWorkflow)
 	assert.Empty(t, checkDraftNamesTheDigests(jobs))
+}
+
+// ghStub stands in for gh on the PATH of a draft step run by runDraftCreate: it records its
+// arguments one per line and copies the notes file a release create names, which is the body gh
+// sends above the notes --generate-notes asks GitHub for. Anything but a release create fails.
+const ghStub = `#!/bin/sh
+set -eu
+[ "$1 $2" = "release create" ] || exit 64
+printf '%s\n' "$@" > "$GH_ARGS"
+while [ $# -gt 0 ]; do
+  if [ "$1" = --notes-file ]; then cp "$2" "$GH_NOTES"; fi
+  shift
+done
+`
+
+// draftRun is what one run of the real create step did: its exit, its output, and, when it
+// reached gh, the arguments gh was given and the notes file it was handed.
+type draftRun struct {
+	err    error
+	output string
+	called bool
+	args   []string
+	notes  string
+}
+
+// runDraftCreate runs the release workflow's own draft create step under bash, in a directory
+// holding one release asset, with gh stubbed and the two digests given.
+func runDraftCreate(t *testing.T, authserverDigest, adminconsoleDigest string) draftRun {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), releaseWorkflow))
+	require.NoError(t, err)
+	jobs, err := readWorkflow(string(body))
+	require.NoError(t, err)
+	step := draftCreateStep(jobs["draft"])
+	require.NotNil(t, step, "%s: the draft job has no step running gh release create", releaseWorkflow)
+
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "dist"), 0o755))
+	require.NoError(t, os.MkdirAll(bin, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dist", "asset.zip"), []byte("asset"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte(ghStub), 0o755))
+	argsFile, notesFile := filepath.Join(dir, "gh-args"), filepath.Join(dir, "gh-notes")
+
+	cmd := exec.Command("bash", "-c", step.Run)
+	cmd.Dir = dir
+	cmd.Env = []string{
+		"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"VERSION=1.2.3",
+		"PRERELEASE=false",
+		"AUTHSERVER_DIGEST=" + authserverDigest,
+		"ADMINCONSOLE_DIGEST=" + adminconsoleDigest,
+		"GH_ARGS=" + argsFile,
+		"GH_NOTES=" + notesFile,
+	}
+	output, err := cmd.CombinedOutput()
+	run := draftRun{err: err, output: string(output)}
+	if args, readErr := os.ReadFile(argsFile); readErr == nil {
+		run.called = true
+		run.args = strings.Split(strings.TrimSuffix(string(args), "\n"), "\n")
+	}
+	if notes, readErr := os.ReadFile(notesFile); readErr == nil {
+		run.notes = string(notes)
+	}
+	return run
+}
+
+// TestReleaseWorkflow_TheDraftIsCreatedWithTheReferencesAboveTheGeneratedNotes runs the real create
+// step: the one gh release create that makes the draft is handed a notes file naming each image
+// with its own version and digest, and still asks for the generated notes, which gh puts below
+// that file, so the draft never exists without the references (#491).
+func TestReleaseWorkflow_TheDraftIsCreatedWithTheReferencesAboveTheGeneratedNotes(t *testing.T) {
+	authserverDigest := "sha256:" + strings.Repeat("a", 64)
+	adminconsoleDigest := "sha256:" + strings.Repeat("b", 64)
+
+	run := runDraftCreate(t, authserverDigest, adminconsoleDigest)
+
+	require.NoError(t, run.err, run.output)
+	require.True(t, run.called, "the step never ran gh release create\n%s", run.output)
+	require.GreaterOrEqual(t, len(run.args), 3, "gh was given %v", run.args)
+	assert.Equal(t, "release", run.args[0])
+	assert.Equal(t, "create", run.args[1])
+	assert.Equal(t, "v1.2.3", run.args[2], "the draft is created for the version's tag")
+	assert.Contains(t, run.args, "--draft")
+	assert.Contains(t, run.args, "--generate-notes", "the generated changelog stays below the references")
+	assert.Contains(t, run.args, "--notes-file")
+	assert.Contains(t, run.args, "dist/asset.zip", "the release assets go up in the same create")
+	notes := strings.Split(run.notes, "\n")
+	assert.Contains(t, notes, "- Auth server: `leodip/goiabada:authserver-1.2.3@"+authserverDigest+"`")
+	assert.Contains(t, notes, "- Admin console: `leodip/goiabada:adminconsole-1.2.3@"+adminconsoleDigest+"`")
+}
+
+// TestReleaseWorkflow_TheDraftIsNotCreatedWithoutBothDigests: a digest the images job did not give,
+// or one that is not a sha256 digest, would publish a reference naming nothing, so the step stops
+// before gh creates any draft.
+func TestReleaseWorkflow_TheDraftIsNotCreatedWithoutBothDigests(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("c", 64)
+	for name, digests := range map[string][2]string{
+		"no auth server digest":    {"", digest},
+		"no admin console digest":  {digest, ""},
+		"a digest of another kind": {"md5:" + strings.Repeat("d", 32), digest},
+	} {
+		t.Run(name, func(t *testing.T) {
+			run := runDraftCreate(t, digests[0], digests[1])
+
+			require.Error(t, run.err)
+			assert.Contains(t, run.output, "::error::the images job gave no digest for one of the images")
+			assert.False(t, run.called, "gh created a draft: %v", run.args)
+		})
+	}
 }
