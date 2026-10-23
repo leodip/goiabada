@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -57,7 +57,7 @@ func newMetricsTestServer(t *testing.T) *Server {
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 
-	s := NewServer(chi.NewRouter(), database, newTestSessionStore(), nil, nil, cfg)
+	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg)
 	s.registerRoutes()
 	return s
 }

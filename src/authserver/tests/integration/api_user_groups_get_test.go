@@ -154,7 +154,8 @@ func TestAPIUserGroupsGet_InvalidId(t *testing.T) {
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
-		{"empty ID", "", http.StatusBadRequest},
+		// An empty segment matches no route, so the group answers 404 (#462 decision 4).
+		{"empty ID", "", http.StatusNotFound},
 		{"negative ID", "-1", http.StatusNotFound},
 	}
 

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -224,7 +224,7 @@ func assertPanics(t *testing.T, fn func()) {
 }
 
 // TestSkipCSRF_CombinedChain mounts the production middleware chain
-// (StripTrailingSlash -> SkipCSRF -> CSRF) onto a chi router and issues real
+// (StripTrailingSlash -> SkipCSRF -> CSRF) onto a core/routing router and issues real
 // cross-origin POSTs. This proves the exemptions reach the enforcing middleware end-to-end, beyond
 // the context-flag check in TestSkipCSRF, and it is the only place the trailing-slash
 // form is exercised: StripTrailingSlash strips r.URL.Path itself, which is what SkipCSRF reads.
@@ -234,8 +234,8 @@ func assertPanics(t *testing.T, fn func()) {
 func TestSkipCSRF_CombinedChain(t *testing.T) {
 	const foreignOrigin = "https://www.certification.openid.net"
 
-	newRouter := func(predicate func(*http.Request) bool) *chi.Mux {
-		r := chi.NewRouter()
+	newRouter := func(predicate func(*http.Request) bool) *routing.Router {
+		r := routing.New()
 		r.Use(StripTrailingSlash)
 		r.Use(SkipCSRF(fixtureCSRFPolicy(predicate)))
 		r.Use(CSRF())

@@ -5,8 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/core/routing"
 )
 
@@ -15,7 +13,7 @@ import (
 // core owns the lookup and owns none of the numbers, as with CSRFPolicy, because the routes and what
 // they legitimately carry are the application's (#426).
 //
-// A limit is found by the pattern chi routes the request to, not by the path, so a route with a
+// A limit is found by the route the router answers the request with, not by the path, so a route with a
 // parameter in it is one entry rather than one per value:
 //
 //   - Routes is matched exactly, on the method and the pattern together: "POST
@@ -89,7 +87,7 @@ func newBodyLimiter(policy BodyLimitPolicy) bodyLimiter {
 	return bodyLimiter{fallback: policy.Default, prefixes: prefixes, routes: policy.Routes}
 }
 
-// limitFor returns the limit for a request chi routes to pattern, which is empty when no route
+// limitFor returns the limit for a request the router answers with the route pattern, which is empty when no route
 // matches.
 func (l bodyLimiter) limitFor(method string, pattern string) int64 {
 	if pattern == "" {
@@ -107,8 +105,9 @@ func (l bodyLimiter) limitFor(method string, pattern string) int64 {
 }
 
 // BodyLimit bounds every request body at the limit policy gives the route the request is
-// about to reach, before anything downstream can read it. routes is the router the middleware is
-// mounted on, consulted per request; the routes need not exist yet when this is called.
+// about to reach, before anything downstream can read it. router is the router the middleware is
+// mounted on, consulted per request; the routes need not exist yet when this is called. Its routes
+// are named in chi's spelling, so the policy's keys are too (#462 decision 5).
 //
 // It makes a read past the limit fail, with *http.MaxBytesError, and does nothing else. It writes no
 // status and reads nothing ahead, so a request over the limit gets whatever answer its handler
@@ -119,31 +118,10 @@ func (l bodyLimiter) limitFor(method string, pattern string) int64 {
 // A handler that bounds its body more tightly keeps its own bound. MaxBytesReader nests, and the
 // inner, smaller one trips first.
 //
-// Mount it after StripTrailingSlash, whose stripped path is what the lookup reads, and before
-// anything that reads a body at the root.
-func BodyLimit(routes chi.Routes, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
-	limiter := newBodyLimiter(policy)
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// net/http gives a request with no body http.NoBody, so every GET skips the lookup.
-			if r.Body != nil && r.Body != http.NoBody {
-				// A fresh route context, because Find writes the URL parameters it collects into
-				// the one it is given, and the request's own must reach the router untouched.
-				pattern := routes.Find(chi.NewRouteContext(), r.Method, routingPath(r))
-				r.Body = http.MaxBytesReader(w, r.Body, limiter.limitFor(r.Method, pattern))
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// BodyLimitOn is BodyLimit for a core/routing router, which names its routes in chi's spelling, so
-// the policy's keys are the same (#462 decision 5). The route is the one the router will answer the
-// request with, read from the path the middleware above left, so it is mounted the same way: with
-// Use on router itself, after StripTrailingSlash. A request the router will answer 404 or 405 gets
-// Default, as on chi.
-func BodyLimitOn(router *routing.Router, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
+// Mount it with Use on router itself, after StripTrailingSlash, whose stripped path is what the
+// lookup reads, and before anything that reads a body at the root. A request the router will answer
+// 404 or 405 gets Default.
+func BodyLimit(router *routing.Router, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
 	limiter := newBodyLimiter(policy)
 
 	return func(next http.Handler) http.Handler {
@@ -155,17 +133,4 @@ func BodyLimitOn(router *routing.Router, policy BodyLimitPolicy) func(next http.
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-// routingPath is the path chi will route r by, resolved the way chi's own routeHTTP resolves it at
-// the root: the raw path when the path carried an escape, else the decoded one. StripTrailingSlash
-// has already stripped both of a trailing slash.
-func routingPath(r *http.Request) string {
-	if r.URL.RawPath != "" {
-		return r.URL.RawPath
-	}
-	if r.URL.Path == "" {
-		return "/"
-	}
-	return r.URL.Path
 }

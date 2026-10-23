@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,9 +30,10 @@ import (
 // What the auth server answers as a router, pinned through the handler Start serves before the
 // router under it is replaced (#462): unmatched paths and the guards that answer them first, 405s,
 // HEAD, the trailing slash, non-canonical paths, the static files, request ids, a panic, and the
-// metrics' route labels. Every answer here is one the switch keeps. The answers #462 changes on
-// purpose, the plain-text 404 under /auth and /account, the methods a 405's Allow names, and a
-// directory under /static, are asserted only as far as they stay: the status.
+// metrics' route labels. Every answer here but three is one the switch keeps; the three #462 changes
+// on purpose are asserted as decided: the 404 page under /auth and /account where chi answered plain
+// text (decision 2), a 405's Allow naming every method its path takes (decision 3), and a directory
+// under /static, which is the 404 page (decision 7).
 
 // notFoundPage is the 404 page's heading, as the English catalog reads, which is what tells the
 // server's own page apart from a plain-text 404.
@@ -50,7 +51,7 @@ func newRoutingTestServer(t *testing.T, database *datamocks.Database) *Server {
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 	cfg.AuthServer.LogHttpRequests = true
 
-	s := NewServer(chi.NewRouter(), database, newTestSessionStore(), nil, nil, cfg)
+	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg)
 	s.registerRoutes()
 	return s
 }
@@ -156,16 +157,29 @@ func TestRegisterRoutes_AnUnmatchedPageMeetsThePageChainFirst(t *testing.T) {
 	}
 }
 
-// Under each page group an unmatched path is a 404. Its body is not pinned: #462 decision 2 changes
-// it from chi's plain text to the 404 page.
-func TestRegisterRoutes_AnUnmatchedPathUnderAPageGroupIs404(t *testing.T) {
+// Under each page group an unmatched path is the server's 404 page, as it is at the root, where chi
+// answered plain text (#462 decision 2).
+func TestRegisterRoutes_AnUnmatchedPathUnderAPageGroupIsThe404Page(t *testing.T) {
 	s := newRoutingTestServer(t, newRoutingDatabase(t))
 
-	for _, target := range []string{"/auth/no/such/page", "/account/no/such/page"} {
-		t.Run(target, func(t *testing.T) {
-			assert.Equal(t, http.StatusNotFound, serveRouting(s, http.MethodGet, target, nil).Code)
+	for _, request := range []struct{ method, target string }{
+		{http.MethodGet, "/auth/no/such/page"},
+		{http.MethodPost, "/auth/no/such/page"},
+		{http.MethodGet, "/account/no/such/page"},
+		{http.MethodGet, "/account"},
+	} {
+		t.Run(request.method+" "+request.target, func(t *testing.T) {
+			assertNotFoundPage(t, serveRouting(s, request.method, request.target, nil))
 		})
 	}
+}
+
+// assertNotFoundPage holds a response to the server's 404 page.
+func assertNotFoundPage(t *testing.T, rr *httptest.ResponseRecorder) {
+	t.Helper()
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+	assert.Equal(t, "text/html; charset=UTF-8", rr.Header().Get("Content-Type"))
+	assert.Contains(t, rr.Body.String(), notFoundPage)
 }
 
 // Under each API group the group's guards answer first: the account and session APIs refuse a
@@ -203,8 +217,10 @@ func TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst(t *tes
 }
 
 // A path that exists, by a method it does not take, is 405 with no content and no Content-Type, on
-// every branch and outside them. Allow is pinned only where the path takes one method, the one
-// case chi names correctly and #462 decision 3 keeps.
+// every branch and outside them, and an Allow naming every method the path takes, sorted, HEAD only
+// where HEAD is registered, where chi named only some of them (#462 decision 3): a PUT on
+// /auth/authorize was told GET and a HEAD there POST. A method no route defines anywhere is answered
+// the same, where chi left Allow empty.
 func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T) {
 	s := newRoutingTestServer(t, newRoutingDatabase(t))
 
@@ -216,14 +232,17 @@ func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T
 		{http.MethodGet, "/auth/token", "POST"},
 		{http.MethodPost, "/api/public/settings", "GET"},
 		{http.MethodDelete, "/openapi.yaml", "GET"},
-		{http.MethodPut, "/auth/authorize", ""},
-		{http.MethodDelete, "/certs", ""},
-		{http.MethodPost, "/health", ""},
-		{http.MethodOptions, "/health", ""},
-		{http.MethodConnect, "/health", ""},
-		{"FOO", "/health", ""},
-		{http.MethodPut, "/static/main.css", ""},
-		{http.MethodPatch, "/api/v1/admin/users/1", ""},
+		{http.MethodPut, "/auth/authorize", "GET, POST"},
+		{http.MethodHead, "/auth/authorize", "GET, POST"},
+		{http.MethodDelete, "/certs", "GET, HEAD"},
+		{http.MethodPost, "/health", "GET, HEAD"},
+		{http.MethodOptions, "/health", "GET, HEAD"},
+		{http.MethodConnect, "/health", "GET, HEAD"},
+		{"FOO", "/health", "GET, HEAD"},
+		{http.MethodPost, "/favicon.ico", "GET, HEAD"},
+		{http.MethodPut, "/static/main.css", "GET, HEAD"},
+		{http.MethodPut, "/userinfo", "GET, POST"},
+		{http.MethodPatch, "/api/v1/admin/users/1", "DELETE, GET"},
 	} {
 		t.Run(request.method+" "+request.target, func(t *testing.T) {
 			rr := serveRouting(s, request.method, request.target, nil)
@@ -231,16 +250,15 @@ func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T
 			assert.Equal(t, http.StatusMethodNotAllowed, rr.Code)
 			assert.Empty(t, rr.Body.String())
 			assert.Empty(t, rr.Header().Get("Content-Type"))
-			if request.allow != "" {
-				assert.Equal(t, request.allow, rr.Header().Get("Allow"))
-			}
+			assert.Equal(t, []string{request.allow}, rr.Header().Values("Allow"))
 		})
 	}
 }
 
 // A resource registered for GET and HEAD answers HEAD as its GET, with the same status and header
-// fields and no content; every other GET route refuses HEAD with 405, whose Allow does not name
-// HEAD. Over a real listener, because net/http's server is what drops a HEAD's content.
+// fields and no content; every other GET route refuses HEAD with 405, whose Allow names the methods
+// the path takes and not HEAD. Over a real listener, because net/http's server is what drops a
+// HEAD's content.
 func TestRegisterRoutes_HeadIsAnsweredAsGetOnlyWhereItIsRegistered(t *testing.T) {
 	s := newRoutingTestServer(t, newRoutingDatabase(t))
 	base := routingListener(t, s)
@@ -261,13 +279,18 @@ func TestRegisterRoutes_HeadIsAnsweredAsGetOnlyWhereItIsRegistered(t *testing.T)
 		})
 	}
 
-	for _, target := range []string{"/auth/authorize", "/auth/pwd", "/auth/logout", "/userinfo", "/openapi.yaml"} {
-		t.Run("HEAD "+target, func(t *testing.T) {
-			head, body := sendRouting(t, http.MethodHead, base+target)
+	for _, request := range []struct{ target, allow string }{
+		{"/auth/authorize", "GET, POST"},
+		{"/auth/pwd", "GET, POST"},
+		{"/auth/logout", "GET, POST"},
+		{"/userinfo", "GET, POST"},
+		{"/openapi.yaml", "GET"},
+	} {
+		t.Run("HEAD "+request.target, func(t *testing.T) {
+			head, body := sendRouting(t, http.MethodHead, base+request.target)
 
 			assert.Equal(t, http.StatusMethodNotAllowed, head.StatusCode)
-			assert.NotEmpty(t, head.Header.Get("Allow"))
-			assert.NotContains(t, strings.Split(strings.ReplaceAll(head.Header.Get("Allow"), " ", ""), ","), http.MethodHead)
+			assert.Equal(t, []string{request.allow}, head.Header.Values("Allow"))
 			assert.Empty(t, body)
 		})
 	}
@@ -317,13 +340,14 @@ func TestRegisterRoutes_ANonCanonicalPathIs404(t *testing.T) {
 		})
 	}
 
-	// Under a page group, or under /static: a 404, its body changed by #462 decisions 2 and 7.
+	// Under a page group, or under /static: the 404 page too (#462 decisions 2 and 7).
 	for _, target := range []string{"/auth//pwd", "/auth/./pwd", "/static/../health"} {
 		t.Run(target, func(t *testing.T) {
-			resp, _ := sendRouting(t, http.MethodGet, base+target)
+			resp, body := sendRouting(t, http.MethodGet, base+target)
 
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 			assert.Empty(t, resp.Header.Get("Location"), "not redirected to the clean path")
+			assert.Contains(t, body, notFoundPage)
 		})
 	}
 
@@ -376,6 +400,29 @@ func TestRegisterRoutes_TheStaticFilesTheFaviconAndHealth(t *testing.T) {
 	health := serveRouting(s, http.MethodGet, "/health", nil)
 	assert.Equal(t, http.StatusOK, health.Code)
 	assert.Equal(t, "healthy", health.Body.String())
+}
+
+// A directory under /static, /static/ itself included, is the 404 page, where Go's file server
+// listed its files, and /static is the 404 page too rather than a redirect to /static/, which
+// redirected to itself for ever once its trailing slash was stripped (#462 decision 7). A HEAD of
+// one is the same 404 with no content.
+func TestRegisterRoutes_ADirectoryUnderStaticIsThe404Page(t *testing.T) {
+	s := newRoutingTestServer(t, newRoutingDatabase(t))
+
+	for _, target := range []string{"/static", "/static/", "/static/favicon", "/static/favicon/"} {
+		t.Run(target, func(t *testing.T) {
+			rr := serveRouting(s, http.MethodGet, target, nil)
+
+			assertNotFoundPage(t, rr)
+			assert.Empty(t, rr.Header().Get("Location"), "not redirected")
+			assert.NotContains(t, rr.Body.String(), "android-chrome-512x512.png", "no listing of the directory's files")
+		})
+	}
+
+	head, body := sendRouting(t, http.MethodHead, routingListener(t, s)+"/static/favicon/")
+	assert.Equal(t, http.StatusNotFound, head.StatusCode)
+	assert.Empty(t, head.Header.Get("Location"))
+	assert.Empty(t, body, "a HEAD has no content")
 }
 
 // mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape

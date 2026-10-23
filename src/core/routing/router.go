@@ -13,6 +13,8 @@
 //     redirect is never reached, nor its redirect from a subtree's bare prefix (decision 4).
 //   - A route is named as chi spelled it: the path alone, the group's prefix joined on, parameters
 //     as {name}, a group's own "/" as the prefix, and a trailing wildcard as "/*" (decision 5).
+//     Two methods on one path may name its parameters differently, as chi let them, and each
+//     method's route keeps its own name and reads its own parameters.
 //
 // Patterns take chi's syntax, restricted to what ServeMux can express: literal segments, {name}
 // parameters as whole segments, and "*" as the last segment, matching everything below it.
@@ -61,7 +63,9 @@ type table struct {
 	// groups is every group but the root's, the longest prefix first.
 	groups    []*group
 	endpoints []*endpoint
-	byName    map[string]*endpoint
+	// byShape is every endpoint by its path with each parameter's name left out, so two methods
+	// naming one path's parameters differently share it, as ServeMux requires.
+	byShape map[string]*endpoint
 }
 
 // group is a prefix with the middleware every request under it meets, matched or not.
@@ -82,17 +86,21 @@ type group struct {
 	sealed bool
 }
 
-// endpoint is one route: one path, one name, a handler per method.
+// endpoint is one path, with a route per method.
 type endpoint struct {
-	table   *table
-	name    string
+	table *table
+	// params are the parameter names ServeMux matches the path with: those of its first route.
+	params  []string
 	methods map[string]*route
 	// order is the methods in the order they were registered, for the walk.
 	order []string
 }
 
-// route is one method of an endpoint, with the group and the With chain it was registered through.
+// route is one method of an endpoint, with its name, the names it gives the path's parameters, and
+// the group and the With chain it was registered through.
 type route struct {
+	name    string
+	params  []string
 	scope   *group
 	handler http.Handler
 	chain   []func(http.Handler) http.Handler
@@ -112,7 +120,7 @@ type matchKey struct{}
 
 // New returns a root router with no routes.
 func New() *Router {
-	t := &table{mux: http.NewServeMux(), byName: map[string]*endpoint{}}
+	t := &table{mux: http.NewServeMux(), byShape: map[string]*endpoint{}}
 	root := &Router{table: t}
 	t.root = &group{router: root}
 	root.scope = t.root
@@ -251,8 +259,8 @@ func (rt *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // RouteFor names the route the router would answer r with, in chi's spelling, or "" when r would
 // be a 404 or a 405. A middleware on the root reads it before routing, as the body limit does.
 func (rt *Router) RouteFor(r *http.Request) string {
-	if ep, rte := rt.table.match(r); rte != nil {
-		return ep.name
+	if _, rte := rt.table.match(r); rte != nil {
+		return rte.name
 	}
 	return ""
 }
@@ -280,7 +288,7 @@ func (rt *Router) Walk(fn WalkFunc) error {
 		for _, method := range ep.order {
 			rte := ep.methods[method]
 			middlewares := slices.Concat(rt.table.use, rte.scope.chain, rte.chain)
-			if err := fn(method, ep.name, rte.handler, middlewares...); err != nil {
+			if err := fn(method, rte.name, rte.handler, middlewares...); err != nil {
 				return err
 			}
 		}
@@ -290,7 +298,9 @@ func (rt *Router) Walk(fn WalkFunc) error {
 
 // register adds one method of one route. A route's path is its group's prefix and pattern; its
 // name is that path in chi's spelling, and ServeMux matches it by path alone, method-free, so
-// ServeMux's own method rules, a GET pattern matching HEAD and its 405, never apply.
+// ServeMux's own method rules, a GET pattern matching HEAD and its 405, never apply. A path is one
+// endpoint whatever its parameters are named, so a method naming them differently from the one
+// registered first joins it rather than conflicting with it in ServeMux.
 func (rt *Router) register(method string, pattern string, handler http.Handler) {
 	if handler == nil {
 		panic("routing: a nil handler for " + pattern)
@@ -299,14 +309,15 @@ func (rt *Router) register(method string, pattern string, handler http.Handler) 
 	t := rt.table
 
 	name, muxPatterns := spell(rt.scope.prefix, pattern)
-	ep := t.byName[name]
+	shape, params := parameters(name)
+	ep := t.byShape[shape]
 	if ep == nil {
-		ep = &endpoint{table: t, name: name, methods: map[string]*route{}}
+		ep = &endpoint{table: t, params: params, methods: map[string]*route{}}
 		for _, p := range muxPatterns {
 			// ServeMux panics on a pattern that conflicts with one already registered.
 			t.mux.Handle(p, ep)
 		}
-		t.byName[name] = ep
+		t.byShape[shape] = ep
 		t.endpoints = append(t.endpoints, ep)
 	}
 	if _, taken := ep.methods[method]; taken {
@@ -316,6 +327,8 @@ func (rt *Router) register(method string, pattern string, handler http.Handler) 
 	t.root.sealed = true
 
 	ep.methods[method] = &route{
+		name:    name,
+		params:  params,
 		scope:   rt.scope,
 		handler: handler,
 		chain:   rt.chain,
@@ -338,6 +351,20 @@ func spell(prefix string, pattern string) (string, []string) {
 	default:
 		return prefix + pattern, []string{prefix + pattern}
 	}
+}
+
+// parameters answers name with each parameter's name left out, which is the path's shape, and the
+// parameters' names in order.
+func parameters(name string) (string, []string) {
+	segments := strings.Split(name, "/")
+	var params []string
+	for i, segment := range segments {
+		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
+			params = append(params, segment[1:len(segment)-1])
+			segments[i] = "{}"
+		}
+	}
+	return strings.Join(segments, "/"), params
 }
 
 // validatePattern refuses a pattern the router would not match as written: one not rooted, with a
@@ -496,7 +523,15 @@ func (ep *endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	m.name = ep.name
+	m.name = m.route.name
+	// ServeMux set the path values under the endpoint's names; a route naming them otherwise reads
+	// them under its own. ServeMux hands its handler the request it was given, so they are set on
+	// the one the route's chain is served.
+	if !slices.Equal(m.route.params, ep.params) {
+		for i, param := range m.route.params {
+			r.SetPathValue(param, r.PathValue(ep.params[i]))
+		}
+	}
 	m.route.served.ServeHTTP(w, r)
 }
 

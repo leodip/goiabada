@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -27,6 +26,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -122,7 +122,7 @@ func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 	t.Helper()
 	registry := metrics.NewRegistry()
 	s := &Server{
-		router:       chi.NewRouter(),
+		router:       routing.New(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		templateFS:   web.TemplateFS(),

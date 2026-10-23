@@ -36,7 +36,7 @@ type refusedImport struct {
 // authflowRefusedImports are the ways an operation could reach the HTTP exchange it serves.
 var authflowRefusedImports = []refusedImport{
 	{"net/http", "the request and the response writer; the browser session is reached through the handler's per-request adapter"},
-	{"github.com/go-chi", "the router and its middleware"},
+	{"github.com/leodip/goiabada/core/routing", "the router, its route table and the route a request reached"},
 	{"github.com/leodip/goiabada/authserver/internal/handlers", "the handlers, which import authflow and write the response"},
 	{"github.com/leodip/goiabada/authserver/internal/middleware", "the request middleware"},
 	{"github.com/leodip/goiabada/authserver/internal/reqctx", "the request-scoped values, which the handler reads and hands over as plain values"},
@@ -154,11 +154,11 @@ import (
 	"net/http"
 	stdhttp "net/http/httptest"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/routing"
 )
 `)
 	writeImportFixture(t, root, authflowDir+"/allowed.go", `package authflow
@@ -170,6 +170,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/handlersx"
+	"github.com/leodip/goiabada/core/routingx"
 )
 
 const s = "net/http"
@@ -194,11 +195,11 @@ import "net/http"
 	assert.Equal(t, []string{
 		authflowDir + "/refused.go:4: net/http",
 		authflowDir + "/refused.go:5: net/http/httptest",
-		authflowDir + "/refused.go:7: github.com/go-chi/chi/v5",
-		authflowDir + "/refused.go:8: github.com/leodip/goiabada/authserver/internal/handlers",
-		authflowDir + "/refused.go:9: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers",
-		authflowDir + "/refused.go:10: github.com/leodip/goiabada/authserver/internal/middleware",
-		authflowDir + "/refused.go:11: github.com/leodip/goiabada/authserver/internal/reqctx",
+		authflowDir + "/refused.go:7: github.com/leodip/goiabada/authserver/internal/handlers",
+		authflowDir + "/refused.go:8: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers",
+		authflowDir + "/refused.go:9: github.com/leodip/goiabada/authserver/internal/middleware",
+		authflowDir + "/refused.go:10: github.com/leodip/goiabada/authserver/internal/reqctx",
+		authflowDir + "/refused.go:11: github.com/leodip/goiabada/core/routing",
 	}, got)
 }
 

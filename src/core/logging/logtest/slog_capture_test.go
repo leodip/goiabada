@@ -10,11 +10,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // Seam 3. CaptureSlog is both the seam every migrated suite asserts through and a unit in its own
@@ -85,13 +85,13 @@ func TestCaptureSlog_ARecordWithNoRequestIdCarriesNothing(t *testing.T) {
 	assert.NotContains(t, oneRecord(t, capture).Attrs, "request_id")
 }
 
-// The end-to-end shape the migrated suites use: a real chi router, the real RequestID middleware,
+// The end-to-end shape the migrated suites use: the servers' router, the real request id middleware,
 // and a handler that logs with the request's context. Driving the middleware rather than planting
-// the context value is what makes this a check on the pair, since the key is chi's and unexported.
-func TestCaptureSlog_ARequestThroughChiCorrelatesTheHandlersRecord(t *testing.T) {
+// the context value is what makes this a check on the pair, since the key is unexported.
+func TestCaptureSlog_ARequestThroughTheRouterCorrelatesTheHandlersRecord(t *testing.T) {
 	capture := CaptureSlog(t)
 
-	router := chi.NewRouter()
+	router := routing.New()
 	router.Use(requestid.Middleware)
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		slog.InfoContext(r.Context(), "a handler record")

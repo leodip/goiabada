@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,7 +54,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	cfg.AuthServer.LogHttpRequests = logHttpRequests
 
 	s := &Server{
-		router:       chi.NewRouter(),
+		router:       routing.New(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		cfg:          cfg,

@@ -7,7 +7,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +32,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	// method. Its chain is recorded once, and every other method of it must have the same one.
 	chains := make(map[string][]string)
 	var differing []string
-	err := chi.Walk(s.router, func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		var chain []string
 		for _, mounted := range middlewares {
 			chain = append(chain, runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name())

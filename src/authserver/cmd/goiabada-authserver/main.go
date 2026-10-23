@@ -23,8 +23,6 @@ import (
 	"time"
 	_ "time/tzdata" // embeds the zone database localzone.Install resolves TZ against (#49, #331, #432)
 
-	"github.com/go-chi/chi/v5"
-
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/bootstrap"
@@ -40,6 +38,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -322,7 +321,7 @@ func run() int {
 
 	slog.Info("initialized server-side session store")
 
-	r := chi.NewRouter()
+	r := routing.New()
 	s := server.NewServer(r, database, sessionStore, dataCipher, trustedProxies, cfg)
 
 	// A signal that arrived during the steps above that read no context, the session keys and the

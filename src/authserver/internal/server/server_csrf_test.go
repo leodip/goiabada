@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -73,7 +73,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 
 		// Claim 3, the one behaviour change. /auth/callback is the admin console's OAuth callback.
 		// This binary does not mount it, and the shared table in core exempted it for both, so a
-		// cross-origin POST used to pass the origin check and reach chi for a 404. It is refused
+		// cross-origin POST used to pass the origin check and reach the router for a 404. It is refused
 		// 403 by the origin check now, which tells a prober less than the 404 did (decision 5).
 		{"POST /auth/callback is refused rather than routed", "/auth/callback", "", false, http.StatusForbidden},
 	}
@@ -160,7 +160,7 @@ func newCsrfTestServer(t *testing.T) *Server {
 	database.On("WebOriginExists", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	s := &Server{
-		router:       chi.NewRouter(),
+		router:       routing.New(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		cfg:          &config.Config{},

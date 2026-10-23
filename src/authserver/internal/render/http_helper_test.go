@@ -12,11 +12,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +45,7 @@ func TestInternalServerError(t *testing.T) {
 	}
 	httpHelper := New(templateFS, nil)
 
-	r := chi.NewRouter()
+	r := routing.New()
 	r.Use(requestid.Middleware)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.InternalServerError(w, r, errors.New("test error"))
@@ -89,7 +89,7 @@ func TestNotFound(t *testing.T) {
 		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
 	}, nil)
 
-	r := chi.NewRouter()
+	r := routing.New()
 	r.Use(requestid.Middleware)
 	r.Get("/admin/clients/{clientId}/settings", func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.NotFound(w, r)
@@ -122,7 +122,7 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}, nil)
 
-	r := chi.NewRouter()
+	r := routing.New()
 	r.Use(requestid.Middleware)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.NotFound(w, r)

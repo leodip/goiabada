@@ -443,7 +443,7 @@ func (s *Server) initMiddleware() *routing.Router {
 	// request logger and for the same reason, above Recoverer, so a panicking request is counted as
 	// the 500 its client received (#400). The route label's set is this router's own table, read
 	// once at the first request, by which time registerRoutes has registered every route.
-	s.router.Use(metrics.HTTPRequestsOn(s.metrics, s.router))
+	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
 	// wrapped writer and lands in the record (#203). It writes the panic's one ERROR record, with
@@ -457,7 +457,7 @@ func (s *Server) initMiddleware() *routing.Router {
 	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripTrailingSlash,
 	// because the lookup resolves the route by the path it stripped, and before anything else
 	// at the root, so no body is read without a bound.
-	s.router.Use(httpmw.BodyLimitOn(s.router, bodyLimitPolicy()))
+	s.router.Use(httpmw.BodyLimit(s.router, bodyLimitPolicy()))
 
 	// CSRF
 	// Note: CSRF runs before the locale middleware below, so there is no localizer on the

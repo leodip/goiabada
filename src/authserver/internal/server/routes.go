@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/authflow"
@@ -23,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // initRoutes registers the application's routes on the branches initMiddleware returns
@@ -137,7 +137,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	ceremonyBoundary := handlers.NewCeremonyBoundary(httpHelper, ceremonyStore, auditLogger, baseURL, adminConsoleBaseURL)
 	clientErrorResponder := handlers.NewClientErrorResponder(s.database, httpHelper)
 
-	pages.Route("/auth", func(r chi.Router) {
+	pages.Route("/auth", func(r *routing.Router) {
 		// The admission tier ahead of both methods, one budget for the two: the GET writes a
 		// browser-session row and the POST a parked-request row, on every request that passes its
 		// first validation (#504).
@@ -164,12 +164,13 @@ func (s *Server) initRoutes(branches appBranches) {
 	})
 	// Token endpoint with ROPC rate limiting (RFC 6749 §4.3.2 MUST protect against brute force).
 	// Outside the /auth group, which is mounted on the page branch whole, because it answers on the
-	// token branch, the protocol branch counting its faults as refusals. chi routes POST /auth/token
-	// here ahead of the group's catch-all; a GET falls through to the group, which answers it 405 as
-	// it did when the route was its own (#435).
+	// token branch, the protocol branch counting its faults as refusals. The router answers POST
+	// /auth/token from this route, behind the token branch alone; any other method falls to the
+	// group its path is under, whose chain runs before the 405, as it did when the route was its
+	// own (#435).
 	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
 
-	pages.Route("/account", func(r chi.Router) {
+	pages.Route("/account", func(r *routing.Router) {
 		// While registration is unavailable both routes are a 404 ahead of the limiter, so a refused
 		// submission spends no budget (#526 decision 2). The POST alone is limited: the GET renders
 		// a static form, while the POST probes whether an address already has an account, sends
@@ -182,7 +183,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	pages.With(rateLimiter.LimitActivate).Post(emaillinks.AccountActivatePath, accounthandlers.HandleActivatePost(httpHelper, s.sessionStore, s.database, userCreator, passwordValidator, auditLogger, adminConsoleBaseURL))
 
 	// Admin API routes
-	api.Route("/api/v1/admin", func(r chi.Router) {
+	api.Route("/api/v1/admin", func(r *routing.Router) {
 		// FIRST in the group, ahead of the debug middleware and every guard. GET
 		// /api/v1/admin/clients/{id}/secret returns a decrypted client secret, so RFC 6749
 		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
@@ -379,7 +380,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	})
 
 	// Account API routes (self-service)
-	api.Route("/api/v1/account", func(r chi.Router) {
+	api.Route("/api/v1/account", func(r *routing.Router) {
 		// FIRST in the group, for the same reason as the admin group above. GET
 		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
 		r.Use(middleware.NoStore())
@@ -442,7 +443,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// POST throughout, with the session identifier in the body and never in the request
 	// line: a handle in a path lands in this server's access log and in every proxy in
 	// front of it.
-	api.Route("/api/v1/sessions", func(r chi.Router) {
+	api.Route("/api/v1/sessions", func(r *routing.Router) {
 		// FIRST in the group, for the same reason as the two groups above: every 200
 		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
 		// response containing tokens, credentials, or other sensitive information".

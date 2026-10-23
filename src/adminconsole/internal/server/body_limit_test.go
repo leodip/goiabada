@@ -117,7 +117,7 @@ func TestInitMiddleware_TheBodyLimitSitsAfterTheSlashStrip(t *testing.T) {
 	strip := slices.Index(root, "github.com/leodip/goiabada/core/httpmw.StripTrailingSlash")
 	require.GreaterOrEqual(t, strip, 0, "StripTrailingSlash must be on the root chain: %v", root)
 	require.Less(t, strip+2, len(root), "the root chain ends too early: %v", root)
-	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.BodyLimitOn.func1", root[strip+1])
+	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.BodyLimit.func1", root[strip+1])
 	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1", root[strip+2])
 }
 

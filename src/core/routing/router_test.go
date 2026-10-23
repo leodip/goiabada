@@ -571,14 +571,49 @@ func TestRouter_TheWalk(t *testing.T) {
 	assert.Equal(t, 1, calls, "the walk stops at the first error")
 }
 
+// Two methods on one path may name its parameters differently, as chi let them and as the auth
+// server's admin API does: GET /api/v1/admin/user-sessions/{sessionIdentifier} reads a session
+// identifier where DELETE /api/v1/admin/user-sessions/{id} reads a numeric id. Each method's route
+// keeps its own name, which the metrics and the audit log read, and reads its own parameter; the
+// path is one, so its 405 names both methods.
+func TestRouter_EachMethodNamesItsOwnParameters(t *testing.T) {
+	param := func(method, name string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			_, _ = fmt.Fprintf(w, "%s %s=%s route=%s", method, name, r.PathValue(name), routing.RouteName(r))
+		}
+	}
+	r := routing.New()
+	r.Route("/sessions", func(g *routing.Router) {
+		g.Get("/{sessionIdentifier}", param("get", "sessionIdentifier"))
+		g.Delete("/{id}", param("delete", "id"))
+	})
+
+	assert.Equal(t, "get sessionIdentifier=abc route=/sessions/{sessionIdentifier}", serve(t, r, http.MethodGet, "/sessions/abc").body)
+	assert.Equal(t, "delete id=7 route=/sessions/{id}", serve(t, r, http.MethodDelete, "/sessions/7").body)
+
+	refused := serve(t, r, http.MethodPut, "/sessions/7")
+	assert.Equal(t, http.StatusMethodNotAllowed, refused.status)
+	assert.Equal(t, []string{"DELETE, GET"}, refused.header.Values("Allow"))
+
+	assert.Equal(t, "/sessions/{sessionIdentifier}", r.RouteFor(httptest.NewRequest(http.MethodGet, "/sessions/abc", nil)))
+	assert.Equal(t, "/sessions/{id}", r.RouteFor(httptest.NewRequest(http.MethodDelete, "/sessions/7", nil)))
+
+	var walked []string
+	require.NoError(t, r.Walk(func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		walked = append(walked, method+" "+route)
+		return nil
+	}))
+	assert.Equal(t, []string{"GET /sessions/{sessionIdentifier}", "DELETE /sessions/{id}"}, walked)
+}
+
 // What would be silently wrong panics at registration: ServeMux's own conflicts, a route registered
 // twice, a pattern in a syntax the router does not take, and middleware added after the routes it
 // would have to wrap.
 func TestRouter_RefusesAtRegistration(t *testing.T) {
 	for name, register := range map[string]func(r *routing.Router){
-		"two parameter names in one place": func(r *routing.Router) {
+		"one method on one path under two parameter names": func(r *routing.Router) {
 			r.Get("/a/{id}", answer("a"))
-			r.Post("/a/{name}", answer("b"))
+			r.Get("/a/{name}", answer("b"))
 		},
 		"the same method and pattern twice":    func(r *routing.Router) { r.Get("/a", answer("a")); r.Get("/a", answer("b")) },
 		"every method twice":                   func(r *routing.Router) { r.HandleFunc("/a", answer("a")); r.HandleFunc("/a", answer("b")) },

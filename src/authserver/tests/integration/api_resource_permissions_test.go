@@ -140,7 +140,8 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
-		{"empty ID", "", http.StatusBadRequest},
+		// An empty segment matches no route, so the group answers 404 (#462 decision 4).
+		{"empty ID", "", http.StatusNotFound},
 		{"negative ID", "-1", http.StatusOK}, // Negative IDs are parsed but return empty results
 		{"zero ID", "0", http.StatusOK},      // Zero ID returns empty results
 	}

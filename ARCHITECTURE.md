@@ -174,6 +174,7 @@ Notes on rows that are not self-evident:
   the 404 and the 405 with its `Allow`, HEAD only where registered, non-canonical paths, and route
   names in chi's spelling, which the metrics' `route` label and the audit log read (#462). It
   imports nothing but the standard library, so `core/metrics` and `core/httpmw` read routes from it.
+  It replaced chi, which no module requires any more.
 - `core/phonecountries` is kernel because both applications offer a user the same phone country
   list: the auth server validates and stores its ids on the user row, and the admin console's two
   phone pages build their list from it rather than ask the admin API, which refuses a token carrying

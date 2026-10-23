@@ -1,9 +1,10 @@
 package metrics_test
 
-// Seam: a chi router with the request middleware mounted the way both servers mount it, above
-// httpmw.Recoverer, driven with real requests and read back through a scrape. The router has a
-// parameterized route, a subrouter from Route, a mounted subrouter, a route that panics and one
-// that returns without writing, which are the shapes whose route label is not simply the path.
+// Seam: the servers' router with the request middleware mounted the way both servers mount it,
+// above httpmw.Recoverer, driven with real requests and read back through a scrape. The router has a
+// parameterized route, groups from Route, a group whose guard answers before any route, a wildcard,
+// a route that panics and one that returns without writing, which are the shapes whose route label
+// is not simply the path.
 
 import (
 	"net/http"
@@ -12,20 +13,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 func ok(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
 
 // newInstrumentedRouter builds the fixture router. The middleware is mounted before any route,
-// which chi requires, and reads the route table once the routes exist.
-func newInstrumentedRouter(reg *metrics.Registry) *chi.Mux {
-	r := chi.NewRouter()
+// which the router requires, and reads the route table once the routes exist.
+func newInstrumentedRouter(reg *metrics.Registry) *routing.Router {
+	r := routing.New()
 	r.Use(metrics.HTTPRequests(reg, r))
 	r.Use(httpmw.Recoverer)
 
@@ -33,13 +34,20 @@ func newInstrumentedRouter(reg *metrics.Registry) *chi.Mux {
 	r.Get("/users/{id}", ok)
 	r.Get("/panic", func(http.ResponseWriter, *http.Request) { panic("boom") })
 	r.Get("/silent", func(http.ResponseWriter, *http.Request) {})
-	r.Route("/auth", func(sr chi.Router) {
+	r.Route("/auth", func(sr *routing.Router) {
 		sr.Get("/", ok)
 		sr.Post("/token", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusBadRequest) })
 	})
-	api := chi.NewRouter()
-	api.Get("/clients/{id}", ok)
-	r.Mount("/api", api)
+	r.Route("/api", func(api *routing.Router) {
+		api.Get("/clients/{id}", ok)
+	})
+	r.Route("/admin", func(admin *routing.Router) {
+		admin.Use(func(http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) })
+		})
+		admin.Get("/clients", ok)
+	})
+	r.Get("/static/*", ok)
 	return r
 }
 
@@ -66,6 +74,7 @@ func TestHTTPRequests_RecordsByRouteMethodAndStatus(t *testing.T) {
 		{http.MethodGet, "/auth", 200},
 		{http.MethodPost, "/auth/token", 400},
 		{http.MethodGet, "/api/clients/7", 200},
+		{http.MethodGet, "/static/css/main.css", 200},
 		{http.MethodGet, "/silent", 200},
 		{http.MethodGet, "/panic", 500},
 		{http.MethodGet, "/nope/abc", 404},
@@ -73,6 +82,7 @@ func TestHTTPRequests_RecordsByRouteMethodAndStatus(t *testing.T) {
 		{http.MethodPost, "/health", 405},
 		{"FOO", "/health", 405},
 		{"get", "/health", 405},
+		{http.MethodGet, "/admin/clients", 401},
 	} {
 		require.Equal(t, req.status, serve(t, router, req.method, req.target), "%s %s", req.method, req.target)
 	}
@@ -87,11 +97,13 @@ func TestHTTPRequests_RecordsByRouteMethodAndStatus(t *testing.T) {
 		`goiabada_http_requests_total{route="/panic",method="GET",status="500"} 1`,
 		// A handler that writes nothing is answered 200 by net/http, and that is what it counts as.
 		`goiabada_http_requests_total{route="/silent",method="GET",status="200"} 1`,
+		`goiabada_http_requests_total{route="/static/*",method="GET",status="200"} 1`,
 		`goiabada_http_requests_total{route="/users/{id}",method="GET",status="200"} 2`,
-		// No route matched: an unknown path, an unknown path under a mounted subrouter, a known
-		// path under a method it does not answer, and a method chi does not know. The method is a
-		// standard verb or other, since any token reaches the router and HTTP methods are case
-		// sensitive.
+		// No route answered: a group's guard answered before any route, as chi's subrouter
+		// middleware did; an unknown path, an unknown path under a group, a known path under a
+		// method it does not answer, and a method no route takes. The method is a standard verb or
+		// other, since any token reaches the router and HTTP methods are case sensitive.
+		`goiabada_http_requests_total{route="unmatched",method="GET",status="401"} 1`,
 		`goiabada_http_requests_total{route="unmatched",method="GET",status="404"} 2`,
 		`goiabada_http_requests_total{route="unmatched",method="POST",status="405"} 1`,
 		`goiabada_http_requests_total{route="unmatched",method="other",status="405"} 2`,
@@ -138,7 +150,7 @@ const slowHandlerDelay = 100 * time.Millisecond
 // An observation of zero, or one in milliseconds, fails both.
 func TestHTTPRequests_RecordsTheElapsedTimeInSeconds(t *testing.T) {
 	reg := metrics.NewRegistry()
-	r := chi.NewRouter()
+	r := routing.New()
 	r.Use(metrics.HTTPRequests(reg, r))
 	r.Get("/slow", func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(slowHandlerDelay)
@@ -188,7 +200,8 @@ func TestHTTPRequests_DeclaresTheRouteTable(t *testing.T) {
 	assert.Equal(t, "route", route.Name())
 	assert.Equal(t, "the route table, `unmatched`", route.Description())
 	assert.Equal(t, []string{
-		"/api/clients/{id}", "/auth", "/auth/token", "/health", "/panic", "/silent", "/users/{id}", "unmatched",
+		"/admin/clients", "/api/clients/{id}", "/auth", "/auth/token", "/health", "/panic", "/silent",
+		"/static/*", "/users/{id}", "unmatched",
 	}, route.Values())
 
 	assert.Equal(t, "method", method.Name())

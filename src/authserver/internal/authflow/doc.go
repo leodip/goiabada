@@ -51,8 +51,8 @@
 //
 // Rules every operation keeps:
 //
-//   - No HTTP. Nothing here imports net/http, chi, internal/handlers, internal/middleware or
-//     internal/reqctx (import_lint_test.go). What the request carries, its settings, its session
+//   - No HTTP. Nothing here imports net/http, core/routing, internal/handlers, internal/middleware
+//     or internal/reqctx (import_lint_test.go). What the request carries, its settings, its session
 //     identifier, the browser's address and a form's submitted body, reaches an operation as a plain
 //     value the handler read.
 //   - Every browser-session write goes through the port an operation declares for it, which the

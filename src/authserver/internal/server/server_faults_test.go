@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -57,7 +56,7 @@ func routeFormat(route string) string {
 func registeredRoutes(t *testing.T, s *Server) []string {
 	t.Helper()
 	var routes []string
-	err := chi.Walk(s.router, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		routes = append(routes, method+" "+route)
 		return nil
 	})
@@ -178,9 +177,9 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 }
 
 // The token endpoint left the /auth group, which is mounted on the page branch whole, for the
-// protocol branch. A GET, which it does not serve, falls through to the group's catch-all, and chi
-// carries the method it found refused there, so the group answers the 405 it answered when the
-// route was its own rather than its 404 page.
+// protocol branch. A GET, which it does not serve, is answered by the group its path is under,
+// whose chain runs first, and the router answers the 405 the path's methods call for, as it
+// answered when the route was the group's own, rather than its 404 page.
 func TestInitRoutes_TheTokenEndpointStillRefusesGETWith405(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// The group's chain runs ahead of its 405, as it did when the route was the group's.
