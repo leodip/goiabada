@@ -260,7 +260,7 @@ func clientLogoCacheControl(t *testing.T) string {
 	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(&record.ClientLogo{ClientId: 1, Logo: createTestLogoData(10, 10), ContentType: "image/png"}, nil)
 
-	req := setChiURLParamForHandlers(httptest.NewRequest(http.MethodGet, "/client/logo/my-app", nil), "clientIdentifier", "my-app")
+	req := withPathValue(httptest.NewRequest(http.MethodGet, "/client/logo/my-app", nil), "clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 	HandleClientLogoGet(handlersmocks.NewPageRenderer(t), database).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
@@ -278,7 +278,7 @@ func profilePictureCacheControl(t *testing.T) string {
 	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(&record.UserProfilePicture{UserId: 1, Picture: createTestLogoData(10, 10), ContentType: "image/png"}, nil)
 
-	req := setChiURLParamForHandlers(httptest.NewRequest(http.MethodGet, "/userinfo/picture/"+user.Subject, nil), "subject", user.Subject)
+	req := withPathValue(httptest.NewRequest(http.MethodGet, "/userinfo/picture/"+user.Subject, nil), "subject", user.Subject)
 	rr := httptest.NewRecorder()
 	HandleProfilePictureGet(handlersmocks.NewPageRenderer(t), database).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {

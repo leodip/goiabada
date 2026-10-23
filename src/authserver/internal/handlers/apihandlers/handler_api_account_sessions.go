@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -100,7 +98,7 @@ func HandleAccountSessionDelete(
 		}
 
 		// Parse session ID from URL
-		sessionIdStr := chi.URLParam(r, "id")
+		sessionIdStr := r.PathValue("id")
 		sessionId, err := strconv.ParseInt(sessionIdStr, 10, 64)
 		if err != nil || sessionId <= 0 {
 			writeJSONError(w, "User session ID is required", "VALIDATION_ERROR", http.StatusBadRequest)

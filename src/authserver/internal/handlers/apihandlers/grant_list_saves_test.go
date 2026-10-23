@@ -185,7 +185,7 @@ func (s grantSave) serve(database *datamocks.Database, auditLogger *handlersmock
 // scope, or with no validated token at all when scope is empty.
 func (s grantSave) serveWithScope(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string, scope string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, s.path, strings.NewReader(body))
-	r = setChiURLParam(r, "id", "5")
+	r.SetPathValue("id", "5")
 	if scope != "" {
 		r = setTokenContextWithClaims(r, map[string]interface{}{"scope": scope, "sub": grantCaller})
 	}

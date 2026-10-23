@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -168,7 +167,7 @@ func HandleClientGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -230,7 +229,7 @@ func HandleClientSecretGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -278,7 +277,7 @@ func HandleClientDelete(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -469,7 +468,7 @@ func HandleClientUpdatePut(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -696,7 +695,7 @@ func HandleClientAuthenticationPut(
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -839,7 +838,7 @@ func HandleClientAdministrativeScopesPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -939,7 +938,7 @@ func HandleClientOAuth2FlowsPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -1020,7 +1019,7 @@ func HandleClientRedirectURIsPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -1243,7 +1242,7 @@ func HandleClientWebOriginsPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -1415,7 +1414,7 @@ func HandleClientTokensPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

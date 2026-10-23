@@ -57,7 +57,7 @@ func adminEmailPutRequest(t *testing.T) *http.Request {
 	body, err := json.Marshal(api.UpdateUserEmailRequest{Email: emailTestAddress, EmailVerified: true})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/email", bytes.NewReader(body))
-	req = setChiURLParam(req, "id", "42")
+	req.SetPathValue("id", "42")
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 }
 
@@ -134,7 +134,7 @@ func TestHandleUserEmailPut_SavesTheEmailNarrowly(t *testing.T) {
 			body, err := json.Marshal(api.UpdateUserEmailRequest{Email: emailTestAddress, EmailVerified: verified})
 			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/email", bytes.NewReader(body))
-			req = setChiURLParam(req, "id", "42")
+			req.SetPathValue("id", "42")
 			req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 
 			rr := httptest.NewRecorder()

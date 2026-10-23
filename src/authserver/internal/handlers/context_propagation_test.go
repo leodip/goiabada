@@ -8,7 +8,6 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -46,12 +45,11 @@ func theRequestsContext() interface{} {
 	})
 }
 
-// withURLParam binds a chi route parameter, which HandleProfilePictureGet reads before it reads
+// withPathValue binds a route's path value, which HandleProfilePictureGet reads before it reads
 // anything else.
-func withURLParam(req *http.Request, key, value string) *http.Request {
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add(key, value)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+func withPathValue(req *http.Request, key, value string) *http.Request {
+	req.SetPathValue(key, value)
+	return req
 }
 
 // TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext is the accept arm: both
@@ -61,7 +59,7 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 
-	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
+	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
 	rr := httptest.NewRecorder()
 
 	user := &record.User{Id: 7, Subject: "sub-1"}
@@ -83,7 +81,7 @@ func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 
-	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
+	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
 	rr := httptest.NewRecorder()
 
 	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)

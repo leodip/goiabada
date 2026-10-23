@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
@@ -25,7 +24,7 @@ func HandleUserSessionGet(
 		// Authentication and authorization handled by middleware
 
 		// Get session identifier from URL parameter
-		sessionIdentifier := chi.URLParam(r, "sessionIdentifier")
+		sessionIdentifier := r.PathValue("sessionIdentifier")
 		if sessionIdentifier == "" {
 			writeJSONError(w, "Session identifier is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

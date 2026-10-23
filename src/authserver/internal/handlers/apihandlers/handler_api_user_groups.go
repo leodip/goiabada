@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -61,7 +60,7 @@ func HandleUserGroupsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -111,7 +110,7 @@ func HandleUserGroupsPut(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

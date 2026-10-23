@@ -80,7 +80,7 @@ func TestIdentifierNamespaces_AFailedLookupInTheOtherNamespaceWritesNothing(t *t
 					strings.NewReader(`{"resourceIdentifier":"renamed","description":"d"}`))
 				rr := httptest.NewRecorder()
 				HandleResourceUpdatePut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).
-					ServeHTTP(rr, setChiURLParam(r, "id", "5"))
+					ServeHTTP(rr, withPathValue(r, "id", "5"))
 				return rr
 			},
 		},

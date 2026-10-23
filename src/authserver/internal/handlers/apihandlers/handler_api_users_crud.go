@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -60,7 +58,7 @@ func HandleUserGet(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -104,7 +102,7 @@ func HandleUserPasswordPut(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -220,7 +218,7 @@ func HandleUserOTPPut(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -562,7 +560,7 @@ func HandleUserEnabledPut(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -720,7 +718,7 @@ func HandleUserDelete(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
@@ -13,19 +12,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-func setChiURLParamForHandlers(req *http.Request, key, value string) *http.Request {
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add(key, value)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
-}
 
 func createTestLogoData(width, height int) []byte {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -60,7 +52,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/client/logo/unknown-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "unknown-app")
+	req.SetPathValue("clientIdentifier", "unknown-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "unknown-app").Return(nil, nil)
@@ -80,7 +72,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
@@ -108,7 +100,7 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 	}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
@@ -140,7 +132,7 @@ func TestHandleClientLogoGet_ServedWhileTheClientIsDisabledAndItsLogoHidden(t *t
 	clientLogo := &record.ClientLogo{Id: 1, ClientId: 123, Logo: logoData, ContentType: "image/png"}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
@@ -172,7 +164,7 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 	expectedETag := fmt.Sprintf("\"%x\"", hash[:8])
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	req.Header.Set("If-None-Match", expectedETag)
 	rr := httptest.NewRecorder()
 
@@ -204,7 +196,7 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 	}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	req.Header.Set("If-None-Match", "\"stale-etag\"")
 	rr := httptest.NewRecorder()
 
@@ -240,7 +232,7 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 	weakETag := "W/" + expectedETag
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	req.Header.Set("If-None-Match", weakETag)
 	rr := httptest.NewRecorder()
 
@@ -275,7 +267,7 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 	multipleETags := "\"old-etag-1\", " + expectedETag + ", \"old-etag-2\""
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	req.Header.Set("If-None-Match", multipleETags)
 	rr := httptest.NewRecorder()
 
@@ -305,7 +297,7 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 	}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	req.Header.Set("If-None-Match", "*")
 	rr := httptest.NewRecorder()
 
@@ -326,7 +318,7 @@ func TestHandleClientLogoGet_DatabaseError(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
-	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
+	req.SetPathValue("clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(nil, assert.AnError)

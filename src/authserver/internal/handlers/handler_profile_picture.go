@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
@@ -23,7 +22,7 @@ func HandleProfilePictureGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		subject := chi.URLParam(r, "subject")
+		subject := r.PathValue("subject")
 		if len(subject) == 0 {
 			http.NotFound(w, r)
 			return

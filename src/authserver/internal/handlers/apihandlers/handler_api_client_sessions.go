@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -43,7 +41,7 @@ func HandleClientSessionsGet(
 		// Authentication and authorization handled by middleware
 
 		// Parse client ID
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

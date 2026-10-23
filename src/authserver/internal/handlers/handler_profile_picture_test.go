@@ -29,7 +29,7 @@ func TestHandleProfilePictureGet_Success(t *testing.T) {
 	picture := &record.UserProfilePicture{Id: 1, UserId: 42, Picture: pictureData, ContentType: "image/png"}
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/"+user.Subject, nil)
-	req = setChiURLParamForHandlers(req, "subject", user.Subject)
+	req.SetPathValue("subject", user.Subject)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
@@ -58,7 +58,7 @@ func TestHandleProfilePictureGet_ServedWhileTheUserIsDisabled(t *testing.T) {
 	picture := &record.UserProfilePicture{Id: 1, UserId: 42, Picture: pictureData, ContentType: "image/png"}
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/"+user.Subject, nil)
-	req = setChiURLParamForHandlers(req, "subject", user.Subject)
+	req.SetPathValue("subject", user.Subject)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
@@ -91,7 +91,7 @@ func TestHandleProfilePictureGet_UnknownSubject(t *testing.T) {
 	handler := HandleProfilePictureGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/unknown", nil)
-	req = setChiURLParamForHandlers(req, "subject", "unknown")
+	req.SetPathValue("subject", "unknown")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "unknown").Return(nil, nil)
@@ -110,7 +110,7 @@ func TestHandleProfilePictureGet_NoPicture(t *testing.T) {
 	user := &record.User{Id: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/"+user.Subject, nil)
-	req = setChiURLParamForHandlers(req, "subject", user.Subject)
+	req.SetPathValue("subject", user.Subject)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
@@ -128,7 +128,7 @@ func TestHandleProfilePictureGet_DatabaseError(t *testing.T) {
 	handler := HandleProfilePictureGet(pageRenderer, database)
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/some-subject", nil)
-	req = setChiURLParamForHandlers(req, "subject", "some-subject")
+	req.SetPathValue("subject", "some-subject")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "some-subject").Return(nil, assert.AnError)

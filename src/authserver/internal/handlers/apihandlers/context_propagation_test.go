@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -72,14 +71,12 @@ func TestHandleUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *tes
 // package: one user's sessions, one client's sessions, each hydrating every client behind them,
 // and each of them now issued on behalf of the request that asked.
 
-// apiSessionsRequest is apiRequestCarryingId plus the chi id parameter and the settings the
+// apiSessionsRequest is apiRequestCarryingId plus the id path value and the settings the
 // session handlers read, which is everything HandleUserSessionsGet needs before its first query.
 func apiSessionsRequest(userId string) *http.Request {
 	req := apiRequestCarryingId("/api/v1/admin/users/" + userId + "/sessions")
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", userId)
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = reqctx.WithSettings(ctx, &record.Settings{
+	req.SetPathValue("id", userId)
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	})
@@ -124,13 +121,12 @@ func TestHandleUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
 // with its redirect URIs and its web origins through two loaders that reach the database again
 // inside commondb.
 
-// apiClientRequest is apiRequestCarryingId plus the chi id parameter the single-client handlers
+// apiClientRequest is apiRequestCarryingId plus the id path value the single-client handlers
 // read, which is everything HandleClientGet needs before its first query.
 func apiClientRequest(clientId string) *http.Request {
 	req := apiRequestCarryingId("/api/v1/admin/clients/" + clientId)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", clientId)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req.SetPathValue("id", clientId)
+	return req
 }
 
 // The accept arm: all three reads -- the client list and both loaders -- carry the request's own
@@ -171,9 +167,8 @@ func TestHandleClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
 // apiResourcePermissionsRequest carries the resourceId parameter the permission listing reads.
 func apiResourcePermissionsRequest(resourceId string) *http.Request {
 	req := apiRequestCarryingId("/api/v1/admin/resources/" + resourceId + "/permissions")
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("resourceId", resourceId)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req.SetPathValue("resourceId", resourceId)
+	return req
 }
 
 // The accept arm for the permission half: the listing and the resource hydration that follows it

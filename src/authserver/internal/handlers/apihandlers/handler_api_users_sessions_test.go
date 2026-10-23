@@ -53,7 +53,7 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).Return(nil).Once()
 }
 
-// adminSessionDeleteRequest builds the DELETE with the chi URL parameter the handler reads and
+// adminSessionDeleteRequest builds the DELETE with the path value the handler reads and
 // the validated bearer token the chain puts on the context.
 //
 // The token is what the audit payload's "logged_in_user" now comes from. It used to come from a
@@ -62,7 +62,7 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 // (#385). A caller with no token is a separate case, covered below.
 func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionId, nil)
-	req = setChiURLParam(req, "id", sessionId)
+	req.SetPathValue("id", sessionId)
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": subject})
 }
 
@@ -157,7 +157,7 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/100", nil)
 	rr := httptest.NewRecorder()
 	handler := HandleUserSessionDelete(database, auditLogger)
-	handler.ServeHTTP(rr, setChiURLParam(req, "id", "100"))
+	handler.ServeHTTP(rr, withPathValue(req, "id", "100"))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	require.Len(t, payloads, 2)

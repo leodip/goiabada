@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
@@ -27,7 +26,7 @@ func HandlePermissionUsersGet(
 	database permissionUsersDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		permStr := chi.URLParam(r, "permissionId")
+		permStr := r.PathValue("permissionId")
 		if permStr == "" {
 			writeJSONError(w, "Permission ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

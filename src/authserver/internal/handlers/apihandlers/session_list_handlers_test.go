@@ -82,7 +82,7 @@ func TestHandleUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	expectSessionListReads(database, sessions)
 
 	req := sessionListRequest("/api/v1/admin/users/42/sessions", "sid-mine", nil)
-	req = setChiURLParam(req, "id", "42")
+	req.SetPathValue("id", "42")
 
 	rr := httptest.NewRecorder()
 	HandleUserSessionsGet(database).ServeHTTP(rr, req)
@@ -108,7 +108,7 @@ func TestHandleUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.T) 
 	expectSessionListReads(database, sessions)
 
 	req := sessionListRequest("/api/v1/admin/users/42/sessions", "", nil)
-	req = setChiURLParam(req, "id", "42")
+	req.SetPathValue("id", "42")
 
 	rr := httptest.NewRecorder()
 	HandleUserSessionsGet(database).ServeHTTP(rr, req)
@@ -134,7 +134,7 @@ func TestHandleClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	expectSessionOwnerRead(database, record.User{Id: 42, Email: "someone@example.com"})
 
 	req := sessionListRequest("/api/v1/admin/clients/7/sessions", "sid-mine", nil)
-	req = setChiURLParam(req, "id", "7")
+	req.SetPathValue("id", "7")
 
 	rr := httptest.NewRecorder()
 	HandleClientSessionsGet(database).ServeHTTP(rr, req)

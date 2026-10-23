@@ -45,7 +45,7 @@ func TestHandleUserConsentsGet_Success(t *testing.T) {
 	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3, Scope: "openid"}}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
-	req = setChiURLParam(req, "id", "7")
+	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(user, nil)
@@ -66,7 +66,7 @@ func TestHandleUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
 	handler := HandleUserConsentsGet(database)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
-	req = setChiURLParam(req, "id", "7")
+	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
@@ -82,7 +82,7 @@ func TestHandleUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 	handler := HandleUserConsentsGet(database)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
-	req = setChiURLParam(req, "id", "7")
+	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil)
@@ -101,7 +101,7 @@ func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3}}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
-	req = setChiURLParam(req, "id", "7")
+	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil)
@@ -124,7 +124,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
-	req = setChiURLParam(req, "id", "5")
+	req.SetPathValue("id", "5")
 	// The audit row names the administrator the token belongs to. It read an untyped "subject"
 	// key nothing writes, so every such row named nobody (#433).
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"})
@@ -183,7 +183,7 @@ func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
-	req = setChiURLParam(req, "id", "5")
+	req.SetPathValue("id", "5")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError)
@@ -200,7 +200,7 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	handler := HandleUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
-	req = setChiURLParam(req, "id", "5")
+	req.SetPathValue("id", "5")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).

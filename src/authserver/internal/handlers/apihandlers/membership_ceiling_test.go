@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -62,15 +60,13 @@ func expectGroupPermissionsOn(database *datamocks.Database, tx *sql.Tx, groupIds
 	database.On("GetGroupPermissionsByGroupIds", mock.Anything, tx, groupIds).Return(rows, nil).Once()
 }
 
-// membershipRequest builds a request for one of the routes, with chi's URL parameters set and a
+// membershipRequest builds a request for one of the routes, with its path values set and a
 // validated token carrying scope, or none when scope is empty.
 func membershipRequest(method, target, body string, scope string, params map[string]string) *http.Request {
 	r := httptest.NewRequest(method, target, strings.NewReader(body))
-	routeContext := chi.NewRouteContext()
 	for key, value := range params {
-		routeContext.URLParams.Add(key, value)
+		r.SetPathValue(key, value)
 	}
-	r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, routeContext))
 	if scope != "" {
 		r = setTokenContextWithClaims(r, map[string]interface{}{"scope": scope, "sub": grantCaller})
 	}

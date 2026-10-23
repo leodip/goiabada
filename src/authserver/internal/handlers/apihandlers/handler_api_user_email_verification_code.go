@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -36,7 +34,7 @@ func HandleUserEmailVerificationCodePost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
 
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

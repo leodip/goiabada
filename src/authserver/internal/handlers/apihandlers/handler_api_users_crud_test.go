@@ -41,7 +41,7 @@ func enabledRequest(t *testing.T, userId string, enabled bool) *http.Request {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/"+userId+"/enabled",
 		bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = setChiURLParam(req, "id", userId)
+	req.SetPathValue("id", userId)
 	return setTokenContextWithClaims(req, map[string]interface{}{
 		"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
 	})
@@ -236,7 +236,7 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/password", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = setChiURLParam(req, "id", "42")
+	req.SetPathValue("id", "42")
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{PasswordPolicy: record.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
@@ -307,7 +307,7 @@ func TestHandleUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/otp", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = setChiURLParam(req, "id", "42")
+	req.SetPathValue("id", "42")
 	req = setTokenContextWithClaims(req, map[string]interface{}{
 		"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
 	})
@@ -364,7 +364,7 @@ func TestHandleUserOTPPut_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/otp", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			req = setChiURLParam(req, "id", "42")
+			req.SetPathValue("id", "42")
 			req = setTokenContextWithClaims(req, map[string]interface{}{
 				"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1),
 			})

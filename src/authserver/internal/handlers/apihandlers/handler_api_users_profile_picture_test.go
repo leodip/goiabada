@@ -1,14 +1,12 @@
 package apihandlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
@@ -21,11 +19,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setChiURLParam sets a chi URL parameter on the request
-func setChiURLParam(req *http.Request, key, value string) *http.Request {
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add(key, value)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+// withPathValue sets a route's path value on the request and returns it.
+func withPathValue(req *http.Request, key, value string) *http.Request {
+	req.SetPathValue(key, value)
+	return req
 }
 
 // setTokenContextWithClaims sets a JWT token with custom claims in the request context
@@ -61,7 +58,7 @@ func TestHandleUserProfilePictureGet_InvalidUserId(t *testing.T) {
 	handler := HandleUserProfilePictureGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/invalid/profile-picture", nil)
-	req = setChiURLParam(req, "id", "invalid")
+	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -80,7 +77,7 @@ func TestHandleUserProfilePictureGet_UserNotFound(t *testing.T) {
 	handler := HandleUserProfilePictureGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
@@ -106,7 +103,7 @@ func TestHandleUserProfilePictureGet_HasPicture(t *testing.T) {
 	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -130,7 +127,7 @@ func TestHandleUserProfilePictureGet_NoPicture(t *testing.T) {
 	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/123/profile-picture", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -171,7 +168,7 @@ func TestHandleUserProfilePicturePost_InvalidUserId(t *testing.T) {
 	handler := HandleUserProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/admin/users/invalid/profile-picture", nil)
-	req = setChiURLParam(req, "id", "invalid")
+	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -193,7 +190,7 @@ func TestHandleUserProfilePicturePost_UserNotFound(t *testing.T) {
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
@@ -222,7 +219,7 @@ func TestHandleUserProfilePicturePost_InvalidImage(t *testing.T) {
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", invalidImageData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -255,7 +252,7 @@ func TestHandleUserProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *tes
 	require.Greater(t, len(pictureData), 64)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -283,7 +280,7 @@ func TestHandleUserProfilePicturePost_CreateNew(t *testing.T) {
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
@@ -326,7 +323,7 @@ func TestHandleUserProfilePicturePost_UpdateExisting(t *testing.T) {
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
@@ -376,7 +373,7 @@ func TestHandleUserProfilePictureDelete_InvalidUserId(t *testing.T) {
 	handler := HandleUserProfilePictureDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/invalid/profile-picture", nil)
-	req = setChiURLParam(req, "id", "invalid")
+	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -396,7 +393,7 @@ func TestHandleUserProfilePictureDelete_UserNotFound(t *testing.T) {
 	handler := HandleUserProfilePictureDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
@@ -424,7 +421,7 @@ func TestHandleUserProfilePictureDelete_Success(t *testing.T) {
 	adminSub := fake.UUID()
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
@@ -455,7 +452,7 @@ func TestHandleUserProfilePictureDelete_DatabaseError(t *testing.T) {
 	user := &record.User{Id: 123, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/users/123/profile-picture", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)

@@ -61,7 +61,7 @@ func redescribed(stored []record.Permission, identifier, description string) []a
 // token carries scope, or with no validated token at all when scope is empty.
 func serveResourcePermsWithScope(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body, scope string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(body))
-	r = setChiURLParam(r, "resourceId", "7")
+	r.SetPathValue("resourceId", "7")
 	if scope != "" {
 		r = setTokenContextWithClaims(r, map[string]interface{}{"scope": scope, "sub": grantCaller})
 	}

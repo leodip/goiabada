@@ -30,7 +30,7 @@ func clientRefusalRequest(method, target, body, acceptLanguage string) *http.Req
 	r := httptest.NewRequest(method, target, strings.NewReader(body))
 	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
-	return inRequestLanguage(setChiURLParam(r, "id", "7"), acceptLanguage)
+	return inRequestLanguage(withPathValue(r, "id", "7"), acceptLanguage)
 }
 
 // serveClient answers one request to the handler built over a database holding stored as client 7,

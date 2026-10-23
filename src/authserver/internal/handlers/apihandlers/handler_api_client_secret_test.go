@@ -21,12 +21,12 @@ import (
 // /clients/{id} carries no secret, so admin-read, which reaches the detail and not this route,
 // receives no credential (#402 decision 8, #403).
 
-// clientSecretRequest is GET /api/v1/admin/clients/{id}/secret with its chi parameter and a manage
+// clientSecretRequest is GET /api/v1/admin/clients/{id}/secret with its path value and a manage
 // token, which the target ceiling reads nothing for, whose sub is the caller an audit row names.
 func clientSecretRequest(id string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/clients/"+id+"/secret", nil)
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": "the-caller"})
-	return setChiURLParam(r, "id", id)
+	return withPathValue(r, "id", id)
 }
 
 func TestHandleClientSecretGet_AnswersTheDecryptedSecretAndRecordsTheRead(t *testing.T) {
@@ -131,7 +131,7 @@ func TestHandleClientGet_CarriesNoClientSecret(t *testing.T) {
 		Return(&record.Client{Id: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
 	stubClientResponseLoads(database)
 
-	r := setChiURLParam(httptest.NewRequest(http.MethodGet, "/api/v1/admin/clients/7", nil), "id", "7")
+	r := withPathValue(httptest.NewRequest(http.MethodGet, "/api/v1/admin/clients/7", nil), "id", "7")
 	rr := httptest.NewRecorder()
 	HandleClientGet(database).ServeHTTP(rr, r)
 

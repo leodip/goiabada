@@ -11,7 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
@@ -117,10 +116,8 @@ func serveRedirectURIsSave(db data.Database, auditLogger apihandlers.AuditLogger
 	id := strconv.FormatInt(clientId, 10)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", id)
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = reqctx.WithSettings(ctx, &record.Settings{Id: 1})
+	req.SetPathValue("id", id)
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})
 
 	rr := httptest.NewRecorder()
 	apihandlers.HandleClientRedirectURIsPut(db, auditLogger).ServeHTTP(rr, req.WithContext(ctx))

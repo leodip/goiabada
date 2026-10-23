@@ -31,7 +31,7 @@ const (
 
 func codeGenRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users/73/email/verification-code", nil)
-	req = setChiURLParam(req, "id", "73")
+	req.SetPathValue("id", "73")
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 }
 

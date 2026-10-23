@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
@@ -153,12 +152,10 @@ func (d *parkedAfterTheRemovalCounted) CountEnabledUsersHoldingPermission(ctx co
 func serveAsManage(handler http.HandlerFunc, method, target string, params map[string]string, body []byte) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, target, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	rctx := chi.NewRouteContext()
 	for key, value := range params {
-		rctx.URLParams.Add(key, value)
+		req.SetPathValue(key, value)
 	}
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = reqctx.WithSettings(ctx, &record.Settings{Id: 1})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})
 	ctx = reqctx.WithValidatedToken(ctx, oauth.JwtToken{Claims: map[string]interface{}{
 		"sub":   "last-administrator-test",
 		"scope": builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,

@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -40,7 +38,7 @@ func HandleUserSessionsGet(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -116,7 +114,7 @@ func HandleUserSessionDelete(
 		// Authentication and authorization handled by middleware
 
 		// Get session ID from URL parameter
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "User session ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
