@@ -60,7 +60,7 @@ func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T)
 	}
 
 	req := handlertest.Request(http.MethodPost, "/admin/users/9/phone?page=2&query=ana",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "9"),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "9"),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
 		handlertest.WithForm(url.Values{"phoneCountryUniqueId": {"BRA_0"}, "phoneNumber": {"12"}}))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))

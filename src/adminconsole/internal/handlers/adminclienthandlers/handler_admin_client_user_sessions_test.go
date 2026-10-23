@@ -79,7 +79,7 @@ func TestHandleUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 	)
 
 	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -114,7 +114,7 @@ func TestHandleUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 	)
 
 	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -147,7 +147,7 @@ func TestHandleUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 	)
 
 	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -184,7 +184,7 @@ func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T)
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 	)
 
 	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -224,7 +224,7 @@ func TestHandleUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 	)
 
 	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -257,7 +257,7 @@ func TestHandleUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) 
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 	)
 
 	HandleUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -337,7 +337,7 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 			}
 
 			opts := []handlertest.Option{
-				handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 			}
 			if testCase.sid == "" {
@@ -392,7 +392,7 @@ func TestHandleUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T
 
 	req := handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 	)
 

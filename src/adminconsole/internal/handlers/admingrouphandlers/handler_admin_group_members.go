@@ -9,8 +9,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // groupMembersAPI is what the group members page needs: the group, and its members.
@@ -26,7 +24,7 @@ func HandleMembersGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return

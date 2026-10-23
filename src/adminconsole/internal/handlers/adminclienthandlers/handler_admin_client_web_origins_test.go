@@ -86,7 +86,7 @@ func TestHandleWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/web-origins",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("clientId", "7"),
+		handlertest.WithPathValue("clientId", "7"),
 	)
 
 	httpSession := newTestSessionStore()

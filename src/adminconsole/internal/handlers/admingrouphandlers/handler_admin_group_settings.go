@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -29,7 +28,7 @@ func HandleSettingsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -96,7 +95,7 @@ func HandleSettingsPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return

@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -112,13 +111,13 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 
 			req := handlertest.Request(http.MethodPost,
 				"/admin/resources/3/users-with-permission/9/permissions/5/remove",
-				handlertest.WithAccessToken())
+				handlertest.WithAccessToken(),
+				handlertest.WithPathValue("resourceId", "3"),
+				handlertest.WithPathValue("userId", "9"),
+				handlertest.WithPathValue("permissionId", "5"))
 
-			router := chi.NewRouter()
-			router.Post("/admin/resources/{resourceId}/users-with-permission/{userId}/permissions/{permissionId}/remove",
-				HandleUsersWithPermissionRemovePermissionPost(httpHelper,
-					&usersWithPermissionApiClient{err: testCase.apiErr}))
-			router.ServeHTTP(httptest.NewRecorder(), req)
+			HandleUsersWithPermissionRemovePermissionPost(httpHelper,
+				&usersWithPermissionApiClient{err: testCase.apiErr}).ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 			require.Error(t, captured, "the handler answered nothing")

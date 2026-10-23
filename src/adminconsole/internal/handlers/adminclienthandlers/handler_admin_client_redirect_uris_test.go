@@ -342,7 +342,7 @@ func TestHandleRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/redirect-uris",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("clientId", "7"),
+				handlertest.WithPathValue("clientId", "7"),
 			)
 
 			httpSession := newTestSessionStore()

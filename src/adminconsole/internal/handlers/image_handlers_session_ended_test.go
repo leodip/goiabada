@@ -148,7 +148,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 				opts = append(opts, pictureForm(t)...)
 			}
 			if testCase.routeParam[0] != "" {
-				opts = append(opts, handlertest.WithRouteParam(testCase.routeParam[0], testCase.routeParam[1]))
+				opts = append(opts, handlertest.WithPathValue(testCase.routeParam[0], testCase.routeParam[1]))
 			}
 
 			w := httptest.NewRecorder()

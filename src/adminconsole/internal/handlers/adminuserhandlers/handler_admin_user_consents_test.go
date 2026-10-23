@@ -41,7 +41,7 @@ func revokeConsent(t *testing.T, apiClient *consentsApiClient, consentId string)
 	t.Helper()
 
 	req := handlertest.Request(http.MethodPost, "/admin/users/42/consents",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42"),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42"),
 		handlertest.WithBody(strings.NewReader(`{"consentId":`+consentId+`}`)),
 		handlertest.WithContentType("application/json"))
 	recorder := httptest.NewRecorder()

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -32,7 +31,7 @@ func HandleTokensGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "clientId")
+		idStr := r.PathValue("clientId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -120,7 +119,7 @@ func HandleTokensPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "clientId")
+		idStr := r.PathValue("clientId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return

@@ -167,7 +167,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandlePermissionsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/permissions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleLogoGet",
@@ -175,7 +175,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleLogoGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/logo",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleDeleteGet",
@@ -183,7 +183,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleTokensGet",
@@ -191,7 +191,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleTokensGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/tokens",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleSettingsGet",
@@ -199,7 +199,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleSettingsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleOAuth2FlowsGet",
@@ -207,7 +207,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleOAuth2FlowsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleRedirectURIsGet",
@@ -215,7 +215,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleRedirectURIsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/redirect-uris",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleUserSessionsGet",
@@ -223,7 +223,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandleUserSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
 			name: "HandleUserSessionsPost",
@@ -232,7 +232,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "DeleteUserSessionById",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)),
 				handlertest.WithContentType("application/json")),
 		},
@@ -253,7 +253,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClient",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}, "enabled": {"on"}})),
 		},
 		{
@@ -263,7 +263,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClientAuthentication",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/authentication",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{"publicConfidential": {"confidential"}, "clientSecret": {"a-secret"}})),
 		},
 		{
@@ -273,7 +273,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClientOAuth2Flows",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/oauth2-flows",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{"authCodeEnabled": {"on"}})),
 		},
 		{
@@ -283,7 +283,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClientRedirectURIs",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/redirect-uris",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(
 					`{"clientId":3,"redirectURIs":["https://app.example.test/callback"],"expectedRedirectURIs":[]}`)),
 				handlertest.WithContentType("application/json")),
@@ -295,7 +295,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClientWebOrigins",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/web-origins",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(
 					`{"clientId":3,"webOrigins":["https://app.example.test"],"expectedWebOrigins":[]}`)),
 				handlertest.WithContentType("application/json")),
@@ -307,7 +307,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClientTokens",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/tokens",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{
 					"tokenExpirationInSeconds":                {"300"},
 					"refreshTokenOfflineIdleTimeoutInSeconds": {"3600"},
@@ -323,7 +323,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "UpdateClientPermissions",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/permissions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(
 					`{"clientId":3,"assignedPermissionsIds":[5],"expectedPermissionIds":[]}`)),
 				handlertest.WithContentType("application/json")),
@@ -335,7 +335,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "DeleteClient",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}})),
 		},
 		{
@@ -353,7 +353,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			},
 			write: "DeleteClientLogo",
 			request: handlertest.Request(http.MethodDelete, "/admin/clients/3/logo",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 	}
 
@@ -405,7 +405,7 @@ func TestAdminClientHandlers_TheAllowanceWriteCarriesTheRequestsContext(t *testi
 	request := handlertest.Request(http.MethodPost, "/admin/clients/3/settings",
 		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{
 			AccessToken: handlertest.AccessToken, Scope: manageGrant}}),
-		handlertest.WithRouteParam("clientId", "3"),
+		handlertest.WithPathValue("clientId", "3"),
 		handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}, "administrativeScopesAllowed": {"on"}}))
 	marked := request.WithContext(context.WithValue(request.Context(), clientCtxMarkerKey{}, "allowance"))
 
@@ -444,7 +444,7 @@ func logoUpload(clientId string) *http.Request {
 	_ = writer.Close()
 
 	return handlertest.Request(http.MethodPost, "/admin/clients/"+clientId+"/logo",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", clientId),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", clientId),
 		handlertest.WithContentType(writer.FormDataContentType()),
 		handlertest.WithBody(bytes.NewReader(buf.Bytes())))
 }

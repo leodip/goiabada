@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -82,13 +81,12 @@ func TestHandleEmailPost_AnswersAFailedWrite(t *testing.T) {
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_email.html").Once()
 			}
 
-			router := chi.NewRouter()
 			// The session store is nil: every row fails before the success path reaches it.
-			router.Post("/admin/users/{userId}/email", HandleEmailPost(httpHelper, nil,
-				&userEmailApiClient{updateErr: testCase.err}, consoleBaseURL))
-			router.ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodPost,
-				"/admin/users/42/email?page=2&query=bob", handlertest.WithAccessToken(),
-				handlertest.WithForm(url.Values{"email": {" Taken@Example.com "}, "emailVerified": {"on"}})))
+			HandleEmailPost(httpHelper, nil, &userEmailApiClient{updateErr: testCase.err}, consoleBaseURL).
+				ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodPost,
+					"/admin/users/42/email?page=2&query=bob", handlertest.WithAccessToken(),
+					handlertest.WithPathValue("userId", "42"),
+					handlertest.WithForm(url.Values{"email": {" Taken@Example.com "}, "emailVerified": {"on"}})))
 
 			httpHelper.AssertExpectations(t)
 			if testCase.wantNotFound || testCase.wantError {

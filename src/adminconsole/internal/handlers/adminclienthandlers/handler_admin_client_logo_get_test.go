@@ -6,16 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
-	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The logo is the one read on this page the page can do without, and a 401 is the one failure of
@@ -63,18 +60,10 @@ func TestHandleLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 
 			httpHelper := &stubHttpHelper{}
-			router := chi.NewRouter()
-			router.Use(func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					ctx := reqctx.WithJwtInfo(r.Context(),
-						oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
-					next.ServeHTTP(w, r.WithContext(ctx))
-				})
-			})
-			router.Get("/admin/clients/{clientId}/logo", HandleLogoGet(httpHelper, &logoApiClient{logoErr: tc.logoErr}))
-
 			recorder := httptest.NewRecorder()
-			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/clients/42/logo", nil))
+			HandleLogoGet(httpHelper, &logoApiClient{logoErr: tc.logoErr}).ServeHTTP(recorder,
+				handlertest.Request(http.MethodGet, "/admin/clients/42/logo",
+					handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "42")))
 
 			if tc.ended {
 				assert.Equal(t, http.StatusFound, recorder.Code)

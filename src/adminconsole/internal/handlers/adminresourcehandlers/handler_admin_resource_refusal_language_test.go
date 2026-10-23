@@ -63,7 +63,7 @@ func TestAdminResourceDeletePost_RefusesInThePagesLanguage(t *testing.T) {
 
 				handler := HandleDeletePost(httpHelper, &systemLevelApiClient{resource: testCase.resource}, consoleBaseURL)
 				req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
-					handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"),
+					handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"),
 					handlertest.WithLocale(language.tag),
 					handlertest.WithForm(url.Values{"resourceIdentifier": {testCase.identifier}}))
 				handler.ServeHTTP(httptest.NewRecorder(), req)

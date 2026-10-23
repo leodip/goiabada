@@ -21,7 +21,7 @@ import (
 // sentinel reqctx declares, through whichever writer its route answers with, and consults the API
 // with nothing (#440).
 func TestAdminClientHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T) {
-	routed := handlertest.WithRouteParam("clientId", "3")
+	routed := handlertest.WithPathValue("clientId", "3")
 	jsonBody := func() handlertest.Option {
 		return handlertest.WithBody(strings.NewReader(`{"clientId":3}`))
 	}

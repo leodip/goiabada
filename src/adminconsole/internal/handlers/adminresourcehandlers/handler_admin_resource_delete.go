@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -27,7 +26,7 @@ func HandleDeleteGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "resourceId")
+		idStr := r.PathValue("resourceId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -79,7 +78,7 @@ func HandleDeletePost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "resourceId")
+		idStr := r.PathValue("resourceId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return

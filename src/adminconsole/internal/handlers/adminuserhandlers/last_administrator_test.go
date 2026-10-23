@@ -80,7 +80,7 @@ func TestHandleDetailsPost_TheLastAdministratorRefusalIsShownOnThePage(t *testin
 
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/details",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 		handlertest.WithForm(url.Values{}),
 	)
 
@@ -105,7 +105,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/delete",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 		handlertest.WithForm(url.Values{"email": {"admin@example.com"}}),
 	)
 	rec := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 func TestHandlePermissionsPost_TheLastAdministratorRefusalReachesTheBrowser(t *testing.T) {
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/permissions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 		handlertest.WithBody(bytes.NewBufferString(`{"assignedPermissionsIds":[],"expectedPermissionIds":[1]}`)),
 	)
 	rec := httptest.NewRecorder()
@@ -140,7 +140,7 @@ func TestHandlePermissionsPost_TheLastAdministratorRefusalReachesTheBrowser(t *t
 func TestHandleGroupsPost_TheLastAdministratorRefusalReachesTheBrowser(t *testing.T) {
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/groups",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 		handlertest.WithBody(bytes.NewBufferString(`{"assignedGroupsIds":[],"expectedGroupIds":[2]}`)),
 	)
 	rec := httptest.NewRecorder()

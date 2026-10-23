@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -119,20 +118,18 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 
 			req := handlertest.Request(http.MethodPost, "/admin/resources/3/permissions",
 				handlertest.WithAccessToken(),
+				handlertest.WithPathValue("resourceId", "3"),
 				handlertest.WithBody(bytes.NewReader(body)),
 			)
 			rec := httptest.NewRecorder()
 
-			router := chi.NewRouter()
-			router.Post("/admin/resources/{resourceId}/permissions",
-				HandlePermissionsPost(
-					render.New(nil, nil),
-					nil,
-					&savePermissionsApiClient{
-						resource:  &api.ResourceResponse{Id: 3},
-						updateErr: testCase.updateErr,
-					}))
-			router.ServeHTTP(rec, req)
+			HandlePermissionsPost(
+				render.New(nil, nil),
+				nil,
+				&savePermissionsApiClient{
+					resource:  &api.ResourceResponse{Id: 3},
+					updateErr: testCase.updateErr,
+				}).ServeHTTP(rec, req)
 
 			assert.Equal(t, testCase.wantStatus, rec.Code,
 				"the API's status is what the browser has to see; a 200 here reports a save that did not happen")

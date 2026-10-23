@@ -185,7 +185,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/permissions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleDetailsGet",
@@ -193,7 +193,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleDetailsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/details",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleDetailsPost",
@@ -201,7 +201,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleDetailsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/details",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{"enabled": {"on"}})),
 		},
 		{
@@ -210,7 +210,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleProfileGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/profile",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleProfilePost",
@@ -218,7 +218,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleProfilePost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/profile",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{"username": {"jdoe"}})),
 		},
 		{
@@ -227,7 +227,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleEmailGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/email",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleEmailPost",
@@ -235,7 +235,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleEmailPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/email",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{"email": {"jane@example.com"}})),
 		},
 		{
@@ -244,7 +244,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAddressGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/address",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleAddressPost",
@@ -252,7 +252,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAddressPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/address",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{})),
 		},
 		{
@@ -261,7 +261,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandlePhoneGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/phone",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleAuthenticationGet",
@@ -269,7 +269,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAuthenticationGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/authentication",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleAuthenticationPost",
@@ -277,7 +277,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAuthenticationPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/authentication",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{})),
 		},
 		{
@@ -286,7 +286,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandlePictureGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/picture",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleProfilePicturePost",
@@ -301,7 +301,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleProfilePictureDelete(h, c)
 			},
 			request: handlertest.Request(http.MethodDelete, "/admin/users/42/profile-picture",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleGroupsGet",
@@ -309,7 +309,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleGroupsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/groups",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleGroupsPost",
@@ -317,7 +317,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleGroupsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/groups",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithBody(strings.NewReader(`{"assignedGroupsIds":[5]}`)),
 				handlertest.WithContentType("application/json")),
 		},
@@ -327,7 +327,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/attributes",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleAttributesRemovePost",
@@ -335,8 +335,8 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAttributesRemovePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/21/remove",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
-				handlertest.WithRouteParam("attributeId", "21")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
+				handlertest.WithPathValue("attributeId", "21")),
 		},
 		{
 			name: "HandleAttributesAddGet",
@@ -344,7 +344,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/attributes/add",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleAttributesAddPost",
@@ -352,7 +352,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAttributesAddPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/add",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}})),
 		},
 		{
@@ -361,8 +361,8 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAttributesEditGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/attributes/21/edit",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
-				handlertest.WithRouteParam("attributeId", "21")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
+				handlertest.WithPathValue("attributeId", "21")),
 		},
 		{
 			name: "HandleAttributesEditPost",
@@ -370,8 +370,8 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleAttributesEditPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/21/edit",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
-				handlertest.WithRouteParam("attributeId", "21"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
+				handlertest.WithPathValue("attributeId", "21"),
 				handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}})),
 		},
 		{
@@ -380,7 +380,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleConsentsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/consents",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleConsentsPost",
@@ -388,7 +388,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleConsentsPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/consents",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithBody(strings.NewReader(`{"consentId":13}`)),
 				handlertest.WithContentType("application/json")),
 		},
@@ -398,7 +398,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/sessions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleSessionsPost",
@@ -406,7 +406,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleSessionsPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/sessions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)),
 				handlertest.WithContentType("application/json")),
 		},
@@ -416,7 +416,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
 			name: "HandleDeletePost",
@@ -424,7 +424,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				return HandleDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 				handlertest.WithForm(url.Values{})),
 		},
 	}
@@ -470,7 +470,7 @@ func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) 
 	apiClient := &ctxRecordingApiClient{}
 
 	request := handlertest.Request(http.MethodPost, "/admin/users/42/phone",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42"),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42"),
 		handlertest.WithForm(url.Values{"phoneCountryUniqueId": {"BRA_0"}, "phoneNumber": {"5551234"}}))
 	marked := request.WithContext(context.WithValue(request.Context(), userCtxMarkerKey{}, "phone"))
 
@@ -493,7 +493,7 @@ func pictureUpload(userId string) *http.Request {
 	_ = writer.Close()
 
 	return handlertest.Request(http.MethodPost, "/admin/users/"+userId+"/profile-picture",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
 		handlertest.WithContentType(writer.FormDataContentType()),
 		handlertest.WithBody(bytes.NewReader(buf.Bytes())))
 }

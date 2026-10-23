@@ -80,7 +80,7 @@ func TestHandleGroupsPost_SendsTheLoadedList(t *testing.T) {
 			httpHelper := render.New(nil, nil)
 			req := handlertest.Request(http.MethodPost, "/admin/users/5/groups",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("userId", "5"),
+				handlertest.WithPathValue("userId", "5"),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),
 			)
 
@@ -106,7 +106,7 @@ func TestHandleGroupsPost_AConflictReachesTheBrowser(t *testing.T) {
 	httpHelper := render.New(nil, nil)
 	req := handlertest.Request(http.MethodPost, "/admin/users/5/groups",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "5"),
+		handlertest.WithPathValue("userId", "5"),
 		handlertest.WithBody(bytes.NewBufferString(`{"assignedGroupsIds":[6],"expectedGroupIds":[3]}`)),
 	)
 	rec := httptest.NewRecorder()

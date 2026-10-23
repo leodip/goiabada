@@ -79,7 +79,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 			httpHelper := render.New(nil, nil)
 			req := handlertest.Request(http.MethodPost, "/admin/users/5/permissions",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("userId", "5"),
+				handlertest.WithPathValue("userId", "5"),
 				handlertest.WithBody(bytes.NewBufferString(tc.body)),
 			)
 
@@ -105,7 +105,7 @@ func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	httpHelper := render.New(nil, nil)
 	req := handlertest.Request(http.MethodPost, "/admin/users/5/permissions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "5"),
+		handlertest.WithPathValue("userId", "5"),
 		handlertest.WithBody(bytes.NewBufferString(`{"assignedPermissionsIds":[6],"expectedPermissionIds":[3]}`)),
 	)
 	rec := httptest.NewRecorder()

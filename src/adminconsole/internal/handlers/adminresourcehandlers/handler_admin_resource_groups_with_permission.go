@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
@@ -210,7 +209,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		groupIdStr := chi.URLParam(r, "groupId")
+		groupIdStr := r.PathValue("groupId")
 		if len(groupIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -232,7 +231,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissionIdStr := chi.URLParam(r, "permissionId")
+		permissionIdStr := r.PathValue("permissionId")
 		if len(permissionIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -309,7 +308,7 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		groupIdStr := chi.URLParam(r, "groupId")
+		groupIdStr := r.PathValue("groupId")
 		if len(groupIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -331,7 +330,7 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissionIdStr := chi.URLParam(r, "permissionId")
+		permissionIdStr := r.PathValue("permissionId")
 		if len(permissionIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return

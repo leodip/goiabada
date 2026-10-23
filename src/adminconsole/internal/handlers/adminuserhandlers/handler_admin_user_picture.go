@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -29,7 +28,7 @@ func HandlePictureGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "userId")
+		idStr := r.PathValue("userId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -112,7 +111,7 @@ func HandleProfilePicturePost(
 		}
 
 		// Get user ID from URL
-		userIdStr := chi.URLParam(r, "userId")
+		userIdStr := r.PathValue("userId")
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
@@ -172,7 +171,7 @@ func HandleProfilePictureDelete(
 		}
 
 		// Get user ID from URL
-		userIdStr := chi.URLParam(r, "userId")
+		userIdStr := r.PathValue("userId")
 		userId, err := strconv.ParseInt(userIdStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)

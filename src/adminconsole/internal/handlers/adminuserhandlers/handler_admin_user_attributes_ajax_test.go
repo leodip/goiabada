@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -61,8 +60,6 @@ func (*attributesApiClient) GetUserConsents(context.Context, string, int64) ([]a
 }
 
 func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) {
-	const routePattern = "/admin/users/{userId}/attributes/{attributeId}/remove"
-
 	present := &api.UserResponse{Id: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
@@ -70,75 +67,82 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 
 	testCases := []struct {
 		name string
-		// target is the URL. When routed is false the handler runs without a chi route context,
-		// which is how an unbound URL parameter reads from inside chi.URLParam.
-		target     string
-		routed     bool
-		withJwt    bool
-		user       *api.UserResponse
-		userErr    error
-		attributes []api.UserAttributeResponse
+		// target is the URL. userId and attributeId are the path values the route binds from it,
+		// both empty for a request the router never bound, which is how an unbound parameter reads
+		// from r.PathValue.
+		target      string
+		userId      string
+		attributeId string
+		withJwt     bool
+		user        *api.UserResponse
+		userErr     error
+		attributes  []api.UserAttributeResponse
 		// wantStatus is the HTTP status the handler must choose; 0 means it must take JSONError's
 		// generic 500 arm instead, with a bare error rather than an *ErrorDetail.
 		wantStatus int
 	}{
 		{
-			name:       "a user id that does not parse",
-			target:     "/admin/users/not-a-number/attributes/7/remove",
-			routed:     true,
-			withJwt:    true,
-			user:       present,
-			attributes: attributes,
-			wantStatus: http.StatusNotFound,
+			name:        "a user id that does not parse",
+			target:      "/admin/users/not-a-number/attributes/7/remove",
+			userId:      "not-a-number",
+			attributeId: "7",
+			withJwt:     true,
+			user:        present,
+			attributes:  attributes,
+			wantStatus:  http.StatusNotFound,
 		},
 		{
 			name:       "a user id the router never bound",
 			target:     "/admin/users/42/attributes/7/remove",
-			routed:     false,
 			withJwt:    true,
 			user:       present,
 			attributes: attributes,
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			name:       "an attribute id that does not parse",
-			target:     "/admin/users/42/attributes/not-a-number/remove",
-			routed:     true,
-			withJwt:    true,
-			user:       present,
-			attributes: attributes,
-			wantStatus: http.StatusNotFound,
+			name:        "an attribute id that does not parse",
+			target:      "/admin/users/42/attributes/not-a-number/remove",
+			userId:      "42",
+			attributeId: "not-a-number",
+			withJwt:     true,
+			user:        present,
+			attributes:  attributes,
+			wantStatus:  http.StatusNotFound,
 		},
 		{
-			name:       "a user the API says is gone",
-			target:     "/admin/users/42/attributes/7/remove",
-			routed:     true,
-			withJwt:    true,
-			userErr:    gone,
-			wantStatus: http.StatusNotFound,
+			name:        "a user the API says is gone",
+			target:      "/admin/users/42/attributes/7/remove",
+			userId:      "42",
+			attributeId: "7",
+			withJwt:     true,
+			userErr:     gone,
+			wantStatus:  http.StatusNotFound,
 		},
 		{
-			name:       "an attribute that is no longer on the user",
-			target:     "/admin/users/42/attributes/7/remove",
-			routed:     true,
-			withJwt:    true,
-			user:       present,
-			attributes: []api.UserAttributeResponse{{Id: 99}},
-			wantStatus: http.StatusNotFound,
+			name:        "an attribute that is no longer on the user",
+			target:      "/admin/users/42/attributes/7/remove",
+			userId:      "42",
+			attributeId: "7",
+			withJwt:     true,
+			user:        present,
+			attributes:  []api.UserAttributeResponse{{Id: 99}},
+			wantStatus:  http.StatusNotFound,
 		},
 		{
-			name:    "no JWT info in context, which is a middleware invariant and stays a 500",
-			target:  "/admin/users/42/attributes/7/remove",
-			routed:  true,
-			withJwt: false,
-			user:    present,
+			name:        "no JWT info in context, which is a middleware invariant and stays a 500",
+			target:      "/admin/users/42/attributes/7/remove",
+			userId:      "42",
+			attributeId: "7",
+			withJwt:     false,
+			user:        present,
 		},
 		{
-			name:    "a 500 from the API, which is a server fault and stays a 500",
-			target:  "/admin/users/42/attributes/7/remove",
-			routed:  true,
-			withJwt: true,
-			userErr: broken,
+			name:        "a 500 from the API, which is a server fault and stays a 500",
+			target:      "/admin/users/42/attributes/7/remove",
+			userId:      "42",
+			attributeId: "7",
+			withJwt:     true,
+			userErr:     broken,
 		},
 	}
 
@@ -155,6 +159,11 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			if testCase.withJwt {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
+			if testCase.userId != "" {
+				opts = append(opts,
+					handlertest.WithPathValue("userId", testCase.userId),
+					handlertest.WithPathValue("attributeId", testCase.attributeId))
+			}
 			req := handlertest.Request(http.MethodPost, testCase.target, opts...)
 
 			apiClient := &attributesApiClient{
@@ -165,13 +174,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			handler := HandleAttributesRemovePost(httpHelper, apiClient)
 			w := httptest.NewRecorder()
 
-			if testCase.routed {
-				router := chi.NewRouter()
-				router.Post(routePattern, handler)
-				router.ServeHTTP(w, req)
-			} else {
-				handler.ServeHTTP(w, req)
-			}
+			handler.ServeHTTP(w, req)
 
 			httpHelper.AssertExpectations(t)
 			require.Error(t, captured, "the handler answered nothing")
@@ -216,13 +219,12 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 
 			req := handlertest.Request(http.MethodPost, "/admin/users/42/consents",
 				handlertest.WithAccessToken(),
+				handlertest.WithPathValue("userId", "42"),
 				handlertest.WithBody(strings.NewReader(testCase.body)),
 			)
 
-			router := chi.NewRouter()
-			router.Post("/admin/users/{userId}/consents",
-				HandleConsentsPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}))
-			router.ServeHTTP(httptest.NewRecorder(), req)
+			HandleConsentsPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}).
+				ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 			var detail *oauth.ErrorDetail

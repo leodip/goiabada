@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -102,15 +101,13 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 
 			req := handlertest.Request(http.MethodPost, "/admin/groups/7/attributes/add",
 				handlertest.WithAccessToken(),
+				handlertest.WithPathValue("groupId", "7"),
 				handlertest.WithBody(strings.NewReader("attributeKey=k&attributeValue=v")),
 				handlertest.WithContentType("application/x-www-form-urlencoded"),
 			)
 
-			router := chi.NewRouter()
-			router.Post("/admin/groups/{groupId}/attributes/add",
-				HandleAttributesAddPost(httpHelper,
-					&attributesAddApiClient{err: testCase.apiErr}))
-			router.ServeHTTP(httptest.NewRecorder(), req)
+			HandleAttributesAddPost(httpHelper,
+				&attributesAddApiClient{err: testCase.apiErr}).ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 			if testCase.want == answerRenderForm {

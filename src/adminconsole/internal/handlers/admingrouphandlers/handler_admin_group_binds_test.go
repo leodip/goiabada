@@ -67,7 +67,7 @@ func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page stri
 
 	req := handlertest.Request(http.MethodGet, target,
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("groupId", "4"),
+		handlertest.WithPathValue("groupId", "4"),
 	)
 
 	handler(httpHelper).ServeHTTP(httptest.NewRecorder(), req)

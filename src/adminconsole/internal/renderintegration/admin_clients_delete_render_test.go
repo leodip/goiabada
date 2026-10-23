@@ -40,7 +40,7 @@ func (d *deletePageAPI) DeleteClient(_ context.Context, _ string, _ int64) error
 // and returns the status and the page it answers with.
 func serveClientDelete(t *testing.T, handler http.HandlerFunc, method string, form url.Values) (int, string) {
 	t.Helper()
-	opts := []handlertest.Option{handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"),
+	opts := []handlertest.Option{handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"})}
 	if form != nil {
 		opts = append(opts, handlertest.WithForm(form))

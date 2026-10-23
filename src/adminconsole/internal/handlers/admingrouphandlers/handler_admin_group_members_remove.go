@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 )
@@ -22,7 +21,7 @@ func HandleMembersRemoveUserPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -34,7 +33,7 @@ func HandleMembersRemoveUserPost(
 			return
 		}
 
-		userIdStr := chi.URLParam(r, "userId")
+		userIdStr := r.PathValue("userId")
 		if len(userIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return

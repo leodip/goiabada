@@ -139,7 +139,7 @@ func profilePages(apiClient *profilePageAPI) []struct {
 			name:    "Users > Profile",
 			handler: adminuserhandlers.HandleProfilePost(renderer, nil, apiClient, "https://console.example"),
 			target:  "/admin/users/9/profile",
-			options: []handlertest.Option{handlertest.WithRouteParam("userId", "9")},
+			options: []handlertest.Option{handlertest.WithPathValue("userId", "9")},
 		},
 		{
 			name:    "Account > Profile",

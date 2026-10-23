@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -84,11 +83,9 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_picture.html").Once()
 			}
 
-			router := chi.NewRouter()
-			router.Get("/admin/users/{userId}/picture", HandlePictureGet(httpHelper,
-				&userPictureApiClient{picture: testCase.picture, err: testCase.err}))
-			router.ServeHTTP(httptest.NewRecorder(),
-				handlertest.Request(http.MethodGet, "/admin/users/42/picture", handlertest.WithAccessToken()))
+			HandlePictureGet(httpHelper, &userPictureApiClient{picture: testCase.picture, err: testCase.err}).
+				ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodGet, "/admin/users/42/picture",
+					handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42")))
 
 			httpHelper.AssertExpectations(t)
 			if testCase.wantNotFound || testCase.wantError {

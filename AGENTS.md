@@ -83,7 +83,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/` - Admin UI handlers
 - `internal/apiclient/` - The admin API client: `AuthServerClient`, its methods behind the one deadlined, bounded executor, and `APIError`. There is no interface over it: each handler declares an unexported port beside the function taking it, and each test fake implements the port of the handler it is passed to, embedding no interface, so a method a handler starts calling that a fake lacks fails to compile rather than panicking at test time. `TestAuthServerClient_TheCharacterizationCoversEveryMethod` holds every exported method to a wire characterization row. One file per resource the methods call, with no `_client.go` suffix, and a test beside the file of the method it tests; `layout_test.go` holds both (#386, #441)
 - `internal/publicsettings/` - The auth server's public settings every page renders with: `Client` reads `/api/public/settings` under its own timeout and bound, and `Cache` serves the answer for a TTL, every request arriving during a fetch sharing that one fetch with no lock held across it, and an `Invalidate` never undone by a fetch that started before it. It was `internal/cache`, and the client `apiclient.SettingsClient`, until #441
-- `internal/reqctx/` - The two request-scoped values, the signed-in administrator's token set and the auth server's public settings, each written by one middleware and read through a typed accessor over an unexported key; an absent value is `ErrNoJwtInfo` or `ErrNoSettings` rather than a panic. The twin of the auth server's, and the context-value guard holds the module to it with one exemption, `internal/handlertest/request.go`'s write of chi's route context (#440)
+- `internal/reqctx/` - The two request-scoped values, the signed-in administrator's token set and the auth server's public settings, each written by one middleware and read through a typed accessor over an unexported key; an absent value is `ErrNoJwtInfo` or `ErrNoSettings` rather than a panic. The twin of the auth server's, and the context-value guard holds the module to it with no exemption (#440, #462)
 - `internal/sessionbackend/` - The HTTP backend of `core/sessionstore` over the auth server's browser-session endpoint, the twin of the auth server's package of the same name, and its `TokenSource` port, which `oauthclient.SessionTokenSource` implements as a cache over the token client's client-credentials grant. It left `apiclient` in #441
 - `internal/sessionkeys/` - The two keys of the console's browser session, the token set and its expiry, and the six of its sealed sign-in handshake. Stored data: a live session carries the two spellings, so renaming one signs every administrator out at deploy, and renaming one of the six fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map and the callback deletes the stale copies a session written before #620 can hold. It was `internal/constants` until the context keys left for `reqctx` (#440, #620)
 - `web/template/` - Admin UI templates
@@ -558,8 +558,9 @@ console over its six, and which #387 wrote as that server's own lint before #440
 both applications, and before it
 `AssertContextValuesThroughAccessors`, which refuses a `context.WithValue` or a context `Value`
 read in a production file outside the module's accessor package, resolved with `go/types`, and
-which each application calls with its own `internal/reqctx`, the admin console naming one
-exemption, `internal/handlertest`'s write of chi's route context (#433, #440), and
+which each application calls with its own `internal/reqctx` and no exemption, the admin
+console's last, `internal/handlertest`'s write of chi's route context, gone once it set path
+values with `r.SetPathValue` (#433, #440, #462), and
 `AssertNoAgreementPointers`, which
 refuses a comment pointing at an issue's agreement or a probe file instead of stating the fact
 with its issue number (#428), plus `authserver/internal/data`'s

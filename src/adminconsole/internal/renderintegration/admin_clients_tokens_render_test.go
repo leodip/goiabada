@@ -87,7 +87,7 @@ func newRenderSessionStore(t *testing.T) sessionstore.Store {
 // and returns the page it answers with.
 func serveClientTokens(t *testing.T, handler http.HandlerFunc, method string, form url.Values) string {
 	t.Helper()
-	opts := []handlertest.Option{handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"),
+	opts := []handlertest.Option{handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"})}
 	if form != nil {
 		opts = append(opts, handlertest.WithForm(form))

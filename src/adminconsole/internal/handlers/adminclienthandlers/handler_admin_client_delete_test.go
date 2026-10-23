@@ -27,7 +27,7 @@ func TestAdminClientDeletePost_RefusesTheConsolesOwnClient(t *testing.T) {
 
 			handler := HandleDeletePost(httpHelper, &refusingClientApiClient{isSystemLevel: true}, consoleBaseURL)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/3/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{"clientIdentifier": {typed}}))
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, req)

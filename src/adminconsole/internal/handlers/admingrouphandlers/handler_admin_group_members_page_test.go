@@ -71,7 +71,7 @@ func renderMembers(t *testing.T, rawPage string, total int) (map[string]interfac
 		target += "?page=" + rawPage
 	}
 	req := handlertest.Request(http.MethodGet, target,
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "3"))
+		handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "3"))
 
 	apiClient := &membersPagingApiClient{total: total}
 	HandleMembersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)

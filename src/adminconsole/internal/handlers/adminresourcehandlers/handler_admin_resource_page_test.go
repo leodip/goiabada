@@ -175,7 +175,7 @@ func renderPermissionPage(t *testing.T, handler http.HandlerFunc, template, rawP
 		target += "?page=" + rawPage
 	}
 	req := handlertest.Request(http.MethodGet, target,
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"))
+		handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"))
 
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 

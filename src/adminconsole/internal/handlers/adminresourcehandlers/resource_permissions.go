@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -36,7 +35,7 @@ type resourcePermissions struct {
 // errNoSuchResource, reqctx.ErrNoJwtInfo or the API's error, and each caller answers it through
 // its own writers, so a JSON handler's every branch is still visibly JSON.
 func loadResourcePermissions(r *http.Request, apiClient resourceAndPermissionsReader) (resourcePermissions, error) {
-	resourceId, err := strconv.ParseInt(chi.URLParam(r, "resourceId"), 10, 64)
+	resourceId, err := strconv.ParseInt(r.PathValue("resourceId"), 10, 64)
 	if err != nil {
 		return resourcePermissions{}, errNoSuchResource
 	}

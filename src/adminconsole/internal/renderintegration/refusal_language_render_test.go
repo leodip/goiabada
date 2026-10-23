@@ -39,7 +39,7 @@ func (resourceToDelete) DeleteResource(context.Context, string, int64) error {
 // bound (#559 decision 4).
 func TestRender_AdminResourceDelete_TheConsolesRefusalIsInThePagesLanguage(t *testing.T) {
 	req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
 		handlertest.WithLocale("pt-BR"),
 		handlertest.WithForm(url.Values{"resourceIdentifier": {"shipping"}}))

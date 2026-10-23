@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -51,7 +50,7 @@ func (*notFoundGroupApiClient) UpdateGroup(context.Context, string, int64, *api.
 }
 
 func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
-	const routePattern = "/admin/groups/{groupId}/attributes"
+	const pathValueName = "groupId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
 	present := &api.GroupResponse{Id: 42}
@@ -60,10 +59,10 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		// target is the URL. When routed is false the handler is called without a chi route
-		// context, which is how an unbound URL parameter reads from inside chi.URLParam.
+		// target is the URL. id is the path value the route binds from it, and empty for a request
+		// the router never bound, which is how an unbound parameter reads from r.PathValue.
 		target       string
-		routed       bool
+		id           string
 		withJwt      bool
 		entity       *api.GroupResponse
 		apiErr       error
@@ -72,7 +71,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		{
 			name:         "an id that does not parse",
 			target:       "/admin/groups/not-a-number/attributes",
-			routed:       true,
+			id:           "not-a-number",
 			withJwt:      true,
 			entity:       present,
 			wantNotFound: true,
@@ -80,7 +79,6 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		{
 			name:         "an id the router never bound",
 			target:       "/admin/groups/42/attributes",
-			routed:       false,
 			withJwt:      true,
 			entity:       present,
 			wantNotFound: true,
@@ -88,7 +86,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		{
 			name:         "an entity the API says is gone",
 			target:       "/admin/groups/42/attributes",
-			routed:       true,
+			id:           "42",
 			withJwt:      true,
 			apiErr:       gone,
 			wantNotFound: true,
@@ -96,21 +94,21 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		{
 			name:         "an entity the API returns as nil without an error",
 			target:       "/admin/groups/42/attributes",
-			routed:       true,
+			id:           "42",
 			withJwt:      true,
 			wantNotFound: true,
 		},
 		{
 			name:    "no JWT info in context, which is a middleware invariant and stays a 500",
 			target:  "/admin/groups/42/attributes",
-			routed:  true,
+			id:      "42",
 			withJwt: false,
 			entity:  present,
 		},
 		{
 			name:    "a 500 from the API, which is a server fault and stays a 500",
 			target:  "/admin/groups/42/attributes",
-			routed:  true,
+			id:      "42",
 			withJwt: true,
 			apiErr:  broken,
 		},
@@ -130,19 +128,16 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			if testCase.withJwt {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
+			if testCase.id != "" {
+				opts = append(opts, handlertest.WithPathValue(pathValueName, testCase.id))
+			}
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
 			apiClient := &notFoundGroupApiClient{entity: testCase.entity, err: testCase.apiErr}
 			handler := HandleAttributesGet(httpHelper, apiClient)
 			w := httptest.NewRecorder()
 
-			if testCase.routed {
-				router := chi.NewRouter()
-				router.Get(routePattern, handler)
-				router.ServeHTTP(w, req)
-			} else {
-				handler.ServeHTTP(w, req)
-			}
+			handler.ServeHTTP(w, req)
 
 			httpHelper.AssertExpectations(t)
 		})
@@ -177,7 +172,7 @@ func TestGroupSettings_AGoneGroupAnswers404AndAFaultAnswers500(t *testing.T) {
 			}
 
 			req := handlertest.Request(http.MethodGet, "/admin/groups/42/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "42"))
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "42"))
 			apiClient := &notFoundGroupApiClient{err: testCase.apiErr}
 
 			// The session store is nil: neither answer reaches it.

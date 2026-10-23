@@ -7,16 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
-	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
 )
 
@@ -58,21 +55,11 @@ func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *te
 	httpHelper := &stubHttpHelper{}
 	apiClient := &logoApiClient{logoErr: errs.New("the auth server is unreachable")}
 
-	router := chi.NewRouter()
-	router.Use(requestid.Middleware)
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := reqctx.WithJwtInfo(r.Context(),
-				oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	})
-	router.Get("/admin/clients/{clientId}/logo", HandleLogoGet(httpHelper, apiClient))
-
-	req := httptest.NewRequest(http.MethodGet, "/admin/clients/42/logo", nil)
+	req := handlertest.Request(http.MethodGet, "/admin/clients/42/logo",
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "42"))
 	req.Header.Set("X-Request-Id", "req-client-logo")
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, req)
+	requestid.Middleware(HandleLogoGet(httpHelper, apiClient)).ServeHTTP(recorder, req)
 
 	assert.Equal(t, http.StatusOK, recorder.Code, "the page still renders, which is why this is a Warn")
 	require.NotNil(t, httpHelper.bind, "the page is rendered with no logo rather than refused")
@@ -87,7 +74,7 @@ func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *te
 	assert.Equal(t, int64(42), records[0].Attrs["client_id"],
 		"the numeric row id under decision 3's name for it, where the key used to be clientId")
 	assert.Equal(t, "req-client-logo", records[0].Attrs["request_id"],
-		"from chi's id on the context, with nothing at the call site naming it")
+		"from the request id middleware's id on the context, with nothing at the call site naming it")
 
 	logged, _ := records[0].Attrs["error"].(error)
 	require.Error(t, logged, "the error rides as a value, so %+v prints the frames it captured")

@@ -50,7 +50,7 @@ func postAuthentication(httpHelper *handlersmocks.HttpHelper, apiClient *authent
 	recorder := httptest.NewRecorder()
 	HandleAuthenticationPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(recorder,
 		handlertest.Request(http.MethodPost, "/admin/users/42/authentication",
-			handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42"),
+			handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42"),
 			handlertest.WithForm(url.Values{"newPassword": {"a-new-password-for-them"}})))
 	return recorder
 }

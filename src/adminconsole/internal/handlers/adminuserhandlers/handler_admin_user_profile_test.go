@@ -91,7 +91,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 	rr := httptest.NewRecorder()
 	HandleProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 		"/admin/users/7/profile?page=3&query=jane", handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"), handlertest.WithForm(form)))
+		handlertest.WithPathValue("userId", "7"), handlertest.WithForm(form)))
 
 	require.Len(t, apiClient.updates, 1)
 	assert.Equal(t, []string{handlertest.AccessToken}, apiClient.tokens)
@@ -153,7 +153,7 @@ func TestHandleProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.
 			rr := httptest.NewRecorder()
 			HandleProfilePost(httpHelper, nil, apiClient, consoleBaseURL).ServeHTTP(rr, handlertest.Request(http.MethodPost,
 				"/admin/users/7/profile", handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("userId", "7"), handlertest.WithForm(form)))
+				handlertest.WithPathValue("userId", "7"), handlertest.WithForm(form)))
 
 			assert.Empty(t, apiClient.updates, "a malformed zone reached the API")
 			assert.Empty(t, apiClient.reads)

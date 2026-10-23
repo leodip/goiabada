@@ -49,7 +49,7 @@ func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]inte
 
 	req := handlertest.Request(http.MethodGet, "/admin/users/7/delete",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 	)
 
 	HandleDeleteGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(), req)
@@ -127,7 +127,7 @@ func TestHandleDeletePost_RefusesAnEmailThatIsNotTheUsers(t *testing.T) {
 
 			req := handlertest.Request(http.MethodPost, "/admin/users/7/delete",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("userId", "7"),
+				handlertest.WithPathValue("userId", "7"),
 				handlertest.WithForm(url.Values{"email": {typed}}),
 			)
 			rec := httptest.NewRecorder()
