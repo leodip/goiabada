@@ -19,8 +19,10 @@
 "common.field.password_confirmation" = "Confirm password"
 "common.link.sign_in_to_account" = "Sign in to your account"
 
-# The password rules a form that sets a password shows under its field. accountvalidation.DescribePasswordRules
-# builds the sentence from the rules the password validator applies, so these pieces change with them.
+# The password rules a form that sets a password shows under its field, on the auth server's registration,
+# activation and reset forms and the admin console's change-password, new user and Authentication tab pages.
+# passwordrules.Describe builds the sentence from the rules the password validator applies, as the public
+# settings carry them, so these pieces change with them.
 "password_rules.length" = "At least {{.min}} characters."
 "password_rules.length_with" = "At least {{.min}} characters, with {{.requirements}}."
 "password_rules.lowercase" = "a lowercase letter"
@@ -28,6 +30,9 @@
 "password_rules.number" = "a number"
 "password_rules.symbol" = "a symbol"
 "password_rules.list" = "{{.items}} and {{.last}}"
+# The nist policy's guidance and what it refuses, after its length (#550 decision 10).
+"password_rules.passphrase_guidance" = "A few unrelated words make a long password that's easy to remember."
+"password_rules.common_and_account_refused" = "Common passwords, and the account's email address or the app's name, are refused."
 
 # --- Dates and durations -----------------------------------------------------
 #
@@ -1346,6 +1351,11 @@
 "adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it will have to be updated to the new one, tokens issued before will keep the old one, and you'll be signed out."
 "adminconsole.admin_settings.general.field.password_policy" = "Password policy"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Applies whenever a password is set or changed. Passwords already set aren't checked again."
+# The nist policy's card, first among the five, and the line each older card gains (#550 decision 3).
+"adminconsole.admin_settings.general.password_policy_nist" = "NIST SP 800-63B"
+"adminconsole.admin_settings.general.password_policy_nist_hint" = "At least 15 characters, any characters at all. A commonly used password is refused, and so is the account's email address, username or the app's name, or a simple variation of them."
+"adminconsole.admin_settings.general.password_policy_nist_why" = "Recommended. It follows the US National Institute of Standards and Technology's guideline for a password that may be the only thing a sign-in checks: length, and a check against the passwords attackers try first, rather than required kinds of character, which make a password harder to remember without making it harder to guess."
+"adminconsole.admin_settings.general.password_policy_short_of_nist" = "Falls short of NIST SP 800-63B."
 "adminconsole.admin_settings.general.password_policy_none" = "No policy"
 "adminconsole.admin_settings.general.password_policy_none_hint" = "At least 1 character."
 "adminconsole.admin_settings.general.password_policy_low" = "Low"
@@ -1751,6 +1761,8 @@
 "validator.password.uppercase_required" = "Add an uppercase letter to the password."
 "validator.password.number_required" = "Add a number to the password."
 "validator.password.special_char_required" = "Add a symbol to the password."
+"validator.password.too_common" = "This password is one attackers try first. Choose another: a few unrelated words make a long password that's easy to remember."
+"validator.password.too_close_to_account" = "This password is too close to the account's email address, username or the app's name. Choose another."
 
 # --- Profile validator (LocalizedError-backed) -------------------------------
 

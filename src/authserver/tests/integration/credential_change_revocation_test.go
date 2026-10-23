@@ -521,7 +521,7 @@ func TestCredentialChange_OfflineGrantWithNoSessionStopsRefreshing(t *testing.T)
 	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
 
 	before := generationOf(t, grant.user.Id)
-	resetPasswordFor(t, grant.user, "R3setP4ss!word")
+	resetPasswordFor(t, grant.user, fake.Password(20))
 	assert.Equal(t, before+1, generationOf(t, grant.user.Id),
 		"the reset must advance the generation")
 
@@ -571,7 +571,7 @@ func TestCredentialChange_ROPCGrantStopsRefreshing(t *testing.T) {
 	require.NotNil(t, childRow)
 	require.False(t, childRow.Revoked, "the child must be unspent before the reset")
 
-	resetPasswordFor(t, user, "R3setP4ss!word")
+	resetPasswordFor(t, user, fake.Password(20))
 
 	data := refreshOnce(child)
 	assert.Equal(t, "invalid_grant", data["error"],
@@ -631,7 +631,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 	resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/password",
 		callerToken, api.UpdateAccountPasswordRequest{
 			CurrentPassword: current,
-			NewPassword:     "N3wP4ss!word",
+			NewPassword:     fake.Password(20),
 		})
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
@@ -676,7 +676,7 @@ func TestCredentialChange_AnotherUserIsUnaffected(t *testing.T) {
 		"openid "+builtin.AuthServerResourceIdentifier+":"+builtin.ManageAccountPermissionIdentifier)
 
 	grant := createOfflineGrant(t)
-	resetPasswordFor(t, grant.user, "R3setP4ss!word")
+	resetPasswordFor(t, grant.user, fake.Password(20))
 
 	resp := makeAPIRequest(t, "GET",
 		appConfig.AuthServer.BaseURL+"/api/v1/account/profile", victimToken, nil)
@@ -702,7 +702,7 @@ func TestCredentialChange_OutstandingAuthCodeIsRejected(t *testing.T) {
 	code := grant.codeFromSameSession(t, scope, verifier)
 
 	// NOW reset, with the code still outstanding.
-	resetPasswordFor(t, grant.user, "R3setP4ss!word")
+	resetPasswordFor(t, grant.user, fake.Password(20))
 
 	data := grant.exchange(t, code, verifier)
 	assert.Equal(t, "invalid_grant", data["error"],
@@ -779,7 +779,7 @@ func TestCredentialChange_GenerationRoundTripsThroughTheToken(t *testing.T) {
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "the token should work before the change")
 
-	resetPasswordFor(t, grant.user, "R3setP4ss!word")
+	resetPasswordFor(t, grant.user, fake.Password(20))
 
 	// Same token, both surfaces, immediately.
 	resp2 := makeAPIRequest(t, "GET", userinfoURL, grant.accessToken, nil)
@@ -828,7 +828,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/password",
 		callerToken, api.UpdateAccountPasswordRequest{
 			CurrentPassword: current,
-			NewPassword:     "N3wP4ss!word",
+			NewPassword:     fake.Password(20),
 		})
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
@@ -888,7 +888,7 @@ func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {
 	grant.refreshToken = first["refresh_token"].(string)
 
 	beforeGeneration := generationOf(t, grant.user.Id)
-	resetPasswordFor(t, grant.user, "R3setP4ss!word")
+	resetPasswordFor(t, grant.user, fake.Password(20))
 	afterGeneration := generationOf(t, grant.user.Id)
 	require.Equal(t, beforeGeneration+1, afterGeneration)
 

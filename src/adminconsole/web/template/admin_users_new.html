@@ -80,7 +80,11 @@
     <div class="form-grid" id="passwordField"{{ if .smtpEnabled }}{{ if eq .setPasswordType "email" }} hidden{{ end }}{{ end }}>
       <div class="field">
         <label class="field-label" for="password">{{ T $.ctx "adminconsole.admin_users.new.field.password" }}</label>
-        <input class="control" id="password" type="password" name="password" value="" autocomplete="new-password"{{ if .error }}{{ if eq .errorField "password" }} aria-invalid="true" aria-describedby="user-error" autofocus{{ end }}{{ end }}>
+        <input class="control" id="password" type="password" name="password" value="" autocomplete="new-password"
+          {{- if .error }}{{ if eq .errorField "password" }} aria-invalid="true" autofocus{{ end }}{{ end }}
+          {{- if .passwordRules }} aria-describedby="{{ if .error }}{{ if eq .errorField "password" }}user-error {{ end }}{{ end }}password-rules"
+          {{- else if .error }}{{ if eq .errorField "password" }} aria-describedby="user-error"{{ end }}{{ end }}>
+        {{ if .passwordRules }}<p class="field-hint" id="password-rules">{{ .passwordRules }}</p>{{ end }}
       </div>
     </div>
   </div>

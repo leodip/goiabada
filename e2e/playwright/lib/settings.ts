@@ -85,7 +85,7 @@ export async function withSettingsRestored(page: Page, path: string, body: () =>
 // issuer is the deployment's own.
 const baseline: Record<string, FormValues> = {
   "/admin/settings/general": {
-    passwordPolicy: "low",
+    passwordPolicy: "nist",
     selfRegistrationEnabled: false,
     selfRegistrationRequiresEmailVerification: true,
     dynamicClientRegistrationEnabled: false,

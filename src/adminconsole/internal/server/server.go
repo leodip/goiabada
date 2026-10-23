@@ -629,7 +629,7 @@ func (s *Server) serveStaticFiles() {
 
 		cacheInSeconds := 5 * 60
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
-		w.Header().Set("Expires", time.Now().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
+		w.Header().Set("Expires", time.Now().UTC().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
 		files.ServeHTTP(w, r)

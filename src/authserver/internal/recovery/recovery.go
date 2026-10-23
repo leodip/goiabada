@@ -142,8 +142,8 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 			return Outcome{}, refused("the database holds no settings row, so there is no " +
 				"password policy to hold the new password to")
 		}
-		validationErr := accountvalidation.NewPasswordValidator().
-			ValidatePassword(settings.PasswordPolicy, req.Password)
+		validationErr := accountvalidation.NewPasswordValidator().ValidatePassword(settings.PasswordPolicy, req.Password,
+			accountvalidation.AccountWords{Email: user.Email, Username: user.Username, AppName: settings.AppName})
 		if validationErr != nil {
 			return Outcome{}, refused("the password is refused by the stored password policy: %v", validationErr)
 		}

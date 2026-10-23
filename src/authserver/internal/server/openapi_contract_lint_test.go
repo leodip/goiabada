@@ -1114,6 +1114,8 @@ var apiStructsWithNoSchema = map[string]string{
 	// there is not a gap this map can be exempting, and the loop below fails an entry that
 	// names one.
 	"PublicSettingsResponse": "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
+	// Carried by PublicSettingsResponse alone, as its passwordRules (#550 decision 11).
+	"PasswordRulesResponse": "the password rules the unauthenticated /api/public/settings carries, outside the Admin and Account API scope this document declares",
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
@@ -1866,6 +1868,11 @@ var publishedRequestEnums = map[string]string{
 		"handler_api_clients.go parses the trimmed value through record.ThreeStateSettingFromString " +
 		"and refuses anything outside [on, off, default] with 400 before writing. Covered by " +
 		"TestAPIClientTokensPut_ValidationErrors' invalid_three_state_id case. Published in #562",
+	"UpdateSettingsGeneralRequest.passwordPolicy": "enforced: handler_api_settings_general.go parses " +
+		"the trimmed value through record.PasswordPolicyFromString and refuses anything outside " +
+		"[none, low, medium, high, nist] with 400 before saving. Covered by " +
+		"TestAPISettingsGeneralPut_ValidationErrors' invalid-policy request. Published in #550, when nist " +
+		"became the fifth",
 	"UpdateSettingsUIThemeRequest.uiTheme": "enforced: handler_api_settings_ui_theme.go trims the " +
 		"value and refuses anything but the empty value and uithemes.Get() with 400 before saving. " +
 		"Covered by TestAPISettingsUIThemePut_ValidationErrors. Published in #617, when the themes " +

@@ -144,7 +144,8 @@ func HandleUserPasswordPut(
 			writeInternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword)
+		err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword,
+			accountvalidation.AccountWords{Email: user.Email, Username: user.Username, AppName: settings.AppName})
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -419,7 +420,10 @@ func HandleUserCreatePost(
 			}
 
 			// Validate password
-			err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.Password)
+			// The request names no username, so the words are its email, normalized above, and
+			// the app name (#550 decision 6).
+			err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.Password,
+				accountvalidation.AccountWords{Email: req.Email, AppName: settings.AppName})
 			if err != nil {
 				writeValidationError(w, r, err)
 				return

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"net/http"
 
@@ -74,7 +75,7 @@ type EmailValidator interface {
 
 // PasswordValidator holds a chosen password to the configured policy.
 type PasswordValidator interface {
-	ValidatePassword(policy record.PasswordPolicy, password string) error
+	ValidatePassword(policy record.PasswordPolicy, password string, words accountvalidation.AccountWords) error
 }
 
 // UserCreator creates the user row and its default permissions in one transaction.

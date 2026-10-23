@@ -190,7 +190,7 @@ func TestHandleRegisterPost_WithVerificationAnswersAfterBothLookupsAlone(t *test
 			h.pageRenderer.AssertExpectations(t)
 
 			h.assertNothingWrittenOrSent(t)
-			h.passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
+			h.passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything, mock.Anything)
 			h.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 			require.Len(t, h.jobs.jobs, 1, "the rest is handed to one job")

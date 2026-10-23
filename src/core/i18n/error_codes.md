@@ -308,6 +308,8 @@ cause, each a whole sentence.
 | `validator.password.uppercase_required` | (none) | Add an uppercase letter to the password. |
 | `validator.password.number_required` | (none) | Add a number to the password. |
 | `validator.password.special_char_required` | (none) | Add a symbol to the password. |
+| `validator.password.too_common` | (none) | This password is one attackers try first. Choose another: a few unrelated words make a long password that's easy to remember. |
+| `validator.password.too_close_to_account` | (none) | This password is too close to the account's email address, username or the app's name. Choose another. |
 
 ## Profile validator
 

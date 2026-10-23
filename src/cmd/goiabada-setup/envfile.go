@@ -25,7 +25,7 @@ func generateEnvFile(config *Config, paths outputPaths) string {
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# Application settings\n")
 	sb.WriteString("# =============================================================================\n")
-	sb.WriteString("GOIABADA_APPNAME=\"Goiabada\"\n")
+	writeEnvVariable(&sb, "GOIABADA_APPNAME", seededAppName)
 	writeEnvVariable(&sb, "GOIABADA_ADMIN_EMAIL", config.AdminEmail)
 	writeEnvVariable(&sb, "GOIABADA_ADMIN_PASSWORD", config.AdminPassword)
 	sb.WriteString("\n")

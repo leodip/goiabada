@@ -193,6 +193,14 @@ jobs:
     name: Images
     needs: [verify, checks, versions]
     runs-on: ubuntu-latest
+    # The manifest digests the push produced, for the draft job to name in the release notes as
+    # full references, tag@sha256:digest, so an operator can pin a deployment to the image content
+    # this release attests (#491). They are the multi-platform index digests the digests step read
+    # and the attestations are made against, not the per-platform ones a registry's tags page
+    # lists.
+    outputs:
+      authserver: ${{ steps.digests.outputs.authserver }}
+      adminconsole: ${{ steps.digests.outputs.adminconsole }}
     # The push credentials, DOCKER_USERNAME and DOCKER_PASSWORD, exist only in this environment,
     # which admits main and v* tags alone, and GitHub exposes environment secrets only to jobs
     # that declare it. The Check workflow pulls with a separate read-only token.
@@ -267,12 +275,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.verify.outputs.version }}
           PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+          AUTHSERVER_DIGEST: ${{ needs.images.outputs.authserver }}
+          ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
         run: |
           set -euo pipefail
-          args=(--draft --title "Release $VERSION" --generate-notes)
+          # The draft opens with the two images as full references, tag and digest together, so
+          # an operator pinning a deployment names the exact image content this release pushed
+          # and attested (#491). gh puts the notes file above the changelog --generate-notes
+          # writes, and both reach the draft in the one write that creates it, so no draft
+          # exists without them.
+          [[ "$AUTHSERVER_DIGEST" == sha256:* && "$ADMINCONSOLE_DIGEST" == sha256:* ]] ||
+            { echo "::error::the images job gave no digest for one of the images"; exit 1; }
+          {
+            echo "## Pinned image references"
+            echo ""
+            echo "The multi-platform image index digests this release pushed and attested, one per image. The same digests name the images at \`ghcr.io/leodip/goiabada\`, which the same push wrote."
+            echo ""
+            echo "- Auth server: \`leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST\`"
+            echo "- Admin console: \`leodip/goiabada:adminconsole-$VERSION@$ADMINCONSOLE_DIGEST\`"
+          } > pinned.md
+          args=(--draft --title "Release $VERSION" --generate-notes --notes-file pinned.md)
           # A prerelease MUST be flagged: /releases/latest/ skips prereleases and
           # drafts, which is what keeps the docs' download links pointing at the
           # last stable release (constraint A).
           [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
           gh release create "v$VERSION" "${args[@]}" dist/*
-          echo "Draft created. Write the notes, then publish to move 'latest'."
+          echo "Draft created. Write the notes, keeping the Pinned image references section, then publish to move 'latest'."

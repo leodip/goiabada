@@ -4585,6 +4585,10 @@ components:
           description: >-
             Required if setPasswordType is "now", and required whatever setPasswordType says on
             a deployment with no SMTP configured, since the setup email cannot be sent.
+            Held to the passwordPolicy of the general settings, and refused with 400 and the
+            refusal's catalog key as its error_code: under nist, validator.password.too_common for a
+            commonly used password and validator.password.too_close_to_account for one too close to
+            the email address or the app name.
 
     UpdateUserProfileRequest:
       type: object
@@ -4660,6 +4664,11 @@ components:
       properties:
         newPassword:
           type: string
+          description: >-
+            Held to the passwordPolicy of the general settings, and refused with 400 and the
+            refusal's catalog key as its error_code: under nist, validator.password.too_common for a
+            commonly used password and validator.password.too_close_to_account for one too close to
+            the user's email address, username or the app name.
 
     UpdateUserEnabledRequest:
       type: object
@@ -6022,6 +6031,17 @@ components:
           type: boolean
         passwordPolicy:
           type: string
+          enum: [none, low, medium, high, nist]
+          description: >-
+            The policy every new password is held to: none, at least 1 character; low, at least
+            6; medium, at least 8, with a lowercase letter, an uppercase letter and a number;
+            high, at least 10, with a symbol too; nist, at least 15 characters of any kind and no
+            required character types, as NIST SP 800-63B-4 section 3.1.1.2 asks, refusing a
+            commonly used password with validator.password.too_common and one that is the
+            account's email address, its local part, its username or the app name, or one of them
+            repeated or padded with digits and symbols, with
+            validator.password.too_close_to_account. Every policy accepts at most 72 bytes.
+            Passwords already set are not checked again.
         pkceRequired:
           type: boolean
           description: When true, confidential clients must use PKCE. Public clients always require PKCE regardless of this setting
@@ -6064,6 +6084,19 @@ components:
           type: boolean
         passwordPolicy:
           type: string
+          enum: [none, low, medium, high, nist]
+          description: >-
+            The policy every new password is held to: none, at least 1 character; low, at least
+            6; medium, at least 8, with a lowercase letter, an uppercase letter and a number;
+            high, at least 10, with a symbol too; nist, at least 15 characters of any kind and no
+            required character types, as NIST SP 800-63B-4 section 3.1.1.2 asks, refusing a
+            commonly used password with validator.password.too_common and one that is the
+            account's email address, its local part, its username or the app name, or one of them
+            repeated or padded with digits and symbols, with
+            validator.password.too_close_to_account. Every policy accepts at most 72 bytes.
+            Passwords already set are not checked again.
+            Surrounding spaces are ignored, and any other value is refused with 400
+            handler.settings_general.password_policy_invalid.
         pkceRequired:
           type: boolean
           description: When true, confidential clients must use PKCE. Public clients always require PKCE regardless of this setting
@@ -6467,6 +6500,11 @@ components:
           type: string
         newPassword:
           type: string
+          description: >-
+            Held to the passwordPolicy of the general settings, and refused with 400 and the
+            refusal's catalog key as its error_code: under nist, validator.password.too_common for a
+            commonly used password and validator.password.too_close_to_account for one too close to
+            the account's email address, username or the app name.
 
     AccountOTPEnrollmentResponse:
       type: object

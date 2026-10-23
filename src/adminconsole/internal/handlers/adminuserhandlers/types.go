@@ -56,6 +56,8 @@ var userNewErrorFields = map[string]string{
 	i18n.ErrCodePasswordUppercaseRequired:   "password",
 	i18n.ErrCodePasswordNumberRequired:      "password",
 	i18n.ErrCodePasswordSpecialCharRequired: "password",
+	i18n.ErrCodePasswordTooCommon:           "password",
+	i18n.ErrCodePasswordTooCloseToAccount:   "password",
 }
 
 // groupMembership is a group a user belongs to, as the user's groups tab lists it: the group's id,

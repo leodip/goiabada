@@ -40,6 +40,7 @@ func HandleChangePasswordGet(
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": savedSuccessfully,
+			"passwordRules":     render.PasswordRulesHint(r),
 		}
 
 		if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
@@ -60,6 +61,8 @@ var changePasswordErrorFields = map[string]string{
 	i18n.ErrCodePasswordUppercaseRequired:   "newPassword",
 	i18n.ErrCodePasswordNumberRequired:      "newPassword",
 	i18n.ErrCodePasswordSpecialCharRequired: "newPassword",
+	i18n.ErrCodePasswordTooCommon:           "newPassword",
+	i18n.ErrCodePasswordTooCloseToAccount:   "newPassword",
 }
 
 func HandleChangePasswordPost(
@@ -88,8 +91,9 @@ func HandleChangePasswordPost(
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"error":      message,
-				"errorField": errorField,
+				"error":         message,
+				"errorField":    errorField,
+				"passwordRules": render.PasswordRulesHint(r),
 			}
 			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_change_password.html", bind); err != nil {
 				httpHelper.InternalServerError(w, r, err)

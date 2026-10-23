@@ -1,7 +1,7 @@
 // Package adminpassword holds Check, the one rule for the first administrator's password, which
 // the auth server's first start and the setup wizard both apply (#500). It is a package of its own,
-// importing nothing beyond the standard library and core/errs, because the wizard links whatever its
-// home imports: in core/inputvalidation, beside the identifier validator's localized refusal, it
+// importing nothing beyond the standard library, core/errs and core/passwordblocklist, a leaf
+// itself, because the wizard links whatever its home imports: in core/inputvalidation, beside the identifier validator's localized refusal, it
 // brought core/i18n, core/oauth, a TOML parser and a JWT library into a binary that uses none of
 // them. core/guard's imports_only_lint_test.go holds it to that, from there and not from a test
 // here: go mod tidy reads the tests of every package the wizard imports, so a test here importing
@@ -10,9 +10,11 @@
 package adminpassword
 
 import (
+	"strings"
 	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/passwordblocklist"
 )
 
 const (
@@ -35,7 +37,12 @@ const (
 // once here, where both can reach it, and the two cannot disagree on which passwords seed (#500).
 // The reason names no variable or flag: each caller knows which one the password came from and
 // says so.
-func Check(password string) error {
+//
+// It is the nist password policy's rule, which the same seed installs for every other password:
+// beside the bounds, a password on the list of commonly used passwords is refused, and so is the
+// admin email, its local part or the app name, or a simple derivative of them, the words the seed
+// writes beside it, which each caller hands in (#550 decisions 6 and 7).
+func Check(password, adminEmail, appName string) error {
 	if password == "" {
 		return errs.Errorf("it is empty, and the first administrator needs a password of at least %d characters",
 			adminPasswordMinCharacters)
@@ -53,6 +60,17 @@ func Check(password string) error {
 	}
 	if n := utf8.RuneCountInString(password); n < adminPasswordMinCharacters {
 		return errs.Errorf("it is %d characters long, and must be at least %d characters", n, adminPasswordMinCharacters)
+	}
+	if passwordblocklist.IsCommon(password) {
+		return errs.New("it is on a list of commonly used passwords, which attackers try first: " +
+			"choose another, since a few unrelated words make a long password that is easy to remember")
+	}
+	words := []string{adminEmail, appName}
+	if at := strings.LastIndex(adminEmail, "@"); at > 0 {
+		words = append(words, adminEmail[:at])
+	}
+	if passwordblocklist.IsTooClose(password, words...) {
+		return errs.Errorf("it is too close to the admin email, its local part or the app name %s: choose another", appName)
 	}
 	return nil
 }

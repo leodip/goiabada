@@ -110,7 +110,8 @@ func TestSelfRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testing
 	assert.Equal(t, http.StatusNotFound, page.StatusCode, "the page")
 
 	email := fake.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	password := fake.Password(20)
+	resp := postRegister(t, httpClient, email, password, password)
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "the submission")
 
@@ -122,7 +123,8 @@ func TestSelfRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testing
 	assert.Nil(t, preReg, "no pending registration is written")
 
 	taken := createAccountAt(t, fake.Email())
-	resp = postRegister(t, httpClient, taken.Email, "Password123!", "Password123!")
+	password = fake.Password(20)
+	resp = postRegister(t, httpClient, taken.Email, password, password)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "a taken address")
@@ -185,7 +187,8 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	loadRegisterPage(t, httpClient)
 
 	email := fake.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	password := fake.Password(20)
+	resp := postRegister(t, httpClient, email, password, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -218,7 +221,8 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	loadRegisterPage(t, httpClient)
 
 	email := fake.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Password123!")
+	password := fake.Password(20)
+	resp := postRegister(t, httpClient, email, password, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -252,7 +256,8 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 			httpClient := createHttpClient(t)
 			loadRegisterPage(t, httpClient)
 
-			resp := postRegister(t, httpClient, tc.email, "Password123!", "Password123!")
+			password := fake.Password(20)
+			resp := postRegister(t, httpClient, tc.email, password, password)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -273,7 +278,8 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 			httpClient := createHttpClient(t)
 			loadRegisterPage(t, httpClient)
 
-			resp := postRegister(t, httpClient, tc.email, "Password123!", "Password123!")
+			password := fake.Password(20)
+			resp := postRegister(t, httpClient, tc.email, password, password)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -591,7 +597,8 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	// Taken while the marker is still live and usable.
 	captured := capturedSessionCookies(t, httpClient)
 
-	activateResp := postActivation(t, httpClient, cleanURL, "Password123!", "Password123!", continuationId)
+	password := fake.Password(20)
+	activateResp := postActivation(t, httpClient, cleanURL, password, password, continuationId)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
@@ -710,7 +717,8 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 
 	// The redirect in flight renders the form for, and activates, the registration that produced it.
 	continuationId := loadActivationForm(t, browser, cleanURL, firstEmail)
-	activateResp := postActivation(t, browser, cleanURL, "Password123!", "Password123!", continuationId)
+	password := fake.Password(20)
+	activateResp := postActivation(t, browser, cleanURL, password, password, continuationId)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
@@ -780,7 +788,8 @@ func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing
 		continuationId := loadActivationForm(t, browser, cleanURL, email)
 		existing := createAccountAt(t, email)
 
-		resp := postActivation(t, browser, cleanURL, "Password123!", "Password123!", continuationId)
+		password := fake.Password(20)
+		resp := postActivation(t, browser, cleanURL, password, password, continuationId)
 		body := bodyString(t, resp)
 		_ = resp.Body.Close()
 
@@ -810,7 +819,8 @@ func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 
 	setRegSettings(t, false, false, false)
 
-	resp := postRegister(t, httpClient, fake.Email(), "Password123!", "Password123!")
+	password := fake.Password(20)
+	resp := postRegister(t, httpClient, fake.Email(), password, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -832,7 +842,8 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 	httpClient := createHttpClient(t)
 	loadRegisterPage(t, httpClient)
 
-	resp := postRegister(t, httpClient, existing.Email, "Password123!", "Password123!")
+	password := fake.Password(20)
+	resp := postRegister(t, httpClient, existing.Email, password, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -893,7 +904,7 @@ func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 	loadRegisterPage(t, httpClient)
 
 	email := fake.Email()
-	resp := postRegister(t, httpClient, email, "Password123!", "Different456!")
+	resp := postRegister(t, httpClient, email, fake.Password(20), fake.Password(20))
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

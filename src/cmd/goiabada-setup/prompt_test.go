@@ -110,12 +110,9 @@ func TestAsker_AReadFaultIsNeverTheDefault(t *testing.T) {
 		}
 		in.assertConsumed()
 	})
-	t.Run("the weak-password confirmation", func(t *testing.T) {
-		a, in, _ := testAsker(t,
-			scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weakpassphraseonly"},
-			scriptedStep{prompt: "Use this password anyway? [y/N]: ", err: errReadFault},
-		)
-		got, err := a.adminPassword("Password", generatePassword())
+	t.Run("the admin password", func(t *testing.T) {
+		a, in, _ := testAsker(t, scriptedStep{prompt: "Password [generated]: ", hidden: true, err: errReadFault})
+		got, err := a.adminPassword("Password", generatePassword(), "admin@example.com")
 		if !errors.Is(err, errReadFault) || got != "" {
 			t.Errorf("adminPassword = %q, %v; want \"\" and the read fault", got, err)
 		}
@@ -244,33 +241,29 @@ func TestAsker_AnInvalidAnswerIsAskedAgain(t *testing.T) {
 	}
 }
 
-// A password weak only by its character classes is the operator's call: it is warned about and kept
-// only when confirmed. The floor the first start holds it to is not: seeding would refuse it, so it
-// is asked again with no "use anyway".
-func TestAsker_AWeakPasswordIsKeptOnlyWhenConfirmed(t *testing.T) {
+// A password is not judged by its character classes: NIST SP 800-63B-4 section 3.1.1.2 says
+// composition rules "SHALL NOT be imposed", and a passphrase of lowercase words is what the nist
+// policy recommends. One the first start seeds is kept as typed, with no warning and no question
+// (#550 decision 12).
+func TestAsker_APasswordIsNotJudgedByItsCharacterClasses(t *testing.T) {
 	a, in, out := testAsker(t,
-		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weakpassphraseonly"},
-		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: ""},
-		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "weakpassphrasetoo"},
-		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: "y"},
-		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "Str0ng-Passw0rd!"},
+		scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: "lowercase words only here"},
 	)
-	if got, err := a.adminPassword("Password", generatePassword()); err != nil || got != "weakpassphrasetoo" {
-		t.Errorf("adminPassword = %q, %v; want the confirmed \"weakpassphrasetoo\"", got, err)
-	}
-	if got, err := a.adminPassword("Password", generatePassword()); err != nil || got != "Str0ng-Passw0rd!" {
-		t.Errorf("adminPassword = %q, %v; want the strong one, not asked about", got, err)
+	if got, err := a.adminPassword("Password", generatePassword(), "admin@example.com"); err != nil || got != "lowercase words only here" {
+		t.Errorf("adminPassword = %q, %v; want the passphrase as typed", got, err)
 	}
 	in.assertConsumed()
-	if !strings.Contains(out.String(), "Weak password: no uppercase letter, no digit, no special character") {
-		t.Errorf("output lacks the weak-password warning:\n%s", out.String())
+	if strings.Contains(out.String(), "Weak password") {
+		t.Errorf("the passphrase is warned about:\n%s", out.String())
 	}
 }
 
 // The admin password is the first administrator's, and the first start refuses to seed one that is
-// changeme, under 15 characters or over bcrypt's 72 bytes (#500). The prompt refuses the same ones,
-// each with its reason and asked again, with no "use anyway" to keep it: the wizard must not write a
-// configuration whose first start is refused. Characters are counted, not bytes, and 15 is enough.
+// changeme, under 15 characters, over bcrypt's 72 bytes (#500), commonly used, or the admin email,
+// its local part or the app name, or a derivative of them (#550 decision 7). The prompt refuses the
+// same ones, each with its reason and asked again, with no "use anyway" to keep it: the wizard must
+// not write a configuration whose first start is refused. Characters are counted, not bytes, and 15
+// is enough. The email compared is the one asked for first.
 func TestAsker_AnAdminPasswordTheFirstStartRefusesIsAskedAgain(t *testing.T) {
 	fourteenTwoByte := strings.Repeat("é", 14)
 	fifteenTwoByte := strings.Repeat("é", 15)
@@ -279,14 +272,16 @@ func TestAsker_AnAdminPasswordTheFirstStartRefusesIsAskedAgain(t *testing.T) {
 		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "Abcdefgh-12345"},
 		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: fourteenTwoByte},
 		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: strings.Repeat("Ab1-", 18) + "x"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "PasswordPassword"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "jane.doe2026!!!!!!"},
+		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "GoiabadaGoiabada"},
 		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: fifteenTwoByte},
-		scriptedStep{prompt: "Use this password anyway? [y/N]: ", answer: "y"},
 		scriptedStep{prompt: "Admin password [generated]: ", hidden: true, answer: "Abcdefgh-123456"},
 	)
-	if got, err := a.adminPassword("Admin password", generatePassword()); err != nil || got != fifteenTwoByte {
-		t.Errorf("adminPassword = %q, %v; want the 15 two-byte characters, confirmed", got, err)
+	if got, err := a.adminPassword("Admin password", generatePassword(), "jane.doe@example.com"); err != nil || got != fifteenTwoByte {
+		t.Errorf("adminPassword = %q, %v; want the 15 two-byte characters", got, err)
 	}
-	if got, err := a.adminPassword("Admin password", generatePassword()); err != nil || got != "Abcdefgh-123456" {
+	if got, err := a.adminPassword("Admin password", generatePassword(), "jane.doe@example.com"); err != nil || got != "Abcdefgh-123456" {
 		t.Errorf("adminPassword = %q, %v; want the 15 characters, not asked about", got, err)
 	}
 	in.assertConsumed()
@@ -294,6 +289,8 @@ func TestAsker_AnAdminPasswordTheFirstStartRefusesIsAskedAgain(t *testing.T) {
 		"Invalid admin password: it is changeme, a password this project published",
 		"Invalid admin password: it is 14 characters long, and must be at least 15 characters. Please try again.",
 		"Invalid admin password: it is 73 bytes long, and bcrypt accepts at most 72 bytes",
+		"Invalid admin password: it is on a list of commonly used passwords",
+		"Invalid admin password: it is too close to the admin email, its local part or the app name Goiabada",
 	} {
 		if !strings.Contains(out.String(), reason) {
 			t.Errorf("output lacks %q:\n%s", reason, out.String())
@@ -302,8 +299,11 @@ func TestAsker_AnAdminPasswordTheFirstStartRefusesIsAskedAgain(t *testing.T) {
 	if n := strings.Count(out.String(), "Invalid admin password: it is 14 characters long"); n != 2 {
 		t.Errorf("%d refusals for 14 characters, want 2, one for ASCII and one for two-byte characters:\n%s", n, out.String())
 	}
-	if n := strings.Count(out.String(), "Weak password"); n != 1 {
-		t.Errorf("%d weak-password warnings, want 1, for the confirmed password alone:\n%s", n, out.String())
+	if n := strings.Count(out.String(), "Invalid admin password: it is too close to the admin email"); n != 2 {
+		t.Errorf("%d refusals as too close, want 2, one for the email and one for the app name:\n%s", n, out.String())
+	}
+	if strings.Contains(out.String(), "Weak password") {
+		t.Errorf("a password is judged by its character classes:\n%s", out.String())
 	}
 }
 
@@ -526,7 +526,7 @@ func TestAsker_AGeneratedPasswordIsOfferedWithoutItsValue(t *testing.T) {
 func TestAsker_AnEmptyPasswordAnswerTakesTheGeneratedOneUnjudged(t *testing.T) {
 	generated := generatePassword()
 	a, in, out := testAsker(t, scriptedStep{prompt: "Password [generated]: ", hidden: true, answer: ""})
-	if got, err := a.adminPassword("Password", generated); err != nil || got != generated {
+	if got, err := a.adminPassword("Password", generated, "admin@example.com"); err != nil || got != generated {
 		t.Errorf("adminPassword = %q, %v; want the generated %q", got, err, generated)
 	}
 	in.assertConsumed()
