@@ -373,10 +373,11 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 
 // TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment: user A types their password and
 // walks away from the browser at the enrolment of an authenticator, its key on the screen. User B
-// then signs in on the same browser. A's sign-in does not carry on into B's session: A's enrolment
-// page, submitted with a code from the key it shows, gets the "no longer active" page, and A neither
-// enrols that key nor gets a session. Before, whoever used the browser next could scan A's key, enrol
-// it and be signed in as A without A's password (#246).
+// then signs in on the same browser. A's sign-in does not carry on into B's session: once B has
+// finished, the browser holds no sign-in at all, so A's enrolment page, submitted with a code from
+// the key it shows, is sent to the account page, and A neither enrols that key nor gets a session.
+// Before, whoever used the browser next could scan A's key, enrol it and be signed in as A without
+// A's password (#246).
 func TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment(t *testing.T) {
 	clientA, redirectUriA, userA, passwordA, _ := createLevel2MandatoryUser(t, false)
 	clientB, redirectUriB, userB, passwordB, otpSecretB := createLevel2MandatoryUser(t, true)
@@ -408,7 +409,9 @@ func TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment(t *testing.T
 	// A's enrolment page, still in its tab, submitted with a code from the key it shows.
 	resp = authenticateWithOtp(t, httpClient, enrolUrlA, enrolPageA, codeFromAsKey)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-	assertCeremonyMismatchPage(t, resp, "an enrolment of another user's sign-in")
+	location = assertRedirect(t, resp, "/account/profile")
+	assert.Equal(t, appConfig.AdminConsole.BaseURL+"/account/profile", location,
+		"a browser holding no sign-in is sent to the account page")
 	assertNothingWasCompleted(t, userA.Id)
 
 	storedA, err := database.GetUserById(context.Background(), nil, userA.Id)
