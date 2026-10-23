@@ -236,12 +236,127 @@ func webOriginMapping() mappingCase {
 	}
 }
 
+func groupMapping() mappingCase {
+	return mappingCase{
+		name:   "group",
+		table:  "groups",
+		record: reflect.TypeOf(record.Group{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetGroupById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupById(ctx, nil, 1)
+			},
+			"GetGroupsByIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupsByIds(ctx, nil, []int64{1, 2}))
+			},
+			"GetGroupByGroupIdentifier": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetGroupByGroupIdentifier(ctx, nil, distinctString("group_identifier"))
+			},
+			"GetAllGroups": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllGroups(ctx, nil))
+			},
+			"GetAllGroupsPaginated": func(ctx context.Context, d *Database) (any, error) {
+				groups, _, err := d.GetAllGroupsPaginated(ctx, nil, 2, 10)
+				return firstOf(groups, err)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateGroup(ctx, nil, rec.(*record.Group))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateGroup(ctx, nil, rec.(*record.Group))
+		},
+	}
+}
+
+func groupAttributeMapping() mappingCase {
+	return mappingCase{
+		name:   "group attribute",
+		table:  "group_attributes",
+		record: reflect.TypeOf(record.GroupAttribute{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetGroupAttributeById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupAttributeById(ctx, nil, 1)
+			},
+			"GetGroupAttributesByGroupIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupAttributesByGroupIds(ctx, nil, []int64{1, 2}))
+			},
+			"GetGroupAttributesByGroupId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupAttributesByGroupId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateGroupAttribute(ctx, nil, rec.(*record.GroupAttribute))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateGroupAttribute(ctx, nil, rec.(*record.GroupAttribute))
+		},
+	}
+}
+
+func groupPermissionMapping() mappingCase {
+	return mappingCase{
+		name:   "group permission",
+		table:  "groups_permissions",
+		record: reflect.TypeOf(record.GroupPermission{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetGroupPermissionById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupPermissionById(ctx, nil, 1)
+			},
+			"GetGroupPermissionByGroupIdAndPermissionId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupPermissionByGroupIdAndPermissionId(ctx, nil, 1, 2)
+			},
+			"GetGroupPermissionsByGroupId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupPermissionsByGroupId(ctx, nil, 1))
+			},
+			"GetGroupPermissionsByGroupIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupPermissionsByGroupIds(ctx, nil, []int64{1, 2}))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateGroupPermission(ctx, nil, rec.(*record.GroupPermission))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateGroupPermission(ctx, nil, rec.(*record.GroupPermission))
+		},
+	}
+}
+
+func userGroupMapping() mappingCase {
+	return mappingCase{
+		name:   "user group",
+		table:  "users_groups",
+		record: reflect.TypeOf(record.UserGroup{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserGroupById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserGroupById(ctx, nil, 1)
+			},
+			"GetUserGroupByUserIdAndGroupId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserGroupByUserIdAndGroupId(ctx, nil, 1, 2)
+			},
+			"GetUserGroupsByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserGroupsByUserId(ctx, nil, 1))
+			},
+			"GetUserGroupsByUserIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserGroupsByUserIds(ctx, nil, []int64{1, 2}))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserGroup(ctx, nil, rec.(*record.UserGroup))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserGroup(ctx, nil, rec.(*record.UserGroup))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 	for _, c := range []mappingCase{
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), redirectURIMapping(), webOriginMapping(),
+		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
@@ -499,6 +614,10 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 		if m == nil {
 			problems = append(problems, fmt.Sprintf("%s: the statement is not a SELECT this test reads: %q", where, query))
 			return &scriptedRows{}
+		}
+		// A paged read counts the rows beside the page, which selects no field of the record.
+		if strings.EqualFold(strings.TrimSpace(m[1]), "count(*)") {
+			return &scriptedRows{cols: []string{"count"}, values: [][]driver.Value{{int64(1)}}}
 		}
 		selected := map[string]bool{}
 		row := &scriptedRows{values: [][]driver.Value{{}}}
