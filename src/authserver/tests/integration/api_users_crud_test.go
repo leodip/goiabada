@@ -303,7 +303,7 @@ func TestAPIUserCreatePost_AddressLengths(t *testing.T) {
 			GivenName:       "Long",
 			FamilyName:      "Address",
 			SetPasswordType: "now",
-			Password:        "password123",
+			Password:        fake.Password(20),
 		})
 		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(resp.Body)

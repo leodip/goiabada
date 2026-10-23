@@ -256,7 +256,8 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 			httpClient := createHttpClient(t)
 			loadRegisterPage(t, httpClient)
 
-			resp := postRegister(t, httpClient, tc.email, "Password123!", "Password123!")
+			password := fake.Password(20)
+			resp := postRegister(t, httpClient, tc.email, password, password)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -277,7 +278,8 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 			httpClient := createHttpClient(t)
 			loadRegisterPage(t, httpClient)
 
-			resp := postRegister(t, httpClient, tc.email, "Password123!", "Password123!")
+			password := fake.Password(20)
+			resp := postRegister(t, httpClient, tc.email, password, password)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
