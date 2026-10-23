@@ -14,11 +14,30 @@ import (
 // which needs no telling. The maximum is left to its refusal, which explains it: it counts bytes,
 // so a sentence in characters would misstate it for an accented password, and one in bytes would
 // ask every reader what a byte is, for a bound few passwords reach.
+//
+// A policy refusing common passwords or the account's words adds the guidance NIST SP 800-63B-4
+// section 3.1.1.2 asks to be offered ("SHALL offer guidance to the subscriber to help the
+// subscriber choose a strong password"), a passphrase, and says what is refused. The nist policy is
+// the one refusing either, and refuses both, so the sentence names the two together (#550
+// decision 10).
 func DescribePasswordRules(ctx context.Context, policy record.PasswordPolicy) string {
 	rules := PasswordRulesFor(policy)
 	if rules.MinLength <= 1 && !rules.LowerCase && !rules.UpperCase && !rules.Number && !rules.SpecialCharacter {
 		return ""
 	}
+	if rules.RefusesCommon || rules.RefusesAccountWords {
+		return strings.Join([]string{
+			describeLengthAndKinds(ctx, rules),
+			i18n.T(ctx, "password_rules.passphrase_guidance"),
+			i18n.T(ctx, "password_rules.common_and_account_refused"),
+		}, " ")
+	}
+	return describeLengthAndKinds(ctx, rules)
+}
+
+// describeLengthAndKinds is the sentence naming the length and the kinds of character rules
+// requires.
+func describeLengthAndKinds(ctx context.Context, rules PasswordRules) string {
 
 	var kinds []string
 	for _, kind := range []struct {

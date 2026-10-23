@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -480,7 +481,8 @@ func HandleResetPasswordPost(
 			pageRenderer.InternalServerError(w, r, reqctx.ErrNoSettings)
 			return
 		}
-		err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
+		err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password,
+			accountvalidation.AccountWords{Email: user.Email, Username: user.Username, AppName: settings.AppName})
 		if err != nil {
 			// i18n surface: A — browser-flow form rerender.
 			var locErr *i18n.LocalizedError

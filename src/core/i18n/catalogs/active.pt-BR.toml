@@ -26,6 +26,8 @@
 "password_rules.number" = "um número"
 "password_rules.symbol" = "um símbolo"
 "password_rules.list" = "{{.items}} e {{.last}}"
+"password_rules.passphrase_guidance" = "Algumas palavras sem relação entre si formam uma senha longa e fácil de lembrar."
+"password_rules.common_and_account_refused" = "Senhas comuns, o endereço de e-mail da conta e o nome do aplicativo são recusados."
 
 # --- Datas e durações --------------------------------------------------------
 #
@@ -1660,6 +1662,8 @@
 "validator.password.uppercase_required" = "Adicione uma letra maiúscula à senha."
 "validator.password.number_required" = "Adicione um número à senha."
 "validator.password.special_char_required" = "Adicione um símbolo à senha."
+"validator.password.too_common" = "Esta senha é uma das primeiras que os atacantes tentam. Escolha outra: algumas palavras sem relação entre si formam uma senha longa e fácil de lembrar."
+"validator.password.too_close_to_account" = "Esta senha é parecida demais com o endereço de e-mail ou o nome de usuário da conta, ou com o nome do aplicativo. Escolha outra."
 
 "validator.profile.username_taken" = "Desculpe, este nome de usuário já está em uso."
 "validator.profile.username_invalid" = "Nomes de usuário precisam começar com uma letra e conter apenas letras, números e sublinhados. Devem ter entre 2 e 24 caracteres."

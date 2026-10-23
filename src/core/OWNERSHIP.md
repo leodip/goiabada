@@ -444,6 +444,8 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordNumberRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordSpecialCharRequired` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordTooCloseToAccount` | both-apps | — |
+| `core/i18n` | `ErrCodePasswordTooCommon` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordTooShort` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordUppercaseRequired` | both-apps | — |

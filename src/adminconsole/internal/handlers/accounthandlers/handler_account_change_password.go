@@ -60,6 +60,8 @@ var changePasswordErrorFields = map[string]string{
 	i18n.ErrCodePasswordUppercaseRequired:   "newPassword",
 	i18n.ErrCodePasswordNumberRequired:      "newPassword",
 	i18n.ErrCodePasswordSpecialCharRequired: "newPassword",
+	i18n.ErrCodePasswordTooCommon:           "newPassword",
+	i18n.ErrCodePasswordTooCloseToAccount:   "newPassword",
 }
 
 func HandleChangePasswordPost(

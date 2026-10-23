@@ -28,6 +28,9 @@
 "password_rules.number" = "a number"
 "password_rules.symbol" = "a symbol"
 "password_rules.list" = "{{.items}} and {{.last}}"
+# The nist policy's guidance and what it refuses, after its length (#550 decision 10).
+"password_rules.passphrase_guidance" = "A few unrelated words make a long password that's easy to remember."
+"password_rules.common_and_account_refused" = "Common passwords, and the account's email address or the app's name, are refused."
 
 # --- Dates and durations -----------------------------------------------------
 #
@@ -1751,6 +1754,8 @@
 "validator.password.uppercase_required" = "Add an uppercase letter to the password."
 "validator.password.number_required" = "Add a number to the password."
 "validator.password.special_char_required" = "Add a symbol to the password."
+"validator.password.too_common" = "This password is one attackers try first. Choose another: a few unrelated words make a long password that's easy to remember."
+"validator.password.too_close_to_account" = "This password is too close to the account's email address, username or the app's name. Choose another."
 
 # --- Profile validator (LocalizedError-backed) -------------------------------
 

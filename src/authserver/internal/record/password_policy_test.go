@@ -10,8 +10,9 @@ import (
 // TestPasswordPolicy_String owns the total String decision 16 of #385 settled for this type. This is
 // the one of the six whose out-of-range rows are reachable from stored data rather than only from a
 // future caller: Settings scans settings.password_policy straight into this type with no range
-// check, so a column value outside 0..3 used to take down every page that rendered the policy.
-// Nothing the application writes produces one.
+// check, so a column value outside 0..4 used to take down every page that rendered the policy.
+// Nothing the application writes produces one. nist is stored as 4, after high, so the stored 0 to
+// 3 keep their meaning (#550 decision 3).
 func TestPasswordPolicy_String(t *testing.T) {
 	testCases := []struct {
 		name   string
@@ -21,8 +22,9 @@ func TestPasswordPolicy_String(t *testing.T) {
 		{"none is the zero value", PasswordPolicyNone, "none"},
 		{"low", PasswordPolicyLow, "low"},
 		{"medium", PasswordPolicyMedium, "medium"},
-		{"high, the top of the range", PasswordPolicyHigh, "high"},
-		{"one past the range, which is what a stray column value looks like", PasswordPolicy(4), ""},
+		{"high", PasswordPolicyHigh, "high"},
+		{"nist, the top of the range, stored as 4", PasswordPolicy(4), "nist"},
+		{"one past the range, which is what a stray column value looks like", PasswordPolicy(5), ""},
 		{"far past the range", PasswordPolicy(99), ""},
 		{"negative", PasswordPolicy(-1), ""},
 	}
@@ -36,7 +38,7 @@ func TestPasswordPolicy_String(t *testing.T) {
 
 // TestPasswordPolicyFromString covers the parse in both directions.
 func TestPasswordPolicyFromString(t *testing.T) {
-	all := []PasswordPolicy{PasswordPolicyNone, PasswordPolicyLow, PasswordPolicyMedium, PasswordPolicyHigh}
+	all := []PasswordPolicy{PasswordPolicyNone, PasswordPolicyLow, PasswordPolicyMedium, PasswordPolicyHigh, PasswordPolicyNist}
 	for _, policy := range all {
 		t.Run(policy.String(), func(t *testing.T) {
 			parsed, err := PasswordPolicyFromString(policy.String())
@@ -45,8 +47,14 @@ func TestPasswordPolicyFromString(t *testing.T) {
 		})
 	}
 
+	t.Run("nist parses to the stored 4", func(t *testing.T) {
+		parsed, err := PasswordPolicyFromString("nist")
+		require.NoError(t, err)
+		assert.Equal(t, PasswordPolicy(4), parsed)
+	})
+
 	t.Run("an unrecognized policy is refused", func(t *testing.T) {
-		for _, raw := range []string{"", "extreme", "High", "2"} {
+		for _, raw := range []string{"", "extreme", "High", "2", "NIST", "4"} {
 			parsed, err := PasswordPolicyFromString(raw)
 			require.Error(t, err, "%q must not parse", raw)
 			assert.Equal(t, PasswordPolicyNone, parsed, "the refused value returns the zero policy")
