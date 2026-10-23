@@ -94,6 +94,7 @@ func TestPasswordForms_ShowTheNistHint(t *testing.T) {
 		HandleRegisterGet(pageRenderer).ServeHTTP(httptest.NewRecorder(), req)
 
 		require.NotNil(t, *rendered)
+		//nolint:misspell // the pt-BR catalog's text: "relação" is Portuguese, not a misspelling of "real"
 		assert.Equal(t, "Pelo menos 15 caracteres. Algumas palavras sem relação entre si formam uma senha longa e "+
 			"fácil de lembrar. Senhas comuns, o endereço de e-mail da conta e o nome do aplicativo são recusados.",
 			(*rendered)["passwordRules"])

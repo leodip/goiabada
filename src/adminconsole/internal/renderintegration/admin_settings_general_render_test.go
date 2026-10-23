@@ -210,6 +210,7 @@ func TestRender_AdminSettingsGeneralPasswordPoliciesInPtBR(t *testing.T) {
 
 	assert.Contains(t, cards["nist"], ">NIST SP 800-63B</span>")
 	assert.Contains(t, cards["nist"], ">Pelo menos 15 caracteres, de qualquer tipo. Uma senha comum é recusada, assim como o endereço de e-mail da conta, o nome de usuário ou o nome do aplicativo, ou uma variação simples deles.</span>")
+	//nolint:misspell // the pt-BR catalog's text: "Instituto" is Portuguese, not a misspelling of "Institution"
 	assert.Contains(t, cards["nist"], ">Recomendada. Segue a diretriz do Instituto Nacional de Padrões e Tecnologia dos EUA (NIST) para uma senha que pode ser a única coisa verificada ao entrar: comprimento, e uma verificação contra as senhas que atacantes tentam primeiro, em vez de tipos de caractere obrigatórios, que tornam uma senha mais difícil de lembrar sem torná-la mais difícil de adivinhar.</span>")
 	for _, policy := range []string{"none", "low", "medium", "high"} {
 		assert.Contains(t, cards[policy], ">Não atende ao NIST SP 800-63B.</span>", policy)

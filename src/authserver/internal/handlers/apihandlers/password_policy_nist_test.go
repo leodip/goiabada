@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
@@ -41,22 +42,24 @@ func requireRefusal(t *testing.T, rr *httptest.ResponseRecorder, code string) {
 	assert.Equal(t, code, refusal.ErrorCode)
 }
 
-// nistRefusals are passwords of 15 characters or more the nist policy refuses for the account
-// jane.doe@example.com, username janedoe, on the app Goiabada, each with the code it answers.
-var nistRefusals = []struct {
+type nistRefusal struct {
 	name     string
 	password string
 	code     string
-}{
+}
+
+// nistRefusals are passwords of 15 characters or more the nist policy refuses for the account
+// jane.doe@example.com, username janedoe, on the app Goiabada, each with the code it answers.
+var nistRefusals = []nistRefusal{
 	{"a listed password", "PasswordPassword", "validator.password.too_common"},
 	{"the app name padded", "goiabada2026!!!!!", "validator.password.too_close_to_account"},
 }
 
 func TestHandleUserPasswordPut_HoldsThePasswordToNist(t *testing.T) {
-	refusals := append(nistRefusals[:len(nistRefusals):len(nistRefusals)],
-		struct{ name, password, code string }{"the user's username repeated", "JaneDoeJaneDoe2026", "validator.password.too_close_to_account"},
-		struct{ name, password, code string }{"the user's email address", "jane.doe@example.com", "validator.password.too_close_to_account"},
-	)
+	refusals := slices.Concat(nistRefusals, []nistRefusal{
+		{"the user's username repeated", "JaneDoeJaneDoe2026", "validator.password.too_close_to_account"},
+		{"the user's email address", "jane.doe@example.com", "validator.password.too_close_to_account"},
+	})
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -80,10 +83,10 @@ func TestHandleUserPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 }
 
 func TestHandleUserCreatePost_HoldsThePasswordToNist(t *testing.T) {
-	refusals := append(nistRefusals[:len(nistRefusals):len(nistRefusals)],
-		struct{ name, password, code string }{"the email's local part padded", "jane.doe2026!!!!!!", "validator.password.too_close_to_account"},
-		struct{ name, password, code string }{"the email address", "Jane.Doe@Example.com", "validator.password.too_close_to_account"},
-	)
+	refusals := slices.Concat(nistRefusals, []nistRefusal{
+		{"the email's local part padded", "jane.doe2026!!!!!!", "validator.password.too_close_to_account"},
+		{"the email address", "Jane.Doe@Example.com", "validator.password.too_close_to_account"},
+	})
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -118,10 +121,10 @@ func TestHandleAccountPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 
-	refusals := append(nistRefusals[:len(nistRefusals):len(nistRefusals)],
-		struct{ name, password, code string }{"the caller's username repeated", "JaneDoeJaneDoe2026", "validator.password.too_close_to_account"},
-		struct{ name, password, code string }{"the caller's local part padded", "jane.doe2026!!!!!!", "validator.password.too_close_to_account"},
-	)
+	refusals := slices.Concat(nistRefusals, []nistRefusal{
+		{"the caller's username repeated", "JaneDoeJaneDoe2026", "validator.password.too_close_to_account"},
+		{"the caller's local part padded", "jane.doe2026!!!!!!", "validator.password.too_close_to_account"},
+	})
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
