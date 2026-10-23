@@ -3,6 +3,7 @@
 // session or a consent, which the password grant does not.
 import { createHash, randomBytes } from "node:crypto";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
+import { admitted, answerOf } from "./admission";
 import { env } from "./environment";
 
 // The redirect URI the tests register on their clients. Nothing answers there (nginx says 404), which
@@ -33,7 +34,7 @@ export async function openSignIn(browser: Browser, options: { clientId: string; 
     code_challenge: createHash("sha256").update(codeVerifier).digest("base64url"),
     code_challenge_method: "S256",
   });
-  await page.goto(`${env.authUrl}/auth/authorize?${query}`);
+  await admitted(() => page.goto(`${env.authUrl}/auth/authorize?${query}`), answerOf);
   return { context, page, codeVerifier };
 }
 
@@ -76,7 +77,7 @@ export async function authorizeAndLand(
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
   try {
-    await page.goto(`${env.authUrl}/auth/authorize?${new URLSearchParams({ redirect_uri: testRedirectUri, ...params })}`);
+    await admitted(() => page.goto(`${env.authUrl}/auth/authorize?${new URLSearchParams({ redirect_uri: testRedirectUri, ...params })}`), answerOf);
     if (new URL(page.url()).pathname === "/auth/pwd") await submitPassword(page, user.email, user.password);
     await page.waitForURL((url) => url.href.startsWith(testRedirectUri));
     return new URL(page.url());

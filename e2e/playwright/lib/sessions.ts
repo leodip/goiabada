@@ -3,6 +3,7 @@
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { userUrl } from "./admin-console";
 import { testRedirectUri } from "./browser-sign-in";
+import { admitted, answerOf } from "./admission";
 import { env } from "./environment";
 
 // The ids of the user's sessions, from the Users -> Sessions page, each row's End session button
@@ -26,7 +27,7 @@ export async function authorizeAgain(context: BrowserContext, clientId: string):
     code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
     code_challenge_method: "S256",
   });
-  await page.goto(`${env.authUrl}/auth/authorize?${query}`);
+  await admitted(() => page.goto(`${env.authUrl}/auth/authorize?${query}`), answerOf);
   await page.waitForURL((url) => url.href.startsWith(testRedirectUri) || url.pathname === "/auth/pwd");
   return { page, landed: page.url().startsWith(testRedirectUri) ? "client" : "password" };
 }

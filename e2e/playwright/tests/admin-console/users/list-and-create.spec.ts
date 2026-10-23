@@ -40,11 +40,11 @@ test("a user is created, shown on their page, found by search, and can sign in",
   await expect(page.getByText("No users found.")).toBeVisible();
 });
 
-test("a user with an 89-character address, the one #632 reported, is created, found by search, and can sign in", async ({ page, request, clients }) => {
+test("a user with a 92-character address, the one #632 reported, is created, found by search, and can sign in", async ({ page, request, clients }) => {
   // Fixed rather than generated, since it is the address the issue was refused with. Longer than the
   // 60 characters an address was once held to, under the 254 it may now be.
   const email = "maximiliano.bartholomew.montgomery-fitzgerald-worthington@subsidiary.example-enterprises.com";
-  expect(email).toHaveLength(89);
+  expect(email).toHaveLength(92);
   // A run that failed before its cleanup leaves the user behind; a retry starts without it.
   await page.goto(`${list}?query=${encodeURIComponent(email)}`);
   if ((await rowWithCell(page, email).count()) > 0) await deleteUser(page, await idFromListLink(page, `${list}?query=${encodeURIComponent(email)}`, email));
