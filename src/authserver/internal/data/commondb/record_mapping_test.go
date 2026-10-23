@@ -350,6 +350,75 @@ func userGroupMapping() mappingCase {
 	}
 }
 
+// anyOf answers one record of a read returning a map, or an error naming an empty one.
+func anyOf[K comparable, T any](m map[K]T, err error) (any, error) {
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range m {
+		return &v, nil
+	}
+	return nil, fmt.Errorf("the read answered no record")
+}
+
+// userMapping covers every read answering whole users, the group members' page among them, which
+// joins users_groups and so selects each column qualified by its table.
+func userMapping() mappingCase {
+	return mappingCase{
+		name:   "user",
+		table:  "users",
+		record: reflect.TypeOf(record.User{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserById(ctx, nil, 1)
+			},
+			"GetUserByIdForUpdate": func(ctx context.Context, d *Database) (any, error) {
+				tx, err := d.BeginTransaction(ctx)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = tx.Rollback() }()
+				return d.GetUserByIdForUpdate(ctx, tx, 1)
+			},
+			"GetUsersByIds": func(ctx context.Context, d *Database) (any, error) {
+				return anyOf(d.GetUsersByIds(ctx, nil, []int64{1, 2}))
+			},
+			"GetUserByUsername": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserByUsername(ctx, nil, distinctString("username"))
+			},
+			"GetUserBySubject": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetUserBySubject(ctx, nil, distinctString("subject"))
+			},
+			"GetUserByEmail": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetUserByEmail(ctx, nil, distinctString("email"))
+			},
+			"GetUserByForgotPasswordCodeHash": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserByForgotPasswordCodeHash(ctx, nil, distinctString("forgot_password_code_hash"))
+			},
+			"SearchUsersPaginated": func(ctx context.Context, d *Database) (any, error) {
+				users, _, err := d.SearchUsersPaginated(ctx, nil, "", 2, 10)
+				return firstOf(users, err)
+			},
+			"SearchUsersPaginated with a term": func(ctx context.Context, d *Database) (any, error) {
+				users, _, err := d.SearchUsersPaginated(ctx, nil, "ali_ce%", 2, 10)
+				return firstOf(users, err)
+			},
+			"GetGroupMembersPaginated": func(ctx context.Context, d *Database) (any, error) {
+				users, _, err := d.GetGroupMembersPaginated(ctx, nil, 1, 2, 10)
+				return firstOf(users, err)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUser(ctx, nil, rec.(*record.User))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUser(ctx, nil, rec.(*record.User))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -357,6 +426,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), redirectURIMapping(), webOriginMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
+		userMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {

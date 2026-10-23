@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -99,6 +98,34 @@ var countGroups = statement{
 	mysql:    "SELECT count(*) FROM `groups`",
 	postgres: `SELECT count(*) FROM "groups"`,
 	mssql:    `SELECT count(*) FROM "groups"`,
+}
+
+// selectGroupMembersPage is the members of one group, a page at a time: the group id, then the
+// page size, then the offset, which SQL Server's OFFSET … FETCH names before the page size.
+// given_name does not order the rows totally, so paging over it alone can repeat a user on the
+// next page and skip another; see selectUsersPage in user.go for the full reason (#112).
+var selectGroupMembersPage = statement{
+	sqlite: "SELECT " + userColumns.sqlite + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ? ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	mysql: "SELECT " + userColumns.mysql + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ? ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = $1 ORDER BY users.given_name ASC, users.id ASC LIMIT $2 OFFSET $3",
+	mssql: "SELECT " + userColumns.mssql + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = @p1 ORDER BY users.given_name ASC, users.id ASC " +
+		"OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
+}
+
+// countGroupMembersJoined counts the rows selectGroupMembersPage pages through, over the same join.
+var countGroupMembersJoined = statement{
+	sqlite: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ?",
+	mysql: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ?",
+	postgres: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = $1",
+	mssql: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = @p1",
 }
 
 var countGroupMembers = statement{
@@ -353,60 +380,26 @@ func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, gro
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
+	users, err := queryAll(ctx, d, tx, nil, selectGroupMembersPage.text(d.Dialect),
+		[]any{groupId, pageSize, PageOffset(page, pageSize)}, scanUser, "user")
+	if err != nil {
+		return nil, 0, err
+	}
 
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
-	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
-	// given_name does not order the rows totally, so paging over it alone can repeat a user on
-	// the next page and skip another. See SearchUsersPaginated in user.go for the full reason (#112).
-	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
-	selectBuilder.Offset(PageOffset(page, pageSize))
-	selectBuilder.Limit(pageSize)
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, countGroupMembersJoined.text(d.Dialect), groupId)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
-	var users []record.User
-	for rows.Next() {
-		var user record.User
-		addr := userStruct.Addr(&user)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, 0, errs.Wrap(err, "unable to scan user")
-		}
-		users = append(users, user)
-	}
-
-	selectBuilder = d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From("users")
-	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
-	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
-
-	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, 0, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows2.Close() }()
-
 	var total int
-	if rows2.Next() {
-		err = rows2.Scan(&total)
+	if rows.Next() {
+		err = rows.Scan(&total)
 		if err != nil {
 			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, 0, errs.Wrap(err, "unable to read query results")
-	}
-	if err := rows2.Err(); err != nil {
 		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 

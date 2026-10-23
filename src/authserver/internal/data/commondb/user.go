@@ -12,6 +12,360 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// userColumns is the users table as scanUser reads it, each column qualified by its table so the
+// list reads the same in a join with users_groups or users_permissions, whose own id, created_at
+// and updated_at it would otherwise name ambiguously.
+var userColumns = columnList{
+	sqlite: "users.id, users.created_at, users.updated_at, users.enabled, users.subject, " +
+		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
+		"users.website, users.gender, users.email, users.email_verified, " +
+		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
+		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
+		"users.address_locality, users.address_region, users.address_postal_code, " +
+		"users.address_country, users.password_hash, users.otp_secret_encrypted, users.otp_enabled, " +
+		"users.forgot_password_code_encrypted, users.forgot_password_code_issued_at, " +
+		"users.forgot_password_code_hash, users.auth_state_generation, users.last_otp_step, " +
+		"users.otp_config_generation, users.otp_consecutive_failures, " +
+		"users.otp_enrollment_secret_encrypted, users.otp_enrollment_issued_at",
+	mysql: "users.id, users.created_at, users.updated_at, users.enabled, users.subject, " +
+		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
+		"users.website, users.gender, users.email, users.email_verified, " +
+		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
+		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
+		"users.address_locality, users.address_region, users.address_postal_code, " +
+		"users.address_country, users.password_hash, users.otp_secret_encrypted, users.otp_enabled, " +
+		"users.forgot_password_code_encrypted, users.forgot_password_code_issued_at, " +
+		"users.forgot_password_code_hash, users.auth_state_generation, users.last_otp_step, " +
+		"users.otp_config_generation, users.otp_consecutive_failures, " +
+		"users.otp_enrollment_secret_encrypted, users.otp_enrollment_issued_at",
+	postgres: "users.id, users.created_at, users.updated_at, users.enabled, users.subject, " +
+		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
+		"users.website, users.gender, users.email, users.email_verified, " +
+		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
+		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
+		"users.address_locality, users.address_region, users.address_postal_code, " +
+		"users.address_country, users.password_hash, users.otp_secret_encrypted, users.otp_enabled, " +
+		"users.forgot_password_code_encrypted, users.forgot_password_code_issued_at, " +
+		"users.forgot_password_code_hash, users.auth_state_generation, users.last_otp_step, " +
+		"users.otp_config_generation, users.otp_consecutive_failures, " +
+		"users.otp_enrollment_secret_encrypted, users.otp_enrollment_issued_at",
+	mssql: "users.id, users.created_at, users.updated_at, users.enabled, users.subject, " +
+		"users.username, users.given_name, users.middle_name, users.family_name, users.nickname, " +
+		"users.website, users.gender, users.email, users.email_verified, " +
+		"users.email_verification_code_encrypted, users.email_verification_code_issued_at, " +
+		"users.zone_info_country_name, users.zone_info, users.locale, users.birth_date, " +
+		"users.phone_number_country_uniqueid, users.phone_number_country_callingcode, " +
+		"users.phone_number, users.phone_number_verified, users.address_line1, users.address_line2, " +
+		"users.address_locality, users.address_region, users.address_postal_code, " +
+		"users.address_country, users.password_hash, users.otp_secret_encrypted, users.otp_enabled, " +
+		"users.forgot_password_code_encrypted, users.forgot_password_code_issued_at, " +
+		"users.forgot_password_code_hash, users.auth_state_generation, users.last_otp_step, " +
+		"users.otp_config_generation, users.otp_consecutive_failures, " +
+		"users.otp_enrollment_secret_encrypted, users.otp_enrollment_issued_at",
+}
+
+// scanUser reads one row selected with userColumns.
+func scanUser(row rowScanner, user *record.User) error {
+	return row.Scan(
+		&user.Id,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.Enabled,
+		&user.Subject,
+		&user.Username,
+		&user.GivenName,
+		&user.MiddleName,
+		&user.FamilyName,
+		&user.Nickname,
+		&user.Website,
+		&user.Gender,
+		&user.Email,
+		&user.EmailVerified,
+		&user.EmailVerificationCodeEncrypted,
+		&user.EmailVerificationCodeIssuedAt,
+		&user.ZoneInfoCountryName,
+		&user.ZoneInfo,
+		&user.Locale,
+		&user.BirthDate,
+		&user.PhoneNumberCountryUniqueId,
+		&user.PhoneNumberCountryCallingCode,
+		&user.PhoneNumber,
+		&user.PhoneNumberVerified,
+		&user.AddressLine1,
+		&user.AddressLine2,
+		&user.AddressLocality,
+		&user.AddressRegion,
+		&user.AddressPostalCode,
+		&user.AddressCountry,
+		&user.PasswordHash,
+		&user.OTPSecretEncrypted,
+		&user.OTPEnabled,
+		&user.ForgotPasswordCodeEncrypted,
+		&user.ForgotPasswordCodeIssuedAt,
+		&user.ForgotPasswordCodeHash,
+		&user.AuthStateGeneration,
+		&user.LastOTPStep,
+		&user.OtpConfigGeneration,
+		&user.OtpConsecutiveFailures,
+		&user.OtpEnrollmentSecretEncrypted,
+		&user.OtpEnrollmentIssuedAt,
+	)
+}
+
+// insertUser writes every column but id, the dont-update ones included: a new user starts its
+// generations, its one-time code step and its pending enrolment from the values it is created with.
+var insertUser = statement{
+	sqlite: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
+		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
+		"email_verification_code_encrypted, email_verification_code_issued_at, " +
+		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
+		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
+		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
+		"forgot_password_code_issued_at, forgot_password_code_hash, auth_state_generation, " +
+		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
+		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?)",
+	mysql: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
+		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
+		"email_verification_code_encrypted, email_verification_code_issued_at, " +
+		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
+		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
+		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
+		"forgot_password_code_issued_at, forgot_password_code_hash, auth_state_generation, " +
+		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
+		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?)",
+	postgres: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
+		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
+		"email_verification_code_encrypted, email_verification_code_issued_at, " +
+		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
+		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
+		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
+		"forgot_password_code_issued_at, forgot_password_code_hash, auth_state_generation, " +
+		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
+		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) VALUES ($1, $2, $3, $4, $5, $6, " +
+		"$7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, " +
+		"$26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41) RETURNING id",
+	mssql: "INSERT INTO users (created_at, updated_at, enabled, subject, username, given_name, " +
+		"middle_name, family_name, nickname, website, gender, email, email_verified, " +
+		"email_verification_code_encrypted, email_verification_code_issued_at, " +
+		"zone_info_country_name, zone_info, locale, birth_date, phone_number_country_uniqueid, " +
+		"phone_number_country_callingcode, phone_number, phone_number_verified, address_line1, " +
+		"address_line2, address_locality, address_region, address_postal_code, address_country, " +
+		"password_hash, otp_secret_encrypted, otp_enabled, forgot_password_code_encrypted, " +
+		"forgot_password_code_issued_at, forgot_password_code_hash, auth_state_generation, " +
+		"last_otp_step, otp_config_generation, otp_consecutive_failures, " +
+		"otp_enrollment_secret_encrypted, otp_enrollment_issued_at) OUTPUT INSERTED.id VALUES (@p1, " +
+		"@p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, " +
+		"@p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, " +
+		"@p33, @p34, @p35, @p36, @p37, @p38, @p39, @p40, @p41)",
+}
+
+// updateUser writes the whole row but created_at and the six dont-update columns that only
+// their own narrow writers move: auth_state_generation, last_otp_step, otp_config_generation,
+// otp_consecutive_failures, otp_enrollment_secret_encrypted and otp_enrollment_issued_at. Their
+// absence from this text is the whole of their protection from a stale record (#471).
+var updateUser = statement{
+	sqlite: "UPDATE users SET updated_at = ?, enabled = ?, subject = ?, username = ?, " +
+		"given_name = ?, middle_name = ?, family_name = ?, nickname = ?, website = ?, gender = ?, " +
+		"email = ?, email_verified = ?, email_verification_code_encrypted = ?, " +
+		"email_verification_code_issued_at = ?, zone_info_country_name = ?, zone_info = ?, " +
+		"locale = ?, birth_date = ?, phone_number_country_uniqueid = ?, " +
+		"phone_number_country_callingcode = ?, phone_number = ?, phone_number_verified = ?, " +
+		"address_line1 = ?, address_line2 = ?, address_locality = ?, address_region = ?, " +
+		"address_postal_code = ?, address_country = ?, password_hash = ?, otp_secret_encrypted = ?, " +
+		"otp_enabled = ?, forgot_password_code_encrypted = ?, forgot_password_code_issued_at = ?, " +
+		"forgot_password_code_hash = ? WHERE id = ?",
+	mysql: "UPDATE users SET updated_at = ?, enabled = ?, subject = ?, username = ?, " +
+		"given_name = ?, middle_name = ?, family_name = ?, nickname = ?, website = ?, gender = ?, " +
+		"email = ?, email_verified = ?, email_verification_code_encrypted = ?, " +
+		"email_verification_code_issued_at = ?, zone_info_country_name = ?, zone_info = ?, " +
+		"locale = ?, birth_date = ?, phone_number_country_uniqueid = ?, " +
+		"phone_number_country_callingcode = ?, phone_number = ?, phone_number_verified = ?, " +
+		"address_line1 = ?, address_line2 = ?, address_locality = ?, address_region = ?, " +
+		"address_postal_code = ?, address_country = ?, password_hash = ?, otp_secret_encrypted = ?, " +
+		"otp_enabled = ?, forgot_password_code_encrypted = ?, forgot_password_code_issued_at = ?, " +
+		"forgot_password_code_hash = ? WHERE id = ?",
+	postgres: "UPDATE users SET updated_at = $1, enabled = $2, subject = $3, username = $4, " +
+		"given_name = $5, middle_name = $6, family_name = $7, nickname = $8, website = $9, " +
+		"gender = $10, email = $11, email_verified = $12, email_verification_code_encrypted = $13, " +
+		"email_verification_code_issued_at = $14, zone_info_country_name = $15, zone_info = $16, " +
+		"locale = $17, birth_date = $18, phone_number_country_uniqueid = $19, " +
+		"phone_number_country_callingcode = $20, phone_number = $21, phone_number_verified = $22, " +
+		"address_line1 = $23, address_line2 = $24, address_locality = $25, address_region = $26, " +
+		"address_postal_code = $27, address_country = $28, password_hash = $29, " +
+		"otp_secret_encrypted = $30, otp_enabled = $31, forgot_password_code_encrypted = $32, " +
+		"forgot_password_code_issued_at = $33, forgot_password_code_hash = $34 WHERE id = $35",
+	mssql: "UPDATE users SET updated_at = @p1, enabled = @p2, subject = @p3, username = @p4, " +
+		"given_name = @p5, middle_name = @p6, family_name = @p7, nickname = @p8, website = @p9, " +
+		"gender = @p10, email = @p11, email_verified = @p12, " +
+		"email_verification_code_encrypted = @p13, email_verification_code_issued_at = @p14, " +
+		"zone_info_country_name = @p15, zone_info = @p16, locale = @p17, birth_date = @p18, " +
+		"phone_number_country_uniqueid = @p19, phone_number_country_callingcode = @p20, " +
+		"phone_number = @p21, phone_number_verified = @p22, address_line1 = @p23, " +
+		"address_line2 = @p24, address_locality = @p25, address_region = @p26, " +
+		"address_postal_code = @p27, address_country = @p28, password_hash = @p29, " +
+		"otp_secret_encrypted = @p30, otp_enabled = @p31, forgot_password_code_encrypted = @p32, " +
+		"forgot_password_code_issued_at = @p33, forgot_password_code_hash = @p34 WHERE id = @p35",
+}
+
+var selectUserById = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE id = ?",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE id = ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE id = $1",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE id = @p1",
+}
+
+// selectUserByIdForUpdate is the locking read GetUserByIdForUpdate runs, the lock in each engine's
+// own grammar: FOR UPDATE on MySQL and PostgreSQL, the UPDLOCK and ROWLOCK table hints on SQL
+// Server, which has no FOR UPDATE on a SELECT, and none on SQLite, which has no row locks.
+var selectUserByIdForUpdate = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE id = ?",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE id = ? FOR UPDATE",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE id = $1 FOR UPDATE",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WITH (UPDLOCK, ROWLOCK) WHERE id = @p1",
+}
+
+// selectUsersWhere is completed by an IN list of user ids.
+var selectUsersWhere = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE ",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE ",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE ",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE ",
+}
+
+var selectUserByUsername = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE username = ?",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE username = ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE username = $1",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE username = @p1",
+}
+
+var selectUserBySubject = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE subject = ?",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE subject = ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE subject = $1",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE subject = @p1",
+}
+
+var selectUserByEmail = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE email = ?",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE email = ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE email = $1",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE email = @p1",
+}
+
+var selectUserByForgotPasswordCodeHash = statement{
+	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE forgot_password_code_hash = ?",
+	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE forgot_password_code_hash = ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE forgot_password_code_hash = $1",
+	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE forgot_password_code_hash = @p1",
+}
+
+// searchUsersFilter is the user search's predicate: the term, bound once per searched column,
+// matched against subject, username, given_name, middle_name, family_name and email. The page and
+// the count of a search both splice this one text, so the two cannot drift apart and start
+// disagreeing about how many rows a page is a slice of.
+//
+// LOWER() on both sides rather than leaving the fold to the column's collation, because the
+// collation means four different things: PostgreSQL and SQLite compare case-sensitively, so a
+// search for "alice" misses "Alice" there, while MySQL and SQL Server fold. Deciding it in the
+// query is the only spelling that is the same on all four (#283). The ESCAPE clause names
+// likeEscapeChar, which escapeLikePattern writes before each of the term's own wildcards (#95).
+// Removing the LOWER() calls puts PostgreSQL's case-sensitive search back and takes the other three
+// with it; removing the ESCAPE clause makes the escaping inert.
+var searchUsersFilter = statement{
+	sqlite: "(LOWER(subject) LIKE LOWER(?) ESCAPE '!' OR " +
+		"LOWER(username) LIKE LOWER(?) ESCAPE '!' OR LOWER(given_name) LIKE LOWER(?) ESCAPE '!' OR " +
+		"LOWER(middle_name) LIKE LOWER(?) ESCAPE '!' OR LOWER(family_name) LIKE LOWER(?) ESCAPE '!' OR " +
+		"LOWER(email) LIKE LOWER(?) ESCAPE '!')",
+	mysql: "(LOWER(subject) LIKE LOWER(?) ESCAPE '!' OR " +
+		"LOWER(username) LIKE LOWER(?) ESCAPE '!' OR LOWER(given_name) LIKE LOWER(?) ESCAPE '!' OR " +
+		"LOWER(middle_name) LIKE LOWER(?) ESCAPE '!' OR LOWER(family_name) LIKE LOWER(?) ESCAPE '!' OR " +
+		"LOWER(email) LIKE LOWER(?) ESCAPE '!')",
+	postgres: "(LOWER(subject) LIKE LOWER($1) ESCAPE '!' OR " +
+		"LOWER(username) LIKE LOWER($2) ESCAPE '!' OR LOWER(given_name) LIKE LOWER($3) ESCAPE '!' OR " +
+		"LOWER(middle_name) LIKE LOWER($4) ESCAPE '!' OR LOWER(family_name) LIKE LOWER($5) ESCAPE '!' OR " +
+		"LOWER(email) LIKE LOWER($6) ESCAPE '!')",
+	mssql: "(LOWER(subject) LIKE LOWER(@p1) ESCAPE '!' OR " +
+		"LOWER(username) LIKE LOWER(@p2) ESCAPE '!' OR LOWER(given_name) LIKE LOWER(@p3) ESCAPE '!' OR " +
+		"LOWER(middle_name) LIKE LOWER(@p4) ESCAPE '!' OR LOWER(family_name) LIKE LOWER(@p5) ESCAPE '!' OR " +
+		"LOWER(email) LIKE LOWER(@p6) ESCAPE '!')",
+}
+
+// The two pages of users bind the page size, then the offset, after the search's six terms when
+// there is a term. SQL Server pages with OFFSET … FETCH after its ORDER BY, naming the offset
+// first, so its text numbers the two the other way round.
+//
+// given_name is not unique, so it does not order the rows totally, and a page is a slice of an
+// order. Where tied rows straddle a page boundary the database is free to arrange them differently
+// for the page-1 query than for the page-2 query, which shows one user on both pages and omits
+// another entirely. The ties are the common case rather than the exception: every self-registered
+// user has an empty given name, as does the seeded admin. Ordering by the primary key as well makes
+// the order total, which is what makes paging through it correct. Same reason audit_log.go pages
+// by created_at DESC, id DESC (#112).
+var selectUsersPage = statement{
+	sqlite: "SELECT " + userColumns.sqlite +
+		" FROM users ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	mysql: "SELECT " + userColumns.mysql +
+		" FROM users ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	postgres: "SELECT " + userColumns.postgres +
+		" FROM users ORDER BY users.given_name ASC, users.id ASC LIMIT $1 OFFSET $2",
+	mssql: "SELECT " + userColumns.mssql +
+		" FROM users ORDER BY users.given_name ASC, users.id ASC OFFSET @p2 ROWS FETCH NEXT @p1 ROWS ONLY",
+}
+
+var selectUsersSearchPage = statement{
+	sqlite: "SELECT " + userColumns.sqlite + " FROM users WHERE " + searchUsersFilter.sqlite +
+		" ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	mysql: "SELECT " + userColumns.mysql + " FROM users WHERE " + searchUsersFilter.mysql +
+		" ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE " + searchUsersFilter.postgres +
+		" ORDER BY users.given_name ASC, users.id ASC LIMIT $7 OFFSET $8",
+	mssql: "SELECT " + userColumns.mssql + " FROM users WHERE " + searchUsersFilter.mssql +
+		" ORDER BY users.given_name ASC, users.id ASC OFFSET @p8 ROWS FETCH NEXT @p7 ROWS ONLY",
+}
+
+var countUsers = statement{
+	sqlite:   "SELECT count(*) FROM users",
+	mysql:    "SELECT count(*) FROM users",
+	postgres: "SELECT count(*) FROM users",
+	mssql:    "SELECT count(*) FROM users",
+}
+
+var countUsersSearch = statement{
+	sqlite:   "SELECT count(*) FROM users WHERE " + searchUsersFilter.sqlite,
+	mysql:    "SELECT count(*) FROM users WHERE " + searchUsersFilter.mysql,
+	postgres: "SELECT count(*) FROM users WHERE " + searchUsersFilter.postgres,
+	mssql:    "SELECT count(*) FROM users WHERE " + searchUsersFilter.mssql,
+}
+
+var deleteUser = statement{
+	sqlite:   "DELETE FROM users WHERE id = ?",
+	mysql:    "DELETE FROM users WHERE id = ?",
+	postgres: "DELETE FROM users WHERE id = $1",
+	mssql:    "DELETE FROM users WHERE id = @p1",
+}
+
+// acquireUserRow assigns auth_state_generation to itself: see AcquireUserRow.
+var acquireUserRow = statement{
+	sqlite:   "UPDATE users SET auth_state_generation = auth_state_generation WHERE id = ?",
+	mysql:    "UPDATE users SET auth_state_generation = auth_state_generation WHERE id = ?",
+	postgres: "UPDATE users SET auth_state_generation = auth_state_generation WHERE id = $1",
+	mssql:    "UPDATE users SET auth_state_generation = auth_state_generation WHERE id = @p1",
+}
+
 func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
 	now := time.Now().UTC()
@@ -21,12 +375,18 @@ func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User
 	user.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	user.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	insertBuilder := userStruct.WithoutTag("pk").InsertInto("users", user)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "user")
+	id, err := d.insert(ctx, tx, insertUser, "user",
+		user.CreatedAt, user.UpdatedAt, user.Enabled, user.Subject, user.Username, user.GivenName,
+		user.MiddleName, user.FamilyName, user.Nickname, user.Website, user.Gender, user.Email,
+		user.EmailVerified, user.EmailVerificationCodeEncrypted, user.EmailVerificationCodeIssuedAt,
+		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.BirthDate,
+		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
+		user.PhoneNumberVerified, user.AddressLine1, user.AddressLine2, user.AddressLocality,
+		user.AddressRegion, user.AddressPostalCode, user.AddressCountry, user.PasswordHash,
+		user.OTPSecretEncrypted, user.OTPEnabled, user.ForgotPasswordCodeEncrypted,
+		user.ForgotPasswordCodeIssuedAt, user.ForgotPasswordCodeHash, user.AuthStateGeneration,
+		user.LastOTPStep, user.OtpConfigGeneration, user.OtpConsecutiveFailures,
+		user.OtpEnrollmentSecretEncrypted, user.OtpEnrollmentIssuedAt)
 	if err != nil {
 		user.CreatedAt = originalCreatedAt
 		user.UpdatedAt = originalUpdatedAt
@@ -46,14 +406,17 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User
 	originalUpdatedAt := user.UpdatedAt
 	user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	updateBuilder := userStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users", user)
-	updateBuilder.Where(updateBuilder.Equal("id", user.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateUser.text(d.Dialect),
+		user.UpdatedAt, user.Enabled, user.Subject, user.Username, user.GivenName, user.MiddleName,
+		user.FamilyName, user.Nickname, user.Website, user.Gender, user.Email, user.EmailVerified,
+		user.EmailVerificationCodeEncrypted, user.EmailVerificationCodeIssuedAt,
+		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.BirthDate,
+		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
+		user.PhoneNumberVerified, user.AddressLine1, user.AddressLine2, user.AddressLocality,
+		user.AddressRegion, user.AddressPostalCode, user.AddressCountry, user.PasswordHash,
+		user.OTPSecretEncrypted, user.OTPEnabled, user.ForgotPasswordCodeEncrypted,
+		user.ForgotPasswordCodeIssuedAt, user.ForgotPasswordCodeHash,
+		user.Id)
 	if err != nil {
 		user.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update user")
@@ -62,91 +425,34 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User
 	return nil
 }
 
-func (d *Database) getUserCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userStruct *sqlbuilder.Struct) (*record.User, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var user record.User
-	if rows.Next() {
-		addr := userStruct.Addr(&user)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan user")
-		}
-		return &user, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error) {
 
 	if len(userIds) == 0 {
 		return nil, nil
 	}
 
-	users := make(map[int64]record.User)
+	var list []record.User
 
 	err := forEachIdBatch(userIds, func(batch []int64) error {
-		userStruct := sqlbuilder.NewStruct(new(record.User)).
-			For(d.Flavor)
-
-		selectBuilder := userStruct.SelectFrom("users")
-		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
-
-		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySQL(ctx, tx, sql, args...)
-		if err != nil {
-			return errs.Wrap(err, "unable to query database")
-		}
-		defer func() { _ = rows.Close() }()
-
-		for rows.Next() {
-			var user record.User
-			addr := userStruct.Addr(&user)
-			err = rows.Scan(addr...)
-			if err != nil {
-				return errs.Wrap(err, "unable to scan user")
-			}
-			users[user.Id] = user
-		}
-
-		if err := rows.Err(); err != nil {
-			return errs.Wrap(err, "unable to read query results")
-		}
-
-		return nil
+		query := selectUsersWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
+		var err error
+		list, err = queryAll(ctx, d, tx, list, query, int64Args(batch), scanUser, "user")
+		return err
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	users := make(map[int64]record.User, len(list))
+	for _, user := range list {
+		users[user.Id] = user
 	}
 
 	return users, nil
 }
 
 func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
-
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("id", userId))
-
-	user, err := d.getUserCommon(ctx, tx, selectBuilder, userStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return queryOne(ctx, d, tx, selectUserById.text(d.Dialect), []any{userId}, scanUser, "user")
 }
 
 // GetUserByIdForUpdate reads the user as last committed and takes the row for the rest of the
@@ -159,9 +465,9 @@ func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*
 // PostgreSQL and SQL Server at READ COMMITTED each statement reads what was committed when it
 // started, and SQLite has one writer at a time, so on those three only the lock is added (#498).
 //
-// The locking clause is the engine's own, so it is chosen here from the flavor rather than
-// written once: FOR UPDATE on MySQL and PostgreSQL, the UPDLOCK and ROWLOCK table hints on SQL
-// Server, which has no FOR UPDATE on a SELECT, and none on SQLite, which has no row locks.
+// The locking clause is the engine's own, so each version of selectUserByIdForUpdate spells it:
+// FOR UPDATE on MySQL and PostgreSQL, the UPDLOCK and ROWLOCK table hints on SQL Server, which has
+// no FOR UPDATE on a SELECT, and none on SQLite, which has no row locks.
 //
 // tx is required: without one the statement autocommits and the row is released before the
 // caller can decide on what it read.
@@ -171,25 +477,7 @@ func (d *Database) GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId 
 		return nil, errs.New("a locking read of a user requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("id", userId))
-
-	switch d.Flavor {
-	case sqlbuilder.MySQL, sqlbuilder.PostgreSQL:
-		selectBuilder.ForUpdate()
-	case sqlbuilder.SQLServer:
-		// The columns are already qualified with "users", so only the FROM clause takes the hints.
-		selectBuilder.From("users WITH (UPDLOCK, ROWLOCK)")
-	case sqlbuilder.SQLite:
-		// One writer at a time: nothing else writes the row while the caller's transaction does.
-	default:
-		return nil, errs.Errorf("no locking read of a user is written for the %s flavor", d.Flavor)
-	}
-
-	return d.getUserCommon(ctx, tx, selectBuilder, userStruct)
+	return queryOne(ctx, d, tx, selectUserByIdForUpdate.text(d.Dialect), []any{userId}, scanUser, "user")
 }
 
 func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error {
@@ -353,30 +641,12 @@ func (d *Database) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.
 }
 
 func (d *Database) GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*record.User, error) {
-
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("username", username))
-
-	user, err := d.getUserCommon(ctx, tx, selectBuilder, userStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return queryOne(ctx, d, tx, selectUserByUsername.text(d.Dialect), []any{username}, scanUser, "user")
 }
 
 func (d *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("subject", subject))
-
-	user, err := d.getUserCommon(ctx, tx, selectBuilder, userStruct)
+	user, err := queryOne(ctx, d, tx, selectUserBySubject.text(d.Dialect), []any{subject}, scanUser, "user")
 	if err != nil {
 		return nil, err
 	}
@@ -396,13 +666,7 @@ func (d *Database) GetUserBySubject(ctx context.Context, tx *sql.Tx, subject str
 
 func (d *Database) GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error) {
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("email", email))
-
-	user, err := d.getUserCommon(ctx, tx, selectBuilder, userStruct)
+	user, err := queryOne(ctx, d, tx, selectUserByEmail.text(d.Dialect), []any{email}, scanUser, "user")
 	if err != nil {
 		return nil, err
 	}
@@ -437,27 +701,12 @@ func (d *Database) GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.
 		return nil, nil
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.Equal("forgot_password_code_hash", codeHash))
-
-	user, err := d.getUserCommon(ctx, tx, selectBuilder, userStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return queryOne(ctx, d, tx, selectUserByForgotPasswordCodeHash.text(d.Dialect), []any{codeHash},
+		scanUser, "user")
 }
 
-// The columns the admin console's user search reads. The page query and the count query both
-// build their predicates from this one list, through searchUserLikeClauses, so the two cannot
-// drift apart and start disagreeing about how many rows a page is a slice of.
-var searchUserColumns = []string{"subject", "username", "given_name", "middle_name", "family_name", "email"}
-
-// likeEscapeChar is the character the search predicates declare in their ESCAPE clause and the
-// one escapeLikePattern writes. It is "!" rather than the usual backslash because the clause has
+// likeEscapeChar is the character searchUsersFilter declares in its ESCAPE clause and the one
+// escapeLikePattern writes. It is "!" rather than the usual backslash because the clause has
 // to parse on all four engines: MySQL reads backslash escapes inside string literals, so
 // ESCAPE '\' is ERROR 1064 there, while PostgreSQL, SQL Server and SQLite read it as one
 // backslash. A character that is special nowhere avoids an engine branch entirely (#95).
@@ -495,28 +744,6 @@ func escapeLikePattern(term string) string {
 	return b.String()
 }
 
-// searchUserLikeClauses builds one predicate per searched column, to be OR'd together.
-//
-// LOWER() on both sides rather than leaving the fold to the column's collation, because the
-// collation means four different things: PostgreSQL and SQLite compare case-sensitively, so a
-// search for "alice" misses "Alice" there today, while MySQL and SQL Server fold. Deciding it in
-// the query is the only spelling that is the same on all four (#283). sqlbuilder's Cond.ILike
-// would fold too, and is not used because it has no ESCAPE parameter, without which the term's
-// own wildcards survive (#95).
-//
-// sb.Var supplies each flavor's own placeholder, so this is written once and no engine branch
-// appears. Removing the LOWER() calls puts PostgreSQL's case-sensitive search back and takes the
-// other three with it; removing the ESCAPE clause makes the escaping above inert.
-func searchUserLikeClauses(sb *sqlbuilder.SelectBuilder, query string) []string {
-	pattern := "%" + escapeLikePattern(query) + "%"
-	clauses := make([]string, 0, len(searchUserColumns))
-	for _, col := range searchUserColumns {
-		clauses = append(clauses,
-			"LOWER("+col+") LIKE LOWER("+sb.Var(pattern)+") ESCAPE '"+string(likeEscapeChar)+"'")
-	}
-	return clauses
-}
-
 func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]record.User, int, error) {
 
 	if page < 1 {
@@ -527,73 +754,34 @@ func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query s
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-
+	pageQuery, countQuery := selectUsersPage, countUsers
+	var filterArgs []any
 	if query != "" {
-		selectBuilder.Where(
-			selectBuilder.Or(searchUserLikeClauses(selectBuilder, query)...),
-		)
+		pageQuery, countQuery = selectUsersSearchPage, countUsersSearch
+		pattern := "%" + escapeLikePattern(query) + "%"
+		filterArgs = []any{pattern, pattern, pattern, pattern, pattern, pattern}
 	}
-	// given_name is not unique, so it does not order the rows totally, and a page is a slice
-	// of an order. Where tied rows straddle a page boundary the database is free to arrange
-	// them differently for the page-1 query than for the page-2 query, which shows one user on
-	// both pages and omits another entirely. The ties are the common case rather than the
-	// exception: every self-registered user has an empty given name, as does the seeded admin.
-	// Ordering by the primary key as well makes the order total, which is what makes paging
-	// through it correct. Same reason audit_log.go pages by created_at DESC, id DESC (#112).
-	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
-	selectBuilder.Offset(PageOffset(page, pageSize))
-	selectBuilder.Limit(pageSize)
 
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	pageArgs := append(append([]any{}, filterArgs...), pageSize, PageOffset(page, pageSize))
+	users, err := queryAll(ctx, d, tx, nil, pageQuery.text(d.Dialect), pageArgs, scanUser, "user")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := d.QuerySQL(ctx, tx, countQuery.text(d.Dialect), filterArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
-	var users []record.User
-	for rows.Next() {
-		var user record.User
-		addr := userStruct.Addr(&user)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, 0, errs.Wrap(err, "unable to scan user")
-		}
-		users = append(users, user)
-	}
-
 	var count int
-	selectBuilder = d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From("users")
-
-	if query != "" {
-		selectBuilder.Where(
-			selectBuilder.Or(searchUserLikeClauses(selectBuilder, query)...),
-		)
-	}
-
-	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, 0, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows2.Close() }()
-
-	if rows2.Next() {
-		err = rows2.Scan(&count)
+	if rows.Next() {
+		err = rows.Scan(&count)
 		if err != nil {
 			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, 0, errs.Wrap(err, "unable to read query results")
-	}
-	if err := rows2.Err(); err != nil {
 		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
@@ -642,14 +830,7 @@ func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) err
 			return deleteRefreshTokensErr
 		}
 
-		userStruct := sqlbuilder.NewStruct(new(record.UserSession)).
-			For(d.Flavor)
-
-		deleteBuilder := userStruct.DeleteFrom("users")
-		deleteBuilder.Where(deleteBuilder.Equal("id", userId))
-
-		sql, args := deleteBuilder.Build()
-		_, err = d.ExecSQL(ctx, tx, sql, args...)
+		_, err = d.ExecSQL(ctx, tx, deleteUser.text(d.Dialect), userId)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete user")
 		}
@@ -671,8 +852,8 @@ func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) err
 //
 // It assigns auth_state_generation to itself and never touches updated_at, unlike its two
 // siblings: the admin console shows users.updated_at as "Last updated at", and a refresh is not an
-// edit of the account. Assigning a column to its own value is portable through sqlbuilder and locks
-// the row on every engine, which the data tier shows on each.
+// edit of the account. Assigning a column to its own value is the same text on every engine and
+// locks the row on each, which the data tier shows on each.
 //
 // A user that is not there affects no rows and is not reported here, as AcquireClientRow does not
 // report a missing client: there is nothing to hold, and the read that follows decides whether the
@@ -691,13 +872,7 @@ func (d *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64)
 		return errs.New("can't acquire a user row with an id of 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set("auth_state_generation = auth_state_generation")
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireUserRow.text(d.Dialect), userId); err != nil {
 		return errs.Wrap(err, "unable to acquire user row")
 	}
 
