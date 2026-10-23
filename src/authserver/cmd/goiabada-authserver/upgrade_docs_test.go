@@ -118,3 +118,61 @@ func TestUpgradePage_TheNativeRollbackRunsAsTheService(t *testing.T) {
 		assert.Empty(t, recorded)
 	})
 }
+
+// TestUpgradePage_APinnedDeploymentChangesTheTagAndTheDigestTogether: a reference carrying both
+// a tag and a digest is pulled by the digest alone, so a pinned deployment that changes the tag
+// alone keeps the old release running while the platform reports success, and a rollback that
+// leaves the digest in place starts the newer server again, which migrates the schema back up
+// (#491). The update steps name that rule where an operator follows them, in the Compose and
+// Kubernetes tabs, the rollback names it too, and checking the start reads the record whose
+// version attribute is where a stale pin shows.
+func TestUpgradePage_APinnedDeploymentChangesTheTagAndTheDigestTogether(t *testing.T) {
+	const page = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
+	require.NoError(t, err)
+	update, found := docsreader.SectionText(string(body), "## Update to a new release")
+	require.Truef(t, found, "%s has no section headed ## Update to a new release", page)
+
+	for _, tab := range []string{"Docker Compose", "Kubernetes"} {
+		_, in, found := strings.Cut(update, `<TabItem label="`+tab+`">`)
+		require.Truef(t, found, "%s: the update holds a %s tab", page, tab)
+		in, _, _ = strings.Cut(in, "</TabItem>")
+		assert.Containsf(t, in, "changes the tag and the digest together",
+			"%s: the update's %s tab names the rule a pinned deployment follows", page, tab)
+		assert.Containsf(t, in, "(#pin-a-deployment-to-an-image-digest)",
+			"%s: the update's %s tab links the pinning section", page, tab)
+	}
+
+	assert.Containsf(t, update, "`build information`",
+		"%s: checking the start reads the record that names the release actually running", page)
+	assert.Containsf(t, update, "its `version` attribute",
+		"%s: checking the start names the attribute that carries the release, which is where a stale pin shows", page)
+
+	rollback, found := docsreader.SectionText(string(body), "## Roll back to an earlier release")
+	require.True(t, found, "%s has no section headed ## Roll back to an earlier release", page)
+	assert.Containsf(t, rollback, "changes the tag and the digest together here too",
+		"%s: the rollback names the rule a pinned deployment follows", page)
+}
+
+// TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells: the pinning section is where an
+// operator learns what a digest buys and takes one from, and it names the forms the release and
+// the tooling spell: the full reference the release's notes list, tag and digest together, the
+// buildx command that prints the multi-platform index digest rather than a per-platform one, and
+// the gh command that verifies a digest against the release's attestation (#491).
+func TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells(t *testing.T) {
+	const page = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
+	require.NoError(t, err)
+	section, found := docsreader.SectionText(string(body), "## Pin a deployment to an image digest")
+	require.Truef(t, found, "%s has no section headed ## Pin a deployment to an image digest", page)
+	for _, want := range []string{
+		"`leodip/goiabada:authserver-<version>@sha256:<digest>`",
+		"`tag@sha256:digest`",
+		"`docker buildx imagetools inspect leodip/goiabada:authserver-<version>`",
+		"multi-platform image index",
+		"per-platform digest",
+		"gh attestation verify oci://docker.io/leodip/goiabada@sha256:<digest> --repo leodip/goiabada",
+	} {
+		assert.Containsf(t, section, want, "%s: the pinning section names %q as the release and the tooling spell it", page, want)
+	}
+}

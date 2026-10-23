@@ -193,6 +193,14 @@ jobs:
     name: Images
     needs: [verify, checks, versions]
     runs-on: ubuntu-latest
+    # The manifest digests the push produced, for the draft job to name in the release notes as
+    # full references, tag@sha256:digest, so an operator can pin a deployment to the image content
+    # this release attests (#491). They are the multi-platform index digests the digests step read
+    # and the attestations are made against, not the per-platform ones a registry's tags page
+    # lists.
+    outputs:
+      authserver: ${{ steps.digests.outputs.authserver }}
+      adminconsole: ${{ steps.digests.outputs.adminconsole }}
     # The push credentials, DOCKER_USERNAME and DOCKER_PASSWORD, exist only in this environment,
     # which admits main and v* tags alone, and GitHub exposes environment secrets only to jobs
     # that declare it. The Check workflow pulls with a separate read-only token.
@@ -276,3 +284,27 @@ jobs:
           [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
           gh release create "v$VERSION" "${args[@]}" dist/*
           echo "Draft created. Write the notes, then publish to move 'latest'."
+
+      - name: Write the image digests into the draft notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          AUTHSERVER_DIGEST: ${{ needs.images.outputs.authserver }}
+          ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
+        run: |
+          set -euo pipefail
+          # --generate-notes wrote the changelog into the draft; the digests follow it,
+          # so the notes an operator reads to pin a deployment name the exact image
+          # content this release pushed and attested (#491). The notes are still a
+          # draft: the publish step is whatever the maintainer writes on top of them.
+          gh release view "v$VERSION" --json body --jq .body > notes.md
+          {
+            echo ""
+            echo "## Pinned image references"
+            echo ""
+            echo "The multi-platform image index digests this release pushed and attested, one per image. The same digests name the images at \`ghcr.io/leodip/goiabada\`, which the same push wrote."
+            echo ""
+            echo "- Auth server: \`leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST\`"
+            echo "- Admin console: \`leodip/goiabada:adminconsole-$VERSION@$ADMINCONSOLE_DIGEST\`"
+          } >> notes.md
+          gh release edit "v$VERSION" --notes-file notes.md

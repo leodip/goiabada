@@ -29,6 +29,8 @@ You don't migrate the database yourself. The auth server brings the schema up to
        ```
 
        A setup wizard built from source writes the moving `latest` tag instead of a version, so `docker compose pull` fetches whatever release `latest` names that day. Replace it with a [release version](https://github.com/leodip/goiabada/releases), so that you choose when to upgrade.
+
+       A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together: the digest alone decides what runs, so a tag changed on its own keeps the old release running while `docker compose up -d` reports success.
      </TabItem>
      <TabItem label="Native binaries">
        Download the release's ZIP for your platform from the [releases page](https://github.com/leodip/goiabada/releases), put both binaries where the old ones are, and restart. With the layout on [Native binaries](/deploy/native-binaries/#set-it-up):
@@ -52,16 +54,39 @@ You don't migrate the database yourself. The auth server brings the schema up to
        ```
 
        If you regenerate the manifest with the setup wizard instead, apply only the new `goiabada-k8s.yaml`: the `goiabada-secrets.yaml` written beside it holds new secrets, which the database isn't under.
+
+       A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together: the digest alone decides what a pod runs, so a tag changed on its own leaves every pod on the old release while `kubectl rollout status` reports success.
      </TabItem>
    </Tabs>
 
-4. **Check the start.** The auth server writes `database migrated` once it has run the release's migrations, or `no need to migrate the database` when it had none to run, and then starts its listeners.
+4. **Check the start.** The auth server writes `database migrated` once it has run the release's migrations, or `no need to migrate the database` when it had none to run, and then starts its listeners. The `build information` record it writes as it starts names the release actually running in its `version` attribute: confirm it is the one you installed, which is where a stale pin shows.
 
 </Steps>
 
 <Aside type="caution">
 Running the setup wizard again generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) explains: a new AES key can't decrypt the database.
 </Aside>
+
+## Pin a deployment to an image digest
+
+The image lines the setup wizard writes name a release by its version tag, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`. A tag is mutable in the registry: a re-push under the same name, by mistake or through a compromised credential, changes what every node pulls next. A digest names the image content itself, and the release's attestations are made against it, so pinning a deployment to a digest makes the registry unable to change what runs.
+
+The wizard keeps writing the version tag: pinning is a choice an operator makes knowing the rule at the end of this section.
+
+To pin, give each image line the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>` in `docker-compose.yml`, the same form for both images in `goiabada-k8s.yaml`.
+
+Where the digest comes from:
+
+- **The release's notes.** Each release lists both images as full references, `tag@sha256:digest`, with the digests that release pushed and attested.
+- **The registry, read through buildx.** `docker buildx imagetools inspect leodip/goiabada:authserver-<version>` prints the digest on its `Digest:` line, and the same holds for the admin console's image. That line names the multi-platform image index, the digest the release attests. A per-platform digest, the kind a registry's tags page lists beside each architecture, pins that one architecture: a node on another platform cannot pull it.
+
+Verify the digest against the release's attestation before you trust it:
+
+```bash
+gh attestation verify oci://docker.io/leodip/goiabada@sha256:<digest> --repo leodip/goiabada
+```
+
+A reference carrying both a tag and a digest is pulled by the digest alone, so once a deployment is pinned, the tag and the digest change together, on an upgrade and on a rollback. A tag changed on its own keeps the old release running while the platform reports success, and a digest left in place on a rollback starts the newer server again, which migrates the schema back up. [Update to a new release](#update-to-a-new-release) and [Roll back to an earlier release](#roll-back-to-an-earlier-release) name that rule where you follow them.
 
 ## How migrations run
 
@@ -137,7 +162,7 @@ The `migrate` command steps the schema without starting the server, against the 
      </TabItem>
    </Tabs>
 
-3. **Install the target release straight away,** as in [Update to a new release](#update-to-a-new-release), with its version in place of the new one.
+3. **Install the target release straight away,** as in [Update to a new release](#update-to-a-new-release), with its version in place of the new one. A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together here too: a digest left in place starts the newer server again, which migrates the schema back up.
 
 </Steps>
 
