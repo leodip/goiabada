@@ -122,19 +122,99 @@ func TestRender_AdminSettingsGeneralVerificationHintSaysItNeedsEmail(t *testing.
 	assert.Contains(t, html.UnescapeString(out), "A new account is activated through a link sent to its email address. This needs email set up.")
 }
 
-// The password policy is four option cards, each saying what its policy asks, the stored one chosen.
+// policyCardRe matches one password policy's option card, capturing its value and the card's
+// markup up to the next card or the fieldset's end.
+var policyCardRe = regexp.MustCompile(`(?s)<label class="option-card">\s*<input type="radio" name="passwordPolicy" value="([a-z]+)".*?</label>`)
+
+// policyCards answers each password policy's card in page order, by its value.
+func policyCards(t *testing.T, out string) (order []string, cards map[string]string) {
+	t.Helper()
+	cards = map[string]string{}
+	for _, m := range policyCardRe.FindAllStringSubmatch(out, -1) {
+		order = append(order, m[1])
+		cards[m[1]] = html.UnescapeString(m[0])
+	}
+	return order, cards
+}
+
+// The password policy is five option cards, the NIST SP 800-63B one first and the four older ones
+// after it in their order, each saying what its policy asks, the stored one chosen (#550 decision 3).
 func TestRender_AdminSettingsGeneralOffersEachPasswordPolicy(t *testing.T) {
+	for _, stored := range []string{"nist", "none", "low", "medium", "high"} {
+		t.Run(stored, func(t *testing.T) {
+			out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+				"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: stored},
+			}, "en", true)
+
+			checked := regexp.MustCompile(`<input type="radio" name="passwordPolicy" value="([a-z]+)" checked`).FindAllStringSubmatch(out, -1)
+			require.Len(t, checked, 1, "one policy is chosen")
+			assert.Equal(t, stored, checked[0][1])
+			order, _ := policyCards(t, out)
+			assert.Equal(t, []string{"nist", "none", "low", "medium", "high"}, order)
+		})
+	}
 	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
 		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "medium"},
 	}, "en", true)
-
-	checked := regexp.MustCompile(`<input type="radio" name="passwordPolicy" value="([a-z]+)" checked`).FindAllStringSubmatch(out, -1)
-	require.Len(t, checked, 1, "one policy is chosen")
-	assert.Equal(t, "medium", checked[0][1])
-	for _, policy := range []string{"none", "low", "medium", "high"} {
-		assert.Contains(t, out, `<input type="radio" name="passwordPolicy" value="`+policy+`"`)
-	}
 	assert.Contains(t, out, "At least 10 characters, with a lowercase letter, an uppercase letter, a number and a symbol.")
+}
+
+// The NIST card names the guideline, says what it asks for, and why it is the recommended policy:
+// length and a check against the passwords attackers try first, not required character types
+// (#550 decision 3). The radio is named by the card's name and described by both lines.
+func TestRender_AdminSettingsGeneralExplainsTheNistPolicy(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "low"},
+	}, "en", true)
+	_, cards := policyCards(t, out)
+	nist := cards["nist"]
+	require.NotEmpty(t, nist)
+
+	assert.Contains(t, nist, `<span class="choice-label" id="policy-name-nist">NIST SP 800-63B</span>`)
+	assert.Contains(t, nist, `aria-labelledby="policy-name-nist"`)
+	assert.Contains(t, nist, `aria-describedby="policy-hint-nist policy-why-nist"`)
+	assert.Contains(t, nist, `<span class="field-hint" id="policy-hint-nist">At least 15 characters, any characters at all. A commonly used password is refused, and so is the account's email address, username or the app's name, or a simple variation of them.</span>`)
+	assert.Contains(t, nist, `<span class="field-hint" id="policy-why-nist">Recommended. It follows the US National Institute of Standards and Technology's guideline for a password that may be the only thing a sign-in checks: length, and a check against the passwords attackers try first, rather than required kinds of character, which make a password harder to remember without making it harder to guess.</span>`)
+	assert.NotContains(t, nist, "Falls short of NIST SP 800-63B.")
+}
+
+// Each of the four older cards keeps its own hint and gains a line saying it falls short of NIST,
+// which describes its radio too, so choosing one is a departure made knowingly (#550 decision 1).
+func TestRender_AdminSettingsGeneralSaysTheOlderPoliciesFallShortOfNist(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "nist"},
+	}, "en", true)
+	_, cards := policyCards(t, out)
+
+	for policy, hint := range map[string]string{
+		"none":   "At least 1 character.",
+		"low":    "At least 6 characters.",
+		"medium": "At least 8 characters, with a lowercase letter, an uppercase letter and a number.",
+		"high":   "At least 10 characters, with a lowercase letter, an uppercase letter, a number and a symbol.",
+	} {
+		card := cards[policy]
+		require.NotEmpty(t, card, policy)
+		assert.Contains(t, card, `id="policy-hint-`+policy+`">`+hint+`</span>`, policy)
+		assert.Contains(t, card, `<span class="field-hint" id="policy-short-`+policy+`">Falls short of NIST SP 800-63B.</span>`, policy)
+		assert.Contains(t, card, `aria-describedby="policy-hint-`+policy+` policy-short-`+policy+`"`, policy)
+	}
+}
+
+// The NIST card and the older cards' line in Brazilian Portuguese, from that catalog, with no raw
+// key leaking.
+func TestRender_AdminSettingsGeneralPasswordPoliciesInPtBR(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_settings_general.html", map[string]interface{}{
+		"settings": adminsettingshandlers.SettingsGeneral{PasswordPolicy: "nist"},
+	}, "pt-BR", true)
+	_, cards := policyCards(t, out)
+
+	assert.Contains(t, cards["nist"], ">NIST SP 800-63B</span>")
+	assert.Contains(t, cards["nist"], ">Pelo menos 15 caracteres, de qualquer tipo. Uma senha comum é recusada, assim como o endereço de e-mail da conta, o nome de usuário ou o nome do aplicativo, ou uma variação simples deles.</span>")
+	assert.Contains(t, cards["nist"], ">Recomendada. Segue a diretriz do Instituto Nacional de Padrões e Tecnologia dos EUA (NIST) para uma senha que pode ser a única coisa verificada ao entrar: comprimento, e uma verificação contra as senhas que atacantes tentam primeiro, em vez de tipos de caractere obrigatórios, que tornam uma senha mais difícil de lembrar sem torná-la mais difícil de adivinhar.</span>")
+	for _, policy := range []string{"none", "low", "medium", "high"} {
+		assert.Contains(t, cards[policy], ">Não atende ao NIST SP 800-63B.</span>", policy)
+	}
+	assert.NotContains(t, out, "adminconsole.admin_settings.general.")
 }
 
 // A change of issuer asks first, against the issuer the auth server holds: after a refused save the

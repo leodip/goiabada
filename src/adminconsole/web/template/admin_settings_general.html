@@ -60,31 +60,43 @@
     </div>
     <fieldset class="grid gap-3 md:grid-cols-2" aria-labelledby="passwordPolicyTitle" aria-describedby="passwordPolicyHint">
       <label class="option-card">
-        <input type="radio" name="passwordPolicy" value="none"{{ if eq $policy "none" }} checked{{ end }} aria-labelledby="policy-name-none" aria-describedby="policy-hint-none">
+        <input type="radio" name="passwordPolicy" value="nist"{{ if eq $policy "nist" }} checked{{ end }} aria-labelledby="policy-name-nist" aria-describedby="policy-hint-nist policy-why-nist">
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span class="choice-label" id="policy-name-nist">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_nist" }}</span>
+          <span class="field-hint" id="policy-hint-nist">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_nist_hint" }}</span>
+          <span class="field-hint" id="policy-why-nist">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_nist_why" }}</span>
+        </span>
+      </label>
+      <label class="option-card">
+        <input type="radio" name="passwordPolicy" value="none"{{ if eq $policy "none" }} checked{{ end }} aria-labelledby="policy-name-none" aria-describedby="policy-hint-none policy-short-none">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label" id="policy-name-none">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_none" }}</span>
           <span class="field-hint" id="policy-hint-none">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_none_hint" }}</span>
+          <span class="field-hint" id="policy-short-none">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_short_of_nist" }}</span>
         </span>
       </label>
       <label class="option-card">
-        <input type="radio" name="passwordPolicy" value="low"{{ if eq $policy "low" }} checked{{ end }} aria-labelledby="policy-name-low" aria-describedby="policy-hint-low">
+        <input type="radio" name="passwordPolicy" value="low"{{ if eq $policy "low" }} checked{{ end }} aria-labelledby="policy-name-low" aria-describedby="policy-hint-low policy-short-low">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label" id="policy-name-low">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_low" }}</span>
           <span class="field-hint" id="policy-hint-low">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_low_hint" }}</span>
+          <span class="field-hint" id="policy-short-low">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_short_of_nist" }}</span>
         </span>
       </label>
       <label class="option-card">
-        <input type="radio" name="passwordPolicy" value="medium"{{ if eq $policy "medium" }} checked{{ end }} aria-labelledby="policy-name-medium" aria-describedby="policy-hint-medium">
+        <input type="radio" name="passwordPolicy" value="medium"{{ if eq $policy "medium" }} checked{{ end }} aria-labelledby="policy-name-medium" aria-describedby="policy-hint-medium policy-short-medium">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label" id="policy-name-medium">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_medium" }}</span>
           <span class="field-hint" id="policy-hint-medium">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_medium_hint" }}</span>
+          <span class="field-hint" id="policy-short-medium">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_short_of_nist" }}</span>
         </span>
       </label>
       <label class="option-card">
-        <input type="radio" name="passwordPolicy" value="high"{{ if eq $policy "high" }} checked{{ end }} aria-labelledby="policy-name-high" aria-describedby="policy-hint-high">
+        <input type="radio" name="passwordPolicy" value="high"{{ if eq $policy "high" }} checked{{ end }} aria-labelledby="policy-name-high" aria-describedby="policy-hint-high policy-short-high">
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label" id="policy-name-high">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_high" }}</span>
           <span class="field-hint" id="policy-hint-high">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_high_hint" }}</span>
+          <span class="field-hint" id="policy-short-high">{{ T $.ctx "adminconsole.admin_settings.general.password_policy_short_of_nist" }}</span>
         </span>
       </label>
     </fieldset>

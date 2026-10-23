@@ -21,7 +21,7 @@ import { linksIn, waitForMail } from "../../../lib/mailpit";
 import { passwordToken } from "../../../lib/oauth";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../../lib/settings";
 import { browserSignInClient } from "../../../lib/test-clients";
-import { uniqueIdentifier } from "../../../lib/unique";
+import { testPrefix, uniqueIdentifier } from "../../../lib/unique";
 
 const general = "/admin/settings/general";
 const registerUrl = `${env.authUrl}/account/register`;
@@ -134,6 +134,55 @@ test("the password policy applies to passwords set from then on", async ({ page 
     await submitNewUser(page, { email, password: "Medium1Pass" });
     await expect(page).toHaveURL(/\/admin\/users\/\d+\/details/);
     await deleteUser(page, Number(page.url().match(/\/admin\/users\/(\d+)\//)![1]));
+  });
+});
+
+test("the NIST SP 800-63B card says what it asks, and registration holds a password to it", async ({ page, browser }) => {
+  await withSettingsRestored(page, general, async () => {
+    const nist = page.getByRole("radio", { name: "NIST SP 800-63B", exact: true });
+    await expect(page.locator('input[name="passwordPolicy"]').first()).toHaveAttribute("value", "nist");
+    await expect(nist).toHaveAccessibleDescription(/^At least 15 characters, any characters at all\..* Recommended\. It follows the US National Institute of Standards and Technology's guideline/);
+    await expect(page.getByRole("radio", { name: "Low", exact: true })).toHaveAccessibleDescription("At least 6 characters. Falls short of NIST SP 800-63B.");
+    await nist.check();
+    await fillSettingsForm(page, { selfRegistrationEnabled: true, selfRegistrationRequiresEmailVerification: false });
+    await saveSettings(page);
+    await expect(nist).toBeChecked();
+
+    // A local part of 10 characters, so the address's own, padded with a year and a symbol, is 15.
+    const local = `${testPrefix}${randomBytes(3).toString("hex")}`;
+    const email = `${local}@example.com`;
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const register = await context.newPage();
+    await register.goto(registerUrl);
+    await expect(register.locator("#password-rules")).toHaveText(
+      "At least 15 characters. A few unrelated words make a long password that's easy to remember. Common passwords, and the account's email address or the app's name, are refused.",
+    );
+    const submit = async (password: string) => {
+      await register.locator("#email").fill(email);
+      await register.locator("#password").fill(password);
+      await register.locator("#passwordConfirmation").fill(password);
+      await register.getByRole("button", { name: "Create account", exact: true }).click();
+    };
+
+    await submit("passwordpassword");
+    await expect(register.locator("#register-error")).toHaveText(
+      "This password is one attackers try first. Choose another: a few unrelated words make a long password that's easy to remember.",
+    );
+    await expect(register.locator("#password")).toHaveAttribute("aria-invalid", "true");
+
+    const padded = local.padEnd(15, "2026!");
+    expect(padded).toHaveLength(15);
+    await submit(padded);
+    await expect(register.locator("#register-error")).toHaveText(
+      "This password is too close to the account's email address, username or the app's name. Choose another.",
+    );
+
+    await submit("amber lantern drifts over a quiet harbor");
+    await expect(register.getByRole("heading", { name: "Account created" })).toBeVisible();
+    await expect(register.locator("code.auth-address")).toHaveText(email);
+    await context.close();
+
+    await deleteUser(page, await idFromListLink(page, `${env.adminUrl}/admin/users?query=${local}`, email));
   });
 });
 
