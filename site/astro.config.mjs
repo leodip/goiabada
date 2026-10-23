@@ -117,6 +117,7 @@ export default defineConfig({
 						{ label: 'Clients', slug: 'concepts/clients' },
 						{ label: 'Users and groups', slug: 'concepts/users-and-groups' },
 						{ label: 'Self-registration', slug: 'concepts/self-registration' },
+						{ label: 'Password policy', slug: 'concepts/password-policy' },
 						{ label: 'Password recovery', slug: 'concepts/password-recovery' },
 						{ label: 'Resources and permissions', slug: 'concepts/resources-and-permissions' },
 						{ label: 'Scopes', slug: 'concepts/scopes' },

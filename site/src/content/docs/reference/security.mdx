@@ -20,6 +20,7 @@ This page helps you report a security issue in Goiabada, and shows what it does 
 ## Sign-in
 
 - **Passwords are hashed** with bcrypt, and never stored or logged as typed. See [passwords](/concepts/users-and-groups/#passwords).
+- **New passwords follow NIST SP 800-63B** on a new installation: at least 15 characters, no required kinds of character, and never a commonly used password or the account's own details, as section 3.1.1.2 of SP 800-63B-4 requires. An upgraded installation keeps the policy it had. Two of the section's SHOULDs aren't met: the maximum is bcrypt's 72 bytes rather than 64 characters in every script, and passwords aren't normalized to NFC. See [Password policy](/concepts/password-policy/).
 - **Two-factor authentication** uses one-time codes from an authenticator app, optional or required per client. See [ACR and AMR](/concepts/acr-and-amr/).
 - **A one-time code works once.** Once a code has been accepted, it's refused everywhere, at sign-in, while setting up an authenticator and through the account API, with the same error a wrong code gets. Two submissions of the same code at the same moment get at most one success. A refused replay leaves an `otp_code_replay_detected` entry in the [audit log](/concepts/audit-log/). Removing an authenticator clears that history.
 - **[PKCE](/concepts/pkce/) is required** for every public client, and by default for every other one.
