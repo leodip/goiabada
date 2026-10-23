@@ -51,7 +51,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	assert.Empty(t, differing, "every method of a route passes through the same chain")
 
 	wantRoot := []string{
-		"github.com/go-chi/cors.(*Cors).Handler-fm",
+		"github.com/leodip/goiabada/authserver/internal/middleware.CORS.func1",
 		"github.com/go-chi/chi/v5/middleware.RequestID",
 		"github.com/leodip/goiabada/core/httpmw.SecurityHeaders.func1",
 		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",

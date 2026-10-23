@@ -380,7 +380,6 @@ A row may name a package inside a module the admin console otherwise compiles le
 | `github.com/microsoft/go-mssqldb` | SQL Server driver | no | — |
 | `github.com/huandu/go-sqlbuilder` | SQL construction | no | — |
 | `github.com/pquerna/otp` | TOTP generation | no | — |
-| `github.com/go-chi/cors` | CORS policy is the auth server's | no | — |
 | `golang.org/x/crypto/bcrypt` | provider-only password hashing | no | — |
 
 Every driver used to arrive the same way, through one edge:

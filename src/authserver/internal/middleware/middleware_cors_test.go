@@ -245,10 +245,9 @@ func TestCORS_ADatabaseErrorFailsClosed(t *testing.T) {
 	db.AssertExpectations(t)
 }
 
-// A preflight has to say how long it may be cached. cors@v1.2.2 emits Access-Control-Max-Age only
-// when maxAge > 0, so with no value set the header never shipped and every browser fell back to
-// its own short default, re-preflighting roughly every five seconds and paying for a lookup each
-// time.
+// A preflight has to say how long it may be cached. While go-chi/cors answered, no MaxAge was set
+// and the header never shipped, so every browser fell back to its own short default,
+// re-preflighting roughly every five seconds and paying for a lookup each time.
 //
 // Read through Result().Header rather than the recorder's live map: the live map shows a header
 // that was set even if the response never carried it, which is how a test of a header can be
@@ -274,7 +273,7 @@ func TestCORS_APreflightIsCacheable(t *testing.T) {
 //
 // CORS is the one consumer in this batch whose port is reached from a middleware rather
 // than a handler, and the one where dropping the request's context would be worse than slow: the
-// preflight decision is made inside AllowOriginFunc, which has the request in scope and nothing
+// preflight decision is made inside corsOriginAllowed, which has the request in scope and nothing
 // else, so a WebOriginExists issued on context.Background() would keep answering for a browser
 // that has already gone away.
 //

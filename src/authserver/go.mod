@@ -5,7 +5,6 @@ go 1.27.3
 require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/go-chi/chi/v5 v5.5.0
-	github.com/go-chi/cors v1.2.2
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/huandu/go-sqlbuilder v1.44.0
