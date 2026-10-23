@@ -77,7 +77,7 @@ To pin, give each image line the tag and the digest together, `leodip/goiabada:a
 
 Where the digest comes from:
 
-- **The release's notes.** A release's notes list both images under Pinned image references, as full references, `tag@sha256:digest`, with the digests that release pushed and attested. Releases made before the notes carried them don't list them: take an earlier release's digests from the registry, as below.
+- **The release's notes.** A release's notes list both images under **Pinned image references**, each as a full reference, `tag@sha256:digest`, with the digests that release pushed and attested. Releases made before the notes carried them don't list them: take an earlier release's digests from the registry, as below.
 - **The registry, read through buildx.** `docker buildx imagetools inspect leodip/goiabada:authserver-<version>` prints the digest on its `Digest:` line, and the same holds for the admin console's image. That line names the multi-platform image index, the digest the release attests. A per-platform digest, the kind a registry's tags page lists beside each architecture, selects that one architecture, so a node on another one can't run it natively, and it won't verify against the release's attestation, which names the index.
 
 Verify the digest against the release's attestation before you trust it:

@@ -156,10 +156,10 @@ func TestUpgradePage_APinnedDeploymentChangesTheTagAndTheDigestTogether(t *testi
 
 // TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells: the pinning section is where an
 // operator learns what a digest buys and takes one from, and it names the forms the release and
-// the tooling spell: the full reference the release's notes list, tag and digest together, the
-// buildx command that prints the multi-platform index digest rather than a per-platform one, and
-// the gh command that verifies a digest against the attestation of the release being installed,
-// not of any release of this repository (#491).
+// the tooling spell: the heading the release's notes list the images under, the full reference
+// they list, tag and digest together, the buildx command that prints the multi-platform index
+// digest rather than a per-platform one, and the gh command that verifies a digest against the
+// attestation of the release being installed, not of any release of this repository (#491).
 func TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells(t *testing.T) {
 	const page = "site/src/content/docs/deploy/upgrade-goiabada.mdx"
 	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), page))
@@ -169,6 +169,7 @@ func TestUpgradePage_ThePinningSectionNamesTheFormsTheReleaseSpells(t *testing.T
 	for _, want := range []string{
 		"`leodip/goiabada:authserver-<version>@sha256:<digest>`",
 		"`tag@sha256:digest`",
+		"**" + pinnedReferencesHeading + "**",
 		"`docker buildx imagetools inspect leodip/goiabada:authserver-<version>`",
 		"multi-platform image index",
 		"per-platform digest",

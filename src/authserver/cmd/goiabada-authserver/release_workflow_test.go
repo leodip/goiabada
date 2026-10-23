@@ -18,6 +18,10 @@ import (
 // builds and attests the images and writes the draft release the maintainer publishes.
 const releaseWorkflow = ".github/workflows/release.yml"
 
+// pinnedReferencesHeading is the heading the draft's notes open with, which the upgrade page and
+// the draft step's closing reminder send the reader to by name.
+const pinnedReferencesHeading = "Pinned image references"
+
 // workflowStep is one step of a workflow job, as far as the digest contract reads it: the name it
 // runs under, the env it runs with, and its script.
 type workflowStep struct {
@@ -271,9 +275,10 @@ func runDraftCreate(t *testing.T, authserverDigest, adminconsoleDigest string) d
 }
 
 // TestReleaseWorkflow_TheDraftIsCreatedWithTheReferencesAboveTheGeneratedNotes runs the real create
-// step: the one gh release create that makes the draft is handed a notes file naming each image
-// with its own version and digest, and still asks for the generated notes, which gh puts below
-// that file, so the draft never exists without the references (#491).
+// step: the one gh release create that makes the draft is handed a notes file opening with the
+// heading the docs name and naming each image with its own version and digest, and still asks for
+// the generated notes, which gh puts below that file, so the draft never exists without the
+// references (#491).
 func TestReleaseWorkflow_TheDraftIsCreatedWithTheReferencesAboveTheGeneratedNotes(t *testing.T) {
 	authserverDigest := "sha256:" + strings.Repeat("a", 64)
 	adminconsoleDigest := "sha256:" + strings.Repeat("b", 64)
@@ -291,6 +296,9 @@ func TestReleaseWorkflow_TheDraftIsCreatedWithTheReferencesAboveTheGeneratedNote
 	assert.Contains(t, run.args, "--notes-file")
 	assert.Contains(t, run.args, "dist/asset.zip", "the release assets go up in the same create")
 	notes := strings.Split(run.notes, "\n")
+	assert.Equal(t, "## "+pinnedReferencesHeading, notes[0], "the draft opens with the section the docs name")
+	assert.Contains(t, run.output, "keeping the "+pinnedReferencesHeading+" section",
+		"the closing reminder names the section the draft writes")
 	assert.Contains(t, notes, "- Auth server: `leodip/goiabada:authserver-1.2.3@"+authserverDigest+"`")
 	assert.Contains(t, notes, "- Admin console: `leodip/goiabada:adminconsole-1.2.3@"+adminconsoleDigest+"`")
 }
