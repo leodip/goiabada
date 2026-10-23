@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +29,7 @@ func TestMissingSettings_ThePasswordStepAnswersBeforeReadingItsCeremony(t *testi
 			var handler http.Handler
 			if method == http.MethodPost {
 				form := url.Values{}
-				form.Add(ceremonyIdField, testCeremonyId)
+				form.Add(ceremony.IdField, testCeremonyId)
 				form.Add("email", "test@example.com")
 				form.Add("password", "testpassword")
 				req = httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))

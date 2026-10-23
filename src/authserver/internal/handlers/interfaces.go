@@ -40,7 +40,13 @@ type JSONWriter interface {
 // on the concrete type and not here: only the locale middleware reads it, and no handler does
 // (#435).
 type CeremonyStore interface {
+	// GetAuthContext reads the ceremony the request names (ceremony.RequestedId). It answers
+	// ceremony.ErrCeremonyNotHeld when the browser session holds a ceremony but not that one, and
+	// ceremony.ErrNoAuthContext when it holds none.
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
+	// LatestAuthContext reads the ceremony the browser most recently wrote, whatever the request
+	// names, which the ceremony mismatch audit event records.
+	LatestAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 	// SaveAuthContext is a step's save, which writes only while the browser session still holds
 	// the step's ceremony and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing
 	// (#579). Every step after /auth/authorize saves through it, and answers that error through

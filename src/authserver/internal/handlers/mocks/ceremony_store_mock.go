@@ -297,6 +297,68 @@ func (_c *CeremonyStore_GetAuthContext_Call) RunAndReturn(run func(r *http.Reque
 	return _c
 }
 
+// LatestAuthContext provides a mock function for the type CeremonyStore
+func (_mock *CeremonyStore) LatestAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
+	ret := _mock.Called(r)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LatestAuthContext")
+	}
+
+	var r0 *ceremony.AuthContext
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*http.Request) (*ceremony.AuthContext, error)); ok {
+		return returnFunc(r)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*http.Request) *ceremony.AuthContext); ok {
+		r0 = returnFunc(r)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ceremony.AuthContext)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*http.Request) error); ok {
+		r1 = returnFunc(r)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// CeremonyStore_LatestAuthContext_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestAuthContext'
+type CeremonyStore_LatestAuthContext_Call struct {
+	*mock.Call
+}
+
+// LatestAuthContext is a helper method to define mock.On call
+//   - r *http.Request
+func (_e *CeremonyStore_Expecter) LatestAuthContext(r any) *CeremonyStore_LatestAuthContext_Call {
+	return &CeremonyStore_LatestAuthContext_Call{Call: _e.mock.On("LatestAuthContext", r)}
+}
+
+func (_c *CeremonyStore_LatestAuthContext_Call) Run(run func(r *http.Request)) *CeremonyStore_LatestAuthContext_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *http.Request
+		if args[0] != nil {
+			arg0 = args[0].(*http.Request)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *CeremonyStore_LatestAuthContext_Call) Return(authContext *ceremony.AuthContext, err error) *CeremonyStore_LatestAuthContext_Call {
+	_c.Call.Return(authContext, err)
+	return _c
+}
+
+func (_c *CeremonyStore_LatestAuthContext_Call) RunAndReturn(run func(r *http.Request) (*ceremony.AuthContext, error)) *CeremonyStore_LatestAuthContext_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RegenerateSession provides a mock function for the type CeremonyStore
 func (_mock *CeremonyStore) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
 	ret := _mock.Called(w, r, ceremonyId)

@@ -140,7 +140,7 @@ type AuthContext struct {
 	//
 	// Generated only in authflow.Authorization.Run, through NewId, the sole creation site, so no other
 	// path can mint one. Absent from a context written by an older binary it unmarshals as "", which
-	// ceremonyMatches refuses rather than matching against an empty submission: a user mid-flow
+	// idMatches refuses rather than matching against an empty submission: a user mid-flow
 	// across a deploy is refused once and restarts the authorization, bounded by the session
 	// cookie's life. That is the fail-closed direction.
 	CeremonyId string

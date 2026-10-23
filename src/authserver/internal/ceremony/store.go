@@ -25,7 +25,9 @@ type authSessionStore interface {
 }
 
 // Store keeps a browser's AuthContext in the server-side session, under
-// sessionkeys.AuthContext, between the hops of one authorization ceremony. It was
+// sessionkeys.AuthContext, between the hops of one authorization ceremony. Every reader reads the
+// ceremony the request names (GetAuthContext, UILocales), and every write names the ceremony it
+// writes. It was
 // handlerhelpers.AuthHelper until #435 moved it beside the type it persists; the handlers reach it
 // through their CeremonyStore port, and server.go's locale middleware through UILocales.
 type Store struct {
@@ -40,7 +42,37 @@ func NewStore(sessionStore authSessionStore, sessionName string) *Store {
 	}
 }
 
+// GetAuthContext reads the ceremony the request names, through the one rule for which that is
+// (RequestedId): the URL's parameter on a GET, the form's field on a POST. The step boundary loads
+// every step's ceremony through it, and the one-time-code rate limit the user whose budget a
+// submission spends, so the two always read the same ceremony.
+//
+// It answers ErrNoAuthContext when the browser session holds no ceremony at all, whatever the request
+// names, and ErrCeremonyNotHeld when it holds a ceremony but not the one named, or the request names
+// none.
 func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
+	return s.authContextNamed(r, RequestedId(r))
+}
+
+// authContextNamed reads the ceremony the browser session holds under ceremonyId: ErrNoAuthContext
+// when it holds none, and ErrCeremonyNotHeld when it holds another, or a context naming none, since
+// an empty id is never held (idMatches).
+func (s *Store) authContextNamed(r *http.Request, ceremonyId string) (*AuthContext, error) {
+	authContext, err := s.LatestAuthContext(r)
+	if err != nil {
+		return nil, err
+	}
+	if !idMatches(authContext.CeremonyId, ceremonyId) {
+		return nil, errs.WithStack(ErrCeremonyNotHeld)
+	}
+	return authContext, nil
+}
+
+// LatestAuthContext reads the ceremony the browser most recently wrote, whichever one the request
+// names, which while a browser holds one ceremony is the one it holds. It answers ErrNoAuthContext
+// when the session holds none. The ceremony mismatch audit event records it, and the page language
+// falls back to it when the URL names no ceremony the browser holds.
+func (s *Store) LatestAuthContext(r *http.Request) (*AuthContext, error) {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return nil, err
@@ -69,7 +101,7 @@ func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 // or is gone: the browser has moved on from this ceremony, and the newer one carries on. Ownership
 // is the ceremony id, not the state, so two requests of one ceremony stay last-writer-wins between
 // themselves, as a double-submitted consent form needs. An empty stored id is never owned, as
-// ceremonyMatches refuses it.
+// idMatches refuses it.
 func (s *Store) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *AuthContext) error {
 	jsonData, err := json.Marshal(authContext)
 	if err != nil {
@@ -117,7 +149,7 @@ func goneIsReplaced(err error) error {
 // held is the condition every write of the ceremony named makes on the browser session, applied to
 // the session's values as a fresh read found them: nil while they hold that ceremony, and
 // ErrCeremonyReplaced when they hold another, none, or a context naming none, since an empty id is
-// never held, as ceremonyMatches refuses it (#579). A context that does not decode is a fault and
+// never held, as idMatches refuses it (#579). A context that does not decode is a fault and
 // is returned as one.
 func held(ceremonyId string) func(values map[string]any) error {
 	return func(values map[string]any) error {
@@ -263,8 +295,15 @@ func (s *Store) ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremony
 	return err
 }
 
+// UILocales is the ui_locales of the ceremony the request's URL names, which the locale middleware
+// renders every page in, and of the ceremony the browser most recently wrote when the URL names none
+// it holds. It reads the URL's parameter whatever the method and never a form body: the middleware
+// runs ahead of every handler, and a step's form posts to the URL its page was loaded with.
 func (s *Store) UILocales(r *http.Request) []string {
-	authContext, err := s.GetAuthContext(r)
+	authContext, err := s.authContextNamed(r, r.URL.Query().Get(QueryParameter))
+	if errors.Is(err, ErrCeremonyNotHeld) {
+		authContext, err = s.LatestAuthContext(r)
+	}
 	if err != nil || authContext == nil || len(authContext.UILocales) == 0 {
 		return nil
 	}

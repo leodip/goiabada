@@ -96,7 +96,7 @@ func otpGetRequest() *http.Request {
 
 func otpPostRequest(code string) *http.Request {
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("otp", code)
 	req := httptest.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -120,7 +120,7 @@ func TestMissingSettings_TheOTPStepAnswersBeforeReadingItsCeremony(t *testing.T)
 			var handler http.Handler
 			if method == http.MethodPost {
 				form := url.Values{}
-				form.Add(ceremonyIdField, testCeremonyId)
+				form.Add(ceremony.IdField, testCeremonyId)
 				form.Add("otp", "123456")
 				req = httptest.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

@@ -87,7 +87,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 // checked, which is how the form already treats a body that names no ceremony.
 func TestCutBody_ThePasswordForm(t *testing.T) {
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("email", "test@example.com")
 	form.Add("password", "the password")
 	body := form.Encode()
@@ -95,21 +95,22 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	serve := func(t *testing.T, limit int, prepare func(pageRenderer *handlersmocks.PageRenderer,
 		auditLogger *handlersmocks.AuditLogger, database *datamocks.Database, rr *httptest.ResponseRecorder, req *http.Request)) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
-		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		// The real store, whose read of the ceremony the body names is what the cut decides.
+		ceremonyStore, cookies := holdingCeremony(t, &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
+			CeremonyId: testCeremonyId,
+			ClientId:   "test-client",
+		})
 
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
 		req.Body = cutBody(rr, body, limit)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1}))
+		req = withCookies(req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})), cookies)
 
-		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
-		}, nil).Once()
 		prepare(pageRenderer, auditLogger, database, rr, req)
 
 		buildAuthPwdPost(authPwdPostDeps{

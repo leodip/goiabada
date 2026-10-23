@@ -181,7 +181,7 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorizeLeavesItsCeremonyA
 	assert.True(t, warned, "the replaced step is logged at warn:\n%s", logged.Text())
 
 	// Tab B's next step finds the ceremony it started.
-	stored, err := ceremonyStore.GetAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
+	stored, err := ceremonyStore.LatestAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
 	require.NoError(t, err)
 	assert.Equal(t, ceremonyB, stored.CeremonyId, "the browser session keeps the newer ceremony")
 	assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState, "tab A's state did not land on it")

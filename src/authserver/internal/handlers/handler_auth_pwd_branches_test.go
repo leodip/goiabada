@@ -76,7 +76,7 @@ func pwdGetRequest() *http.Request {
 
 func pwdPostRequest(email string, password string) *http.Request {
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("email", email)
 	form.Add("password", password)
 	req := httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))

@@ -432,7 +432,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -470,7 +470,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -507,7 +507,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -584,25 +584,26 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)
-				ceremonyStore := handlersmocks.NewCeremonyStore(t)
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := buildAuthOtpPost(authOtpPostDeps{
-					pageRenderer:  pageRenderer,
-					ceremonyStore: ceremonyStore,
-					database:      database,
-					auditLogger:   auditLogger,
-				})
+				buildHandler := func(ceremonyStore CeremonyStore) http.Handler {
+					return buildAuthOtpPost(authOtpPostDeps{
+						pageRenderer:  pageRenderer,
+						ceremonyStore: ceremonyStore,
+						database:      database,
+						auditLogger:   auditLogger,
+					})
+				}
 
 				form := url.Values{}
 				form.Add("otp", "123456")
 				target := "/auth/otp"
 				if tc.submitted != "" {
 					if tc.inQuery {
-						target += "?" + url.Values{ceremonyIdField: {tc.submitted}}.Encode()
+						target += "?" + url.Values{ceremony.IdField: {tc.submitted}}.Encode()
 					} else {
-						form.Add(ceremonyIdField, tc.submitted)
+						form.Add(ceremony.IdField, tc.submitted)
 					}
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
@@ -616,18 +617,18 @@ func TestHandleAuthOtpPost(t *testing.T) {
 					UserId:     1,
 					ClientId:   "test-client",
 				}
-				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore, cookies := holdingCeremony(t, authContext)
+				req = withCookies(req, cookies)
+				expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, authContext)
 
-				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
-
-				handler.ServeHTTP(rr, req)
+				buildHandler(ceremonyStore).ServeHTTP(rr, req)
 
 				// Nothing was saved and nowhere was redirected to: the auth context is untouched,
 				// so the ceremony the user is actually on is still theirs to finish.
 				assert.Empty(t, rr.Header().Get("Location"))
 
 				pageRenderer.AssertExpectations(t)
-				ceremonyStore.AssertExpectations(t)
+				assertStillHeld(t, ceremonyStore, cookies, authContext)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
 			})
@@ -650,7 +651,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -692,7 +693,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -747,7 +748,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony matches, so the gate below is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -812,7 +813,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// The ceremony id is in the body, so the gate above passes and the credential read is
 		// what answers. The passcode is in the query and nowhere else.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		target := "/auth/otp?" + url.Values{"otp": {otpCode}}.Encode()
 		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -878,7 +879,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -941,7 +942,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1003,7 +1004,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", "123456")
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1071,7 +1072,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1165,7 +1166,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1223,7 +1224,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1357,7 +1358,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1436,7 +1437,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1511,7 +1512,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1616,7 +1617,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1715,7 +1716,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1779,7 +1780,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", otpCode)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1868,7 +1869,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentEndsTheSignIn(t *testing.T) {
 			require.NoError(t, err)
 
 			form := url.Values{}
-			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add(ceremony.IdField, testCeremonyId)
 			form.Add("otp", otpCode)
 			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -1946,7 +1947,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormAfterAnEnrolmentElsewhereEndsTheSignIn
 	require.NoError(t, err)
 
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -2065,7 +2066,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 
 	post := func(handler http.Handler, code string) int {
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("otp", code)
 		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")

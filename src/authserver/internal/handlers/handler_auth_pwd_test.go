@@ -344,7 +344,7 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing
 			})
 
 			form := url.Values{}
-			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add(ceremony.IdField, testCeremonyId)
 			form.Add("password", "testpassword")
 			req, err := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 			require.NoError(t, err)
@@ -420,7 +420,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -501,16 +501,17 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)
-				ceremonyStore := handlersmocks.NewCeremonyStore(t)
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
 
-				handler := buildAuthPwdPost(authPwdPostDeps{
-					pageRenderer:  pageRenderer,
-					ceremonyStore: ceremonyStore,
-					database:      database,
-					auditLogger:   auditLogger,
-				})
+				buildHandler := func(ceremonyStore CeremonyStore) http.Handler {
+					return buildAuthPwdPost(authPwdPostDeps{
+						pageRenderer:  pageRenderer,
+						ceremonyStore: ceremonyStore,
+						database:      database,
+						auditLogger:   auditLogger,
+					})
+				}
 
 				form := url.Values{}
 				form.Add("email", "test@example.com")
@@ -518,9 +519,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				target := "/auth/pwd"
 				if tc.submitted != "" {
 					if tc.inQuery {
-						target += "?" + url.Values{ceremonyIdField: {tc.submitted}}.Encode()
+						target += "?" + url.Values{ceremony.IdField: {tc.submitted}}.Encode()
 					} else {
-						form.Add(ceremonyIdField, tc.submitted)
+						form.Add(ceremony.IdField, tc.submitted)
 					}
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
@@ -533,18 +534,18 @@ func TestHandleAuthPwdPost(t *testing.T) {
 					CeremonyId: tc.stored,
 					ClientId:   "test-client",
 				}
-				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+				ceremonyStore, cookies := holdingCeremony(t, authContext)
+				req = withCookies(req, cookies)
+				expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, authContext)
 
-				expectCeremonyMismatch(t, pageRenderer, auditLogger, rr, req)
-
-				handler.ServeHTTP(rr, req)
+				buildHandler(ceremonyStore).ServeHTTP(rr, req)
 
 				// Nothing was saved and nowhere was redirected to: the auth context is untouched,
 				// so the ceremony the user is actually on is still theirs to finish.
 				assert.Empty(t, rr.Header().Get("Location"))
 
 				pageRenderer.AssertExpectations(t)
-				ceremonyStore.AssertExpectations(t)
+				assertStillHeld(t, ceremonyStore, cookies, authContext)
 				database.AssertExpectations(t)
 				auditLogger.AssertExpectations(t)
 			})
@@ -565,7 +566,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -620,7 +621,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -681,7 +682,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		target := "/auth/pwd?" + url.Values{"password": {"testpassword"}}.Encode()
 		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
@@ -733,7 +734,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -808,7 +809,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "Alice@Example.com")
 		form.Add("password", "a-wrong-password")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -878,7 +879,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "  Bob@Example.com  ")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -938,7 +939,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "   ")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -989,7 +990,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -1097,7 +1098,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "test@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -1157,7 +1158,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", "disabled@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -1276,7 +1277,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// post submits one attempt from a fixed host and reports the status.
 	post := func(handler http.Handler, submitted string) int {
 		form := url.Values{}
-		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add(ceremony.IdField, testCeremonyId)
 		form.Add("email", email)
 		form.Add("password", submitted)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))

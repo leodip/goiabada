@@ -66,7 +66,7 @@ func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("email", "test@example.com")
 	form.Add("password", "testpassword")
 	req, _ := http.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
@@ -113,7 +113,7 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	require.NoError(t, err)
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -399,7 +399,7 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	auditLoggerA.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
 
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("email", "test@example.com")
 	form.Add("password", "testpassword")
 	reqA := withCookies(httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode())), cookies)
@@ -462,7 +462,7 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorizeLeavesItsCeremon
 	assert.Empty(t, rrA.Result().Cookies(), "tab A rotated nothing, so it tells the browser nothing")
 	pageRendererA.AssertExpectations(t)
 
-	stored, err := ceremonyStore.GetAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
+	stored, err := ceremonyStore.LatestAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
 	require.NoError(t, err, "the browser's identifier still names its session")
 	assert.Equal(t, ceremonyB, stored.CeremonyId, "the browser session keeps the newer ceremony")
 	assert.Equal(t, ceremony.AuthStateRequiresLevel1, stored.AuthState)

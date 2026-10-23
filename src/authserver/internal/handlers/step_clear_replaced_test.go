@@ -187,7 +187,7 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 	assertAnsweredNoLongerActive(t, rr)
 	assertReplacedAnsweredAtWarn(t, logged)
 	assert.Empty(t, rr.Result().Cookies())
-	stored, err := ceremonyStore.GetAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
+	stored, err := ceremonyStore.LatestAuthContext(withCookies(httptest.NewRequest(http.MethodGet, "/auth/level1", nil), cookies))
 	require.NoError(t, err)
 	assert.Equal(t, "ceremony-b", stored.CeremonyId)
 	pageRenderer.AssertExpectations(t)
@@ -305,7 +305,7 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	require.NoError(t, err)
 
 	form := url.Values{}
-	form.Add(ceremonyIdField, testCeremonyId)
+	form.Add(ceremony.IdField, testCeremonyId)
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")

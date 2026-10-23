@@ -136,7 +136,7 @@ func TestRedirectStatus_TheDeclinedConsent(t *testing.T) {
 
 			form := url.Values{}
 			form.Add("btnCancel", "cancel")
-			form.Add(ceremonyIdField, testCeremonyId)
+			form.Add(ceremony.IdField, testCeremonyId)
 			req := httptest.NewRequest(http.MethodPost, "/auth/consent", strings.NewReader(form.Encode()))
 			req = withSettings(req, &record.Settings{Issuer: "https://auth.example.com"})
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
