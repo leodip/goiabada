@@ -6067,7 +6067,6 @@ components:
       properties:
         appName:
           type: string
-          maxLength: 30
           description: >-
             The App name, required: surrounding spaces are removed, and it is stored that way. One
             that is empty once they are is refused with 400
