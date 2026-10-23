@@ -31,14 +31,6 @@ const list = "\n" +
 	"!cucij_ln942q0ew\n" +
 	"!qazxsw2#edcvfr4\n" +
 	"!s!wcrtestinput000003!e!\n" +
-	"$hex[6173646667686a6b6cc3a7]\n" +
-	"$hex[6173646667686a6b6cc3b1]\n" +
-	"$hex[6173646667686a6b6cf6e4]\n" +
-	"$hex[636f6e7472617365c3b161]\n" +
-	"$hex[687474703a2f2f616473]\n" +
-	"$hex[687474703a2f2f777777]\n" +
-	"$hex[71776572747a75696f70fc]\n" +
-	"$hex[c3b16fc3b16f]\n" +
 	"$xearoms8upwybts\n" +
 	"****intiitnikcuf\n" +
 	"*1879600505602*\n" +

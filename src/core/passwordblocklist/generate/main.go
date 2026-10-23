@@ -28,6 +28,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"go/format"
 	"net/http"
@@ -36,7 +37,9 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -65,7 +68,7 @@ const (
 
 	// expectedCount is the number of entries the pinned lists give. Any drift stops generation for
 	// human review.
-	expectedCount = 16051
+	expectedCount = 16043
 )
 
 // source is one list: its file name under Passwords/Common-Credentials, what it is, its licence,
@@ -184,20 +187,18 @@ func fetchPinned(doer pinnedfetch.Doer, p pin) ([][]byte, []provenance, error) {
 }
 
 // build reads each body as one password per line and returns, lowercased, de-duplicated and
-// sorted, those the nist policy could otherwise accept. A line that is not UTF-8 names no password
-// a form can submit, so it is dropped rather than repaired.
+// sorted, those a password the nist policy accepts can lowercase to. A line in hashcat's $HEX[]
+// encoding is read as the password it encodes. A line that is not UTF-8 names no password a form
+// can submit, so it is dropped rather than repaired.
 func build(bodies [][]byte) []string {
 	seen := map[string]bool{}
 	for _, body := range bodies {
 		for _, line := range bytes.Split(body, []byte("\n")) {
-			password := strings.TrimRight(string(line), "\r")
-			if !utf8.ValidString(password) || !withinPolicy(password) {
+			password := decodeHashcatHex(strings.TrimRight(string(line), "\r"))
+			if !utf8.ValidString(password) {
 				continue
 			}
-			entry := strings.ToLower(password)
-			// Lowercasing can change a character's width; an entry outside the bounds is one
-			// no lowercased password the policy accepts can equal.
-			if withinPolicy(entry) {
+			if entry := strings.ToLower(password); reachable(entry) {
 				seen[entry] = true
 			}
 		}
@@ -209,6 +210,69 @@ func build(bodies [][]byte) []string {
 	slices.Sort(entries)
 	return entries
 }
+
+// decodeHashcatHex returns the password line names. Hashcat writes a password it cannot write as
+// is, one holding a byte outside printable ASCII or a colon, ending in whitespace, or itself reading
+// as such a line, as $HEX[ followed by its bytes in hex and ], and the NCSC and Pwdb lists carry
+// such lines: taken as written, each was an entry nobody types, in place of the password it
+// encodes. A line hashcat would not read as one, the hex odd in length or not hex at all, is taken
+// as written, as hashcat takes it.
+func decodeHashcatHex(line string) string {
+	inner, ok := strings.CutPrefix(line, "$HEX[")
+	if !ok {
+		return line
+	}
+	inner, ok = strings.CutSuffix(inner, "]")
+	if !ok {
+		return line
+	}
+	decoded, err := hex.DecodeString(inner)
+	if err != nil {
+		return line
+	}
+	return string(decoded)
+}
+
+// reachable reports whether a password the nist policy accepts, 15 characters or more and at most
+// 72 bytes as typed, can lowercase to entry, which is what IsCommon looks the password up as. The
+// bounds are weighed on the password as typed, not on entry or on the line it came from, because
+// lowercasing keeps the number of characters but can change their width: the Kelvin sign (U+212A)
+// takes three bytes and its lowercase k one, while U+023A takes two and its lowercase three. An
+// entry over 72 bytes that a narrower password lowercases to is kept here, and validateEntries
+// then stops the run for review, since the list holds entries of at most 72 bytes.
+func reachable(entry string) bool {
+	if utf8.RuneCountInString(entry) < minCharacters {
+		return false
+	}
+	narrower := narrowerCases()
+	width := 0
+	for _, r := range entry {
+		if w, ok := narrower[r]; ok {
+			width += w
+		} else {
+			width += utf8.RuneLen(r)
+		}
+	}
+	return width <= maxBytes
+}
+
+// narrowerCases maps each character to the fewest bytes a character lowercasing to it takes, for
+// the characters where that is fewer than their own, read from the same tables strings.ToLower
+// reads, so no case mapping is assumed.
+var narrowerCases = sync.OnceValue(func() map[rune]int {
+	narrower := map[rune]int{}
+	for r := rune(0); r <= unicode.MaxRune; r++ {
+		lower := unicode.ToLower(r)
+		w := utf8.RuneLen(r)
+		if lower == r || w < 0 || w >= utf8.RuneLen(lower) {
+			continue
+		}
+		if known, ok := narrower[lower]; !ok || w < known {
+			narrower[lower] = w
+		}
+	}
+	return narrower
+})
 
 func withinPolicy(password string) bool {
 	return utf8.RuneCountInString(password) >= minCharacters && len(password) <= maxBytes

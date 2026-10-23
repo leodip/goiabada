@@ -191,6 +191,19 @@ func TestBuild(t *testing.T) {
 			want:   []string{strings.Repeat("é", 36)},
 		},
 		{
+			// 25 Kelvin signs (U+212A) are 75 bytes; the policy accepts their lowercase, 25 k's.
+			name:   "a line over 72 bytes kept when its lowercase is a password the policy accepts",
+			bodies: []string{strings.Repeat("K", 25) + "\n"},
+			want:   []string{strings.Repeat("k", 25)},
+		},
+		{
+			// 25 of U+2C65 are 75 bytes; 25 of U+023A, which lowercase to them, are 50. The
+			// entry is kept, and validateEntries stops the run over it.
+			name:   "an entry over 72 bytes kept when a password the policy accepts lowercases to it",
+			bodies: []string{strings.Repeat("Ⱥ", 25) + "\n"},
+			want:   []string{strings.Repeat("ⱥ", 25)},
+		},
+		{
 			name:   "line endings stripped, spaces inside and around kept",
 			bodies: []string{"correct horse battery\r\n  leading spaces too\r\n"},
 			want:   []string{"  leading spaces too", "correct horse battery"},
@@ -204,6 +217,32 @@ func TestBuild(t *testing.T) {
 			name:   "invalid UTF-8 dropped",
 			bodies: []string{"abcdefghijklmn\xff\nabcdefghijklmnop\n"},
 			want:   []string{"abcdefghijklmnop"},
+		},
+		{
+			name:   "a $HEX[] line read as the password it encodes",
+			bodies: []string{"$HEX[" + hex.EncodeToString([]byte("http://www.example.com")) + "]\n"},
+			want:   []string{"http://www.example.com"},
+		},
+		{
+			// Two of the eight lines the pinned lists carry, "asdfghjklç" and "contraseña".
+			name:   "a $HEX[] line whose password is under 15 characters dropped, its encoding too",
+			bodies: []string{"$HEX[6173646667686a6b6cc3a7]\n$HEX[636f6e7472617365c3b161]\n"},
+			want:   []string{},
+		},
+		{
+			name:   "a $HEX[] line whose password is not UTF-8 dropped",
+			bodies: []string{"$HEX[" + hex.EncodeToString([]byte("qwertzuiopasdf\xfc")) + "]\n"},
+			want:   []string{},
+		},
+		{
+			name: "a line hashcat would not decode taken as written",
+			bodies: []string{
+				"$HEX[6173646667686a6b6c6]\n" + // odd in length
+					"$HEX[not hex at all]\n" +
+					"$hex[6173646667686a6b6c]\n" + // hashcat writes $HEX
+					"$HEX[6173646667686a6b6c\n", // no closing bracket
+			},
+			want: []string{"$hex[6173646667686a6b6c", "$hex[6173646667686a6b6c6]", "$hex[6173646667686a6b6c]", "$hex[not hex at all]"},
 		},
 		{
 			name:   "nothing long enough: nothing",
@@ -233,14 +272,16 @@ func TestValidate(t *testing.T) {
 		t.Errorf("valid entries refused: %v", err)
 	}
 	for name, entries := range map[string][]string{
-		"uppercase":   {"Aaaaaaaaaaaaaaa"},
-		"duplicate":   {"aaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaa"},
-		"unsorted":    {"bbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaa"},
-		"14 chars":    {"aaaaaaaaaaaaaa"},
-		"73 bytes":    {strings.Repeat("a", 73)},
-		"a newline":   {"aaaaaaa\naaaaaaa"},
-		"not utf-8":   {"aaaaaaaaaaaaaa\xff"},
-		"empty entry": {""},
+		"uppercase": {"Aaaaaaaaaaaaaaa"},
+		"duplicate": {"aaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaa"},
+		"unsorted":  {"bbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaa"},
+		"14 chars":  {"aaaaaaaaaaaaaa"},
+		"73 bytes":  {strings.Repeat("a", 73)},
+		// What build keeps when a narrower password lowercases to an entry over 72 bytes.
+		"75 bytes a narrower password reaches": {strings.Repeat("ⱥ", 25)},
+		"a newline":                            {"aaaaaaa\naaaaaaa"},
+		"not utf-8":                            {"aaaaaaaaaaaaaa\xff"},
+		"empty entry":                          {""},
 	} {
 		if err := validateEntries(entries); err == nil {
 			t.Errorf("%s: want error, got nil", name)

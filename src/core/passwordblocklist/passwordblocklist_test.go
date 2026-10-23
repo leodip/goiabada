@@ -128,7 +128,7 @@ func TestIsTooClose_AWordWithNothingInItRefusesNothing(t *testing.T) {
 	assert.True(t, IsTooClose("2026202620262026", "2026"), "a word of digits is still the word itself, repeated")
 }
 
-// The committed list, held to what the generator promises of it (#550 decisions 4 and 5): the 16,051
+// The committed list, held to what the generator promises of it (#550 decisions 4 and 5): the 16,043
 // entries of the three sources that the nist policy could otherwise accept, each lowercase, unique,
 // sorted, at least 15 characters and at most bcrypt's 72 bytes.
 func TestList_HoldsItsInvariants(t *testing.T) {
@@ -136,7 +136,7 @@ func TestList_HoldsItsInvariants(t *testing.T) {
 	require.True(t, strings.HasSuffix(list, "\n"), "the list closes with the newline every entry is matched before")
 	entries := strings.Split(strings.Trim(list, "\n"), "\n")
 
-	assert.Len(t, entries, 16051)
+	assert.Len(t, entries, 16043)
 	seen := make(map[string]bool, len(entries))
 	for i, e := range entries {
 		require.NotEmpty(t, e, "entry %d", i)

@@ -6,7 +6,7 @@
 // The list is data_generated.go, which generate/main.go writes from three public lists pinned by
 // SHA-256 (see that file, or run `version-manager.sh generate passwordblocklist`): the UK NCSC's
 // 100,000 most used passwords, Pwdb's top 1,000,000 and xato's top 1,000,000, each source and its
-// licence named in the generated file's header. It keeps only the 16,051 entries the policy could
+// licence named in the generated file's header. It keeps only the 16,043 entries the policy could
 // otherwise accept, 15 characters or more and at most bcrypt's 72 bytes (#550 decisions 4 and 5).
 //
 // The package imports the standard library alone, because the setup wizard links it through the
