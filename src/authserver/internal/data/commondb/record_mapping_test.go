@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"math/bits"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -46,7 +47,8 @@ type mappingCase struct {
 	record reflect.Type
 	// reads each run one read answering whole records and return the first, as a pointer.
 	reads map[string]func(ctx context.Context, d *Database) (any, error)
-	// insert and update run the record's whole-row writes on a pointer to the record.
+	// insert and update run the record's whole-row writes on a pointer to the record. update is
+	// nil for a record that has no whole-row UPDATE, which is then not checked.
 	insert func(ctx context.Context, d *Database, rec any) error
 	update func(ctx context.Context, d *Database, rec any) error
 }
@@ -118,10 +120,129 @@ func resourceMapping() mappingCase {
 	}
 }
 
+func clientMapping() mappingCase {
+	return mappingCase{
+		name:   "client",
+		table:  "clients",
+		record: reflect.TypeOf(record.Client{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetClientById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientById(ctx, nil, 1)
+			},
+			"GetClientByClientIdentifier": func(ctx context.Context, d *Database) (any, error) {
+				// The distinct value the row carries, so the exact-match check keeps it.
+				return d.GetClientByClientIdentifier(ctx, nil, distinctString("client_identifier"))
+			},
+			"GetClientsByIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetClientsByIds(ctx, nil, []int64{1, 2}))
+			},
+			"GetAllClients": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllClients(ctx, nil))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateClient(ctx, nil, rec.(*record.Client))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateClient(ctx, nil, rec.(*record.Client))
+		},
+	}
+}
+
+func clientLogoMapping() mappingCase {
+	return mappingCase{
+		name:   "client logo",
+		table:  "client_logos",
+		record: reflect.TypeOf(record.ClientLogo{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetClientLogoByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientLogoByClientId(ctx, nil, 1)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateClientLogo(ctx, nil, rec.(*record.ClientLogo))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateClientLogo(ctx, nil, rec.(*record.ClientLogo))
+		},
+	}
+}
+
+func clientPermissionMapping() mappingCase {
+	return mappingCase{
+		name:   "client permission",
+		table:  "clients_permissions",
+		record: reflect.TypeOf(record.ClientPermission{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetClientPermissionById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientPermissionById(ctx, nil, 1)
+			},
+			"GetClientPermissionByClientIdAndPermissionId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientPermissionByClientIdAndPermissionId(ctx, nil, 1, 2)
+			},
+			"GetClientPermissionsByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetClientPermissionsByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateClientPermission(ctx, nil, rec.(*record.ClientPermission))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateClientPermission(ctx, nil, rec.(*record.ClientPermission))
+		},
+	}
+}
+
+// redirectURIMapping has no update: a redirect URI is created and deleted, never rewritten.
+func redirectURIMapping() mappingCase {
+	return mappingCase{
+		name:   "redirect URI",
+		table:  "redirect_uris",
+		record: reflect.TypeOf(record.RedirectURI{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetRedirectURIById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetRedirectURIById(ctx, nil, 1)
+			},
+			"GetRedirectURIsByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetRedirectURIsByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateRedirectURI(ctx, nil, rec.(*record.RedirectURI))
+		},
+	}
+}
+
+// webOriginMapping has no update: a web origin is created and deleted, never rewritten.
+func webOriginMapping() mappingCase {
+	return mappingCase{
+		name:   "web origin",
+		table:  "web_origins",
+		record: reflect.TypeOf(record.WebOrigin{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetWebOriginById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetWebOriginById(ctx, nil, 1)
+			},
+			"GetWebOriginsByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetWebOriginsByClientId(ctx, nil, 1))
+			},
+			"GetAllWebOrigins": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllWebOrigins(ctx, nil))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateWebOrigin(ctx, nil, rec.(*record.WebOrigin))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
-	for _, c := range []mappingCase{permissionMapping(), resourceMapping()} {
+	for _, c := range []mappingCase{
+		permissionMapping(), resourceMapping(),
+		clientMapping(), clientLogoMapping(), clientPermissionMapping(), redirectURIMapping(), webOriginMapping(),
+	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
 				problems := checkMapping(t, dialect, c)
@@ -173,22 +294,48 @@ func distinctString(column string) string {
 	return "value of " + column
 }
 
-// distinctValue is the value field i of the record carries in this test, as the driver hands it
-// over and as the field holds it once scanned. Distinct per field for every type but bool, which
-// has two values; a type it does not know is reported rather than guessed, so the record that
-// brings one extends this.
-func distinctValue(ft reflect.Type, i int, column string) (driver.Value, reflect.Value, error) {
+// passesFor is how many passes checkMapping makes over a record: two per bit of the largest field
+// code, so that any two bool fields hold different values in at least one pass and every bool
+// field holds both values in some pass. A bool has two values, so one pass cannot tell a swapped
+// pair of bool columns apart; a record carries many of them (#644).
+func passesFor(rt reflect.Type) int {
+	return 2 * bits.Len(uint(rt.NumField()))
+}
+
+// boolFor is the value bool field i holds in pass: bit (pass mod the bit count) of i, inverted in
+// the second half of the passes. Two fields' indexes differ in some bit, and the inversion gives
+// every field both values.
+func boolFor(rt reflect.Type, i int, pass int) bool {
+	n := bits.Len(uint(rt.NumField()))
+	bit := i>>(pass%n)&1 == 1
+	if pass >= n {
+		return !bit
+	}
+	return bit
+}
+
+// distinctValue is the value field i of the record carries in this test's pass, as the driver
+// hands it over and as the field holds it once scanned. Distinct per field for every type but
+// bool, which has two values and is told apart across passes (boolFor); a type it does not know
+// is reported rather than guessed, so the record that brings one extends this.
+func distinctValue(rt reflect.Type, i int, column string, pass int) (driver.Value, reflect.Value, error) {
+	ft := rt.Field(i).Type
 	at := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC).Add(time.Duration(i) * time.Hour)
 	n := int64(1000 + i)
+	b := boolFor(rt, i, pass)
 	var dv driver.Value
 	var gv any
 	switch ft {
 	case reflect.TypeOf(int64(0)):
 		dv, gv = n, n
+	case reflect.TypeOf(int(0)):
+		dv, gv = n, int(n)
 	case reflect.TypeOf(""):
 		dv, gv = distinctString(column), distinctString(column)
 	case reflect.TypeOf(false):
-		dv, gv = i%2 == 0, i%2 == 0
+		dv, gv = b, b
+	case reflect.TypeOf((*bool)(nil)):
+		dv, gv = b, &b
 	case reflect.TypeOf(time.Time{}):
 		dv, gv = at, at
 	case reflect.TypeOf([]byte(nil)):
@@ -202,8 +349,12 @@ func distinctValue(ft reflect.Type, i int, column string) (driver.Value, reflect
 	case reflect.TypeOf(sql.NullInt32{}):
 		dv, gv = n, sql.NullInt32{Int32: int32(n), Valid: true}
 	case reflect.TypeOf(sql.NullBool{}):
-		dv, gv = i%2 == 0, sql.NullBool{Bool: i%2 == 0, Valid: true}
+		dv, gv = b, sql.NullBool{Bool: b, Valid: true}
 	default:
+		// A named string type, such as record.AcrLevel, is stored and scanned as its string.
+		if ft.Kind() == reflect.String {
+			return distinctString(column), reflect.ValueOf(distinctString(column)).Convert(ft), nil
+		}
 		return nil, reflect.Value{}, fmt.Errorf("no distinct value is written for a %s field (column %s)", ft, column)
 	}
 	return dv, reflect.ValueOf(gv), nil
@@ -315,16 +466,29 @@ func checkMapping(t *testing.T, dialect data.Dialect, c mappingCase) []string {
 	}
 
 	var problems []string
-	for name, read := range c.reads {
-		problems = append(problems, checkRead(t, dialect, c, fields, byColumn, name, read)...)
+	seen := map[string]bool{}
+	for pass := 0; pass < passesFor(c.record); pass++ {
+		var found []string
+		for name, read := range c.reads {
+			found = append(found, checkRead(t, dialect, c, fields, byColumn, name, read, pass)...)
+		}
+		found = append(found, checkInsert(t, dialect, c, fields, byColumn, pass)...)
+		if c.update != nil {
+			found = append(found, checkUpdate(t, dialect, c, fields, byColumn, pass)...)
+		}
+		// A problem that does not depend on the pass is reported once.
+		for _, problem := range found {
+			if !seen[problem] {
+				seen[problem] = true
+				problems = append(problems, problem)
+			}
+		}
 	}
-	problems = append(problems, checkInsert(t, dialect, c, fields, byColumn)...)
-	problems = append(problems, checkUpdate(t, dialect, c, fields, byColumn)...)
 	return problems
 }
 
 func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
-	byColumn map[string]taggedField, name string, read func(context.Context, *Database) (any, error)) []string {
+	byColumn map[string]taggedField, name string, read func(context.Context, *Database) (any, error), pass int) []string {
 	t.Helper()
 	where := fmt.Sprintf("%s %s", dialect, name)
 	var problems []string
@@ -352,7 +516,7 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 			}
 			selected[id.name] = true
 			problems = append(problems, quoteProblems(dialect, id, field, where)...)
-			dv, _, err := distinctValue(c.record.Field(field.index).Type, field.index, field.column)
+			dv, _, err := distinctValue(c.record, field.index, field.column, pass)
 			if err != nil {
 				problems = append(problems, where+": "+err.Error())
 			}
@@ -376,7 +540,7 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 	}
 	rv := reflect.ValueOf(got).Elem()
 	for _, f := range fields {
-		_, want, err := distinctValue(c.record.Field(f.index).Type, f.index, f.column)
+		_, want, err := distinctValue(c.record, f.index, f.column, pass)
 		if err != nil {
 			continue
 		}
@@ -389,11 +553,11 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 }
 
 // filledRecord is a new record whose every tagged field holds its distinct value.
-func filledRecord(c mappingCase, fields []taggedField) (reflect.Value, []string) {
+func filledRecord(c mappingCase, fields []taggedField, pass int) (reflect.Value, []string) {
 	rec := reflect.New(c.record)
 	var problems []string
 	for _, f := range fields {
-		_, gv, err := distinctValue(c.record.Field(f.index).Type, f.index, f.column)
+		_, gv, err := distinctValue(c.record, f.index, f.column, pass)
 		if err != nil {
 			problems = append(problems, err.Error())
 			continue
@@ -430,10 +594,10 @@ func checkWrittenColumn(where string, dialect data.Dialect, rec reflect.Value, b
 const newId = 4242
 
 func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
-	byColumn map[string]taggedField) []string {
+	byColumn map[string]taggedField, pass int) []string {
 	t.Helper()
 	where := fmt.Sprintf("%s insert", dialect)
-	rec, problems := filledRecord(c, fields)
+	rec, problems := filledRecord(c, fields, pass)
 
 	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: newId}}}
 	script.answer = func(string, []driver.Value) *scriptedRows {
@@ -513,10 +677,10 @@ func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 }
 
 func checkUpdate(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
-	byColumn map[string]taggedField) []string {
+	byColumn map[string]taggedField, pass int) []string {
 	t.Helper()
 	where := fmt.Sprintf("%s update", dialect)
-	rec, problems := filledRecord(c, fields)
+	rec, problems := filledRecord(c, fields, pass)
 
 	script := &scriptedDriver{}
 	if err := c.update(context.Background(), scriptedDBFor(t, script, dialect), rec.Interface()); err != nil {
@@ -589,6 +753,8 @@ type widget struct {
 	Name      string       `db:"name"`
 	Label     string       `db:"label"`
 	Key       string       `db:"key" fieldopt:"withquote"`
+	Enabled   bool         `db:"enabled"`
+	Visible   bool         `db:"visible"`
 	Parent    record.Group `db:"-"`
 }
 
@@ -603,25 +769,25 @@ type widgetSQL struct {
 func rightWidgetSQL() widgetSQL {
 	return widgetSQL{
 		columns: columnList{
-			sqlite:   `id, created_at, name, label, "key"`,
-			mysql:    "id, created_at, name, label, `key`",
-			postgres: `id, created_at, name, label, "key"`,
-			mssql:    `id, created_at, name, label, "key"`,
+			sqlite:   `id, created_at, name, label, "key", enabled, visible`,
+			mysql:    "id, created_at, name, label, `key`, enabled, visible",
+			postgres: `id, created_at, name, label, "key", enabled, visible`,
+			mssql:    `id, created_at, name, label, "key", enabled, visible`,
 		},
 		scan: func(r rowScanner, w *widget) error {
-			return r.Scan(&w.Id, &w.CreatedAt, &w.Name, &w.Label, &w.Key)
+			return r.Scan(&w.Id, &w.CreatedAt, &w.Name, &w.Label, &w.Key, &w.Enabled, &w.Visible)
 		},
 		insert: statement{
-			sqlite:   `INSERT INTO widgets (created_at, name, label, "key") VALUES (?, ?, ?, ?)`,
-			mysql:    "INSERT INTO widgets (created_at, name, label, `key`) VALUES (?, ?, ?, ?)",
-			postgres: `INSERT INTO widgets (created_at, name, label, "key") VALUES ($1, $2, $3, $4) RETURNING id`,
-			mssql:    `INSERT INTO widgets (created_at, name, label, "key") OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4)`,
+			sqlite:   `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES (?, ?, ?, ?, ?, ?)`,
+			mysql:    "INSERT INTO widgets (created_at, name, label, `key`, enabled, visible) VALUES (?, ?, ?, ?, ?, ?)",
+			postgres: `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+			mssql:    `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
 		},
 		update: statement{
-			sqlite:   `UPDATE widgets SET name = ?, label = ?, "key" = ? WHERE id = ?`,
-			mysql:    "UPDATE widgets SET name = ?, label = ?, `key` = ? WHERE id = ?",
-			postgres: `UPDATE widgets SET name = $1, label = $2, "key" = $3 WHERE id = $4`,
-			mssql:    `UPDATE widgets SET name = @p1, label = @p2, "key" = @p3 WHERE id = @p4`,
+			sqlite:   `UPDATE widgets SET name = ?, label = ?, "key" = ?, enabled = ?, visible = ? WHERE id = ?`,
+			mysql:    "UPDATE widgets SET name = ?, label = ?, `key` = ?, enabled = ?, visible = ? WHERE id = ?",
+			postgres: `UPDATE widgets SET name = $1, label = $2, "key" = $3, enabled = $4, visible = $5 WHERE id = $6`,
+			mssql:    `UPDATE widgets SET name = @p1, label = @p2, "key" = @p3, enabled = @p4, visible = @p5 WHERE id = @p6`,
 		},
 	}
 }
@@ -647,13 +813,13 @@ func widgetMapping(w widgetSQL) mappingCase {
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
 			v := rec.(*widget)
-			id, err := d.insert(ctx, nil, w.insert, "widget", v.CreatedAt, v.Name, v.Label, v.Key)
+			id, err := d.insert(ctx, nil, w.insert, "widget", v.CreatedAt, v.Name, v.Label, v.Key, v.Enabled, v.Visible)
 			v.Id = id
 			return err
 		},
 		update: func(ctx context.Context, d *Database, rec any) error {
 			v := rec.(*widget)
-			_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.Name, v.Label, v.Key, v.Id)
+			_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.Name, v.Label, v.Key, v.Enabled, v.Visible, v.Id)
 			return err
 		},
 	}
@@ -670,8 +836,10 @@ func TestRecordMapping_TheCheckerPassesRightSQLOnEveryEngine(t *testing.T) {
 
 func TestRecordMapping_TheCheckerRefusesAColumnMissingFromTheList(t *testing.T) {
 	w := rightWidgetSQL()
-	w.columns.postgres = `id, created_at, name, "key"`
-	w.scan = func(r rowScanner, v *widget) error { return r.Scan(&v.Id, &v.CreatedAt, &v.Name, &v.Key) }
+	w.columns.postgres = `id, created_at, name, "key", enabled, visible`
+	w.scan = func(r rowScanner, v *widget) error {
+		return r.Scan(&v.Id, &v.CreatedAt, &v.Name, &v.Key, &v.Enabled, &v.Visible)
+	}
 
 	problems := checkMapping(t, data.Postgres, widgetMapping(w))
 	require.NotEmpty(t, problems)
@@ -681,7 +849,7 @@ func TestRecordMapping_TheCheckerRefusesAColumnMissingFromTheList(t *testing.T) 
 func TestRecordMapping_TheCheckerRefusesAFieldScannedOutOfOrder(t *testing.T) {
 	w := rightWidgetSQL()
 	w.scan = func(r rowScanner, v *widget) error {
-		return r.Scan(&v.Id, &v.CreatedAt, &v.Label, &v.Name, &v.Key)
+		return r.Scan(&v.Id, &v.CreatedAt, &v.Label, &v.Name, &v.Key, &v.Enabled, &v.Visible)
 	}
 
 	problems := checkMapping(t, data.MySQL, widgetMapping(w))
@@ -693,11 +861,11 @@ func TestRecordMapping_TheCheckerRefusesAFieldScannedOutOfOrder(t *testing.T) {
 
 func TestRecordMapping_TheCheckerRefusesAnUpdateWritingADontUpdateColumn(t *testing.T) {
 	w := rightWidgetSQL()
-	w.update.mssql = `UPDATE widgets SET created_at = @p1, name = @p2, label = @p3, "key" = @p4 WHERE id = @p5`
+	w.update.mssql = `UPDATE widgets SET created_at = @p1, name = @p2, label = @p3, "key" = @p4, enabled = @p5, visible = @p6 WHERE id = @p7`
 	broken := widgetMapping(w)
 	broken.update = func(ctx context.Context, d *Database, rec any) error {
 		v := rec.(*widget)
-		_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.CreatedAt, v.Name, v.Label, v.Key, v.Id)
+		_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.CreatedAt, v.Name, v.Label, v.Key, v.Enabled, v.Visible, v.Id)
 		return err
 	}
 
@@ -710,7 +878,7 @@ func TestRecordMapping_TheCheckerRefusesAWrittenValueFromAnotherField(t *testing
 	broken := widgetMapping(rightWidgetSQL())
 	broken.insert = func(ctx context.Context, d *Database, rec any) error {
 		v := rec.(*widget)
-		id, err := d.insert(ctx, nil, rightWidgetSQL().insert, "widget", v.CreatedAt, v.Label, v.Name, v.Key)
+		id, err := d.insert(ctx, nil, rightWidgetSQL().insert, "widget", v.CreatedAt, v.Label, v.Name, v.Key, v.Enabled, v.Visible)
 		v.Id = id
 		return err
 	}
@@ -722,7 +890,7 @@ func TestRecordMapping_TheCheckerRefusesAWrittenValueFromAnotherField(t *testing
 
 func TestRecordMapping_TheCheckerRefusesTheOtherEnginesQuote(t *testing.T) {
 	w := rightWidgetSQL()
-	w.columns.mysql = `id, created_at, name, label, "key"`
+	w.columns.mysql = `id, created_at, name, label, "key", enabled, visible`
 
 	problems := checkMapping(t, data.MySQL, widgetMapping(w))
 	assert.Contains(t, strings.Join(problems, "\n"), `mysql read: column key is quoted with ", which mysql does not quote with`)
@@ -730,8 +898,36 @@ func TestRecordMapping_TheCheckerRefusesTheOtherEnginesQuote(t *testing.T) {
 
 func TestRecordMapping_TheCheckerRefusesAnInsertNotAnsweringItsIdInTheEnginesGrammar(t *testing.T) {
 	w := rightWidgetSQL()
-	w.insert.postgres = `INSERT INTO widgets (created_at, name, label, "key") VALUES ($1, $2, $3, $4)`
+	w.insert.postgres = `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES ($1, $2, $3, $4, $5, $6)`
 
 	problems := checkMapping(t, data.Postgres, widgetMapping(w))
 	assert.Contains(t, strings.Join(problems, "\n"), "postgres insert: the statement does not answer the new id in postgres's own grammar")
+}
+
+func TestRecordMapping_TheCheckerRefusesTwoBoolColumnsScannedSwapped(t *testing.T) {
+	w := rightWidgetSQL()
+	w.scan = func(r rowScanner, v *widget) error {
+		return r.Scan(&v.Id, &v.CreatedAt, &v.Name, &v.Label, &v.Key, &v.Visible, &v.Enabled)
+	}
+
+	problems := checkMapping(t, data.Postgres, widgetMapping(w))
+	require.NotEmpty(t, problems)
+	joined := strings.Join(problems, "\n")
+	assert.Contains(t, joined, "field Enabled holds")
+	assert.Contains(t, joined, "field Visible holds")
+}
+
+func TestRecordMapping_TheCheckerRefusesTwoBoolValuesWrittenSwapped(t *testing.T) {
+	broken := widgetMapping(rightWidgetSQL())
+	broken.update = func(ctx context.Context, d *Database, rec any) error {
+		v := rec.(*widget)
+		_, err := d.ExecSQL(ctx, nil, rightWidgetSQL().update.text(d.Dialect), v.Name, v.Label, v.Key, v.Visible, v.Enabled, v.Id)
+		return err
+	}
+
+	problems := checkMapping(t, data.SQLite, broken)
+	require.NotEmpty(t, problems)
+	joined := strings.Join(problems, "\n")
+	assert.Contains(t, joined, "sqlite update: column enabled is written")
+	assert.Contains(t, joined, "sqlite update: column visible is written")
 }

@@ -5,10 +5,55 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// redirectURIColumns is the redirect_uris table as scanRedirectURI reads it.
+var redirectURIColumns = columnList{
+	sqlite:   "id, created_at, uri, client_id",
+	mysql:    "id, created_at, uri, client_id",
+	postgres: "id, created_at, uri, client_id",
+	mssql:    "id, created_at, uri, client_id",
+}
+
+// scanRedirectURI reads one row selected with redirectURIColumns.
+func scanRedirectURI(row rowScanner, redirectURI *record.RedirectURI) error {
+	return row.Scan(
+		&redirectURI.Id,
+		&redirectURI.CreatedAt,
+		&redirectURI.URI,
+		&redirectURI.ClientId,
+	)
+}
+
+var insertRedirectURI = statement{
+	sqlite:   "INSERT INTO redirect_uris (created_at, uri, client_id) VALUES (?, ?, ?)",
+	mysql:    "INSERT INTO redirect_uris (created_at, uri, client_id) VALUES (?, ?, ?)",
+	postgres: "INSERT INTO redirect_uris (created_at, uri, client_id) VALUES ($1, $2, $3) RETURNING id",
+	mssql:    "INSERT INTO redirect_uris (created_at, uri, client_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
+}
+
+var selectRedirectURIById = statement{
+	sqlite:   "SELECT " + redirectURIColumns.sqlite + " FROM redirect_uris WHERE id = ?",
+	mysql:    "SELECT " + redirectURIColumns.mysql + " FROM redirect_uris WHERE id = ?",
+	postgres: "SELECT " + redirectURIColumns.postgres + " FROM redirect_uris WHERE id = $1",
+	mssql:    "SELECT " + redirectURIColumns.mssql + " FROM redirect_uris WHERE id = @p1",
+}
+
+var selectRedirectURIsByClientId = statement{
+	sqlite:   "SELECT " + redirectURIColumns.sqlite + " FROM redirect_uris WHERE client_id = ?",
+	mysql:    "SELECT " + redirectURIColumns.mysql + " FROM redirect_uris WHERE client_id = ?",
+	postgres: "SELECT " + redirectURIColumns.postgres + " FROM redirect_uris WHERE client_id = $1",
+	mssql:    "SELECT " + redirectURIColumns.mssql + " FROM redirect_uris WHERE client_id = @p1",
+}
+
+var deleteRedirectURI = statement{
+	sqlite:   "DELETE FROM redirect_uris WHERE id = ?",
+	mysql:    "DELETE FROM redirect_uris WHERE id = ?",
+	postgres: "DELETE FROM redirect_uris WHERE id = $1",
+	mssql:    "DELETE FROM redirect_uris WHERE id = @p1",
+}
 
 func (d *Database) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error {
 
@@ -21,12 +66,8 @@ func (d *Database) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectUR
 	originalCreatedAt := redirectURI.CreatedAt
 	redirectURI.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
-	redirectURIStruct := sqlbuilder.NewStruct(new(record.RedirectURI)).
-		For(d.Flavor)
-
-	insertBuilder := redirectURIStruct.WithoutTag("pk").InsertInto("redirect_uris", redirectURI)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "redirectURI")
+	id, err := d.insert(ctx, tx, insertRedirectURI, "redirectURI",
+		redirectURI.CreatedAt, redirectURI.URI, redirectURI.ClientId)
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
 		return err
@@ -36,91 +77,18 @@ func (d *Database) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectUR
 	return nil
 }
 
-func (d *Database) getRedirectURICommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	redirectURIStruct *sqlbuilder.Struct) (*record.RedirectURI, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var redirectURI record.RedirectURI
-	if rows.Next() {
-		addr := redirectURIStruct.Addr(&redirectURI)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan redirectURI")
-		}
-		return &redirectURI, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*record.RedirectURI, error) {
-
-	redirectURIStruct := sqlbuilder.NewStruct(new(record.RedirectURI)).
-		For(d.Flavor)
-
-	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
-	selectBuilder.Where(selectBuilder.Equal("id", redirectURIId))
-
-	redirectURI, err := d.getRedirectURICommon(ctx, tx, selectBuilder, redirectURIStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return redirectURI, nil
+	return queryOne(ctx, d, tx, selectRedirectURIById.text(d.Dialect), []any{redirectURIId}, scanRedirectURI, "redirectURI")
 }
 
 func (d *Database) GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error) {
-
-	redirectURIStruct := sqlbuilder.NewStruct(new(record.RedirectURI)).
-		For(d.Flavor)
-
-	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
-	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	redirectURIs := []record.RedirectURI{}
-	for rows.Next() {
-		var redirectURI record.RedirectURI
-		addr := redirectURIStruct.Addr(&redirectURI)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan redirectURI")
-		}
-		redirectURIs = append(redirectURIs, redirectURI)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return redirectURIs, nil
+	return queryAll(ctx, d, tx, []record.RedirectURI{}, selectRedirectURIsByClientId.text(d.Dialect), []any{clientId},
+		scanRedirectURI, "redirectURI")
 }
 
 func (d *Database) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.RedirectURI)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom("redirect_uris")
-	deleteBuilder.Where(deleteBuilder.Equal("id", redirectURIId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteRedirectURI.text(d.Dialect), redirectURIId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete redirectURI")
 	}
