@@ -48,7 +48,7 @@ func TestMissingSettings_ThePasswordStepAnswersBeforeReadingItsCeremony(t *testi
 
 			pageRenderer.AssertExpectations(t)
 			ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
-			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)

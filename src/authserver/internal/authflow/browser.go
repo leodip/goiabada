@@ -22,9 +22,10 @@ type ceremonyClearer interface {
 // /auth/completed's reuse arm when the bind raises the session, so an identifier planted before the
 // sign-in names nothing the sign-in produced (#266). It lands only while the browser session still
 // holds the ceremony, and otherwise answers ceremony.ErrCeremonyReplaced and writes nothing (#579).
-// The handler's per-request adapter satisfies it, over ceremony.Store.
+// It keeps no ceremony held for a user other than userId, the user the ceremony has authenticated
+// (#246). The handler's per-request adapter satisfies it, over ceremony.Store.
 type sessionRotator interface {
-	RegenerateSession(ceremonyId string) error
+	RegenerateSession(ceremonyId string, userId int64) error
 }
 
 // credentialFailureRecorder charges a refused credential to the rate limiter, against the

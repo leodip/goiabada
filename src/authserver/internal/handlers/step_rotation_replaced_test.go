@@ -47,7 +47,7 @@ func expectCeremonyConfirmed(ceremonyStore *handlersmocks.CeremonyStore, rr *htt
 // expectRotationReplaced arms a step's rotation to find the browser session holding another
 // ceremony.
 func expectRotationReplaced(ceremonyStore *handlersmocks.CeremonyStore, rr *httptest.ResponseRecorder, req interface{}) {
-	ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId).Return(ceremony.ErrCeremonyReplaced).Once()
+	ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(ceremony.ErrCeremonyReplaced).Once()
 }
 
 func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerActive(t *testing.T) {
@@ -335,7 +335,7 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 				signedInAs(int64(1), "pwd", record.AcrLevel1, pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "",
 				(*record.UserSession)(nil), testSessionLimits).Return(started, removed, nil).Once()
-			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, "the-new-user-session").
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "the-new-user-session").
 				Return(failure.err).Once()
 			userSessionManager.On("AbandonUserSession", theContextOf(req), started, mock.MatchedBy(func(cause error) bool {
 				return errors.Is(cause, failure.err)
@@ -496,10 +496,11 @@ func aNewDeviceOf(req *http.Request, minted *string) interface{} {
 }
 
 // expectNewSessionBound arms /auth/completed's create arm's rotation, which binds the user session it
-// started to the browser session on condition it still holds this ceremony (#266, #579 decision 4).
+// started to the browser session on condition it still holds this ceremony (#266, #579 decision 4),
+// for userId, the user the ceremony signed in, whom no other user's ceremony outlives (#246).
 func expectNewSessionBound(ceremonyStore *handlersmocks.CeremonyStore, rr *httptest.ResponseRecorder, req *http.Request,
-	userSessionIdentifier string) {
-	ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, userSessionIdentifier).Return(nil).Once()
+	userId int64, userSessionIdentifier string) {
+	ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, userId, userSessionIdentifier).Return(nil).Once()
 }
 
 // expectCeremonyNoLongerActiveOnAnyRequest is expectCeremonyNoLongerActive for a handler that renders

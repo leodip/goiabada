@@ -165,7 +165,7 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 		UserLocale: user.Locale,
 		NextStep:   "/auth/level1completed",
 	}
-	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId); result.SaveErr != nil {
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
 		return result, nil
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)

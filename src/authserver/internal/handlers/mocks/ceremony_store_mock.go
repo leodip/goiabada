@@ -366,16 +366,16 @@ func (_c *CeremonyStore_LatestAuthContext_Call) RunAndReturn(run func(r *http.Re
 }
 
 // RegenerateSession provides a mock function for the type CeremonyStore
-func (_mock *CeremonyStore) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
-	ret := _mock.Called(w, r, ceremonyId)
+func (_mock *CeremonyStore) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error {
+	ret := _mock.Called(w, r, ceremonyId, userId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RegenerateSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string) error); ok {
-		r0 = returnFunc(w, r, ceremonyId)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, int64) error); ok {
+		r0 = returnFunc(w, r, ceremonyId, userId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -391,11 +391,12 @@ type CeremonyStore_RegenerateSession_Call struct {
 //   - w http.ResponseWriter
 //   - r *http.Request
 //   - ceremonyId string
-func (_e *CeremonyStore_Expecter) RegenerateSession(w any, r any, ceremonyId any) *CeremonyStore_RegenerateSession_Call {
-	return &CeremonyStore_RegenerateSession_Call{Call: _e.mock.On("RegenerateSession", w, r, ceremonyId)}
+//   - userId int64
+func (_e *CeremonyStore_Expecter) RegenerateSession(w any, r any, ceremonyId any, userId any) *CeremonyStore_RegenerateSession_Call {
+	return &CeremonyStore_RegenerateSession_Call{Call: _e.mock.On("RegenerateSession", w, r, ceremonyId, userId)}
 }
 
-func (_c *CeremonyStore_RegenerateSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string)) *CeremonyStore_RegenerateSession_Call {
+func (_c *CeremonyStore_RegenerateSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64)) *CeremonyStore_RegenerateSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -409,10 +410,15 @@ func (_c *CeremonyStore_RegenerateSession_Call) Run(run func(w http.ResponseWrit
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -423,22 +429,22 @@ func (_c *CeremonyStore_RegenerateSession_Call) Return(err error) *CeremonyStore
 	return _c
 }
 
-func (_c *CeremonyStore_RegenerateSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string) error) *CeremonyStore_RegenerateSession_Call {
+func (_c *CeremonyStore_RegenerateSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error) *CeremonyStore_RegenerateSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RegenerateSessionAndBind provides a mock function for the type CeremonyStore
-func (_mock *CeremonyStore) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error {
-	ret := _mock.Called(w, r, ceremonyId, userSessionIdentifier)
+func (_mock *CeremonyStore) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string) error {
+	ret := _mock.Called(w, r, ceremonyId, userId, userSessionIdentifier)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RegenerateSessionAndBind")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, string) error); ok {
-		r0 = returnFunc(w, r, ceremonyId, userSessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, int64, string) error); ok {
+		r0 = returnFunc(w, r, ceremonyId, userId, userSessionIdentifier)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -454,12 +460,13 @@ type CeremonyStore_RegenerateSessionAndBind_Call struct {
 //   - w http.ResponseWriter
 //   - r *http.Request
 //   - ceremonyId string
+//   - userId int64
 //   - userSessionIdentifier string
-func (_e *CeremonyStore_Expecter) RegenerateSessionAndBind(w any, r any, ceremonyId any, userSessionIdentifier any) *CeremonyStore_RegenerateSessionAndBind_Call {
-	return &CeremonyStore_RegenerateSessionAndBind_Call{Call: _e.mock.On("RegenerateSessionAndBind", w, r, ceremonyId, userSessionIdentifier)}
+func (_e *CeremonyStore_Expecter) RegenerateSessionAndBind(w any, r any, ceremonyId any, userId any, userSessionIdentifier any) *CeremonyStore_RegenerateSessionAndBind_Call {
+	return &CeremonyStore_RegenerateSessionAndBind_Call{Call: _e.mock.On("RegenerateSessionAndBind", w, r, ceremonyId, userId, userSessionIdentifier)}
 }
 
-func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string)) *CeremonyStore_RegenerateSessionAndBind_Call {
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string)) *CeremonyStore_RegenerateSessionAndBind_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -473,15 +480,20 @@ func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Run(run func(w http.Respo
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 string
+		var arg3 int64
 		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg3 = args[3].(int64)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -492,7 +504,7 @@ func (_c *CeremonyStore_RegenerateSessionAndBind_Call) Return(err error) *Ceremo
 	return _c
 }
 
-func (_c *CeremonyStore_RegenerateSessionAndBind_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error) *CeremonyStore_RegenerateSessionAndBind_Call {
+func (_c *CeremonyStore_RegenerateSessionAndBind_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64, userSessionIdentifier string) error) *CeremonyStore_RegenerateSessionAndBind_Call {
 	_c.Call.Return(run)
 	return _c
 }

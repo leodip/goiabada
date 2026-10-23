@@ -190,7 +190,7 @@ func TestHandleAuthPwdPost_AnAcceptedPasswordReadsNoClient(t *testing.T) {
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.armAcceptedPassword(t, "")
-	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(nil).Once()
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
 	m.ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(nil).Once()
 
 	m.post().ServeHTTP(rr, req)
@@ -252,7 +252,7 @@ func TestHandleAuthPwdPost_ARotationFailingAnswers500AndSavesNothing(t *testing.
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.armAcceptedPassword(t, "")
-	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(assert.AnError).Once()
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, mock.Anything, isTheError(assert.AnError)).Return().Once()
 
 	m.post().ServeHTTP(rr, req)
@@ -267,7 +267,7 @@ func TestHandleAuthPwdPost_ASaveFailingAnswers500(t *testing.T) {
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.armAcceptedPassword(t, "")
-	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(nil).Once()
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
 	m.ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, mock.Anything, isTheError(assert.AnError)).Return().Once()
 
@@ -323,7 +323,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 
 		m.post().ServeHTTP(rr, req)
 
-		m.ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+		m.ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		m.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -333,7 +333,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersLocaleOnlyOnceThePasswordIsVerified(
 		rr := httptest.NewRecorder()
 		m.armPasswordCeremony()
 		m.armAcceptedPassword(t, "pt-BR")
-		m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).
+		m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).
 			Return(ceremony.ErrCeremonyReplaced).Once()
 		m.pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.MatchedBy(func(data map[string]interface{}) bool {

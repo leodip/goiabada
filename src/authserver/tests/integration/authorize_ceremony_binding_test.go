@@ -371,58 +371,49 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 	}
 }
 
-// TestAuthorize_WrongCodesInOneUsersSignInSpendOnlyThatUsersBudget: two users' sign-ins at their
-// OTP prompts in one browser, the second started after the first. Wrong codes entered on the first
-// user's prompt spend that user's one-time-code budget, which refuses the sixth, and none of the
-// second user's, whose sign-in, the one the browser most recently wrote, still finishes with a
-// code. The budget counts against the user of the sign-in the submitted form names, which is the
-// user whose code is checked (#246 decision 1).
-func TestAuthorize_WrongCodesInOneUsersSignInSpendOnlyThatUsersBudget(t *testing.T) {
-	clientA, redirectUriA, userA, passwordA, otpSecretA := createLevel2MandatoryUser(t, true)
+// TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment: user A types their password and
+// walks away from the browser at the enrolment of an authenticator, its key on the screen. User B
+// then signs in on the same browser. A's sign-in does not carry on into B's session: A's enrolment
+// page, submitted with a code from the key it shows, gets the "no longer active" page, and A neither
+// enrols that key nor gets a session. Before, whoever used the browser next could scan A's key, enrol
+// it and be signed in as A without A's password (#246).
+func TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment(t *testing.T) {
+	clientA, redirectUriA, userA, passwordA, _ := createLevel2MandatoryUser(t, false)
 	clientB, redirectUriB, userB, passwordB, otpSecretB := createLevel2MandatoryUser(t, true)
 
 	httpClient := createHttpClient(t)
 
-	otpUrlA, otpPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, fake.LetterN(8), userA, passwordA)
-	defer func() { _ = otpPageA.Body.Close() }()
+	enrolUrlA, enrolPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, fake.LetterN(8), userA, passwordA)
+	defer func() { _ = enrolPageA.Body.Close() }()
+	codeFromAsKey, err := totp.GenerateCode(getOtpSecretFromEnrollmentPage(t, enrolPageA), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	stateB := fake.LetterN(8)
 	otpUrlB, otpPageB := walkToOtpPrompt(t, httpClient, clientB, redirectUriB, stateB, userB, passwordB)
 	defer func() { _ = otpPageB.Body.Close() }()
-
-	// A code that is wrong for user A: user B's.
-	wrongForA, err := totp.GenerateCode(otpSecretB, time.Now())
+	codeB, err := totp.GenerateCode(otpSecretB, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	rightForA, err := totp.GenerateCode(otpSecretA, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if wrongForA == rightForA {
-		t.Skip("the two users' current codes collide, one time in a million")
-	}
 
-	for attempt := 1; attempt <= 5; attempt++ {
-		resp := authenticateWithOtp(t, httpClient, otpUrlA, otpPageA, wrongForA)
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "wrong code %d is refused on A's prompt and not limited", attempt)
-		_ = resp.Body.Close()
-	}
-	resp := authenticateWithOtp(t, httpClient, otpUrlA, otpPageA, wrongForA)
-	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode, "the sixth spends past user A's budget")
-	_ = resp.Body.Close()
-
-	// User B's budget is untouched: B's own prompt takes B's code.
-	rightForB, err := totp.GenerateCode(otpSecretB, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp = authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, rightForB)
+	resp := authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, codeB)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
 	location := assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, location)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-
 	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
+
+	// A's enrolment page, still in its tab, submitted with a code from the key it shows.
+	resp = authenticateWithOtp(t, httpClient, enrolUrlA, enrolPageA, codeFromAsKey)
+	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
+	assertCeremonyMismatchPage(t, resp, "an enrolment of another user's sign-in")
+	assertNothingWasCompleted(t, userA.Id)
+
+	storedA, err := database.GetUserById(context.Background(), nil, userA.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.False(t, storedA.OTPEnabled, "the key A's page showed is enrolled for nobody")
 }

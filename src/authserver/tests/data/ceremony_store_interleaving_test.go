@@ -29,6 +29,9 @@ import (
 
 const interleavingSessionName = "goiabada-auth-test"
 
+// rotatingUserId is the user a rotation here is for, whose password or code the step has just accepted.
+const rotatingUserId int64 = 1
+
 // newDatabaseCeremonyStore is the ceremony store as the auth server builds it, over this run's
 // database, with the session store and the backend under it.
 func newDatabaseCeremonyStore(t *testing.T) (*ceremony.Store, *sessionstore.ServerSideStore, sessionstore.ConditionalBackend) {
@@ -245,7 +248,7 @@ func TestCeremonyStore_ARotationThatResumesAfterANewerAuthorizeCarriesBothCeremo
 		&ceremony.AuthContext{CeremonyId: "ceremony-b", ClientId: "client-b", AuthState: ceremony.AuthStateRequiresLevel1}))
 
 	rr := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId))
+	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId, rotatingUserId))
 
 	rotated := rr.Result().Cookies()
 	require.Len(t, rotated, 1)
@@ -270,7 +273,7 @@ func TestCeremonyStore_ARotationOfAPushedOutCeremonyLeavesTheNewerOnesStored(t *
 	}
 
 	rr := httptest.NewRecorder()
-	err = ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId)
+	err = ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId, rotatingUserId)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	assert.Empty(t, rr.Result().Cookies(), "tab A rotated nothing, so it tells the browser nothing")
@@ -294,7 +297,7 @@ func TestCeremonyStore_ARotationThatStillHoldsItsCeremonyRotates(t *testing.T) {
 	require.NoError(t, err)
 
 	rr := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a"))
+	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a", rotatingUserId))
 
 	rotated := rr.Result().Cookies()
 	require.Len(t, rotated, 1)
@@ -322,7 +325,7 @@ func TestCeremonyStore_ARotationWhoseSessionIsGoneDoesNotPutItBack(t *testing.T)
 	require.NoError(t, backend.Delete(context.Background(), id))
 
 	rr := httptest.NewRecorder()
-	err = ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a")
+	err = ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a", rotatingUserId)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	assert.Empty(t, rr.Result().Cookies(), "no cookie names a session re-created from tab A's copy")

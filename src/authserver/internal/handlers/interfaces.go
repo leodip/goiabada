@@ -63,12 +63,14 @@ type CeremonyStore interface {
 	// contents, which is what a server-side session store must do at every privilege
 	// change to match a cookie store's structural immunity to session fixation (#266). It
 	// rotates only while the browser session still holds the ceremony named, and otherwise
-	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
-	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579). It keeps no ceremony held for a
+	// user other than userId, the user the rotation is for (#246).
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error
 	// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm, which also
 	// writes the new user session's identifier into the browser session as it rotates it (#266),
 	// on the same condition (#579 decision 4).
-	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userSessionIdentifier string) error
+	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64,
+		userSessionIdentifier string) error
 	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
 	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
 	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error

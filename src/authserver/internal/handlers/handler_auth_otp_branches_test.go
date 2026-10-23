@@ -84,7 +84,7 @@ func (m otpStepMocks) armClient() {
 func (m otpStepMocks) assertNothingSaved(t *testing.T) {
 	t.Helper()
 	m.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
-	m.ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything)
+	m.ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	m.pageRenderer.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything,
 		"/layouts/auth_layout.html", mock.Anything, mock.Anything)
 }

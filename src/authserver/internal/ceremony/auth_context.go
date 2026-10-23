@@ -110,12 +110,14 @@ type AuthContext struct {
 	// only when this field carries no usable key makes that GET idempotent (#242 part 3).
 	//
 	// The binding to the ceremony is structural rather than compared, which is the second
-	// half of it: a second /auth/authorize mints a new auth context and takes the old key
-	// with it, so there is no shared slot for one ceremony's seed to be read out of by
-	// another and no ceremony id to check it against. ClearAuthContext at /auth/issue removes
-	// it, and RecordOTPVerified blanks it once the enrolment has succeeded, so a spent
-	// credential neither travels through the rest of the ceremony nor sits in the cookie of
-	// one abandoned after enrolling (#247).
+	// half of it: each /auth/authorize mints its own auth context, carrying its own key or
+	// none, so there is no shared slot for one ceremony's seed to be read out of by another
+	// and no ceremony id to check it against. ClearAuthContext at /auth/issue removes it, and
+	// RecordOTPVerified blanks it once the enrolment has succeeded, so a spent credential
+	// neither travels through the rest of the ceremony nor sits in the session of one
+	// abandoned after enrolling (#247). An enrolment abandoned before that ends with the
+	// ceremony: pushed out by newer ones, removed by the rotation of another user's sign-in
+	// in the same browser (Store), or gone with the browser session (#246).
 	//
 	// Absent from a context written by an older binary it unmarshals as "", which reads as
 	// "this ceremony has generated nothing" and makes the next render generate. So does a

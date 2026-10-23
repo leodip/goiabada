@@ -147,7 +147,7 @@ Programmatic client registration for MCP clients, native apps, etc.
 
 ## Authentication Flow (Authorization Code)
 
-The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)). A browser holds up to five ceremonies side by side, each its own `AuthContext`, under the session key `AuthContexts` (`ceremony.Store`, `ceremony.MaxHeldCeremonies`), so two tabs signing in to two applications both finish, and a link or redirect from another site starts its own ceremony and ends none. `/auth/authorize` adds its ceremony beside the others, a step's save makes its ceremony the most recently written, and an add beyond five pushes out the least recently written. The key the one ceremony was held under before, `AuthContext`, is never read, and the store's first write to a session removes it (#246).
+The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)). A browser holds up to five ceremonies side by side, each its own `AuthContext`, under the session key `AuthContexts` (`ceremony.Store`, `ceremony.MaxHeldCeremonies`), so two tabs signing in to two applications both finish, and a link or redirect from another site starts its own ceremony and ends none. `/auth/authorize` adds its ceremony beside the others, a step's save makes its ceremony the most recently written, and an add beyond five pushes out the least recently written. A rotation of the browser session's identifier, at an accepted password or code and at `/auth/completed`'s rotations, is for the user the ceremony authenticated and removes every held ceremony carrying another user (`heldRotation`), so a ceremony someone abandoned after their password does not ride into the next user's session, where whoever used the browser then could finish it as them. The key the one ceremony was held under before, `AuthContext`, is never read, and the store's first write to a session removes it (#246).
 
 ### ACR Levels (Authentication Context Class Reference)
 Defined in `src/authserver/internal/record/acr_level.go`:
@@ -253,9 +253,9 @@ a step after `/auth/authorize` makes to the browser session lands only while the
 holds that step's ceremony (#579): the ceremony store's save, clear and rotation read the session
 afresh, refuse when it does not hold the ceremony (ended by another request of it, or pushed out
 by newer ones) or is gone (signed out, expired, or rotated away by another request of the browser),
-apply only their own change to what they read, touching no other ceremony, and write on condition
-the stored row is unchanged, trying again at most three times in all when another write lands
-between. A step so refused writes nothing and answers the "no longer active" page
+apply only their own change to what they read, touching no other ceremony but, at a rotation,
+those carrying another user, and write on condition the stored row is unchanged, trying again at
+most three times in all when another write lands between. A step so refused writes nothing and answers the "no longer active" page
 (`ceremony.ErrCeremonyReplaced`), so the ceremonies the browser holds carry on. The create arm of
 `/auth/completed` asks first (`ConfirmCeremony`), before it ends a foreign session or commits a new
 one, and its rotation carries the same condition and every held ceremony. `/auth/authorize`'s add

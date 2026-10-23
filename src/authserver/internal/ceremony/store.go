@@ -39,8 +39,10 @@ const MaxHeldCeremonies = 5
 // server.go's locale middleware through UILocales.
 //
 // The held ceremonies are stored least recently written first: an add puts its ceremony last, a
-// save moves its ceremony last, and an add that makes one too many removes the first. Every write
-// also removes sessionkeys.RetiredAuthContext, which nothing reads (#246 decision 3).
+// save moves its ceremony last, and an add that makes one too many removes the first. A rotation,
+// the instant a user's password or code is accepted or a session bound to them, removes every
+// ceremony held for another user (heldRotation). Every write also removes
+// sessionkeys.RetiredAuthContext, which nothing reads (#246 decision 3).
 type Store struct {
 	sessionStore authSessionStore
 	sessionName  string
@@ -213,16 +215,34 @@ func goneIsReplaced(err error) error {
 
 // heldRotation is the change every rotation of the ceremony named makes to the browser session,
 // applied to the session's values as a fresh read found them: ErrCeremonyReplaced when they do not
-// hold that ceremony, and otherwise only the removal of the key before #246's, since a rotation is a
-// write of the session (#246 decision 3). It moves no ceremony: a rotation writes none. A list
-// that does not decode is a fault and is returned as one.
-func heldRotation(ceremonyId string) func(values map[string]any) error {
+// hold that ceremony, and otherwise the removal of every other ceremony held for a user other than
+// userId, the user the rotation is for, and of the key before #246's, since a rotation is a write of
+// the session (#246 decision 3). It moves no ceremony and changes none it keeps. A list that does not
+// decode is a fault and is returned as one.
+//
+// A rotation is a privilege change: a password or a code has just been accepted for userId in this
+// browser, or a session is being bound to them. A ceremony another user verified a password in and
+// walked away from would otherwise ride along into this user's session, outliving the pre-sign-in
+// lifetime it was stored under, and whoever used the browser next could finish it as that user: scan
+// the code its enrolment shows, enter it, and be signed in as them (#246). A ceremony naming no user
+// carries no credential and is kept, as are this user's own.
+func heldRotation(ceremonyId string, userId int64) func(values map[string]any) error {
 	return func(values map[string]any) error {
-		if err := holds(ceremonyId)(values); err != nil {
+		ceremonies, err := heldIn(values)
+		if err != nil {
 			return err
 		}
-		delete(values, sessionkeys.RetiredAuthContext)
-		return nil
+		own := indexOf(ceremonies, ceremonyId)
+		if own < 0 {
+			return errs.WithStack(ErrCeremonyReplaced)
+		}
+		kept := make([]AuthContext, 0, len(ceremonies))
+		for i, c := range ceremonies {
+			if i == own || c.UserId == 0 || c.UserId == userId {
+				kept = append(kept, c)
+			}
+		}
+		return putHeld(values, kept)
 	}
 }
 
@@ -294,10 +314,11 @@ func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremon
 }
 
 // RegenerateSession replaces the browser session's identifier, keeping its contents, every held
-// ceremony among them, only while the session still holds the ceremony named (#579). The step
-// loaded its context when its request began, and the ceremony may have ended or been pushed out
-// since, so the session is read afresh, the ceremony looked for in what it holds, and the new row
-// written from what that read found; the old row is removed on condition nothing wrote it in
+// ceremony among them but those held for a user other than userId, the user whose password or code
+// the step has just accepted (heldRotation), only while the session still holds the ceremony named
+// (#579). The step loaded its context when its request began, and the ceremony may have ended or been
+// pushed out since, so the session is read afresh, the ceremony looked for in what it holds, and the
+// new row written from what that read found; the old row is removed on condition nothing wrote it in
 // between, through ChangeAndRegenerate. A rotation from the request's own copy put an ended ceremony
 // back under the new identifier and deleted the row holding the newer ones.
 //
@@ -309,13 +330,13 @@ func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremon
 // Handlers reach rotation through here rather than through the store, so the one port that
 // names a rotation is this type's and sessionstore.Store stays Get and Save for the
 // hundred places that take it (#266, #431).
-func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string) error {
+func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, heldRotation(ceremonyId)))
+	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, heldRotation(ceremonyId, userId)))
 }
 
 // RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm: the rotation also
@@ -324,18 +345,19 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 // sign-in reaches the browser as one Set-Cookie. A planted identifier would otherwise name the row
 // the victim's sign-in fills in (session fixation, #266).
 //
-// It writes, as RegenerateSession does, only while the browser session still holds the ceremony
-// named, and answers ErrCeremonyReplaced, having written nothing and set no cookie, when it does
-// not, or is gone (#579 decision 4). The caller then abandons the user session it bound nothing to.
+// It keeps, as RegenerateSession does, no ceremony held for a user other than userId, the user the
+// session is bound to, and writes only while the browser session still holds the ceremony named,
+// answering ErrCeremonyReplaced, having written nothing and set no cookie, when it does not, or is
+// gone (#579 decision 4). The caller then abandons the user session it bound nothing to.
 func (s *Store) RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string,
-	userSessionIdentifier string) error {
+	userId int64, userSessionIdentifier string) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return err
 	}
 
-	rotation := heldRotation(ceremonyId)
+	rotation := heldRotation(ceremonyId, userId)
 	return goneIsReplaced(s.sessionStore.ChangeAndRegenerate(w, r, sess, func(values map[string]any) error {
 		if err := rotation(values); err != nil {
 			return err

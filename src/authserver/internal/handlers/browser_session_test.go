@@ -161,12 +161,12 @@ func TestBrowserSession_RegenerateSessionCarriesTheHandlersWriterAndRequest(t *t
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyId).
+	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyId, int64(42)).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(nil).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyId)
+	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyId, 42)
 
 	require.NoError(t, err)
 	ceremonyStore.AssertExpectations(t)
@@ -177,10 +177,10 @@ func TestBrowserSession_RegenerateSessionReturnsTheStoresRefusal(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyId).
+	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyId, int64(42)).
 		Return(ceremony.ErrCeremonyReplaced).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyId)
+	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyId, 42)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 }
@@ -215,20 +215,20 @@ func TestBrowserSession_ConfirmCeremonyReturnsTheStoresRefusal(t *testing.T) {
 }
 
 // The create arm's rotation binds the new user session to the browser session, so it reaches the
-// ceremony store with the handler's own writer and request, the ceremony and the user session named,
-// and answers what the store answered.
+// ceremony store with the handler's own writer and request, the ceremony, the user and the user
+// session named, and answers what the store answered.
 func TestBrowserSession_RegenerateSessionAndBindCarriesTheHandlersWriterAndRequest(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, "the-new-user-session").
+	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, int64(42), "the-new-user-session").
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(ceremony.ErrCeremonyReplaced).Once()
 
 	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
-		RegenerateSessionAndBind(testCeremonyId, "the-new-user-session")
+		RegenerateSessionAndBind(testCeremonyId, 42, "the-new-user-session")
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	ceremonyStore.AssertExpectations(t)

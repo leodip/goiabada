@@ -1034,7 +1034,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// integration case can see that the cookie moved but not that it moved first
 		// (#266 decision 20).
 		authContextSaved := false
-		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(nil).Once().
+		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once().
 			Run(func(mock.Arguments) {
 				assert.False(t, authContextSaved,
 					"rotation must run before the password-completed auth context is saved: "+
@@ -1119,7 +1119,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			Enabled:      true,
 		}, nil)
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
-		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
 
 		// mock.Anything for the request, as in the successful case: the handler refines the
 		// localizer onto a fresh *http.Request after the password verifies.
@@ -1254,7 +1254,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only the accepted-password case reaches it, and this table covers both outcomes.
-		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only a refusal reads it, for the form it shows again; this table covers both outcomes.
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
