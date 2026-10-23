@@ -5,11 +5,102 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// permissionColumns is the permissions table as scanPermission reads it.
+var permissionColumns = columnList{
+	sqlite:   "id, created_at, updated_at, permission_identifier, description, resource_id",
+	mysql:    "id, created_at, updated_at, permission_identifier, description, resource_id",
+	postgres: "id, created_at, updated_at, permission_identifier, description, resource_id",
+	mssql:    "id, created_at, updated_at, permission_identifier, description, resource_id",
+}
+
+// scanPermission reads one row selected with permissionColumns.
+func scanPermission(row rowScanner, permission *record.Permission) error {
+	return row.Scan(
+		&permission.Id,
+		&permission.CreatedAt,
+		&permission.UpdatedAt,
+		&permission.PermissionIdentifier,
+		&permission.Description,
+		&permission.ResourceId,
+	)
+}
+
+var insertPermission = statement{
+	sqlite:   "INSERT INTO permissions (created_at, updated_at, permission_identifier, description, resource_id) VALUES (?, ?, ?, ?, ?)",
+	mysql:    "INSERT INTO permissions (created_at, updated_at, permission_identifier, description, resource_id) VALUES (?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO permissions (created_at, updated_at, permission_identifier, description, resource_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+	mssql:    "INSERT INTO permissions (created_at, updated_at, permission_identifier, description, resource_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5)",
+}
+
+// updatePermission writes the whole row but created_at, which is dont-update.
+var updatePermission = statement{
+	sqlite:   "UPDATE permissions SET updated_at = ?, permission_identifier = ?, description = ?, resource_id = ? WHERE id = ?",
+	mysql:    "UPDATE permissions SET updated_at = ?, permission_identifier = ?, description = ?, resource_id = ? WHERE id = ?",
+	postgres: "UPDATE permissions SET updated_at = $1, permission_identifier = $2, description = $3, resource_id = $4 WHERE id = $5",
+	mssql:    "UPDATE permissions SET updated_at = @p1, permission_identifier = @p2, description = @p3, resource_id = @p4 WHERE id = @p5",
+}
+
+var selectPermissionById = statement{
+	sqlite:   "SELECT " + permissionColumns.sqlite + " FROM permissions WHERE id = ?",
+	mysql:    "SELECT " + permissionColumns.mysql + " FROM permissions WHERE id = ?",
+	postgres: "SELECT " + permissionColumns.postgres + " FROM permissions WHERE id = $1",
+	mssql:    "SELECT " + permissionColumns.mssql + " FROM permissions WHERE id = @p1",
+}
+
+var selectPermissionsByResourceId = statement{
+	sqlite:   "SELECT " + permissionColumns.sqlite + " FROM permissions WHERE resource_id = ?",
+	mysql:    "SELECT " + permissionColumns.mysql + " FROM permissions WHERE resource_id = ?",
+	postgres: "SELECT " + permissionColumns.postgres + " FROM permissions WHERE resource_id = $1",
+	mssql:    "SELECT " + permissionColumns.mssql + " FROM permissions WHERE resource_id = @p1",
+}
+
+// selectPermissionsWhere is completed by an IN list of permission ids.
+var selectPermissionsWhere = statement{
+	sqlite:   "SELECT " + permissionColumns.sqlite + " FROM permissions WHERE ",
+	mysql:    "SELECT " + permissionColumns.mysql + " FROM permissions WHERE ",
+	postgres: "SELECT " + permissionColumns.postgres + " FROM permissions WHERE ",
+	mssql:    "SELECT " + permissionColumns.mssql + " FROM permissions WHERE ",
+}
+
+var deletePermission = statement{
+	sqlite:   "DELETE FROM permissions WHERE id = ?",
+	mysql:    "DELETE FROM permissions WHERE id = ?",
+	postgres: "DELETE FROM permissions WHERE id = $1",
+	mssql:    "DELETE FROM permissions WHERE id = @p1",
+}
+
+// acquireManagePermission assigns permission_identifier to itself on the authserver resource's
+// manage permission, which is a write that takes the row and changes nothing.
+var acquireManagePermission = statement{
+	sqlite: "UPDATE permissions SET permission_identifier = permission_identifier WHERE permission_identifier = ? " +
+		"AND EXISTS (SELECT 1 FROM resources WHERE resources.id = permissions.resource_id AND resources.resource_identifier = ?)",
+	mysql: "UPDATE permissions SET permission_identifier = permission_identifier WHERE permission_identifier = ? " +
+		"AND EXISTS (SELECT 1 FROM resources WHERE resources.id = permissions.resource_id AND resources.resource_identifier = ?)",
+	postgres: "UPDATE permissions SET permission_identifier = permission_identifier WHERE permission_identifier = $1 " +
+		"AND EXISTS (SELECT 1 FROM resources WHERE resources.id = permissions.resource_id AND resources.resource_identifier = $2)",
+	mssql: "UPDATE permissions SET permission_identifier = permission_identifier WHERE permission_identifier = @p1 " +
+		"AND EXISTS (SELECT 1 FROM resources WHERE resources.id = permissions.resource_id AND resources.resource_identifier = @p2)",
+}
+
+var selectManagePermission = statement{
+	sqlite: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
+		"INNER JOIN resources ON resources.id = permissions.resource_id " +
+		"WHERE permissions.permission_identifier = ? AND resources.resource_identifier = ?",
+	mysql: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
+		"INNER JOIN resources ON resources.id = permissions.resource_id " +
+		"WHERE permissions.permission_identifier = ? AND resources.resource_identifier = ?",
+	postgres: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
+		"INNER JOIN resources ON resources.id = permissions.resource_id " +
+		"WHERE permissions.permission_identifier = $1 AND resources.resource_identifier = $2",
+	mssql: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
+		"INNER JOIN resources ON resources.id = permissions.resource_id " +
+		"WHERE permissions.permission_identifier = @p1 AND resources.resource_identifier = @p2",
+}
 
 func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error {
 
@@ -24,12 +115,9 @@ func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission 
 	permission.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	permission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
-		For(d.Flavor)
-
-	insertBuilder := permissionStruct.WithoutTag("pk").InsertInto("permissions", permission)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "permission")
+	id, err := d.insert(ctx, tx, insertPermission, "permission",
+		permission.CreatedAt, permission.UpdatedAt, permission.PermissionIdentifier, permission.Description,
+		permission.ResourceId)
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
@@ -49,14 +137,9 @@ func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission 
 	originalUpdatedAt := permission.UpdatedAt
 	permission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
-		For(d.Flavor)
-
-	updateBuilder := permissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("permissions", permission)
-	updateBuilder.Where(updateBuilder.Equal("id", permission.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updatePermission.text(d.Dialect),
+		permission.UpdatedAt, permission.PermissionIdentifier, permission.Description, permission.ResourceId,
+		permission.Id)
 	if err != nil {
 		permission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update permission")
@@ -65,79 +148,13 @@ func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission 
 	return nil
 }
 
-func (d *Database) getPermissionCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	permissionStruct *sqlbuilder.Struct) (*record.Permission, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var permission record.Permission
-	if rows.Next() {
-		addr := permissionStruct.Addr(&permission)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan permission")
-		}
-		return &permission, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error) {
-
-	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
-		For(d.Flavor)
-
-	selectBuilder := permissionStruct.SelectFrom("permissions")
-	selectBuilder.Where(selectBuilder.Equal("id", permissionId))
-
-	permission, err := d.getPermissionCommon(ctx, tx, selectBuilder, permissionStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return permission, nil
+	return queryOne(ctx, d, tx, selectPermissionById.text(d.Dialect), []any{permissionId}, scanPermission, "permission")
 }
 
 func (d *Database) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error) {
-
-	permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
-		For(d.Flavor)
-
-	selectBuilder := permissionStruct.SelectFrom("permissions")
-	selectBuilder.Where(selectBuilder.Equal("resource_id", resourceId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var permissions []record.Permission
-	for rows.Next() {
-		var permission record.Permission
-		addr := permissionStruct.Addr(&permission)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan permission")
-		}
-		permissions = append(permissions, permission)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return permissions, nil
+	return queryAll(ctx, d, tx, nil, selectPermissionsByResourceId.text(d.Dialect), []any{resourceId},
+		scanPermission, "permission")
 }
 
 func (d *Database) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error {
@@ -177,34 +194,10 @@ func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissi
 	var permissions []record.Permission
 
 	err := forEachIdBatch(permissionIds, func(batch []int64) error {
-		permissionStruct := sqlbuilder.NewStruct(new(record.Permission)).
-			For(d.Flavor)
-
-		selectBuilder := permissionStruct.SelectFrom("permissions")
-		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
-
-		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySQL(ctx, tx, sql, args...)
-		if err != nil {
-			return errs.Wrap(err, "unable to query database")
-		}
-		defer func() { _ = rows.Close() }()
-
-		for rows.Next() {
-			var permission record.Permission
-			addr := permissionStruct.Addr(&permission)
-			err = rows.Scan(addr...)
-			if err != nil {
-				return errs.Wrap(err, "unable to scan permission")
-			}
-			permissions = append(permissions, permission)
-		}
-
-		if err := rows.Err(); err != nil {
-			return errs.Wrap(err, "unable to read query results")
-		}
-
-		return nil
+		query := selectPermissionsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
+		var err error
+		permissions, err = queryAll(ctx, d, tx, permissions, query, int64Args(batch), scanPermission, "permission")
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -215,14 +208,7 @@ func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissi
 
 func (d *Database) DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.Permission)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom("permissions")
-	deleteBuilder.Where(deleteBuilder.Equal("id", permissionId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deletePermission.text(d.Dialect), permissionId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete permission")
 	}
@@ -261,38 +247,14 @@ func (d *Database) AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (
 		return 0, errs.New("acquiring the manage permission row requires a transaction: an autocommitted statement releases the row before the caller can count under it")
 	}
 
-	ofAuthServer := d.Flavor.NewSelectBuilder()
-	ofAuthServer.Select("1")
-	ofAuthServer.From("resources")
-	ofAuthServer.Where(
-		"resources.id = permissions.resource_id",
-		ofAuthServer.Equal("resources.resource_identifier", builtin.AuthServerResourceIdentifier),
-	)
-
-	acquire := d.Flavor.NewUpdateBuilder()
-	acquire.Update("permissions")
-	acquire.Set("permission_identifier = permission_identifier")
-	acquire.Where(
-		acquire.Equal("permission_identifier", builtin.ManagePermissionIdentifier),
-		acquire.Exists(ofAuthServer),
-	)
-
-	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	_, err := d.ExecSQL(ctx, tx, acquireManagePermission.text(d.Dialect),
+		builtin.ManagePermissionIdentifier, builtin.AuthServerResourceIdentifier)
+	if err != nil {
 		return 0, errs.Wrap(err, "unable to acquire the manage permission row")
 	}
 
-	read := d.Flavor.NewSelectBuilder()
-	read.Select("permissions.id", "permissions.permission_identifier", "resources.resource_identifier")
-	read.From("permissions")
-	read.JoinWithOption(sqlbuilder.InnerJoin, "resources", "resources.id = permissions.resource_id")
-	read.Where(
-		read.Equal("permissions.permission_identifier", builtin.ManagePermissionIdentifier),
-		read.Equal("resources.resource_identifier", builtin.AuthServerResourceIdentifier),
-	)
-
-	query, args = read.BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, selectManagePermission.text(d.Dialect),
+		builtin.ManagePermissionIdentifier, builtin.AuthServerResourceIdentifier)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read the manage permission row")
 	}

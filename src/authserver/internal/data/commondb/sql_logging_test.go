@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func loggingDB(t *testing.T, logSQL bool) *Database {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	database := New(db, sqlbuilder.SQLite, logSQL)
+	database := New(db, data.SQLite, logSQL)
 	_, err = database.DB.Exec(`CREATE TABLE secrets (id INTEGER PRIMARY KEY, value TEXT)`)
 	require.NoError(t, err, "the table is created behind the logger's back, so nothing it writes is under test yet")
 	return database

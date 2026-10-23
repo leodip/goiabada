@@ -16,7 +16,6 @@ import (
 	"strings"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
@@ -145,7 +144,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		}
 	}
 
-	commonDb := commondb.New(db, sqlbuilder.MySQL, logSQL)
+	commonDb := commondb.New(db, data.MySQL, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 

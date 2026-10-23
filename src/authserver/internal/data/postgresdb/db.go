@@ -16,7 +16,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -137,7 +136,7 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		}
 	}
 
-	commonDb := commondb.New(db, sqlbuilder.PostgreSQL, logSQL)
+	commonDb := commondb.New(db, data.Postgres, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	commonDb.InsertReturningIdSQL = insertReturningIdSQL

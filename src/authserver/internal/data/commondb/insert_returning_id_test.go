@@ -249,3 +249,78 @@ func TestInsertReturningId_ReturningArmWrapsARefusedQuery(t *testing.T) {
 		t.Errorf("err.Error() = %q, want %q", err.Error(), want)
 	}
 }
+
+// insert, the arm for a statement whose versions say how the id comes back in their own text
+// (#644). The engine decides the arm, not the presence of a rewrite hook, and nothing rewrites the
+// text: PostgreSQL and SQL Server still wire InsertReturningIdSQL for the inserts built through the
+// query builder, and applying it here would send RETURNING id twice.
+
+// widgetInsert is one INSERT in each engine's text, chosen by the test.
+var widgetInsert = statement{
+	sqlite:   "INSERT INTO widgets (name) VALUES (?)",
+	mysql:    "INSERT INTO widgets (name) VALUES (?)",
+	postgres: "INSERT INTO widgets (name) VALUES ($1) RETURNING id",
+	mssql:    "INSERT INTO widgets (name) OUTPUT INSERTED.id VALUES (@p1)",
+}
+
+func TestInsert_EachEngineRunsItsOwnTextUnchanged(t *testing.T) {
+	for _, dialect := range allDialects {
+		t.Run(string(dialect), func(t *testing.T) {
+			script := &scriptedDriver{
+				execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: 77}},
+				rows:  []*scriptedRows{{cols: []string{"id"}, values: [][]driver.Value{{int64(77)}}}},
+			}
+			d := scriptedDBFor(t, script, dialect)
+			// Wired as the engine packages wire it, so a helper that applied it is caught.
+			d.InsertReturningIdSQL = appendReturningId
+
+			id, err := d.insert(context.Background(), nil, widgetInsert, "widget", "probe")
+			if err != nil {
+				t.Fatalf("insert returned %v, want nil", err)
+			}
+			if id != 77 {
+				t.Errorf("id = %d, want 77", id)
+			}
+			if len(script.statements) != 1 || script.statements[0] != widgetInsert.text(dialect) {
+				t.Errorf("the engine ran %q, want exactly %q", script.statements, widgetInsert.text(dialect))
+			}
+			returnsARow := dialect == data.Postgres || dialect == data.MSSQL
+			if returnsARow && (script.queryCount != 1 || script.execCount != 0) {
+				t.Errorf("%s must run its insert as a query answering the id", dialect)
+			}
+			if !returnsARow && (script.execCount != 1 || script.queryCount != 0) {
+				t.Errorf("%s must run its insert as a statement and read LastInsertId", dialect)
+			}
+		})
+	}
+}
+
+// TestInsert_AViolationDeferredToTheResultSetSurfaces is the deferred violation of
+// TestInsertReturningId_ReturningArmSurfacesADeferredViolation, on the two engines whose inserts
+// answer their id as a row.
+func TestInsert_AViolationDeferredToTheResultSetSurfaces(t *testing.T) {
+	for _, dialect := range []data.Dialect{data.Postgres, data.MSSQL} {
+		t.Run(string(dialect), func(t *testing.T) {
+			driverErr := &driverUniqueError{msg: "duplicate key value violates unique constraint"}
+			d := scriptedDBFor(t, &scriptedDriver{rows: []*scriptedRows{{
+				cols: []string{"id"}, failAt: 0, err: driverErr,
+			}}}, dialect)
+			d.IsUniqueViolation = func(err error) bool {
+				var target *driverUniqueError
+				return errors.As(err, &target)
+			}
+
+			id, err := d.insert(context.Background(), nil, widgetInsert, "widget", "probe")
+			if err == nil {
+				t.Fatalf("a violation the driver deferred to the result set was reported as a "+
+					"successful insert with id %d", id)
+			}
+			if !errors.Is(err, data.ErrUniqueViolation) {
+				t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false; err = %v", err)
+			}
+			if want := "unable to insert widget: unique constraint violation: " + driverErr.msg; err.Error() != want {
+				t.Errorf("err.Error() = %q, want %q", err.Error(), want)
+			}
+		})
+	}
+}

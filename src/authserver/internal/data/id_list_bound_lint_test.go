@@ -49,8 +49,10 @@ type unboundedIdList struct {
 }
 
 // findUnboundedIdLists walks root for non-test Go files and reports every function whose body
-// contains a call to a method named In -- which is how github.com/huandu/go-sqlbuilder spells an
-// IN list, on a select builder and on an update builder alike -- and no call to forEachIdBatch.
+// contains a call that writes an IN list and no call to forEachIdBatch. Two calls write one: a
+// method named In, which is how github.com/huandu/go-sqlbuilder spells an IN list on a select
+// builder and on an update builder alike, and inList, the helper every statement written per
+// engine spells its IN list with (#644).
 //
 // It returns the number of functions that build an IN list at all, not the number of files, so an
 // empty walk and a walk that reached files holding no IN list are the same answer: nothing was
@@ -93,10 +95,13 @@ func findUnboundedIdLists(root string) ([]unboundedIdList, int, error) {
 				}
 				switch fun := call.Fun.(type) {
 				case *ast.SelectorExpr:
-					if fun.Sel.Name == "In" && inLine == 0 {
+					if (fun.Sel.Name == "In" || fun.Sel.Name == "inList") && inLine == 0 {
 						inLine = fset.Position(call.Pos()).Line
 					}
 				case *ast.Ident:
+					if fun.Name == "inList" && inLine == 0 {
+						inLine = fset.Position(call.Pos()).Line
+					}
 					if fun.Name == "forEachIdBatch" {
 						batched = true
 					}
@@ -193,6 +198,15 @@ func TestIdListsAreBounded_TheCheckerTellsABatchedLookupFromAnUnboundedOne(t *te
 	writeLintFixture(t, root, "lookup_test.go", "package commondb\n\n"+
 		"func fixture(sb builder, ids []int64) { sb.In(\"id\", ids) }\n")
 
+	// Accepted: the IN list a statement written per engine spells with inList, batched.
+	writeLintFixture(t, root, "per_engine.go", "package commondb\n\n"+
+		"func perEngine(ids []int64) error {\n"+
+		"\treturn forEachIdBatch(ids, func(batch []int64) error {\n"+
+		"\t\t_ = \"SELECT id FROM t WHERE \" + inList(\"sqlite\", \"id\", 1, len(batch))\n"+
+		"\t\treturn nil\n"+
+		"\t})\n"+
+		"}\n")
+
 	// Reported: the shape the twelve had, and an update builder, which spells In the same way.
 	writeLintFixture(t, root, "unbounded.go", "package commondb\n\n"+
 		"func unbounded(sb builder, ids []int64) {\n"+
@@ -202,12 +216,24 @@ func TestIdListsAreBounded_TheCheckerTellsABatchedLookupFromAnUnboundedOne(t *te
 		"\tub.In(\"id\", ids)\n"+
 		"}\n")
 
+	// Reported: an IN list written with inList over the caller's whole list, as a function and
+	// as a method.
+	writeLintFixture(t, root, "unbounded_per_engine.go", "package commondb\n\n"+
+		"func unboundedPerEngine(ids []int64) string {\n"+
+		"\treturn \"SELECT id FROM t WHERE \" + inList(\"sqlite\", \"id\", 1, len(ids))\n"+
+		"}\n\n"+
+		"func unboundedMethod(d db, ids []int64) string {\n"+
+		"\treturn d.inList(\"id\", len(ids))\n"+
+		"}\n")
+
 	findings, builders, err := findUnboundedIdLists(root)
 	require.NoError(t, err)
-	assert.Equal(t, 4, builders, "every non-test function building an IN list is counted")
+	assert.Equal(t, 7, builders, "every non-test function building an IN list is counted")
 	assert.Equal(t, []unboundedIdList{
 		{file: "unbounded.go", line: 4, function: "unbounded"},
 		{file: "unbounded.go", line: 8, function: "unboundedUpdate"},
+		{file: "unbounded_per_engine.go", line: 4, function: "unboundedPerEngine"},
+		{file: "unbounded_per_engine.go", line: 8, function: "unboundedMethod"},
 	}, findings)
 }
 
