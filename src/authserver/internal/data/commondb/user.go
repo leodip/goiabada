@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -879,6 +878,26 @@ func (d *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64)
 	return nil
 }
 
+// incrementUserAuthStateGeneration and selectUserAuthStateGeneration are the increment and the
+// read-back of IncrementUserAuthStateGeneration.
+var incrementUserAuthStateGeneration = statement{
+	sqlite: "UPDATE users SET auth_state_generation = auth_state_generation + 1, updated_at = ? " +
+		"WHERE id = ?",
+	mysql: "UPDATE users SET auth_state_generation = auth_state_generation + 1, updated_at = ? " +
+		"WHERE id = ?",
+	postgres: "UPDATE users SET auth_state_generation = auth_state_generation + 1, " +
+		"updated_at = $1 WHERE id = $2",
+	mssql: "UPDATE users SET auth_state_generation = auth_state_generation + 1, updated_at = @p1 " +
+		"WHERE id = @p2",
+}
+
+var selectUserAuthStateGeneration = statement{
+	sqlite:   "SELECT auth_state_generation FROM users WHERE id = ?",
+	mysql:    "SELECT auth_state_generation FROM users WHERE id = ?",
+	postgres: "SELECT auth_state_generation FROM users WHERE id = $1",
+	mssql:    "SELECT auth_state_generation FROM users WHERE id = @p1",
+}
+
 // IncrementUserAuthStateGeneration advances the user's authentication generation and
 // returns the new value.
 //
@@ -909,16 +928,7 @@ func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql
 		return 0, errs.New("incrementing the auth state generation requires a transaction: the increment and the read-back must not be separable")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		"auth_state_generation = auth_state_generation + 1",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, incrementUserAuthStateGeneration.text(d.Dialect), time.Now().UTC(), userId)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user auth state generation")
 	}
@@ -933,13 +943,8 @@ func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql
 
 	// Read back rather than computing the successor in Go: the increment happened in the
 	// database, so this is the value that actually landed.
-	sb := d.Flavor.NewSelectBuilder()
-	sb.Select("auth_state_generation").From("users")
-	sb.Where(sb.Equal("id", userId))
-	query, args = sb.BuildWithFlavor(d.Flavor)
-
 	var generation int64
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, selectUserAuthStateGeneration.text(d.Dialect), userId)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user auth state generation")
 	}
@@ -957,6 +962,26 @@ func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql
 	}
 
 	return generation, nil
+}
+
+// incrementUserOtpConfigGeneration and selectUserOtpConfigGeneration are the increment and the
+// read-back of IncrementUserOtpConfigGeneration.
+var incrementUserOtpConfigGeneration = statement{
+	sqlite: "UPDATE users SET otp_config_generation = otp_config_generation + 1, updated_at = ? " +
+		"WHERE id = ?",
+	mysql: "UPDATE users SET otp_config_generation = otp_config_generation + 1, updated_at = ? " +
+		"WHERE id = ?",
+	postgres: "UPDATE users SET otp_config_generation = otp_config_generation + 1, " +
+		"updated_at = $1 WHERE id = $2",
+	mssql: "UPDATE users SET otp_config_generation = otp_config_generation + 1, updated_at = @p1 " +
+		"WHERE id = @p2",
+}
+
+var selectUserOtpConfigGeneration = statement{
+	sqlite:   "SELECT otp_config_generation FROM users WHERE id = ?",
+	mysql:    "SELECT otp_config_generation FROM users WHERE id = ?",
+	postgres: "SELECT otp_config_generation FROM users WHERE id = $1",
+	mssql:    "SELECT otp_config_generation FROM users WHERE id = @p1",
 }
 
 // IncrementUserOtpConfigGeneration advances the user's OTP configuration generation and
@@ -982,16 +1007,7 @@ func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql
 		return 0, errs.New("incrementing the otp config generation requires a transaction: it must commit with the write that changed the authenticator")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		"otp_config_generation = otp_config_generation + 1",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, incrementUserOtpConfigGeneration.text(d.Dialect), time.Now().UTC(), userId)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user otp config generation")
 	}
@@ -1008,13 +1024,8 @@ func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql
 	// database, so this is the value that actually landed. The browser enrollment caller
 	// promotes this value onto the session it is about to create, and computing N+1 here
 	// would promote a number a concurrent change may already have passed.
-	sb := d.Flavor.NewSelectBuilder()
-	sb.Select("otp_config_generation").From("users")
-	sb.Where(sb.Equal("id", userId))
-	query, args = sb.BuildWithFlavor(d.Flavor)
-
 	var generation int64
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, selectUserOtpConfigGeneration.text(d.Dialect), userId)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user otp config generation")
 	}
@@ -1034,6 +1045,33 @@ func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql
 	return generation, nil
 }
 
+// setUserPasswordHash writes the hash and clears any outstanding reset code.
+//
+// The clears are literal NULLs rather than a bound nil. The SQL Server driver types an untyped Go
+// nil as nvarchar, which it then refuses to convert implicitly to varbinary(max): "Implicit
+// conversion from data type nvarchar to varbinary(max) is not allowed". A literal NULL has no
+// parameter type to get wrong and is portable across all four engines. The same holds for every
+// NULL the narrow writes below spell in their text.
+//
+// The hash clears to the empty string rather than NULL because its column is NOT NULL, the empty
+// string being the dormant value meaning no code outstanding. Clearing it matters for the same
+// reason clearing the encrypted code does: the expiry check would still refuse a used code, but
+// the row should not be findable by that hash at all (#112).
+var setUserPasswordHash = statement{
+	sqlite: "UPDATE users SET password_hash = ?, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET password_hash = ?, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET password_hash = $1, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = $2 WHERE id = $3",
+	mssql: "UPDATE users SET password_hash = @p1, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = @p2 WHERE id = @p3",
+}
+
 // SetUserPasswordHash writes a new password hash and clears any outstanding
 // forgot-password code in the same statement, so a reset cannot leave a usable code
 // behind.
@@ -1047,35 +1085,61 @@ func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId i
 		return errs.New("can't set the password hash of user with id 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	// The clears are raw SQL rather than Assign(..., nil). sqlbuilder sends an
-	// untyped Go nil as a parameter, and the SQL Server driver types it as nvarchar,
-	// which it then refuses to convert implicitly to varbinary(max):
-	// "Implicit conversion from data type nvarchar to varbinary(max) is not allowed".
-	// A literal NULL has no parameter type to get wrong and is portable across all four
-	// engines.
-	//
-	// The hash clears to '' rather than NULL because its column is NOT NULL, '' being
-	// the dormant value meaning no code outstanding. Clearing it matters for the same
-	// reason clearing the encrypted code does: the expiry check would still refuse a
-	// used code, but the row should not be findable by that hash at all (#112).
-	ub.Set(
-		ub.Assign("password_hash", passwordHash),
-		"forgot_password_code_encrypted = NULL",
-		"forgot_password_code_issued_at = NULL",
-		"forgot_password_code_hash = ''",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSQL(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, setUserPasswordHash.text(d.Dialect), passwordHash, time.Now().UTC(), userId)
 	if err != nil {
 		return errs.Wrap(err, "unable to set user password hash")
 	}
 
 	return nil
+}
+
+// setUserProfile, setUserAddress and setUserPhone are the column-group writes: the group's
+// columns, then updated_at, keyed on the user's id, which setUserColumns binds in that order.
+var setUserProfile = statement{
+	sqlite: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
+		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
+		"zone_info = ?, locale = ?, updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET username = ?, given_name = ?, middle_name = ?, family_name = ?, " +
+		"nickname = ?, website = ?, gender = ?, birth_date = ?, zone_info_country_name = ?, " +
+		"zone_info = ?, locale = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET username = $1, given_name = $2, middle_name = $3, " +
+		"family_name = $4, nickname = $5, website = $6, gender = $7, birth_date = $8, " +
+		"zone_info_country_name = $9, zone_info = $10, locale = $11, updated_at = $12 " +
+		"WHERE id = $13",
+	mssql: "UPDATE users SET username = @p1, given_name = @p2, middle_name = @p3, " +
+		"family_name = @p4, nickname = @p5, website = @p6, gender = @p7, birth_date = @p8, " +
+		"zone_info_country_name = @p9, zone_info = @p10, locale = @p11, updated_at = @p12 " +
+		"WHERE id = @p13",
+}
+
+var setUserAddress = statement{
+	sqlite: "UPDATE users SET address_line1 = ?, address_line2 = ?, address_locality = ?, " +
+		"address_region = ?, address_postal_code = ?, address_country = ?, updated_at = ? " +
+		"WHERE id = ?",
+	mysql: "UPDATE users SET address_line1 = ?, address_line2 = ?, address_locality = ?, " +
+		"address_region = ?, address_postal_code = ?, address_country = ?, updated_at = ? " +
+		"WHERE id = ?",
+	postgres: "UPDATE users SET address_line1 = $1, address_line2 = $2, address_locality = $3, " +
+		"address_region = $4, address_postal_code = $5, address_country = $6, updated_at = $7 " +
+		"WHERE id = $8",
+	mssql: "UPDATE users SET address_line1 = @p1, address_line2 = @p2, address_locality = @p3, " +
+		"address_region = @p4, address_postal_code = @p5, address_country = @p6, " +
+		"updated_at = @p7 WHERE id = @p8",
+}
+
+var setUserPhone = statement{
+	sqlite: "UPDATE users SET phone_number_country_uniqueid = ?, " +
+		"phone_number_country_callingcode = ?, phone_number = ?, phone_number_verified = ?, " +
+		"updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET phone_number_country_uniqueid = ?, " +
+		"phone_number_country_callingcode = ?, phone_number = ?, phone_number_verified = ?, " +
+		"updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET phone_number_country_uniqueid = $1, " +
+		"phone_number_country_callingcode = $2, phone_number = $3, " +
+		"phone_number_verified = $4, updated_at = $5 WHERE id = $6",
+	mssql: "UPDATE users SET phone_number_country_uniqueid = @p1, " +
+		"phone_number_country_callingcode = @p2, phone_number = @p3, " +
+		"phone_number_verified = @p4, updated_at = @p5 WHERE id = @p6",
 }
 
 // SetUserProfile writes the user's eleven profile columns from user, and updated_at, and no
@@ -1092,21 +1156,9 @@ func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.
 	if user.Id == 0 {
 		return errs.New("can't set the profile of user with id 0")
 	}
-	return d.setUserColumns(ctx, tx, user, "profile", func(ub *sqlbuilder.UpdateBuilder) []string {
-		return []string{
-			ub.Assign("username", user.Username),
-			ub.Assign("given_name", user.GivenName),
-			ub.Assign("middle_name", user.MiddleName),
-			ub.Assign("family_name", user.FamilyName),
-			ub.Assign("nickname", user.Nickname),
-			ub.Assign("website", user.Website),
-			ub.Assign("gender", user.Gender),
-			ub.Assign("birth_date", user.BirthDate),
-			ub.Assign("zone_info_country_name", user.ZoneInfoCountryName),
-			ub.Assign("zone_info", user.ZoneInfo),
-			ub.Assign("locale", user.Locale),
-		}
-	})
+	return d.setUserColumns(ctx, tx, user, "profile", setUserProfile,
+		user.Username, user.GivenName, user.MiddleName, user.FamilyName, user.Nickname, user.Website,
+		user.Gender, user.BirthDate, user.ZoneInfoCountryName, user.ZoneInfo, user.Locale)
 }
 
 // SetUserAddress writes the user's six address columns from user, and updated_at, and no other
@@ -1115,16 +1167,9 @@ func (d *Database) SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.
 	if user.Id == 0 {
 		return errs.New("can't set the address of user with id 0")
 	}
-	return d.setUserColumns(ctx, tx, user, "address", func(ub *sqlbuilder.UpdateBuilder) []string {
-		return []string{
-			ub.Assign("address_line1", user.AddressLine1),
-			ub.Assign("address_line2", user.AddressLine2),
-			ub.Assign("address_locality", user.AddressLocality),
-			ub.Assign("address_region", user.AddressRegion),
-			ub.Assign("address_postal_code", user.AddressPostalCode),
-			ub.Assign("address_country", user.AddressCountry),
-		}
-	})
+	return d.setUserColumns(ctx, tx, user, "address", setUserAddress,
+		user.AddressLine1, user.AddressLine2, user.AddressLocality, user.AddressRegion,
+		user.AddressPostalCode, user.AddressCountry)
 }
 
 // SetUserPhone writes the user's phone country, calling code, number and verified flag from
@@ -1135,35 +1180,69 @@ func (d *Database) SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.Us
 	if user.Id == 0 {
 		return errs.New("can't set the phone of user with id 0")
 	}
-	return d.setUserColumns(ctx, tx, user, "phone", func(ub *sqlbuilder.UpdateBuilder) []string {
-		return []string{
-			ub.Assign("phone_number_country_uniqueid", user.PhoneNumberCountryUniqueId),
-			ub.Assign("phone_number_country_callingcode", user.PhoneNumberCountryCallingCode),
-			ub.Assign("phone_number", user.PhoneNumber),
-			ub.Assign("phone_number_verified", user.PhoneNumberVerified),
-		}
-	})
+	return d.setUserColumns(ctx, tx, user, "phone", setUserPhone,
+		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
+		user.PhoneNumberVerified)
 }
 
-// setUserColumns is the one statement the column-group writes share: the assignments
-// columns builds, updated_at, keyed on the user's id. It sets user.UpdatedAt to what it stored
-// once the statement succeeds, as UpdateUser did, so a response built from user reports it.
+// setUserColumns runs one of the column-group writes, whose statements all end the same way:
+// the group's values in the order its SET names them, then updated_at, then the user's id. It sets
+// user.UpdatedAt to what it stored once the statement succeeds, as UpdateUser does, so a response
+// built from user reports it.
 func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.User, group string,
-	columns func(ub *sqlbuilder.UpdateBuilder) []string) error {
+	stmt statement, values ...any) error {
 
 	now := time.Now().UTC()
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(append(columns(ub), ub.Assign("updated_at", now))...)
-	ub.Where(ub.Equal("id", user.Id))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, stmt.text(d.Dialect), append(values, now, user.Id)...); err != nil {
 		return errs.Wrapf(err, "unable to set user %s", group)
 	}
 
 	user.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 	return nil
+}
+
+// setUserEmail is the administrator's email change, run by setUserColumns: the address bound once
+// per CASE and once for its assignment, then the verified flag.
+//
+// The reset code keeps its value when the row already holds the address being written, so it is
+// compared against the row's email as the statement finds it, not the request's read. The three
+// CASEs come before the email assignment because MySQL evaluates a single-table UPDATE's
+// assignments left to right, each seeing the ones before it; every other engine reads the row as
+// it was before the statement whatever the order. The reset code's hash clears to its dormant
+// empty string, for the reason setUserPasswordHash gives.
+var setUserEmail = statement{
+	sqlite: "UPDATE users SET forgot_password_code_encrypted = CASE WHEN email = ? " +
+		"THEN forgot_password_code_encrypted ELSE NULL END, " +
+		"forgot_password_code_issued_at = CASE WHEN email = ? " +
+		"THEN forgot_password_code_issued_at ELSE NULL END, " +
+		"forgot_password_code_hash = CASE WHEN email = ? THEN forgot_password_code_hash " +
+		"ELSE '' END, email = ?, email_verified = ?, " +
+		"email_verification_code_encrypted = NULL, email_verification_code_issued_at = NULL, " +
+		"updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET forgot_password_code_encrypted = CASE WHEN email = ? " +
+		"THEN forgot_password_code_encrypted ELSE NULL END, " +
+		"forgot_password_code_issued_at = CASE WHEN email = ? " +
+		"THEN forgot_password_code_issued_at ELSE NULL END, " +
+		"forgot_password_code_hash = CASE WHEN email = ? THEN forgot_password_code_hash " +
+		"ELSE '' END, email = ?, email_verified = ?, " +
+		"email_verification_code_encrypted = NULL, email_verification_code_issued_at = NULL, " +
+		"updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET forgot_password_code_encrypted = CASE WHEN email = $1 " +
+		"THEN forgot_password_code_encrypted ELSE NULL END, " +
+		"forgot_password_code_issued_at = CASE WHEN email = $2 " +
+		"THEN forgot_password_code_issued_at ELSE NULL END, " +
+		"forgot_password_code_hash = CASE WHEN email = $3 THEN forgot_password_code_hash " +
+		"ELSE '' END, email = $4, email_verified = $5, " +
+		"email_verification_code_encrypted = NULL, email_verification_code_issued_at = NULL, " +
+		"updated_at = $6 WHERE id = $7",
+	mssql: "UPDATE users SET forgot_password_code_encrypted = CASE WHEN email = @p1 " +
+		"THEN forgot_password_code_encrypted ELSE NULL END, " +
+		"forgot_password_code_issued_at = CASE WHEN email = @p2 " +
+		"THEN forgot_password_code_issued_at ELSE NULL END, " +
+		"forgot_password_code_hash = CASE WHEN email = @p3 THEN forgot_password_code_hash " +
+		"ELSE '' END, email = @p4, email_verified = @p5, " +
+		"email_verification_code_encrypted = NULL, email_verification_code_issued_at = NULL, " +
+		"updated_at = @p6 WHERE id = @p7",
 }
 
 // SetUserEmail writes the administrator's email change: the address and the verified flag from
@@ -1185,29 +1264,30 @@ func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.Us
 	if user.Id == 0 {
 		return errs.New("can't set the email of user with id 0")
 	}
-	return d.setUserColumns(ctx, tx, user, "email", func(ub *sqlbuilder.UpdateBuilder) []string {
-		// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash
-		// gives, and the reset code's hash clears to its dormant '' for the same reason there.
-		//
-		// The reset code keeps its value when the row already holds the address being written, so
-		// it is compared against the row's email as the statement finds it, not the request's read.
-		// The three CASEs come before the email assignment because MySQL evaluates a single-table
-		// UPDATE's assignments left to right, each seeing the ones before it; every other engine
-		// reads the row as it was before the statement whatever the order.
-		sameEmail := "email = " + ub.Var(user.Email)
-		return []string{
-			"forgot_password_code_encrypted = CASE WHEN " + sameEmail +
-				" THEN forgot_password_code_encrypted ELSE NULL END",
-			"forgot_password_code_issued_at = CASE WHEN " + sameEmail +
-				" THEN forgot_password_code_issued_at ELSE NULL END",
-			"forgot_password_code_hash = CASE WHEN " + sameEmail +
-				" THEN forgot_password_code_hash ELSE '' END",
-			ub.Assign("email", user.Email),
-			ub.Assign("email_verified", user.EmailVerified),
-			"email_verification_code_encrypted = NULL",
-			"email_verification_code_issued_at = NULL",
-		}
-	})
+	// The address is bound four times, once per CASE and once for the assignment, so the
+	// arguments are the same on every engine, numbered or not.
+	return d.setUserColumns(ctx, tx, user, "email", setUserEmail,
+		user.Email, user.Email, user.Email, user.Email, user.EmailVerified)
+}
+
+// trySetUserEmail is TrySetUserEmail's compare-and-set on the address and the verified flag.
+var trySetUserEmail = statement{
+	sqlite: "UPDATE users SET email = ?, email_verified = ?, " +
+		"email_verification_code_encrypted = NULL, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = ? WHERE id = ? AND email = ? AND email_verified = ?",
+	mysql: "UPDATE users SET email = ?, email_verified = ?, " +
+		"email_verification_code_encrypted = NULL, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = ? WHERE id = ? AND email = ? AND email_verified = ?",
+	postgres: "UPDATE users SET email = $1, email_verified = $2, " +
+		"email_verification_code_encrypted = NULL, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = $3 WHERE id = $4 AND email = $5 AND email_verified = $6",
+	mssql: "UPDATE users SET email = @p1, email_verified = @p2, " +
+		"email_verification_code_encrypted = NULL, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"updated_at = @p3 WHERE id = @p4 AND email = @p5 AND email_verified = @p6",
 }
 
 // TrySetUserEmail moves a user's address from fromEmail to toEmail and, in the same
@@ -1248,28 +1328,8 @@ func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64
 		return false, errs.New("can't move an email to the address it already has")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash
-	// gives: the SQL Server driver types an untyped Go nil as nvarchar and refuses to convert it
-	// to varbinary(max).
-	ub.Set(
-		ub.Assign("email", toEmail),
-		ub.Assign("email_verified", false),
-		"email_verification_code_encrypted = NULL",
-		"forgot_password_code_encrypted = NULL",
-		"forgot_password_code_issued_at = NULL",
-		"forgot_password_code_hash = ''",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("email", fromEmail),
-		ub.Equal("email_verified", fromVerified),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, trySetUserEmail.text(d.Dialect),
+		toEmail, false, time.Now().UTC(), userId, fromEmail, fromVerified)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to set user email")
 	}
@@ -1281,6 +1341,28 @@ func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64
 
 	// The address always changes, so a matched row is a changed row on all four engines.
 	return rowsAffected == 1, nil
+}
+
+// tryStoreEmailVerificationCode is TryStoreEmailVerificationCode's conditional store, the resend
+// cooldown in its predicate.
+var tryStoreEmailVerificationCode = statement{
+	sqlite: "UPDATE users SET email_verification_code_encrypted = ?, " +
+		"email_verification_code_issued_at = ?, updated_at = ? WHERE id = ? AND email = ? " +
+		"AND email_verified = ? AND (email_verification_code_issued_at IS NULL " +
+		"OR email_verification_code_issued_at <= ?)",
+	mysql: "UPDATE users SET email_verification_code_encrypted = ?, " +
+		"email_verification_code_issued_at = ?, updated_at = ? WHERE id = ? AND email = ? " +
+		"AND email_verified = ? AND (email_verification_code_issued_at IS NULL " +
+		"OR email_verification_code_issued_at <= ?)",
+	postgres: "UPDATE users SET email_verification_code_encrypted = $1, " +
+		"email_verification_code_issued_at = $2, updated_at = $3 WHERE id = $4 AND email = $5 " +
+		"AND email_verified = $6 AND (email_verification_code_issued_at IS NULL " +
+		"OR email_verification_code_issued_at <= $7)",
+	mssql: "UPDATE users SET email_verification_code_encrypted = @p1, " +
+		"email_verification_code_issued_at = @p2, updated_at = @p3 WHERE id = @p4 " +
+		"AND email = @p5 AND email_verified = @p6 " +
+		"AND (email_verification_code_issued_at IS NULL " +
+		"OR email_verification_code_issued_at <= @p7)",
 }
 
 // TryStoreEmailVerificationCode stores a freshly issued verification code, encrypted, and
@@ -1304,25 +1386,8 @@ func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx
 		return false, errs.New("can't store an empty email verification code")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("email_verification_code_encrypted", codeEncrypted),
-		ub.Assign("email_verification_code_issued_at", issuedAt),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("email", email),
-		ub.Equal("email_verified", false),
-		ub.Or(
-			ub.IsNull("email_verification_code_issued_at"),
-			ub.LessEqualThan("email_verification_code_issued_at", issuedNotAfter),
-		),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryStoreEmailVerificationCode.text(d.Dialect),
+		codeEncrypted, issuedAt, time.Now().UTC(), userId, email, false, issuedNotAfter)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to store email verification code")
 	}
@@ -1335,6 +1400,19 @@ func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx
 	// A fresh ciphertext always differs from whatever the row carried, so a matched row is a
 	// changed row on all four engines, as in TryStoreForgotPasswordCode.
 	return rowsAffected == 1, nil
+}
+
+// tryIssueEmailVerificationCode is TryIssueEmailVerificationCode's store, conditional on the address.
+var tryIssueEmailVerificationCode = statement{
+	sqlite: "UPDATE users SET email_verified = ?, email_verification_code_encrypted = ?, " +
+		"email_verification_code_issued_at = ?, updated_at = ? WHERE id = ? AND email = ?",
+	mysql: "UPDATE users SET email_verified = ?, email_verification_code_encrypted = ?, " +
+		"email_verification_code_issued_at = ?, updated_at = ? WHERE id = ? AND email = ?",
+	postgres: "UPDATE users SET email_verified = $1, email_verification_code_encrypted = $2, " +
+		"email_verification_code_issued_at = $3, updated_at = $4 WHERE id = $5 AND email = $6",
+	mssql: "UPDATE users SET email_verified = @p1, email_verification_code_encrypted = @p2, " +
+		"email_verification_code_issued_at = @p3, updated_at = @p4 WHERE id = @p5 " +
+		"AND email = @p6",
 }
 
 // TryIssueEmailVerificationCode stores the code the administrator generates, encrypted, and when
@@ -1358,21 +1436,8 @@ func (d *Database) TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx
 		return false, errs.New("can't issue an empty email verification code")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("email_verified", false),
-		ub.Assign("email_verification_code_encrypted", codeEncrypted),
-		ub.Assign("email_verification_code_issued_at", issuedAt),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("email", email),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryIssueEmailVerificationCode.text(d.Dialect),
+		false, codeEncrypted, issuedAt, time.Now().UTC(), userId, email)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to issue email verification code")
 	}
@@ -1385,6 +1450,22 @@ func (d *Database) TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx
 	// A fresh ciphertext always differs from whatever the row carried, so a matched row is a
 	// changed row on all four engines, as in TryStoreEmailVerificationCode.
 	return rowsAffected == 1, nil
+}
+
+// tryVerifyUserEmail is TryVerifyUserEmail's compare-and-set on the address and the pending code.
+var tryVerifyUserEmail = statement{
+	sqlite: "UPDATE users SET email_verified = ?, email_verification_code_encrypted = NULL, " +
+		"updated_at = ? WHERE id = ? AND email = ? AND email_verified = ? " +
+		"AND email_verification_code_encrypted = ?",
+	mysql: "UPDATE users SET email_verified = ?, email_verification_code_encrypted = NULL, " +
+		"updated_at = ? WHERE id = ? AND email = ? AND email_verified = ? " +
+		"AND email_verification_code_encrypted = ?",
+	postgres: "UPDATE users SET email_verified = $1, email_verification_code_encrypted = NULL, " +
+		"updated_at = $2 WHERE id = $3 AND email = $4 AND email_verified = $5 " +
+		"AND email_verification_code_encrypted = $6",
+	mssql: "UPDATE users SET email_verified = @p1, email_verification_code_encrypted = NULL, " +
+		"updated_at = @p2 WHERE id = @p3 AND email = @p4 AND email_verified = @p5 " +
+		"AND email_verification_code_encrypted = @p6",
 }
 
 // TryVerifyUserEmail marks a user's address verified and clears the code, only while the
@@ -1409,22 +1490,8 @@ func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId in
 		return false, errs.New("can't verify an email against an empty code")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("email_verified", true),
-		"email_verification_code_encrypted = NULL",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("email", email),
-		ub.Equal("email_verified", false),
-		ub.Equal("email_verification_code_encrypted", codeEncrypted),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryVerifyUserEmail.text(d.Dialect),
+		true, time.Now().UTC(), userId, email, false, codeEncrypted)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to verify user email")
 	}
@@ -1437,6 +1504,30 @@ func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId in
 	// email_verified always moves from false to true, so a matched row is a changed row on all
 	// four engines.
 	return rowsAffected == 1, nil
+}
+
+// tryConsumeForgotPasswordCode is TryConsumeForgotPasswordCode's claim of the reset code.
+var tryConsumeForgotPasswordCode = statement{
+	sqlite: "UPDATE users SET password_hash = ?, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"email_verified = ?, email_verification_code_encrypted = NULL, " +
+		"email_verification_code_issued_at = NULL, updated_at = ? WHERE id = ? " +
+		"AND forgot_password_code_hash = ? AND enabled = ?",
+	mysql: "UPDATE users SET password_hash = ?, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"email_verified = ?, email_verification_code_encrypted = NULL, " +
+		"email_verification_code_issued_at = NULL, updated_at = ? WHERE id = ? " +
+		"AND forgot_password_code_hash = ? AND enabled = ?",
+	postgres: "UPDATE users SET password_hash = $1, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"email_verified = $2, email_verification_code_encrypted = NULL, " +
+		"email_verification_code_issued_at = NULL, updated_at = $3 WHERE id = $4 " +
+		"AND forgot_password_code_hash = $5 AND enabled = $6",
+	mssql: "UPDATE users SET password_hash = @p1, forgot_password_code_encrypted = NULL, " +
+		"forgot_password_code_issued_at = NULL, forgot_password_code_hash = '', " +
+		"email_verified = @p2, email_verification_code_encrypted = NULL, " +
+		"email_verification_code_issued_at = NULL, updated_at = @p3 WHERE id = @p4 " +
+		"AND forgot_password_code_hash = @p5 AND enabled = @p6",
 }
 
 // TryConsumeForgotPasswordCode writes a new password hash, claims the outstanding reset
@@ -1485,11 +1576,9 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 		return false, errs.New("can't consume an empty forgot password code hash")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
 	// The same narrow write SetUserPasswordHash performs, plus the hash clear. Narrow
 	// rather than a full-row UpdateUser so a concurrent admin disable cannot be undone
-	// by it (#106). See SetUserPasswordHash for why the clears are raw SQL.
+	// by it (#106). See setUserPasswordHash for why the clears are literal NULLs.
 	//
 	// It also marks the address verified, and drops any verification code outstanding for
 	// it. A reset link is sent to the address the row holds and dies when that address
@@ -1498,26 +1587,11 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 	// so this changes nothing there; the link an administrator has emailed to a new user
 	// goes to an unverified one, which until this stayed unverified after the user set
 	// their password through it, and so could not recover a password later.
-	ub.Set(
-		ub.Assign("password_hash", passwordHash),
-		"forgot_password_code_encrypted = NULL",
-		"forgot_password_code_issued_at = NULL",
-		"forgot_password_code_hash = ''",
-		ub.Assign("email_verified", true),
-		"email_verification_code_encrypted = NULL",
-		"email_verification_code_issued_at = NULL",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
+	//
 	// enabled is in the predicate so a disable landing between the reset handler's read and
 	// this write refuses the reset instead of setting a password (#404 decision 2).
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("forgot_password_code_hash", codeHash),
-		ub.Equal("enabled", true),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryConsumeForgotPasswordCode.text(d.Dialect),
+		passwordHash, true, time.Now().UTC(), userId, codeHash, true)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume forgot password code")
 	}
@@ -1532,6 +1606,23 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 	// changes and MySQL's changed-rows accounting agrees with matched rows. That is the
 	// trap RevokeCodesBySessionIdentifier documents, and it does not bite here.
 	return rowsAffected == 1, nil
+}
+
+// tryStoreForgotPasswordCode is TryStoreForgotPasswordCode's conditional store.
+var tryStoreForgotPasswordCode = statement{
+	sqlite: "UPDATE users SET forgot_password_code_encrypted = ?, forgot_password_code_hash = ?, " +
+		"forgot_password_code_issued_at = ?, updated_at = ? WHERE id = ? AND email = ? " +
+		"AND enabled = ? AND email_verified = ?",
+	mysql: "UPDATE users SET forgot_password_code_encrypted = ?, forgot_password_code_hash = ?, " +
+		"forgot_password_code_issued_at = ?, updated_at = ? WHERE id = ? AND email = ? " +
+		"AND enabled = ? AND email_verified = ?",
+	postgres: "UPDATE users SET forgot_password_code_encrypted = $1, " +
+		"forgot_password_code_hash = $2, forgot_password_code_issued_at = $3, updated_at = $4 " +
+		"WHERE id = $5 AND email = $6 AND enabled = $7 AND email_verified = $8",
+	mssql: "UPDATE users SET forgot_password_code_encrypted = @p1, " +
+		"forgot_password_code_hash = @p2, forgot_password_code_issued_at = @p3, " +
+		"updated_at = @p4 WHERE id = @p5 AND email = @p6 AND enabled = @p7 " +
+		"AND email_verified = @p8",
 }
 
 // TryStoreForgotPasswordCode stores an issued reset code (its encrypted form, the hash the
@@ -1555,24 +1646,9 @@ func (d *Database) TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, u
 		return false, errs.New("can't store an empty forgot password code hash")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("forgot_password_code_encrypted", codeEncrypted),
-		ub.Assign("forgot_password_code_hash", codeHash),
-		ub.Assign("forgot_password_code_issued_at", issuedAt),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
 	// Bound Go bools, as TrySetUserEnabled does against users.enabled.
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("email", email),
-		ub.Equal("enabled", true),
-		ub.Equal("email_verified", true),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryStoreForgotPasswordCode.text(d.Dialect),
+		codeEncrypted, codeHash, issuedAt, time.Now().UTC(), userId, email, true, true)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to store forgot password code")
 	}
@@ -1586,6 +1662,14 @@ func (d *Database) TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, u
 	// always differs from whatever the row carried, so the row always changes and MySQL's
 	// changed-rows accounting agrees with matched rows.
 	return rowsAffected == 1, nil
+}
+
+// trySetUserEnabled is TrySetUserEnabled's compare-and-set on the enabled flag.
+var trySetUserEnabled = statement{
+	sqlite:   "UPDATE users SET enabled = ?, updated_at = ? WHERE id = ? AND enabled = ?",
+	mysql:    "UPDATE users SET enabled = ?, updated_at = ? WHERE id = ? AND enabled = ?",
+	postgres: "UPDATE users SET enabled = $1, updated_at = $2 WHERE id = $3 AND enabled = $4",
+	mssql:    "UPDATE users SET enabled = @p1, updated_at = @p2 WHERE id = @p3 AND enabled = @p4",
 }
 
 // TrySetUserEnabled flips enabled from expected to desired, reporting whether this
@@ -1607,19 +1691,8 @@ func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int
 		return false, errs.New("can't set enabled on user with id 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("enabled", desired),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("enabled", expected),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, trySetUserEnabled.text(d.Dialect),
+		desired, time.Now().UTC(), userId, expected)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to set user enabled")
 	}
@@ -1630,6 +1703,49 @@ func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int
 	}
 
 	return rowsAffected == 1, nil
+}
+
+// consumeUserOTPStep is the enrolment claim and consumeEnrolledUserOTPStep the verification claim,
+// which binds four more terms after the enrolment claim's.
+//
+// The strict inequality is what refuses a replay: the second submission of one code carries the
+// step already stored, so it matches no row. rowsAffected == 1 means this call transitioned the
+// row on all four engines, because matching the WHERE implies the assigned step differs from the
+// stored one, so MySQL's changed-rows accounting agrees with matched rows. That is the trap
+// RevokeCodesBySessionIdentifier documents, and it does not bite here.
+var consumeUserOTPStep = statement{
+	sqlite: "UPDATE users SET last_otp_step = ?, updated_at = ? WHERE id = ? " +
+		"AND last_otp_step < ?",
+	mysql: "UPDATE users SET last_otp_step = ?, updated_at = ? WHERE id = ? " +
+		"AND last_otp_step < ?",
+	postgres: "UPDATE users SET last_otp_step = $1, updated_at = $2 WHERE id = $3 " +
+		"AND last_otp_step < $4",
+	mssql: "UPDATE users SET last_otp_step = @p1, updated_at = @p2 WHERE id = @p3 " +
+		"AND last_otp_step < @p4",
+}
+
+// The verification claim returns the consecutive-failure count to 0 in the same statement, which
+// is the "disregard any previous failed attempts" NIST SP 800-63B section 3.2.2 asks of a
+// verifier, done beside the claim rather than after it so no committed state has a step consumed
+// and the attempts before it still standing (#489). otp_enabled is compared with a bound Go bool,
+// as TrySetUserEnabled does against users.enabled. The count's limit is part of the claim, not a
+// read before it: an authenticator disabled at record.OtpConsecutiveFailureLimit stays disabled
+// even to a request that loaded the user before the count reached it, the same way the generation
+// term refuses a replaced authenticator (#489).
+var consumeEnrolledUserOTPStep = statement{
+	sqlite: "UPDATE users SET last_otp_step = ?, updated_at = ?, otp_consecutive_failures = 0 " +
+		"WHERE id = ? AND last_otp_step < ? AND otp_enabled = ? AND otp_config_generation = ? " +
+		"AND otp_consecutive_failures < ?",
+	mysql: "UPDATE users SET last_otp_step = ?, updated_at = ?, otp_consecutive_failures = 0 " +
+		"WHERE id = ? AND last_otp_step < ? AND otp_enabled = ? AND otp_config_generation = ? " +
+		"AND otp_consecutive_failures < ?",
+	postgres: "UPDATE users SET last_otp_step = $1, updated_at = $2, " +
+		"otp_consecutive_failures = 0 WHERE id = $3 AND last_otp_step < $4 " +
+		"AND otp_enabled = $5 AND otp_config_generation = $6 " +
+		"AND otp_consecutive_failures < $7",
+	mssql: "UPDATE users SET last_otp_step = @p1, updated_at = @p2, otp_consecutive_failures = 0 " +
+		"WHERE id = @p3 AND last_otp_step < @p4 AND otp_enabled = @p5 " +
+		"AND otp_config_generation = @p6 AND otp_consecutive_failures < @p7",
 }
 
 // TryConsumeUserOTPStep records step as the user's most recently consumed TOTP time
@@ -1702,48 +1818,13 @@ func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId in
 		return false, errs.New("can't consume an OTP step for user with id 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("last_otp_step", step),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
+	query := consumeUserOTPStep.text(d.Dialect)
+	args := []any{step, time.Now().UTC(), userId, step}
 	if enrolledAt != nil {
-		// The verification claim returns the consecutive-failure count to 0 in the same
-		// statement, which is the "disregard any previous failed attempts" NIST SP 800-63B
-		// section 3.2.2 asks of a verifier, done beside the claim rather than after it so
-		// no committed state has a step consumed and the attempts before it still
-		// standing (#489). SetMore rather than a second Set, which replaces: the claim
-		// must keep the step it came for.
-		ub.SetMore(ub.Assign("otp_consecutive_failures", 0))
+		query = consumeEnrolledUserOTPStep.text(d.Dialect)
+		args = append(args, true, *enrolledAt, record.OtpConsecutiveFailureLimit)
 	}
-	// The strict inequality is what refuses a replay: the second submission of one code
-	// carries the step already stored, so it matches no row. rowsAffected == 1 means
-	// this call transitioned the row on all four engines, because matching the WHERE
-	// implies the assigned step differs from the stored one, so MySQL's changed-rows
-	// accounting agrees with matched rows. That is the trap
-	// RevokeCodesBySessionIdentifier documents, and it does not bite here.
-	predicates := []string{
-		ub.Equal("id", userId),
-		ub.LessThan("last_otp_step", step),
-	}
-	if enrolledAt != nil {
-		// A bound Go bool, as TrySetUserEnabled does against users.enabled. The two
-		// columns carry the same type on every engine, so nothing here is dialect
-		// specific.
-		predicates = append(predicates,
-			ub.Equal("otp_enabled", true),
-			ub.Equal("otp_config_generation", *enrolledAt),
-			// The count's limit is part of the claim, not a read before it: an
-			// authenticator disabled at record.OtpConsecutiveFailureLimit stays disabled
-			// even to a request that loaded the user before the count reached it, the
-			// same way the generation term refuses a replaced authenticator (#489).
-			ub.LessThan("otp_consecutive_failures", record.OtpConsecutiveFailureLimit),
-		)
-	}
-	ub.Where(predicates...)
 
-	query, args := ub.BuildWithFlavor(d.Flavor)
 	result, err := d.ExecSQL(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume user OTP step")
@@ -1755,6 +1836,14 @@ func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId in
 	}
 
 	return rowsAffected == 1, nil
+}
+
+// resetUserOTPStep returns the consumed-step marker to 0.
+var resetUserOTPStep = statement{
+	sqlite:   "UPDATE users SET last_otp_step = 0, updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE users SET last_otp_step = 0, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET last_otp_step = 0, updated_at = $1 WHERE id = $2",
+	mssql:    "UPDATE users SET last_otp_step = 0, updated_at = @p1 WHERE id = @p2",
 }
 
 // ResetUserOTPStep returns the user's consumed-step marker to 0, meaning no code has
@@ -1781,21 +1870,41 @@ func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int6
 		return errs.New("can't reset the OTP step of user with id 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("last_otp_step", 0),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSQL(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, resetUserOTPStep.text(d.Dialect), time.Now().UTC(), userId)
 	if err != nil {
 		return errs.Wrap(err, "unable to reset user OTP step")
 	}
 
 	return nil
+}
+
+// advanceUserOtpConsecutiveFailures and reachUserOtpConsecutiveFailureLimit are
+// IncrementUserOtpConsecutiveFailures' two statements. Both assignments change the count, so a
+// matched row is a changed row on all four engines.
+var advanceUserOtpConsecutiveFailures = statement{
+	sqlite: "UPDATE users SET otp_consecutive_failures = otp_consecutive_failures + 1 " +
+		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ? " +
+		"AND otp_consecutive_failures < ?",
+	mysql: "UPDATE users SET otp_consecutive_failures = otp_consecutive_failures + 1 " +
+		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ? " +
+		"AND otp_consecutive_failures < ?",
+	postgres: "UPDATE users SET otp_consecutive_failures = otp_consecutive_failures + 1 " +
+		"WHERE id = $1 AND otp_enabled = $2 AND otp_config_generation = $3 " +
+		"AND otp_consecutive_failures < $4",
+	mssql: "UPDATE users SET otp_consecutive_failures = otp_consecutive_failures + 1 " +
+		"WHERE id = @p1 AND otp_enabled = @p2 AND otp_config_generation = @p3 " +
+		"AND otp_consecutive_failures < @p4",
+}
+
+var reachUserOtpConsecutiveFailureLimit = statement{
+	sqlite: "UPDATE users SET otp_consecutive_failures = ? WHERE id = ? AND otp_enabled = ? " +
+		"AND otp_config_generation = ? AND otp_consecutive_failures = ?",
+	mysql: "UPDATE users SET otp_consecutive_failures = ? WHERE id = ? AND otp_enabled = ? " +
+		"AND otp_config_generation = ? AND otp_consecutive_failures = ?",
+	postgres: "UPDATE users SET otp_consecutive_failures = $1 WHERE id = $2 AND otp_enabled = $3 " +
+		"AND otp_config_generation = $4 AND otp_consecutive_failures = $5",
+	mssql: "UPDATE users SET otp_consecutive_failures = @p1 WHERE id = @p2 AND otp_enabled = @p3 " +
+		"AND otp_config_generation = @p4 AND otp_consecutive_failures = @p5",
 }
 
 // IncrementUserOtpConsecutiveFailures advances the count of consecutive failed attempts
@@ -1840,44 +1949,23 @@ func (d *Database) IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *
 		return false, errs.New("can't increment the OTP consecutive failures of user with id 0")
 	}
 
-	advanced, err := d.casUserOtpConsecutiveFailures(ctx, tx, userId, expectedGeneration,
-		func(ub *sqlbuilder.UpdateBuilder) string {
-			return "otp_consecutive_failures = otp_consecutive_failures + 1"
-		},
-		func(ub *sqlbuilder.UpdateBuilder) string {
-			return ub.LessThan("otp_consecutive_failures", record.OtpConsecutiveFailureLimit-1)
-		})
+	advanced, err := d.casUserOtpConsecutiveFailures(ctx, tx, advanceUserOtpConsecutiveFailures,
+		userId, true, expectedGeneration, record.OtpConsecutiveFailureLimit-1)
 	if err != nil || advanced {
 		return false, err
 	}
 
-	return d.casUserOtpConsecutiveFailures(ctx, tx, userId, expectedGeneration,
-		func(ub *sqlbuilder.UpdateBuilder) string {
-			return ub.Assign("otp_consecutive_failures", record.OtpConsecutiveFailureLimit)
-		},
-		func(ub *sqlbuilder.UpdateBuilder) string {
-			return ub.Equal("otp_consecutive_failures", record.OtpConsecutiveFailureLimit-1)
-		})
+	return d.casUserOtpConsecutiveFailures(ctx, tx, reachUserOtpConsecutiveFailureLimit,
+		record.OtpConsecutiveFailureLimit, userId, true, expectedGeneration, record.OtpConsecutiveFailureLimit-1)
 }
 
-// casUserOtpConsecutiveFailures is one of IncrementUserOtpConsecutiveFailures' two
-// statements: the assignment applied where the row still holds the authenticator at
-// expectedGeneration and the count matches countTerm, reporting whether it matched.
-func (d *Database) casUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
-	expectedGeneration int64, assignment, countTerm func(*sqlbuilder.UpdateBuilder) string) (bool, error) {
+// casUserOtpConsecutiveFailures runs one of IncrementUserOtpConsecutiveFailures' two
+// statements, each of which writes the count only where the row still holds the authenticator
+// at the generation it binds and the count matches its own term, and reports whether it matched.
+func (d *Database) casUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, stmt statement,
+	args ...any) (bool, error) {
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(assignment(ub))
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("otp_enabled", true),
-		ub.Equal("otp_config_generation", expectedGeneration),
-		countTerm(ub),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, stmt.text(d.Dialect), args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to increment user OTP consecutive failures")
 	}
@@ -1888,6 +1976,14 @@ func (d *Database) casUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx
 		return false, errs.Wrap(err, "unable to get rows affected when incrementing user OTP consecutive failures")
 	}
 	return rowsAffected == 1, nil
+}
+
+// clearUserOtpConsecutiveFailures returns the consecutive-failure count to 0.
+var clearUserOtpConsecutiveFailures = statement{
+	sqlite:   "UPDATE users SET otp_consecutive_failures = 0, updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE users SET otp_consecutive_failures = 0, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET otp_consecutive_failures = 0, updated_at = $1 WHERE id = $2",
+	mssql:    "UPDATE users SET otp_consecutive_failures = 0, updated_at = @p1 WHERE id = @p2",
 }
 
 // ClearUserOtpConsecutiveFailures returns the consecutive-failure count to 0, the state
@@ -1910,21 +2006,38 @@ func (d *Database) ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.
 		return errs.New("clearing the OTP consecutive failures requires a transaction: it must commit with the write that rebinds the authenticator")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("otp_consecutive_failures", 0),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSQL(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, clearUserOtpConsecutiveFailures.text(d.Dialect), time.Now().UTC(), userId)
 	if err != nil {
 		return errs.Wrap(err, "unable to clear user OTP consecutive failures")
 	}
 
 	return nil
+}
+
+// tryInstallPendingOTPEnrollment is TryInstallPendingOTPEnrollment's conditional install.
+//
+// otp_enabled is compared with a bound Go bool, as TrySetUserEnabled does against users.enabled.
+// The four engines declare it numeric, tinyint(1), boolean and BIT, and the driver types the
+// parameter. The OR carries both halves on the timestamp, because a row carrying ciphertext with a
+// NULL issued_at has no expiry to compare and would otherwise be permanent. No writer produces
+// that state, and this is what stops it being unrecoverable if one ever did.
+var tryInstallPendingOTPEnrollment = statement{
+	sqlite: "UPDATE users SET otp_enrollment_secret_encrypted = ?, otp_enrollment_issued_at = ?, " +
+		"updated_at = ? WHERE id = ? AND otp_enabled = ? " +
+		"AND (otp_enrollment_secret_encrypted IS NULL OR otp_enrollment_issued_at IS NULL " +
+		"OR otp_enrollment_issued_at < ?)",
+	mysql: "UPDATE users SET otp_enrollment_secret_encrypted = ?, otp_enrollment_issued_at = ?, " +
+		"updated_at = ? WHERE id = ? AND otp_enabled = ? " +
+		"AND (otp_enrollment_secret_encrypted IS NULL OR otp_enrollment_issued_at IS NULL " +
+		"OR otp_enrollment_issued_at < ?)",
+	postgres: "UPDATE users SET otp_enrollment_secret_encrypted = $1, " +
+		"otp_enrollment_issued_at = $2, updated_at = $3 WHERE id = $4 AND otp_enabled = $5 " +
+		"AND (otp_enrollment_secret_encrypted IS NULL OR otp_enrollment_issued_at IS NULL " +
+		"OR otp_enrollment_issued_at < $6)",
+	mssql: "UPDATE users SET otp_enrollment_secret_encrypted = @p1, " +
+		"otp_enrollment_issued_at = @p2, updated_at = @p3 WHERE id = @p4 " +
+		"AND otp_enabled = @p5 AND (otp_enrollment_secret_encrypted IS NULL " +
+		"OR otp_enrollment_issued_at IS NULL OR otp_enrollment_issued_at < @p6)",
 }
 
 // TryInstallPendingOTPEnrollment records a TOTP enrolment the server has just issued, but only if
@@ -1977,33 +2090,8 @@ func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.T
 		return false, errs.New("can't install a pending OTP enrollment with a zero issued at")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("otp_enrollment_secret_encrypted", secretEncrypted),
-		ub.Assign("otp_enrollment_issued_at", issuedAt),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		// A bound Go bool, as TrySetUserEnabled does against users.enabled and
-		// TryConsumeUserOTPStep against this same column. The four engines declare it
-		// numeric, tinyint(1), boolean and BIT, and the driver types the parameter, so
-		// nothing here is dialect specific.
-		ub.Equal("otp_enabled", false),
-		ub.Or(
-			ub.IsNull("otp_enrollment_secret_encrypted"),
-			// Both halves of the OR on the timestamp, because a row carrying ciphertext with
-			// a NULL issued_at has no expiry to compare and would otherwise be permanent. No
-			// writer produces that state, and this is what stops it being unrecoverable if
-			// one ever did.
-			ub.IsNull("otp_enrollment_issued_at"),
-			ub.LessThan("otp_enrollment_issued_at", staleBefore),
-		),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryInstallPendingOTPEnrollment.text(d.Dialect),
+		secretEncrypted, issuedAt, time.Now().UTC(), userId, false, staleBefore)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to install pending OTP enrollment")
 	}
@@ -2016,6 +2104,18 @@ func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.T
 	return rowsAffected == 1, nil
 }
 
+// clearPendingOTPEnrollment returns the pending enrolment pair to NULL.
+var clearPendingOTPEnrollment = statement{
+	sqlite: "UPDATE users SET otp_enrollment_secret_encrypted = NULL, " +
+		"otp_enrollment_issued_at = NULL, updated_at = ? WHERE id = ?",
+	mysql: "UPDATE users SET otp_enrollment_secret_encrypted = NULL, " +
+		"otp_enrollment_issued_at = NULL, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE users SET otp_enrollment_secret_encrypted = NULL, " +
+		"otp_enrollment_issued_at = NULL, updated_at = $1 WHERE id = $2",
+	mssql: "UPDATE users SET otp_enrollment_secret_encrypted = NULL, " +
+		"otp_enrollment_issued_at = NULL, updated_at = @p1 WHERE id = @p2",
+}
+
 // ClearPendingOTPEnrollment returns the pending enrollment pair to its dormant NULL state. Called
 // once the authenticator it staged has been established, inside the same transaction as the write
 // that established it, so there is no committed state in which OTP is on and a live pending seed is
@@ -2025,32 +2125,34 @@ func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.T
 // nothing pending is not a failure, and nothing gates on the transition, unlike TrySetUserEnabled's
 // disable direction. So this reports only an error.
 //
-// The clears are raw SQL rather than Assign(..., nil), for the reason SetUserPasswordHash gives:
-// sqlbuilder sends an untyped Go nil as a parameter and the SQL Server driver types it nvarchar,
-// which it then refuses to convert implicitly to varbinary(max). A literal NULL has no parameter
-// type to get wrong and is portable across all four engines (#247).
+// The clears are literal NULLs rather than a bound nil, for the reason setUserPasswordHash gives:
+// the SQL Server driver types an untyped Go nil as nvarchar, which it then refuses to convert
+// implicitly to varbinary(max). A literal NULL has no parameter type to get wrong and is portable
+// across all four engines (#247).
 func (d *Database) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	if userId == 0 {
 		return errs.New("can't clear the pending OTP enrollment of user with id 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		"otp_enrollment_secret_encrypted = NULL",
-		"otp_enrollment_issued_at = NULL",
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(ub.Equal("id", userId))
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSQL(ctx, tx, query, args...)
+	_, err := d.ExecSQL(ctx, tx, clearPendingOTPEnrollment.text(d.Dialect), time.Now().UTC(), userId)
 	if err != nil {
 		return errs.Wrap(err, "unable to clear pending OTP enrollment")
 	}
 
 	return nil
+}
+
+// tryEstablishUserOTP is TryEstablishUserOTP's compare-and-set on the authenticator.
+var tryEstablishUserOTP = statement{
+	sqlite: "UPDATE users SET otp_secret_encrypted = ?, otp_enabled = ?, updated_at = ? " +
+		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ?",
+	mysql: "UPDATE users SET otp_secret_encrypted = ?, otp_enabled = ?, updated_at = ? " +
+		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ?",
+	postgres: "UPDATE users SET otp_secret_encrypted = $1, otp_enabled = $2, updated_at = $3 " +
+		"WHERE id = $4 AND otp_enabled = $5 AND otp_config_generation = $6",
+	mssql: "UPDATE users SET otp_secret_encrypted = @p1, otp_enabled = @p2, updated_at = @p3 " +
+		"WHERE id = @p4 AND otp_enabled = @p5 AND otp_config_generation = @p6",
 }
 
 // TryEstablishUserOTP installs an authenticator: it stores secretEncrypted and turns otp_enabled
@@ -2080,21 +2182,8 @@ func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId i
 		return false, errs.New("can't establish OTP with an empty secret")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		ub.Assign("otp_secret_encrypted", secretEncrypted),
-		ub.Assign("otp_enabled", true),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("otp_enabled", false),
-		ub.Equal("otp_config_generation", expectedGeneration),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryEstablishUserOTP.text(d.Dialect),
+		secretEncrypted, true, time.Now().UTC(), userId, false, expectedGeneration)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to establish user OTP")
 	}
@@ -2107,6 +2196,18 @@ func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId i
 	return rowsAffected == 1, nil
 }
 
+// tryRemoveUserOTP is TryRemoveUserOTP's compare-and-set on the authenticator.
+var tryRemoveUserOTP = statement{
+	sqlite: "UPDATE users SET otp_secret_encrypted = NULL, otp_enabled = ?, updated_at = ? " +
+		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ?",
+	mysql: "UPDATE users SET otp_secret_encrypted = NULL, otp_enabled = ?, updated_at = ? " +
+		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ?",
+	postgres: "UPDATE users SET otp_secret_encrypted = NULL, otp_enabled = $1, updated_at = $2 " +
+		"WHERE id = $3 AND otp_enabled = $4 AND otp_config_generation = $5",
+	mssql: "UPDATE users SET otp_secret_encrypted = NULL, otp_enabled = @p1, updated_at = @p2 " +
+		"WHERE id = @p3 AND otp_enabled = @p4 AND otp_config_generation = @p5",
+}
+
 // TryRemoveUserOTP removes an authenticator: it clears the seed and turns otp_enabled off, and
 // writes no other column but updated_at, only while OTP is still on at expectedGeneration, the
 // otp_config_generation the caller read. It reports whether it did.
@@ -2117,8 +2218,8 @@ func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId i
 // replacement. The consumed-step reset and the generation advance stay the caller's, in the same
 // transaction, and run only when this reports true.
 //
-// The seed clears to a literal NULL rather than Assign(..., nil), for the reason
-// SetUserPasswordHash gives. otp_enabled flips on every matched row, so a matched row is a changed
+// The seed clears to a literal NULL rather than a bound nil, for the reason setUserPasswordHash
+// gives. otp_enabled flips on every matched row, so a matched row is a changed
 // row on all four engines.
 func (d *Database) TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error) {
 
@@ -2126,21 +2227,8 @@ func (d *Database) TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int6
 		return false, errs.New("can't remove OTP for user with id 0")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("users")
-	ub.Set(
-		"otp_secret_encrypted = NULL",
-		ub.Assign("otp_enabled", false),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", userId),
-		ub.Equal("otp_enabled", true),
-		ub.Equal("otp_config_generation", expectedGeneration),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, tryRemoveUserOTP.text(d.Dialect),
+		false, time.Now().UTC(), userId, true, expectedGeneration)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to remove user OTP")
 	}
