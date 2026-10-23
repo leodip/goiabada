@@ -19,7 +19,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -29,6 +28,7 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
@@ -76,7 +76,7 @@ func (s *stubAuditLogger) Log(ctx context.Context, name string, details map[stri
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.events = append(s.events, auditEvent{
-		name: name, details: details, requestId: chimiddleware.GetReqID(ctx),
+		name: name, details: details, requestId: requestid.FromContext(ctx),
 	})
 }
 
@@ -119,13 +119,13 @@ func newMeteredTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*R
 // the context. A request built without them panics on the first 429, so this is the shape
 // the reject path has to work in rather than test scaffolding.
 //
-// The request id is there for the same reason: chi's RequestID middleware is mounted at the root
+// The request id is there for the same reason: requestid.Middleware is mounted at the root
 // of both servers, ahead of every limiter tier, so a request reaching a limiter carries one and
 // the trip it audits is correlated to it (#328).
 func limiterRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Goiabada"})
-	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, limiterRequestId)
+	ctx = requestid.NewContext(ctx, limiterRequestId)
 	return req.WithContext(ctx)
 }
 

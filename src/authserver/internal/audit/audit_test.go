@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -301,15 +301,15 @@ func TestLogger_AsksTheSwitchesOncePerEventWithTheCallersValues(t *testing.T) {
 
 	require.Len(t, switches.asked, 2)
 	for _, asked := range switches.asked {
-		assert.Equal(t, "goiabada/req-0000007", chimiddleware.GetReqID(asked))
+		assert.Equal(t, "goiabada/req-0000007", requestid.FromContext(asked))
 	}
 }
 
-// requestContext is a context carrying chi's request id under the key chimiddleware.GetReqID
+// requestContext is a context carrying the request id under the key chimiddleware.GetReqID
 // reads, which is what a request's context holds once the RequestID middleware at the root of
 // both servers has run.
 func requestContext(id string) context.Context {
-	return context.WithValue(context.Background(), chimiddleware.RequestIDKey, id)
+	return requestid.NewContext(context.Background(), id)
 }
 
 // TestLogger_EveryRecordCarriesTheRequestId is the whole of #328 at this seam: all four
@@ -416,7 +416,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 // hand rather than taken from logging.FieldForLog, so a change to the clip or the escape fails
 // here instead of agreeing with itself.
 //
-// The id is client-chosen: chi's RequestID middleware adopts an inbound X-Request-Id header
+// The id is client-chosen: requestid.Middleware adopts an inbound X-Request-Id header
 // verbatim, bounded only by the server's 1 MiB header cap, which is why the oversized and the
 // non-printable cases are here and not just the well-behaved one.
 func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {

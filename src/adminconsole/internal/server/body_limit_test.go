@@ -96,10 +96,10 @@ func TestBodyLimitPolicy_TheUploadRowFollowsTheUploadPage(t *testing.T) {
 	assert.Equal(t, int64(3*1024*1024+64*1024), int64(uploadBodyLimit))
 }
 
-// TestInitMiddleware_TheBodyLimitSitsAfterStripSlashes pins the mount's place in the root chain:
-// after StripSlashes, whose normalized path the lookup routes by, and ahead of everything else
+// TestInitMiddleware_TheBodyLimitSitsAfterTheSlashStrip pins the mount's place in the root chain:
+// after StripTrailingSlash, whose stripped path the lookup routes by, and ahead of everything else
 // that could read a body.
-func TestInitMiddleware_TheBodyLimitSitsAfterStripSlashes(t *testing.T) {
+func TestInitMiddleware_TheBodyLimitSitsAfterTheSlashStrip(t *testing.T) {
 	s := newStaticBranchTestServer("http://127.0.0.1:1", newTestSessionStore())
 	s.initMiddleware()
 	s.serveStaticFiles()
@@ -115,8 +115,8 @@ func TestInitMiddleware_TheBodyLimitSitsAfterStripSlashes(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	strip := slices.Index(root, "github.com/go-chi/chi/v5/middleware.StripSlashes")
-	require.GreaterOrEqual(t, strip, 0, "StripSlashes must be on the root chain: %v", root)
+	strip := slices.Index(root, "github.com/leodip/goiabada/core/httpmw.StripTrailingSlash")
+	require.GreaterOrEqual(t, strip, 0, "StripTrailingSlash must be on the root chain: %v", root)
 	require.Less(t, strip+2, len(root), "the root chain ends too early: %v", root)
 	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.BodyLimit.func1", root[strip+1])
 	assert.Equal(t, "github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1", root[strip+2])

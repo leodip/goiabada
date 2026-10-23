@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // logoApiClient answers the two calls this page makes: the client it renders, and the logo
@@ -59,7 +59,7 @@ func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *te
 	apiClient := &logoApiClient{logoErr: errs.New("the auth server is unreachable")}
 
 	router := chi.NewRouter()
-	router.Use(chimiddleware.RequestID)
+	router.Use(requestid.Middleware)
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := reqctx.WithJwtInfo(r.Context(),

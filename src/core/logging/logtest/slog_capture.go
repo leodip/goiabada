@@ -24,7 +24,7 @@ import (
 //
 // The recorder sits under logging.WrapRequestID, which is the handler both servers install, so a
 // test asserting on request_id exercises the injection the servers run rather than a second copy
-// of it: a record logged with a context carrying chi's request id carries the attribute here for
+// of it: a record logged with a context carrying the request id carries the attribute here for
 // the same reason it does in production, and a wrapper that stopped injecting would fail a test
 // instead of quietly losing the correlation on every record the product writes (#320 decision 11).
 //

@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,6 +28,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
@@ -96,7 +96,7 @@ func (e *recordingExchanger) ExchangeCode(ctx context.Context, code, redirectURI
 	codeVerifier string) (*oauth.TokenResponse, error) {
 	e.called = true
 	e.code, e.redirectURI, e.codeVerifier = code, redirectURI, codeVerifier
-	e.requestID = chimiddleware.GetReqID(ctx)
+	e.requestID = requestid.FromContext(ctx)
 	return e.response, e.err
 }
 
@@ -216,7 +216,7 @@ func (h *callbackHarness) readBack(cookies []*http.Cookie) *sessionstore.Session
 	return sess
 }
 
-// serve posts form to the callback with cookies, behind chi's RequestID as in production.
+// serve posts form to the callback with cookies, behind requestid.Middleware as in production.
 func (h *callbackHarness) serve(exchanger codeExchanger, cookies []*http.Cookie, form url.Values) *httptest.ResponseRecorder {
 	h.t.Helper()
 	req := handlertest.Request(http.MethodPost, "/auth/callback", handlertest.WithForm(form))
@@ -225,7 +225,7 @@ func (h *callbackHarness) serve(exchanger codeExchanger, cookies []*http.Cookie,
 		req.AddCookie(c)
 	}
 	w := httptest.NewRecorder()
-	chimiddleware.RequestID(HandleAuthCallbackPost(h.httpHelper, h.store, h.parser, exchanger)).ServeHTTP(w, req)
+	requestid.Middleware(HandleAuthCallbackPost(h.httpHelper, h.store, h.parser, exchanger)).ServeHTTP(w, req)
 	return w
 }
 

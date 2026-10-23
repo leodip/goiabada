@@ -126,7 +126,7 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 }
 
 // #203. A panicking handler is answered 500 by Recoverer, and until this change the request
-// logger sat above that 500 rather than below it: chi's Recoverer wrote WriteHeader(500) to the
+// logger sat above that 500 rather than below it: the Recoverer wrote WriteHeader(500) to the
 // writer it was handed, which was the one ABOVE the logger's wrapper, so the wrapper never saw a
 // status and the record said status=0. An operator filtering for 500s therefore found every
 // request that failed except the ones that failed hardest.

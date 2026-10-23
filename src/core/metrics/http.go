@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/leodip/goiabada/core/httpmw/statuswriter"
 )
 
 // unmatched is the route a request no route answered is recorded under.
@@ -65,7 +66,7 @@ func HTTPRequests(reg *Registry, router chi.Routes) func(http.Handler) http.Hand
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			wrapped := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			wrapped := statuswriter.Wrap(w)
 			started := time.Now()
 			returned := false
 

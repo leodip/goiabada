@@ -4,7 +4,7 @@ This file records which module owns what, and it is executable. The five tables 
 [package ownership](#package-ownership), [built-in identifiers ownership](#built-in-identifiers-ownership),
 [temporary exceptions](#temporary-exceptions),
 [foreign modules](#foreign-modules-the-admin-console-must-not-compile) and
-[test frameworks](#test-code-no-shipped-binary-may-link) — are parsed by
+[refused packages](#packages-no-shipped-binary-may-link) — are parsed by
 `AssertArchitecture` in `src/core/guard/architecture.go`, which every module's unit tier calls.
 A row that stops describing the tree fails the tier, in both directions: an edge the tables do not
 allow is a finding, and so is an exception listed for an edge that no longer exists. A sixth table,
@@ -116,6 +116,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
 | `core/phonecountries` | kernel | — |
+| `core/requestid` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
 | `core/sourceroot` | kernel | — |
@@ -161,6 +162,11 @@ Notes on rows that are not self-evident:
   labels take only declared values, the Prometheus text exposition and the request middleware. It is
   written here rather than taken from `prometheus/client_golang`, which would add eight modules and
   link `expvar` into both binaries, and which takes any string as a label value (#400).
+- `core/requestid` is kernel because both servers carry the same request id, made the same way:
+  adopted from the `X-Request-Id` a client or proxy sent, or minted as `<hostname>/<10 base62>-<counter>`,
+  as chi's middleware made it until #462 replaced it. `core/logging`'s handler reads it onto every
+  record, so it sits below `core/logging` and `core/httpmw`, which mounts nothing of it: the
+  middleware is `requestid.Middleware` itself.
 - `core/phonecountries` is kernel because both applications offer a user the same phone country
   list: the auth server validates and stores its ids on the user row, and the admin console's two
   phone pages build their list from it rather than ask the admin API, which refuses a token carrying
@@ -314,8 +320,9 @@ The guard reports findings by these names.
    `contract` and `moving`. Same both directions as rule 7, and the same reason: `core/constants`
    reached 139 symbols, 108 named by a single process, with every rule above green throughout. That
    file's own header carries the definitions and the ceilings (#385).
-9. **test code** — no shipped binary links a package the
-   [Test frameworks](#test-code-no-shipped-binary-may-link) table refuses, or any package under one.
+9. **refused package** — no shipped binary links a package the
+   [Refused packages](#packages-no-shipped-binary-may-link) table refuses, or any package under one:
+   the test frameworks, and the two packages that publish a process's internals on Go's default mux.
    The shipped binaries are the three a release ships: the auth server, the admin console and the
    setup wizard. Each is walked from its `main` package, and the guard fails when one of the three is
    not where it looks, so a renamed main cannot drop out of the rule unnoticed (#331).
@@ -419,9 +426,20 @@ module the admin console legitimately compiles, churned on every dependency chan
 rule than #332 asks for. #360 checked off the categories in its point 5 — database drivers,
 sqlbuilder, OTP and image libraries, provider-only crypto — and each is a row above, asserted `no`.
 
-## Test code no shipped binary may link
+## Packages no shipped binary may link
 
-A shipped binary carries no test code: no assertion library, no mock, no test helper, and none of
+A shipped binary carries no test code, and nothing that publishes the process's internals. The rows
+below are both kinds.
+
+The second kind is two packages of the standard library, `net/http/pprof` and `expvar`, which
+register live heap, goroutine, CPU and trace profiles under `/debug/pprof/` and the process's
+variables under `/debug/vars` on Go's default mux the moment they are linked. Neither server serves
+the default mux, so linking them is one listener written the obvious way away from publishing
+both, and a `grep` of the source would not say they were there: until #462 both servers linked them
+through chi's middleware package, which no file needed for them. The rule holds them out by the same
+walk as the test frameworks, through a dependency as through first-party code.
+
+The rest of this section is about the first kind. A shipped binary carries no test code: no assertion library, no mock, no test helper, and none of
 the test frameworks they are written with. Both servers and the setup wizard are clean, and before
 #331 nothing kept them so. The generated mocks carry `//go:build !production`, so a production
 import of one breaks only the release build, which no pull-request job compiles; every other helper
@@ -463,13 +481,15 @@ are still read from source, with every tag but `production` free, because that c
 targets at once. A package the go command cannot load is a finding, since the walk cannot see what
 it imports.
 
-### Test frameworks
+### Refused packages
 
 | package | what it is |
 |---|---|
 | `testing` | the standard library's test framework, and `testing/fstest`, `testing/iotest`, `testing/quick` and the rest under it |
 | `net/http/httptest` | the standard library's test server and response recorder |
 | `github.com/stretchr/testify` | the assertions, `require`, `mock` and `suite` the tests and the generated mocks are written with |
+| `net/http/pprof` | the profiler, which registers live heap, goroutine, CPU and trace profiles under `/debug/pprof/` on the default mux |
+| `expvar` | the process's variables, its command line and memory statistics among them, which it registers under `/debug/vars` on the default mux |
 
 ## The guard
 
@@ -502,7 +522,7 @@ justify its namesake.
 `src/core/internal/refgraph/symbol_ownership_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate
 leniency, and then take the real tables apart one row at a time — dropping each exception and
-flipping each declared reachability, and adding a test-framework row for a package every shipped
+flipping each declared reachability, and adding a refused-package row for a package every shipped
 binary links — because the tree satisfies this document by construction, so
 passing proves nothing on its own. A guard that has quietly stopped matching anything passes a clean
 tree exactly the way it passes a correct one; `errors_lint_test.go` sets out the same reasoning for

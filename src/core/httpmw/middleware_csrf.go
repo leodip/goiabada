@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 )
@@ -126,8 +125,8 @@ func newCsrfSkipper(policy CSRFPolicy) csrfSkipper {
 // it differs per endpoint, and the rationale for each is at the composition root that supplied it;
 // do not assume a shared one (#155).
 //
-// The path is passed in rather than read off the request because the caller has already resolved
-// chi's normalized RoutePath, which is what a trailing slash arrives as.
+// The path is passed in rather than read off the request so the caller names which one: r.URL.Path,
+// which StripTrailingSlash above has already stripped of a trailing slash.
 func (s csrfSkipper) shouldSkip(r *http.Request, path string) bool {
 	if s.exact[path] {
 		return true
@@ -152,16 +151,9 @@ func SkipCSRF(policy CSRFPolicy) func(next http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			// Resolve the effective request path: chi's StripSlashes middleware
-			// writes the normalized path to RouteContext.RoutePath (not r.URL.Path)
-			// when a RouteContext is present. Fall back to r.URL.Path to keep this
-			// safe outside chi (e.g. unit tests that don't wire chi).
-			path := r.URL.Path
-			if rctx := chi.RouteContext(r.Context()); rctx != nil && rctx.RoutePath != "" {
-				path = rctx.RoutePath
-			}
-
-			if skipper.shouldSkip(r, path) {
+			// The path as routed: StripTrailingSlash, mounted above, has already stripped one
+			// trailing slash from r.URL.Path, so "/auth/token/" is exempt as "/auth/token" is.
+			if skipper.shouldSkip(r, r.URL.Path) {
 				r = markCsrfSkipped(r)
 			}
 			next.ServeHTTP(w, r)

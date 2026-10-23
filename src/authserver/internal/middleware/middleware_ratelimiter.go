@@ -647,7 +647,7 @@ func (m *RateLimiter) refuse(w http.ResponseWriter, r *http.Request, t *tier, ke
 // Warn rather than Error because a limiter doing its job is an expected event, and an auth
 // server whose error log fills with them has no error log left.
 // The context is a parameter rather than something this reaches for because a trip is a request
-// event: the installed handler reads chi's request id off it, so the warning below joins the
+// event: the installed handler reads the request id off it, so the warning below joins the
 // request log line for the request that was refused. Without it the operator has a rate-limit
 // warning and no way to tell which request produced it (#320 decision 2).
 func (m *RateLimiter) reportTrip(ctx context.Context, t *tier, key string,

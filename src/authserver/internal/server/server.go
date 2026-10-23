@@ -18,7 +18,6 @@ import (
 	"log/slog"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/cleanup"
@@ -36,6 +35,7 @@ import (
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 type Server struct {
@@ -220,9 +220,10 @@ func (s *Server) Start(ctx context.Context) (drained bool, err error) {
 
 // metricsHandler is the metrics listener's whole handler: a mux of its own answering GET /metrics
 // with reg's exposition and 404 for every other path. It is never Go's default mux, on which the
-// net/http/pprof and expvar packages chi's middleware links register /debug/pprof/ and /debug/vars
-// (#462), and nothing on it passes through the main router's chain, so a scrape is neither logged
-// by the request logger nor counted in the HTTP metrics (#400 decision 3).
+// net/http/pprof and expvar packages would register /debug/pprof/ and /debug/vars, were either
+// linked (rule 9 refuses both in every shipped binary, #462), and nothing on it passes through the
+// main router's chain, so a scrape is neither logged by the request logger nor counted in the HTTP
+// metrics (#400 decision 3).
 func metricsHandler(reg *metrics.Registry) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", reg.Handler())
@@ -448,8 +449,9 @@ func (s *Server) initMiddleware() appBranches {
 	// CORS
 	s.router.Use(middleware.CORS(s.database))
 
-	// Request ID
-	s.router.Use(chimiddleware.RequestID)
+	// Request ID: the X-Request-Id the request arrived with, or one minted as chi minted them
+	// (#462 decision 6), on the context of every record, audit event and error page below.
+	s.router.Use(requestid.Middleware)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
 	s.router.Use(httpmw.SecurityHeaders(s.cfg.AuthServer.IsCookieSecure()))
@@ -478,8 +480,8 @@ func (s *Server) initMiddleware() appBranches {
 	// connection instead of answering 500. The logger is bounded formatting over values it
 	// has already clipped, and a panic in it would be a bug to fix rather than to absorb.
 	//
-	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
-	// middleware renders the target before calling the next handler.
+	// It stays above StripTrailingSlash, which edits r.URL.Path in place, and renders the target
+	// before calling the next handler, so its record carries the path the client sent.
 	logHttpRequests := s.cfg.AuthServer.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(httpmw.RequestLogger(logHttpRequests))
@@ -491,14 +493,16 @@ func (s *Server) initMiddleware() appBranches {
 	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
-	// wrapped writer and lands in the record (#203).
-	s.router.Use(chimiddleware.Recoverer)
+	// wrapped writer and lands in the record (#203). It writes the panic's one ERROR record, with
+	// the request id and the stack, through the process's log handler (#462).
+	s.router.Use(httpmw.Recoverer)
 
-	// Strip slashes
-	s.router.Use(chimiddleware.StripSlashes)
+	// One trailing slash stripped before routing, from r.URL.Path itself, so the router, the
+	// lookups below and the handlers all read the stripped path (#462).
+	s.router.Use(httpmw.StripTrailingSlash)
 
-	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripSlashes, because
-	// the lookup resolves the route by the path StripSlashes normalized; before httpmw.SkipCSRF,
+	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripTrailingSlash,
+	// because the lookup resolves the route by the path it stripped; before httpmw.SkipCSRF,
 	// because the /auth/logout exemption predicate parses the form body right there at the root,
 	// and a body read before this mount would be read without a bound.
 	s.router.Use(httpmw.BodyLimit(s.router,

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 func TestHandleAuthPwdGet(t *testing.T) {
@@ -759,7 +759,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		ctx := reqctx.WithSettings(req.Context(), settings)
 		// The request id chi's middleware would have put there, so the expectation below can
 		// assert which context the handler audited under (#328 seam 3).
-		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-pwd-1")
+		ctx = requestid.NewContext(ctx, "goiabada/req-pwd-1")
 		req = req.WithContext(ctx)
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
@@ -769,7 +769,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// The other 122 handler sites are held by the compiler, which requires a context, and by
 		// guard.AssertAuditLogContext, which refuses a Background one here.
 		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
-			return chimiddleware.GetReqID(ctx) == "goiabada/req-pwd-1"
+			return requestid.FromContext(ctx) == "goiabada/req-pwd-1"
 		}), audit.EventAuthFailedPwd, map[string]interface{}{
 			// The address typed into the form is recorded only as its digest, and no account
 			// is named because none matched (#522 decision 10). The literal is SHA-256 of

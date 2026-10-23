@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // Decision 2 measured end to end, on a real handler rather than on a middleware.
@@ -25,7 +25,7 @@ import (
 // product, because the middleware that puts the id on the context and the handler that reads it
 // off it are mounted in different files and neither test runs both.
 //
-// So this drives an ordinary auth handler through chi's RequestID, exactly as initMiddleware
+// So this drives an ordinary auth handler through requestid.Middleware, exactly as initMiddleware
 // mounts it, and asserts the record it writes carries an id nothing in this test named: not the
 // attribute, not the key, not the value. Remove the wrapper from either server and every request
 // record silently loses its correlation while every other test here stays green (#320).
@@ -42,13 +42,13 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, ceremony.ErrNoAuthContext)
 
 	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
-	// The id the middleware will adopt. chi's RequestID takes X-Request-Id from the caller
+	// The id the middleware will adopt. requestid.Middleware takes X-Request-Id from the caller
 	// verbatim, which is also why the handler clips it (#159).
 	req.Header.Set("X-Request-Id", "req-level2-e2e")
 	rr := httptest.NewRecorder()
 
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	chimiddleware.RequestID(buildAuthLevel2Get(authLevel2GetDeps{
+	requestid.Middleware(buildAuthLevel2Get(authLevel2GetDeps{
 		pageRenderer:  pageRenderer,
 		ceremonyStore: ceremonyStore,
 		database:      database,
@@ -64,7 +64,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	assert.Equal(t, "auth context is missing, redirecting", records[0].Message,
 		"one literal message, shared by all eleven copies of this branch")
 	assert.Equal(t, "req-level2-e2e", records[0].Attrs["request_id"],
-		"injected by the handler from chi's request id, with nothing in this file naming it")
+		"injected by the handler from the request id, with nothing in this file naming it")
 
 	ceremonyStore.AssertExpectations(t)
 }

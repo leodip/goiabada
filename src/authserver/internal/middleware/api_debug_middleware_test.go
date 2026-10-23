@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,11 +14,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -464,7 +463,7 @@ func TestDebugLog_CarriesTheRequestIdFromTheContext(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
-	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-abc"))
+	req = req.WithContext(requestid.NewContext(req.Context(), "req-abc"))
 	debugLog("GET", "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
 
 	records := logged.Records()

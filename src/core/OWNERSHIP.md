@@ -328,9 +328,13 @@ command itself and fails on a tree it changed.
 | `core/httpmw` | `CookieReset` | both-apps | — |
 | `core/httpmw` | `ParseTrustedProxies` | both-apps | — |
 | `core/httpmw` | `RealIP` | both-apps | — |
+| `core/httpmw` | `Recoverer` | both-apps | — |
 | `core/httpmw` | `RequestLogger` | both-apps | — |
 | `core/httpmw` | `SecurityHeaders` | both-apps | — |
 | `core/httpmw` | `SkipCSRF` | both-apps | — |
+| `core/httpmw` | `StripTrailingSlash` | both-apps | — |
+| `core/httpmw/statuswriter` | `Wrap` | kernel | — |
+| `core/httpmw/statuswriter` | `Writer` | own-package | — |
 | `core/i18n` | `CatalogTag` | both-apps | The cross-process half of a refusal's language: the admin console sends it as `Accept-Language` on every admin API call, and the auth server resolves it against the same catalogs, so its answer is in the language of the console's page (#559 decision 3). The auth server names it in its own right too: the two registration mails read it to take the language the registration page was matched to, rather than the first `Accept-Language` tag alone (#607). It stays because it reads the localizer this package keeps private, as `Raw` does, and exporting the localizer to move it would undo #385 decision 11. |
 | `core/i18n` | `ErrCodeAccountChangedSinceLoaded` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeAccountCurrentPasswordIncorrect` | contract | Catalog key of an account API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
@@ -624,8 +628,12 @@ command itself and fails on a tree it changed.
 | `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
 | `core/phonecountries` | `PhoneCountry` | own-package | — |
+| `core/requestid` | `FromContext` | kernel | — |
+| `core/requestid` | `Header` | own-package | — |
+| `core/requestid` | `Middleware` | both-apps | — |
+| `core/requestid` | `NewContext` | own-package | — |
 | `core/securerandom` | `String` | both-apps | — |
-| `core/securerandom` | `StringFromAlphabet` | own-package | — |
+| `core/securerandom` | `StringFromAlphabet` | kernel | — |
 | `core/sessionstore` | `Backend` | both-apps | — |
 | `core/sessionstore` | `BrowserSessionCookie` | reachable | — |
 | `core/sessionstore` | `ConditionalBackend` | kernel | — |

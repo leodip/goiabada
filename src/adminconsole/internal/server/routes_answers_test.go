@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -324,7 +325,7 @@ func TestRegisterRoutes_TheStaticFilesTheFaviconAndHealth(t *testing.T) {
 	assert.Equal(t, "healthy", health.Body.String())
 }
 
-// mintedRequestId is the request id chi's RequestID mints when a request carries none, the shape
+// mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape
 // #462 decision 6 keeps: the host name, ten base62 characters, and a counter of at least six
 // digits. A host whose name cannot be read is localhost.
 func mintedRequestId(t *testing.T) *regexp.Regexp {
@@ -393,6 +394,28 @@ func TestRegisterRoutes_APanicIsAnEmpty500(t *testing.T) {
 	assert.PanicsWithValue(t, http.ErrAbortHandler, func() {
 		serveRouting(s, http.MethodGet, "/probe/abort", nil)
 	})
+}
+
+// A panic is one ERROR record through the process's one handler, carrying the request id, the
+// panic value and the stack it was raised on, where chi's recovery wrote a coloured trace to
+// standard error outside the log stream (#462).
+func TestRegisterRoutes_APanicIsOneErrorRecord(t *testing.T) {
+	s, _ := newRoutingTestServer(t)
+	s.router.Get("/probe/panic", func(http.ResponseWriter, *http.Request) { panic("a handler panicked") })
+	logged := logtest.CaptureSlog(t)
+
+	serveRouting(s, http.MethodGet, "/probe/panic", http.Header{"X-Request-Id": {"the-panic-record"}})
+
+	var errors []logtest.CapturedRecord
+	for _, record := range logged.Records() {
+		if record.Level == slog.LevelError {
+			errors = append(errors, record)
+		}
+	}
+	require.Len(t, errors, 1, "one ERROR record for the panic:\n%s", logged.Text())
+	assert.Equal(t, "the-panic-record", errors[0].Attrs["request_id"])
+	assert.Equal(t, "a handler panicked", errors[0].Attrs["panic"])
+	assert.Contains(t, errors[0].Attrs["stack"], "routes_answers_test.go", "the stack the panic was raised on")
 }
 
 // The metrics' route label is the route as registered, the group's prefix joined on and its

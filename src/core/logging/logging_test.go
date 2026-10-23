@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // -----------------------------------------------------------------------------
@@ -35,10 +35,10 @@ func handlerFor(t *testing.T, w io.Writer, level, format string) slog.Handler {
 	return handler
 }
 
-// contextWithRequestID builds what chi's RequestID middleware leaves on a
+// contextWithRequestID builds what requestid.Middleware leaves on a
 // request context, which is the only thing the wrapper reads.
 func contextWithRequestID(requestId string) context.Context {
-	return context.WithValue(context.Background(), chimiddleware.RequestIDKey, requestId)
+	return requestid.NewContext(context.Background(), requestId)
 }
 
 // decodeJSON reads the one record written to buf.
@@ -145,7 +145,7 @@ func TestNewHandler_InjectsTheRequestIdFromTheContext(t *testing.T) {
 }
 
 func TestNewHandler_BoundsTheRequestIdItInjects(t *testing.T) {
-	// chi's RequestID middleware adopts an inbound X-Request-Id verbatim, so this
+	// requestid.Middleware adopts an inbound X-Request-Id verbatim, so this
 	// string is client-chosen. Without FieldForLog one header makes one 900 KB
 	// log line, on every record of that request rather than just the access line
 	// (#159).
@@ -329,7 +329,7 @@ func TestInstall_InstallsTheHandler(t *testing.T) {
 }
 
 func TestInstall_RequestIdReachesARecordLoggedFromAHandler(t *testing.T) {
-	// The one end-to-end case: a real request, through chi's real RequestID
+	// The one end-to-end case: a real request, through the real requestid.Middleware
 	// middleware, into a handler that names no id at all. It is what decision 2
 	// promises, and it also shows the bound applies to an id the client chose.
 	previous := slog.Default()
@@ -339,12 +339,12 @@ func TestInstall_RequestIdReachesARecordLoggedFromAHandler(t *testing.T) {
 	slog.SetDefault(slog.New(handlerFor(t, buf, "info", "json")))
 
 	oversized := strings.Repeat("x", 900000)
-	handler := chimiddleware.RequestID(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	handler := requestid.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		slog.InfoContext(r.Context(), "a record")
 	}))
 
 	request := httptest.NewRequest(http.MethodGet, "/auth/token", nil)
-	request.Header.Set(chimiddleware.RequestIDHeader, oversized)
+	request.Header.Set(requestid.Header, oversized)
 	handler.ServeHTTP(httptest.NewRecorder(), request)
 
 	assert.Equal(t, FieldForLog(oversized), decodeJSON(t, buf)["request_id"])

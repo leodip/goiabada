@@ -8,12 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
-
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -44,7 +43,7 @@ func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIden
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			requestId := chimiddleware.GetReqID(ctx)
+			requestId := requestid.FromContext(ctx)
 
 			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
 

@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -19,19 +19,19 @@ import (
 // executor's behaviour belongs to the data tier and the retry loop to the scripted driver. All a
 // handler can show is that the context it handed to its port was the REQUEST's.
 //
-// chi's request id is on this request's context and on no other, so a handler that passed
+// the request id is on this request's context and on no other, so a handler that passed
 // context.Background() matches nothing and the strict mock reports an unexpected call.
 
 const apiPropagatedRequestId = "goiabada/req-api-propagation-1"
 
 func apiRequestCarryingId(target string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, apiPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), apiPropagatedRequestId))
 }
 
 func theApiRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return chimiddleware.GetReqID(ctx) == apiPropagatedRequestId
+		return requestid.FromContext(ctx) == apiPropagatedRequestId
 	})
 }
 

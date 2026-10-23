@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -28,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,12 +54,12 @@ func accountEmailPut(t *testing.T, body any) *http.Request {
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/email", bytes.NewReader(encoded))
-	ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, accountEmailRequestId)
+	ctx := requestid.NewContext(req.Context(), accountEmailRequestId)
 	req = req.WithContext(reqctx.WithSettings(ctx, accountEmailSettings()))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": emailTestSubject})
 }
 
-// accountEmailRequestId is the request id accountEmailPut carries, as chi's RequestID middleware
+// accountEmailRequestId is the request id accountEmailPut carries, as requestid.Middleware
 // puts one on every request.
 const accountEmailRequestId = "req-email-0001"
 
@@ -427,7 +427,7 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), "new@example.com",
 					"the notice must not name the new address, found under %q", key)
 			}
-			assert.Equal(t, accountEmailRequestId, chimiddleware.GetReqID(sendCtx),
+			assert.Equal(t, accountEmailRequestId, requestid.FromContext(sendCtx),
 				"the job's records carry the request's id")
 		})
 	}

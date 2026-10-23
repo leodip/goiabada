@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(Settings(mockDB, PageFaults())(http.HandlerFunc(
+	requestid.Middleware(Settings(mockDB, PageFaults())(http.HandlerFunc(
 		func(http.ResponseWriter, *http.Request) {
 			t.Error("the handler must not be reached when the settings cannot be read")
 		}))).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -68,7 +68,7 @@ func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
 	reached := false
 	// This is the production order: CORS evaluates the origin before the inner RequestID
 	// middleware can put an id on the context. Reordering the two changes the record (#335).
-	CORS(mockDB)(chimiddleware.RequestID(http.HandlerFunc(
+	CORS(mockDB)(requestid.Middleware(http.HandlerFunc(
 		func(w http.ResponseWriter, _ *http.Request) {
 			reached = true
 			w.WriteHeader(http.StatusOK)
@@ -105,9 +105,9 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = ip
 		rr := httptest.NewRecorder()
-		// Through chi's RequestID, as the real chain mounts it, so the id the trip record
+		// Through requestid.Middleware, as the real chain mounts it, so the id the trip record
 		// carries is one this test did not put there.
-		chimiddleware.RequestID(m.LimitPwd(http.HandlerFunc(
+		requestid.Middleware(m.LimitPwd(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				m.RecordCredentialFailure(r)
 				w.WriteHeader(http.StatusTeapot)

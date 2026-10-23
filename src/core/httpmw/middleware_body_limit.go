@@ -117,7 +117,7 @@ func (l bodyLimiter) limitFor(method string, pattern string) int64 {
 // A handler that bounds its body more tightly keeps its own bound. MaxBytesReader nests, and the
 // inner, smaller one trips first.
 //
-// Mount it after chi's StripSlashes, whose normalized path is what the lookup reads, and before
+// Mount it after StripTrailingSlash, whose stripped path is what the lookup reads, and before
 // anything that reads a body at the root.
 func BodyLimit(routes chi.Routes, policy BodyLimitPolicy) func(next http.Handler) http.Handler {
 	limiter := newBodyLimiter(policy)
@@ -136,13 +136,10 @@ func BodyLimit(routes chi.Routes, policy BodyLimitPolicy) func(next http.Handler
 	}
 }
 
-// routingPath is the path chi will route r by, resolved the way chi's own routeHTTP resolves it:
-// the route context's RoutePath when set, which is where StripSlashes writes the path it
-// normalized, else the raw path, else the decoded one.
+// routingPath is the path chi will route r by, resolved the way chi's own routeHTTP resolves it at
+// the root: the raw path when the path carried an escape, else the decoded one. StripTrailingSlash
+// has already stripped both of a trailing slash.
 func routingPath(r *http.Request) string {
-	if rctx := chi.RouteContext(r.Context()); rctx != nil && rctx.RoutePath != "" {
-		return rctx.RoutePath
-	}
 	if r.URL.RawPath != "" {
 		return r.URL.RawPath
 	}

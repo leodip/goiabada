@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/builtin"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // This renderer is one of two. The auth server has its own copy in
@@ -56,7 +56,7 @@ func New(templateFS fs.FS, staticFS fs.FS) *Renderer {
 // no frames at all. The attributes are structured, and the stack rides inside the error attribute
 // because slog's default handler formats an error value with %+v (#279 decisions 9 and 10).
 func (h *Renderer) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
-	requestId := middleware.GetReqID(r.Context())
+	requestId := requestid.FromContext(r.Context())
 	// No request_id attribute: the installed handler reads it off the context this call passes
 	// it, so naming it here would write it twice (#320 decision 2). requestId is still read,
 	// because the page below shows it to whoever hit the error.
@@ -76,7 +76,7 @@ func (h *Renderer) InternalServerError(w http.ResponseWriter, r *http.Request, e
 	if err != nil {
 		// The last resort writes fixed catalog text and never the render error, which named
 		// template files and internal state to whoever hit the page. The request id is the one
-		// variable, and it is client-chosen: chi's RequestID adopts an inbound X-Request-Id
+		// variable, and it is client-chosen: requestid.Middleware adopts an inbound X-Request-Id
 		// verbatim, so it is escaped and clipped before it is echoed (#159, #414, #425).
 		slog.ErrorContext(r.Context(), "unable to render the error page", "error", err)
 		http.Error(w, i18n.T(r.Context(), "adminconsole.error.body")+" "+
@@ -267,7 +267,7 @@ func (h *Renderer) JSONError(w http.ResponseWriter, r *http.Request, err error) 
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Pragma", "no-cache")
 
-	requestId := middleware.GetReqID(r.Context())
+	requestId := requestid.FromContext(r.Context())
 
 	var errorStr, errorDescriptionStr string
 

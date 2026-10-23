@@ -12,10 +12,10 @@ import (
 	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +67,7 @@ func loggedErrorOf(t *testing.T, record logtest.CapturedRecord) (error, bool) {
 // calling handle for GET /. The settings the renderer reads ride on each request, from newRequest.
 func errorRouter(handle http.HandlerFunc) *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
+	r.Use(requestid.Middleware)
 	r.Get("/", handle)
 	return r
 }

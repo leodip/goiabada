@@ -100,7 +100,7 @@ func assertArchitecture(r Reporter, root string) {
 	}
 	for _, dir := range missing {
 		findings = append(findings, fmt.Sprintf(
-			"test code: the shipped main %s holds no production Go file, so rule 9 walks nothing for it; if it moved, shippedMains in core/guard/architecture.go moves with it",
+			"refused package: the shipped main %s holds no production Go file, so rule 9 walks nothing for it; if it moved, shippedMains in core/guard/architecture.go moves with it",
 			dir))
 	}
 
@@ -126,10 +126,10 @@ const architectureDoc = "ARCHITECTURE.md"
 // prose above it is free to change without touching the parser. The fifth, builtinHeading,
 // is declared beside the checks that read it in builtin_ownership.go.
 const (
-	ownershipHeading     = "### Package ownership"
-	exceptionHeading     = "### Temporary exceptions"
-	foreignHeading       = "### Foreign modules"
-	testFrameworkHeading = "### Test frameworks"
+	ownershipHeading      = "### Package ownership"
+	exceptionHeading      = "### Temporary exceptions"
+	foreignHeading        = "### Foreign modules"
+	refusedPackageHeading = "### Refused packages"
 )
 
 // shippedMains are the binaries a release ships, as directories relative to the source root: the
@@ -192,19 +192,19 @@ type foreignRow struct {
 	line      int
 }
 
-// testFrameworkRow names a package rule 9 refuses in a shipped binary, together with every package
+// refusedPackageRow names a package rule 9 refuses in a shipped binary, together with every package
 // under it.
-type testFrameworkRow struct {
+type refusedPackageRow struct {
 	pkg  string
 	line int
 }
 
 type architectureTables struct {
-	owners         []ownerRow
-	exceptions     []exceptionRow
-	foreign        []foreignRow
-	testFrameworks []testFrameworkRow
-	builtin        []builtinRow
+	owners     []ownerRow
+	exceptions []exceptionRow
+	foreign    []foreignRow
+	refused    []refusedPackageRow
+	builtin    []builtinRow
 }
 
 // parseArchitectureDoc reads the five data tables. A malformed row is a finding rather than a
@@ -257,21 +257,21 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 		tables.foreign = append(tables.foreign, foreignRow{module: row.Cells[0], reachable: reachable, clearedBy: row.Cells[3], line: row.Line})
 	}
 
-	frameworks, ok := refgraph.TableUnder(lines, testFrameworkHeading)
+	refused, ok := refgraph.TableUnder(lines, refusedPackageHeading)
 	if !ok {
-		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, testFrameworkHeading))
+		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, refusedPackageHeading))
 	}
 	// The exception table may be empty, since an empty burn-down list is where it is meant to end.
 	// This one empty is rule 9 refusing nothing, which passes every tree.
-	if ok && len(frameworks) == 0 {
-		findings = append(findings, fmt.Sprintf("%s has an empty %q table, so rule 9 refuses nothing", architectureDoc, testFrameworkHeading))
+	if ok && len(refused) == 0 {
+		findings = append(findings, fmt.Sprintf("%s has an empty %q table, so rule 9 refuses nothing", architectureDoc, refusedPackageHeading))
 	}
-	for _, row := range frameworks {
+	for _, row := range refused {
 		if len(row.Cells) != 2 {
-			findings = append(findings, fmt.Sprintf("%s:%d: a test-framework row needs 2 cells, found %d", architectureDoc, row.Line, len(row.Cells)))
+			findings = append(findings, fmt.Sprintf("%s:%d: a refused-package row needs 2 cells, found %d", architectureDoc, row.Line, len(row.Cells)))
 			continue
 		}
-		tables.testFrameworks = append(tables.testFrameworks, testFrameworkRow{pkg: row.Cells[0], line: row.Line})
+		tables.refused = append(tables.refused, refusedPackageRow{pkg: row.Cells[0], line: row.Line})
 	}
 
 	builtinRows, ok := refgraph.TableUnder(lines, builtinHeading)
@@ -343,7 +343,7 @@ func checkArchitecture(tables architectureTables, graph *refgraph.ImportGraph, e
 	findings = append(findings, checkModuleDirection(graph)...)
 	findings = append(findings, checkDeadPackages(tables, graph)...)
 	findings = append(findings, checkForeignClosure(tables, graph)...)
-	findings = append(findings, checkTestCode(tables, graph, external)...)
+	findings = append(findings, checkRefusedPackages(tables, graph, external)...)
 	findings = append(findings, reconcileExceptions(tables, violations)...)
 
 	return findings
@@ -553,10 +553,11 @@ func isStdlib(importPath string) bool {
 	return !strings.Contains(first, ".")
 }
 
-// checkTestCode is rule 9: no shipped main links a package the test-framework table refuses. Test
-// code is defined by the frameworks rather than by where a helper lives or what it is called, so the
-// rule needs no list of first-party helpers: a helper reaching testing or testify is caught through
-// the framework behind it, the moment it gains one (#331).
+// checkRefusedPackages is rule 9: no shipped main links a package the refused-package table refuses:
+// the test frameworks, and net/http/pprof and expvar, which publish the process's internals on Go's
+// default mux (#462). Test code is defined by the frameworks rather than by where a helper lives or
+// what it is called, so the rule needs no list of first-party helpers: a helper reaching testing or
+// testify is caught through the framework behind it, the moment it gains one (#331).
 //
 // The walk starts at each shipped main rather than at every production package of its module, which
 // is the difference from rule 5. The graph counts core/guard's untagged files as production, so a
@@ -564,8 +565,8 @@ func isStdlib(importPath string) bool {
 //
 // The walk does not stop at the edge of the four modules: past it, it follows external, the
 // imports the go command reports for every third-party and standard package a shipped main
-// reaches, so a framework that a dependency imports is refused like one a first-party helper does.
-func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph, external map[string][]string) []string {
+// reaches, so a package that a dependency imports is refused like one a first-party helper does.
+func checkRefusedPackages(tables architectureTables, graph *refgraph.ImportGraph, external map[string][]string) []string {
 	var findings []string
 	for _, dir := range shippedMains {
 		main, ok := shippedMainPackage(graph, dir)
@@ -573,8 +574,8 @@ func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph, exter
 			// Reported by the reporting half, which knows whether any main was found at all.
 			continue
 		}
-		reached := testFrameworksReached(graph, external, main, tables.testFrameworks)
-		for i, row := range tables.testFrameworks {
+		reached := refusedPackagesReached(graph, external, main, tables.refused)
+		for i, row := range tables.refused {
 			chain, hit := reached[i]
 			if !hit {
 				continue
@@ -584,7 +585,7 @@ func checkTestCode(tables architectureTables, graph *refgraph.ImportGraph, exter
 				rel = append(rel, graph.RelPath(pkg))
 			}
 			findings = append(findings, fmt.Sprintf(
-				"test code: %s links %s, which %s:%d refuses in a shipped binary: %s",
+				"refused package: %s links %s, which %s:%d refuses in a shipped binary: %s",
 				dir, chain[len(chain)-1], architectureDoc, row.line, strings.Join(rel, " -> ")))
 		}
 	}
@@ -602,13 +603,13 @@ func shippedMainPackage(graph *refgraph.ImportGraph, dir string) (string, bool) 
 	return main, ok
 }
 
-// testFrameworksReached walks main's production closure breadth first and returns, per row of the
-// test-framework table, the chain of packages from main to the first refused import the walk met:
+// refusedPackagesReached walks main's production closure breadth first and returns, per row of the
+// refused-package table, the chain of packages from main to the first refused import the walk met:
 // the main, each package between, and the refused path itself. A first-party package's imports are
 // the graph's, read from source with every tag but production free; any other package's are
 // external's. Breadth first makes that chain a shortest one, which is the edge a reader has to cut,
 // and sorted import lists make it the same chain on every run.
-func testFrameworksReached(graph *refgraph.ImportGraph, external map[string][]string, main string, rows []testFrameworkRow) map[int][]string {
+func refusedPackagesReached(graph *refgraph.ImportGraph, external map[string][]string, main string, rows []refusedPackageRow) map[int][]string {
 	parent := map[string]string{main: ""}
 	queue := []string{main}
 	found := map[int][]string{}
@@ -668,7 +669,7 @@ func compiledClosure(root string, graph *refgraph.ImportGraph) (map[string][]str
 					if !reported[key] {
 						reported[key] = true
 						findings = append(findings, fmt.Sprintf(
-							"test code: the go command cannot load %s for %s on %s/%s, so rule 9 cannot see what it imports: %s",
+							"refused package: the go command cannot load %s for %s on %s/%s, so rule 9 cannot see what it imports: %s",
 							p.ImportPath, dir, target.goos, target.goarch, strings.TrimSpace(p.Error.Err)))
 					}
 					continue
@@ -845,15 +846,15 @@ func checkTableHygiene(tables architectureTables, graph *refgraph.ImportGraph) [
 		}
 	}
 
-	frameworks := map[string]int{}
-	for _, row := range tables.testFrameworks {
-		if first, duplicate := frameworks[row.pkg]; duplicate {
+	refused := map[string]int{}
+	for _, row := range tables.refused {
+		if first, duplicate := refused[row.pkg]; duplicate {
 			findings = append(findings, fmt.Sprintf(
-				"table hygiene: %s:%d lists the test framework %s twice; the first is at line %d",
+				"table hygiene: %s:%d lists the refused package %s twice; the first is at line %d",
 				architectureDoc, row.line, row.pkg, first))
 			continue
 		}
-		frameworks[row.pkg] = row.line
+		refused[row.pkg] = row.line
 	}
 
 	for _, row := range tables.foreign {

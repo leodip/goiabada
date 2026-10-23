@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // #621, the two rows its done-when asks for and what they rest on. The console refreshes an
@@ -704,7 +704,7 @@ func TestSessionHandler_TheReReadKeepsTheRequestAndOutlivesTheBrowser(t *testing
 
 	const wantRequestID = "the-inbound-request-id"
 	ctx, cancel := context.WithCancel(
-		context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
+		requestid.NewContext(context.Background(), wantRequestID))
 	defer cancel()
 
 	// The browser leaves once the request has loaded its session and step 3 has begun.

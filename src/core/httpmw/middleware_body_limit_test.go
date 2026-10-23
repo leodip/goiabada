@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,11 +47,11 @@ func bodyLimitReader(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// newBodyLimitRouter mounts the middleware the way both servers do, after StripSlashes, on a router
+// newBodyLimitRouter mounts the middleware the way both servers do, after StripTrailingSlash, on a router
 // with a subrouter, so the lookup has a full pattern to resolve across the two.
 func newBodyLimitRouter(policy BodyLimitPolicy, handler http.HandlerFunc) *chi.Mux {
 	router := chi.NewRouter()
-	router.Use(chimiddleware.StripSlashes)
+	router.Use(StripTrailingSlash)
 	router.Use(BodyLimit(router, policy))
 	registerBodyLimitRoutes(router, handler)
 	return router
@@ -92,7 +91,7 @@ func TestBodyLimit_TheLimitEachRequestMeets(t *testing.T) {
 		{"the longest prefix wins", http.MethodPost, "/api/deep/thing", "refused at 48"},
 		{"an exact route wins over its prefix", http.MethodPost, "/api/items/7", "refused at 64"},
 		{"the same pattern under another method falls to the prefix", http.MethodPut, "/api/items/7", "refused at 32"},
-		{"a trailing slash resolves as StripSlashes routes it", http.MethodPost, "/api/items/7/", "refused at 64"},
+		{"a trailing slash resolves as the strip routes it", http.MethodPost, "/api/items/7/", "refused at 64"},
 		{"an escaped path resolves by its raw form, as chi routes it", http.MethodPost, "/api/items/a%2Fb", "refused at 64"},
 	}
 	for _, test := range tests {
@@ -122,7 +121,7 @@ func TestBodyLimit_LeavesTheRouteContextAlone(t *testing.T) {
 		_, _ = fmt.Fprintf(w, "%s %v %v", rctx.RoutePattern(), rctx.URLParams.Keys, rctx.URLParams.Values)
 	}
 	without := chi.NewRouter()
-	without.Use(chimiddleware.StripSlashes)
+	without.Use(StripTrailingSlash)
 	registerBodyLimitRoutes(without, report)
 	want := serveBody(without, http.MethodPost, "/api/items/7", 3)
 	require.Contains(t, want, "/api/items/{id} ", "the baseline must have reached the route under test")

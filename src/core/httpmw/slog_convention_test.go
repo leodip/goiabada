@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // This file pins the level and the shape of the records core's middleware writes, per #320
@@ -25,7 +25,7 @@ import (
 // middleware_jwt_test.go.
 //
 // Each case also asserts request_id, which is decision 2 measured end to end rather than by
-// reading the call site: the attribute is on the record because chi's RequestID ran ahead of the
+// reading the call site: the attribute is on the record because requestid.Middleware ran ahead of the
 // middleware and the installed handler took the id off the context, and no call here names it.
 
 // requestIdOf reads the injected attribute, failing the test when it is absent.
@@ -33,7 +33,7 @@ func requestIdOf(t *testing.T, record logtest.CapturedRecord) string {
 	t.Helper()
 	requestId, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString,
-		"the record must carry request_id, injected by the handler from chi's request id")
+		"the record must carry request_id, injected by the handler from the request id")
 	require.NotEmpty(t, requestId)
 	return requestId
 }
@@ -59,7 +59,7 @@ func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(CSRF()(http.HandlerFunc(
+	requestid.Middleware(CSRF()(http.HandlerFunc(
 		func(http.ResponseWriter, *http.Request) {
 			t.Error("the handler must not be reached on a refused request")
 		}))).ServeHTTP(rr, req)
@@ -89,7 +89,7 @@ func TestSlogConvention_RequestLogCarriesTheInjectedRequestIdOnce(t *testing.T) 
 	logged := logtest.CaptureSlog(t)
 
 	rr := httptest.NewRecorder()
-	chimiddleware.RequestID(RequestLogger(true)(http.HandlerFunc(
+	requestid.Middleware(RequestLogger(true)(http.HandlerFunc(
 		func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }),
 	)).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 

@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -19,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -58,13 +57,13 @@ func stubRotateRead(database *datamocks.Database, keys []record.KeyPair) *datamo
 	return stub
 }
 
-// rotateKeysRequestId is chi's request id for these rows: the attribute the request logger writes,
+// rotateKeysRequestId is the request id for these rows: the attribute the request logger writes,
 // and therefore the one a 500's log record and its body have to agree on.
 const rotateKeysRequestId = "req-rotate-keys"
 
 func rotateRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/keys/rotate", nil)
-	r = r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, rotateKeysRequestId))
+	r = r.WithContext(requestid.NewContext(r.Context(), rotateKeysRequestId))
 	// The validated bearer token the chain puts on the context, which is where the audit
 	// payload's "logged_in_user" comes from. It used to come from a mocked
 	// AuthHelper.GetLoggedInSubject, which is why nothing here noticed the real accessor read a

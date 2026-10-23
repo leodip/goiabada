@@ -11,9 +11,10 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // Seam 3. CaptureSlog is both the seam every migrated suite asserts through and a unit in its own
@@ -68,7 +69,7 @@ func TestCaptureSlog_CapturesEveryLevelIncludingDebug(t *testing.T) {
 func TestCaptureSlog_ARecordLoggedWithChisRequestIdCarriesIt(t *testing.T) {
 	capture := CaptureSlog(t)
 
-	ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, "req-abc-123")
+	ctx := requestid.NewContext(context.Background(), "req-abc-123")
 	slog.InfoContext(ctx, "a record")
 
 	assert.Equal(t, "req-abc-123", oneRecord(t, capture).Attrs["request_id"])
@@ -91,13 +92,13 @@ func TestCaptureSlog_ARequestThroughChiCorrelatesTheHandlersRecord(t *testing.T)
 	capture := CaptureSlog(t)
 
 	router := chi.NewRouter()
-	router.Use(chimiddleware.RequestID)
+	router.Use(requestid.Middleware)
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		slog.InfoContext(r.Context(), "a handler record")
 	})
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	request.Header.Set(chimiddleware.RequestIDHeader, "req-from-the-edge")
+	request.Header.Set(requestid.Header, "req-from-the-edge")
 	router.ServeHTTP(httptest.NewRecorder(), request)
 
 	record := oneRecord(t, capture)

@@ -52,15 +52,15 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 
 	wantRoot := []string{
 		"github.com/leodip/goiabada/authserver/internal/middleware.CORS.func1",
-		"github.com/go-chi/chi/v5/middleware.RequestID",
+		"github.com/leodip/goiabada/core/requestid.Middleware",
 		"github.com/leodip/goiabada/core/httpmw.SecurityHeaders.func1",
 		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",
 		"github.com/leodip/goiabada/core/httpmw.RequestLogger.func1",
 		// Above Recoverer, as the logger is, so a panic is counted as the 500 its client got (#400).
 		"github.com/leodip/goiabada/core/metrics.HTTPRequests.func3",
-		"github.com/go-chi/chi/v5/middleware.Recoverer",
-		"github.com/go-chi/chi/v5/middleware.StripSlashes",
-		// After StripSlashes, whose path it routes by, and before the /auth/logout exemption
+		"github.com/leodip/goiabada/core/httpmw.Recoverer",
+		"github.com/leodip/goiabada/core/httpmw.StripTrailingSlash",
+		// After StripTrailingSlash, whose path it routes by, and before the /auth/logout exemption
 		// predicate, which parses the form body (#426).
 		"github.com/leodip/goiabada/core/httpmw.BodyLimit.func1",
 		"github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1",

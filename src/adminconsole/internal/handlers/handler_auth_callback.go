@@ -7,13 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
-
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -302,7 +301,7 @@ func renderSignInRefusal(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 		"code":        errorCode,
 		"description": errorDescription,
 		"serverFault": serverFault,
-		"requestId":   middleware.GetReqID(r.Context()),
+		"requestId":   requestid.FromContext(r.Context()),
 		"_httpStatus": refusal.status,
 	}
 	if err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/sign_in_error.html", bind); err != nil {

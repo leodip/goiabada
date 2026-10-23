@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 
 	"github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // Seam 5 of #427: SessionHandler, one row per step of its per-request order, over a real
@@ -79,7 +79,7 @@ func (f *fakeRefresher) Refresh(ctx context.Context, refreshToken string) (*oaut
 	f.mu.Lock()
 	f.calls++
 	f.refreshToken = refreshToken
-	f.requestID = chimiddleware.GetReqID(ctx)
+	f.requestID = requestid.FromContext(ctx)
 	during := f.during
 	f.mu.Unlock()
 	if during != nil {
@@ -137,7 +137,7 @@ type observedContext struct {
 func observe(ctx context.Context) observedContext {
 	deadline, hasDeadline := ctx.Deadline()
 	return observedContext{err: ctx.Err(), deadline: deadline, hasDeadline: hasDeadline,
-		requestID: chimiddleware.GetReqID(ctx)}
+		requestID: requestid.FromContext(ctx)}
 }
 
 func (b *contextHonouringBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
@@ -908,7 +908,7 @@ func TestSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 
 	const wantRequestID = "the-inbound-request-id"
 	ctx, cancel := context.WithCancel(
-		context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
+		requestid.NewContext(context.Background(), wantRequestID))
 	defer cancel()
 
 	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).Return(verifiedStored, nil)

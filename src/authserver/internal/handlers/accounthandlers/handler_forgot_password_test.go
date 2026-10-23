@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -25,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -120,7 +120,7 @@ func (h *heldJobs) runAll(t *testing.T, class afterresponse.Class) {
 	}
 }
 
-// forgotPasswordRequestId is the request id forgotPasswordRequest carries, as chi's RequestID
+// forgotPasswordRequestId is the request id forgotPasswordRequest carries, as requestid.Middleware
 // middleware puts one on every request.
 const forgotPasswordRequestId = "req-forgot-0001"
 
@@ -131,7 +131,7 @@ func forgotPasswordRequest(email string) *http.Request {
 	form.Add("email", email)
 	req := httptest.NewRequest("POST", "/forgot-password", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, forgotPasswordRequestId)
+	ctx := requestid.NewContext(req.Context(), forgotPasswordRequestId)
 	return req.WithContext(reqctx.WithSettings(ctx, &record.Settings{
 		AppName:       "TestApp",
 		SMTPEnabled:   true,
@@ -564,7 +564,7 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 			emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 
 			require.Len(t, jobs.jobs, 1, "the rest is handed to one job")
-			assert.Equal(t, forgotPasswordRequestId, jobs.ctxs[0].Value(chimiddleware.RequestIDKey),
+			assert.Equal(t, forgotPasswordRequestId, requestid.FromContext(jobs.ctxs[0]),
 				"the job is handed the request's context, so what it records joins the request")
 		})
 	}
@@ -674,7 +674,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		}, details)
 		assert.Equal(t, []string{"audit", "send"}, order,
 			"the record is written once the code is stored and before the mail is sent")
-		assert.Equal(t, forgotPasswordRequestId, auditCtx.Value(chimiddleware.RequestIDKey),
+		assert.Equal(t, forgotPasswordRequestId, requestid.FromContext(auditCtx),
 			"the record is written under the job's context, which carries the request's id")
 	})
 

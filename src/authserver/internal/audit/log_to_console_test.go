@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +75,7 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 func TestLogToConsole_CarriesTheRequestIdOfTheContextItIsGiven(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, "host/req-0000001")
+	ctx := requestid.NewContext(context.Background(), "host/req-0000001")
 	LogToConsole(ctx, "auth_failed_pwd", map[string]any{"email": "jane@example.com"})
 
 	records := logs.Records()

@@ -11,9 +11,8 @@ import (
 	"os"
 	"strings"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
-
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // Install builds the process-wide handler from the two configured settings and
@@ -80,7 +79,7 @@ func errorWithStack(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-// WrapRequestID returns h with chi's request id appended to every record logged
+// WrapRequestID returns h with the request id appended to every record logged
 // with a context that carries one, so no call site has to name it.
 //
 // It is exported because logtest.CaptureSlog wraps its recorder with it: a
@@ -121,12 +120,12 @@ func (h *requestIDHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *requestIDHandler) Handle(ctx context.Context, r slog.Record) error {
-	requestId := chimiddleware.GetReqID(ctx)
+	requestId := requestid.FromContext(ctx)
 	if requestId == "" {
 		return h.delegate.Handle(ctx, r)
 	}
 
-	// Through FieldForLog because chi's RequestID middleware adopts an inbound
+	// Through FieldForLog because requestid.Middleware adopts an inbound
 	// X-Request-Id header verbatim, so this string is client-chosen on every
 	// request that supplies one (#159).
 	attr := slog.String("request_id", FieldForLog(requestId))

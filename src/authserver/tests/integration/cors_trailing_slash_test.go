@@ -12,7 +12,7 @@ import (
 )
 
 // TestCors_TrailingSlashUsesTheSamePolicy proves the CORS middleware mounted on the running
-// server treats paths that chi's StripSlashes routes to the same handler alike. Unit tests can
+// server treats paths that the trailing-slash strip routes to the same handler alike. Unit tests can
 // prove the policy function's answer, but they stay green if the middleware is no longer mounted.
 func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 	origin := "https://cors-" + strings.ToLower(fake.LetterN(8)) + ".example.com"

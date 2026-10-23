@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -27,12 +27,12 @@ import (
 const propagatedRequestId = "goiabada/req-validation-propagation-1"
 
 func aCallersContext() context.Context {
-	return context.WithValue(context.Background(), chimiddleware.RequestIDKey, propagatedRequestId)
+	return requestid.NewContext(context.Background(), propagatedRequestId)
 }
 
 func theCallersContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return chimiddleware.GetReqID(ctx) == propagatedRequestId
+		return requestid.FromContext(ctx) == propagatedRequestId
 	})
 }
 

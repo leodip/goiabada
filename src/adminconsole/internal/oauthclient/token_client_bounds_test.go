@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -172,7 +172,7 @@ func (o *outboundContext) client() *http.Client {
 		o.called.Store(true)
 		o.ctxErr = r.Context().Err()
 		o.deadline, o.hasLimit = r.Context().Deadline()
-		o.requestID = chimiddleware.GetReqID(r.Context())
+		o.requestID = requestid.FromContext(r.Context())
 		return nil, errs.New("the transport stops here")
 	})}
 }
@@ -186,7 +186,7 @@ func (o *outboundContext) client() *http.Client {
 //
 // The caller's context here is already cancelled, which is exactly that. What reaches
 // the request has to be live anyway, bounded by TokenExchangeTimeout, which is what
-// replaces the cancellation, and still carrying the caller's values: chi's RequestID
+// replaces the cancellation, and still carrying the caller's values: requestid.Middleware
 // puts the id on every inbound request and the installed slog handler lifts it off the
 // context onto every record, so context.Background() would silence this grant in the
 // operator's log. Passing ctx straight through is the one-token change this case
@@ -196,7 +196,7 @@ func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestI
 		t.Run(g.name, func(t *testing.T) {
 			const wantRequestID = "the-inbound-request-id"
 			ctx, cancel := context.WithCancel(
-				context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
+				requestid.NewContext(context.Background(), wantRequestID))
 			cancel()
 
 			outbound := &outboundContext{}
@@ -247,7 +247,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 
 	t.Run("a live caller with no deadline gets TokenExchangeTimeout", func(t *testing.T) {
 		const wantRequestID = "the-inbound-request-id"
-		ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID)
+		ctx := requestid.NewContext(context.Background(), wantRequestID)
 
 		outbound := &outboundContext{}
 		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil).ClientCredentials(ctx, "s")
@@ -288,7 +288,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 // it rode on the context and the installed handler read it off there.
 func TestExchangeCode_TheExchangeIsDebugAndCarriesTheTokenUrlAndTheRequestId(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, "req-admin-callback")
+	ctx := requestid.NewContext(context.Background(), "req-admin-callback")
 
 	_, err := NewTokenClient("https://authserver.internal.example/auth/token", "ci", "cs", clientReturning(http.StatusOK, io.NopCloser(strings.NewReader(`{}`))), nil).
 		ExchangeCode(ctx, "c", "r", "cv")

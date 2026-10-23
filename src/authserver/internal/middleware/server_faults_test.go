@@ -1,18 +1,17 @@
 package middleware
 
 import (
-	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -45,10 +44,10 @@ func faultFormats() []faultFormat {
 	}
 }
 
-// faultRequest is a request carrying the request id chi's RequestID would have put on it.
+// faultRequest is a request carrying the request id requestid.Middleware would have put on it.
 func faultRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/auth/token", nil)
-	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, faultRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), faultRequestId))
 }
 
 // faultingSessionStore is a browser session store answering the session middleware's read with

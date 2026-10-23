@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,9 +20,9 @@ import (
 func TestRender_SettingsUnavailable(t *testing.T) {
 	var requestID string
 	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
+	router.Use(requestid.Middleware)
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		requestID = middleware.GetReqID(r.Context())
+		requestID = requestid.FromContext(r.Context())
 		r = r.WithContext(i18n.WithLocale(r.Context(), true, "pt-BR"))
 		render.New(web.TemplateFS(), web.StaticFS()).SettingsUnavailable(w, r,
 			"adminconsole.error.settings_unavailable_title", "adminconsole.error.settings_unavailable")

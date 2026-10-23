@@ -1,7 +1,6 @@
 package apiresponse
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -11,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,12 +23,12 @@ import (
 
 const requestId = "req-abc-123"
 
-// requestWithId builds a request carrying chi's request id, which is the attribute the request
+// requestWithId builds a request carrying the request id, which is the attribute the request
 // logger already writes and therefore the one the body and the log record have to agree on.
 func requestWithId(t *testing.T) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/anything", nil)
-	return r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, requestId))
+	return r.WithContext(requestid.NewContext(r.Context(), requestId))
 }
 
 func decodeEnvelope(t *testing.T, rr *httptest.ResponseRecorder) (code, description string) {

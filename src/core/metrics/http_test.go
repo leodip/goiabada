@@ -1,7 +1,7 @@
 package metrics_test
 
 // Seam: a chi router with the request middleware mounted the way both servers mount it, above
-// chi's Recoverer, driven with real requests and read back through a scrape. The router has a
+// httpmw.Recoverer, driven with real requests and read back through a scrape. The router has a
 // parameterized route, a subrouter from Route, a mounted subrouter, a route that panics and one
 // that returns without writing, which are the shapes whose route label is not simply the path.
 
@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/metrics"
 )
 
@@ -27,7 +27,7 @@ func ok(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
 func newInstrumentedRouter(reg *metrics.Registry) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(metrics.HTTPRequests(reg, r))
-	r.Use(chimiddleware.Recoverer)
+	r.Use(httpmw.Recoverer)
 
 	r.Get("/health", ok)
 	r.Get("/users/{id}", ok)

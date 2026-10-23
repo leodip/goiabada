@@ -10,7 +10,6 @@ import (
 	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // This handler carried the console's only caller-side error log: a slog.Error on every apiClient
@@ -55,7 +55,7 @@ func permissionRecords(t *testing.T, client *permissionsByResourceClient, query 
 	httpHelper := render.New(fstest.MapFS{}, nil)
 
 	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
+	router.Use(requestid.Middleware)
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := reqctx.WithJwtInfo(r.Context(),
@@ -171,7 +171,7 @@ func TestAdminGetPermissions_TheCallCarriesTheRequestsContext(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	require.NotNil(t, client.seen, "the handler must consult its API client")
-	assert.NotEmpty(t, middleware.GetReqID(client.seen),
+	assert.NotEmpty(t, requestid.FromContext(client.seen),
 		"the call carried the request's own context, which is where the request id lives")
 }
 
@@ -183,7 +183,7 @@ func TestAdminGetPermissions_WithoutATokenSetAnswersTheSentinel(t *testing.T) {
 	client := &permissionsByResourceClient{}
 
 	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
+	router.Use(requestid.Middleware)
 	router.Get("/admin/permissions", HandleAdminGetPermissionsGet(render.New(fstest.MapFS{}, nil), client))
 
 	recorder := httptest.NewRecorder()

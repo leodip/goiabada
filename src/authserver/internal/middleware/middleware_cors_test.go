@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -277,7 +277,7 @@ func TestCORS_APreflightIsCacheable(t *testing.T) {
 // else, so a WebOriginExists issued on context.Background() would keep answering for a browser
 // that has already gone away.
 //
-// chi's request id is on this request's context and on no other, so a middleware that passed
+// the request id is on this request's context and on no other, so a middleware that passed
 // context.Background() matches nothing and the strict mock reports an unexpected call.
 
 const corsPropagatedRequestId = "goiabada/req-cors-propagation-1"
@@ -286,12 +286,12 @@ func corsRequestCarryingId(path, origin string) *http.Request {
 	req := httptest.NewRequest("OPTIONS", path, nil)
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Access-Control-Request-Method", "GET")
-	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, corsPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), corsPropagatedRequestId))
 }
 
 func theCorsRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return chimiddleware.GetReqID(ctx) == corsPropagatedRequestId
+		return requestid.FromContext(ctx) == corsPropagatedRequestId
 	})
 }
 

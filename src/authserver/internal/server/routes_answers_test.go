@@ -378,7 +378,7 @@ func TestRegisterRoutes_TheStaticFilesTheFaviconAndHealth(t *testing.T) {
 	assert.Equal(t, "healthy", health.Body.String())
 }
 
-// mintedRequestId is the request id chi's RequestID mints when a request carries none, the shape
+// mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape
 // #462 decision 6 keeps: the host name, ten base62 characters, and a counter of at least six
 // digits. A host whose name cannot be read is localhost.
 func mintedRequestId(t *testing.T) *regexp.Regexp {
@@ -483,6 +483,38 @@ func TestRegisterRoutes_APanicIsAnswered500OnEachBranch(t *testing.T) {
 		`goiabada_http_requests_total{route="/api/public/settings",method="GET",status="500"} 1`,
 	} {
 		assert.Contains(t, exposition, line+"\n")
+	}
+}
+
+// A panic is one ERROR record on every branch, carrying the request id and the stack the panic was
+// raised on, through the process's one handler: on the page branch the root's recovery writes it,
+// where chi's wrote a coloured trace to standard error outside the log stream (#462), and on a JSON
+// branch the branch's 500 does.
+func TestRegisterRoutes_APanicIsOneErrorRecordOnEachBranch(t *testing.T) {
+	s := newPanickingServer(t, "the settings read panicked")
+	logged := logtest.CaptureSlog(t)
+
+	for _, request := range []struct{ method, target string }{
+		{http.MethodGet, "/openapi.yaml"},
+		{http.MethodGet, "/no/such/page"},
+		{http.MethodGet, "/.well-known/openid-configuration"},
+		{http.MethodPost, "/auth/token"},
+		{http.MethodGet, "/api/public/settings"},
+	} {
+		t.Run(request.method+" "+request.target, func(t *testing.T) {
+			requestId := "panic-record" + strings.ReplaceAll(request.target, "/", "-")
+			serveRouting(s, request.method, request.target, http.Header{"X-Request-Id": {requestId}})
+
+			var lines []string
+			for _, line := range strings.Split(logged.Text(), "\n") {
+				if strings.Contains(line, "level=ERROR") && strings.Contains(line, "request_id="+requestId) {
+					lines = append(lines, line)
+				}
+			}
+			require.Len(t, lines, 1, "one ERROR record for the panic:\n%s", logged.Text())
+			assert.Contains(t, lines[0], "the settings read panicked")
+			assert.Contains(t, lines[0], "routes_answers_test.go", "the record carries the stack the panic was raised on")
+		})
 	}
 }
 

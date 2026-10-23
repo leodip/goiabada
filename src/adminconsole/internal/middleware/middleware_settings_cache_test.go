@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,12 +72,12 @@ func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *htt
 	})
 
 	recorder := httptest.NewRecorder()
-	// chi's RequestID in front, exactly as Server.initMiddleware mounts it, because the two
+	// requestid.Middleware in front, exactly as Server.initMiddleware mounts it, because the two
 	// refusals below no longer name request_id themselves: the installed handler reads chi's id
 	// off the context and appends it. Without this middleware the id does not exist, so the two
 	// cases asserting the attribute are what would fail if the wrapper were removed (#320
 	// decision 2).
-	chimiddleware.RequestID(
+	requestid.Middleware(
 		i18n.Locale(nil)(
 			SettingsCache(publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 				render.New(web.TemplateFS(), web.StaticFS()))(next),

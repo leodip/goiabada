@@ -4,12 +4,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/go-chi/chi/v5/middleware"
-
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/authorizerequest"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // HandleAuthorizePost answers a POST to the authorization endpoint with a 303 to a GET, once
@@ -38,7 +37,7 @@ func HandleAuthorizePost(
 
 		r = withUILocales(r, authflow.AuthorizeUILocales(params))
 
-		result, err := parking.Run(r.Context(), params, middleware.GetReqID(r.Context()))
+		result, err := parking.Run(r.Context(), params, requestid.FromContext(r.Context()))
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return
