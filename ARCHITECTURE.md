@@ -115,6 +115,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/logging` | kernel | — |
 | `core/metrics` | kernel | — |
 | `core/oauth` | kernel | — |
+| `core/passwordblocklist` | kernel | — |
 | `core/phonecountries` | kernel | — |
 | `core/securerandom` | kernel | — |
 | `core/sessionstore` | kernel | — |
@@ -182,6 +183,12 @@ Notes on rows that are not self-evident:
   URL the wizard writes is one the start accepts and the save keeps. `inputvalidation.TextLength`
   counts the same unit, but the wizard cannot link that package, so the leaf counts it itself, and
   `core/guard`'s `imports_only_lint_test.go` holds it to `core/errs` and the standard library (#615).
+- `core/passwordblocklist` is kernel because it is written for the two places the `nist` password
+  policy is applied, which must agree: the auth server's account validator, on every path that sets
+  a password, and `core/adminpassword`, the first administrator's rule the setup wizard shares. It
+  holds the generated list of commonly used passwords and the check against the account's own
+  words, and imports the standard library alone, for `core/adminpassword`'s reason: the wizard links
+  whatever it imports, and `core/guard`'s `imports_only_lint_test.go` holds it there (#550).
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are

@@ -44,3 +44,14 @@ func TestIssuerLength_ImportsNothingButErrsAndTheStandardLibrary(t *testing.T) {
 		"A refusal message that needs localizing, or anything else that needs a dependency, belongs "+
 		"with the caller that renders it, not in the bound the start, the save and the wizard share (#615).")
 }
+
+// TestPasswordBlocklist_ImportsNothingButTheStandardLibrary holds core/passwordblocklist to being
+// a leaf, for core/adminpassword's reason: the first administrator's rule the setup wizard calls
+// reads the blocklist, so the wizard links whatever this package imports (#550 decision 7).
+func TestPasswordBlocklist_ImportsNothingButTheStandardLibrary(t *testing.T) {
+	AssertImportsOnly(t, "core/passwordblocklist", map[string]string{},
+		"The setup wizard links whatever this package imports, through the first administrator's "+
+			"rule. The two checks are comparisons over strings and need nothing more; a refusal "+
+			"message, or anything else that needs a dependency, belongs with the caller that "+
+			"renders it (#550).")
+}

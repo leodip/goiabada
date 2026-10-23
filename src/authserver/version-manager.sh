@@ -13,7 +13,7 @@
 #   check   - Check online for newer versions of dependencies
 #   update  - Update version strings in all project files
 #   deps    - Update Go modules and npm packages
-#   generate - Regenerate committed data files (timezones, countries)
+#   generate - Regenerate committed data files (timezones, countries, passwordblocklist)
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
@@ -916,8 +916,10 @@ cmd_deps() {
 # sources. Each target has a `generate/` sub-package run with `go run .`:
 #   timezones -> src/core/timezones/data_generated.go  (from IANA tzdata)
 #   countries -> src/core/countries/data_generated.go  (from datahub CSV)
+#   passwordblocklist -> src/core/passwordblocklist/data_generated.go
+#                        (from three SecLists password lists)
 #
-# Usage: generate [timezones|countries|all]   (default: all)
+# Usage: generate [timezones|countries|passwordblocklist|all]   (default: all)
 #
 # Exit status: the script omits 'set -e', so exit codes are captured
 # explicitly. An unknown target, a missing generator dir, or any `go run`
@@ -932,10 +934,11 @@ cmd_generate() {
     case "$target" in
         timezones) pkgs=("timezones") ;;
         countries) pkgs=("countries") ;;
-        all)       pkgs=("timezones" "countries") ;;
+        passwordblocklist) pkgs=("passwordblocklist") ;;
+        all)       pkgs=("timezones" "countries" "passwordblocklist") ;;
         *)
             print_error "Unknown generate target: ${target}"
-            echo "Valid targets: timezones, countries, all"
+            echo "Valid targets: timezones, countries, passwordblocklist, all"
             return 1
             ;;
     esac
@@ -1015,7 +1018,7 @@ show_help() {
     echo "  check   Check online for newer versions"
     echo "  update  Update version strings in all project files"
     echo "  deps    Update Go modules and npm packages"
-    echo "  generate Regenerate committed data files (timezones, countries)"
+    echo "  generate Regenerate committed data files (timezones, countries, passwordblocklist)"
     echo "  all     Run all commands in sequence"
     echo ""
     echo "Scope: toolchain and CDN pins only. The product version comes from"
@@ -1034,7 +1037,7 @@ show_help() {
     echo "  $0 show          # See current versions"
     echo "  $0 check         # Check for newer versions online"
     echo "  $0 update        # Apply versions from yaml to files"
-    echo "  $0 generate      # Regenerate timezones + countries data files"
+    echo "  $0 generate      # Regenerate timezones, countries and passwordblocklist data files"
     echo ""
 }
 
