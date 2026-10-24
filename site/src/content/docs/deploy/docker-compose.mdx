@@ -105,6 +105,14 @@ The auth server writes to two directories, and its image creates both owned by 1
 
 The generated file also drops every capability, keeps the root file system read-only and gives each server a `/tmp` in memory.
 
+## What the images contain
+
+Each image is Alpine with the server's binary and eight Alpine packages, upgraded when the image is built: `alpine-baselayout`, `alpine-baselayout-data`, `alpine-keys`, `alpine-release`, `busybox`, `busybox-binsh`, `ca-certificates-bundle` and `musl`. The binaries are static and do their own TLS, so that's all they need: BusyBox gives the shell and the `wget` the healthchecks run, and the CA bundle at `/etc/ssl/certs/ca-certificates.crt` is what the servers check a certificate against when they connect over TLS to the database, the SMTP server or each other.
+
+There's no package manager, so `apk` doesn't run inside a container, and no OpenSSL, zlib or `ssl_client`, so an image scanner has little to report. Without `ssl_client`, the image's `wget` reaches `http://` addresses only: `wget https://…` fails with `can't execute 'ssl_client'`. The healthchecks the setup wizard writes call `http://`, so they're unaffected.
+
+To add a tool to an image of your own built on Goiabada's, install it in another stage and copy it in, since `apk` isn't there to run.
+
 <Aside type="note" title="Local testing">
 The wizard's **Local testing** choice writes Compose files too, serving plain HTTP on `localhost`, published on every interface, with no proxy. It's for the [Quickstart](/get-started/quickstart/), never for a deployment other people reach.
 </Aside>
