@@ -19,7 +19,8 @@ import (
 // confirmation page's button submits: the account's and a client's sessions through
 // pages/user-sessions.js, a user's through its template's script.
 //
-// Lexical, like its neighbours, because no tier runs JavaScript: it holds utils.js to building a
+// Lexical, like its neighbours, because no tier runs a page's JavaScript, the one test that runs
+// any, TestUtilsJS_Durations, running utils.js with no page: it holds utils.js to building a
 // POST to /auth/logout, the scripts of the three pages to calling it, and every template and
 // script to navigating to /auth/logout nowhere.
 

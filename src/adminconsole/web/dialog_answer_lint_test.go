@@ -22,7 +22,8 @@ import (
 // kept whatever callback a previous call had left on it, so a "close" after a "yes/no" could still
 // run the old Yes.
 //
-// Lexical, like the checks in static_lint_test.go, because no tier runs JavaScript: inside
+// Lexical, like the checks in static_lint_test.go, because no tier runs a dialog's JavaScript, the
+// one test that runs any, TestUtilsJS_Durations, running utils.js with no page: inside
 // showModalDialog's body, an inner function whose returned handler calls preventDefault, then
 // close on the dialog element, and only after both its callback; each button's onclick set once,
 // to that function's answer for its own callback; and neither callback read anywhere else, since a

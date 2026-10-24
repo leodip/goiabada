@@ -55,7 +55,8 @@ func jsLiteral(s string) string {
 // HTML parser is the dialog's plain branch, which core/guard.AssertNoHTMLSinks holds to writing no
 // innerHTML, and which this test reads as a textContent write besides, as it reads showNotice's.
 //
-// Lexical, like its neighbours, because no JavaScript runs in any tier: each occurrence of
+// Lexical, like its neighbours, because the one test that runs JavaScript, TestUtilsJS_Durations,
+// runs utils.js's durations in a context with no page to show a dialog in: each occurrence of
 // err.error_description outside a comment must be the whole third argument of a showModalDialog
 // call or the whole second of a fail call, and fail must hand its message on whole. A sink that reaches the same value by another spelling, destructuring it or aliasing it
 // first, is out of this check's reach.

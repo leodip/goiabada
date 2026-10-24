@@ -124,9 +124,24 @@ test("a second verification code asked for at once is refused, saying how long t
   const status = own.page.locator("#verification-status");
   await send.click();
   await expect(status).toHaveText(`We sent a code to ${user.email}. Check your inbox and spam folder.`);
-  // One code per address for as long as a code lasts, the wait written as a duration.
+  // One code per address for as long as a code lasts, the wait written as a duration of at most
+  // five minutes, in minutes and seconds.
   await send.click();
-  await expect(status).toHaveText(/^Wait .+ before asking for another code\.$/);
+  await expect(status).toHaveText(/^Wait (\d+ minutes?(, \d+ seconds?)?|\d+ seconds?) before asking for another code\.$/);
+  await own.context.close();
+});
+
+test("on a page in Portuguese, the wait for a second verification code is said in Portuguese", async ({ browser, users }) => {
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/email-verification");
+  await own.page.goto(`${env.adminUrl}/account/email-verification?ui_locales=pt-BR`);
+  await expect(own.page.locator("html")).toHaveAttribute("data-catalog-lang", "pt-BR");
+  const send = own.page.getByRole("button", { name: "Enviar código" });
+  const status = own.page.locator("#verification-status");
+  await send.click();
+  await expect(status).toHaveText(`Enviamos um código para ${user.email}. Verifique sua caixa de entrada e a pasta de spam.`);
+  await send.click();
+  await expect(status).toHaveText(/^Aguarde (\d+ minutos?( e \d+ segundos?)?|\d+ segundos?) antes de pedir outro código\.$/);
   await own.context.close();
 });
 
