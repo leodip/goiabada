@@ -1,6 +1,7 @@
 package render
 
 import (
+	"io/fs"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -262,6 +264,77 @@ func TestRenderTemplateToBuffer_EmailBodyFollowsTheSubjectCatalog(t *testing.T) 
 			require.NoError(t, err)
 			require.Equal(t, tc.want, i18n.CatalogTag(req.Context()), "the subject's catalog")
 			assert.Equal(t, i18n.CatalogTag(req.Context()), buf.String(), "the body's copy")
+		})
+	}
+}
+
+// emailLayoutFS is the shipped email layout over fixture bodies, one per language, so an operator's
+// copy can be drawn in the real layout beside the copies this server ships.
+func emailLayoutFS(t *testing.T, suffixes ...string) fstest.MapFS {
+	t.Helper()
+	layout, err := fs.ReadFile(web.TemplateFS(), "layouts/email_layout.html")
+	require.NoError(t, err)
+	body := func(name string) *fstest.MapFile {
+		return &fstest.MapFile{Data: []byte(`{{define "title"}}t{{end}}{{define "head"}}{{end}}` +
+			`{{define "body"}}the ` + name + ` body{{end}}`)}
+	}
+	templateFS := fstest.MapFS{
+		"layouts/email_layout.html": {Data: layout},
+		"emails/note.html":          body("base"),
+	}
+	for _, suffix := range suffixes {
+		templateFS["emails/note."+suffix+".html"] = body(suffix)
+	}
+	return templateFS
+}
+
+// An email is marked with the language of the body copy it was drawn with, not the recipient's
+// locale and not a hardcoded en: the base copy is English, the .pt-BR copy pt-BR, and an operator's
+// .es or .es-MX copy its own tag. A screen reader chooses its voice from the attribute (WCAG 2.2 SC
+// 3.1.1, #645 decision 10).
+func TestRenderTemplateToBuffer_EmailIsMarkedWithItsBodyCopyLanguage(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		suffixes []string
+		locale   string
+		lang     string
+		body     string
+	}{
+		{"a pt-BR recipient", []string{"pt-BR"}, "pt-BR", "pt-BR", "the pt-BR body"},
+		{"a pt recipient reads the pt-BR copy", []string{"pt-BR"}, "pt", "pt-BR", "the pt-BR body"},
+		{"an en recipient", []string{"pt-BR"}, "en", "en", "the base body"},
+		{"an en-GB recipient reads the base copy", []string{"pt-BR"}, "en-GB", "en", "the base body"},
+		{"a de recipient, with no German copy", []string{"pt-BR"}, "de", "en", "the base body"},
+		{"no locale at all", []string{"pt-BR"}, "", "en", "the base body"},
+		{"an operator's es copy for es-MX", []string{"pt-BR", "es"}, "es-MX", "es", "the es body"},
+		{"an operator's exact es-MX copy", []string{"es", "es-MX"}, "es-MX", "es-MX", "the es-MX body"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := renderEmail(t, emailLayoutFS(t, tc.suffixes...), tc.locale)
+
+			require.NoError(t, err)
+			assert.Contains(t, body, tc.body, "the body copy chosen")
+			assert.Contains(t, body, `<html lang="`+tc.lang+`">`)
+		})
+	}
+}
+
+// The emails this server ships are marked so too: the forgot-password email, drawn in the real
+// layout from the real copies, says pt-BR for a pt-BR recipient and en for an English one or one
+// whose language has no copy.
+func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(t *testing.T) {
+	for locale, want := range map[string]string{"pt-BR": "pt-BR", "en": "en", "de-DE": "en"} {
+		t.Run(locale, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
+			req = req.WithContext(i18n.WithLocale(req.Context(), true, locale, "en"))
+
+			buf, err := New(web.TemplateFS(), web.StaticFS()).RenderTemplateToBuffer(req,
+				"/layouts/email_layout.html", "/emails/email_forgot_password.html",
+				map[string]interface{}{"name": "Ana", "link": "https://example.com/reset"})
+
+			require.NoError(t, err)
+			assert.Contains(t, buf.String(), `<html lang="`+want+`">`)
 		})
 	}
 }

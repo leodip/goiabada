@@ -178,7 +178,11 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 	// subject renders from the es catalog), and a locale no copy shares a
 	// language with keeps <name>.html, the English baseline. The default
 	// locale "en" is always served by the base file (#531).
+	//
+	// The layout marks the email with the language of the copy chosen, which
+	// is the body's, not the recipient's locale (#645 decision 10).
 	if strings.HasPrefix(templateName, "emails/") {
+		requested := templateName
 		locale := i18n.LocaleTag(r.Context())
 		if locale != "" && locale != "en" {
 			ext := filepath.Ext(templateName)
@@ -190,6 +194,7 @@ func (h *Renderer) RenderTemplateToBuffer(r *http.Request, layoutName string, te
 				templateName = localizedEmailTemplate(h.templateFS, templateName, locale)
 			}
 		}
+		data["emailLang"] = emailCopyLang(requested, templateName)
 	}
 
 	templateFiles := []string{
@@ -283,6 +288,23 @@ func localizedEmailTemplate(templateFS fs.FS, templateName, locale string) strin
 		return templateName
 	}
 	return base + "." + suffixes[idx] + ext
+}
+
+// emailCopyLang answers the language the chosen copy of an email is written in:
+// English for the base file, and for a copy <name>.<tag>.html its own tag,
+// written as BCP 47 spells it, so an operator's .es copy is es and the .pt-BR
+// copy pt-BR. A suffix that does not parse is written as it stands, being
+// the only name the copy has for its language.
+func emailCopyLang(requested, chosen string) string {
+	if chosen == requested {
+		return "en"
+	}
+	ext := filepath.Ext(requested)
+	suffix := strings.TrimSuffix(strings.TrimPrefix(chosen, strings.TrimSuffix(requested, ext)+"."), ext)
+	if tag, err := language.Parse(suffix); err == nil {
+		return tag.String()
+	}
+	return suffix
 }
 
 func (h *Renderer) JSONError(w http.ResponseWriter, r *http.Request, err error) {

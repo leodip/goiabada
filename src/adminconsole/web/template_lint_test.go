@@ -29,8 +29,7 @@ func TestTemplates_NoCsrfField(t *testing.T) {
 }
 
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
-// lang attribute from the active locale. This module's email layouts are exempt, being per-locale
-// sibling files.
+// lang attribute from the active locale. This module sends no email, so it has no email layout.
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
 }
@@ -40,7 +39,7 @@ func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 // core/guard.AssertWellFormedTemplates, which carries each rule and its reasoning (#617). Each page
 // is read as served, in the layouts the handlers under ../internal render it in.
 func TestTemplates_AreWellFormed(t *testing.T) {
-	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", emailTemplates)
+	guard.AssertWellFormedTemplates(t, templateFS, "template", "../internal", nil)
 }
 
 // TestPages_NameOnlyClassesMainCSSDraws holds every class a page names to a rule in the
@@ -51,17 +50,5 @@ func TestPages_NameOnlyClassesMainCSSDraws(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	guard.AssertClassesAreDrawn(t, css, emailTemplatesAsWalked(), templateFS)
+	guard.AssertClassesAreDrawn(t, css, nil, templateFS)
 }
-
-// emailTemplatesAsWalked is emailTemplates as a walk of templateFS from its root spells them.
-func emailTemplatesAsWalked() []string {
-	walked := make([]string, 0, len(emailTemplates))
-	for _, entry := range emailTemplates {
-		walked = append(walked, "template/"+entry)
-	}
-	return walked
-}
-
-// emailTemplates are not pages: no rule reads them.
-var emailTemplates = []string{"layouts/email_layout.html"}

@@ -26,8 +26,7 @@ func TestTemplates_NoCsrfField(t *testing.T) {
 }
 
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
-// lang attribute from the active locale. This module's email layouts are exempt, being per-locale
-// sibling files.
+// lang attribute from the active locale, and the email layout from the body copy the renderer chose.
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
 	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
 }
