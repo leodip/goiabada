@@ -89,7 +89,6 @@ var machineOnlyRefusals = map[string]machineOnlyClass{
 	// account API: its one caller is the console's session backend, whose refusals no person reads
 	// (#559 decision 3).
 	"Session id is required":         classMissingOrBadID,
-	"Session identifier is required": classMissingOrBadID,
 	"User ID is required":            classMissingOrBadID,
 	"User session ID is required":    classMissingOrBadID,
 	"Invalid attribute ID":           classMissingOrBadID,

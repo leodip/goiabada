@@ -268,7 +268,7 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// User session routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/sessions", apihandlers.HandleUserSessionsGet(s.database))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-sessions/{sessionIdentifier}", apihandlers.HandleUserSessionGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/user-sessions/{id}", apihandlers.HandleUserSessionGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-sessions/{id}", apihandlers.HandleUserSessionDelete(s.database, auditLogger))
 
 		// User consent routes

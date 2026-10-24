@@ -1003,19 +1003,27 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/admin/user-sessions/{sessionIdentifier}:
+  /api/v1/admin/user-sessions/{id}:
     get:
       tags: [User Sessions]
       summary: Get session
-      description: Get session details by identifier
+      description: |
+        Get one live session by its numeric id, the `id` a session list returns, as a session list
+        carries it: its device, IP address and the clients it authorized. A session that has passed
+        the configured idle timeout or maximum lifetime is answered with 404, as an id naming no
+        session is.
+
+        `isCurrent` marks the session the calling token was issued through. A token carrying no
+        `sid` claim, such as one from the client credentials grant, gets `false`.
       operationId: getUserSession
       parameters:
-        - name: sessionIdentifier
+        - name: id
           in: path
           required: true
-          description: Session identifier
+          description: Session ID
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: Session details
@@ -1037,19 +1045,17 @@ paths:
       tags: [User Sessions]
       summary: Delete session
       description: |
-        Terminate a user session. The session's authorization codes are marked revoked and the
-        refresh tokens descended from them are swept, offline refresh tokens included, in one
-        transaction.
-
-        Note: while GET takes the sessionIdentifier, DELETE takes the numeric session id at the
-        same position. It does not accept the identifier: a value that is not an integer is
-        refused with 400 and error_code VALIDATION_ERROR.
+        Terminate a live user session by its numeric id. The session's authorization codes are
+        marked revoked and the refresh tokens descended from them are swept, offline refresh tokens
+        included, in one transaction. A session that has passed the configured idle timeout or
+        maximum lifetime is already gone: it is answered with 404, as an id naming no session is,
+        and nothing is revoked.
       operationId: deleteUserSession
       parameters:
-        - name: sessionIdentifier
+        - name: id
           in: path
           required: true
-          description: Session ID (numeric)
+          description: Session ID
           schema:
             type: integer
             format: int64
@@ -1750,14 +1756,20 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/admin/resources/{id}/permissions:
+  /api/v1/admin/resources/{resourceId}/permissions:
     get:
       tags: [Resources]
       summary: Get resource permissions
       description: Get permissions defined for a resource
       operationId: getResourcePermissions
       parameters:
-        - $ref: '#/components/parameters/ResourceIdParam'
+        - name: resourceId
+          in: path
+          required: true
+          description: Resource ID
+          schema:
+            type: integer
+            format: int64
       responses:
         '200':
           description: |
@@ -1791,7 +1803,13 @@ paths:
         MANAGE_SCOPE_REQUIRED.
       operationId: updateResourcePermissions
       parameters:
-        - $ref: '#/components/parameters/ResourceIdParam'
+        - name: resourceId
+          in: path
+          required: true
+          description: Resource ID
+          schema:
+            type: integer
+            format: int64
       requestBody:
         required: true
         content:
@@ -1825,14 +1843,14 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/admin/permissions/{id}/users:
+  /api/v1/admin/permissions/{permissionId}/users:
     get:
       tags: [Permissions]
       summary: Get users with permission
       description: Get users that have a specific permission
       operationId: getUsersByPermission
       parameters:
-        - name: id
+        - name: permissionId
           in: path
           required: true
           description: Permission ID
@@ -3641,10 +3659,12 @@ paths:
       tags: [Account]
       summary: Terminate own session
       description: |
-        Terminate one of the caller's own sessions, the current one included. The session's
+        Terminate one of the caller's own live sessions, the current one included. The session's
         authorization codes are marked revoked and the refresh tokens descended from them are swept,
         offline refresh tokens included, in one transaction. A session of another user is refused
-        with 403 FORBIDDEN.
+        with 403 FORBIDDEN, whether or not it is still live. One of the caller's own sessions that
+        has passed the configured idle timeout or maximum lifetime is already gone: it is answered
+        with 404, as an id naming no session is, and nothing is revoked.
       operationId: deleteAccountSession
       parameters:
         - name: id
@@ -4993,7 +5013,7 @@ components:
       type: object
       properties:
         session:
-          $ref: '#/components/schemas/UserSessionResponse'
+          $ref: '#/components/schemas/UserSessionDetailResponse'
       required:
         - session
 

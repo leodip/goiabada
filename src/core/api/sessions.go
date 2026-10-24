@@ -25,8 +25,10 @@ type UserSessionResponse struct {
 	UserId    int64  `json:"userId"`
 }
 
+// GetUserSessionResponse carries one session as a session list row carries it, built by the same
+// code, so a session reads the same whichever endpoint is asked (#651).
 type GetUserSessionResponse struct {
-	Session UserSessionResponse `json:"session"`
+	Session UserSessionDetailResponse `json:"session"`
 }
 
 // UserSessionDetailResponse is a session plus the two things a caller cannot work out for

@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,11 +25,12 @@ import (
 // terminated, and the pre-existing integration case asserts only the status code, which a handler
 // terminating first would still satisfy.
 
-// accountSessionDeleteRequest builds the DELETE with the path value and the validated token
-// the handler reads.
+// accountSessionDeleteRequest builds the DELETE with the path value, the settings its liveness
+// rule reads, and the validated token the handler reads.
 func accountSessionDeleteRequest(sessionId string, subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/sessions/"+sessionId, nil)
 	req.SetPathValue("id", sessionId)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
@@ -48,7 +50,7 @@ func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			user := &record.User{Id: 42, Enabled: true}
-			userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}
+			userSession := liveSessionOf(100, "sid-own", 42)
 
 			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
@@ -105,7 +107,7 @@ func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
-		Return(&record.UserSession{Id: 100, SessionIdentifier: "sid-someone-else", UserId: 7}, nil).Once()
+		Return(liveSessionOf(100, "sid-someone-else", 7), nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 
@@ -130,7 +132,7 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	const subject = "the-user"
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
-		Return(&record.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}, nil).Once()
+		Return(liveSessionOf(100, "sid-own", 42), nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
@@ -146,4 +148,56 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database.AssertExpectations(t)
 	require.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestHandleAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound pins #651 decision 5's
+// self-service half: the caller's own session past the idle timeout or the maximum lifetime, stored
+// until the worker sweeps it, is the same 404 as an id naming no session, and nothing is ended,
+// revoked or audited.
+func TestHandleAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound(t *testing.T) {
+	const subject = "the-user"
+	for name, session := range deadSessions(100, 42) {
+		t.Run(name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
+				Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleAccountSessionDelete(database, auditLogger).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
+
+			require.Equal(t, http.StatusNotFound, rr.Code)
+			assert.Equal(t, "NOT_FOUND", decodeAPIError(t, rr))
+			database.AssertExpectations(t)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// The ownership check answers first, so another user's session is 403 whether it is live or dead,
+// and the endpoint tells no user whether someone else is still signed in (#651 decision 5).
+func TestHandleAccountSessionDelete_AnotherUsersDeadSessionIsForbidden(t *testing.T) {
+	const subject = "the-user"
+	for name, session := range deadSessions(100, 7) {
+		t.Run(name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
+				Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleAccountSessionDelete(database, auditLogger).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
+
+			require.Equal(t, http.StatusForbidden, rr.Code)
+			assert.Equal(t, "FORBIDDEN", decodeAPIError(t, rr))
+			database.AssertExpectations(t)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }

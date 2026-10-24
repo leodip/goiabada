@@ -93,11 +93,10 @@ type routeRegistration struct {
 	line         int
 }
 
-// pathParam erases the name of a path parameter. routes.go and the spec disagree on several
-// of them (routes.go says /user-sessions/{id} where the spec says {sessionIdentifier}), and
-// that disagreement is invisible on the wire: an OpenAPI path template's parameter names are
-// local to the document. Joining on the erased form matches the two by the URL a caller
-// actually sends.
+// pathParam erases the name of a path parameter, so a route joins the spec by the URL a caller
+// actually sends. The names themselves are held to agree by
+// TestOpenAPI_NamesPathParametersAsTheRoutesDo, which reports a joined pair spelling them two
+// ways rather than leaving it to fail as an undocumented route and an unrouted operation.
 var pathParam = regexp.MustCompile(`\{[^}]*\}`)
 
 func routeKey(method, path string) string {
@@ -255,6 +254,130 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 			t.Errorf("openapi.yaml describes %s (%s), which routes.go does not register",
 				op.operationId, key)
 		}
+	}
+}
+
+// TestOpenAPI_NamesPathParametersAsTheRoutesDo holds the names the join above erases. A path
+// parameter's name is local to the document (OpenAPI 3.0.3 section 4.7.8), so nothing on the
+// wire depends on it, but it is the argument name of the operation in a generated client and
+// on the reference pages, and a spec naming it otherwise than routes.go is one parameter named
+// two ways between the code and the contract (#651). routes.go's spelling is the one kept,
+// because it is also the route's metrics label and the route detail of an audit event.
+func TestOpenAPI_NamesPathParametersAsTheRoutesDo(t *testing.T) {
+	assertPathParameterNames(t, parseRoutes(t), parseSpec(t))
+}
+
+// assertPathParameterNames is the reporting half: one failure per finding of
+// pathParameterNameFindings, and a stop for a join that matched no route to the spec, since a
+// comparison of nothing proves nothing.
+func assertPathParameterNames(r guard.Reporter, routes []routeRegistration, spec map[string]specOperation) {
+	r.Helper()
+	findings, joined := pathParameterNameFindings(routes, spec)
+	if joined == 0 {
+		r.Fatalf("joined none of %d routes to the %d operations of openapi.yaml; the comparison "+
+			"is no longer reaching the spec", len(routes), len(spec))
+		return
+	}
+	for _, finding := range findings {
+		r.Errorf("%s", finding)
+	}
+}
+
+// pathParameterNameFindings returns one finding per route whose path openapi.yaml describes
+// under other parameter names, naming both spellings, and how many routes it joined to the
+// spec. The join key erases the names, so a joined pair differs in nothing else.
+func pathParameterNameFindings(routes []routeRegistration, spec map[string]specOperation) ([]string, int) {
+	var findings []string
+	joined := 0
+	for _, r := range routes {
+		op, documented := spec[r.key]
+		if !documented {
+			continue
+		}
+		joined++
+		if op.path != r.path {
+			findings = append(findings, fmt.Sprintf("routes.go:%d: %s %s is %s in openapi.yaml (%s): "+
+				"name the spec's path parameters as routes.go does", r.line,
+				strings.ToUpper(r.method), r.path, op.path, op.operationId))
+		}
+	}
+	return findings, joined
+}
+
+// pathParameterNamesFixture is a route table and a spec agreeing on every name, plus a route
+// the spec does not describe, which the comparison leaves to TestOpenAPI_DescribesEveryAPIRoute.
+func pathParameterNamesFixture() ([]routeRegistration, map[string]specOperation) {
+	route := func(method, path string, line int) routeRegistration {
+		return routeRegistration{method: method, path: path, key: routeKey(method, path), line: line}
+	}
+	operation := func(method, path, operationId string) (string, specOperation) {
+		return routeKey(method, path), specOperation{operationId: operationId, path: path}
+	}
+	routes := []routeRegistration{
+		route("get", "/api/v1/admin/user-sessions/{id}", 10),
+		route("delete", "/api/v1/admin/user-sessions/{id}", 11),
+		route("get", "/api/v1/admin/groups/{groupId}/members/{userId}", 12),
+		route("get", "/api/v1/admin/undocumented/{id}", 13),
+	}
+	spec := map[string]specOperation{}
+	for _, op := range []struct{ method, path, operationId string }{
+		{"get", "/api/v1/admin/user-sessions/{id}", "getUserSession"},
+		{"delete", "/api/v1/admin/user-sessions/{id}", "deleteUserSession"},
+		{"get", "/api/v1/admin/groups/{groupId}/members/{userId}", "getGroupMember"},
+	} {
+		key, value := operation(op.method, op.path, op.operationId)
+		spec[key] = value
+	}
+	return routes, spec
+}
+
+func TestPathParameterNames_ASpecNamingAParameterOtherwiseFails(t *testing.T) {
+	routes, spec := pathParameterNamesFixture()
+	rename := func(method, path, operationId string) {
+		spec[routeKey(method, path)] = specOperation{operationId: operationId, path: path}
+	}
+	rename("delete", "/api/v1/admin/user-sessions/{sessionIdentifier}", "deleteUserSession")
+	rename("get", "/api/v1/admin/groups/{userId}/members/{groupId}", "getGroupMember")
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertPathParameterNames(r, routes, spec)
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{
+		"routes.go:11: DELETE /api/v1/admin/user-sessions/{id} is /api/v1/admin/user-sessions/{sessionIdentifier} in openapi.yaml (deleteUserSession): name the spec's path parameters as routes.go does",
+		"routes.go:12: GET /api/v1/admin/groups/{groupId}/members/{userId} is /api/v1/admin/groups/{userId}/members/{groupId} in openapi.yaml (getGroupMember): name the spec's path parameters as routes.go does",
+	}
+	got := append([]string(nil), report.Errors...)
+	sort.Strings(got)
+	if !slices.Equal(got, want) {
+		t.Errorf("failures\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestPathParameterNames_ASpecNamingEveryParameterAsTheRoutesPasses(t *testing.T) {
+	routes, spec := pathParameterNamesFixture()
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertPathParameterNames(r, routes, spec)
+	})
+
+	if report.Failed() {
+		t.Errorf("a spec naming every path parameter as the routes do failed: %+v", report)
+	}
+}
+
+func TestPathParameterNames_AJoinThatMatchedNoRouteStops(t *testing.T) {
+	routes, _ := pathParameterNamesFixture()
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertPathParameterNames(r, routes, map[string]specOperation{})
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "joined none of 4 routes") {
+		t.Errorf("a join that matched no route did not stop the check: %+v", report)
 	}
 }
 
@@ -837,6 +960,7 @@ func forEachHandlerSource(t *testing.T, visit func(*testing.T, string, *token.Fi
 // specOperation is the part of an operation these tests read.
 type specOperation struct {
 	operationId string
+	path        string // as written, with the spec's own parameter names
 	responses   map[int]bool
 }
 
@@ -871,7 +995,7 @@ func parseSpec(t *testing.T) map[string]specOperation {
 				}
 				responses[n] = true
 			}
-			out[routeKey(verb, path)] = specOperation{operationId: op.OperationId, responses: responses}
+			out[routeKey(verb, path)] = specOperation{operationId: op.OperationId, path: path, responses: responses}
 		}
 	}
 

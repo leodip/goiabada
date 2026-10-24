@@ -358,6 +358,87 @@ func TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *testing
 		"the same user's OTHER session must be untouched: %v", stillWorks)
 }
 
+// deadSessionCases are the two ways a stored session stops being live under the deployment's
+// settings, past the idle timeout and past the maximum lifetime, each by a few minutes, as
+// timestamps to write onto a session the background worker has not swept yet.
+type deadSessionCase struct {
+	name         string
+	started      time.Time
+	lastAccessed time.Time
+}
+
+func deadSessionCases(t *testing.T) []deadSessionCase {
+	t.Helper()
+
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	idle := time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second
+	lifetime := time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second
+	require.Less(t, idle+10*time.Minute, lifetime, "the idle case must be dead by idle time alone")
+
+	now := time.Now().UTC()
+	return []deadSessionCase{
+		{"past the idle timeout", now.Add(-idle - 10*time.Minute), now.Add(-idle - 5*time.Minute)},
+		{"past the maximum lifetime", now.Add(-lifetime - 10*time.Minute), now.Add(-time.Minute)},
+	}
+}
+
+// killGrantSession writes the case's timestamps onto the browser session the grant was authorized
+// through and returns it, still stored.
+func killGrantSession(t *testing.T, grant *offlineGrant, dead deadSessionCase) *record.UserSession {
+	t.Helper()
+
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	session.Started = dead.started
+	session.LastAccessed = dead.lastAccessed
+	require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
+	return session
+}
+
+// assertDeadSessionNotEnded shows a refused DELETE ended nothing: the session row is still stored
+// until the sweep, and the grant authorized through it still refreshes, which the refresh grant
+// refuses once either its code or its refresh token is marked revoked.
+func assertDeadSessionNotEnded(t *testing.T, grant *offlineGrant, session *record.UserSession) {
+	t.Helper()
+
+	stored, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	require.NoError(t, err)
+	assert.NotNil(t, stored, "the session is left for the sweep, not deleted")
+
+	after := grant.refresh(t)
+	assert.NotEmpty(t, after["access_token"], "nothing descended from the session is revoked: %v", after)
+}
+
+// TestAPIUserSessionDelete_ASessionNoLongerLiveIsNotFound is #651 decision 5's administrative half
+// end to end: a session past the idle timeout or the maximum lifetime, still stored, gets the same
+// 404 as an id naming no session, and its offline grant is not cut by the DELETE. Its offline
+// refresh token outlives it, as expiry's always has; the consent withdrawal and the credential
+// change are what cut it.
+func TestAPIUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
+	adminToken, _ := createAdminClientWithToken(t)
+
+	for _, dead := range deadSessionCases(t) {
+		t.Run(dead.name, func(t *testing.T) {
+			grant := createOfflineGrant(t)
+			session := killGrantSession(t, grant, dead)
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			resp := makeAPIRequest(t, "DELETE", url, adminToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "NOT_FOUND", body.ErrorCode)
+			assert.Equal(t, "User session not found", body.ErrorDescription, "the answer an id naming no session gets")
+
+			assertDeadSessionNotEnded(t, grant, session)
+		})
+	}
+}
+
 func TestAPIUserSessionDelete_NotFound(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)

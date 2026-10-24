@@ -13,8 +13,9 @@
 //     redirect is never reached, nor its redirect from a subtree's bare prefix (decision 4).
 //   - A route is named as chi spelled it: the path alone, the group's prefix joined on, parameters
 //     as {name}, a group's own "/" as the prefix, and a trailing wildcard as "/*" (decision 5).
-//     Two methods on one path may name its parameters differently, as chi let them, and each
-//     method's route keeps its own name and reads its own parameters.
+//   - A path's parameters have one name for every method registered on it, as OpenAPI requires of
+//     one path: a method naming them otherwise, or in another order, panics at registration (#651
+//     decision 2).
 //
 // Patterns take chi's syntax, restricted to what ServeMux can express: literal segments, {name}
 // parameters as whole segments, and "*" as the last segment, matching everything below it.
@@ -63,8 +64,8 @@ type table struct {
 	// groups is every group but the root's, the longest prefix first.
 	groups    []*group
 	endpoints []*endpoint
-	// byShape is every endpoint by its path with each parameter's name left out, so two methods
-	// naming one path's parameters differently share it, as ServeMux requires.
+	// byShape is every endpoint by its path with each parameter's name left out, so a method naming
+	// one path's parameters differently finds the endpoint it would conflict with.
 	byShape map[string]*endpoint
 }
 
@@ -89,18 +90,17 @@ type group struct {
 // endpoint is one path, with a route per method.
 type endpoint struct {
 	table *table
-	// params are the parameter names ServeMux matches the path with: those of its first route.
-	params  []string
+	// name is the path in chi's spelling, which every method's route is named by.
+	name    string
 	methods map[string]*route
 	// order is the methods in the order they were registered, for the walk.
 	order []string
 }
 
-// route is one method of an endpoint, with its name, the names it gives the path's parameters, and
-// the group and the With chain it was registered through.
+// route is one method of an endpoint, with its name and the group and the With chain it was
+// registered through.
 type route struct {
 	name    string
-	params  []string
 	scope   *group
 	handler http.Handler
 	chain   []func(http.Handler) http.Handler
@@ -298,9 +298,9 @@ func (rt *Router) Walk(fn WalkFunc) error {
 
 // register adds one method of one route. A route's path is its group's prefix and pattern; its
 // name is that path in chi's spelling, and ServeMux matches it by path alone, method-free, so
-// ServeMux's own method rules, a GET pattern matching HEAD and its 405, never apply. A path is one
-// endpoint whatever its parameters are named, so a method naming them differently from the one
-// registered first joins it rather than conflicting with it in ServeMux.
+// ServeMux's own method rules, a GET pattern matching HEAD and its 405, never apply. A method
+// naming a path's parameters differently from the one registered first is refused here, by name,
+// rather than by ServeMux's conflict.
 func (rt *Router) register(method string, pattern string, handler http.Handler) {
 	if handler == nil {
 		panic("routing: a nil handler for " + pattern)
@@ -309,10 +309,10 @@ func (rt *Router) register(method string, pattern string, handler http.Handler) 
 	t := rt.table
 
 	name, muxPatterns := spell(rt.scope.prefix, pattern)
-	shape, params := parameters(name)
+	shape := shapeOf(name)
 	ep := t.byShape[shape]
 	if ep == nil {
-		ep = &endpoint{table: t, params: params, methods: map[string]*route{}}
+		ep = &endpoint{table: t, name: name, methods: map[string]*route{}}
 		for _, p := range muxPatterns {
 			// ServeMux panics on a pattern that conflicts with one already registered.
 			t.mux.Handle(p, ep)
@@ -323,12 +323,15 @@ func (rt *Router) register(method string, pattern string, handler http.Handler) 
 	if _, taken := ep.methods[method]; taken {
 		panic(fmt.Sprintf("routing: %s %s is registered twice", method, name))
 	}
+	if name != ep.name {
+		panic(fmt.Sprintf("routing: %s %s names the parameters of %s differently; a path's parameters have one name for every method",
+			method, name, ep.name))
+	}
 	rt.scope.sealed = true
 	t.root.sealed = true
 
 	ep.methods[method] = &route{
 		name:    name,
-		params:  params,
 		scope:   rt.scope,
 		handler: handler,
 		chain:   rt.chain,
@@ -353,18 +356,15 @@ func spell(prefix string, pattern string) (string, []string) {
 	}
 }
 
-// parameters answers name with each parameter's name left out, which is the path's shape, and the
-// parameters' names in order.
-func parameters(name string) (string, []string) {
+// shapeOf answers name with each parameter's name left out, which is the path's shape.
+func shapeOf(name string) string {
 	segments := strings.Split(name, "/")
-	var params []string
 	for i, segment := range segments {
 		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
-			params = append(params, segment[1:len(segment)-1])
 			segments[i] = "{}"
 		}
 	}
-	return strings.Join(segments, "/"), params
+	return strings.Join(segments, "/")
 }
 
 // validatePattern refuses a pattern the router would not match as written: one not rooted, with a
@@ -524,19 +524,6 @@ func (ep *endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m.name = m.route.name
-	// ServeMux set the path values under the endpoint's names; a route naming them otherwise reads
-	// them under its own. ServeMux hands its handler the request it was given, so they are set on
-	// the one the route's chain is served. Every value is read before any is set, since the two may
-	// give one name different places.
-	if !slices.Equal(m.route.params, ep.params) {
-		values := make([]string, len(ep.params))
-		for i, param := range ep.params {
-			values[i] = r.PathValue(param)
-		}
-		for i, param := range m.route.params {
-			r.SetPathValue(param, values[i])
-		}
-	}
 	m.route.served.ServeHTTP(w, r)
 }
 

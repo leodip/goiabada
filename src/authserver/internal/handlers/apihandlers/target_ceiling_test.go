@@ -404,13 +404,14 @@ var userTargetWrites = []targetWrite{
 		kind: targetKindUser,
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string) *httptest.ResponseRecorder {
 			r := targetRequest(http.MethodDelete, "/api/v1/admin/user-sessions/91", "", scope, map[string]string{"id": "91"})
+			r = r.WithContext(reqctx.WithSettings(r.Context(), sessionSettings))
 			rr := httptest.NewRecorder()
 			HandleUserSessionDelete(database, auditLogger).ServeHTTP(rr, r)
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
 			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), targetSessionId).
-				Return(&record.UserSession{Id: targetSessionId, UserId: targetUserId, SessionIdentifier: "sid-91"}, nil).Once()
+				Return(liveSessionOf(targetSessionId, "sid-91", targetUserId), nil).Once()
 		},
 		writes:           []string{"RunInTransaction", "DeleteUserSession"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),

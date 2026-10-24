@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -371,7 +372,9 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-// TestAPIUserSessionGet tests the GET /api/v1/admin/user-sessions/{sessionIdentifier} endpoint
+// TestAPIUserSessionGet_Success reads a session by the numeric id a session list returns, and gets
+// back the row that list carries: the stored fields, isCurrent, and the clients it authorized
+// (#651 decisions 1 and 6).
 func TestAPIUserSessionGet_Success(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
@@ -390,6 +393,19 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
+
+	// Setup: A client the session authorized, shown to users under a name of its own
+	testClient := &record.Client{
+		ClientIdentifier:         "session-get-client-" + fake.UUID()[:8],
+		ClientSecretEncrypted:    []byte("encrypted-secret"),
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		DisplayName:              "Session Portal",
+		ShowDisplayName:          true,
+	}
+	err = database.CreateClient(context.Background(), nil, testClient)
+	require.NoError(t, err)
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// Setup: Create test session
 	testSession := &record.UserSession{
@@ -411,14 +427,19 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	defer func() {
 		_ = database.DeleteUserSession(context.Background(), nil, testSession.Id)
 	}()
+	now := time.Now().UTC()
+	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
+		UserSessionId: testSession.Id, ClientId: testClient.Id, Started: now, LastAccessed: now,
+	})
+	require.NoError(t, err)
 
-	// Test: Get user session
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + testSession.SessionIdentifier
+	// Test: Get user session by its numeric id
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(testSession.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Response should be successful
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 
 	// Parse response
@@ -427,12 +448,128 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Session data should match
-	assert.Equal(t, testSession.SessionIdentifier, getSessionResponse.Session.SessionIdentifier)
-	assert.Equal(t, testSession.AuthMethods, getSessionResponse.Session.AuthMethods)
-	assert.Equal(t, testSession.AcrLevel.String(), getSessionResponse.Session.AcrLevel)
-	assert.Equal(t, testSession.IpAddress, getSessionResponse.Session.IpAddress)
-	assert.Equal(t, testSession.DeviceName, getSessionResponse.Session.DeviceName)
-	assert.Equal(t, testSession.UserId, getSessionResponse.Session.UserId)
+	got := getSessionResponse.Session
+	assert.Equal(t, testSession.Id, got.Id)
+	assert.Equal(t, testSession.SessionIdentifier, got.SessionIdentifier)
+	assert.Equal(t, testSession.AuthMethods, got.AuthMethods)
+	assert.Equal(t, testSession.AcrLevel.String(), got.AcrLevel)
+	assert.Equal(t, testSession.IpAddress, got.IpAddress)
+	assert.Equal(t, testSession.DeviceName, got.DeviceName)
+	assert.Equal(t, testSession.UserId, got.UserId)
+
+	// Assert: The list row's fields, as the user's session list carries them
+	assert.False(t, got.IsCurrent, "a client credentials token carries no sid, so no session is its own")
+	assert.Equal(t, []string{testClient.ClientIdentifier}, got.ClientIdentifiers)
+	assert.Equal(t, []api.SessionClientResponse{
+		{ClientIdentifier: testClient.ClientIdentifier, Name: "Session Portal", NameUnverified: false},
+	}, got.Clients)
+}
+
+// One case per scope: the users-read scopes, admin-read, manage-users and manage, read a session,
+// and the other domains' scopes are refused at the route. admin-read tells the gate from a
+// users-write one, manage-users and manage-clients from a clients-read one (#651 decision 1).
+func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
+	testUser := &record.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("testuser@session-get-scopes.test"),
+		EmailVerified: true,
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+	session.Started = time.Now().UTC()
+	session.LastAccessed = time.Now().UTC()
+	require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
+
+	testCases := []struct {
+		permission string
+		admitted   bool
+	}{
+		{builtin.AdminReadPermissionIdentifier, true},
+		{builtin.ManageUsersPermissionIdentifier, true},
+		{builtin.ManagePermissionIdentifier, true},
+		{builtin.ManageClientsPermissionIdentifier, false},
+		{builtin.ManageSettingsPermissionIdentifier, false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.permission, func(t *testing.T) {
+			token, caller := createClientWithGranularScope(t, tc.permission)
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			resp := makeAPIRequest(t, "GET", url, token, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			if tc.admitted {
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				var body api.GetUserSessionResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+				assert.Equal(t, session.Id, body.Session.Id)
+				assert.Equal(t, session.SessionIdentifier, body.Session.SessionIdentifier)
+				return
+			}
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "INSUFFICIENT_SCOPE", body.ErrorCode)
+		})
+	}
+}
+
+// A session past the idle timeout or the maximum lifetime is gone to the API, with the same answer
+// as an id naming no session, though the background worker has not swept its row yet (#651
+// decision 4). Each is stored dead by its own timestamps against the deployment's settings.
+func TestAPIUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	idle := time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second
+	lifetime := time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second
+	require.Less(t, idle+10*time.Minute, lifetime, "the idle case must be dead by idle time alone")
+
+	testUser := &record.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("testuser@dead-session.test"),
+		EmailVerified: true,
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+
+	now := time.Now().UTC()
+	for _, tc := range []struct {
+		name         string
+		started      time.Time
+		lastAccessed time.Time
+	}{
+		{"past the idle timeout", now.Add(-idle - 10*time.Minute), now.Add(-idle - 5*time.Minute)},
+		{"past the maximum lifetime", now.Add(-lifetime - 10*time.Minute), now.Add(-time.Minute)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			session := createTestUserSession(t, testUser.Id, fake.UUID())
+			defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+			session.Started = tc.started
+			session.LastAccessed = tc.lastAccessed
+			require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "NOT_FOUND", body.ErrorCode)
+
+			// Still stored: the 404 is the API's answer, not the sweep's.
+			stored, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+			require.NoError(t, err)
+			assert.NotNil(t, stored)
+		})
+	}
 }
 
 func TestAPIUserSessionGet_NotFound(t *testing.T) {
@@ -440,17 +577,50 @@ func TestAPIUserSessionGet_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get non-existent session
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/nonexistent-session"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/99999999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Assert: Should return not found
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	var body api.ErrorResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "NOT_FOUND", body.ErrorCode)
+}
+
+// The path takes the numeric id alone: the session identifier it used to take is refused as any
+// other value that is not an integer, even when it names a stored session (#651 decision 1).
+func TestAPIUserSessionGet_ANonIntegerIsAValidationError(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &record.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("testuser@session-by-sid.test"),
+		EmailVerified: true,
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+
+	for _, value := range []string{session.SessionIdentifier, "abc"} {
+		t.Run(value, func(t *testing.T) {
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + value
+			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "VALIDATION_ERROR", body.ErrorCode)
+		})
+	}
 }
 
 // The PUT on this path was retired with the level2AuthConfigHasChanged mechanism it
 // existed to drive: its request body carried that field and nothing else, so the endpoint
-// had no other function (#242). GET and DELETE stay, so the path still exists and chi
+// had no other function (#242). GET and DELETE stay, so the path still exists and the router
 // answers a PUT to it with 405 rather than 404.
 func TestAPIUserSessionPut_MethodNotAllowed(t *testing.T) {
 	// Setup: Create admin client and get access token

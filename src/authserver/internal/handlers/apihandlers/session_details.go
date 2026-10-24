@@ -40,7 +40,7 @@ func buildSessionDetails(
 	for _, session := range sessions {
 		// Invalid sessions are omitted rather than reported: the endpoints list what is live,
 		// and the background worker deletes the rest within its sweep interval (#373 decision 2).
-		if !session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
+		if !sessionIsLive(&session, settings) {
 			continue
 		}
 		valid = append(valid, session)
@@ -63,6 +63,15 @@ func buildSessionDetails(
 	}
 
 	return details, nil
+}
+
+// sessionIsLive is the one rule the session endpoints judge a stored session by: within the idle
+// timeout and the maximum lifetime under the current settings. A session outside them is gone to
+// the API, left out of the lists and answered 404 by the single-session GET and both session
+// DELETEs, whether or not the background worker has swept its row yet (#373 decision 2, #651
+// decisions 4 and 5).
+func sessionIsLive(session *record.UserSession, settings *record.Settings) bool {
+	return session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
 }
 
 // loadSessionClients fills in the Client on every UserSessionClient of every session given, in
