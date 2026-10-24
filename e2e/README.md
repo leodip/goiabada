@@ -2,7 +2,12 @@
 
 A real Goiabada deployment, built from a release tag on a VPS, for browser tests to run against.
 It builds the environment, deploys the test app beside it, checks that both are reachable, and runs
-the Playwright suite against them.
+two Playwright suites against them:
+
+- **e2e** (`playwright/tests/`, `e2e/test.sh`): the product works. Every page, flow and protocol rule,
+  eight tests at a time, with the auth server's rate limiter off.
+- **rate-limits** (`playwright/rate-limits/`, `e2e/test-rate-limits.sh`): the rate limiter works. The
+  limits the auth server counts by a client's address, one test at a time, with the limiter on.
 
 | Host | What |
 |---|---|
@@ -28,21 +33,24 @@ From the repository root, on a machine with an SSH key the VPS accepts:
 ```bash
 cp e2e/.env.example e2e/.env    # once: set E2E_VPS_HOST
 
-e2e/run.sh [tag | --source]     # everything from scratch: reset, then the whole suite
+e2e/run.sh [tag | --source]     # reset, then the e2e suite
 e2e/reset.sh [tag | --source]   # wipe the environment and build it again from a release, or this checkout
-e2e/test.sh [playwright args]   # run the suite against the current environment
+e2e/test.sh [playwright args]   # run the e2e suite against the current environment
+e2e/test-rate-limits.sh [args]  # run the rate-limits suite against the current environment
 e2e/wipe.sh [--all] [-y]        # remove the environment (asks first)
 ```
 
 With no tag, `run.sh` and `reset.sh` take the latest GitHub release. With `--source` they build what
 a release would ship from this checkout's `src/` instead, on the VPS: both servers' images from their
 Dockerfiles and the setup wizard, under the version `e2e-<commit>`, with `-dirty` when `src/` has
-uncommitted changes. `test.sh` installs the suite's packages and Chromium the first time, checks the
-suite's types (`npm run typecheck`), and passes its arguments to Playwright: `--headed`, `--ui`, or a
-folder such as `tests/admin-console`. Each script answers `--help`.
+uncommitted changes. `test.sh` and `test-rate-limits.sh` install the suites' packages and Chromium the
+first time, check their types (`npm run typecheck`), and pass their arguments to Playwright:
+`--headed`, `--ui`, or a folder such as `tests/admin-console`. The two never run at once: each holds
+`e2e/.state/suite.lock` for its run. Each script answers `--help`.
 
 They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag | --source>`,
-`verify.sh [tag]` (check the environment again at any time) and `teardown.sh [--all]`.
+`verify.sh [tag]` (check the environment again at any time), `rate-limiter.sh on | off | reset` and
+`teardown.sh [--all]`.
 
 `prepare.sh`:
 
@@ -55,7 +63,8 @@ They wrap the scripts in `infra/`, which can also be run on their own: `prepare.
    the stack, waits for both servers, and writes `/etc/nginx/conf.d/goiabada-e2e.conf` from
    `nginx.conf.template`. The certificate is requested only when it is missing or does not cover the
    four hosts.
-4. Writes `e2e/.state/environment.env` (URLs, tag, admin email, whether the rate limiter is on).
+4. Writes `e2e/.state/environment.env` (URLs, tag, admin email), and switches the rate limiter off
+   (`rate-limiter.sh off`).
 5. Sets up the test app with `testapp.sh` (see [Test app](#test-app)).
 6. Runs `verify.sh`.
 
@@ -64,32 +73,37 @@ runs the tag's images, the auth server's health, discovery and JWKS, the admin c
 sign-in lands on the auth server's password page, that the test app runs configured on both hosts,
 and that its API refuses a request with no token.
 
-### With the rate limiter on or off
+### The rate limiter
 
-`E2E_RATE_LIMITER` in `e2e/.env` is what the setup wizard is given for
-`GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`, so it takes a `reset.sh` to change. It is `true` by default,
-as in production, and then the limits counted by an IP address apply to the suite, which signs
-everyone in from this machine's one address: 30 wrong passwords and 120 password checks a minute, at
-the sign-in form and the password grant each, and 120 requests a minute to the authorization endpoint,
-its GET and POST together, which every browser sign-in, single sign-on and raw authorization request
-spends once or twice whatever it asks for. The suite is written to stay under them: the password grant
-is the shortest way to a user's tokens and spends no authorization request, so the tests sign in through
-the browser only where the subject needs it. The `system` tests for these limits run only in this mode.
-Two of them spend a budget to the end, and each records when it did (`lib/address-limits.ts`) rather
-than waiting its window out: whatever needs that budget whole next, a later test or the next run's setup
-step, waits only for what is left of it.
+The setup wizard turns the auth server's rate limiter on, as it does for production. The environment
+rests with it off: `infra/rate-limiter.sh` sets `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` in
+`ratelimiter.yml` beside the wizard's Compose files, over the wizard's value, and fails unless the
+running auth server has the value it asked for.
 
-`E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for: it skips
-those tests, and runs eight tests at a time rather than four. It is the only switch there is: the
-limits counted by an account or a user apply either way, since no proxy can count them. The suite does
-not spend them, because a successful sign-in spends nothing and the tests that fail a password or a
-code do it on throwaway accounts of their own. Run with the switch on before a release.
+Off, nothing counts this machine's address, so the e2e suite signs everyone in from it as fast as it
+likes. The limits counted by an account or a user apply either way, since no proxy can count them. The
+e2e suite does not spend them, because a successful sign-in spends nothing and the tests that fail a
+password or a code do it on throwaway accounts of their own. `test.sh` switches the limiter off before
+it runs, in case a run of the rate-limits suite was killed before switching it back.
+
+The rate-limits suite tests what the limiter counts by an address: 120 requests a minute to the
+authorization endpoint, and 30 wrong passwords and 120 password checks a minute at the sign-in form and
+the password grant. `test-rate-limits.sh` switches the limiter on for the run, and off again when the
+run ends, pass or fail. Before each test, `lib/rate-limits.ts` restarts the auth server
+(`rate-limiter.sh reset`). The limiter keeps the counts of an address in memory, so every test starts
+with whole budgets: what another test or an earlier run spent weighs on none of them, and no test waits
+for a window to pass. Run it before a release.
 
 ## Browser tests
 
-`playwright/` holds the Playwright suite. It reads the URLs and the admin password `prepare.sh` left in
-`e2e/.state/`, so it runs against the environment this machine last prepared. `e2e/test.sh` runs it;
-after a failure, `(cd e2e/playwright && npx playwright show-report)` opens the report with traces.
+`playwright/` holds both suites, which share `lib/`. They read the URLs and the admin password
+`prepare.sh` left in `e2e/.state/`, so they run against the environment this machine last prepared.
+After a failure, `(cd e2e/playwright && npx playwright show-report)` opens the e2e suite's report with
+traces, and `npx playwright show-report playwright-report-rate-limits` the rate-limits suite's.
+
+The rate-limits suite is `playwright/rate-limits/`, run by `rate-limits.config.ts`; its tests import
+`test` from `lib/rate-limits.ts`, whose restart before each test is what they rely on. Everything
+below is about the e2e suite.
 
 Tests sit under `playwright/tests/`, one folder per area: the admin console (`admin-console/sign-in`,
 `admin-console/shell`, `admin-console/clients/`, `resources/`, `groups/`, `users/`, `account/` and
@@ -98,7 +112,7 @@ sign-on across its two sites, signing out, the authorization parameters, and the
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
 itself where no page reaches it (`oauth/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
-and the main journeys by keyboard). They run four at a time, eight with the rate limiter off, against an
+and the main journeys by keyboard). They run eight at a time against an
 environment that stays up between runs, so every test keeps to these rules, which is what lets the
 suite run again and again without a reset:
 
@@ -108,20 +122,19 @@ suite run again and again without a reset:
   a run that crashed.
 - **It changes nothing global**: no settings, and the system client and the system resource
   (`authserver`) are only read; a test reaching their save answers Cancel to the confirmation. The
-  exceptions are the tests whose subject is global, the settings pages, the signing keys, the
-  guards around the system resource, and the limits on sign-ins from one address, which every
-  test signs in from. They are named `*.system.ts` and run in the `system` project, which
-  `playwright.config.ts` runs after every other test, on one worker. Each puts back what it changes
-  (`lib/settings.ts`), the address test waiting until the address may sign in again, and the setup
-  step restores the seeded settings before a run if one failed to.
+  exceptions are the tests whose subject is global, the settings pages, the signing keys and the
+  guards around the system resource. They are named `*.system.ts` and run in the `system` project,
+  which `playwright.config.ts` runs after every other test, on one worker. Each puts back what it
+  changes (`lib/settings.ts`), and the setup step restores the seeded settings before a run if one
+  failed to.
 - **It never depends on what another test did**, or on counts or order.
 - **Users other than the administrator sign in through the browser** where the subject needs it
   (`lib/console-user.ts`, `lib/browser-sign-in.ts`), always from an empty browser state: inside a test,
   `browser.newContext()` starts from the test's options, which carry the administrator's session.
 - **Each worker signs the administrator in for itself**, in a browser of its own (`lib/fixtures.ts`).
   Every browser context is a device of its own through its own cookies, so no sign-in ends another
-  worker's session. A run signs the administrator in about ten times, fourteen with the rate limiter
-  off, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
+  worker's session. A run signs the administrator in about fourteen times, and the rate-limits suite
+  once, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
   recently used, those earlier runs left.
 
 ## The VPS

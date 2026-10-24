@@ -3,7 +3,6 @@
 // one empty, which the helpers in oauth.ts never do.
 import { createHash, randomBytes } from "node:crypto";
 import { expect, type APIRequestContext, type Browser } from "@playwright/test";
-import { admitted, answerOf } from "./admission";
 import { testRedirectUri } from "./browser-sign-in";
 import { env } from "./environment";
 
@@ -125,12 +124,10 @@ export function codeRequest(clientId: string, overrides: Record<string, string |
 // An authorization request's parameters: pairs, so that one can be sent twice, or a record.
 export type AuthorizeParams = Record<string, string> | [string, string][];
 
-// One GET of the authorization endpoint, its redirect not followed, asked again while the admission
-// budget refuses it.
+// One GET of the authorization endpoint, its redirect not followed.
 export async function getAuthorize(api: APIRequestContext, params: AuthorizeParams): Promise<RawAnswer> {
   const url = `${authorizeEndpoint}?${new URLSearchParams(params)}`;
-  const response = await admitted(() => api.get(url, { failOnStatusCode: false, maxRedirects: 0 }), answerOf);
-  return readAnswer(response);
+  return readAnswer(await api.get(url, { failOnStatusCode: false, maxRedirects: 0 }));
 }
 
 export interface AuthorizeOutcome {
@@ -151,13 +148,11 @@ export async function followAuthorize(api: APIRequestContext, params: AuthorizeP
 }
 
 // The same from any address on the auth server, such as the GET a POST to the authorization endpoint
-// redirects to. A hop to the authorization endpoint is asked again while the admission budget refuses
-// it.
+// redirects to.
 export async function followFrom(api: APIRequestContext, start: string): Promise<AuthorizeOutcome> {
   let url = start;
   for (let hop = 0; hop < 10; hop++) {
-    const get = () => api.get(url, { failOnStatusCode: false, maxRedirects: 0 });
-    const response = new URL(url).pathname === "/auth/authorize" ? await admitted(get, answerOf) : await get();
+    const response = await api.get(url, { failOnStatusCode: false, maxRedirects: 0 });
     const location = response.headers()["location"];
     if (response.status() >= 300 && response.status() < 400 && location) {
       const next = new URL(location, url);

@@ -107,12 +107,11 @@ fi
 chmod +x "$wizard"
 log "$("./$wizard" --version)"
 
-log "running the setup wizard: production, $E2E_DB, rate limiter $E2E_RATE_LIMITER"
+log "running the setup wizard: production, $E2E_DB"
 umask 077
 if ! "./$wizard" --no-color --type production --db "$E2E_DB" \
   --auth-url "https://$E2E_AUTH_HOST" --admin-url "https://$E2E_ADMIN_HOST" \
-  --admin-email "$E2E_ADMIN_EMAIL" --admin-password-file "$stage/admin-password" \
-  --rate-limiter="$E2E_RATE_LIMITER" >wizard.log 2>&1; then
+  --admin-email "$E2E_ADMIN_EMAIL" --admin-password-file "$stage/admin-password" >wizard.log 2>&1; then
   cat wizard.log >&2
   fail "the setup wizard failed"
 fi

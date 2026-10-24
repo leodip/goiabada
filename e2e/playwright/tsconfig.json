@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["tests", "lib", "provision", "*.config.ts"]
+  "include": ["tests", "rate-limits", "lib", "provision", "*.config.ts"]
 }

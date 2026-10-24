@@ -12,5 +12,6 @@ export function adminStorageState(worker: number | "setup"): string {
 // The test app's client secrets, as e2e/infra/testapp.sh hands them to the test app on the VPS.
 export const testappEnvFile = path.resolve(here, "../../.state/testapp.env");
 
-// When the rate-limit tests last spent this machine's address's budgets (lib/address-limits.ts).
-export const addressLimitsFile = path.resolve(here, "../../.state/address-limits.json");
+// Switches the auth server's rate limiter, and restarts the auth server for the rate-limits suite
+// (lib/rate-limits.ts).
+export const rateLimiterScript = path.resolve(here, "../../infra/rate-limiter.sh");

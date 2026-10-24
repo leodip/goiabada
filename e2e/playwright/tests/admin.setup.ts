@@ -8,7 +8,6 @@ import {
   idFromListLink,
   signInAsAdmin,
 } from "../lib/admin-console";
-import { untilCleared } from "../lib/address-limits";
 import { env } from "../lib/environment";
 import { restoreBaselineSettings } from "../lib/settings";
 import { testPrefix } from "../lib/unique";
@@ -22,9 +21,6 @@ async function leftoversOn(page: Page, listUrl: string): Promise<string[]> {
 }
 
 setup("sweep what earlier runs left", async ({ page }, testInfo) => {
-  // A run started within two minutes of the rate-limit tests (tests/oauth/*.system.ts) waits for what
-  // they spent of this address's budgets, which every sign-in here and in the tests after spends too.
-  await untilCleared("authorization endpoint", "password grant");
   await signInAsAdmin(page);
   // The settings tests put back what they change; one that failed while doing so is put right here,
   // and so is a new environment's missing SMTP set-up.

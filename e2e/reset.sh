@@ -22,4 +22,4 @@ started=$SECONDS
 "$E2E_DIR/infra/prepare.sh" "$tag"
 # For --source, the version prepare.sh named the build.
 tag="$(sed -n 's/^E2E_TAG=//p' "$STATE_DIR/environment.env")"
-printf '\n%sThe environment runs %s%s (%ds). Next: e2e/test.sh\n' "$GREEN" "$tag" "$RESET" $((SECONDS - started))
+printf '\n%sThe environment runs %s%s (%ds). Next: e2e/test.sh, then e2e/test-rate-limits.sh\n' "$GREEN" "$tag" "$RESET" $((SECONDS - started))

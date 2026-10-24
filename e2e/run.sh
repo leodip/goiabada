@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Everything from scratch: rebuild the environment from a release, then run the whole suite.
+# From scratch: rebuild the environment from a release, then run the e2e suite. The rate-limits suite
+# runs on its own, with e2e/test-rate-limits.sh.
 #
 #   e2e/run.sh                       # the latest GitHub release
 #   e2e/run.sh vX.Y.Z                # a given tag, a release after v1.7.0
@@ -9,7 +10,7 @@ set -euo pipefail
 here="$(dirname "${BASH_SOURCE[0]}")"
 
 case "${1:-}" in
-  -h | --help) sed -n '2,8s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,9s/^# \{0,1\}//p' "$0"; exit 0 ;;
   v[0-9]* | --source) tag="$1"; shift ;;
   *) tag="" ;;
 esac

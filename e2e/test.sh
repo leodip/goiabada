@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the Playwright suite against the environment e2e/reset.sh built.
+# Run the e2e suite against the environment e2e/reset.sh built, with the rate limiter off.
 #
 #   e2e/test.sh                          # every test, headless
 #   e2e/test.sh --headed                 # watch the browser
@@ -25,6 +25,7 @@ tag="$(sed -n 's/^E2E_TAG=//p' "$state")"
 prepared="$(sed -n 's/^E2E_PREPARED_AT=//p' "$state")"
 auth_url="$(sed -n 's/^E2E_AUTH_URL=//p' "$state")"
 
+hold_suite_lock
 ensure_suite_packages
 cd "$suite" || die "no $suite"
 
@@ -34,9 +35,12 @@ npm run --silent typecheck || die "the suite has type errors (cd e2e/playwright 
 curl -fsS -o /dev/null --max-time 10 "$auth_url/health" ||
   die "$auth_url does not answer: check it with e2e/infra/verify.sh, or rebuild with e2e/reset.sh"
 
+require_vps
+# Off already, unless a run of the rate-limits suite was killed before it could switch it back.
+"$E2E_DIR/infra/rate-limiter.sh" off
+
 # Mailpit's API listens on the VPS's loopback only; the tests read the mail through this tunnel, on a
 # free local port, closed when the run ends.
-require_vps
 tunnel_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
 ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "127.0.0.1:$tunnel_port:127.0.0.1:$E2E_MAILPIT_PORT" \
   "$E2E_VPS_USER@$E2E_VPS_HOST" &
@@ -50,7 +54,7 @@ curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:$tunnel_port/api/v1/info" 
   die "Mailpit does not answer through the SSH tunnel: rebuild with e2e/reset.sh"
 export E2E_MAILPIT_URL="http://127.0.0.1:$tunnel_port"
 
-step "Running the suite against $tag (prepared $prepared)"
+step "Running the e2e suite against $tag (prepared $prepared)"
 started=$SECONDS
 npx playwright test "$@"
 status=$?

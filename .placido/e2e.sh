@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 # placido's last gate for Goiabada: rebuild the e2e environment on the VPS from this
-# worktree's src/, then run the Playwright suite against it (e2e/run.sh --source).
+# worktree's src/, then run the e2e suite against it (e2e/run.sh --source). The
+# rate-limits suite is not part of it: it runs by hand, before a release.
 #
-#   .placido/e2e.sh                  # the whole suite
+#   .placido/e2e.sh                  # the whole e2e suite
 #   .placido/e2e.sh tests/oauth      # one area; any Playwright argument passes through
-#
-# The environment is built with the rate limiter off, whatever e2e/.env says: the
-# tests of one address's limits then skip, and they were nearly half the suite's time,
-# spent waiting out the limits' windows. The release check, e2e/run.sh --source run by
-# hand, keeps the limiter on.
 #
 # There is one environment, so a lock keeps two placido runs from rebuilding it at
 # once. The machine's settings (e2e/.env) come from the main checkout, and what the
@@ -17,7 +13,7 @@
 set -uo pipefail
 
 case "${1:-}" in
-  -h | --help) sed -n '2,16s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 0 ;;
 esac
 
 worktree="$(git rev-parse --show-toplevel)" || exit 1
@@ -35,7 +31,7 @@ if ! flock -n 9; then
   flock 9
 fi
 
-E2E_RATE_LIMITER=false "$worktree/e2e/run.sh" --source "$@"
+"$worktree/e2e/run.sh" --source "$@"
 status=$?
 
 if [[ "$main" != "$worktree" && -d "$worktree/e2e/.state" ]]; then

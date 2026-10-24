@@ -47,8 +47,8 @@ test("the administrator signs in to the admin console through the auth server", 
 });
 
 // No negative test here uses a wrong password for the administrator: every one counts against the
-// account's failure budget (10 per 15 minutes from one address, held in memory until the next
-// reset), so a few runs in a row would lock the administrator out and fail every test after them.
+// account's failure budget (100 an hour, which applies with the rate limiter off too), so runs in a
+// row would lock the administrator out and fail every test after them.
 // A wrong password for a real account waits for throwaway users.
 
 test("an address that names no account is refused, and the same sign-in then succeeds", async ({ page }) => {

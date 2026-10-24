@@ -75,7 +75,7 @@ if [[ "$source_build" == true ]]; then
 fi
 settings="E2E_TAG=$(printf %q "$tag") E2E_SOURCE_BUILD=$source_build"
 for name in E2E_AUTH_HOST E2E_ADMIN_HOST E2E_WEBTEST1_HOST E2E_WEBTEST2_HOST E2E_ADMIN_EMAIL \
-  E2E_DB E2E_RATE_LIMITER E2E_REMOTE_DIR E2E_CERT_NAME E2E_MAILPIT_IMAGE E2E_MAILPIT_PORT; do
+  E2E_DB E2E_REMOTE_DIR E2E_CERT_NAME E2E_MAILPIT_IMAGE E2E_MAILPIT_PORT; do
   settings+=" $name=$(printf %q "${!name}")"
 done
 ssh_vps "env $settings bash $stage/remote-prepare.sh $stage; status=\$?; rm -rf $stage; exit \$status" ||
@@ -89,8 +89,10 @@ E2E_ADMIN_URL=https://$E2E_ADMIN_HOST
 E2E_WEBTEST1_URL=https://$E2E_WEBTEST1_HOST
 E2E_WEBTEST2_URL=https://$E2E_WEBTEST2_HOST
 E2E_ADMIN_EMAIL=$E2E_ADMIN_EMAIL
-E2E_RATE_LIMITER=$E2E_RATE_LIMITER
 EOF
+
+# The wizard turned the rate limiter on, as it does for production; the environment rests with it off.
+"$E2E_DIR/infra/rate-limiter.sh" off
 
 "$E2E_DIR/infra/testapp.sh"
 

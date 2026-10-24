@@ -33,7 +33,5 @@ export const env = {
   webtest1Url: value("E2E_WEBTEST1_URL"),
   webtest2Url: value("E2E_WEBTEST2_URL"),
   adminEmail: value("E2E_ADMIN_EMAIL"),
-  // Whether the wizard switched the rate limiter on, as it is unless e2e/.env says otherwise.
-  rateLimiter: values.E2E_RATE_LIMITER !== "false",
   adminPassword: readState("admin-password").trim(),
 };

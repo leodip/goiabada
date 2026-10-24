@@ -1,6 +1,6 @@
 // RFC 6749 section 4.3, the resource owner password credentials grant: the client authenticates when
 // it can, the user's credentials are checked, and the scope follows section 3.3. Its brute-force
-// protection, which 4.3.2 makes a MUST, is ../oauth/sign-ins-from-one-address.system.ts; UTF-8 in a
+// protection, which 4.3.2 makes a MUST, is ../../rate-limits/sign-ins-from-one-address.spec.ts; UTF-8 in a
 // password is in token-endpoint.spec.ts.
 import { clientUrl, grantUserPermission } from "../../lib/admin-console";
 import { expect, test } from "../../lib/fixtures";

@@ -52,7 +52,7 @@ services:
       - "127.0.0.1:9093:3000"
 EOF
 # Every docker compose command in this directory takes testapp.yml too from now on.
-grep -q ':testapp.yml$' .env || sed -i 's/^COMPOSE_FILE=.*/&:testapp.yml/' .env
+grep -Eq '^COMPOSE_FILE=(.*:)?testapp\.yml(:|$)' .env || sed -i 's/^COMPOSE_FILE=.*/&:testapp.yml/' .env
 
 log "starting testapp1 and testapp2"
 # Recreated whether or not Compose sees a change: the secrets may be new, and the image is.

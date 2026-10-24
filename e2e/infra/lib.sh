@@ -23,7 +23,6 @@ E2E_WEBTEST1_HOST="${E2E_WEBTEST1_HOST:-e2e-webtest1.goiabada.dev}"
 E2E_WEBTEST2_HOST="${E2E_WEBTEST2_HOST:-e2e-webtest2.goiabada.dev}"
 E2E_ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-admin@goiabada.dev}"
 E2E_DB="${E2E_DB:-postgres}"
-E2E_RATE_LIMITER="${E2E_RATE_LIMITER:-true}"
 # On the VPS: the Compose project's directory (and so its name), and the certificate's name.
 E2E_REMOTE_DIR="${E2E_REMOTE_DIR:-/root/goiabada-e2e}"
 E2E_CERT_NAME="${E2E_CERT_NAME:-e2e.goiabada.dev}"
@@ -80,7 +79,16 @@ ensure_suite_packages() {
   fi
 }
 
-# The scripts that reach the VPS call this first; the test run does not need it.
+# The e2e suite and the rate-limits suite each hold this for their run, so they never run at once: the
+# rate-limits suite switches the limiter on for the whole environment, and restarts the auth server.
+hold_suite_lock() {
+  command -v flock >/dev/null || die "flock is not installed"
+  mkdir -p "$STATE_DIR"
+  exec 9>"$STATE_DIR/suite.lock"
+  flock -n 9 || die "a run of the e2e suite or the rate-limits suite holds e2e/.state/suite.lock"
+}
+
+# The scripts that reach the VPS call this first.
 require_vps() {
   [[ -n "$E2E_VPS_HOST" ]] || die "set E2E_VPS_HOST, the VPS address, in e2e/.env or the environment (see e2e/.env.example)"
 }
