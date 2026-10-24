@@ -18,7 +18,7 @@
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, cropperjs, acorn). It does NOT
+# images' Alpine base, Trivy, cropperjs, acorn). It does NOT
 # manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
@@ -184,6 +184,7 @@ get_all_versions() {
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
+        echo "tools.trivy=$(get_version 'tools.trivy')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
@@ -266,6 +267,76 @@ alpine_latest_minor() {
         | tail -1
 }
 
+# The days GitHub must have recorded a release public before check suggests it.
+# A pin cannot be swapped once it is set, so the danger left is bumping to a
+# release that is already poisoned: Trivy's malicious v0.69.4 was public for
+# about 12 hours before it was pulled (#520).
+RELEASE_MIN_AGE_DAYS=7
+
+# utc_timestamp prints seconds since the epoch as GitHub writes a time,
+# 2026-10-21T11:18:34Z, which compares as text in time order. GNU date, then BSD.
+utc_timestamp() {
+    date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ
+}
+
+# Reduce a GitHub releases API answer, read on stdin, to the newest vX.Y.Z
+# release, as X.Y.Z, that GitHub records published at least
+# RELEASE_MIN_AGE_DAYS before NOW, given in seconds since the epoch.
+# Usage: github_settled_release NOW < releases.json
+#
+# The age is published_at, when the release was made public. created_at is the
+# tagged commit's date, which whoever pushes the tag sets. A draft and a
+# prerelease are passed over, and so is a tag that is not vX.Y.Z.
+#
+# The fields are read in the order GitHub writes a release's: tag_name, then
+# draft, prerelease and published_at, each once. Nothing nested in a release
+# carries those names, and a release's body escapes its quotes. An answer in
+# any other order selects nothing, rather than pairing one release's tag with
+# another's publication time.
+github_settled_release() {
+    local cutoff
+    cutoff=$(utc_timestamp $(( $1 - RELEASE_MIN_AGE_DAYS * 86400 ))) || return 1
+    grep -oE '"(tag_name|draft|prerelease|published_at)"[[:space:]]*:[[:space:]]*("[^"]*"|true|false|null)' \
+        | awk -v cutoff="$cutoff" '
+            function settle() {
+                if (!open) return
+                if (draft == "" || pre == "" || pub == "") { bad = 1; return }
+                if (draft == "false" && pre == "false" && pub ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z$/ && pub <= cutoff) {
+                    found[++n] = tag
+                }
+            }
+            {
+                key = $0; sub(/^"/, "", key); sub(/".*/, "", key)
+                value = $0; sub(/^"[^"]*"[ \t]*:[ \t]*/, "", value); gsub(/"/, "", value)
+                if (key == "tag_name") { settle(); open = 1; tag = value; draft = pre = pub = ""; next }
+                if (!open) { bad = 1; next }
+                if (key == "draft") { if (draft != "") bad = 1; draft = value }
+                else if (key == "prerelease") { if (pre != "") bad = 1; pre = value }
+                else if (key == "published_at") { if (pub != "") bad = 1; pub = value }
+            }
+            END {
+                settle()
+                if (bad) exit
+                for (i = 1; i <= n; i++) print found[i]
+            }' \
+        | sed 's/^v//' \
+        | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sort -V \
+        | tail -1
+}
+
+# Fetch the newest settled release of a GitHub repository, as github_settled_release
+# selects it from the ten newest releases.
+# Usage: get_github_settled "aquasecurity/trivy"
+get_github_settled() {
+    local repo="$1"
+    local response
+    response=$(curl -s --connect-timeout 10 "https://api.github.com/repos/${repo}/releases?per_page=10" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$response" ]; then
+        echo "$response" | github_settled_release "$(date -u +%s)"
+    fi
+}
+
 # Fetch the newest stable Alpine minor from alpinelinux.org
 get_alpine_latest() {
     local response
@@ -342,6 +413,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "trivy" "$(get_version 'tools.trivy')"
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
@@ -513,6 +585,24 @@ cmd_check() {
             updates_available+=("Alpine|$current_alpine|$latest_alpine|https://alpinelinux.org/releases/")
         else
             print_success "Up to date ($current_alpine)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- Trivy ---
+    # Built from source at the pin in CI. A release is suggested only once
+    # GitHub has recorded it public for RELEASE_MIN_AGE_DAYS, so a newer one
+    # younger than that reads as up to date (#520).
+    echo -n "Checking Trivy... "
+    local current_trivy=$(get_version 'tools.trivy')
+    local latest_trivy=$(get_github_settled "aquasecurity/trivy")
+    if [ -n "$latest_trivy" ]; then
+        if version_lt "$current_trivy" "$latest_trivy"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Trivy|$current_trivy|$latest_trivy|https://github.com/aquasecurity/trivy/releases")
+        else
+            print_success "Up to date ($current_trivy)"
         fi
     else
         print_warning "Check failed"

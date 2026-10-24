@@ -28,6 +28,9 @@
 # govulncheck:    Vulnerability scanner (devcontainer)
 # alpine:         Base of the release images' final stage, as major.minor
 #                 (Dockerfile-authserver, Dockerfile-adminconsole)
+# trivy:          Image scanner, built from source in CI's Build validation, which
+#                 fails on a fixable HIGH or CRITICAL finding in the images' Alpine
+#                 packages
 #
 # staticcheck, unparam and govulncheck are pinned because they gate CI. An
 # unpinned tool can turn every open PR red on an upstream release, with no
@@ -45,6 +48,16 @@
 # `./version-manager.sh check` reports it from alpinelinux.org. It replaced
 # alpine:latest, which moved the release images to a new minor with no change
 # on our side (#396).
+#
+# trivy is built from source, `go install .../cmd/trivy@v<pin>`, never downloaded
+# as a release binary or run from its action or image: Trivy's publishing was
+# compromised in March 2026 (a malicious v0.69.4 release, hijacked trivy-action
+# and setup-trivy tags, malicious Docker Hub images), and Go's checksum database
+# fixes what source a version is for everyone, which a takeover of the project's
+# accounts cannot rewrite. What the pin cannot prevent is bumping to a release
+# that is already poisoned, so `./version-manager.sh check` suggests a Trivy
+# release only once GitHub has recorded it public for 7 days; the malicious
+# v0.69.4 was public for about 12 hours (#520).
 tools:
   go: "1.27.3"
   tailwind: "4.3.3"
@@ -55,6 +68,7 @@ tools:
   unparam: "0.0.0-20261011093844-7a2c2c0b7aa6"
   govulncheck: "1.9.0"
   alpine: "3.24"
+  trivy: "0.76.0"
 
 # -----------------------------------------------------------------------------
 # Vendored dependencies
