@@ -123,6 +123,10 @@ func TestValidateName_Accepted(t *testing.T) {
 		// #669 decision 3: the bound is more than four nonspacing marks in a row.
 		{"hebrew with three marks on one letter", "\u05E9\u05BC\u05C1\u05B8"}, // שּׁ
 		{"exactly four marks stacked on one letter", "a\u0301\u0302\u0303\u0304"},
+		// Spacing marks (Mc) sit beside the letter and are not counted, in the four
+		// or as a repeat.
+		{"four stacked marks and a spacing mark", "a\u0301\u0302\u0303\u0304\u093e"},
+		{"the same spacing mark twice", "\u0915\u093e\u093e"},
 		// #669 decision 4: five punctuation characters go wherever the apostrophe
 		// and hyphen go.
 		{"typographic apostrophe", "O\u2019Brien"},                                  // O’Brien
