@@ -693,6 +693,109 @@ func userConsentMapping() mappingCase {
 	}
 }
 
+// settingsMapping's whole-row UPDATE leaves created_at, aes_encryption_key and last_cleanup_at
+// alone, the three dont-update columns. CreateInitialSettings, which names the row's id, is held to
+// the tags by TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId.
+func settingsMapping() mappingCase {
+	return mappingCase{
+		name:   "settings",
+		table:  "settings",
+		record: reflect.TypeOf(record.Settings{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetSettingsById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetSettingsById(ctx, nil, 1)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateSettings(ctx, nil, rec.(*record.Settings))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateSettings(ctx, nil, rec.(*record.Settings))
+		},
+	}
+}
+
+// keyPairMapping's type and algorithm columns are tagged withquote, so every statement quotes them
+// in the engine's own way.
+func keyPairMapping() mappingCase {
+	return mappingCase{
+		name:   "key pair",
+		table:  "key_pairs",
+		record: reflect.TypeOf(record.KeyPair{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetKeyPairById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetKeyPairById(ctx, nil, 1)
+			},
+			"GetAllSigningKeys": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAllSigningKeys(ctx, nil))
+			},
+			"GetCurrentSigningKey": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetCurrentSigningKey(ctx, nil)
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateKeyPair(ctx, nil, rec.(*record.KeyPair))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateKeyPair(ctx, nil, rec.(*record.KeyPair))
+		},
+	}
+}
+
+// auditLogMapping has no update: an audit log is written once and never rewritten. Its page is
+// read with each combination of filters, since each is its own statement.
+func auditLogMapping() mappingCase {
+	page := func(auditEvent, requestId string) func(ctx context.Context, d *Database) (any, error) {
+		return func(ctx context.Context, d *Database) (any, error) {
+			logs, _, err := d.GetAuditLogsPaginated(ctx, nil, 2, 10, auditEvent, requestId)
+			return firstOf(logs, err)
+		}
+	}
+	// The distinct values the row carries, so the request-id guard keeps it.
+	event, request := distinctString("audit_event"), distinctString("request_id")
+	return mappingCase{
+		name:   "audit log",
+		table:  "audit_logs",
+		record: reflect.TypeOf(record.AuditLog{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetAuditLogsPaginated":                      page("", ""),
+			"GetAuditLogsPaginated by event":             page(event, ""),
+			"GetAuditLogsPaginated by request id":        page("", request),
+			"GetAuditLogsPaginated by event and request": page(event, request),
+		},
+		// CreateAuditLog stamps created_at from the clock whatever the record held; the value
+		// written is checked against the record as it returned, which carries the stamp.
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateAuditLog(ctx, nil, rec.(*record.AuditLog))
+		},
+	}
+}
+
+func preRegistrationMapping() mappingCase {
+	return mappingCase{
+		name:   "pre-registration",
+		table:  "pre_registrations",
+		record: reflect.TypeOf(record.PreRegistration{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetPreRegistrationById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetPreRegistrationById(ctx, nil, 1)
+			},
+			"GetPreRegistrationByVerificationCodeHash": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetPreRegistrationByVerificationCodeHash(ctx, nil, distinctString("verification_code_hash"))
+			},
+			"GetPreRegistrationByEmail": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetPreRegistrationByEmail(ctx, nil, distinctString("email"))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreatePreRegistration(ctx, nil, rec.(*record.PreRegistration))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdatePreRegistration(ctx, nil, rec.(*record.PreRegistration))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -703,6 +806,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
 		userSessionMapping(), userSessionClientMapping(), browserSessionMapping(), userConsentMapping(),
+		settingsMapping(), keyPairMapping(), auditLogMapping(), preRegistrationMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
@@ -711,6 +815,91 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId holds the one INSERT
+// that names its row's id to the settings tags on every engine: it writes every tagged column, the
+// primary key included, each from its field, and the id it writes is initialSettingsId, the one
+// every reader asks for (#424 decision 14). It runs as a plain statement on every engine, since the
+// id is the caller's and there is none to answer.
+func TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId(t *testing.T) {
+	c := settingsMapping()
+	fields := taggedFields(c.record)
+	byColumn := map[string]taggedField{}
+	for _, f := range fields {
+		byColumn[f.column] = f
+	}
+
+	for _, dialect := range allDialects {
+		t.Run(string(dialect), func(t *testing.T) {
+			var problems []string
+			for pass := 0; pass < passesFor(c.record); pass++ {
+				problems = append(problems, checkInitialSettingsInsert(t, dialect, c, fields, byColumn, pass)...)
+			}
+			assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
+		})
+	}
+}
+
+func checkInitialSettingsInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
+	byColumn map[string]taggedField, pass int) []string {
+	t.Helper()
+	where := fmt.Sprintf("%s initial insert", dialect)
+	rec, problems := filledRecord(c, fields, pass)
+
+	script := &scriptedDriver{}
+	d := scriptedDBFor(t, script, dialect)
+	_, err := inTx(context.Background(), d, func(tx *sql.Tx) (any, error) {
+		return nil, d.CreateInitialSettings(context.Background(), tx, rec.Interface().(*record.Settings))
+	})
+	if err != nil {
+		return append(problems, fmt.Sprintf("%s: %v", where, err))
+	}
+	if len(script.statements) != 1 || len(script.execArgs) != 1 || script.queryCount != 0 {
+		return append(problems, fmt.Sprintf("%s: %d statements reached the engine, want 1 run as a statement", where, len(script.statements)))
+	}
+	query, args := script.statements[0], script.execArgs[0]
+
+	m := insertShape.FindStringSubmatch(query)
+	if m == nil {
+		return append(problems, fmt.Sprintf("%s: the statement is not an INSERT this test reads: %q", where, query))
+	}
+	if table := parseIdentifier(m[1]).name; table != c.table {
+		problems = append(problems, fmt.Sprintf("%s: inserts into %s, want %s", where, table, c.table))
+	}
+	if m[3] != "" || m[5] != "" {
+		problems = append(problems, fmt.Sprintf("%s: the statement asks for an id it names itself: %q", where, query))
+	}
+
+	columns := strings.Split(m[2], ",")
+	values := strings.Split(m[4], ",")
+	if len(columns) != len(values) {
+		return append(problems, fmt.Sprintf("%s: %d columns and %d values", where, len(columns), len(values)))
+	}
+	reader := &placeholderReader{dialect: dialect}
+	written := map[string]bool{}
+	for i, entry := range columns {
+		col := parseIdentifier(entry)
+		if written[col.name] {
+			problems = append(problems, fmt.Sprintf("%s: writes %s twice", where, col.name))
+		}
+		written[col.name] = true
+		argIndex, err := reader.read(values[i])
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", where, err))
+			continue
+		}
+		problems = append(problems, checkWrittenColumn(where, dialect, rec, byColumn, col, argIndex, args)...)
+		if col.name == "id" && argIndex < len(args) && !sameValue(args[argIndex], int64(initialSettingsId)) {
+			problems = append(problems, fmt.Sprintf("%s: writes id %v, want %d", where, args[argIndex], initialSettingsId))
+		}
+	}
+	for _, f := range fields {
+		if !written[f.column] {
+			problems = append(problems, fmt.Sprintf("%s: does not write %s", where, f.column))
+		}
+	}
+	return problems
 }
 
 // taggedField is one column of the contract: a field with a `db` tag other than "-".
@@ -812,9 +1001,13 @@ func distinctValue(rt reflect.Type, i int, column string, pass int) (driver.Valu
 	case reflect.TypeOf(sql.NullBool{}):
 		dv, gv = b, sql.NullBool{Bool: b, Valid: true}
 	default:
-		// A named string type, such as record.AcrLevel, is stored and scanned as its string.
+		// A named string type, such as record.AcrLevel, is stored and scanned as its string, and a
+		// named int type, such as record.PasswordPolicy, as its number.
 		if ft.Kind() == reflect.String {
 			return distinctString(column), reflect.ValueOf(distinctString(column)).Convert(ft), nil
+		}
+		if ft.Kind() == reflect.Int {
+			return n, reflect.ValueOf(int(n)).Convert(ft), nil
 		}
 		return nil, reflect.Value{}, fmt.Errorf("no distinct value is written for a %s field (column %s)", ft, column)
 	}

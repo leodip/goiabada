@@ -5,10 +5,282 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// settingsColumns is the settings table as scanSettings reads it.
+var settingsColumns = columnList{
+	sqlite: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
+	mysql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
+	postgres: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
+	mssql: "id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, last_cleanup_at",
+}
+
+// scanSettings reads one row selected with settingsColumns.
+func scanSettings(row rowScanner, settings *record.Settings) error {
+	return row.Scan(
+		&settings.Id,
+		&settings.CreatedAt,
+		&settings.UpdatedAt,
+		&settings.AppName,
+		&settings.Issuer,
+		&settings.UITheme,
+		&settings.PasswordPolicy,
+		&settings.SelfRegistrationEnabled,
+		&settings.SelfRegistrationRequiresEmailVerification,
+		&settings.TokenExpirationInSeconds,
+		&settings.RefreshTokenOfflineIdleTimeoutInSeconds,
+		&settings.RefreshTokenOfflineMaxLifetimeInSeconds,
+		&settings.UserSessionIdleTimeoutInSeconds,
+		&settings.UserSessionMaxLifetimeInSeconds,
+		&settings.IncludeOpenIDConnectClaimsInAccessToken,
+		&settings.IncludeOpenIDConnectClaimsInIdToken,
+		&settings.MaxUserSessionsPerUser,
+		&settings.AESEncryptionKeyLegacy,
+		&settings.SMTPHost,
+		&settings.SMTPPort,
+		&settings.SMTPUsername,
+		&settings.SMTPPasswordEncrypted,
+		&settings.SMTPFromName,
+		&settings.SMTPFromEmail,
+		&settings.SMTPEncryption,
+		&settings.SMTPEnabled,
+		&settings.DynamicClientRegistrationEnabled,
+		&settings.PKCERequired,
+		&settings.ImplicitFlowEnabled,
+		&settings.ResourceOwnerPasswordCredentialsEnabled,
+		&settings.AuditLogsInConsoleEnabled,
+		&settings.AuditLogsInDatabaseEnabled,
+		&settings.AuditLogRetentionDays,
+		&settings.LastCleanupAt,
+	)
+}
+
+var insertSettings = statement{
+	sqlite: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
+		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, " +
+		"$33) RETURNING id",
+	mssql: "INSERT INTO settings (created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, " +
+		"@p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, " +
+		"@p27, @p28, @p29, @p30, @p31, @p32, @p33)",
+}
+
+// insertInitialSettings is the settings row with its id named, written once, by
+// CreateInitialSettings. It answers no id on any engine, since the caller names it.
+var insertInitialSettings = statement{
+	sqlite: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, " +
+		"$17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)",
+	mssql: "INSERT INTO settings (id, created_at, updated_at, app_name, issuer, ui_theme, password_policy, " +
+		"self_registration_enabled, self_registration_requires_email_verification, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, user_session_idle_timeout_in_seconds, " +
+		"user_session_max_lifetime_in_seconds, include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, max_user_sessions_per_user, aes_encryption_key, " +
+		"smtp_host, smtp_port, smtp_username, smtp_password_encrypted, smtp_from_name, smtp_from_email, " +
+		"smtp_encryption, smtp_enabled, dynamic_client_registration_enabled, pkce_required, " +
+		"implicit_flow_enabled, resource_owner_password_credentials_enabled, " +
+		"audit_logs_in_console_enabled, audit_logs_in_database_enabled, audit_log_retention_days, " +
+		"last_cleanup_at) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, " +
+		"@p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, " +
+		"@p30, @p31, @p32, @p33, @p34)",
+}
+
+// updateSettings writes the whole row but created_at, aes_encryption_key and last_cleanup_at, which
+// are dont-update: see the record for why each is left alone.
+var updateSettings = statement{
+	sqlite: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, ui_theme = ?, " +
+		"password_policy = ?, self_registration_enabled = ?, " +
+		"self_registration_requires_email_verification = ?, token_expiration_in_seconds = ?, " +
+		"refresh_token_offline_idle_timeout_in_seconds = ?, " +
+		"refresh_token_offline_max_lifetime_in_seconds = ?, user_session_idle_timeout_in_seconds = ?, " +
+		"user_session_max_lifetime_in_seconds = ?, include_open_id_connect_claims_in_access_token = ?, " +
+		"include_open_id_connect_claims_in_id_token = ?, max_user_sessions_per_user = ?, smtp_host = ?, " +
+		"smtp_port = ?, smtp_username = ?, smtp_password_encrypted = ?, smtp_from_name = ?, " +
+		"smtp_from_email = ?, smtp_encryption = ?, smtp_enabled = ?, " +
+		"dynamic_client_registration_enabled = ?, pkce_required = ?, implicit_flow_enabled = ?, " +
+		"resource_owner_password_credentials_enabled = ?, audit_logs_in_console_enabled = ?, " +
+		"audit_logs_in_database_enabled = ?, audit_log_retention_days = ? WHERE id = ?",
+	mysql: "UPDATE settings SET updated_at = ?, app_name = ?, issuer = ?, ui_theme = ?, " +
+		"password_policy = ?, self_registration_enabled = ?, " +
+		"self_registration_requires_email_verification = ?, token_expiration_in_seconds = ?, " +
+		"refresh_token_offline_idle_timeout_in_seconds = ?, " +
+		"refresh_token_offline_max_lifetime_in_seconds = ?, user_session_idle_timeout_in_seconds = ?, " +
+		"user_session_max_lifetime_in_seconds = ?, include_open_id_connect_claims_in_access_token = ?, " +
+		"include_open_id_connect_claims_in_id_token = ?, max_user_sessions_per_user = ?, smtp_host = ?, " +
+		"smtp_port = ?, smtp_username = ?, smtp_password_encrypted = ?, smtp_from_name = ?, " +
+		"smtp_from_email = ?, smtp_encryption = ?, smtp_enabled = ?, " +
+		"dynamic_client_registration_enabled = ?, pkce_required = ?, implicit_flow_enabled = ?, " +
+		"resource_owner_password_credentials_enabled = ?, audit_logs_in_console_enabled = ?, " +
+		"audit_logs_in_database_enabled = ?, audit_log_retention_days = ? WHERE id = ?",
+	postgres: "UPDATE settings SET updated_at = $1, app_name = $2, issuer = $3, ui_theme = $4, " +
+		"password_policy = $5, self_registration_enabled = $6, " +
+		"self_registration_requires_email_verification = $7, token_expiration_in_seconds = $8, " +
+		"refresh_token_offline_idle_timeout_in_seconds = $9, " +
+		"refresh_token_offline_max_lifetime_in_seconds = $10, " +
+		"user_session_idle_timeout_in_seconds = $11, user_session_max_lifetime_in_seconds = $12, " +
+		"include_open_id_connect_claims_in_access_token = $13, " +
+		"include_open_id_connect_claims_in_id_token = $14, max_user_sessions_per_user = $15, " +
+		"smtp_host = $16, smtp_port = $17, smtp_username = $18, smtp_password_encrypted = $19, " +
+		"smtp_from_name = $20, smtp_from_email = $21, smtp_encryption = $22, smtp_enabled = $23, " +
+		"dynamic_client_registration_enabled = $24, pkce_required = $25, implicit_flow_enabled = $26, " +
+		"resource_owner_password_credentials_enabled = $27, audit_logs_in_console_enabled = $28, " +
+		"audit_logs_in_database_enabled = $29, audit_log_retention_days = $30 WHERE id = $31",
+	mssql: "UPDATE settings SET updated_at = @p1, app_name = @p2, issuer = @p3, ui_theme = @p4, " +
+		"password_policy = @p5, self_registration_enabled = @p6, " +
+		"self_registration_requires_email_verification = @p7, token_expiration_in_seconds = @p8, " +
+		"refresh_token_offline_idle_timeout_in_seconds = @p9, " +
+		"refresh_token_offline_max_lifetime_in_seconds = @p10, " +
+		"user_session_idle_timeout_in_seconds = @p11, user_session_max_lifetime_in_seconds = @p12, " +
+		"include_open_id_connect_claims_in_access_token = @p13, " +
+		"include_open_id_connect_claims_in_id_token = @p14, max_user_sessions_per_user = @p15, " +
+		"smtp_host = @p16, smtp_port = @p17, smtp_username = @p18, smtp_password_encrypted = @p19, " +
+		"smtp_from_name = @p20, smtp_from_email = @p21, smtp_encryption = @p22, smtp_enabled = @p23, " +
+		"dynamic_client_registration_enabled = @p24, pkce_required = @p25, implicit_flow_enabled = @p26, " +
+		"resource_owner_password_credentials_enabled = @p27, audit_logs_in_console_enabled = @p28, " +
+		"audit_logs_in_database_enabled = @p29, audit_log_retention_days = @p30 WHERE id = @p31",
+}
+
+var selectSettingsById = statement{
+	sqlite:   "SELECT " + settingsColumns.sqlite + " FROM settings WHERE id = ?",
+	mysql:    "SELECT " + settingsColumns.mysql + " FROM settings WHERE id = ?",
+	postgres: "SELECT " + settingsColumns.postgres + " FROM settings WHERE id = $1",
+	mssql:    "SELECT " + settingsColumns.mssql + " FROM settings WHERE id = @p1",
+}
+
+var acquireSettingsRow = statement{
+	sqlite:   "UPDATE settings SET updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE settings SET updated_at = ? WHERE id = ?",
+	postgres: "UPDATE settings SET updated_at = $1 WHERE id = $2",
+	mssql:    "UPDATE settings SET updated_at = @p1 WHERE id = @p2",
+}
+
+// claimCleanupRun binds the run's time twice, as last_cleanup_at and as updated_at, then the
+// settings row's id, then the cutoff.
+var claimCleanupRun = statement{
+	sqlite: "UPDATE settings SET last_cleanup_at = ?, updated_at = ? " +
+		"WHERE id = ? AND (last_cleanup_at IS NULL OR last_cleanup_at < ?)",
+	mysql: "UPDATE settings SET last_cleanup_at = ?, updated_at = ? " +
+		"WHERE id = ? AND (last_cleanup_at IS NULL OR last_cleanup_at < ?)",
+	postgres: "UPDATE settings SET last_cleanup_at = $1, updated_at = $2 " +
+		"WHERE id = $3 AND (last_cleanup_at IS NULL OR last_cleanup_at < $4)",
+	mssql: "UPDATE settings SET last_cleanup_at = @p1, updated_at = @p2 " +
+		"WHERE id = @p3 AND (last_cleanup_at IS NULL OR last_cleanup_at < @p4)",
+}
 
 func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 
@@ -19,12 +291,19 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 	settings.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	settingsStruct := sqlbuilder.NewStruct(new(record.Settings)).
-		For(d.Flavor)
-
-	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "settings")
+	id, err := d.insert(ctx, tx, insertSettings, "settings",
+		settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer, settings.UITheme,
+		settings.PasswordPolicy, settings.SelfRegistrationEnabled,
+		settings.SelfRegistrationRequiresEmailVerification, settings.TokenExpirationInSeconds,
+		settings.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds,
+		settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
+		settings.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInIdToken,
+		settings.MaxUserSessionsPerUser, settings.AESEncryptionKeyLegacy, settings.SMTPHost,
+		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
+		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
+		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
+		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
+		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt)
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
@@ -80,11 +359,19 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 		}
 	}
 
-	insertBuilder := sqlbuilder.NewStruct(new(record.Settings)).
-		For(d.Flavor).
-		InsertInto("settings", settings)
-	statement, args := insertBuilder.Build()
-	if _, err := d.ExecSQL(ctx, tx, statement, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, insertInitialSettings.text(d.Dialect),
+		settings.Id, settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer,
+		settings.UITheme, settings.PasswordPolicy, settings.SelfRegistrationEnabled,
+		settings.SelfRegistrationRequiresEmailVerification, settings.TokenExpirationInSeconds,
+		settings.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds,
+		settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
+		settings.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInIdToken,
+		settings.MaxUserSessionsPerUser, settings.AESEncryptionKeyLegacy, settings.SMTPHost,
+		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
+		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
+		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
+		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
+		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt); err != nil {
 		restore()
 		return d.wrapSQLError(err, "unable to insert the initial settings")
 	}
@@ -108,14 +395,18 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 	originalUpdatedAt := settings.UpdatedAt
 	settings.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	settingsStruct := sqlbuilder.NewStruct(new(record.Settings)).
-		For(d.Flavor)
-
-	updateBuilder := settingsStruct.WithoutTag("pk").WithoutTag("dont-update").Update("settings", settings)
-	updateBuilder.Where(updateBuilder.Equal("id", settings.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateSettings.text(d.Dialect),
+		settings.UpdatedAt, settings.AppName, settings.Issuer, settings.UITheme, settings.PasswordPolicy,
+		settings.SelfRegistrationEnabled, settings.SelfRegistrationRequiresEmailVerification,
+		settings.TokenExpirationInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds,
+		settings.RefreshTokenOfflineMaxLifetimeInSeconds, settings.UserSessionIdleTimeoutInSeconds,
+		settings.UserSessionMaxLifetimeInSeconds, settings.IncludeOpenIDConnectClaimsInAccessToken,
+		settings.IncludeOpenIDConnectClaimsInIdToken, settings.MaxUserSessionsPerUser, settings.SMTPHost,
+		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
+		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
+		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
+		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
+		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.Id)
 	if err != nil {
 		settings.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update settings")
@@ -158,59 +449,15 @@ func (d *Database) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsI
 		return errs.New("can't acquire a settings row with an id of 0")
 	}
 
-	acquire := sqlbuilder.NewUpdateBuilder()
-	acquire.Update("settings")
-	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
-	acquire.Where(acquire.Equal("id", settingsId))
-
-	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireSettingsRow.text(d.Dialect), time.Now().UTC(), settingsId); err != nil {
 		return errs.Wrap(err, "unable to acquire the settings row")
 	}
 
 	return nil
 }
 
-func (d *Database) getSettingsCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	settingsStruct *sqlbuilder.Struct) (*record.Settings, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var settings record.Settings
-	if rows.Next() {
-		addr := settingsStruct.Addr(&settings)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan settings")
-		}
-		return &settings, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error) {
-
-	settingsStruct := sqlbuilder.NewStruct(new(record.Settings)).
-		For(d.Flavor)
-
-	selectBuilder := settingsStruct.SelectFrom("settings")
-	selectBuilder.Where(selectBuilder.Equal("id", settingsId))
-
-	settings, err := d.getSettingsCommon(ctx, tx, selectBuilder, settingsStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return settings, nil
+	return queryOne(ctx, d, tx, selectSettingsById.text(d.Dialect), []any{settingsId}, scanSettings, "settings")
 }
 
 // TryClaimCleanupRun atomically claims the next background cleanup run, and
@@ -233,22 +480,7 @@ func (d *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId i
 // attempt by one interval rather than letting every instance retry immediately.
 func (d *Database) TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("settings")
-	ub.Set(
-		ub.Assign("last_cleanup_at", now),
-		ub.Assign("updated_at", now),
-	)
-	ub.Where(
-		ub.Equal("id", 1),
-		ub.Or(
-			ub.IsNull("last_cleanup_at"),
-			ub.LessThan("last_cleanup_at", claimableBefore),
-		),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, claimCleanupRun.text(d.Dialect), now, now, initialSettingsId, claimableBefore)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim the cleanup run")
 	}

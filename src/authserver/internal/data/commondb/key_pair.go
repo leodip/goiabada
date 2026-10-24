@@ -5,10 +5,107 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// The type and algorithm columns are reserved words on some engine, so every statement quotes
+// them, with backticks on MySQL and double quotes on the other three.
+
+// keyPairColumns is the key_pairs table as scanKeyPair reads it.
+var keyPairColumns = columnList{
+	sqlite: `id, created_at, updated_at, state, key_identifier, "type", "algorithm", private_key_pem, ` +
+		"public_key_pem, public_key_asn1_der, public_key_jwk",
+	mysql: "id, created_at, updated_at, state, key_identifier, `type`, `algorithm`, private_key_pem, " +
+		"public_key_pem, public_key_asn1_der, public_key_jwk",
+	postgres: `id, created_at, updated_at, state, key_identifier, "type", "algorithm", private_key_pem, ` +
+		"public_key_pem, public_key_asn1_der, public_key_jwk",
+	mssql: `id, created_at, updated_at, state, key_identifier, "type", "algorithm", private_key_pem, ` +
+		"public_key_pem, public_key_asn1_der, public_key_jwk",
+}
+
+// scanKeyPair reads one row selected with keyPairColumns.
+func scanKeyPair(row rowScanner, keyPair *record.KeyPair) error {
+	return row.Scan(
+		&keyPair.Id,
+		&keyPair.CreatedAt,
+		&keyPair.UpdatedAt,
+		&keyPair.State,
+		&keyPair.KeyIdentifier,
+		&keyPair.Type,
+		&keyPair.Algorithm,
+		&keyPair.PrivateKeyPEM,
+		&keyPair.PublicKeyPEM,
+		&keyPair.PublicKeyASN1_DER,
+		&keyPair.PublicKeyJWK,
+	)
+}
+
+var insertKeyPair = statement{
+	sqlite: `INSERT INTO key_pairs (created_at, updated_at, state, key_identifier, "type", "algorithm", ` +
+		"private_key_pem, public_key_pem, public_key_asn1_der, public_key_jwk) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO key_pairs (created_at, updated_at, state, key_identifier, `type`, `algorithm`, " +
+		"private_key_pem, public_key_pem, public_key_asn1_der, public_key_jwk) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: `INSERT INTO key_pairs (created_at, updated_at, state, key_identifier, "type", "algorithm", ` +
+		"private_key_pem, public_key_pem, public_key_asn1_der, public_key_jwk) VALUES ($1, $2, $3, $4, " +
+		"$5, $6, $7, $8, $9, $10) RETURNING id",
+	mssql: `INSERT INTO key_pairs (created_at, updated_at, state, key_identifier, "type", "algorithm", ` +
+		"private_key_pem, public_key_pem, public_key_asn1_der, " +
+		"public_key_jwk) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10)",
+}
+
+// updateKeyPair writes the whole row but created_at, which is dont-update.
+var updateKeyPair = statement{
+	sqlite: `UPDATE key_pairs SET updated_at = ?, state = ?, key_identifier = ?, "type" = ?, ` +
+		`"algorithm" = ?, private_key_pem = ?, public_key_pem = ?, public_key_asn1_der = ?, ` +
+		"public_key_jwk = ? WHERE id = ?",
+	mysql: "UPDATE key_pairs SET updated_at = ?, state = ?, key_identifier = ?, `type` = ?, " +
+		"`algorithm` = ?, private_key_pem = ?, public_key_pem = ?, public_key_asn1_der = ?, " +
+		"public_key_jwk = ? WHERE id = ?",
+	postgres: `UPDATE key_pairs SET updated_at = $1, state = $2, key_identifier = $3, "type" = $4, ` +
+		`"algorithm" = $5, private_key_pem = $6, public_key_pem = $7, public_key_asn1_der = $8, ` +
+		"public_key_jwk = $9 WHERE id = $10",
+	mssql: `UPDATE key_pairs SET updated_at = @p1, state = @p2, key_identifier = @p3, "type" = @p4, ` +
+		`"algorithm" = @p5, private_key_pem = @p6, public_key_pem = @p7, public_key_asn1_der = @p8, ` +
+		"public_key_jwk = @p9 WHERE id = @p10",
+}
+
+// updateKeyPairState binds the new state and the clock, then the key's id and the state the
+// caller read.
+var updateKeyPairState = statement{
+	sqlite:   "UPDATE key_pairs SET state = ?, updated_at = ? WHERE id = ? AND state = ?",
+	mysql:    "UPDATE key_pairs SET state = ?, updated_at = ? WHERE id = ? AND state = ?",
+	postgres: "UPDATE key_pairs SET state = $1, updated_at = $2 WHERE id = $3 AND state = $4",
+	mssql:    "UPDATE key_pairs SET state = @p1, updated_at = @p2 WHERE id = @p3 AND state = @p4",
+}
+
+var selectKeyPairById = statement{
+	sqlite:   "SELECT " + keyPairColumns.sqlite + " FROM key_pairs WHERE id = ?",
+	mysql:    "SELECT " + keyPairColumns.mysql + " FROM key_pairs WHERE id = ?",
+	postgres: "SELECT " + keyPairColumns.postgres + " FROM key_pairs WHERE id = $1",
+	mssql:    "SELECT " + keyPairColumns.mssql + " FROM key_pairs WHERE id = @p1",
+}
+
+var selectAllKeyPairs = statement{
+	sqlite:   "SELECT " + keyPairColumns.sqlite + " FROM key_pairs",
+	mysql:    "SELECT " + keyPairColumns.mysql + " FROM key_pairs",
+	postgres: "SELECT " + keyPairColumns.postgres + " FROM key_pairs",
+	mssql:    "SELECT " + keyPairColumns.mssql + " FROM key_pairs",
+}
+
+var selectKeyPairsByState = statement{
+	sqlite:   "SELECT " + keyPairColumns.sqlite + " FROM key_pairs WHERE state = ?",
+	mysql:    "SELECT " + keyPairColumns.mysql + " FROM key_pairs WHERE state = ?",
+	postgres: "SELECT " + keyPairColumns.postgres + " FROM key_pairs WHERE state = $1",
+	mssql:    "SELECT " + keyPairColumns.mssql + " FROM key_pairs WHERE state = @p1",
+}
+
+var deleteKeyPair = statement{
+	sqlite:   "DELETE FROM key_pairs WHERE id = ?",
+	mysql:    "DELETE FROM key_pairs WHERE id = ?",
+	postgres: "DELETE FROM key_pairs WHERE id = $1",
+	mssql:    "DELETE FROM key_pairs WHERE id = @p1",
+}
 
 func (d *Database) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error {
 
@@ -19,12 +116,10 @@ func (d *Database) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *recor
 	keyPair.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	keyPair.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	keyPairStruct := sqlbuilder.NewStruct(new(record.KeyPair)).
-		For(d.Flavor)
-
-	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("key_pairs", keyPair)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "keyPair")
+	id, err := d.insert(ctx, tx, insertKeyPair, "keyPair",
+		keyPair.CreatedAt, keyPair.UpdatedAt, keyPair.State, keyPair.KeyIdentifier, keyPair.Type,
+		keyPair.Algorithm, keyPair.PrivateKeyPEM, keyPair.PublicKeyPEM, keyPair.PublicKeyASN1_DER,
+		keyPair.PublicKeyJWK)
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
@@ -44,14 +139,10 @@ func (d *Database) UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *recor
 	originalUpdatedAt := keyPair.UpdatedAt
 	keyPair.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	keyPairStruct := sqlbuilder.NewStruct(new(record.KeyPair)).
-		For(d.Flavor)
-
-	updateBuilder := keyPairStruct.WithoutTag("pk").WithoutTag("dont-update").Update("key_pairs", keyPair)
-	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateKeyPair.text(d.Dialect),
+		keyPair.UpdatedAt, keyPair.State, keyPair.KeyIdentifier, keyPair.Type, keyPair.Algorithm,
+		keyPair.PrivateKeyPEM, keyPair.PublicKeyPEM, keyPair.PublicKeyASN1_DER, keyPair.PublicKeyJWK,
+		keyPair.Id)
 	if err != nil {
 		keyPair.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update keyPair")
@@ -71,19 +162,7 @@ func (d *Database) UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId
 		return false, errs.New("can't update the state of a keyPair with id 0")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("key_pairs")
-	ub.Set(
-		ub.Assign("state", toState),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", keyPairId),
-		ub.Equal("state", fromState),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, updateKeyPairState.text(d.Dialect), toState, time.Now().UTC(), keyPairId, fromState)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update keyPair state")
 	}
@@ -96,77 +175,12 @@ func (d *Database) UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId
 	return rowsAffected == 1, nil
 }
 
-func (d *Database) getKeyPairCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	keyPairStruct *sqlbuilder.Struct) (*record.KeyPair, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var keyPair record.KeyPair
-	if rows.Next() {
-		addr := keyPairStruct.Addr(&keyPair)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan keyPair")
-		}
-		return &keyPair, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error) {
-
-	keyPairStruct := sqlbuilder.NewStruct(new(record.KeyPair)).
-		For(d.Flavor)
-
-	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
-	selectBuilder.Where(selectBuilder.Equal("id", keyPairId))
-
-	keyPair, err := d.getKeyPairCommon(ctx, tx, selectBuilder, keyPairStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return keyPair, nil
+	return queryOne(ctx, d, tx, selectKeyPairById.text(d.Dialect), []any{keyPairId}, scanKeyPair, "keyPair")
 }
 
 func (d *Database) GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error) {
-	keyPairStruct := sqlbuilder.NewStruct(new(record.KeyPair)).
-		For(d.Flavor)
-
-	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var keyPairs []record.KeyPair
-	for rows.Next() {
-		var keyPair record.KeyPair
-		addr := keyPairStruct.Addr(&keyPair)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan keyPair")
-		}
-		keyPairs = append(keyPairs, keyPair)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return keyPairs, nil
+	return queryAll(ctx, d, tx, nil, selectAllKeyPairs.text(d.Dialect), nil, scanKeyPair, "keyPair")
 }
 
 // GetCurrentSigningKey returns an error when no key is in the current state, departing from
@@ -176,13 +190,8 @@ func (d *Database) GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.
 // needed to repair itself. Returning the error here is what makes all of those sites correct
 // at once, including ones added later (#251).
 func (d *Database) GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error) {
-	keyPairStruct := sqlbuilder.NewStruct(new(record.KeyPair)).
-		For(d.Flavor)
-
-	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
-	selectBuilder.Where(selectBuilder.Equal("state", record.KeyStateCurrent.String()))
-
-	keyPair, err := d.getKeyPairCommon(ctx, tx, selectBuilder, keyPairStruct)
+	keyPair, err := queryOne(ctx, d, tx, selectKeyPairsByState.text(d.Dialect), []any{record.KeyStateCurrent.String()},
+		scanKeyPair, "keyPair")
 	if err != nil {
 		return nil, err
 	}
@@ -196,14 +205,7 @@ func (d *Database) GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*recor
 
 func (d *Database) DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(record.KeyPair)).
-		For(d.Flavor)
-
-	deleteBuilder := userConsentStruct.DeleteFrom("key_pairs")
-	deleteBuilder.Where(deleteBuilder.Equal("id", keyPairId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteKeyPair.text(d.Dialect), keyPairId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete keyPair")
 	}

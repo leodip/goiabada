@@ -17,9 +17,7 @@ import (
 // forgets fails to compile against data.Database rather than inheriting another engine's syntax
 // (#438 decision 7).
 func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
-	deleteSQL := `DELETE FROM audit_logs WHERE id IN (
-		SELECT id FROM audit_logs WHERE created_at < ? ORDER BY id LIMIT ?
-	)`
+	deleteSQL := "DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs WHERE created_at < ? ORDER BY id LIMIT ?)"
 
 	result, err := d.ExecSQL(ctx, tx, deleteSQL, cutoff, maxDeletions)
 	if err != nil {

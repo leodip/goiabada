@@ -344,9 +344,13 @@ trap cleanup EXIT
 
 # Run go test for the given test sub-directory (data|integration).
 # Honors $RUN_PATTERN when set so you can target a single test by name.
+#
+# -timeout is 30m rather than go test's default 10m: the MySQL data tier alone
+# takes about ten minutes, and passed the default on a slower machine with every
+# test green (#644). A real hang still ends, and the panic still names the test.
 run_tests() {
     local test_type=$1
-    local args=(-v -count=1 -p 1)
+    local args=(-v -count=1 -p 1 -timeout 30m)
     if [ -n "$RUN_PATTERN" ]; then
         args+=(-run "$RUN_PATTERN")
         echo "Running $test_type tests (filter: -run '$RUN_PATTERN')..."

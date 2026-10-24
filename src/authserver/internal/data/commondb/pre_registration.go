@@ -5,10 +5,112 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// preRegistrationColumns is the pre_registrations table as scanPreRegistration reads it.
+var preRegistrationColumns = columnList{
+	sqlite: "id, created_at, updated_at, email, verification_code_encrypted, verification_code_issued_at, " +
+		"verification_code_hash",
+	mysql: "id, created_at, updated_at, email, verification_code_encrypted, verification_code_issued_at, " +
+		"verification_code_hash",
+	postgres: "id, created_at, updated_at, email, verification_code_encrypted, verification_code_issued_at, " +
+		"verification_code_hash",
+	mssql: "id, created_at, updated_at, email, verification_code_encrypted, verification_code_issued_at, " +
+		"verification_code_hash",
+}
+
+// scanPreRegistration reads one row selected with preRegistrationColumns.
+func scanPreRegistration(row rowScanner, preRegistration *record.PreRegistration) error {
+	return row.Scan(
+		&preRegistration.Id,
+		&preRegistration.CreatedAt,
+		&preRegistration.UpdatedAt,
+		&preRegistration.Email,
+		&preRegistration.VerificationCodeEncrypted,
+		&preRegistration.VerificationCodeIssuedAt,
+		&preRegistration.VerificationCodeHash,
+	)
+}
+
+var insertPreRegistration = statement{
+	sqlite: "INSERT INTO pre_registrations (created_at, updated_at, email, verification_code_encrypted, " +
+		"verification_code_issued_at, verification_code_hash) VALUES (?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO pre_registrations (created_at, updated_at, email, verification_code_encrypted, " +
+		"verification_code_issued_at, verification_code_hash) VALUES (?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO pre_registrations (created_at, updated_at, email, verification_code_encrypted, " +
+		"verification_code_issued_at, verification_code_hash) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+	mssql: "INSERT INTO pre_registrations (created_at, updated_at, email, verification_code_encrypted, " +
+		"verification_code_issued_at, verification_code_hash) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6)",
+}
+
+// updatePreRegistration writes the whole row but created_at, which is dont-update.
+var updatePreRegistration = statement{
+	sqlite: "UPDATE pre_registrations SET updated_at = ?, email = ?, verification_code_encrypted = ?, " +
+		"verification_code_issued_at = ?, verification_code_hash = ? WHERE id = ?",
+	mysql: "UPDATE pre_registrations SET updated_at = ?, email = ?, verification_code_encrypted = ?, " +
+		"verification_code_issued_at = ?, verification_code_hash = ? WHERE id = ?",
+	postgres: "UPDATE pre_registrations SET updated_at = $1, email = $2, verification_code_encrypted = $3, " +
+		"verification_code_issued_at = $4, verification_code_hash = $5 WHERE id = $6",
+	mssql: "UPDATE pre_registrations SET updated_at = @p1, email = @p2, verification_code_encrypted = @p3, " +
+		"verification_code_issued_at = @p4, verification_code_hash = @p5 WHERE id = @p6",
+}
+
+var selectPreRegistrationById = statement{
+	sqlite:   "SELECT " + preRegistrationColumns.sqlite + " FROM pre_registrations WHERE id = ?",
+	mysql:    "SELECT " + preRegistrationColumns.mysql + " FROM pre_registrations WHERE id = ?",
+	postgres: "SELECT " + preRegistrationColumns.postgres + " FROM pre_registrations WHERE id = $1",
+	mssql:    "SELECT " + preRegistrationColumns.mssql + " FROM pre_registrations WHERE id = @p1",
+}
+
+var selectPreRegistrationByVerificationCodeHash = statement{
+	sqlite:   "SELECT " + preRegistrationColumns.sqlite + " FROM pre_registrations WHERE verification_code_hash = ?",
+	mysql:    "SELECT " + preRegistrationColumns.mysql + " FROM pre_registrations WHERE verification_code_hash = ?",
+	postgres: "SELECT " + preRegistrationColumns.postgres + " FROM pre_registrations WHERE verification_code_hash = $1",
+	mssql:    "SELECT " + preRegistrationColumns.mssql + " FROM pre_registrations WHERE verification_code_hash = @p1",
+}
+
+var selectPreRegistrationByEmail = statement{
+	sqlite:   "SELECT " + preRegistrationColumns.sqlite + " FROM pre_registrations WHERE email = ?",
+	mysql:    "SELECT " + preRegistrationColumns.mysql + " FROM pre_registrations WHERE email = ?",
+	postgres: "SELECT " + preRegistrationColumns.postgres + " FROM pre_registrations WHERE email = $1",
+	mssql:    "SELECT " + preRegistrationColumns.mssql + " FROM pre_registrations WHERE email = @p1",
+}
+
+var deletePreRegistration = statement{
+	sqlite:   "DELETE FROM pre_registrations WHERE id = ?",
+	mysql:    "DELETE FROM pre_registrations WHERE id = ?",
+	postgres: "DELETE FROM pre_registrations WHERE id = $1",
+	mssql:    "DELETE FROM pre_registrations WHERE id = @p1",
+}
+
+var deletePreRegistrationHoldingCode = statement{
+	sqlite:   "DELETE FROM pre_registrations WHERE id = ? AND verification_code_hash = ?",
+	mysql:    "DELETE FROM pre_registrations WHERE id = ? AND verification_code_hash = ?",
+	postgres: "DELETE FROM pre_registrations WHERE id = $1 AND verification_code_hash = $2",
+	mssql:    "DELETE FROM pre_registrations WHERE id = @p1 AND verification_code_hash = @p2",
+}
+
+var deleteDeadPreRegistrations = statement{
+	sqlite:   "DELETE FROM pre_registrations WHERE (verification_code_issued_at < ? OR verification_code_issued_at IS NULL)",
+	mysql:    "DELETE FROM pre_registrations WHERE (verification_code_issued_at < ? OR verification_code_issued_at IS NULL)",
+	postgres: "DELETE FROM pre_registrations WHERE (verification_code_issued_at < $1 OR verification_code_issued_at IS NULL)",
+	mssql:    "DELETE FROM pre_registrations WHERE (verification_code_issued_at < @p1 OR verification_code_issued_at IS NULL)",
+}
+
+// replacePreRegistrationCode binds the fresh code, its hash, its issued-at and the clock, then the
+// row's id and the dead code's hash the caller read.
+var replacePreRegistrationCode = statement{
+	sqlite: "UPDATE pre_registrations SET verification_code_encrypted = ?, verification_code_hash = ?, " +
+		"verification_code_issued_at = ?, updated_at = ? WHERE id = ? AND verification_code_hash = ?",
+	mysql: "UPDATE pre_registrations SET verification_code_encrypted = ?, verification_code_hash = ?, " +
+		"verification_code_issued_at = ?, updated_at = ? WHERE id = ? AND verification_code_hash = ?",
+	postgres: "UPDATE pre_registrations SET verification_code_encrypted = $1, verification_code_hash = $2, " +
+		"verification_code_issued_at = $3, updated_at = $4 WHERE id = $5 AND verification_code_hash = $6",
+	mssql: "UPDATE pre_registrations SET verification_code_encrypted = @p1, verification_code_hash = @p2, " +
+		"verification_code_issued_at = @p3, updated_at = @p4 WHERE id = @p5 AND verification_code_hash = @p6",
+}
 
 func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error {
 
@@ -19,12 +121,10 @@ func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	preRegistration.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	preRegistration.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	insertBuilder := preRegistrationStruct.WithoutTag("pk").InsertInto("pre_registrations", preRegistration)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "preRegistration")
+	id, err := d.insert(ctx, tx, insertPreRegistration, "preRegistration",
+		preRegistration.CreatedAt, preRegistration.UpdatedAt, preRegistration.Email,
+		preRegistration.VerificationCodeEncrypted, preRegistration.VerificationCodeIssuedAt,
+		preRegistration.VerificationCodeHash)
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
@@ -44,14 +144,9 @@ func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	originalUpdatedAt := preRegistration.UpdatedAt
 	preRegistration.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	updateBuilder := preRegistrationStruct.WithoutTag("pk").WithoutTag("dont-update").Update("pre_registrations", preRegistration)
-	updateBuilder.Where(updateBuilder.Equal("id", preRegistration.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updatePreRegistration.text(d.Dialect),
+		preRegistration.UpdatedAt, preRegistration.Email, preRegistration.VerificationCodeEncrypted,
+		preRegistration.VerificationCodeIssuedAt, preRegistration.VerificationCodeHash, preRegistration.Id)
 	if err != nil {
 		preRegistration.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update preRegistration")
@@ -60,58 +155,14 @@ func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	return nil
 }
 
-func (d *Database) getPreRegistrationCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	preRegistrationStruct *sqlbuilder.Struct) (*record.PreRegistration, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var preRegistration record.PreRegistration
-	if rows.Next() {
-		addr := preRegistrationStruct.Addr(&preRegistration)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan preRegistration")
-		}
-		return &preRegistration, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*record.PreRegistration, error) {
-
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
-	selectBuilder.Where(selectBuilder.Equal("id", preRegistrationId))
-
-	preRegistration, err := d.getPreRegistrationCommon(ctx, tx, selectBuilder, preRegistrationStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return preRegistration, nil
+	return queryOne(ctx, d, tx, selectPreRegistrationById.text(d.Dialect), []any{preRegistrationId},
+		scanPreRegistration, "preRegistration")
 }
 
 func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom("pre_registrations")
-	deleteBuilder.Where(deleteBuilder.Equal("id", preRegistrationId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deletePreRegistration.text(d.Dialect), preRegistrationId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete preRegistration")
 	}
@@ -135,17 +186,7 @@ func (d *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql
 		return false, errs.New("can't delete a preRegistration by an empty code hash")
 	}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	deleteBuilder := preRegistrationStruct.DeleteFrom("pre_registrations")
-	deleteBuilder.Where(
-		deleteBuilder.Equal("id", preRegistrationId),
-		deleteBuilder.Equal("verification_code_hash", codeHash),
-	)
-
-	sql, args := deleteBuilder.Build()
-	result, err := d.ExecSQL(ctx, tx, sql, args...)
+	result, err := d.ExecSQL(ctx, tx, deletePreRegistrationHoldingCode.text(d.Dialect), preRegistrationId, codeHash)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to delete preRegistration")
 	}
@@ -164,17 +205,7 @@ func (d *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql
 // it; the next sweep has it (#207 decision 7).
 func (d *Database) DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error {
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	deleteBuilder := preRegistrationStruct.DeleteFrom("pre_registrations")
-	deleteBuilder.Where(deleteBuilder.Or(
-		deleteBuilder.LessThan("verification_code_issued_at", deadBefore),
-		deleteBuilder.IsNull("verification_code_issued_at"),
-	))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteDeadPreRegistrations.text(d.Dialect), deadBefore)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete dead preRegistrations")
 	}
@@ -197,18 +228,8 @@ func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context,
 		return nil, nil
 	}
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
-	selectBuilder.Where(selectBuilder.Equal("verification_code_hash", codeHash))
-
-	preRegistration, err := d.getPreRegistrationCommon(ctx, tx, selectBuilder, preRegistrationStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return preRegistration, nil
+	return queryOne(ctx, d, tx, selectPreRegistrationByVerificationCodeHash.text(d.Dialect), []any{codeHash},
+		scanPreRegistration, "preRegistration")
 }
 
 // TryReplacePreRegistrationCode gives a dead pending registration a fresh code in one
@@ -233,21 +254,8 @@ func (d *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx
 		return false, errs.New("can't replace a preRegistration code with an empty code hash")
 	}
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("pre_registrations")
-	ub.Set(
-		ub.Assign("verification_code_encrypted", codeEncrypted),
-		ub.Assign("verification_code_hash", codeHash),
-		ub.Assign("verification_code_issued_at", issuedAt),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.Equal("id", preRegistrationId),
-		ub.Equal("verification_code_hash", deadCodeHash),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, replacePreRegistrationCode.text(d.Dialect),
+		codeEncrypted, codeHash, issuedAt, time.Now().UTC(), preRegistrationId, deadCodeHash)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to replace preRegistration code")
 	}
@@ -265,16 +273,6 @@ func (d *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx
 
 func (d *Database) GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error) {
 
-	preRegistrationStruct := sqlbuilder.NewStruct(new(record.PreRegistration)).
-		For(d.Flavor)
-
-	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
-	selectBuilder.Where(selectBuilder.Equal("email", email))
-
-	preRegistration, err := d.getPreRegistrationCommon(ctx, tx, selectBuilder, preRegistrationStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return preRegistration, nil
+	return queryOne(ctx, d, tx, selectPreRegistrationByEmail.text(d.Dialect), []any{email},
+		scanPreRegistration, "preRegistration")
 }
