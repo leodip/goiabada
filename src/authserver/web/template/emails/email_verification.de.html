@@ -1,0 +1,16 @@
+{{define "title"}}{{ .appName }} – E-Mail-Adresse bestätigen{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Guten Tag {{.name}},</p>
+
+    <p>Mit diesem Code können Sie Ihre E-Mail-Adresse bestätigen:</p>
+
+    <p>{{.verificationCode}}</p>
+
+    <p>Geben Sie den Code hier ein: <a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Mit freundlichen Grüßen<br />{{ .appName }}</p>
+</div>
+{{end}}

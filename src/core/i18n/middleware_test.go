@@ -427,7 +427,7 @@ func TestCatalogTag_NamesTheCatalogTheRequestRendersIn(t *testing.T) {
 		{"a first preference with no catalog", "/", "nl-BE,nl;q=0.9,pt-BR;q=0.8", "pt-BR"},
 		{"a later preference at a lower quality", "/", "sv-SE, pt-BR;q=0.5", "pt-BR"},
 		{"a language matched to its regional catalog", "/", "pt-PT", "pt-BR"},
-		{"a language with no catalog", "/", "de", "en"},
+		{"a language with no catalog", "/", "sv", "en"},
 		{"a regional English", "/", "en-US,en;q=0.9", "en"},
 		{"nothing to go on", "/", "", "en"},
 		{"ui_locales over the header", "/?ui_locales=pt-BR", "de", "pt-BR"},

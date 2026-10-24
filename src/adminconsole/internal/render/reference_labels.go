@@ -17,8 +17,8 @@ import (
 //
 // "The active locale" below is the catalog the page was rendered from, not the
 // first preference asked for, so the names are in the language of the page
-// around them: a browser asking for de-DE, with no German catalog, reads an
-// English page naming Germany "Germany", and one asking for fr-CA first and
+// around them: a browser asking for sv-SE, with no Swedish catalog, reads an
+// English page naming Germany "Germany", and one asking for nl-BE first and
 // pt-BR third a pt-BR page naming it "Alemanha" (#645 decision 9).
 
 // refCountry returns the localized country name for an ISO 3166-1 alpha-2

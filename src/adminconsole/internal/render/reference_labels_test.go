@@ -107,8 +107,8 @@ func TestReference_LocalizedRegionName(t *testing.T) {
 }
 
 // The labels are in the language of the catalog the page was rendered from, not the first
-// preference asked for: de-DE has no catalog, so its page is English and names Germany "Germany",
-// not "Deutschland"; nl-BE first and pt-BR third renders pt-BR, so its names are Portuguese, not
+// preference asked for: sv-SE has no catalog, so its page is English and names Germany "Germany",
+// not "Tyskland"; nl-BE first and pt-BR third renders pt-BR, so its names are Portuguese, not
 // Dutch (#645 decision 9).
 func TestReference_LabelsFollowTheCatalogLanguage(t *testing.T) {
 	for _, tc := range []struct {
@@ -116,8 +116,10 @@ func TestReference_LabelsFollowTheCatalogLanguage(t *testing.T) {
 		tags                            []string
 		country, phoneCountry, timezone string
 	}{
-		{"a first preference with no catalog", []string{"de-DE"},
+		{"a first preference with no catalog", []string{"sv-SE"},
 			"Germany", "🇩🇪 - Germany (+49)", "Germany - Europe/Berlin - most of Germany"},
+		{"a supported German region", []string{"de-AT"},
+			"Deutschland", "🇩🇪 - Deutschland (+49)", "Deutschland - Europe/Berlin - most of Germany"},
 		{"a third preference with a catalog", []string{"nl-BE", "nl", "pt-BR"},
 			"Alemanha", "🇩🇪 - Alemanha (+49)", "Alemanha - Europe/Berlin - most of Germany"},
 	} {

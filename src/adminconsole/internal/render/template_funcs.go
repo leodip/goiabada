@@ -133,8 +133,8 @@ var templateFuncMap = template.FuncMap{
 	},
 	// Lang is the tag of the catalog the page rendered from, for the <html lang="..."> attribute,
 	// so the document advertises the language it is written in (screen readers, hyphenation,
-	// translation tools): a browser asking for de-DE, with no German catalog, reads an English page
-	// marked en, not de-DE (WCAG 2.2 SC 3.1.1, #645 decision 8).
+	// translation tools): a browser asking for sv-SE, with no Swedish catalog, reads an English page
+	// marked en, not sv-SE (WCAG 2.2 SC 3.1.1, #645 decision 8).
 	"Lang": i18n.CatalogTag,
 	// CatalogLang is the same tag, kept under its own name because operators' templates and the
 	// page scripts of #559 name it: the layouts publish it as data-catalog-lang, and every request a

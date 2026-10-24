@@ -15,7 +15,7 @@ import (
 
 // TestRender_LayoutsAreMarkedWithTheCatalogLanguage holds both page layouts, through the real
 // templates, to marking a page with the language it is written in: the tag of the catalog it was
-// rendered from, not the first preference asked for. A browser asking for de-DE, with no German
+// rendered from, not the first preference asked for. A browser asking for sv-SE, with no Swedish
 // catalog, reads an English page; one asking for nl-BE first and pt-BR third reads pt-BR. A screen
 // reader chooses its voice from the attribute (WCAG 2.2 SC 3.1.1, #645 decisions 7 and 8).
 func TestRender_LayoutsAreMarkedWithTheCatalogLanguage(t *testing.T) {
@@ -24,7 +24,8 @@ func TestRender_LayoutsAreMarkedWithTheCatalogLanguage(t *testing.T) {
 		{"/layouts/no_menu_layout.html", "/not_found.html"},
 	} {
 		for acceptLanguage, want := range map[string]string{
-			"de-DE":                      "en",
+			"sv-SE":                      "en",
+			"de-AT":                      "de",
 			"nl-BE,nl;q=0.9,pt-BR;q=0.8": "pt-BR",
 			"en-GB":                      "en",
 		} {

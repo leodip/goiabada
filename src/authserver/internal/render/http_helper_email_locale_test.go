@@ -323,7 +323,7 @@ func TestRenderTemplateToBuffer_EmailIsMarkedWithItsBodyCopyLanguage(t *testing.
 // layout from the real copies, says pt-BR for a pt-BR recipient and en for an English one or one
 // whose language has no copy.
 func TestRenderTemplateToBuffer_ShippedEmailsAreMarkedWithTheirBodyCopyLanguage(t *testing.T) {
-	for locale, want := range map[string]string{"pt-BR": "pt-BR", "en": "en", "de-DE": "en"} {
+	for locale, want := range map[string]string{"pt-BR": "pt-BR", "en": "en", "sv-SE": "en", "de-AT": "de"} {
 		t.Run(locale, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))

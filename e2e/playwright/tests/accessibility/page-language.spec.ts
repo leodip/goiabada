@@ -1,8 +1,8 @@
 // Every page is marked with the language it is written in, the catalog's, whatever the first
 // language asked for (WCAG 2.2 SC 3.1.1, Language of Page): a screen reader chooses its voice from
-// <html lang>. A language with no catalog (de) reads an English page, marked en; nl then pt-BR reads
+// <html lang>. A language with no catalog (sv) reads an English page, marked en; nl then pt-BR reads
 // a pt-BR page, marked pt-BR, not nl. The console's country names follow the page too, so an English
-// page asked for in German names Germany in English.
+// page asked for in Swedish names Germany in English.
 import { userUrl } from "../../lib/admin-console";
 import { openSignIn } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
@@ -14,7 +14,11 @@ const asked = [
   { uiLocales: "es-MX", lang: "es" },
   { uiLocales: "gl", lang: "en" },
   { uiLocales: "eu", lang: "en" },
-  { uiLocales: "de", lang: "en" },
+  { uiLocales: "sv", lang: "en" },
+  { uiLocales: "de", lang: "de" },
+  { uiLocales: "de-AT", lang: "de" },
+  { uiLocales: "gsw", lang: "en" },
+  { uiLocales: "lb", lang: "en" },
   { uiLocales: "nl pt-BR", lang: "pt-BR" },
 ];
 
@@ -36,9 +40,9 @@ test("the sign-in page is marked with the language of its catalog", async ({ pag
   }
 });
 
-test("the phone country list on an English page asked for in German names Germany in English", async ({ page, users }) => {
+test("the phone country list on an English page asked for in Swedish names Germany in English", async ({ page, users }) => {
   const user = await users.create();
-  await page.goto(`${userUrl(user.id, "phone")}?ui_locales=de`);
+  await page.goto(`${userUrl(user.id, "phone")}?ui_locales=sv`);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   const countries = page.locator('select[name="phoneCountryUniqueId"] option');
   await expect(countries.filter({ hasText: "Germany (+49)" })).toHaveCount(1);

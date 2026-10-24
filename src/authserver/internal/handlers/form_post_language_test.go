@@ -15,11 +15,11 @@ import (
 
 // The form_post page is parsed alone, with no layout, so it marks its own language, and marks it as
 // the layouts do: the tag of the catalog its sentences were rendered from, not the first preference
-// asked for. de-DE has no catalog and reads English; nl-BE first and pt-BR third reads pt-BR (WCAG
+// asked for. sv-SE has no catalog and reads English; nl-BE first and pt-BR third reads pt-BR (WCAG
 // 2.2 SC 3.1.1, #645 decision 8).
 func TestFormPost_ThePageIsMarkedWithTheCatalogLanguage(t *testing.T) {
 	for acceptLanguage, want := range map[string]string{
-		"de-DE":                      "en",
+		"sv-SE":                      "en",
 		"nl-BE,nl;q=0.9,pt-BR;q=0.8": "pt-BR",
 	} {
 		t.Run(acceptLanguage, func(t *testing.T) {

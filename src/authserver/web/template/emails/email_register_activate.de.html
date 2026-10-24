@@ -1,0 +1,18 @@
+{{define "title"}}{{ .appName }} – Konto aktivieren{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Guten Tag,</p>
+
+    <p>Öffnen Sie diesen Link und wählen Sie ein Passwort, um Ihr Konto bei {{ .appName }} fertig einzurichten:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Der Link läuft nach 5 Minuten ab. Falls er sich nicht öffnen lässt, kopieren Sie ihn und fügen Sie ihn in die Adresszeile Ihres Browsers ein.</p>
+
+    <p>Falls Sie kein Konto erstellen wollten, ignorieren Sie diese Nachricht. Es wird kein Konto erstellt, solange der Link nicht verwendet wird.</p>
+
+    <p>Mit freundlichen Grüßen<br />{{ .appName }}</p>
+</div>
+{{end}}
