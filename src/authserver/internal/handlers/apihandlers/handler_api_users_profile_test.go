@@ -48,7 +48,7 @@ func adminProfilePutRequest(t *testing.T, gender string) *http.Request {
 	body, err := json.Marshal(api.UpdateUserProfileRequest{GivenName: "Ada", FamilyName: "Lovelace", Gender: gender})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/profile", bytes.NewReader(body))
-	req = setChiURLParam(req, "id", "42")
+	req.SetPathValue("id", "42")
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 }
 

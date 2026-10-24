@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -304,7 +304,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 					Return(nil, errors.New("the database is down"))
 
 				req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
-				ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-chain-1")
+				ctx := requestid.NewContext(req.Context(), "req-chain-1")
 				req = req.WithContext(reqctx.WithBearerToken(ctx, userSessionToken()))
 				rr := httptest.NewRecorder()
 				surface.build().RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

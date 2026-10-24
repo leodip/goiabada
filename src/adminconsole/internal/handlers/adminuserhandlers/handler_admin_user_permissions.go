@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -39,7 +38,7 @@ func HandlePermissionsGet(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		idStr := chi.URLParam(r, "userId")
+		idStr := r.PathValue("userId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -130,7 +129,7 @@ func HandlePermissionsPost(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		idStr := chi.URLParam(r, "userId")
+		idStr := r.PathValue("userId")
 		if len(idStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return

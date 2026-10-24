@@ -40,7 +40,7 @@ import (
 // write that reached a different one, or nil, fails.
 var clientUpdateTx = &sql.Tx{}
 
-// authenticationPutRequest builds the PUT with its chi URL parameter and body.
+// authenticationPutRequest builds the PUT with its path value and body.
 func authenticationPutRequest(t *testing.T, id string, req api.UpdateClientAuthenticationRequest) *http.Request {
 	t.Helper()
 	body, err := json.Marshal(req)
@@ -48,7 +48,7 @@ func authenticationPutRequest(t *testing.T, id string, req api.UpdateClientAuthe
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/authentication", bytes.NewReader(body))
 	// A manage token: the target ceiling reads nothing for it, and this file is about the save (#402).
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
-	return setChiURLParam(r, "id", id)
+	return withPathValue(r, "id", id)
 }
 
 // stubClientResponseLoads registers the two related-field loads every client handler performs
@@ -413,13 +413,13 @@ func webOriginsBody(t *testing.T, wanted, expected []string) string {
 	return string(body)
 }
 
-// webOriginsPutRequest builds the PUT with its chi URL parameter and body.
+// webOriginsPutRequest builds the PUT with its path value and body.
 func webOriginsPutRequest(t *testing.T, id string, body string) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/web-origins", strings.NewReader(body))
 	// A manage token: the target ceiling reads nothing for it, and this file is about the save (#402).
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
-	return setChiURLParam(r, "id", id)
+	return withPathValue(r, "id", id)
 }
 
 // expectWebOriginsClient registers the client read the save makes before it validates. The
@@ -890,7 +890,7 @@ func redirectURIsBody(t *testing.T, wanted, expected []string) string {
 	return string(body)
 }
 
-// redirectURIsPutRequest builds the PUT with its chi URL parameter, its body, and the settings the
+// redirectURIsPutRequest builds the PUT with its path value, its body, and the settings the
 // flow gate reads from the context.
 func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request {
 	t.Helper()
@@ -898,7 +898,7 @@ func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request 
 	r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{}))
 	// A manage token: the target ceiling reads nothing for it, and this file is about the save (#402).
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
-	return setChiURLParam(r, "id", id)
+	return withPathValue(r, "id", id)
 }
 
 // expectRedirectURIsClient registers the client read the save makes before it validates, for a

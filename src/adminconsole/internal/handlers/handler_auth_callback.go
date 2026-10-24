@@ -7,13 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
-
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -248,9 +247,9 @@ func HandleAuthCallbackPost(
 // so the route used to answer with chi's bare 405, an empty body that left a blank page with nothing
 // to do next (#632 item 3). The sign-in error page is drawn instead, at the same honest status and
 // with the same Allow header: the method is still wrong, only the body no longer is. The route
-// hands this handler every method but POST, rather than chi answering the others, because chi's own
-// 405 would name every method registered on the path in Allow, GET among them, though GET is
-// refused too (RFC 9110 section 15.5.6). No session is read and nothing is logged beyond the
+// hands this handler every method but POST, rather than the router answering the others, because
+// the router's own 405 would name every method registered on the path in Allow, GET among them,
+// though GET is refused too (RFC 9110 section 15.5.6). No session is read and nothing is logged beyond the
 // refusal itself, because there is no sign-in here to say anything about.
 func HandleAuthCallbackWrongMethod(httpHelper HttpHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +301,7 @@ func renderSignInRefusal(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 		"code":        errorCode,
 		"description": errorDescription,
 		"serverFault": serverFault,
-		"requestId":   middleware.GetReqID(r.Context()),
+		"requestId":   requestid.FromContext(r.Context()),
 		"_httpStatus": refusal.status,
 	}
 	if err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/sign_in_error.html", bind); err != nil {

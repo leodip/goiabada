@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -20,6 +18,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // authflow.decideSilentAuthentication's steps 5 to 7 through the handler: each answer the step-up
@@ -417,7 +416,7 @@ func newSilentSessionFixture(t *testing.T, authTime time.Time) *silentSessionFix
 	require.NoError(t, err)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 	ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
-	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, propagatedRequestId)
+	ctx = requestid.NewContext(ctx, propagatedRequestId)
 	f.req = req.WithContext(ctx)
 	f.rr = httptest.NewRecorder()
 

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -27,7 +26,7 @@ func HandleMembersAddGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -78,7 +77,7 @@ func HandleMembersSearchGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		result := SearchResult{}
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -145,7 +144,7 @@ func HandleMembersAddPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "groupId")
+		idStr := r.PathValue("groupId")
 		if len(idStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return

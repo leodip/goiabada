@@ -145,7 +145,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleSettingsGet",
@@ -153,7 +153,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleSettingsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleSettingsPost",
@@ -161,7 +161,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleSettingsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5"),
 				handlertest.WithForm(url.Values{"groupIdentifier": {"support"}})),
 		},
 		{
@@ -170,7 +170,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleDeletePost",
@@ -178,7 +178,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5"),
 				handlertest.WithForm(url.Values{"groupIdentifier": {"support"}})),
 		},
 		{
@@ -187,7 +187,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleMembersGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleMembersAddGet",
@@ -195,7 +195,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleMembersAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/add",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleMembersSearchGet",
@@ -203,7 +203,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleMembersSearchGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/search?query=jane",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleMembersAddPost",
@@ -211,7 +211,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleMembersAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/add?userId=42",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleMembersRemoveUserPost",
@@ -220,7 +220,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/42/remove",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("userId", "42")),
+				handlertest.WithPathValue("groupId", "5"), handlertest.WithPathValue("userId", "42")),
 		},
 		{
 			name: "HandlePermissionsGet",
@@ -228,7 +228,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandlePermissionsPost",
@@ -246,7 +246,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleAttributesRemovePost",
@@ -255,7 +255,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/remove",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("attributeId", "11")),
+				handlertest.WithPathValue("groupId", "5"), handlertest.WithPathValue("attributeId", "11")),
 		},
 		{
 			name: "HandleAttributesAddGet",
@@ -263,7 +263,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/add",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5")),
 		},
 		{
 			name: "HandleAttributesAddPost",
@@ -271,7 +271,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 				return HandleAttributesAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/add",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "5"),
 				handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}})),
 		},
 		{
@@ -281,7 +281,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/11/edit",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("attributeId", "11")),
+				handlertest.WithPathValue("groupId", "5"), handlertest.WithPathValue("attributeId", "11")),
 		},
 		{
 			name: "HandleAttributesEditPost",
@@ -290,7 +290,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/edit",
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("attributeId", "11"),
+				handlertest.WithPathValue("groupId", "5"), handlertest.WithPathValue("attributeId", "11"),
 				handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}})),
 		},
 	}

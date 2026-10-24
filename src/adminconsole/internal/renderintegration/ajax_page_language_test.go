@@ -120,7 +120,7 @@ func TestAjax_ThePagesLanguageOutranksTheBrowserAndTheProfile(t *testing.T) {
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
 					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"locale": "en"}},
 				}),
-				handlertest.WithRouteParam("resourceId", "7"),
+				handlertest.WithPathValue("resourceId", "7"),
 				handlertest.WithBody(strings.NewReader(`{"resourceId":7,"permissions":[],"expectedPermissions":[]}`)))
 			req.Header.Set("Accept-Language", "en")
 			w := httptest.NewRecorder()

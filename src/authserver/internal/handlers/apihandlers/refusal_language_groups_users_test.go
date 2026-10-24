@@ -51,7 +51,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				expect(database)
 			}
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/groups/5", strings.NewReader(body))
-			r = inRequestLanguage(setChiURLParam(r, "id", "5"), acceptLanguage)
+			r = inRequestLanguage(withPathValue(r, "id", "5"), acceptLanguage)
 			rr := httptest.NewRecorder()
 			HandleGroupUpdatePut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 			return rr
@@ -190,7 +190,7 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			database.On("GetGroupAttributeById", mock.Anything, (*sql.Tx)(nil), int64(3)).
 				Return(&record.GroupAttribute{Id: 3, GroupId: 5, Key: "k", Value: "v"}, nil).Once()
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/groups/attributes/3", strings.NewReader(body))
-			r = inRequestLanguage(setChiURLParam(r, "id", "3"), acceptLanguage)
+			r = inRequestLanguage(withPathValue(r, "id", "3"), acceptLanguage)
 			rr := httptest.NewRecorder()
 			HandleGroupAttributeUpdatePut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 			return rr
@@ -214,7 +214,7 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			database.On("GetUserAttributeById", mock.Anything, (*sql.Tx)(nil), int64(4)).
 				Return(&record.UserAttribute{Id: 4, UserId: 7, Key: "k", Value: "v"}, nil).Once()
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/attributes/4", strings.NewReader(body))
-			r = inRequestLanguage(setChiURLParam(r, "id", "4"), acceptLanguage)
+			r = inRequestLanguage(withPathValue(r, "id", "4"), acceptLanguage)
 			rr := httptest.NewRecorder()
 			HandleUserAttributeUpdatePut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 			return rr
@@ -312,7 +312,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	}
 	userRequest := func(method, target, body string, acceptLanguage string) *http.Request {
 		r := httptest.NewRequest(method, target, strings.NewReader(body))
-		r = setTokenContextWithClaims(setChiURLParam(r, "id", "73"), map[string]any{"scope": "authserver:manage", "sub": adminSubject})
+		r = setTokenContextWithClaims(withPathValue(r, "id", "73"), map[string]any{"scope": "authserver:manage", "sub": adminSubject})
 		return inRequestLanguage(r, acceptLanguage)
 	}
 	disableOTP := func(body string, stored *record.User) func(*testing.T, string) *httptest.ResponseRecorder {

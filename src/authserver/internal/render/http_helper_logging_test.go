@@ -11,11 +11,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,11 +63,11 @@ func loggedErrorOf(t *testing.T, record logtest.CapturedRecord) (error, bool) {
 	return logged, true
 }
 
-// errorRouter is the harness these rows share: a chi router carrying the request id middleware,
+// errorRouter is the harness these rows share: a router carrying the request id middleware,
 // calling handle for GET /. The settings the renderer reads ride on each request, from newRequest.
-func errorRouter(handle http.HandlerFunc) *chi.Mux {
-	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
+func errorRouter(handle http.HandlerFunc) *routing.Router {
+	r := routing.New()
+	r.Use(requestid.Middleware)
 	r.Get("/", handle)
 	return r
 }
@@ -361,7 +361,7 @@ func assertConformsToNQSCHAR(t *testing.T, description string) {
 
 // The writer's conformance table. Every caller of JSONError is a protocol endpoint, and both of its
 // branches interpolate text somebody else chose: a detail's description carries request text, and
-// the request id is whatever the caller sent as X-Request-Id, which chi's RequestID adopts verbatim
+// the request id is whatever the caller sent as X-Request-Id, which requestid.Middleware adopts verbatim
 // and which a caller need not authenticate to send. So one conform call runs on the final
 // description, after the id is appended, and these rows hold it there (#213, #435).
 //
@@ -430,17 +430,17 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 			httpHelper := New(fstest.MapFS{}, nil)
 			var adoptedRequestId string
 			router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
-				adoptedRequestId = middleware.GetReqID(r.Context())
+				adoptedRequestId = requestid.FromContext(r.Context())
 				httpHelper.JSONError(w, r, test.err)
 			})
 
 			req := newRequest("GET", "/", nil)
-			req.Header.Set(middleware.RequestIDHeader, test.requestId)
+			req.Header.Set(requestid.Header, test.requestId)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
 			require.Equal(t, test.requestId, adoptedRequestId,
-				"chi must adopt the inbound header verbatim, otherwise this row proves nothing")
+				"the request id middleware must adopt the inbound header verbatim, otherwise this row proves nothing")
 
 			assert.Equal(t, test.wantStatus, w.Code)
 			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))

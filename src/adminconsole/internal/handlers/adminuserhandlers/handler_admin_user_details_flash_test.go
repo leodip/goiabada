@@ -64,11 +64,11 @@ func newFlashTestStore() *sessionstore.ServerSideStore {
 	return store
 }
 
-// detailsRequest builds the GET the handler expects: the userId route parameter chi would
-// have matched, and the access token it reads out of the request context.
+// detailsRequest builds the GET the handler expects: the userId path value the route would have
+// bound, and the access token it reads out of the request context.
 func detailsRequest() *http.Request {
 	return handlertest.Request(http.MethodGet, "/admin/users/7/details",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "7"))
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "7"))
 }
 
 // flashInSession puts the named flashes into a stored session and returns the cookie that

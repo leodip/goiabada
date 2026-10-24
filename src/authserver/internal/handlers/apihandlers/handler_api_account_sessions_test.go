@@ -24,11 +24,11 @@ import (
 // terminated, and the pre-existing integration case asserts only the status code, which a handler
 // terminating first would still satisfy.
 
-// accountSessionDeleteRequest builds the DELETE with the chi URL parameter and the validated token
+// accountSessionDeleteRequest builds the DELETE with the path value and the validated token
 // the handler reads.
 func accountSessionDeleteRequest(sessionId string, subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/sessions/"+sessionId, nil)
-	req = setChiURLParam(req, "id", sessionId)
+	req.SetPathValue("id", sessionId)
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 

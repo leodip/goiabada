@@ -63,7 +63,7 @@ func TestAdminGroupDeletePost_RefusesInThePagesLanguage(t *testing.T) {
 
 				handler := HandleDeletePost(httpHelper, &refusingGroupDeleteApiClient{}, consoleBaseURL)
 				req := handlertest.Request(http.MethodPost, "/admin/groups/4/delete",
-					handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "4"),
+					handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "4"),
 					handlertest.WithLocale(language.tag),
 					handlertest.WithForm(url.Values{"groupIdentifier": {testCase.identifier}}))
 				handler.ServeHTTP(httptest.NewRecorder(), req)

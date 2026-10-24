@@ -64,9 +64,9 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 	grantRoute := func(subject, permissionId string) []handlertest.Option {
 		return []handlertest.Option{
 			handlertest.WithAccessToken(),
-			handlertest.WithRouteParam("resourceId", "2"),
-			handlertest.WithRouteParam(subject, "5"),
-			handlertest.WithRouteParam("permissionId", permissionId),
+			handlertest.WithPathValue("resourceId", "2"),
+			handlertest.WithPathValue(subject, "5"),
+			handlertest.WithPathValue("permissionId", permissionId),
 		}
 	}
 
@@ -145,7 +145,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 			},
 			options: []handlertest.Option{
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("resourceId", "2"),
+				handlertest.WithPathValue("resourceId", "2"),
 				handlertest.WithBody(strings.NewReader(
 					`{"resourceId":3,"permissions":[],"expectedPermissions":[]}`)),
 				handlertest.WithContentType("application/json"),

@@ -1,5 +1,5 @@
 // Package handlertest carries the wiring every admin console handler test builds by hand: the
-// values a handler reads off its request context, the chi route parameters its URL carries, and
+// values a handler reads off its request context, the path values its URL carries, and
 // the expectations and call-log reads its rendering performs against the HttpHelper mock.
 //
 // It is a sibling of internal/handlers rather than a child on purpose. The slog convention guard
@@ -17,8 +17,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
@@ -40,7 +38,7 @@ type Option func(*requestSpec)
 type requestSpec struct {
 	body        io.Reader
 	contentType string
-	routeParams [][2]string
+	pathValues  [][2]string
 	accessToken *string
 	jwtInfo     *oauthclient.JwtInfo
 	settings    *api.PublicSettingsResponse
@@ -62,14 +60,11 @@ func Request(method, target string, opts ...Option) *http.Request {
 		req.Header.Set("Content-Type", spec.contentType)
 	}
 
-	ctx := req.Context()
-	if len(spec.routeParams) > 0 {
-		routeCtx := chi.NewRouteContext()
-		for _, param := range spec.routeParams {
-			routeCtx.URLParams.Add(param[0], param[1])
-		}
-		ctx = context.WithValue(ctx, chi.RouteCtxKey, routeCtx)
+	for _, value := range spec.pathValues {
+		req.SetPathValue(value[0], value[1])
 	}
+
+	ctx := req.Context()
 	if spec.jwtInfo != nil {
 		ctx = reqctx.WithJwtInfo(ctx, *spec.jwtInfo)
 	} else if spec.accessToken != nil {
@@ -107,12 +102,13 @@ func WithJwtInfo(jwtInfo oauthclient.JwtInfo) Option {
 	}
 }
 
-// WithRouteParam adds one chi URL parameter, as the router would have parsed it from the pattern.
-// A handler reached through chi.NewRouter() needs none of these; a handler called directly, which
-// is most of them, reads an empty string for every parameter without them.
-func WithRouteParam(key, value string) Option {
+// WithPathValue sets one path value, as the router would have bound it from the pattern, which is
+// what the handler reads through r.PathValue. A handler reached through a router needs none of
+// these; a handler called directly, which is most of them, reads an empty string for every
+// parameter without them.
+func WithPathValue(name, value string) Option {
 	return func(spec *requestSpec) {
-		spec.routeParams = append(spec.routeParams, [2]string{key, value})
+		spec.pathValues = append(spec.pathValues, [2]string{name, value})
 	}
 }
 

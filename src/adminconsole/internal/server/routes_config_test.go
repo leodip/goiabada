@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +35,7 @@ func TestInitRoutes_TheHomePageLinksToTheConfiguredPublicAuthServerURL(t *testin
 			InternalBaseURL: authServer.URL,
 		},
 	}
-	s := NewServer(chi.NewRouter(), newTestSessionStore(),
+	s := NewServer(routing.New(), newTestSessionStore(),
 		publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()), nil, cfg, nil, nil, nil, metrics.NewRegistry(), nil)
 	s.initRoutes(s.initMiddleware())
 

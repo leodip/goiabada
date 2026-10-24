@@ -75,7 +75,7 @@ func bindOfSystemLevelPage(t *testing.T, page string, resource api.ResourceRespo
 	}
 
 	req := handlertest.Request(http.MethodGet, "/admin/resources/7/"+page,
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"))
+		handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"))
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	return handlertest.Bind(t, httpHelper)
@@ -126,7 +126,7 @@ func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
 
 	handler := HandleDeletePost(httpHelper, apiClient, consoleBaseURL)
 	req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"))
+		handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"))
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)

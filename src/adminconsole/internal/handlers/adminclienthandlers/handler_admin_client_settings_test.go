@@ -81,7 +81,7 @@ func postSettings(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHtt
 	}
 	req := handlertest.Request(http.MethodPost, target,
 		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken, Scope: grant}}),
-		handlertest.WithRouteParam("clientId", "7"), handlertest.WithForm(form))
+		handlertest.WithPathValue("clientId", "7"), handlertest.WithForm(form))
 	rec := httptest.NewRecorder()
 	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).ServeHTTP(rec, req)
 	return rec
@@ -119,7 +119,7 @@ func TestHandleSettingsGet_BindsTheAdministrativeScopesAllowance(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := &stubHttpHelper{}
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"))
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 
 			HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: tc.client}).
 				ServeHTTP(httptest.NewRecorder(), req)
@@ -139,7 +139,7 @@ func TestHandleSettingsGet_BindsWhetherTheClientRegisteredItself(t *testing.T) {
 	for _, createdViaDCR := range []bool{true, false} {
 		httpHelper := &stubHttpHelper{}
 		req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
-			handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"))
+			handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 		client := &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9e1b2", CreatedViaDCR: createdViaDCR}
 
 		HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).

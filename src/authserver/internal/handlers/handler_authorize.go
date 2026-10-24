@@ -5,14 +5,13 @@ import (
 	"net/http"
 	"net/url"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
-
 	"github.com/leodip/goiabada/authserver/internal/authflow"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // HandleAuthorizeGet answers GET /auth/authorize, and the GET a POST to it redirects to. It reads the
@@ -66,7 +65,7 @@ func HandleAuthorizeGet(
 		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 		result, err := authorization.Run(r.Context(), newBrowserSession(w, r, ceremonyStore), settings, params,
 			authflow.AuthorizeArrival{
-				RequestId:         chimiddleware.GetReqID(r.Context()),
+				RequestId:         requestid.FromContext(r.Context()),
 				SessionIdentifier: sessionIdentifier,
 				UserAgent:         r.UserAgent(),
 				IpAddress:         middleware.ClientIP(r),

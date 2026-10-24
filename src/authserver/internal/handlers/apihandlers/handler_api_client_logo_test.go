@@ -44,7 +44,7 @@ func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
 	handler := HandleClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/invalid/logo", nil)
-	req = setChiURLParam(req, "id", "invalid")
+	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -63,7 +63,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 	handler := HandleClientLogoGet(database, testBaseURL)
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
@@ -88,7 +88,7 @@ func TestHandleClientLogoGet_HasLogo(t *testing.T) {
 	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -111,7 +111,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -156,7 +156,7 @@ func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	req, _ := http.NewRequest("POST", "/api/v1/admin/clients/invalid/logo", nil)
-	req = setChiURLParam(req, "id", "invalid")
+	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -178,7 +178,7 @@ func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
@@ -206,7 +206,7 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", invalidImageData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -238,7 +238,7 @@ func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) 
 	require.Greater(t, len(pictureData), 64)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
@@ -265,7 +265,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
@@ -307,7 +307,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", pictureData)
 	require.NoError(t, err)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
@@ -361,7 +361,7 @@ func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
 	handler := HandleClientLogoDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/invalid/logo", nil)
-	req = setChiURLParam(req, "id", "invalid")
+	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -381,7 +381,7 @@ func TestHandleClientLogoDelete_ClientNotFound(t *testing.T) {
 	handler := HandleClientLogoDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
@@ -408,7 +408,7 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 	adminSub := "admin-user-sub"
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
@@ -438,7 +438,7 @@ func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
 	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
-	req = setChiURLParam(req, "id", "123")
+	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)

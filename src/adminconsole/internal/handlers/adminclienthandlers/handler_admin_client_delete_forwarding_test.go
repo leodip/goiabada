@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -78,12 +77,11 @@ func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
 					Return().Once()
 			}
 
-			req := handlertest.Request(http.MethodGet, "/admin/clients/42/delete", handlertest.WithAccessToken())
+			req := handlertest.Request(http.MethodGet, "/admin/clients/42/delete",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "42"))
 
-			router := chi.NewRouter()
-			router.Get("/admin/clients/{clientId}/delete",
-				HandleDeleteGet(httpHelper, &deleteClientApiClient{err: testCase.apiErr}))
-			router.ServeHTTP(httptest.NewRecorder(), req)
+			HandleDeleteGet(httpHelper, &deleteClientApiClient{err: testCase.apiErr}).
+				ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 		})

@@ -69,7 +69,7 @@ func TestHandleUserPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 			body, err := json.Marshal(map[string]string{"newPassword": tc.password})
 			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/password", bytes.NewReader(body))
-			req = setChiURLParam(req, "id", "42")
+			req.SetPathValue("id", "42")
 			req = setTokenContextWithClaims(nistSettings(req),
 				map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 

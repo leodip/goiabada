@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,6 +16,7 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // authorizeFaultEndpoint is GET /auth/authorize built from fresh doubles, with the address check
@@ -59,7 +58,7 @@ func newAuthorizeFaultEndpoint(t *testing.T, query string) *authorizeFaultEndpoi
 		"&redirect_uri=https%3A%2F%2Fexample.com%2Fcb&response_type=code&"+query, nil)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 	ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
-	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, propagatedRequestId)
+	ctx = requestid.NewContext(ctx, propagatedRequestId)
 	e.req = req.WithContext(ctx)
 	e.rr = httptest.NewRecorder()
 

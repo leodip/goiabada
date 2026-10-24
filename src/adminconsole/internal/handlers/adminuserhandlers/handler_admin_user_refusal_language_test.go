@@ -72,7 +72,7 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 				return HandleAttributesAddPost(h, &refusingUserApiClient{}, consoleBaseURL)
 			},
 			target:     "/admin/users/5/attributes/add",
-			options:    []handlertest.Option{handlertest.WithRouteParam("userId", "5")},
+			options:    []handlertest.Option{handlertest.WithPathValue("userId", "5")},
 			form:       url.Values{"attributeKey": {" "}, "attributeValue": {"sales"}},
 			english:    "Attribute key is required",
 			portuguese: "A chave do atributo é obrigatória",
@@ -84,8 +84,8 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 				return HandleAttributesEditPost(h, &refusingUserApiClient{}, consoleBaseURL)
 			},
 			target: "/admin/users/5/attributes/edit/9",
-			options: []handlertest.Option{handlertest.WithRouteParam("userId", "5"),
-				handlertest.WithRouteParam("attributeId", "9")},
+			options: []handlertest.Option{handlertest.WithPathValue("userId", "5"),
+				handlertest.WithPathValue("attributeId", "9")},
 			form:       url.Values{"attributeKey": {""}, "attributeValue": {"sales"}},
 			english:    "Attribute key is required",
 			portuguese: "A chave do atributo é obrigatória",

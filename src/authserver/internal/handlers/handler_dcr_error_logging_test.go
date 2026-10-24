@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -18,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -46,7 +45,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
-	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, requestId)
+	ctx = requestid.NewContext(ctx, requestId)
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()

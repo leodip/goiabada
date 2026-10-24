@@ -8,17 +8,17 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// requestContext is a request's context as the handler holds it: carrying chi's request id, and
+// requestContext is a request's context as the handler holds it: carrying the request id, and
 // cancelled the moment the handler returns, which the test does by calling the cancel it gets.
 func requestContext(requestId string) (context.Context, context.CancelFunc) {
-	return context.WithCancel(context.WithValue(context.Background(), chimiddleware.RequestIDKey, requestId))
+	return context.WithCancel(requestid.NewContext(context.Background(), requestId))
 }
 
 // The job outlives its request: the request's cancellation does not reach it, and every value the
@@ -48,7 +48,7 @@ func TestGo_TheJobRunsDetachedFromTheRequestsCancellationButKeepsItsValues(t *te
 	require.NoError(t, jobCtx.Err(), "the request's cancellation must not reach the job")
 	_, hasDeadline := jobCtx.Deadline()
 	assert.False(t, hasDeadline, "the job's only bound is its own work's, not one inherited from the request")
-	assert.Equal(t, "req-detached", jobCtx.Value(chimiddleware.RequestIDKey), "the job keeps the request's id")
+	assert.Equal(t, "req-detached", requestid.FromContext(jobCtx), "the job keeps the request's id")
 	assert.True(t, jobs.Wait(5*time.Second))
 }
 

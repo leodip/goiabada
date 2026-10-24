@@ -46,7 +46,7 @@ func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *t
 			}
 		}).Return(nil).Once()
 
-	req := setChiURLParam(httptest.NewRequest(http.MethodGet, "/api/v1/admin/resources/1/permissions", nil), "resourceId", "1")
+	req := withPathValue(httptest.NewRequest(http.MethodGet, "/api/v1/admin/resources/1/permissions", nil), "resourceId", "1")
 	rr := httptest.NewRecorder()
 	HandlePermissionsByResourceGet(database).ServeHTTP(rr, req)
 
@@ -107,7 +107,7 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 
 	req, _ := http.NewRequest("PUT", "/api/v1/admin/resources/1/permissions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = setChiURLParam(req, "resourceId", "1")
+	req.SetPathValue("resourceId", "1")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -175,7 +175,7 @@ func resourcePermsBody(t *testing.T, permissions, expected []api.ResourcePermiss
 // serveResourcePerms runs the save on a PUT carrying body.
 func serveResourcePerms(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(body))
-	r = setChiURLParam(r, "resourceId", "7")
+	r.SetPathValue("resourceId", "7")
 	rr := httptest.NewRecorder()
 	HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
 	return rr

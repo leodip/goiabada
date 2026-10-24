@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -28,7 +27,7 @@ func HandleUserSessionsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "clientId")
+		idStr := r.PathValue("clientId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -122,7 +121,7 @@ func HandleUserSessionsPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "clientId")
+		idStr := r.PathValue("clientId")
 		if len(idStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return

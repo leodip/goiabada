@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
@@ -15,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // The administrative policy, the one rule behind the admin API's route gate: only an
@@ -140,14 +140,12 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 	writeJSONError(w, manageScopeRequiredDescription, "MANAGE_SCOPE_REQUIRED", http.StatusForbidden)
 }
 
-// routePattern is the pattern of the route chi matched, such as /api/v1/admin/users/{id}/permissions,
-// never the path: the path carries ids and a pattern is what an operator filters on.
+// routePattern is the route the request was answered by, in chi's spelling, such as
+// /api/v1/admin/users/{id}/permissions, never the path: the path carries ids and a route is what an
+// operator filters on, and audit rows written before and after #462 name a route one way (#462
+// decision 5). A request that reached no route reads "".
 func routePattern(r *http.Request) string {
-	routeContext := chi.RouteContext(r.Context())
-	if routeContext == nil {
-		return ""
-	}
-	return routeContext.RoutePattern()
+	return routing.RouteName(r)
 }
 
 // grantCeilingAllows applies the grant ceiling to a save replacing a target's permission grants:

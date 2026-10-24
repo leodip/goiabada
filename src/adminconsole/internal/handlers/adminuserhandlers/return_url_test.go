@@ -176,7 +176,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 				return HandleAttributesEditPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
-			options:  []handlertest.Option{handlertest.WithRouteParam("attributeId", "3")},
+			options:  []handlertest.Option{handlertest.WithPathValue("attributeId", "3")},
 			wantPath: "/admin/users/7/attributes",
 		},
 		{
@@ -241,7 +241,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 
 			options := append([]handlertest.Option{
 				handlertest.WithAccessToken(),
-				handlertest.WithRouteParam("userId", "7"),
+				handlertest.WithPathValue("userId", "7"),
 				handlertest.WithForm(testCase.form),
 			}, testCase.options...)
 			req := handlertest.Request(http.MethodPost,

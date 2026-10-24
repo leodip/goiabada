@@ -21,10 +21,10 @@ import (
 // reqctx declares, through whichever writer its route answers with, and consults the API with
 // nothing (#440).
 func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T) {
-	routed := handlertest.WithRouteParam("resourceId", "3")
+	routed := handlertest.WithPathValue("resourceId", "3")
 	grant := func(subject string) []handlertest.Option {
-		return []handlertest.Option{routed, handlertest.WithRouteParam(subject, "5"),
-			handlertest.WithRouteParam("permissionId", "8")}
+		return []handlertest.Option{routed, handlertest.WithPathValue(subject, "5"),
+			handlertest.WithPathValue("permissionId", "8")}
 	}
 	request := handlertest.Request
 
@@ -67,11 +67,11 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 		{"HandleUsersWithPermissionAddGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleUsersWithPermissionAddGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission-add/8", routed,
-			handlertest.WithRouteParam("permissionId", "8"))},
+			handlertest.WithPathValue("permissionId", "8"))},
 		{"HandleUsersWithPermissionSearchGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleUsersWithPermissionSearchGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission-add/8/search?query=jdoe", routed,
-			handlertest.WithRouteParam("permissionId", "8"))},
+			handlertest.WithPathValue("permissionId", "8"))},
 		{"HandleUsersWithPermissionAddPermissionPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 			return HandleUsersWithPermissionAddPermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/users-with-permission/add/5/8", grant("userId")...)},

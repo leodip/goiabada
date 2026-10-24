@@ -8,11 +8,11 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/publicsettings"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -89,7 +89,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 
 func newStaticBranchTestServer(authServerBaseURL string, store *sessionstore.ServerSideStore) *Server {
 	return &Server{
-		router:        chi.NewRouter(),
+		router:        routing.New(),
 		sessionStore:  store,
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServerBaseURL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
 		cfg:           &config.Config{},

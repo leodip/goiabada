@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // The fixture policy the lookup tests drive, deliberately neither application's: core owns the
@@ -33,8 +33,7 @@ func bodyLimitFixturePolicy() BodyLimitPolicy {
 }
 
 // bodyLimitReader reads the whole body and answers what it saw: the byte count on success, the
-// limit that refused it otherwise, and the {id} parameter chi routed with, so a lookup that wrote
-// into the request's route context would show here.
+// limit that refused it otherwise, and the {id} parameter the route was reached with.
 func bodyLimitReader(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	var tooLarge *http.MaxBytesError
@@ -44,24 +43,24 @@ func bodyLimitReader(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		_, _ = fmt.Fprintf(w, "error %v", err)
 	default:
-		_, _ = fmt.Fprintf(w, "read %d id=%s", len(body), chi.URLParam(r, "id"))
+		_, _ = fmt.Fprintf(w, "read %d id=%s", len(body), r.PathValue("id"))
 	}
 }
 
-// newBodyLimitRouter mounts the middleware the way both servers do, after StripSlashes, on a router
-// with a subrouter, so the lookup has a full pattern to resolve across the two.
-func newBodyLimitRouter(policy BodyLimitPolicy, handler http.HandlerFunc) *chi.Mux {
-	router := chi.NewRouter()
-	router.Use(chimiddleware.StripSlashes)
+// newBodyLimitRouter mounts the middleware the way both servers do, after StripTrailingSlash, on a router
+// with a group, so the lookup has a full pattern to resolve across the two.
+func newBodyLimitRouter(policy BodyLimitPolicy, handler http.HandlerFunc) *routing.Router {
+	router := routing.New()
+	router.Use(StripTrailingSlash)
 	router.Use(BodyLimit(router, policy))
 	registerBodyLimitRoutes(router, handler)
 	return router
 }
 
-func registerBodyLimitRoutes(router *chi.Mux, handler http.HandlerFunc) {
+func registerBodyLimitRoutes(router *routing.Router, handler http.HandlerFunc) {
 	router.NotFound(handler)
 	router.Post("/plain", handler)
-	router.Route("/api", func(api chi.Router) {
+	router.Route("/api", func(api *routing.Router) {
 		api.Post("/items", handler)
 		api.Post("/items/{id}", handler)
 		api.Put("/items/{id}", handler)
@@ -87,13 +86,14 @@ func TestBodyLimit_TheLimitEachRequestMeets(t *testing.T) {
 		want   string
 	}{
 		{"a path no route matches gets the default", http.MethodPost, "/nowhere", "refused at 16"},
+		{"a path under a prefix no route matches gets the default", http.MethodPost, "/api/nowhere", "refused at 16"},
 		{"a route no entry names gets the default", http.MethodPost, "/plain", "refused at 16"},
 		{"a route under a prefix gets the prefix", http.MethodPost, "/api/items", "refused at 32"},
 		{"the longest prefix wins", http.MethodPost, "/api/deep/thing", "refused at 48"},
 		{"an exact route wins over its prefix", http.MethodPost, "/api/items/7", "refused at 64"},
 		{"the same pattern under another method falls to the prefix", http.MethodPut, "/api/items/7", "refused at 32"},
-		{"a trailing slash resolves as StripSlashes routes it", http.MethodPost, "/api/items/7/", "refused at 64"},
-		{"an escaped path resolves by its raw form, as chi routes it", http.MethodPost, "/api/items/a%2Fb", "refused at 64"},
+		{"a trailing slash resolves as the strip routes it", http.MethodPost, "/api/items/7/", "refused at 64"},
+		{"an escaped parameter resolves to its route", http.MethodPost, "/api/items/a%2Fb", "refused at 64"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -108,24 +108,23 @@ func TestBodyLimit_TheBoundary(t *testing.T) {
 
 	assert.Equal(t, "read 32 id=", serveBody(router, http.MethodPost, "/api/items", 32), "a body of exactly the limit reads whole")
 	assert.Equal(t, "refused at 32", serveBody(router, http.MethodPost, "/api/items", 33), "one byte more is refused")
+	assert.Equal(t, "read 64 id=7", serveBody(router, http.MethodPost, "/api/items/7", 64), "a route's own limit, exactly")
+	assert.Equal(t, "refused at 64", serveBody(router, http.MethodPost, "/api/items/7", 65), "and one byte more")
 }
 
-// TestBodyLimit_LeavesTheRouteContextAlone: the lookup resolves a pattern with a
-// parameter in it, and must do so without touching the request's own route context. Given that
-// context, Find would rewrite its RoutePath to the subrouter's remainder, which the root then
-// routes by, and would leave its parameters behind. So the handler reports the pattern chi
-// actually routed to and every parameter it holds, not only the one it looks for, which a leaked
-// copy would also supply, and the report must equal the same router's without the middleware.
-func TestBodyLimit_LeavesTheRouteContextAlone(t *testing.T) {
+// TestBodyLimit_LeavesTheRequestAlone: the lookup resolves a route with a parameter in it before
+// routing, and must leave the request the router routes as it found it, so the handler reports the
+// route it was reached by and its parameter, and the report must equal the same router's without
+// the middleware.
+func TestBodyLimit_LeavesTheRequestAlone(t *testing.T) {
 	report := func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		_, _ = fmt.Fprintf(w, "%s %v %v", rctx.RoutePattern(), rctx.URLParams.Keys, rctx.URLParams.Values)
+		_, _ = fmt.Fprintf(w, "%s id=%s", routing.RouteName(r), r.PathValue("id"))
 	}
-	without := chi.NewRouter()
-	without.Use(chimiddleware.StripSlashes)
+	without := routing.New()
+	without.Use(StripTrailingSlash)
 	registerBodyLimitRoutes(without, report)
 	want := serveBody(without, http.MethodPost, "/api/items/7", 3)
-	require.Contains(t, want, "/api/items/{id} ", "the baseline must have reached the route under test")
+	require.Equal(t, "/api/items/{id} id=7", want, "the baseline must have reached the route under test")
 
 	assert.Equal(t, want, serveBody(newBodyLimitRouter(bodyLimitFixturePolicy(), report), http.MethodPost, "/api/items/7", 3))
 }
@@ -183,11 +182,11 @@ func TestBodyLimit_RefusesASilentlyWrongPolicy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			policy := test.policy()
-			assert.Panics(t, func() { BodyLimit(chi.NewRouter(), policy) })
+			assert.Panics(t, func() { BodyLimit(routing.New(), policy) })
 		})
 	}
 
 	t.Run("the fixture itself is accepted", func(t *testing.T) {
-		require.NotPanics(t, func() { BodyLimit(chi.NewRouter(), valid()) })
+		require.NotPanics(t, func() { BodyLimit(routing.New(), valid()) })
 	})
 }

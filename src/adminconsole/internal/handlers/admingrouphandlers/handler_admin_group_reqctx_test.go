@@ -21,7 +21,7 @@ import (
 // sentinel reqctx declares, through whichever writer its route answers with, and consults the API
 // with nothing (#440).
 func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T) {
-	routed := handlertest.WithRouteParam("groupId", "3")
+	routed := handlertest.WithPathValue("groupId", "3")
 
 	testCases := []struct {
 		name    string
@@ -41,7 +41,7 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 		{"HandleAttributesRemovePost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAttributesRemovePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/attributes/remove/5", routed,
-			handlertest.WithRouteParam("attributeId", "5"))},
+			handlertest.WithPathValue("attributeId", "5"))},
 		{"HandleAttributesAddGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAttributesAddGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/attributes/add", routed)},
@@ -52,11 +52,11 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 		{"HandleAttributesEditGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAttributesEditGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/attributes/edit/5", routed,
-			handlertest.WithRouteParam("attributeId", "5"))},
+			handlertest.WithPathValue("attributeId", "5"))},
 		{"HandleAttributesEditPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandleAttributesEditPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/attributes/edit/5", routed,
-			handlertest.WithRouteParam("attributeId", "5"), handlertest.WithForm(url.Values{}))},
+			handlertest.WithPathValue("attributeId", "5"), handlertest.WithForm(url.Values{}))},
 		{"HandleDeleteGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandleDeleteGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/delete", routed)},
@@ -79,7 +79,7 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 		{"HandleMembersRemoveUserPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandleMembersRemoveUserPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/members/remove/7", routed,
-			handlertest.WithRouteParam("userId", "7"))},
+			handlertest.WithPathValue("userId", "7"))},
 		{"HandlePermissionsGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
 			return HandlePermissionsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/permissions", routed)},

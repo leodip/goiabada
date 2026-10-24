@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -245,10 +245,9 @@ func TestCORS_ADatabaseErrorFailsClosed(t *testing.T) {
 	db.AssertExpectations(t)
 }
 
-// A preflight has to say how long it may be cached. cors@v1.2.2 emits Access-Control-Max-Age only
-// when maxAge > 0, so with no value set the header never shipped and every browser fell back to
-// its own short default, re-preflighting roughly every five seconds and paying for a lookup each
-// time.
+// A preflight has to say how long it may be cached. While go-chi/cors answered, no MaxAge was set
+// and the header never shipped, so every browser fell back to its own short default,
+// re-preflighting roughly every five seconds and paying for a lookup each time.
 //
 // Read through Result().Header rather than the recorder's live map: the live map shows a header
 // that was set even if the response never carried it, which is how a test of a header can be
@@ -274,11 +273,11 @@ func TestCORS_APreflightIsCacheable(t *testing.T) {
 //
 // CORS is the one consumer in this batch whose port is reached from a middleware rather
 // than a handler, and the one where dropping the request's context would be worse than slow: the
-// preflight decision is made inside AllowOriginFunc, which has the request in scope and nothing
+// preflight decision is made inside corsOriginAllowed, which has the request in scope and nothing
 // else, so a WebOriginExists issued on context.Background() would keep answering for a browser
 // that has already gone away.
 //
-// chi's request id is on this request's context and on no other, so a middleware that passed
+// the request id is on this request's context and on no other, so a middleware that passed
 // context.Background() matches nothing and the strict mock reports an unexpected call.
 
 const corsPropagatedRequestId = "goiabada/req-cors-propagation-1"
@@ -287,12 +286,12 @@ func corsRequestCarryingId(path, origin string) *http.Request {
 	req := httptest.NewRequest("OPTIONS", path, nil)
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Access-Control-Request-Method", "GET")
-	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, corsPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), corsPropagatedRequestId))
 }
 
 func theCorsRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return chimiddleware.GetReqID(ctx) == corsPropagatedRequestId
+		return requestid.FromContext(ctx) == corsPropagatedRequestId
 	})
 }
 

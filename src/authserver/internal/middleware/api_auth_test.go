@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1677,7 +1677,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
 	ctx := reqctx.WithBearerToken(req.Context(), token)
-	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, requestId)
+	ctx = requestid.NewContext(ctx, requestId)
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
@@ -1709,7 +1709,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 // acceptance criterion forbids below a request boundary, and would also outlive the request it
 // serves.
 //
-// The accept arm matches on chi's request id, which nothing but this request's context carries.
+// The accept arm matches on the request id, which nothing but this request's context carries.
 // The reject arm is a token with no auth_time -- client_credentials, no user -- which reaches no
 // port at all, so there is no context to get wrong.
 func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
@@ -1717,7 +1717,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 
 	requestWithId := func() *http.Request {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, requestId)
+		ctx := requestid.NewContext(req.Context(), requestId)
 		ctx = reqctx.WithSettings(ctx, &record.Settings{
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
@@ -1730,7 +1730,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.MatchedBy(func(ctx context.Context) bool {
-			return chimiddleware.GetReqID(ctx) == requestId
+			return requestid.FromContext(ctx) == requestId
 		}), mock.Anything, "user-1").Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-abc").
 			Return(&record.UserSession{

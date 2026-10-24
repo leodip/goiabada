@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
-
+	"github.com/leodip/goiabada/core/httpmw/statuswriter"
 	"github.com/leodip/goiabada/core/logging"
 )
 
@@ -39,12 +38,12 @@ func RequestLogger(enabled bool) func(next http.Handler) http.Handler {
 			}
 
 			// Rendered before the handler runs, because middleware downstream of
-			// this one rewrites r.URL: chi's StripSlashes, registered right after,
-			// edits r.URL.Path in place. The target logged is therefore the one
-			// that arrived.
+			// this one rewrites r.URL: StripTrailingSlash, beneath it in both
+			// servers, edits r.URL.Path in place. The target logged is therefore the
+			// one that arrived.
 			target := logging.RequestTargetForLog(r.URL)
 
-			wrapped := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			wrapped := statuswriter.Wrap(w)
 			started := time.Now()
 
 			// Deferred, so a request whose handler panics still produces a line,

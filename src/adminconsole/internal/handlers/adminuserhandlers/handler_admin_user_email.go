@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -29,7 +28,7 @@ func HandleEmailGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "userId")
+		idStr := r.PathValue("userId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return
@@ -99,7 +98,7 @@ func HandleEmailPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "userId")
+		idStr := r.PathValue("userId")
 		if len(idStr) == 0 {
 			httpHelper.NotFound(w, r)
 			return

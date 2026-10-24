@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -37,7 +36,7 @@ func HandleGroupAttributesGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Group ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -86,7 +85,7 @@ func HandleGroupAttributeGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Group attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -225,7 +224,7 @@ func HandleGroupAttributeUpdatePut(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Group attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -333,7 +332,7 @@ func HandleGroupAttributeDelete(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Group attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

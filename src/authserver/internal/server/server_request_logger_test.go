@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,8 +40,8 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 // handler that answers 200 and records that it ran.
 //
 // The database is a mock with GetSettingsById stubbed, which middleware.Settings calls on every
-// request. middleware.CORS also holds the database but needs no stub: go-chi/cors only calls
-// AllowOriginFunc for a request carrying an Origin header, and these send none. That is enforced
+// request. middleware.CORS also holds the database but needs no stub: it looks an origin up only
+// for a request carrying an Origin header, and these send none. That is enforced
 // rather than assumed, since datamocks.NewDatabase(t) fails the test on any call nobody expected.
 func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
 	t.Helper()
@@ -54,7 +54,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	cfg.AuthServer.LogHttpRequests = logHttpRequests
 
 	s := &Server{
-		router:       chi.NewRouter(),
+		router:       routing.New(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		cfg:          cfg,
@@ -126,7 +126,7 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 }
 
 // #203. A panicking handler is answered 500 by Recoverer, and until this change the request
-// logger sat above that 500 rather than below it: chi's Recoverer wrote WriteHeader(500) to the
+// logger sat above that 500 rather than below it: the Recoverer wrote WriteHeader(500) to the
 // writer it was handed, which was the one ABOVE the logger's wrapper, so the wrapper never saw a
 // status and the record said status=0. An operator filtering for 500s therefore found every
 // request that failed except the ones that failed hardest.

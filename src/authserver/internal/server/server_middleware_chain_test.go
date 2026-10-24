@@ -7,7 +7,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +32,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	// method. Its chain is recorded once, and every other method of it must have the same one.
 	chains := make(map[string][]string)
 	var differing []string
-	err := chi.Walk(s.router, func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		var chain []string
 		for _, mounted := range middlewares {
 			chain = append(chain, runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name())
@@ -51,16 +50,16 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	assert.Empty(t, differing, "every method of a route passes through the same chain")
 
 	wantRoot := []string{
-		"github.com/go-chi/cors.(*Cors).Handler-fm",
-		"github.com/go-chi/chi/v5/middleware.RequestID",
+		"github.com/leodip/goiabada/authserver/internal/middleware.CORS.func1",
+		"github.com/leodip/goiabada/core/requestid.Middleware",
 		"github.com/leodip/goiabada/core/httpmw.SecurityHeaders.func1",
 		"github.com/leodip/goiabada/core/httpmw.RealIP.func1",
 		"github.com/leodip/goiabada/core/httpmw.RequestLogger.func1",
 		// Above Recoverer, as the logger is, so a panic is counted as the 500 its client got (#400).
-		"github.com/leodip/goiabada/core/metrics.HTTPRequests.func3",
-		"github.com/go-chi/chi/v5/middleware.Recoverer",
-		"github.com/go-chi/chi/v5/middleware.StripSlashes",
-		// After StripSlashes, whose path it routes by, and before the /auth/logout exemption
+		"github.com/leodip/goiabada/core/metrics.httpRequests.func2",
+		"github.com/leodip/goiabada/core/httpmw.Recoverer",
+		"github.com/leodip/goiabada/core/httpmw.StripTrailingSlash",
+		// After StripTrailingSlash, whose path it routes by, and before the /auth/logout exemption
 		// predicate, which parses the form body (#426).
 		"github.com/leodip/goiabada/core/httpmw.BodyLimit.func1",
 		"github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1",

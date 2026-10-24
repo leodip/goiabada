@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/httpmw"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +33,7 @@ func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
 	s.initRoutes(s.initMiddleware())
 
 	var registered []string
-	err := chi.Walk(s.router, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		registered = append(registered, method+" "+route)
 		return nil
 	})
@@ -152,6 +152,6 @@ func TestBodyLimitPolicy_TheLargestAcceptedSizeBuilds(t *testing.T) {
 		assert.Positive(t, limit, "%s at the largest accepted upload size", route)
 	}
 
-	router := chi.NewRouter()
+	router := routing.New()
 	assert.NotPanics(t, func() { httpmw.BodyLimit(router, policy) })
 }

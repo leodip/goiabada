@@ -139,7 +139,7 @@ func TestHandleClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T)
 	})
 
 	req := sessionListRequest("/api/v1/admin/clients/7/sessions", "", nil)
-	req = setChiURLParam(req, "id", "7")
+	req.SetPathValue("id", "7")
 
 	rr := httptest.NewRecorder()
 	HandleClientSessionsGet(database).ServeHTTP(rr, req)

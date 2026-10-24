@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +50,7 @@ func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 	}
 	var routes []apiRoute
 
-	err := chi.Walk(s.router, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	err := s.router.Walk(func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		if !strings.HasPrefix(route, "/api/v1/") {
 			return nil
 		}
@@ -64,10 +63,10 @@ func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// A chi.Walk that silently enumerated nothing would make every assertion below vacuous, and
+	// A router walk that silently enumerated nothing would make every assertion below vacuous, and
 	// so would a walk that reached one group and not the other. Both prefixes are named because
 	// the mount is two separate r.Use lines and losing either one is the failure this catches.
-	assert.NotEmpty(t, routes, "chi.Walk found no /api/v1/ routes, so this test asserts nothing")
+	assert.NotEmpty(t, routes, "the router walk found no /api/v1/ routes, so this test asserts nothing")
 	var sawAdmin, sawAccount bool
 	for _, rt := range routes {
 		switch {
@@ -131,12 +130,12 @@ func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 // and a freshly constructed one.
 const noStoreMiddlewareName = "github.com/leodip/goiabada/authserver/internal/middleware.NoStore"
 
-// routeTestPathParam matches a chi path parameter, including the {id:[0-9]+} form.
+// routeTestPathParam matches a path parameter, {name}.
 var routeTestPathParam = regexp.MustCompile(`\{[^}]+\}`)
 
-// routeTestTarget turns a chi pattern into a request target by substituting each path parameter.
-// The value is a plain "1": it has to satisfy any regexp constraint in the pattern, and every
-// parameter this API declares is either a numeric id or a free identifier. A substitution that
+// routeTestTarget turns a route into a request target by substituting each path parameter. The
+// value is a plain "1": every parameter this API declares is either a numeric id or a free
+// identifier. A substitution that
 // fails to match produces a 404, which the status assertion above turns into a failure rather than
 // letting it pass on the header alone.
 func routeTestTarget(pattern string) string {

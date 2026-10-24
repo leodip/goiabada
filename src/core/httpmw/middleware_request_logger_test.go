@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -152,7 +152,7 @@ func TestRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
 	t.Run("Recoverer beneath the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 
-		handler := RequestLogger(true)(chimiddleware.Recoverer(panicking))
+		handler := RequestLogger(true)(Recoverer(panicking))
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
@@ -166,7 +166,7 @@ func TestRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
 	t.Run("Recoverer above the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 
-		handler := chimiddleware.Recoverer(RequestLogger(true)(panicking))
+		handler := Recoverer(RequestLogger(true)(panicking))
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil))
 
@@ -177,13 +177,13 @@ func TestRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
 }
 
 func TestRequestLogger_RequestId(t *testing.T) {
-	t.Run("present when chi's RequestID ran ahead of the logger", func(t *testing.T) {
+	t.Run("present when requestid.Middleware ran ahead of the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 		ran := false
 
-		handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
+		handler := requestid.Middleware(RequestLogger(true)(okHandler(&ran)))
 		request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
-		request.Header.Set(chimiddleware.RequestIDHeader, "REQUEST-ID-SENTINEL")
+		request.Header.Set(requestid.Header, "REQUEST-ID-SENTINEL")
 		handler.ServeHTTP(httptest.NewRecorder(), request)
 
 		assert.Contains(t, buf.Text(), "request_id=REQUEST-ID-SENTINEL")
@@ -221,7 +221,7 @@ func TestRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 		{
 			name: "a 900000-byte X-Request-Id",
 			setup: func(r *http.Request) {
-				r.Header.Set(chimiddleware.RequestIDHeader, strings.Repeat("R", huge))
+				r.Header.Set(requestid.Header, strings.Repeat("R", huge))
 			},
 			wantMarker: "[truncated, 128 of 900000 bytes]",
 		},
@@ -237,7 +237,7 @@ func TestRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 			buf := logtest.CaptureSlog(t)
 			ran := false
 
-			handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
+			handler := requestid.Middleware(RequestLogger(true)(okHandler(&ran)))
 			request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
 			test.setup(request)
 			handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -270,9 +270,9 @@ func TestRequestLogger_TheClipIsLossy(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 		ran := false
 
-		handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
+		handler := requestid.Middleware(RequestLogger(true)(okHandler(&ran)))
 		request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
-		request.Header.Set(chimiddleware.RequestIDHeader, requestId)
+		request.Header.Set(requestid.Header, requestId)
 		handler.ServeHTTP(httptest.NewRecorder(), request)
 
 		// request_id is the last attribute on the line now, because the installed handler
@@ -300,7 +300,7 @@ func TestRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 		{
 			name: "U+2028 in the request id",
 			setup: func(r *http.Request) {
-				r.Header.Set(chimiddleware.RequestIDHeader, "before\u2028after")
+				r.Header.Set(requestid.Header, "before\u2028after")
 			},
 			wantIn:   "before%E2%80%A8after",
 			rawIsBad: "\u2028",
@@ -318,7 +318,7 @@ func TestRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 			buf := logtest.CaptureSlog(t)
 			ran := false
 
-			handler := chimiddleware.RequestID(RequestLogger(true)(okHandler(&ran)))
+			handler := requestid.Middleware(RequestLogger(true)(okHandler(&ran)))
 			request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
 			test.setup(request)
 			handler.ServeHTTP(httptest.NewRecorder(), request)
@@ -333,7 +333,7 @@ func TestRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 
 func TestRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *testing.T) {
 	// The one attribute whose value depends on WHEN it is read. Both servers
-	// register chi's StripSlashes immediately after this middleware, and it edits
+	// register StripTrailingSlash beneath this middleware, and it edits
 	// r.URL.Path in place, so a logger that rendered the target on the way out
 	// would record a path the client never sent. Every other assertion in this file
 	// passes either way, which is what makes this case worth its own test rather
@@ -342,7 +342,7 @@ func TestRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *testing.T) 
 
 	var seenByHandler string
 	chain := RequestLogger(true)(
-		chimiddleware.StripSlashes(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		StripTrailingSlash(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			seenByHandler = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		})))
@@ -350,7 +350,7 @@ func TestRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *testing.T) 
 	chain.ServeHTTP(httptest.NewRecorder(),
 		httptest.NewRequest(http.MethodGet, "/auth/authorize/?client_id=c", nil))
 
-	assert.Equal(t, "/auth/authorize", seenByHandler, "StripSlashes really does rewrite the path")
+	assert.Equal(t, "/auth/authorize", seenByHandler, "StripTrailingSlash really does rewrite the path")
 	// Quoted because slog's text handler quotes any value holding an "="".
 	assert.Contains(t, buf.Text(), `target="/auth/authorize/?client_id=c"`,
 		"the log must carry the target that arrived, trailing slash and all")

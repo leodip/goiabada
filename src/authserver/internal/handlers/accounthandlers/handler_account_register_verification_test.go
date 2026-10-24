@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -25,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,7 +36,7 @@ import (
 // it. These tests drive that seam the way the forgot-password tests drive theirs: the job is held,
 // what the request did before its response is asserted, then the job is run and what it did is.
 
-// registerRequestId is the request id registrationRequest carries, as chi's RequestID middleware
+// registerRequestId is the request id registrationRequest carries, as requestid.Middleware
 // puts one on every request.
 const registerRequestId = "req-register-0001"
 
@@ -67,7 +67,7 @@ func registrationRequest(email string) *http.Request {
 	form := url.Values{"email": {email}, "password": {"Str0ngP4ss!"}, "passwordConfirmation": {"Str0ngP4ss!"}}
 	req := httptest.NewRequest(http.MethodPost, "/account/register", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, registerRequestId)
+	ctx := requestid.NewContext(req.Context(), registerRequestId)
 	return req.WithContext(reqctx.WithSettings(ctx, verificationSettings()))
 }
 
@@ -194,7 +194,7 @@ func TestHandleRegisterPost_WithVerificationAnswersAfterBothLookupsAlone(t *test
 			h.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 			require.Len(t, h.jobs.jobs, 1, "the rest is handed to one job")
-			assert.Equal(t, registerRequestId, h.jobs.ctxs[0].Value(chimiddleware.RequestIDKey),
+			assert.Equal(t, registerRequestId, requestid.FromContext(h.jobs.ctxs[0]),
 				"the job is handed the request's context, so what it records joins the request")
 		})
 	}
@@ -256,7 +256,7 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, tc.wantDetails, *details)
-			assert.Equal(t, registerRequestId, (*auditCtx).Value(chimiddleware.RequestIDKey),
+			assert.Equal(t, registerRequestId, requestid.FromContext(*auditCtx),
 				"the record is written under the job's context, which carries the request's id")
 			h.assertNothingWrittenOrSent(t)
 		})

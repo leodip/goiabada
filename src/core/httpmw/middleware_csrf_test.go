@@ -9,11 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,20 +224,19 @@ func assertPanics(t *testing.T, fn func()) {
 }
 
 // TestSkipCSRF_CombinedChain mounts the production middleware chain
-// (StripSlashes -> SkipCSRF -> CSRF) onto a chi router and issues real
+// (StripTrailingSlash -> SkipCSRF -> CSRF) onto a core/routing router and issues real
 // cross-origin POSTs. This proves the exemptions reach the enforcing middleware end-to-end, beyond
 // the context-flag check in TestSkipCSRF, and it is the only place the trailing-slash
-// form is exercised: chi's StripSlashes writes the normalized path to RouteContext.RoutePath rather
-// than to r.URL.Path, and SkipCSRF has to read it from there.
+// form is exercised: StripTrailingSlash strips r.URL.Path itself, which is what SkipCSRF reads.
 //
 // Over the fixture policy, like everything else here. Each binary's own chain test makes the same
 // claims about its own routes, which is where "this server exempts /auth/token" now belongs.
 func TestSkipCSRF_CombinedChain(t *testing.T) {
 	const foreignOrigin = "https://www.certification.openid.net"
 
-	newRouter := func(predicate func(*http.Request) bool) *chi.Mux {
-		r := chi.NewRouter()
-		r.Use(chimiddleware.StripSlashes)
+	newRouter := func(predicate func(*http.Request) bool) *routing.Router {
+		r := routing.New()
+		r.Use(StripTrailingSlash)
 		r.Use(SkipCSRF(fixtureCSRFPolicy(predicate)))
 		r.Use(CSRF())
 

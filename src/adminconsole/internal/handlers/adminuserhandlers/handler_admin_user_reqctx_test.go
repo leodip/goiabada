@@ -22,8 +22,8 @@ import (
 // declares, through whichever writer its route answers with, and consults the API with nothing
 // (#440).
 func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T) {
-	routed := handlertest.WithRouteParam("userId", "42")
-	attribute := handlertest.WithRouteParam("attributeId", "21")
+	routed := handlertest.WithPathValue("userId", "42")
+	attribute := handlertest.WithPathValue("attributeId", "21")
 	jsonBody := func(body string) []handlertest.Option {
 		return []handlertest.Option{
 			handlertest.WithBody(strings.NewReader(body)),

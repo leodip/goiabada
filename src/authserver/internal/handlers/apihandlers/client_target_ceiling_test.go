@@ -136,7 +136,7 @@ type clientTargetWrite struct {
 	refusedEarlierForTheConsoleClient bool
 }
 
-// clientRequest builds a request for one of the routes, with chi's id parameter set.
+// clientRequest builds a request for one of the routes, with its id path value set.
 func clientRequest(method, target, body, scope string) *http.Request {
 	return membershipRequest(method, target, body, scope, map[string]string{"id": "58"})
 }
@@ -277,7 +277,7 @@ var clientTargetWrites = []clientTargetWrite{
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string, client *record.Client) *httptest.ResponseRecorder {
 			r, err := createMultipartRequest(http.MethodPost, "/api/v1/admin/clients/58/logo", "picture", createTestPNG(100, 100))
 			require.NoError(t, err)
-			r = setChiURLParam(r, "id", "58")
+			r.SetPathValue("id", "58")
 			if scope != "" {
 				r = setTokenContextWithClaims(r, map[string]interface{}{"scope": scope, "sub": grantCaller})
 			}
@@ -578,7 +578,7 @@ func TestClientTargetCeiling_TheRoutesAnswerTheirOwnFourHundredsFirst(t *testing
 
 		r, err := createMultipartRequest(http.MethodPost, "/api/v1/admin/clients/58/logo", "picture", []byte("not an image"))
 		require.NoError(t, err)
-		r = setChiURLParam(r, "id", "58")
+		r.SetPathValue("id", "58")
 		r = setTokenContextWithClaims(r, map[string]interface{}{"scope": granularScopeOfClients, "sub": grantCaller})
 		rr := httptest.NewRecorder()
 		HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes).ServeHTTP(rr, r)

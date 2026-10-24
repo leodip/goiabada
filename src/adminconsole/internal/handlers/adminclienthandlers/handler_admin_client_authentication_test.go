@@ -46,7 +46,7 @@ func authenticationTabBind(t *testing.T, apiClient *stubAuthenticationApiClient)
 	t.Helper()
 	httpHelper := &stubHttpHelper{}
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/authentication",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"))
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 
 	HandleAuthenticationGet(httpHelper, newTestSessionStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
@@ -99,7 +99,7 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 			}
 			httpHelper := &stubHttpHelper{}
 			req := handlertest.Request(http.MethodPost, "/admin/clients/7/authentication",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 				handlertest.WithForm(form))
 			recorder := httptest.NewRecorder()
 
@@ -133,7 +133,7 @@ func TestHandleAuthenticationPost_ARefusedPublicClientReadsNoSecret(t *testing.T
 	}
 	httpHelper := &stubHttpHelper{}
 	req := handlertest.Request(http.MethodPost, "/admin/clients/7/authentication",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 		handlertest.WithForm(url.Values{"publicConfidential": {"neither"}}))
 
 	HandleAuthenticationPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).

@@ -60,7 +60,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 
 	req := handlertest.Request(http.MethodPost, "/admin/groups/4/delete",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("groupId", "4"),
+		handlertest.WithPathValue("groupId", "4"),
 		handlertest.WithForm(url.Values{"groupIdentifier": {"admins"}}),
 	)
 	rec := httptest.NewRecorder()
@@ -79,8 +79,8 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 func TestHandleMembersRemoveUserPost_TheLastAdministratorRefusalReachesTheBrowser(t *testing.T) {
 	req := handlertest.Request(http.MethodPost, "/admin/groups/4/members/7/remove",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("groupId", "4"),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("groupId", "4"),
+		handlertest.WithPathValue("userId", "7"),
 	)
 	rec := httptest.NewRecorder()
 

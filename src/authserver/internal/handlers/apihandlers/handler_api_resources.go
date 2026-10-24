@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -149,7 +148,7 @@ func HandleResourceGet(
 	database resourcesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -185,7 +184,7 @@ func HandleResourceUpdatePut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -302,7 +301,7 @@ func HandleResourceDelete(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if idStr == "" {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

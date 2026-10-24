@@ -244,7 +244,7 @@ func (s *settingsTabAPI) UpdateClientAdministrativeScopes(_ context.Context, _ s
 func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values) string {
 	t.Helper()
 	req := handlertest.Request(http.MethodPost, "/admin/clients/7/settings",
-		handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "7"),
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", UITheme: "dark"}),
 		handlertest.WithForm(form))
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))

@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // settingsDatabase is what the settings middleware needs: the settings row it puts on every
@@ -36,7 +36,7 @@ func Settings(database settingsDatabase, faults ServerFaults) func(next http.Han
 				// reads. The sentence is unchanged; the log line is decision 9's shape, with the
 				// stack riding inside the error attribute rather than formatted into the message
 				// (#279).
-				requestId := chimiddleware.GetReqID(r.Context())
+				requestId := requestid.FromContext(r.Context())
 				// No request_id attribute: the installed handler takes it off the context this
 				// call passes it (#320 decision 2). requestId is still read for the body below,
 				// which is what gives whoever hit this something to quote to an operator.

@@ -44,7 +44,7 @@ func SettingsCache(settingsCache settingsGetter, unavailable settingsUnavailable
 				// tree whose 500 record had no frames (#279 decisions 9 and 17).
 				//
 				// ErrorContext with no request_id attribute: the installed handler reads
-				// chi's request id off the context and appends it, so the correlation is
+				// the request id off the context and appends it, so the correlation is
 				// the same and no call site can spell the key differently (#320 decision 2).
 				slog.ErrorContext(r.Context(), "unable to fetch settings from the auth server", "error", err)
 				unavailable.SettingsUnavailable(w, r, "adminconsole.error.settings_unavailable_title", "adminconsole.error.settings_unavailable")

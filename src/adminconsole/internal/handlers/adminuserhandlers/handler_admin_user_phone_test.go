@@ -61,7 +61,7 @@ func TestHandlePhoneGet_RendersTheCorePhoneCountryList(t *testing.T) {
 
 	HandlePhoneGet(httpHelper, newFlashTestStore(), phoneApiClient{}).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/users/42/phone",
-			handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42")))
+			handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42")))
 
 	bind := handlertest.Bind(t, httpHelper)
 	rendered := renderedPhoneCountries(t, bind)
@@ -81,7 +81,7 @@ func TestHandlePhonePost_ARefusedSaveKeepsTheCorePhoneCountryList(t *testing.T) 
 	HandlePhonePost(httpHelper, newFlashTestStore(), phoneApiClient{}, consoleBaseURL).ServeHTTP(
 		httptest.NewRecorder(),
 		handlertest.Request(http.MethodPost, "/admin/users/42/phone",
-			handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "42"),
+			handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42"),
 			handlertest.WithForm(url.Values{
 				"phoneCountryUniqueId": {"PRT_0"},
 				"phoneNumber":          {" 912 345 678 "},

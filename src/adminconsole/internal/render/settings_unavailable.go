@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // settingsUnavailablePage is everything settings_unavailable.html shows. The page is parsed alone,
@@ -36,7 +36,7 @@ func (h *Renderer) SettingsUnavailable(w http.ResponseWriter, r *http.Request, t
 		Title:          i18n.T(ctx, titleKey),
 		Message:        i18n.T(ctx, messageKey),
 		RequestIDLabel: i18n.T(ctx, "adminconsole.error.request_id_label"),
-		RequestID:      middleware.GetReqID(ctx),
+		RequestID:      requestid.FromContext(ctx),
 	}
 
 	var buf bytes.Buffer

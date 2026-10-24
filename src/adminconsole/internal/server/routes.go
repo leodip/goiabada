@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
@@ -18,9 +17,10 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/routing"
 )
 
-func (s *Server) initRoutes(root chi.Router) {
+func (s *Server) initRoutes(root *routing.Router) {
 	// The console's own base URL, which every redirect is built from, handed to each handler that
 	// redirects as it is built (#441).
 	baseURL := s.cfg.AdminConsole.BaseURL
@@ -96,9 +96,9 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.With(baseAuth...).Get("/unauthorized", handlers.HandleUnauthorizedGet(httpHelper))
 
 	// Auth routes
-	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
-		// The callback is registered for every method and dispatched here, so that chi never writes
-		// its own 405 on this path, which would name GET in Allow beside POST once a GET route
+	root.With(baseAuth...).Route("/auth", func(r *routing.Router) {
+		// The callback is registered for every method and dispatched here, so that the router never
+		// writes its own 405 on this path, which would name GET in Allow beside POST once a GET route
 		// existed. A browser that reaches the callback by GET -- a bookmark, the history, a pasted
 		// address -- and a request by any other method but POST get the sign-in error page at 405
 		// with Allow: POST, rather than the empty body the POST-only registration answered them
@@ -122,7 +122,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	})
 
 	// Account routes
-	root.Route("/account", func(r chi.Router) {
+	root.Route("/account", func(r *routing.Router) {
 		r.Use(accountAuth...)
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +155,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	})
 
 	// Admin routes
-	root.Route("/admin", func(r chi.Router) {
+	root.Route("/admin", func(r *routing.Router) {
 		r.Use(adminAuth...)
 
 		r.Get("/get-permissions", handlers.HandleAdminGetPermissionsGet(httpHelper, apiClient))

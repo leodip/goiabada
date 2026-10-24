@@ -67,7 +67,7 @@ func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/users/7/sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 	)
 
 	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -100,7 +100,7 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/users/7/sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 	)
 
 	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -134,7 +134,7 @@ func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 
 	req := handlertest.Request(http.MethodGet, "/admin/users/7/sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 	)
 
 	HandleSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -216,7 +216,7 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 			}
 
 			opts := []handlertest.Option{
-				handlertest.WithRouteParam("userId", "7"),
+				handlertest.WithPathValue("userId", "7"),
 				handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 			}
 			if testCase.sid == "" {
@@ -270,7 +270,7 @@ func TestHandleSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 
 	req := handlertest.Request(http.MethodPost, "/admin/users/7/sessions",
 		handlertest.WithAccessToken(),
-		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithPathValue("userId", "7"),
 		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
 	)
 

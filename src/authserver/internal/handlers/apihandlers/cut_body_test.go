@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -135,9 +133,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodPut, "/", nil)
 			req.Body = cutBody(rr, body, len(body)-1)
-			routeContext := chi.NewRouteContext()
-			routeContext.URLParams.Add(test.param, "1")
-			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeContext))
+			req.SetPathValue(test.param, "1")
 
 			test.handler(database, t).ServeHTTP(rr, req)
 

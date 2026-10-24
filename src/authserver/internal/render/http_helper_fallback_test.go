@@ -129,7 +129,7 @@ func TestInternalServerError_WithoutSettingsAnswersThePlainTextFallback(t *testi
 		requestId+"\n", w.Body.String())
 }
 
-// chi's RequestID adopts an inbound X-Request-Id verbatim, so the one variable in the body is the
+// requestid.Middleware adopts an inbound X-Request-Id verbatim, so the one variable in the body is the
 // caller's to choose. A megabyte of it, led by control bytes, comes back escaped and clipped.
 func TestInternalServerError_RenderFailureBoundsAClientChosenRequestId(t *testing.T) {
 	_ = logtest.CaptureSlog(t)

@@ -120,7 +120,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleSettingsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/settings",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
 		},
 		{
 			name: "HandleDeleteGet",
@@ -128,7 +128,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/delete",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
 		},
 		{
 			name: "HandlePermissionsGet",
@@ -136,7 +136,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandlePermissionsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/permissions",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
 		},
 		{
 			name:        "HandleUsersWithPermissionGet",
@@ -145,7 +145,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleUsersWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/users-with-permission",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
 		},
 		{
 			name: "HandleGroupsWithPermissionGet, no permission to annotate",
@@ -153,7 +153,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleGroupsWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
 		},
 		{
 			name:        "HandleGroupsWithPermissionGet, one to annotate",
@@ -162,7 +162,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleGroupsWithPermissionGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3")),
 		},
 		{
 			name: "HandleGroupsWithPermissionAddPermissionPost",
@@ -170,8 +170,8 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/add/8",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3"),
-				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("permissionId", "8")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3"),
+				handlertest.WithPathValue("groupId", "5"), handlertest.WithPathValue("permissionId", "8")),
 		},
 		{
 			name: "HandleGroupsWithPermissionRemovePermissionPost",
@@ -179,8 +179,8 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 				return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/remove/8",
-				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3"),
-				handlertest.WithRouteParam("groupId", "5"), handlertest.WithRouteParam("permissionId", "8")),
+				handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "3"),
+				handlertest.WithPathValue("groupId", "5"), handlertest.WithPathValue("permissionId", "8")),
 		},
 	}
 

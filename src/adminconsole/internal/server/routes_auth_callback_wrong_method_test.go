@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -37,7 +37,7 @@ func TestRoutes_TheCallbackByAnyMethodButPostAnswersTheSignInErrorPage(t *testin
 		oauthclient.TokenEndpointURL(cfg.AuthServer.GetEffectiveBaseURL()),
 		builtin.AdminConsoleClientIdentifier, cfg.AdminConsole.OAuthClientSecret, http.DefaultClient, nil)
 
-	s := NewServer(chi.NewRouter(), newTestSessionStore(), nil, nil, cfg, http.DefaultClient, nil, tokenClient, metrics.NewRegistry(), nil)
+	s := NewServer(routing.New(), newTestSessionStore(), nil, nil, cfg, http.DefaultClient, nil, tokenClient, metrics.NewRegistry(), nil)
 	s.initRoutes(s.router)
 
 	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete,

@@ -4,12 +4,11 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/core/httpmw/statuswriter"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 // unmatched is the route a request no route answered is recorded under.
@@ -35,12 +34,28 @@ func DurationBuckets() []float64 {
 // method and status, and its duration by route and method.
 //
 // The route label's set is router's own route table, read once at the first request or scrape,
-// since chi takes its middleware before its routes; a request no route answered is "unmatched".
-// The middleware must be mounted on router itself, with Use: chi's routing context, which names
-// the route, is not on the request above it. Mount it above the panic recovery, as the request
-// logger is, so a panicking request is counted as the 500 its client received.
-func HTTPRequests(reg *Registry, router chi.Routes) func(http.Handler) http.Handler {
-	routes := sync.OnceValue(func() map[string]bool { return routeTable(router) })
+// since the router takes its middleware before its routes; the router names each route in chi's
+// spelling, so the label values are the ones chi gave (#462 decision 5). A request no route
+// answered, a 404, a 405 or one a group's middleware answered before any route, is "unmatched".
+// Mount it with Use on router itself, above the panic recovery, as the request logger is, so a
+// panicking request is counted as the 500 its client received.
+func HTTPRequests(reg *Registry, router *routing.Router) func(http.Handler) http.Handler {
+	return httpRequests(reg, func() map[string]bool {
+		table := map[string]bool{}
+		// The walk function returns no error, so Walk returns none.
+		_ = router.Walk(func(_ string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+			table[route] = true
+			return nil
+		})
+		return table
+	}, routing.RouteName)
+}
+
+// httpRequests registers the two families and returns the middleware recording into them, with
+// the route label's set read from table once and each request's route read by routeOf after its
+// handler ran.
+func httpRequests(reg *Registry, table func() map[string]bool, routeOf func(*http.Request) string) func(http.Handler) http.Handler {
+	routes := sync.OnceValue(table)
 	route := Label{
 		name:        "route",
 		description: "the route table, `unmatched`",
@@ -65,13 +80,13 @@ func HTTPRequests(reg *Registry, router chi.Routes) func(http.Handler) http.Hand
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			wrapped := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			wrapped := statuswriter.Wrap(w)
 			started := time.Now()
 			returned := false
 
 			// Deferred, so a request whose handler panics past this middleware is still counted.
 			defer func() {
-				pattern := routePattern(r)
+				pattern := routeOf(r)
 				if !routes()[pattern] {
 					pattern = unmatched
 				}
@@ -90,42 +105,6 @@ func HTTPRequests(reg *Registry, router chi.Routes) func(http.Handler) http.Hand
 			returned = true
 		})
 	}
-}
-
-// routePattern is the one place the route a request was answered by is read, as chi spells it,
-// read after the handler ran. A request no route matched reads "".
-func routePattern(r *http.Request) string {
-	rctx := chi.RouteContext(r.Context())
-	if rctx == nil {
-		return ""
-	}
-	return rctx.RoutePattern()
-}
-
-// routeTable is every pattern router answers, spelled as routePattern reads it. chi.Walk joins a
-// subrouter's mount pattern to its routes and collapses the wildcard between them once; the route
-// context also trims a trailing slash, so "/auth" with a "/" route reads "/auth" there and
-// "/auth/" here. normalizeRoute applies the route context's rules to what Walk returns.
-func routeTable(router chi.Routes) map[string]bool {
-	table := map[string]bool{}
-	// The walk function returns no error, so Walk returns none.
-	_ = chi.Walk(router, func(_ string, pattern string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-		table[normalizeRoute(pattern)] = true
-		return nil
-	})
-	return table
-}
-
-// normalizeRoute mirrors chi's Context.RoutePattern on a joined pattern.
-func normalizeRoute(pattern string) string {
-	for strings.Contains(pattern, "/*/") {
-		pattern = strings.ReplaceAll(pattern, "/*/", "/")
-	}
-	if pattern != "/" {
-		pattern = strings.TrimSuffix(pattern, "//")
-		pattern = strings.TrimSuffix(pattern, "/")
-	}
-	return pattern
 }
 
 // statusCodes is every three-digit code from 100 to 599: the status label's set. The status a

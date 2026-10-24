@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/imageupload"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -37,7 +35,7 @@ func HandleUserProfilePicturePost(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -133,7 +131,7 @@ func HandleUserProfilePictureDelete(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -195,7 +193,7 @@ func HandleUserProfilePictureGet(
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

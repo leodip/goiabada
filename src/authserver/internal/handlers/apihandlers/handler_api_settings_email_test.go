@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -15,7 +14,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -26,6 +24,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -166,7 +165,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(tc.err).Once()
 
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
-			r = r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, sendTestRequestId))
+			r = r.WithContext(requestid.NewContext(r.Context(), sendTestRequestId))
 			rr := httptest.NewRecorder()
 			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, auditLogger).ServeHTTP(rr, r)
 
@@ -257,7 +256,7 @@ func serveEmailSave(t *testing.T, settings *record.Settings, body string) (*http
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedSMTPSettings, mock.Anything).Return().Maybe()
 
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/email", strings.NewReader(body))
-	r = r.WithContext(context.WithValue(reqctx.WithSettings(r.Context(), settings), middleware.RequestIDKey, emailSaveRequestId))
+	r = r.WithContext(requestid.NewContext(reqctx.WithSettings(r.Context(), settings), emailSaveRequestId))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
 	rr := httptest.NewRecorder()
 	HandleSettingsEmailPut(database, accountvalidation.NewEmailValidator(nil), auditLogger, testDataCipher).ServeHTTP(rr, r)

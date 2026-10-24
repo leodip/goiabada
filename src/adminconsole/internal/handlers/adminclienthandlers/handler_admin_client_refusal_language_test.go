@@ -61,7 +61,7 @@ func (*refusingClientApiClient) UpdateClientTokens(context.Context, string, int6
 // language the page is rendered in: English with no language on the request, word for word what
 // they said before, and Portuguese under pt-BR (#559 decision 4).
 func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
-	routed := handlertest.WithRouteParam("clientId", "3")
+	routed := handlertest.WithPathValue("clientId", "3")
 	validTokens := url.Values{
 		"tokenExpirationInSeconds":                {"300"},
 		"refreshTokenOfflineIdleTimeoutInSeconds": {"3600"},

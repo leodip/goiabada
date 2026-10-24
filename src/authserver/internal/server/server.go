@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -17,8 +18,6 @@ import (
 
 	"log/slog"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/cleanup"
@@ -36,10 +35,12 @@ import (
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/requestid"
+	"github.com/leodip/goiabada/core/routing"
 )
 
 type Server struct {
-	router *chi.Mux
+	router *routing.Router
 	// The whole interface, and one of the four places that still holds it: routes.go hands this
 	// to every constructor and each one narrows it to a port of its own (#386 decision 8).
 	database data.Database
@@ -79,7 +80,7 @@ type Server struct {
 	tokenMetrics *tokenmetrics.Recorder
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ConditionalStore,
+func NewServer(router *routing.Router, database data.Database, sessionStore *sessionstore.ConditionalStore,
 	dataCipher *encryption.DataCipher, trustedProxies []*net.IPNet, cfg *config.Config) *Server {
 
 	registry := metrics.NewRegistry()
@@ -220,9 +221,10 @@ func (s *Server) Start(ctx context.Context) (drained bool, err error) {
 
 // metricsHandler is the metrics listener's whole handler: a mux of its own answering GET /metrics
 // with reg's exposition and 404 for every other path. It is never Go's default mux, on which the
-// net/http/pprof and expvar packages chi's middleware links register /debug/pprof/ and /debug/vars
-// (#462), and nothing on it passes through the main router's chain, so a scrape is neither logged
-// by the request logger nor counted in the HTTP metrics (#400 decision 3).
+// net/http/pprof and expvar packages would register /debug/pprof/ and /debug/vars, were either
+// linked (rule 9 refuses both in every shipped binary, #462), and nothing on it passes through the
+// main router's chain, so a scrape is neither logged by the request logger nor counted in the HTTP
+// metrics (#400 decision 3).
 func metricsHandler(reg *metrics.Registry) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /metrics", reg.Handler())
@@ -236,7 +238,7 @@ func metricsHandler(reg *metrics.Registry) http.Handler {
 // http.Redirect answer HEAD on their own. It is for the read-only resources a cache, a monitor or a
 // link checker may probe, and only those: an endpoint whose GET starts or changes something, such
 // as /auth/authorize, stays GET-only, so a HEAD there is 405 with Allow naming GET.
-func getAndHead(r chi.Router, pattern string, handler http.HandlerFunc) {
+func getAndHead(r *routing.Router, pattern string, handler http.HandlerFunc) {
 	r.Get(pattern, handler)
 	r.Head(pattern, handler)
 }
@@ -438,8 +440,8 @@ const (
 // with a 302 back to the request target, which is not a sensible answer to a request for
 // a stylesheet.
 //
-// chi refuses Use after a route has been registered on the same router, and With freezes
-// the parent's chain, so this is a restructure rather than a reorder: every root Use
+// The router refuses Use after a route has been registered on the same router, and With
+// freezes the parent's chain, so this is a restructure rather than a reorder: every root Use
 // happens here, before the branches, and every branch registers its routes afterwards.
 func (s *Server) initMiddleware() appBranches {
 
@@ -448,8 +450,9 @@ func (s *Server) initMiddleware() appBranches {
 	// CORS
 	s.router.Use(middleware.CORS(s.database))
 
-	// Request ID
-	s.router.Use(chimiddleware.RequestID)
+	// Request ID: the X-Request-Id the request arrived with, or one minted as chi minted them
+	// (#462 decision 6), on the context of every record, audit event and error page below.
+	s.router.Use(requestid.Middleware)
 
 	// Security headers (before Recoverer so 500 responses carry them too)
 	s.router.Use(httpmw.SecurityHeaders(s.cfg.AuthServer.IsCookieSecure()))
@@ -478,8 +481,8 @@ func (s *Server) initMiddleware() appBranches {
 	// connection instead of answering 500. The logger is bounded formatting over values it
 	// has already clipped, and a panic in it would be a bug to fix rather than to absorb.
 	//
-	// It stays before StripSlashes, which edits r.URL.Path in place, which is why the
-	// middleware renders the target before calling the next handler.
+	// It stays above StripTrailingSlash, which edits r.URL.Path in place, and renders the target
+	// before calling the next handler, so its record carries the path the client sent.
 	logHttpRequests := s.cfg.AuthServer.LogHttpRequests
 	slog.Info("http request logging configured", "enabled", logHttpRequests)
 	s.router.Use(httpmw.RequestLogger(logHttpRequests))
@@ -491,14 +494,16 @@ func (s *Server) initMiddleware() appBranches {
 	s.router.Use(metrics.HTTPRequests(s.metrics, s.router))
 
 	// Recoverer, beneath the request logger so the 500 it writes reaches that logger's
-	// wrapped writer and lands in the record (#203).
-	s.router.Use(chimiddleware.Recoverer)
+	// wrapped writer and lands in the record (#203). It writes the panic's one ERROR record, with
+	// the request id and the stack, through the process's log handler (#462).
+	s.router.Use(httpmw.Recoverer)
 
-	// Strip slashes
-	s.router.Use(chimiddleware.StripSlashes)
+	// One trailing slash stripped before routing, from r.URL.Path itself, so the router, the
+	// lookups below and the handlers all read the stripped path (#462).
+	s.router.Use(httpmw.StripTrailingSlash)
 
-	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripSlashes, because
-	// the lookup resolves the route by the path StripSlashes normalized; before httpmw.SkipCSRF,
+	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripTrailingSlash,
+	// because the lookup resolves the route by the path it stripped; before httpmw.SkipCSRF,
 	// because the /auth/logout exemption predicate parses the form body right there at the root,
 	// and a body read before this mount would be read without a bound.
 	s.router.Use(httpmw.BodyLimit(s.router,
@@ -521,6 +526,24 @@ func (s *Server) initMiddleware() appBranches {
 
 	// Everything below is on the application branch, not the root.
 
+	branches := appBranches{
+		pages:    s.router.With(s.applicationChain(middleware.PageFaults())...),
+		protocol: s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
+		token:    s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
+		api:      s.router.With(s.applicationChain(middleware.APIFaults())...),
+	}
+
+	slog.Info("finished initializing middleware")
+
+	return branches
+}
+
+// applicationChain is the application branch's own middleware, beneath the root's, answering what
+// stops a request before its handler through faults. The branches initMiddleware builds run this
+// same middleware in the same order and differ only in faults: the settings or the session could not
+// be read, or something panicked. The static branch puts the page branch's in front of the 404 page
+// it answers a directory with, the one request there that needs it.
+func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Handler) http.Handler {
 	// Global locale middleware: resolves a tentative localizer from
 	// ?ui_locales, UI locales from an in-flight authorize flow,
 	// Accept-Language, or English. Must run AFTER middleware.SessionIdentifier
@@ -531,24 +554,7 @@ func (s *Server) initMiddleware() appBranches {
 	// scope.
 	i18nCeremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
 
-	branches := appBranches{
-		pages:    s.applicationBranch(middleware.PageFaults(), i18nCeremonyStore),
-		protocol: s.applicationBranch(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)), i18nCeremonyStore),
-		token:    s.applicationBranch(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))), i18nCeremonyStore),
-		api:      s.applicationBranch(middleware.APIFaults(), i18nCeremonyStore),
-	}
-
-	slog.Info("finished initializing middleware")
-
-	return branches
-}
-
-// applicationBranch is the application chain on s.router, answering what stops a request before its
-// handler through faults. The three branches initMiddleware builds run this same middleware in the
-// same order and differ only in faults: the settings or the session could not be read, or something
-// panicked.
-func (s *Server) applicationBranch(faults middleware.ServerFaults, i18nCeremonyStore *ceremony.Store) chi.Router {
-	return s.router.With(
+	return []func(http.Handler) http.Handler{
 		// Answers a panic on the branch in the branch's format; on the page branch it is a
 		// pass-through and the root Recoverer answers
 		faults.Recoverer,
@@ -564,7 +570,7 @@ func (s *Server) applicationBranch(faults middleware.ServerFaults, i18nCeremonyS
 		middleware.SessionIdentifier(s.sessionStore, s.database, faults),
 
 		i18n.Locale(i18nCeremonyStore),
-	)
+	}
 }
 
 // appBranches is the application branch in its three answering formats, which initMiddleware returns
@@ -576,17 +582,17 @@ func (s *Server) applicationBranch(faults middleware.ServerFaults, i18nCeremonyS
 type appBranches struct {
 	// pages carries everything that answers a page, text, an image or a redirect, and answers such a
 	// fault in text/plain, as every route did before #435.
-	pages chi.Router
+	pages *routing.Router
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
-	protocol chi.Router
+	protocol *routing.Router
 	// api carries the admin, account and session APIs and the public settings, which answer the
 	// {error_code, error_description} envelope.
-	api chi.Router
+	api *routing.Router
 	// token carries the token endpoint alone. It answers as protocol does, and counts each fault it
 	// answers as a token request refused, which the protocol branch cannot, since its faults are
 	// every protocol endpoint's (#400 decision 5).
-	token chi.Router
+	token *routing.Router
 }
 
 // csrfPolicy is the auth server's CSRF exemption policy: the endpoints this binary serves that are
@@ -712,23 +718,52 @@ func bodyLimitPolicy(profilePictureMaxSizeBytes int64) httpmw.BodyLimitPolicy {
 	}
 }
 
-// serveStaticFiles serves the embedded static files under /static/ and redirects /static to
-// /static/. They are mounted nowhere else, so neither the path nor the file system is a parameter.
-func (s *Server) serveStaticFiles() {
-	getAndHead(s.router, "/static", http.RedirectHandler("/static/", http.StatusMovedPermanently).ServeHTTP)
+// staticPrefix is where the static files are served, and what is stripped from a request's path to
+// name the file.
+const staticPrefix = "/static"
 
-	getAndHead(s.router, "/static/*", func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fsHandler := http.StripPrefix(pathPrefix, http.FileServer(http.FS(s.staticFS)))
+// serveStaticFiles serves the embedded static files under /static/. They are mounted nowhere else,
+// so neither the path nor the file system is a parameter.
+//
+// A directory is the 404 page, /static/ itself included, where Go's file server answered one with
+// a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
+// too: it redirected to /static/, which looped for ever once its trailing slash was stripped back to
+// /static. The 404 page is drawn behind the page branch's chain, which it reads its settings and
+// language from, so a directory costs what an unmatched path costs; a file still costs neither.
+func (s *Server) serveStaticFiles() {
+	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
+	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS))
+	directory := http.Handler(notFound)
+	chain := s.applicationChain(middleware.PageFaults())
+	for i := len(chain) - 1; i >= 0; i-- {
+		directory = chain[i](directory)
+	}
+
+	getAndHead(s.router, staticPrefix+"/*", func(w http.ResponseWriter, r *http.Request) {
+		if s.isStaticDirectory(r.URL.Path) {
+			directory.ServeHTTP(w, r)
+			return
+		}
 
 		cacheInSeconds := 5 * 60
 		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%v", cacheInSeconds))
-		w.Header().Set("Expires", time.Now().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
+		w.Header().Set("Expires", time.Now().UTC().Add(time.Second*time.Duration(cacheInSeconds)).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		fsHandler.ServeHTTP(w, r)
+		files.ServeHTTP(w, r)
 	})
+}
+
+// isStaticDirectory reports whether urlPath, under /static, names a directory of the static files,
+// the root among them. The name is read as http.FileServer reads it, so the two agree on what is
+// opened; a name that is not there is no directory, and the file server answers its 404.
+func (s *Server) isStaticDirectory(urlPath string) bool {
+	name := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(urlPath, staticPrefix)), "/")
+	if name == "" {
+		return true
+	}
+	info, err := fs.Stat(s.staticFS, name)
+	return err == nil && info.IsDir()
 }
 
 // logPlainHTTP reports a deployment listening on HTTP with no HTTPS listener. Behind a proxy

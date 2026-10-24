@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -39,7 +37,7 @@ func HandleUserProfilePut(
 		// Authentication and authorization handled by middleware
 
 		// Parse user ID from URL
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -175,7 +173,7 @@ func HandleUserAddressPut(
 		// Authentication and authorization handled by middleware
 
 		// Parse user ID from URL
-		idStr := chi.URLParam(r, "id")
+		idStr := r.PathValue("id")
 		if len(idStr) == 0 {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

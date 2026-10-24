@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
@@ -163,7 +162,7 @@ func HandleUsersWithPermissionRemovePermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		userIdStr := chi.URLParam(r, "userId")
+		userIdStr := r.PathValue("userId")
 		if len(userIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -184,7 +183,7 @@ func HandleUsersWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissionIdStr := chi.URLParam(r, "permissionId")
+		permissionIdStr := r.PathValue("permissionId")
 		if len(permissionIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -251,7 +250,7 @@ func HandleUsersWithPermissionAddGet(
 			return
 		}
 		resource, permissions := loaded.resource, loaded.permissions
-		selectedPermissionStr := chi.URLParam(r, "permissionId")
+		selectedPermissionStr := r.PathValue("permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
 				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
@@ -322,7 +321,7 @@ func HandleUsersWithPermissionSearchGet(
 			return
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
-		selectedPermissionStr := chi.URLParam(r, "permissionId")
+		selectedPermissionStr := r.PathValue("permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
 				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
@@ -393,7 +392,7 @@ func HandleUsersWithPermissionAddPermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		userIdStr := chi.URLParam(r, "userId")
+		userIdStr := r.PathValue("userId")
 		if len(userIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -414,7 +413,7 @@ func HandleUsersWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissionIdStr := chi.URLParam(r, "permissionId")
+		permissionIdStr := r.PathValue("permissionId")
 		if len(permissionIdStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return

@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -59,7 +58,7 @@ func oversized(t *testing.T, prefix string) (raw, want string) {
 func errorLogRequest(t *testing.T, target string, query url.Values) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, target+"?"+query.Encode(), nil)
-	return r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, requestIdOf))
+	return r.WithContext(requestid.NewContext(r.Context(), requestIdOf))
 }
 
 // oneErrorRecord asserts that exactly one ERROR record was written and returns its attributes.

@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -28,6 +27,7 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/metrics"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -44,7 +44,7 @@ import (
 // so an endpoint could be shipped unprotected with every limiter and handler test still
 // passing. One case per registration, so a wrapper cannot be dropped in silence (#219).
 //
-// It runs the real initRoutes on a real chi router, and the request goes through whatever
+// It runs the real initRoutes on the real router, and the request goes through whatever
 // chain that registration produced: for the account API that is the debug, bearer-token,
 // scope, user-bound and session guards ahead of the limiter, in their production order.
 // Only two things are supplied rather than performed. The bearer token is placed in the
@@ -199,7 +199,7 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 
 	registry := metrics.NewRegistry()
 	s := &Server{
-		router:       chi.NewRouter(),
+		router:       routing.New(),
 		database:     database,
 		sessionStore: sessionStore,
 		templateFS:   web.TemplateFS(),

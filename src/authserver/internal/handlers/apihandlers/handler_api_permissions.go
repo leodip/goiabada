@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -36,7 +35,7 @@ func HandlePermissionsByResourceGet(
 	database permissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resourceIdStr := chi.URLParam(r, "resourceId")
+		resourceIdStr := r.PathValue("resourceId")
 		if len(resourceIdStr) == 0 {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -84,7 +83,7 @@ func HandleResourcePermissionsPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resourceIdStr := chi.URLParam(r, "resourceId")
+		resourceIdStr := r.PathValue("resourceId")
 		if len(resourceIdStr) == 0 {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

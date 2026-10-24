@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -57,7 +57,7 @@ func newMetricsTestServer(t *testing.T) *Server {
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 
-	s := NewServer(chi.NewRouter(), database, newTestSessionStore(), nil, nil, cfg)
+	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg)
 	s.registerRoutes()
 	return s
 }
@@ -86,15 +86,17 @@ func scrape(t *testing.T, s *Server) string {
 	return rec.Body.String()
 }
 
-// The listener answers GET /metrics with the exposition and 404 for every other path, the two
-// paths Go's default mux carries in this binary included (#462). Before the 404s are asserted, the
-// default mux is shown to answer them: chi's middleware package links net/http/pprof and expvar,
-// which register there, so a listener serving the default mux would answer both with 200.
+// The listener answers GET /metrics with the exposition and 404 for every other path, the paths
+// net/http/pprof and expvar register on Go's default mux included. Neither is linked any more, and
+// rule 9 refuses both in every shipped binary (#462), so the default mux answers both 404 here: this
+// test binary links the server package's whole production closure, so a dependency bringing either
+// back makes it answer 200.
 func TestMetricsListener_ServesTheExpositionAndNothingElse(t *testing.T) {
 	for _, path := range []string{"/debug/pprof/", "/debug/vars"} {
 		rec := httptest.NewRecorder()
 		http.DefaultServeMux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		require.Equal(t, http.StatusOK, rec.Code, "the default mux answers %s in this binary, which is what the 404 below is about", path)
+		require.Equal(t, http.StatusNotFound, rec.Code,
+			"the default mux answers %s in this binary, so something links net/http/pprof or expvar again", path)
 	}
 
 	s := newMetricsTestServer(t)

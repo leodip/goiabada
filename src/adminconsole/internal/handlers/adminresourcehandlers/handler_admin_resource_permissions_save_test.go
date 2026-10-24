@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -40,18 +39,16 @@ func (*resourcePermissionsSaveApiClient) GetPermissionsByResource(context.Contex
 	panic("unexpected call to GetPermissionsByResource")
 }
 
-// serveResourcePermissionsSave posts body to the save through a router, so the resource id reaches
-// the handler as it does in production.
+// serveResourcePermissionsSave posts body to the save with the resource id as the path value the
+// route binds, so it reaches the handler as it does in production.
 func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body string) *httptest.ResponseRecorder {
 	req := handlertest.Request(http.MethodPost, "/admin/resources/3/permissions",
 		handlertest.WithAccessToken(),
+		handlertest.WithPathValue("resourceId", "3"),
 		handlertest.WithBody(bytes.NewBufferString(body)),
 	)
 	rec := httptest.NewRecorder()
-	router := chi.NewRouter()
-	router.Post("/admin/resources/{resourceId}/permissions",
-		HandlePermissionsPost(render.New(nil, nil), nil, stub))
-	router.ServeHTTP(rec, req)
+	HandlePermissionsPost(render.New(nil, nil), nil, stub).ServeHTTP(rec, req)
 	return rec
 }
 

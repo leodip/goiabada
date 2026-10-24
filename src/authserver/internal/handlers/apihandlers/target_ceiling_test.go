@@ -146,7 +146,7 @@ type targetWrite struct {
 
 var errFirstWriteFails = errors.New("the first write past the ceiling fails")
 
-// targetRequest builds a request for one of the routes, with chi's URL parameters set.
+// targetRequest builds a request for one of the routes, with its path values set.
 func targetRequest(method, target, body, scope string, params map[string]string) *http.Request {
 	return membershipRequest(method, target, body, scope, params)
 }
@@ -313,7 +313,7 @@ var userTargetWrites = []targetWrite{
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string) *httptest.ResponseRecorder {
 			r, err := createMultipartRequest(http.MethodPost, "/api/v1/admin/users/52/profile-picture", "picture", createTestPNG(100, 100))
 			require.NoError(t, err)
-			r = setChiURLParam(r, "id", "52")
+			r.SetPathValue("id", "52")
 			if scope != "" {
 				r = setTokenContextWithClaims(r, map[string]interface{}{"scope": scope, "sub": grantCaller})
 			}

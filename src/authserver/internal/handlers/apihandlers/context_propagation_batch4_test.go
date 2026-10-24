@@ -1,12 +1,10 @@
 package apihandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -22,13 +20,12 @@ import (
 // retry loop to the scripted driver, so all a handler shows here is that the context it handed to
 // its port was the REQUEST's.
 
-// apiIdRequest carries the chi "id" parameter, which is what every handler below reads before its
+// apiIdRequest carries the "id" path value, which is what every handler below reads before its
 // first query and all any of them needs before it.
 func apiIdRequest(target, id string) *http.Request {
 	req := apiRequestCarryingId(target)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", id)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req.SetPathValue("id", id)
+	return req
 }
 
 // The accept arm for the group half: the list read and the per-group member count are both issued

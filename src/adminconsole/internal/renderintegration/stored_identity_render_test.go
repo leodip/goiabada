@@ -93,7 +93,7 @@ func postClientAuthentication(t *testing.T, apiClient *authenticationTabAPI, for
 	t.Helper()
 	return serveRefusal(t,
 		adminclienthandlers.HandleAuthenticationPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
-		"/admin/clients/7/authentication", form, handlertest.WithRouteParam("clientId", "7"))
+		"/admin/clients/7/authentication", form, handlertest.WithPathValue("clientId", "7"))
 }
 
 // The Authentication tab asks before a save that changes a stored secret or switches between public
@@ -203,7 +203,7 @@ func TestRender_AdminGroupSettings_ARefusedSaveKeepsTheStoredGroup(t *testing.T)
 		admingrouphandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/groups/4/settings",
 		url.Values{"groupIdentifier": {"marketing"}, "description": {"Marketing team"}, "includeInIdToken": {"on"}},
-		handlertest.WithRouteParam("groupId", "4"))
+		handlertest.WithPathValue("groupId", "4"))
 
 	assert.Contains(t, out, "The group identifier is already in use.")
 	assert.Contains(t, out, `<title>Configurações – sales – Test</title>`)
@@ -243,7 +243,7 @@ func TestRender_AdminResourceSettings_ARefusedSaveKeepsTheStoredResource(t *test
 		adminresourcehandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
 		"/admin/resources/3/settings",
 		url.Values{"resourceIdentifier": {"invoices-api"}, "description": {"Invoices"}},
-		handlertest.WithRouteParam("resourceId", "3"))
+		handlertest.WithPathValue("resourceId", "3"))
 
 	assert.Contains(t, out, "The resource identifier is already in use.")
 	assert.Contains(t, out, `<title>Configurações – billing-api – Test</title>`)
@@ -337,7 +337,7 @@ func TestRender_AdminGroupAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing
 				admingrouphandlers.HandleAttributesEditPost(render.New(web.TemplateFS(), web.StaticFS()), apiClient),
 				"/admin/groups/4/attributes/edit/11",
 				url.Values{"attributeKey": {typedKey}, "attributeValue": {"Retail"}},
-				handlertest.WithRouteParam("groupId", "4"), handlertest.WithRouteParam("attributeId", "11"))
+				handlertest.WithPathValue("groupId", "4"), handlertest.WithPathValue("attributeId", "11"))
 
 			assert.Contains(t, out, "The attribute key is invalid.")
 			assert.Contains(t, out, `<title>Editar atributo department – sales – Test</title>`)
@@ -394,7 +394,7 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 				adminuserhandlers.HandleAttributesEditPost(render.New(web.TemplateFS(), web.StaticFS()), apiClient, "https://console.example"),
 				"/admin/users/9/attributes/edit/12",
 				url.Values{"attributeKey": {tc.typedKey}, "attributeValue": {"E-200"}},
-				handlertest.WithRouteParam("userId", "9"), handlertest.WithRouteParam("attributeId", "12"))
+				handlertest.WithPathValue("userId", "9"), handlertest.WithPathValue("attributeId", "12"))
 
 			assert.Contains(t, out, tc.wantRefusal)
 			assert.Contains(t, out, `<title>Editar atributo employee-id – ana@example.com – Test</title>`)
@@ -424,7 +424,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			handler: adminclienthandlers.HandleAuthenticationGet(renderer, newRenderSessionStore(t),
 				&authenticationTabAPI{stored: &api.ClientResponse{Id: 7, ClientIdentifier: "portal"}, storedSecret: "s3cret"}),
 			target:  "/admin/clients/7/authentication",
-			options: []handlertest.Option{handlertest.WithRouteParam("clientId", "7")},
+			options: []handlertest.Option{handlertest.WithPathValue("clientId", "7")},
 			want: []string{`<h1 class="page-title" id="page-title">portal</h1>`, `data-stored-checked="false"`,
 				`data-stored-value="s3cret"`, `value="s3cret"`},
 		},
@@ -433,7 +433,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			handler: admingrouphandlers.HandleSettingsGet(renderer, newRenderSessionStore(t),
 				&groupSettingsTabAPI{stored: &api.GroupResponse{Id: 4, GroupIdentifier: "sales"}}),
 			target:  "/admin/groups/4/settings",
-			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4")},
+			options: []handlertest.Option{handlertest.WithPathValue("groupId", "4")},
 			want: []string{`<h1 class="page-title" id="page-title">sales</h1>`, `data-stored-value="sales"`,
 				`name="groupIdentifier" value="sales"`},
 		},
@@ -442,7 +442,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 			handler: adminresourcehandlers.HandleSettingsGet(renderer, newRenderSessionStore(t),
 				&resourceSettingsTabAPI{stored: &api.ResourceResponse{Id: 3, ResourceIdentifier: "billing-api"}}),
 			target:  "/admin/resources/3/settings",
-			options: []handlertest.Option{handlertest.WithRouteParam("resourceId", "3")},
+			options: []handlertest.Option{handlertest.WithPathValue("resourceId", "3")},
 			want: []string{`<h1 class="page-title" id="page-title">billing-api</h1>`,
 				`data-stored-value="billing-api"`, `name="resourceIdentifier" value="billing-api"`},
 		},
@@ -460,8 +460,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				group:  &api.GroupResponse{Id: 4, GroupIdentifier: "sales"},
 				stored: &api.GroupAttributeResponse{Id: 11, GroupId: 4, Key: "department"}}),
 			target: "/admin/groups/4/attributes/edit/11",
-			options: []handlertest.Option{handlertest.WithRouteParam("groupId", "4"),
-				handlertest.WithRouteParam("attributeId", "11")},
+			options: []handlertest.Option{handlertest.WithPathValue("groupId", "4"),
+				handlertest.WithPathValue("attributeId", "11")},
 			want: []string{`Editar atributo <span class="font-mono">department</span></h2>`, `name="attributeKey" value="department"`},
 		},
 		{
@@ -470,8 +470,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 				user:   &api.UserResponse{Id: 9, Email: "ana@example.com"},
 				stored: &api.UserAttributeResponse{Id: 12, UserId: 9, Key: "employee-id"}}),
 			target: "/admin/users/9/attributes/edit/12",
-			options: []handlertest.Option{handlertest.WithRouteParam("userId", "9"),
-				handlertest.WithRouteParam("attributeId", "12")},
+			options: []handlertest.Option{handlertest.WithPathValue("userId", "9"),
+				handlertest.WithPathValue("attributeId", "12")},
 			want: []string{`Editar atributo <span class="font-mono">employee-id</span></h2>`, `name="attributeKey" value="employee-id"`},
 		},
 	}

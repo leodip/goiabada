@@ -15,7 +15,7 @@ package server
 // The tiers are read from the constructor's source, the one place a tier's limit, window, counting
 // rule and the kind of key it counts by are written down, and cross-checked against the limiter label the limiter
 // registers its refusal metric with, so a tier the reader cannot see stops the check. The routes
-// are the real router's, through chi.Walk over initRoutes, as the routes tests resolve them.
+// are the real router's, through the router's Walk over initRoutes, as the routes tests resolve them.
 
 import (
 	"fmt"
@@ -35,7 +35,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/core/docsreader"
 	"github.com/leodip/goiabada/core/guard"
 )
@@ -108,7 +107,7 @@ var (
 	// docLimitCell is a count per window, as "10 per 15 minutes" or "30 per minute", which prose
 	// after a comma may follow.
 	docLimitCell = regexp.MustCompile(`^(\d+) per (?:(\d+) (seconds|minutes|hours)|(second|minute|hour))(?:,.*)?$`)
-	// rateLimitMethodName is a Limit method of the rate limiter, as chi.Walk names it.
+	// rateLimitMethodName is a Limit method of the rate limiter, as the router's Walk names it.
 	rateLimitMethodName = regexp.MustCompile(`/internal/middleware\.\(\*RateLimiter\)\.(Limit[A-Za-z]+)-fm$`)
 )
 
@@ -503,7 +502,7 @@ func productionRateLimitTiers(t *testing.T) []rateLimitTier {
 		byName[read.tiers[i].name] = &read.tiers[i]
 	}
 	mounted := 0
-	err = chi.Walk(s.router, func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	err = s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		for _, mw := range middlewares {
 			match := rateLimitMethodName.FindStringSubmatch(runtime.FuncForPC(reflect.ValueOf(mw).Pointer()).Name())
 			if match == nil {
@@ -525,7 +524,7 @@ func productionRateLimitTiers(t *testing.T) []rateLimitTier {
 		t.Fatalf("%v", err)
 	}
 	if mounted == 0 {
-		t.Fatalf("chi.Walk found no route mounting a rate limiter, so this check asserts nothing")
+		t.Fatalf("the router walk found no route mounting a rate limiter, so this check asserts nothing")
 	}
 	return read.tiers
 }

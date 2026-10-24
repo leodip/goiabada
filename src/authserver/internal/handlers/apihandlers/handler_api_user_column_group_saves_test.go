@@ -71,7 +71,7 @@ func columnGroupAdminRequest(t *testing.T, path string, body any) *http.Request 
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, path, bytes.NewReader(encoded))
-	req = setChiURLParam(req, "id", "61")
+	req.SetPathValue("id", "61")
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject})
 }
 

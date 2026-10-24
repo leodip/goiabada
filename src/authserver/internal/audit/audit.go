@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // auditDatabase is what the audit logger writes: the record.
@@ -51,7 +51,7 @@ func NewLogger(database auditDatabase, switches switchesSource) *Logger {
 // Log records one audit event on whichever of the two targets the switches enable.
 //
 // ctx is the request's, and every record written below carries it, which is the whole of #328:
-// the installed handler reads chi's request id off it, so an operator holding a request id from a
+// the installed handler reads the request id off it, so an operator holding a request id from a
 // user's report finds the audit events that request raised beside the request's own log line.
 // Nothing here names request_id, and that is deliberate — core/logging owns the injection, so the
 // 126 call sites pass a context and nothing else.
@@ -114,7 +114,7 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 			// the log disagree on precisely the ids an attacker chose, which is the case the
 			// correlation has to survive (#328). An empty context yields "", which is what a row
 			// written off a request carries.
-			RequestId: logging.FieldForLog(chimiddleware.GetReqID(ctx)),
+			RequestId: logging.FieldForLog(requestid.FromContext(ctx)),
 			// CreatedAt set by CreateAuditLog
 		}
 

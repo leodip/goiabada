@@ -524,7 +524,7 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 			return true
 		}
 
-		// r.Route("/api/v1/admin", func(r chi.Router) { ... }): descend with the prefix and
+		// r.Route("/api/v1/admin", func(r *routing.Router) { ... }): descend with the prefix and
 		// stop the outer walk, so the body is read once and under the right path.
 		if sel.Sel.Name == "Route" && len(call.Args) == 2 {
 			sub, subOK := stringLiteral(call.Args[0])

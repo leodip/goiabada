@@ -13,7 +13,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
@@ -26,6 +25,7 @@ import (
 
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 func TestHandleAuthCompletedGet(t *testing.T) {
@@ -228,7 +228,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ctx := reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)
 		// The request id chi's middleware would have put there, read back by the
 		// EventTerminatedUserSession expectation below (#328 seam 3).
-		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-completed-1")
+		ctx = requestid.NewContext(ctx, "goiabada/req-completed-1")
 		req = req.WithContext(ctx)
 
 		ceremonyStore.On("GetAuthContext", mock.MatchedBy(func(r *http.Request) bool {
@@ -290,7 +290,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// not have forced on its own: the helper has to be handed the request's context by each
 		// of its eight callers, and the id below is how this case says it was.
 		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
-			return chimiddleware.GetReqID(ctx) == "goiabada/req-completed-1"
+			return requestid.FromContext(ctx) == "goiabada/req-completed-1"
 		}), audit.EventTerminatedUserSession, mock.Anything).
 			Run(func(args mock.Arguments) {
 				recordEvent(args)

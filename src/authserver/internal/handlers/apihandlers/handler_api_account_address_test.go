@@ -2,7 +2,6 @@ package apihandlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -19,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -39,7 +38,7 @@ func addressPutRequest(t *testing.T, subject string, body api.UpdateUserAddressR
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/address", bytes.NewReader(encoded))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(context.WithValue(req.Context(), middleware.RequestIDKey, addressRequestId))
+	req = req.WithContext(requestid.NewContext(req.Context(), addressRequestId))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 

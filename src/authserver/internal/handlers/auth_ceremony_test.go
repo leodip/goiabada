@@ -10,7 +10,6 @@ import (
 	"testing"
 	"testing/fstest"
 
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -20,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -577,11 +577,11 @@ func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 
 	req, err := http.NewRequest("POST", "/auth/pwd", nil)
 	require.NoError(t, err)
-	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, requestId))
+	req = req.WithContext(requestid.NewContext(req.Context(), requestId))
 	rr := httptest.NewRecorder()
 
 	auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
-		return chimiddleware.GetReqID(ctx) == requestId
+		return requestid.FromContext(ctx) == requestId
 	}), audit.EventAuthCeremonyMismatch, mock.MatchedBy(func(details map[string]interface{}) bool {
 		// A plain string, not a ceremony.AuthState: the stored audit detail keeps its type
 		// whatever the context's field is declared as (#436).

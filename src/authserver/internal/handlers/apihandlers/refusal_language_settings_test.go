@@ -1,7 +1,6 @@
 package apihandlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -13,7 +12,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -292,9 +290,7 @@ func TestSettingsKeysRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			database.On("GetKeyPairById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored, nil).Once()
 			r := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/settings/keys/5", nil)
-			routeContext := chi.NewRouteContext()
-			routeContext.URLParams.Add("id", "5")
-			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, routeContext))
+			r.SetPathValue("id", "5")
 			r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
 			rr := httptest.NewRecorder()
 			HandleSettingsKeyDelete(database, handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, inRequestLanguage(r, acceptLanguage))

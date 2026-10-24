@@ -19,11 +19,11 @@ import (
 // The self-service half of the consent withdrawal (#622), the path the issue names: Account,
 // Manage consents. It shares consentWithdrawalTx with the admin site's tests.
 
-// accountConsentDeleteRequest builds the DELETE with the chi URL parameter and the validated token
+// accountConsentDeleteRequest builds the DELETE with the path value and the validated token
 // the handler reads.
 func accountConsentDeleteRequest(consentId string, subject string) *http.Request {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/consents/"+consentId, nil)
-	req = setChiURLParam(req, "id", consentId)
+	req.SetPathValue("id", consentId)
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 

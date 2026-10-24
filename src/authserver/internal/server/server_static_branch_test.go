@@ -8,13 +8,13 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/metrics"
+	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -98,7 +98,7 @@ func newStaticBranchTestServer(database *datamocks.Database) *Server {
 
 	registry := metrics.NewRegistry()
 	return &Server{
-		router:       chi.NewRouter(),
+		router:       routing.New(),
 		database:     database,
 		sessionStore: newTestSessionStore(),
 		staticFS:     fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},

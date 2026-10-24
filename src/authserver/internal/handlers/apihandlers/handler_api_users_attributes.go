@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -40,7 +38,7 @@ func HandleUserAttributesGet(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := chi.URLParam(r, "id")
+		userIdStr := r.PathValue("id")
 		if userIdStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -88,7 +86,7 @@ func HandleUserAttributeGet(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := chi.URLParam(r, "id")
+		attributeIdStr := r.PathValue("id")
 		if attributeIdStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -227,7 +225,7 @@ func HandleUserAttributeUpdatePut(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := chi.URLParam(r, "id")
+		attributeIdStr := r.PathValue("id")
 		if attributeIdStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -333,7 +331,7 @@ func HandleUserAttributeDelete(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := chi.URLParam(r, "id")
+		attributeIdStr := r.PathValue("id")
 		if attributeIdStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -32,8 +31,8 @@ func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 	assert.False(t, hasJwtInfo, "a request built without WithAccessToken must carry no JwtInfo at all")
 	_, hasSettings := reqctx.SettingsFrom(req.Context())
 	assert.False(t, hasSettings, "a request built without WithSettings must carry no settings at all")
-	assert.Nil(t, req.Context().Value(chi.RouteCtxKey),
-		"a request built without WithRouteParam must carry no route context at all")
+	assert.Empty(t, req.PathValue("groupId"),
+		"a request built without WithPathValue must carry no path value at all")
 	assert.Empty(t, req.Header.Get("Content-Type"))
 }
 
@@ -45,15 +44,15 @@ func TestRequest_WithAccessTokenCarriesTheBearerTheHandlersRead(t *testing.T) {
 	assert.Equal(t, AccessToken, jwtInfo.TokenResponse.AccessToken)
 }
 
-// Two parameters rather than one: the option accumulates, and an implementation that replaced the
-// route context each time would pass with one.
-func TestRequest_WithRouteParamIsReadableThroughChi(t *testing.T) {
+// Two values rather than one: the option accumulates, and an implementation that kept only the
+// last would pass with one.
+func TestRequest_WithPathValueIsReadableThroughPathValue(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/groups/3/attributes/9",
-		WithRouteParam("groupId", "3"),
-		WithRouteParam("attributeId", "9"))
+		WithPathValue("groupId", "3"),
+		WithPathValue("attributeId", "9"))
 
-	assert.Equal(t, "3", chi.URLParam(req, "groupId"))
-	assert.Equal(t, "9", chi.URLParam(req, "attributeId"))
+	assert.Equal(t, "3", req.PathValue("groupId"))
+	assert.Equal(t, "9", req.PathValue("attributeId"))
 }
 
 func TestRequest_WithSettingsPutsTheValueWhereTheMiddlewarePutsOne(t *testing.T) {

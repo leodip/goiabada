@@ -78,7 +78,7 @@ func passwordPageCases() []passwordPageCase {
 	weak := url.Values{"currentPassword": {"the-old-one"}, "newPassword": {"PasswordPassword"},
 		"newPasswordConfirmation": {"PasswordPassword"}, "email": {"jane.doe@example.com"},
 		"setPasswordType": {"now"}, "password": {"PasswordPassword"}}
-	user := []handlertest.Option{handlertest.WithRouteParam("userId", "7")}
+	user := []handlertest.Option{handlertest.WithPathValue("userId", "7")}
 	return []passwordPageCase{
 		{"change password", func(t *testing.T) http.HandlerFunc {
 			return accounthandlers.HandleChangePasswordGet(renderer, newRenderSessionStore(t), passwordPage{})

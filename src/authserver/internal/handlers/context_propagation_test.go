@@ -8,13 +8,12 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-chi/chi/v5"
-	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/requestid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ import (
 // show is that the context it handed down was the REQUEST's and not one it invented. Repeating
 // either of the other two here would break on every refactor while proving nothing.
 //
-// The matcher is what makes a failure name its cause. chi's request id is on the request's
+// The matcher is what makes a failure name its cause. the request id is on the request's
 // context and on no other, so a handler that passed context.Background() -- the exact defect the
 // acceptance criterion forbids below a request boundary -- matches nothing, and the strict mock
 // reports an unexpected call rather than letting the case pass.
@@ -36,22 +35,21 @@ const propagatedRequestId = "goiabada/req-propagation-1"
 func requestCarryingId(t *testing.T, method, target string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, target, nil)
-	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, propagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), propagatedRequestId))
 }
 
 // theRequestsContext matches only the context belonging to the request under test.
 func theRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return chimiddleware.GetReqID(ctx) == propagatedRequestId
+		return requestid.FromContext(ctx) == propagatedRequestId
 	})
 }
 
-// withURLParam binds a chi route parameter, which HandleProfilePictureGet reads before it reads
+// withPathValue binds a route's path value, which HandleProfilePictureGet reads before it reads
 // anything else.
-func withURLParam(req *http.Request, key, value string) *http.Request {
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add(key, value)
-	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+func withPathValue(req *http.Request, key, value string) *http.Request {
+	req.SetPathValue(key, value)
+	return req
 }
 
 // TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext is the accept arm: both
@@ -61,7 +59,7 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 
-	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
+	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
 	rr := httptest.NewRecorder()
 
 	user := &record.User{Id: 7, Subject: "sub-1"}
@@ -83,7 +81,7 @@ func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 
-	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
+	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
 	rr := httptest.NewRecorder()
 
 	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)
@@ -102,7 +100,7 @@ func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
 func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Request {
 	t.Helper()
 	req := requestWithSessionIdentifier(t, sessionIdentifier)
-	return req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, propagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), propagatedRequestId))
 }
 
 // The accept arm: the code issuer opens the transaction whose acquisition and insert #139 orders

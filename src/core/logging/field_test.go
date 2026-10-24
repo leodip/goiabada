@@ -134,7 +134,7 @@ func allocatedBytesPerCall(t *testing.T, iterations int, f func()) uint64 {
 var renderSink string
 
 func TestFieldForLog_CountsWhatItDiscardsRatherThanBuildingIt(t *testing.T) {
-	// The reachable shape: chi's RequestID middleware is mounted ahead of the
+	// The reachable shape: requestid.Middleware is mounted ahead of the
 	// request logger in both servers and adopts an inbound X-Request-Id verbatim,
 	// and net/http admits bytes above 0x7e in a header value. Each costs three
 	// bytes to escape, so before the bound this allocated 10.3 MB and burned 31 ms

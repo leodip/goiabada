@@ -11,9 +11,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/requestid"
 )
 
 // internalServerErrorCode is the one code every unexpected failure on this surface answers with.
@@ -98,7 +98,7 @@ func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error,
 // registration is that surface: RFC 7591 section 3.2.2 fixes its body, so it takes the logging half
 // and keeps the shape on the wire (#279, plan finding 9).
 func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
-	requestId := middleware.GetReqID(r.Context())
+	requestId := requestid.FromContext(r.Context())
 	// No request_id attribute: the installed handler reads it off the context this call
 	// passes it, so naming it here would write it twice. requestId is still read, because
 	// the caller puts it on the wire for whoever hit the error (#320 decision 2).

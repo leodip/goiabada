@@ -738,7 +738,7 @@ func assertAdminRoutesClassified(
 const adminRouteFixtureRoutes = `package server
 
 func (s *Server) initRoutes() {
-	api.Route("/api/v1/admin", func(r chi.Router) {
+	api.Route("/api/v1/admin", func(r *routing.Router) {
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}", apihandlers.HandleUserGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/enabled", apihandlers.HandleUserEnabledPut(s.database, auditLogger))
@@ -746,7 +746,7 @@ func (s *Server) initRoutes() {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Post("/users/create", apihandlers.HandleUserCreatePost(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Get("/clients/{id}/secret", apihandlers.HandleClientSecretGet(s.database, auditLogger))
 	})
-	api.Route("/api/v1/account", func(r chi.Router) {
+	api.Route("/api/v1/account", func(r *routing.Router) {
 		r.Put("/profile", apihandlers.HandleAccountProfilePut(s.database, auditLogger))
 	})
 }

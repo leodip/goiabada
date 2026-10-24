@@ -227,7 +227,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				expect(database)
 			}
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/x", strings.NewReader(body))
-			r = inRequestLanguage(setChiURLParam(r, "id", strconv.FormatInt(stored.Id, 10)), acceptLanguage)
+			r = inRequestLanguage(withPathValue(r, "id", strconv.FormatInt(stored.Id, 10)), acceptLanguage)
 			rr := httptest.NewRecorder()
 			HandleResourceUpdatePut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 			return rr
@@ -326,7 +326,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(system(), nil).Once()
 				r := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/resources/1", nil)
-				r = inRequestLanguage(setChiURLParam(r, "id", "1"), acceptLanguage)
+				r = inRequestLanguage(withPathValue(r, "id", "1"), acceptLanguage)
 				rr := httptest.NewRecorder()
 				HandleResourceDelete(database, handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 				return rr
@@ -367,7 +367,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				expectResourcePermsChecked(database, checked)
 			}
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(resourcePermsBody(t, permissions, expected)))
-			r = inRequestLanguage(setChiURLParam(r, "resourceId", "7"), acceptLanguage)
+			r = inRequestLanguage(withPathValue(r, "resourceId", "7"), acceptLanguage)
 			rr := httptest.NewRecorder()
 			HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 			return rr

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
@@ -25,7 +24,7 @@ func HandleClientLogoGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		clientIdentifier := chi.URLParam(r, "clientIdentifier")
+		clientIdentifier := r.PathValue("clientIdentifier")
 		if len(clientIdentifier) == 0 {
 			http.NotFound(w, r)
 			return
