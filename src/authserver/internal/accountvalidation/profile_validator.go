@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -17,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/timezones"
+	"golang.org/x/text/unicode/norm"
 )
 
 // profileValidatorDatabase is what the account profile validator reads: the rows that decide
@@ -51,19 +53,25 @@ type ValidateProfileInput struct {
 	Subject             string
 }
 
-// nameMaxLength is a name's bound in inputvalidation.TextLength's units, the 48 nameShape also
-// counts in code points.
+// nameMaxLength is a name's bound, counted both in code points and in inputvalidation.TextLength's
+// units.
 const nameMaxLength = 48
 
+// nameMaxStackedMarks is the most nonspacing marks a name carries in a row, the bound UTS #39
+// (Unicode Security Mechanisms, revision 34) gives in section 5.4 item 2 and section 3.3, so that
+// no letter carries a stack of marks drawn over the lines around the name (#669).
+const nameMaxStackedMarks = 4
+
+// namePunctuation is what a name takes beside its letters, marks and joiners, anywhere in it: the
+// space, the apostrophe and the typographic apostrophe ’ (U+2019), which iPhone and iPad Smart
+// Punctuation types inside a word, the hyphen, the katakana middle dot ・ (U+30FB) between the
+// parts of a foreign name in katakana, the middle dot · (U+00B7) of Catalan l·l, the Tibetan tsheg
+// ་ (U+0F0B) between syllables, and the Hebrew geresh ׳ (U+05F3) of a foreign name in Hebrew
+// (#669). The space is the literal one rather than any white space: tabs, newlines and other
+// control characters have no place in a name and would otherwise let a value span multiple lines.
+const namePunctuation = " '\u2019-\u30FB\u00B7\u0F0B\u05F3"
+
 var (
-	// nameShape allows Unicode letters, spaces, apostrophes and hyphens, 1 to 48
-	// characters. Note the literal space rather than \s: tabs, newlines and other
-	// control characters have no place in a name and would otherwise let a value
-	// span multiple lines.
-	nameShape = regexp.MustCompile(`^[\p{L} '-]{1,48}$`)
-	// nameHasLetter requires at least one letter, so a value made up entirely of
-	// spaces, apostrophes or hyphens is rejected.
-	nameHasLetter = regexp.MustCompile(`\p{L}`)
 	// usernameShape is a letter, then 1 to 23 letters, digits or underscores.
 	usernameShape = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{1,23}$`)
 	// websiteShape is an optional http or https scheme, a host of dot-separated labels ending in
@@ -83,6 +91,68 @@ func breaksOrReordersLine(r rune) bool {
 		(r >= '\u202A' && r <= '\u202E') || (r >= '\u2066' && r <= '\u2069')
 }
 
+// isNameMark reports a mark a name is written with: a nonspacing or a spacing mark (Mn, Mc), such
+// as a vowel sign, a virama, a point or an accent. An enclosing mark (Me) is none, since no name
+// is written with one and it draws a circle or a box over its neighbours.
+func isNameMark(r rune) bool {
+	return unicode.In(r, unicode.Mn, unicode.Mc)
+}
+
+// nameIsWellFormed reports whether name has a letter and is made of nothing but letters, the
+// marks written on them, namePunctuation and the two joiners, each where it goes. A mark follows
+// a letter or another mark, so it is never alone, first, or after a space or a punctuation
+// character, where it would draw on whatever stands before the name. The zero-width non-joiner
+// (U+200C), which Persian writes between two letters that must not join, and the zero-width
+// joiner (U+200D), which Sinhala writes after a virama to ask for a conjunct, follow a letter or
+// a mark and precede a letter, and no joiner goes anywhere else. Every other format character,
+// the left-to-right and right-to-left marks among them, is refused (#669).
+func nameIsWellFormed(name string) bool {
+	runes := []rune(name)
+	hasLetter := false
+	for i, r := range runes {
+		afterLetterOrMark := i > 0 && (unicode.IsLetter(runes[i-1]) || isNameMark(runes[i-1]))
+		switch {
+		case unicode.IsLetter(r):
+			hasLetter = true
+		case isNameMark(r):
+			if !afterLetterOrMark {
+				return false
+			}
+		case r == '\u200C' || r == '\u200D':
+			if !afterLetterOrMark || i+1 == len(runes) || !unicode.IsLetter(runes[i+1]) {
+				return false
+			}
+		case strings.ContainsRune(namePunctuation, r):
+		default:
+			return false
+		}
+	}
+	return hasLetter
+}
+
+// nameStacksMarks reports a name with more than nameMaxStackedMarks nonspacing marks in a row, or
+// the same nonspacing mark twice in a row, the two rules of UTS #39 section 5.4 item 2. They are
+// counted on the name decomposed (NFD), every composed letter back into its letter and marks, so
+// they bound what is drawn on one letter whatever form it was typed in: à followed by four more
+// marks is five, and é followed by another U+0301 is a repeat. Spacing marks sit beside their
+// letter rather than over the lines around it, so they are not counted; the 48 bounds limit them.
+func nameStacksMarks(name string) bool {
+	inRow := 0
+	var previous rune
+	for _, r := range norm.NFD.String(name) {
+		if !unicode.Is(unicode.Mn, r) {
+			inRow = 0
+		} else {
+			inRow++
+			if inRow > nameMaxStackedMarks || (inRow > 1 && r == previous) {
+				return true
+			}
+		}
+		previous = r
+	}
+	return false
+}
+
 // ParseGender reads a profile's gender as a profile PUT submits it: the word GET returns
 // ("female", "male", "other"), so a client can write back what it read, or the digit the admin
 // console's forms post ("0", "1", "2"). A word is matched exactly, so "Male" names no gender; a
@@ -100,26 +170,28 @@ func ParseGender(value string) (gender.Gender, bool) {
 	return 0, false
 }
 
-// ValidateName checks a name field against the shared name pattern.
-// invalidNameCode is the i18n error code returned on failure (one of
-// ErrCodeProfileGivenNameInvalid, ErrCodeProfileMiddleNameInvalid, or
-// ErrCodeProfileFamilyNameInvalid). Caller picks the right code so that
+// ValidateName checks a name field against the shared name rule: 1 to 48
+// characters, well formed (nameIsWellFormed) and stacking no marks beyond the
+// bound (nameStacksMarks). invalidNameCode is the i18n error code returned on
+// failure (one of ErrCodeProfileGivenNameInvalid, ErrCodeProfileMiddleNameInvalid,
+// or ErrCodeProfileFamilyNameInvalid). Caller picks the right code so that
 // the localized message names the field correctly.
 //
 // An empty name is accepted: all three name fields are optional.
 //
-// i18n surface: A | C — admin user CRUD, account self-service, registration.
+// i18n surface: A | C — the admin API's user create and profile update, and the
+// account's own profile update.
 func (val *ProfileValidator) ValidateName(name string, invalidNameCode string) error {
 	if len(name) == 0 {
 		return nil
 	}
 
-	// The shape's 48 counts code points, and the columns hold 64 UTF-16 code units on SQL Server,
+	// The first 48 counts code points, and the columns hold 64 UTF-16 code units on SQL Server,
 	// so a name of letters beyond the Basic Multilingual Plane, two units each, could pass it and
 	// overflow there, a database error in place of this refusal. Bounded again in TextLength's
 	// units, the ones every text bound uses, which no engine's column can overflow.
-	if !nameShape.MatchString(name) || !nameHasLetter.MatchString(name) ||
-		inputvalidation.TextLength(name) > nameMaxLength {
+	if utf8.RuneCountInString(name) > nameMaxLength || !nameIsWellFormed(name) ||
+		nameStacksMarks(name) || inputvalidation.TextLength(name) > nameMaxLength {
 		return i18n.NewLocalizedError(invalidNameCode, nil)
 	}
 	return nil

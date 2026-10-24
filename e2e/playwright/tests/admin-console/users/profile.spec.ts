@@ -77,6 +77,28 @@ test("one-character names are saved, shown again, and reach the profile claims",
   expect(id).toMatchObject({ given_name: "김", middle_name: "J", family_name: "王", name: "김 J 王" });
 });
 
+// A name is written with the marks on its letters, as Hindi's vowel signs are, and with the
+// typographic apostrophe an iPhone types (#669).
+test("names written with marks and the typographic apostrophe are saved, shown again, and reach the profile claims", async ({ page, request, clients, users }) => {
+  const user = await users.create();
+  // अमित: a, ma, the vowel sign i (a spacing mark), ta.
+  const givenName = "\u0905\u092E\u093F\u0924";
+  const familyName = "O\u2019Brien";
+  await page.goto(userUrl(user.id, "profile"));
+  await page.locator('input[name="givenName"]').fill(givenName);
+  await page.locator('input[name="familyName"]').fill(familyName);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText(saved)).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('input[name="givenName"]')).toHaveValue(givenName);
+  await expect(page.locator('input[name="familyName"]')).toHaveValue(familyName);
+
+  const { client, secret } = await passwordGrantClient(page, clients);
+  const { id } = await userTokens(request, client.identifier, secret, user, "openid profile");
+  expect(id).toMatchObject({ given_name: givenName, family_name: familyName, name: `${givenName} ${familyName}` });
+});
+
 // A nickname is a casual name, free text rather than a username's shape (#632).
 test("a nickname with a space is saved, shown again, and reaches the nickname claim", async ({ page, request, clients, users }) => {
   const user = await users.create();
@@ -98,6 +120,8 @@ for (const { field, value, message } of [
   { field: "givenName", value: "M4ry", message: "Please enter a valid given name." },
   // A name needs a letter, so a lone hyphen is refused where a lone letter is not.
   { field: "familyName", value: "-", message: "Please enter a valid family name." },
+  // At most four nonspacing marks stack on one letter, so a name cannot draw over the page (#669).
+  { field: "givenName", value: "a\u0301\u0302\u0303\u0304\u0306", message: "Please enter a valid given name." },
   // A nickname is free text, but angle brackets are refused rather than stripped (#275, #632).
   { field: "nickname", value: "ni<ck", message: "The nickname cannot contain the characters < or >." },
   { field: "website", value: "not a url", message: "Please enter a valid website URL." },
