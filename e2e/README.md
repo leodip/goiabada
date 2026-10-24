@@ -74,14 +74,16 @@ the sign-in form and the password grant each, and 120 requests a minute to the a
 its GET and POST together, which every browser sign-in, single sign-on and raw authorization request
 spends once or twice whatever it asks for. The suite is written to stay under them: the password grant
 is the shortest way to a user's tokens and spends no authorization request, so the tests sign in through
-the browser only where the subject needs it. The `system` tests for these limits run only in this mode,
-each waiting until the address's window has passed before it ends.
+the browser only where the subject needs it. The `system` tests for these limits run only in this mode.
+Two of them spend a budget to the end, and each records when it did (`lib/address-limits.ts`) rather
+than waiting its window out: whatever needs that budget whole next, a later test or the next run's setup
+step, waits only for what is left of it.
 
-`E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for, and skips
-those tests. It is the only switch there is: the limits counted by an account or a user apply either way,
-since no proxy can count them. The suite does not spend them, because a successful sign-in spends
-nothing and the tests that fail a password or a code do it on throwaway accounts of their own. Run with
-the switch on before a release.
+`E2E_RATE_LIMITER=false` turns those limits off, for a faster run with nothing to wait for: it skips
+those tests, and runs eight tests at a time rather than four. It is the only switch there is: the
+limits counted by an account or a user apply either way, since no proxy can count them. The suite does
+not spend them, because a successful sign-in spends nothing and the tests that fail a password or a
+code do it on throwaway accounts of their own. Run with the switch on before a release.
 
 ## Browser tests
 
@@ -96,9 +98,9 @@ sign-on across its two sites, signing out, the authorization parameters, and the
 pages), OAuth 2.0 and its security practice section by section (`rfc6749/`, `rfc9700/`), the protocol
 itself where no page reaches it (`oauth/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
-and the main journeys by keyboard). They run four at a time against an environment that stays up between
-runs, so every test keeps to these rules, which is what lets the suite run again and again without a
-reset:
+and the main journeys by keyboard). They run four at a time, eight with the rate limiter off, against an
+environment that stays up between runs, so every test keeps to these rules, which is what lets the
+suite run again and again without a reset:
 
 - **It creates what it needs under a unique name** (`e2e-<kind>-<random>`, `lib/unique.ts`) through a
   fixture that removes it afterwards, pass or fail (`clients`, `resources`, `groups` and `users` in
@@ -118,9 +120,9 @@ reset:
   `browser.newContext()` starts from the test's options, which carry the administrator's session.
 - **Each worker signs the administrator in for itself**, in a browser of its own (`lib/fixtures.ts`).
   Every browser context is a device of its own through its own cookies, so no sign-in ends another
-  worker's session. A run signs the administrator in about ten times, under the seeded cap of 20
-  sessions per user, and the sessions the cap ends are the least recently used, those earlier runs
-  left.
+  worker's session. A run signs the administrator in about ten times, fourteen with the rate limiter
+  off, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
+  recently used, those earlier runs left.
 
 ## The VPS
 

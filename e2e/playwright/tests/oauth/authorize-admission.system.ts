@@ -3,9 +3,10 @@
 // that passes the first validation writes a row, a browser session on the GET and a parked request on
 // the POST. Past it the browser gets the "Too many attempts" page with Retry-After, before anything in
 // the request is read, so nothing reaches the redirect URI. A system test because the budget is the
-// address's, which every other test signs in from: it runs alone, and waits the window out before it
-// ends.
+// address's, which every other test signs in from: it runs alone, and records what it spent
+// (lib/address-limits.ts), so whatever needs the budget next waits for the window to pass.
 import type { Response } from "@playwright/test";
+import { spent, untilCleared } from "../../lib/address-limits";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { authorizeEndpoint, codeRequest, emptyBrowser, followAuthorize } from "../../lib/rfc6749";
@@ -31,8 +32,8 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
   // Through the console, before the burst, so its own pages are not what the budget refuses.
   const { client } = await browserSignInClient(page, clients);
   const anonymous = await emptyBrowser(browser);
+  await untilCleared("authorization endpoint");
 
-  let lastRequest = Date.now();
   try {
     // Spent with requests naming no client, which the endpoint refuses on its page and writes nothing
     // for: the budget counts them all the same. Eight at a time, so the burst lands within the minute.
@@ -45,7 +46,7 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
           return answer.status();
         }),
       );
-      lastRequest = Date.now();
+      spent("authorization endpoint");
       expect(statuses.filter((status) => status >= 500), `statuses ${statuses}`).toEqual([]);
       admitted += statuses.filter((status) => status !== 429).length;
       refused = statuses.includes(429);
@@ -61,7 +62,7 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
     const spendUntilRefused = async () => {
       for (let sent = 0; sent <= budget + slack; sent++) {
         const answer = await anonymous.request.get(`${authorizeEndpoint}?response_type=code`, { failOnStatusCode: false, maxRedirects: 0 });
-        lastRequest = Date.now();
+        spent("authorization endpoint");
         expect(answer.status(), "a request naming no client").toBeLessThan(500);
         if (answer.status() === 429) return;
       }
@@ -74,7 +75,7 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
     await expect(async () => {
       await spendUntilRefused();
       gotten = await signIn.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(client.identifier).params)}`);
-      lastRequest = Date.now();
+      spent("authorization endpoint");
       expect(gotten?.status()).toBe(429);
     }).toPass({ timeout: 20_000 });
     expect(gotten!.headers()["retry-after"]).toBe("60");
@@ -107,19 +108,18 @@ test("the authorization endpoint refuses one address past 120 requests a minute,
         own.getByRole("button", { name: "Sign in" }).click(),
       ]);
       posted = answer;
-      lastRequest = Date.now();
+      spent("authorization endpoint");
       expect(answer.status()).toBe(429);
     }).toPass({ timeout: 20_000 });
     expect(posted!.headers()["retry-after"]).toBe("60");
     expect(posted!.headers()["location"]).toBeUndefined();
     await expect(own.getByRole("heading", { name: "Too many attempts" })).toBeVisible();
-  } finally {
-    // A refused request spends nothing, so two minutes after the last admitted or refused one the
-    // window holds none of this test's: the tests after it, and a run started right after this one,
-    // start from an empty window.
-    await new Promise((resolve) => setTimeout(resolve, Math.max(0, lastRequest + 125_000 - Date.now())));
+
+    // The refusal lapses as the window slides: followAuthorize asks again while it is refused, and
+    // once admitted the request proceeds to the password form.
     const { pageUrl } = await followAuthorize(anonymous.request, codeRequest(client.identifier).params);
-    expect(pageUrl, "authorization proceeds to the password form once the window has passed").toMatch(/\/auth\/pwd\?/);
+    expect(pageUrl, "authorization proceeds to the password form once the address is admitted again").toMatch(/\/auth\/pwd\?/);
+  } finally {
     await anonymous.close();
   }
 });

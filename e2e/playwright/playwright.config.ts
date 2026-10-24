@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { env } from "./lib/environment";
 
 // Every test runs against the one environment e2e/infra/prepare.sh built (lib/environment.ts reads
 // it), so the URLs come from there rather than from a baseURL here.
@@ -11,7 +12,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
-  workers: 4,
+  // With the rate limiter on, every test signs in against the budgets of this machine's one address,
+  // which four at a time stay under; with it off nothing counts the address, and eight run at once.
+  workers: env.rateLimiter ? 4 : 8,
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
