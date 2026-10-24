@@ -62,17 +62,14 @@ tools:
 # Committed into the repository by ./version-manager.sh update, which downloads the
 # pinned version and records each file's SHA-256 here; no page fetches them from a CDN
 # (#542). The web packages' tests, and core/guard's for acorn, hold the committed files to
-# these digests.
-# humanize-duration:  duration formatting in the admin console:
-#                     src/adminconsole/web/static/vendor/humanize-duration/, from npm
+# these digests, and the admin console's refuses a vendored file or a digest here that no
+# test checks, so dropping a library means dropping its files and its lines (#645).
 # cropperjs:          image cropping in the admin console, its UMD bundle, which defines
 #                     the cropper's custom elements and carries their styles:
 #                     src/adminconsole/web/static/vendor/cropperjs/, from npm
 # acorn:              the JavaScript parser core/guard's script check runs under Node:
 #                     src/core/guard/scriptcheck/acorn.js, from npm
 vendored:
-  humanize-duration: "3.35.0"
-  humanize-duration-sha256: "fa557682d97d4cf89e978aa3d32599206e9a6b54651aa05f6b6af84d78edefcc"
   cropperjs: "2.3.1"
   cropperjs-js-sha256: "f47f299818c2a37dc797dceceeb1ba4f78dc1eae7d7f8406b6256d5e53406276"
   acorn: "8.19.0"

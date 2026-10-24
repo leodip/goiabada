@@ -18,7 +18,7 @@
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, humanize-duration, cropperjs, acorn). It does NOT
+# images' Alpine base, cropperjs, acorn). It does NOT
 # manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
@@ -184,7 +184,6 @@ get_all_versions() {
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
-        echo "vendored.humanize-duration=$(get_version 'vendored."humanize-duration"')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
@@ -346,7 +345,6 @@ cmd_show() {
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
-    printf "  %-23s ${GREEN}%s${NC}\n" "humanize-duration" "$(get_version 'vendored."humanize-duration"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "cropperjs" "$(get_version 'vendored.cropperjs')"
     printf "  %-23s ${GREEN}%s${NC}\n" "acorn" "$(get_version 'vendored.acorn')"
 
@@ -520,21 +518,6 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
-    # --- humanize-duration ---
-    echo -n "Checking humanize-duration... "
-    local current_humanize=$(get_version 'vendored."humanize-duration"')
-    local latest_humanize=$(get_npm_latest "humanize-duration")
-    if [ -n "$latest_humanize" ]; then
-        if version_lt "$current_humanize" "$latest_humanize"; then
-            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
-            updates_available+=("humanize-duration|$current_humanize|$latest_humanize|https://www.npmjs.com/package/humanize-duration")
-        else
-            print_success "Up to date ($current_humanize)"
-        fi
-    else
-        print_warning "Check failed"
-    fi
-
     # --- cropperjs ---
     echo -n "Checking cropperjs... "
     local current_cropper=$(get_version 'vendored.cropperjs')
@@ -601,7 +584,6 @@ cmd_update() {
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
     local ALPINE_VERSION=$(get_version 'tools.alpine')
-    local HUMANIZE_VERSION=$(get_version 'vendored."humanize-duration"')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
     local ACORN_VERSION=$(get_version 'vendored.acorn')
 
@@ -783,15 +765,6 @@ cmd_update() {
     # The pinned version of each, downloaded into the repository with its license and
     # its digest written beside the pin; no page loads them from a CDN (#542).
     echo -e "\n${BOLD}Vendored dependencies${NC}"
-    local humanize_dir="$BASE_DIR/src/adminconsole/web/static/vendor/humanize-duration"
-    if vendor_fetch "https://cdn.jsdelivr.net/npm/humanize-duration@${HUMANIZE_VERSION}/humanize-duration.js" \
-            "$humanize_dir/humanize-duration.js" "humanize-duration-sha256" &&
-        vendor_fetch "https://cdn.jsdelivr.net/npm/humanize-duration@${HUMANIZE_VERSION}/LICENSE.txt" \
-            "$humanize_dir/LICENSE"; then
-        ((success_count++))
-    else
-        ((fail_count++))
-    fi
     local cropper_dir="$BASE_DIR/src/adminconsole/web/static/vendor/cropperjs"
     # 2.x draws its own elements and carries their styles, so there is no stylesheet to fetch.
     if vendor_fetch "https://cdn.jsdelivr.net/npm/cropperjs@${CROPPER_VERSION}/dist/cropper.min.js" \

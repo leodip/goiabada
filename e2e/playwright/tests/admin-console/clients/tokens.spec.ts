@@ -82,19 +82,23 @@ for (const { locale, query, typed, global } of [
   });
 }
 
-// The durations are written by the console's own script, so the page needs nothing from elsewhere.
-test("the page requests no script or stylesheet from another origin", async ({ page, clients }) => {
+// The durations are written by the console's own script, so the page needs nothing from elsewhere,
+// and nothing of the duration library it used to load (#645).
+test("the page requests no script or stylesheet from another origin, nor the removed duration library", async ({ page, clients }) => {
   const client = await clients.create();
   const adminOrigin = new URL(env.adminUrl).origin;
   const foreign: string[] = [];
+  const removed: string[] = [];
   page.on("request", (request) => {
     const kind = request.resourceType();
     if ((kind === "script" || kind === "stylesheet") && new URL(request.url()).origin !== adminOrigin) foreign.push(request.url());
+    if (new URL(request.url()).pathname.includes("humanize-duration")) removed.push(request.url());
   });
   await page.goto(clientUrl(client.id, "tokens"), { waitUntil: "load" });
   await page.locator("#tokenExpirationInSeconds").fill("600");
   await expect(page.locator('[data-duration-for="tokenExpirationInSeconds"]')).toHaveText("10 minutes");
   expect(foreign).toEqual([]);
+  expect(removed).toEqual([]);
 });
 
 test("the token expiration set here is the lifetime the token endpoint gives", async ({ page, clients, request }) => {
