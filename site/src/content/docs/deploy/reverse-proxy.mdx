@@ -189,7 +189,7 @@ You need a server with Docker and Nginx, two hostnames under one domain, such as
 
 ## The authorization endpoint's budget
 
-`/auth/authorize` is a write: every request that passes its first validation costs a row, a browser session on a GET and a parked request on a POST. The built-in `authorize` limit bounds how fast one IP address spends them while `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` is on, which the wizard's production setup turns on unless you answered no. If you turned it off, rate-limit `/auth/authorize` in Nginx instead, so an unauthenticated flood can't grow the database as fast as it can send requests. See [Rate limits](/reference/environment-variables/#rate-limits).
+Every request to `/auth/authorize` that names a real client and redirect URI writes a row to the database, and anyone can send them. With `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED` on, the built-in `authorize` limit bounds how fast one IP address can do that. If you turned it off, rate-limit `/auth/authorize` in Nginx instead. See [Rate limits](/reference/environment-variables/#rate-limits).
 
 ## Next steps
 

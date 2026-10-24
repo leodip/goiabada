@@ -3002,13 +3002,11 @@ paths:
             race: this call rotated nothing. Do not retry: the rotation it
             conflicted with already happened.
 
-            error_code is ROTATION_OUTCOME_UNKNOWN when the commit that would
-            end the rotation failed for a reason other than a deadlock: the
-            rotation may or may not have happened. Compare the key set with
-            the one listed before the attempt before rotating again: the
-            rotation landed if the key that was next is now current. The
-            description ends with the request id of the log line that records
-            the failure.
+            error_code is ROTATION_OUTCOME_UNKNOWN when saving the rotation
+            failed at its very end, so it may or may not have happened. List the
+            keys before you rotate again: it happened if the key that was next
+            is now current. The description ends with the request id of the log
+            line that records the failure.
           content:
             application/json:
               schema:
@@ -5882,9 +5880,10 @@ components:
           maxItems: 60
           description: >-
             The complete set of redirect URIs the client has after the call. More than 60, one
-            longer than 2048 bytes, or one listed twice is refused before anything is written, its
-            error_code the refusal's catalog key, such as handler.client_redirect_uris.too_many. So is a plain http one on a host other than 127.0.0.1, [::1] or
-            localhost, unless expectedRedirectURIs lists it.
+            longer than 2048 bytes, one listed twice, or a plain http one on a host other than
+            127.0.0.1, [::1] or localhost that expectedRedirectURIs doesn't list, is refused with
+            400 and nothing is written. error_code is the refusal's catalog key, such as
+            handler.client_redirect_uris.too_many.
           items:
             type: string
         expectedRedirectURIs:

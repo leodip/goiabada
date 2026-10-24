@@ -117,7 +117,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `client_id` | The client's row id, the id in the Admin API's client paths. |
 | `client_identifier` | The identifier the client is known by, sent as `client_id` in OAuth requests. On a refusal at the token endpoint, it's the one the request named. |
 | `code_id` | The row id of an authorization code. |
-| `command` | The auth server's `recover` subcommand, named as the actor of every entry a recovery writes, where an entry a request made names its token's subject under `logged_in_user`. |
+| `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
 | `email` | The address of an account: the one created, activated, or given an email verification code. |
 | `email_destination` | The address an email verification code was sent to. |

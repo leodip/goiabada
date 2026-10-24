@@ -82,7 +82,8 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 - a normal refresh token's session ended or expired;
 - the user was disabled, or their password changed or was reset, apart from the tokens of the session a user changed their own password in;
 - the user no longer holds a permission the token carries;
-- the user withdrew their consent to your app, which revokes your app's refresh tokens for that user at once, whatever **Ask users for consent** says. A refresh is also refused when it consults a stored consent that isn't there, for a token from a sign-in, not the password grant, when your app has **Ask users for consent** on or the token is an offline one;
+- the user withdrew their consent to your app, or an administrator revoked it. That revokes your app's refresh tokens for the user at once, whatever **Ask users for consent** says;
+- your app's **Ask users for consent** was turned on after the user signed in, and they haven't approved it since. A token from the [password grant](/legacy-flows/ropc/) isn't checked for this;
 - the user hasn't approved `authserver:manage-account` for your app, or withdrew it, when the refresh renews that scope from a sign-in, whatever **Ask users for consent** says. The admin console's own client is the one exception.
 
 A token issued to another client is refused with `invalid_grant`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#other-reasons-a-refresh-fails) gives each `error_description` and why it happens.
