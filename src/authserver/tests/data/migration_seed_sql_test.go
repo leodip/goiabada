@@ -3,9 +3,10 @@ package datatests
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/stretchr/testify/require"
@@ -21,8 +22,8 @@ import (
 // Each helper names only the columns every version it is used at carries, so a column a later
 // migration adds is simply absent from the statement. Identifiers and descriptions the tests write
 // are plain ASCII with no quote or backslash, inlined as engine-neutral literals, as in the
-// h.SQL.Exec seeds of 000046 and 000055. Free text a fixture controls is bound through sqlbuilder
-// instead: users, for 000048's and 000059's OTP ciphertext, which no literal can carry, and
+// h.SQL.Exec seeds of 000046 and 000055. Free text a fixture controls is bound instead, through
+// the engine's own placeholders (seedBinds): users, for 000048's and 000059's OTP ciphertext, which no literal can carry, and
 // web_origins, whose fixtures carry a backslash, which MySQL's default sql_mode reads as an escape
 // inside a literal. A write that is what its test tests -- 000039's codes, 000046's user_sessions,
 // 000055's duplicate refusals -- keeps the ORM, with a comment saying so where it stands.
@@ -87,34 +88,38 @@ func seedUser(t *testing.T, h *isolatedDB, seed userSeed) int64 {
 		values = append(values, seed.OTPSecretEncrypted)
 	}
 
-	insert := sqlbuilder.NewInsertBuilder()
-	insert.InsertInto("users").Cols(cols...).Values(values...)
-	q, args := insert.BuildWithFlavor(seedFlavor())
-	_, err := h.SQL.ExecContext(context.Background(), q, args...)
+	insert := "INSERT INTO users (" + strings.Join(cols, ", ") + ") VALUES (" + seedBinds(len(values)) + ")"
+	_, err := h.SQL.ExecContext(context.Background(), insert, values...)
 	require.NoError(t, err, "seed user %s", seed.Username)
 
-	lookup := sqlbuilder.NewSelectBuilder()
-	lookup.Select("id").From("users").Where(lookup.Equal("subject", seed.Subject))
-	q, args = lookup.BuildWithFlavor(seedFlavor())
 	var id int64
-	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&id),
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(),
+		"SELECT id FROM users WHERE subject = "+seedBindAt(1), seed.Subject).Scan(&id),
 		"read back the seeded user id")
 	return id
 }
 
-// seedFlavor is the configured engine's placeholder dialect, the one seedRefreshToken000039
-// already binds its literal-hostile values with.
-func seedFlavor() sqlbuilder.Flavor {
+// seedBindAt is the configured engine's placeholder for the i-th value a statement binds, counting
+// from 1: ? on SQLite and MySQL, $i on PostgreSQL, @pi on SQL Server. seedRefreshToken000039
+// binds its literal-hostile values with it too.
+func seedBindAt(i int) string {
 	switch dbType() {
-	case data.MySQL:
-		return sqlbuilder.MySQL
 	case data.Postgres:
-		return sqlbuilder.PostgreSQL
+		return "$" + strconv.Itoa(i)
 	case data.MSSQL:
-		return sqlbuilder.SQLServer
+		return "@p" + strconv.Itoa(i)
 	default:
-		return sqlbuilder.SQLite
+		return "?"
 	}
+}
+
+// seedBinds is the placeholders for a statement's first n values, comma-separated.
+func seedBinds(n int) string {
+	binds := make([]string, n)
+	for i := range binds {
+		binds[i] = seedBindAt(i + 1)
+	}
+	return strings.Join(binds, ", ")
 }
 
 // seedGroup writes a groups row with both include switches off, which is what the ORM wrote for
@@ -257,18 +262,14 @@ func seedUserSessionClient(t *testing.T, h *isolatedDB, sessionId, clientId int6
 func seedWebOrigin(t *testing.T, h *isolatedDB, clientId int64, origin string) int64 {
 	t.Helper()
 
-	insert := sqlbuilder.NewInsertBuilder()
-	insert.InsertInto("web_origins").Cols("origin", "client_id").Values(origin, clientId)
-	q, args := insert.BuildWithFlavor(seedFlavor())
-	_, err := h.SQL.ExecContext(context.Background(), q, args...)
+	_, err := h.SQL.ExecContext(context.Background(),
+		"INSERT INTO web_origins (origin, client_id) VALUES ("+seedBinds(2)+")", origin, clientId)
 	require.NoError(t, err, "seed web origin %s", origin)
 
-	lookup := sqlbuilder.NewSelectBuilder()
-	lookup.Select("id").From("web_origins").Where(
-		lookup.Equal("origin", origin), lookup.Equal("client_id", clientId))
-	q, args = lookup.BuildWithFlavor(seedFlavor())
 	var id int64
-	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&id),
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(),
+		"SELECT id FROM web_origins WHERE origin = "+seedBindAt(1)+" AND client_id = "+seedBindAt(2),
+		origin, clientId).Scan(&id),
 		"read back the seeded web origin id")
 	return id
 }

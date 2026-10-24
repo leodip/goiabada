@@ -7,11 +7,14 @@ package data
 // arrives from a URL. Seven paginated reads each wrote out "(page-1)*pageSize",
 // guarded only by "page < 1", so "?page=9223372036854775807" wrapped the
 // product negative -- and a negative offset is not caught anywhere below. Six
-// of the seven went through sqlbuilder, whose Offset drops the clause when its
-// argument is negative (select.go:316), so those queries ran with no offset and
-// returned the FIRST page's rows labelled as the page asked for. The seventh,
-// the SQL Server audit log override, formats the number into the statement and
-// has no such guard, so SQL Server rejected it and the API answered 500 (#305).
+// of the seven went through the query builder the data layer used until #644,
+// whose Offset dropped the clause when its argument was negative, so those
+// queries ran with no offset and returned the FIRST page's rows labelled as the
+// page asked for. The seventh, the SQL Server audit log override, formatted the
+// number into the statement, so SQL Server rejected it and the API answered 500
+// (#305). Every read binds the offset now, and the engines still split over a
+// negative one: SQLite reads it as no offset, the first page again, and SQL
+// Server refuses it.
 // PageOffset saturates instead, and every one of the seven returns the empty
 // page that any other page past the end returns.
 //
@@ -232,11 +235,11 @@ func assertNoHandRolledPageOffset(r guard.Reporter, root string, dirs []string, 
 	r.Errorf("%d hand-rolled page offset(s) under %s:\n\t%s\n\n"+
 		"Compute the offset with commondb.PageOffset(page, pageSize) instead. The page number "+
 		"arrives from a \"?page=\" query parameter, and at a page near math.MaxInt this product "+
-		"wraps negative. Nothing below catches that: sqlbuilder drops the OFFSET clause when it "+
-		"is negative, so the query returns the FIRST page's rows labelled as the page asked "+
-		"for, and a dialect override that formats the number into SQL itself gets the engine's "+
-		"refusal and a 500 (#305). PageOffset saturates at the largest offset that fits, which "+
-		"is past the end of any table, so the read returns the empty page it should.",
+		"wraps negative. Nothing below catches that: SQLite reads a negative OFFSET as none, so "+
+		"the query returns the FIRST page's rows labelled as the page asked for, and SQL Server "+
+		"refuses it, which the API answers with a 500 (#305). PageOffset saturates at the "+
+		"largest offset that fits, which is past the end of any table, so the read returns the "+
+		"empty page it should.",
 		len(found), strings.Join(dirs, ", "), strings.Join(lines, "\n\t"))
 }
 

@@ -10,9 +10,9 @@ package postgresdb
 // table that has lost the row, and the next explicit insert sets it again (#424 decision 14). The
 // migrating role owns the sequence, which is the privilege setval asks for.
 //
-// It is wired onto commondb.Database in the constructor, beside insertReturningIdSQL, and
-// commondb.CreateInitialSettings is its one caller. table is always a literal from that code,
-// never input.
+// It is wired onto commondb.Database in the constructor, beside the deadlock and unique-violation
+// classifiers, and commondb.CreateInitialSettings is its one caller. table is always a literal
+// from that code, never input.
 func explicitIdInsertSQL(table string) (before []string, after []string) {
 	return nil, []string{
 		"SELECT setval(pg_get_serial_sequence('" + table + "', 'id'), (SELECT MAX(id) FROM " + table + "))",

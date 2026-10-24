@@ -298,10 +298,10 @@ func TestGetUsersByIds_DuplicateIdsCollapse(t *testing.T) {
 //
 // This case is reachable: the load helpers guard userSessions == nil but not
 // len(userSessions) == 0, so a caller-built empty page arrives here as an empty
-// slice. Before the guard was added it still behaved correctly, because
-// go-sqlbuilder's Cond.In emits "0 = 1" rather than an illegal "IN ()" when
-// given no values, but it cost a pointless round-trip and depended on that
-// upstream detail.
+// slice. Before the guard was added it still behaved correctly, because the
+// query builder the data layer used then emitted "0 = 1" rather than an illegal
+// "IN ()" when given no values, as commondb's inList does now, but it cost a
+// pointless round-trip and depended on that detail.
 //
 // Asserted as len()==0 rather than == nil so the test states the contract
 // callers rely on (no users came back) and not the representation.

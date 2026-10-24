@@ -186,8 +186,8 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	var auditLogs []record.AuditLog
 	for rows.Next() {
 		var auditLog record.AuditLog
-		if err := scanAuditLog(rows, &auditLog); err != nil {
-			return nil, 0, errs.Wrap(err, "unable to scan audit log")
+		if scanErr := scanAuditLog(rows, &auditLog); scanErr != nil {
+			return nil, 0, errs.Wrap(scanErr, "unable to scan audit log")
 		}
 		// The request id is client-chosen and is looked up with `=`, so the engine and not
 		// this package would otherwise decide which ids are the same id. A row the engine

@@ -38,7 +38,7 @@ func TestGetGroupById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 }
 
 // TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing covers the insert, which on
-// PostgreSQL and SQL Server goes through insertReturningId's QuerySQL and on SQLite and MySQL
+// PostgreSQL and SQL Server goes through insert's QuerySQL and on SQLite and MySQL
 // through ExecSQL's LastInsertId. The second half is the one that matters: a refusal that still
 // wrote the row would be worse than no refusal at all, because the caller is gone and nobody is
 // left to undo it.

@@ -68,8 +68,8 @@ func rawSQLHandle(t *testing.T) *sql.DB {
 }
 
 // engineOf is the commondb.Database the engine under test embeds, so an arrange that writes a
-// column no data-layer method writes builds it with that engine's own flavor and runs it through
-// that engine's exec.
+// column no data-layer method writes picks that engine's version of its statement by Dialect and
+// runs it through that engine's exec.
 func engineOf(t *testing.T) *commondb.Database {
 	t.Helper()
 	switch d := database.(type) {

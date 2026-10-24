@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -36,10 +35,7 @@ type Database struct {
 	// Dialect names the engine this handle runs on, and picks the version of every statement
 	// written per engine (#644).
 	Dialect data.Dialect
-	// Flavor is the query builder's name for the same engine, read by the statements not yet
-	// written per engine. New derives it from Dialect, so the two cannot disagree.
-	Flavor sqlbuilder.Flavor
-	logSQL bool
+	logSQL  bool
 
 	// IsDeadlock reports whether an error is the engine aborting a transaction as a deadlock
 	// victim, which is the one class of failure RunInTransaction reruns. Each dialect sets it
@@ -60,18 +56,6 @@ type Database struct {
 	// data.ErrUniqueViolation, so no caller above it ever sees a driver number or a driver sentence
 	// (#279).
 	IsUniqueViolation func(error) bool
-
-	// InsertReturningIdSQL rewrites a built INSERT so that the engine reports the new row's id
-	// in a result set. Each dialect sets it in its constructor, because only the engine's own
-	// grammar says how: PostgreSQL appends RETURNING id, SQL Server splices OUTPUT INSERTED.id
-	// in front of VALUES. Left nil, the insert goes through ExecSQL and the id is read from
-	// LastInsertId, which is what SQLite and MySQL do, and which is what a handle built
-	// directly on this type gets by default rather than by remembering to opt out.
-	//
-	// insertReturningId is the only consumer, and it is the only place the 25 Create* methods
-	// obtain an id. Until #416 the two engines whose drivers refuse LastInsertId wrote all 25
-	// out by hand: fifty bodies of forty lines, differing in this one expression.
-	InsertReturningIdSQL func(insertSQL string) (string, error)
 
 	// ExplicitIdInsertSQL answers the statements an INSERT naming its own id needs around it on
 	// table, run on the same transaction. Each dialect that needs any sets it in its constructor:
@@ -96,23 +80,8 @@ func New(db *sql.DB, dialect data.Dialect, logSQL bool) *Database {
 	return &Database{
 		DB:      db,
 		Dialect: dialect,
-		Flavor:  flavorOf(dialect),
 		logSQL:  logSQL,
 		sleep:   waitOrCancel,
-	}
-}
-
-// flavorOf is the query builder's flavor for dialect, for the statements still built through it.
-func flavorOf(dialect data.Dialect) sqlbuilder.Flavor {
-	switch dialect {
-	case data.MySQL:
-		return sqlbuilder.MySQL
-	case data.Postgres:
-		return sqlbuilder.PostgreSQL
-	case data.MSSQL:
-		return sqlbuilder.SQLServer
-	default:
-		return sqlbuilder.SQLite
 	}
 }
 
@@ -503,40 +472,15 @@ func (d *Database) QuerySQL(ctx context.Context, tx *sql.Tx, sql string, args ..
 	return rows, nil
 }
 
-// insertReturningId runs a built INSERT and returns the id the engine gave the new row, for the
-// inserts still built through the query builder. The engine packages' InsertReturningIdSQL rewrites
-// the built text into its id-returning form on PostgreSQL and SQL Server; insert below is the same
-// for a statement whose four versions already say it in their own text (#644).
-//
-// noun names the thing being inserted and reaches the two messages this can fail with,
-// "unable to insert <noun>" and "unable to scan <noun> id". Both are what each engine's
-// hand-written copy printed before they collapsed onto this, so no error text moved (#416).
-//
-// It takes the builder rather than a built statement so that the Build call, and with it the
-// local named sql that shadows the database/sql import, leaves all 25 callers.
-func (d *Database) insertReturningId(ctx context.Context, tx *sql.Tx,
-	insertBuilder *sqlbuilder.InsertBuilder, noun string) (int64, error) {
-
-	statement, args := insertBuilder.Build()
-
-	if d.InsertReturningIdSQL == nil {
-		return d.insertReadingLastInsertId(ctx, tx, statement, noun, args)
-	}
-
-	statement, err := d.InsertReturningIdSQL(statement)
-	if err != nil {
-		return 0, err
-	}
-	return d.insertReadingReturnedId(ctx, tx, statement, noun, args)
-}
-
 // insert runs one of a record's whole-row INSERTs and returns the id the engine gave the new row.
 // Where that id comes back is each engine's own grammar, and each version of s says it in its own
 // text: PostgreSQL's names RETURNING id and SQL Server's OUTPUT INSERTED.id, because pgx and
 // go-mssqldb both refuse LastInsertId, so those two run as a query answering the id; SQLite and
 // MySQL run as a statement and report it through LastInsertId. Nothing rewrites the text (#644).
 //
-// noun reaches the messages this can fail with, as insertReturningId's.
+// noun names the thing being inserted and reaches the two messages this can fail with, "unable to
+// insert <noun>" and "unable to scan <noun> id". Both are what each engine's hand-written copy
+// printed before they collapsed onto one helper, so no error text moved (#416).
 func (d *Database) insert(ctx context.Context, tx *sql.Tx, s statement, noun string, args ...any) (int64, error) {
 	switch d.Dialect {
 	case data.Postgres, data.MSSQL:

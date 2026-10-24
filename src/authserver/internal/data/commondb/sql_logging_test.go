@@ -93,8 +93,8 @@ func TestDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 
 // A statement carrying a literal is the one shape where the statement text is itself a value.
 // It is logged, and deliberately: the flag exists to show which queries run, the statements this
-// tree builds come from sqlbuilder with placeholders rather than interpolation, and a caller that
-// concatenated a credential into a statement has a defect this logger is not the place to fix.
+// tree writes bind their values through placeholders rather than interpolating them, and a caller
+// that concatenated a credential into a statement has a defect this logger is not the place to fix.
 func TestDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)

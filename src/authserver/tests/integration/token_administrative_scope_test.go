@@ -2,12 +2,12 @@ package integration
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"net/url"
 	"testing"
 
-	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
@@ -42,32 +42,36 @@ const refreshAdministrativeScopeRefusal = "Scope 'authserver:manage' is not reco
 func withdrawAdministrativeScopes(t *testing.T, clientId int64) {
 	t.Helper()
 
-	var handle *sql.DB
-	var flavor sqlbuilder.Flavor
+	var engine *commondb.Database
 	switch d := database.(type) {
 	case *sqlitedb.Database:
-		handle, flavor = d.DB, d.Flavor
+		engine = d.Database
 	case *mysqldb.Database:
-		handle, flavor = d.DB, d.Flavor
+		engine = d.Database
 	case *postgresdb.Database:
-		handle, flavor = d.DB, d.Flavor
+		engine = d.Database
 	case *mssqldb.Database:
-		handle, flavor = d.DB, d.Flavor
+		engine = d.Database
 	default:
-		t.Fatalf("no raw handle for database type %T", database)
+		t.Fatalf("no engine for database type %T", database)
 	}
 
-	update := flavor.NewUpdateBuilder()
-	update.Update("clients").
-		Set(update.Assign("administrative_scopes_allowed", false)).
-		Where(update.Equal("id", clientId))
-	query, args := update.Build()
-	_, err := handle.ExecContext(context.Background(), query, args...)
+	_, err := engine.ExecSQL(context.Background(), nil, withdrawAdministrativeScopesSQL[engine.Dialect],
+		false, clientId)
 	require.NoError(t, err)
 
 	client, err := database.GetClientById(context.Background(), nil, clientId)
 	require.NoError(t, err)
 	require.False(t, client.AdministrativeScopesAllowed, "the allowance is withdrawn")
+}
+
+// withdrawAdministrativeScopesSQL is withdrawAdministrativeScopes's one-column UPDATE in each
+// engine's text, binding the allowance and then the client's id.
+var withdrawAdministrativeScopesSQL = map[data.Dialect]string{
+	data.SQLite:   "UPDATE clients SET administrative_scopes_allowed = ? WHERE id = ?",
+	data.MySQL:    "UPDATE clients SET administrative_scopes_allowed = ? WHERE id = ?",
+	data.Postgres: "UPDATE clients SET administrative_scopes_allowed = $1 WHERE id = $2",
+	data.MSSQL:    "UPDATE clients SET administrative_scopes_allowed = @p1 WHERE id = @p2",
 }
 
 // assertRefusedAtTheTokenEndpoint holds the rows naming client to the one a refusal at checkpoint

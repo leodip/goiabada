@@ -111,8 +111,7 @@ type scriptedDriver struct {
 // lastInsertId is opt-in, and the default is the one that matters: with it unset the statement
 // answers with driver.RowsAffected, whose LastInsertId returns an error. That is pgx's and
 // go-mssqldb's behaviour, so a test gets the REFUSING driver unless it asks for the other one,
-// which is the right way round for the arm of insertReturningId that reads an id that way (#283,
-// #416).
+// which is the right way round for the arm of insert that reads an id that way (#283, #416).
 type scriptedExec struct {
 	rowsAffected int64
 	lastInsertId int64

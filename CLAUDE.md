@@ -93,7 +93,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 Single `Database` interface (`src/authserver/internal/data/database.go`) with per-DB implementations:
 - All methods accept `ctx context.Context` then `tx *sql.Tx` (nil = no transaction); the context reaches `BeginTx`, `QueryContext` and `ExecContext` (#386)
-- Uses `sqlbuilder` for query building with DB-specific flavors
+- Every statement is plain SQL in each engine's own form, with no query builder: a `statement` (`commondb/statement.go`) holds its SQLite, MySQL, PostgreSQL and SQL Server text side by side in the shared implementation's file for its resource, and the handle's `data.Dialect` picks the version that runs, so the text in the source is the text the engine receives. `TestStatements_EveryEngineHasItsVersion` refuses one missing a version; an IN list is written by `inList`, inside `forEachIdBatch` (#644)
+- Each record's read column list, scan function and whole-row INSERT and UPDATE are written out per engine. The `db`, `fieldtag` and `fieldopt` tags stay on the records as the column contract: a `dont-update` column is protected by its absence from the UPDATE's text, and `TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine` holds the SQL to the tags on all four engines through the scripted driver (#644)
 - Nothing above the data layer takes the whole interface: each handler, middleware and service declares an unexported port beside the function that takes it, naming only what that file calls (#386)
 - Schema in `src/authserver/internal/data/sqlitedb/schema.golden` (generated; see **Schema golden files** below)
 - Migrations are applied by Goiabada's own runner in `src/authserver/internal/data/migrator/`, built per engine by each `NewMigrator()`
