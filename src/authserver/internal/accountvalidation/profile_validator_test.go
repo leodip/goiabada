@@ -49,12 +49,12 @@ func assertLocalizedError(t *testing.T, err error, expectedCode string, expected
 // deliberately: they are the profile messages carrying an argument, so their sentences
 // are asserted at the call site that knows the limit.
 var profileErrorMessages = map[string]string{
-	i18n.ErrCodeProfileGivenNameInvalid: "Please enter a valid given name. It should contain only letters, " +
-		"spaces, hyphens, and apostrophes and be between 1 and 48 characters in length.",
-	i18n.ErrCodeProfileMiddleNameInvalid: "Please enter a valid middle name. It should contain only letters, " +
-		"spaces, hyphens, and apostrophes and be between 1 and 48 characters in length.",
-	i18n.ErrCodeProfileFamilyNameInvalid: "Please enter a valid family name. It should contain only letters, " +
-		"spaces, hyphens, and apostrophes and be between 1 and 48 characters in length.",
+	i18n.ErrCodeProfileGivenNameInvalid: "Please enter a valid given name. Use letters, spaces, " +
+		"hyphens and apostrophes, up to 48 characters.",
+	i18n.ErrCodeProfileMiddleNameInvalid: "Please enter a valid middle name. Use letters, spaces, " +
+		"hyphens and apostrophes, up to 48 characters.",
+	i18n.ErrCodeProfileFamilyNameInvalid: "Please enter a valid family name. Use letters, spaces, " +
+		"hyphens and apostrophes, up to 48 characters.",
 	i18n.ErrCodeProfileUsernameInvalid: "Usernames must start with a letter and consist only of letters, " +
 		"numbers, and underscores. They must be between 2 and 24 characters long.",
 	i18n.ErrCodeProfileNicknameInvalid: "Nicknames cannot contain control characters, such as " +
@@ -72,9 +72,14 @@ var profileErrorMessages = map[string]string{
 // =============================================================================
 // Tests for ValidateName
 //
-// The shared name pattern is `^[\p{L}\s'-]{1,48}$`: Unicode letters, spaces,
-// apostrophes and hyphens, 1 to 48 characters. An empty name is allowed, since
-// given / middle / family names are all optional.
+// A name is 1 to 48 characters, at least one of them a letter, made of Unicode
+// letters, nonspacing and spacing marks (Mn, Mc) each after a letter or another
+// mark, the literal space, the apostrophes ' and ’, the hyphen, the middle dots
+// ・ and ·, the Tibetan tsheg ་ and the Hebrew geresh ׳, and the zero-width
+// non-joiner and joiner between two letters. At most four nonspacing marks stand
+// in a row, never the same one twice, counted with every composed letter
+// decomposed (#669). An empty name is allowed, since given / middle / family
+// names are all optional.
 // =============================================================================
 
 func TestValidateName_Accepted(t *testing.T) {
@@ -98,6 +103,37 @@ func TestValidateName_Accepted(t *testing.T) {
 		{"chinese characters", "李明"},
 		{"exactly 48 characters", strings.Repeat("a", 48)},
 		{"empty is allowed because the field is optional", ""},
+		// #669 decision 1: the vowel signs, viramas and points a name is written with
+		// are marks (Mn, Mc), each after a letter. One row per script of the issue.
+		{"hindi with a spacing vowel sign", "\u0905\u092E\u093F\u0924"},                     // अमित
+		{"hindi with a virama", "\u092A\u094D\u0930\u093F\u092F\u093E"},                     // प्रिया
+		{"bengali", "\u09B8\u09CC\u09B0\u09AD"},                                             // সৌরভ
+		{"tamil", "\u0BA4\u0BAE\u0BBF\u0BB4\u0BCD"},                                         // தமிழ்
+		{"telugu", "\u0C05\u0C28\u0C3F\u0C32\u0C4D"},                                        // అనిల్
+		{"kannada", "\u0C95\u0CBF\u0CB0\u0CA3\u0CCD"},                                       // ಕಿರಣ್
+		{"sinhala", "\u0D9C\u0DD3\u0DAD\u0DCF"},                                             // ගීතා
+		{"burmese, four marks with one stacked", "\u1000\u103B\u1031\u102C\u103A"},          // ကျော်
+		{"thai", "\u0E1B\u0E23\u0E30\u0E22\u0E38\u0E17\u0E18\u0E4C"},                        // ประยุทธ์
+		{"arabic with its vowel marks", "\u0645\u064F\u062D\u064E\u0645\u0651\u064E\u062F"}, // مُحَمَّد
+		{"hebrew with its points", "\u05E9\u05C1\u05B8\u05DC\u05D5\u05B9\u05DD"},            // שָׁלוֹם
+		{"latin typed decomposed", "Jose\u0301"},
+		// #669 decision 3: the bound is more than four nonspacing marks in a row.
+		{"hebrew with three marks on one letter", "\u05E9\u05BC\u05C1\u05B8"}, // שּׁ
+		{"exactly four marks stacked on one letter", "a\u0301\u0302\u0303\u0304"},
+		// Spacing marks (Mc) sit beside the letter and are not counted, in the four
+		// or as a repeat.
+		{"four stacked marks and a spacing mark", "a\u0301\u0302\u0303\u0304\u093e"},
+		{"the same spacing mark twice", "\u0915\u093e\u093e"},
+		// #669 decision 4: five punctuation characters go wherever the apostrophe
+		// and hyphen go.
+		{"typographic apostrophe", "O\u2019Brien"},                                  // O’Brien
+		{"katakana middle dot", "\u30B8\u30E7\u30F3\u30FB\u30B9\u30DF\u30B9"},       // ジョン・スミス
+		{"catalan middle dot", "Marcel\u00B7l\u00ED"},                               // Marcel·lí
+		{"tibetan tsheg", "\u0F56\u0F66\u0F9F\u0F53\u0F0B\u0F60\u0F5B\u0F72\u0F53"}, // བསྟན་འཛིན
+		{"hebrew geresh", "\u05D2\u05F3\u05D5\u05DF"},                               // ג׳ון
+		// #669 decision 5: the zero-width non-joiner and joiner between two letters.
+		{"persian with a zero-width non-joiner", "\u0646\u06CC\u06A9\u200C\u0646\u0627\u0645"}, // نیک‌نام
+		{"sinhala with a zero-width joiner after a virama", "\u0DC1\u0DCA\u200D\u0DBB\u0DD3"},  // ශ්‍රී
 	}
 
 	for _, tc := range testCases {
@@ -219,6 +255,36 @@ func TestValidateName_Rejected(t *testing.T) {
 		// pattern for either of them fails here with a reason attached.
 		{"pins decision 3 of #275: less-than is refused by the name shape", "Ann<e"},
 		{"pins decision 3 of #275: greater-than is refused by the name shape", "Ann>e"},
+		// #669 decision 1: a mark is written on a letter, never alone, first or after
+		// a separator, and an enclosing mark is never one.
+		{"a mark alone", "\u0301"},
+		{"marks alone", "\u0301\u0302"},
+		{"a mark at the start", "\u0301Jane"},
+		{"a mark after a space", "Mary \u0301Jane"},
+		{"a mark after a hyphen", "Mary-\u0301Jane"},
+		{"a mark after an apostrophe", "O'\u0301Brien"},
+		{"an enclosing mark", "A\u20DD"},
+		// #669 decision 3: more than four nonspacing marks in a row, or the same one
+		// twice, counted decomposed.
+		{"five marks stacked on one letter", "a\u0301\u0302\u0303\u0304\u0306"},
+		{"a composed letter and four more marks, five decomposed", "\u00E0\u0301\u0302\u0303\u0304"},
+		{"the same mark twice", "e\u0301\u0301"},
+		{"a composed letter and its own mark again, a repeat decomposed", "\u00E9\u0301"},
+		// #669 decision 4: every other punctuation character stays refused, and a name
+		// still needs a letter.
+		{"left single quotation mark", "\u2018Brien"},
+		{"middle dots alone", "\u30FB\u00B7"},
+		// #669 decision 5: a joiner stands between two letters and nowhere else, and
+		// the other format characters stay refused.
+		{"a joiner at the start", "\u200CJane"},
+		{"a joiner at the end", "Jane\u200C"},
+		{"a joiner after a space", "Mary \u200DJane"},
+		{"a joiner before a space", "Mary\u200D Jane"},
+		{"a joiner after a hyphen", "Mary-\u200DJane"},
+		{"a joiner before a mark", "a\u200C\u0301"},
+		{"two joiners", "Mary\u200C\u200CJane"},
+		{"left-to-right mark", "Jane\u200EDoe"},
+		{"right-to-left mark", "Jane\u200FDoe"},
 	}
 
 	for _, tc := range testCases {

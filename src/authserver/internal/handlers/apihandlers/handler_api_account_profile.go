@@ -80,9 +80,9 @@ func HandleAccountProfilePut(
 		// Validate profile data
 		input := &accountvalidation.ValidateProfileInput{
 			Username:            strings.TrimSpace(req.Username),
-			GivenName:           strings.TrimSpace(req.GivenName),
-			MiddleName:          strings.TrimSpace(req.MiddleName),
-			FamilyName:          strings.TrimSpace(req.FamilyName),
+			GivenName:           accountvalidation.NormalizeName(req.GivenName),
+			MiddleName:          accountvalidation.NormalizeName(req.MiddleName),
+			FamilyName:          accountvalidation.NormalizeName(req.FamilyName),
 			Nickname:            strings.TrimSpace(req.Nickname),
 			Website:             strings.TrimSpace(req.Website),
 			Gender:              req.Gender,

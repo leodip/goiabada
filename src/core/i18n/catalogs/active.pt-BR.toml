@@ -1675,9 +1675,9 @@
 
 "validator.profile.username_taken" = "Desculpe, este nome de usuário já está em uso."
 "validator.profile.username_invalid" = "Nomes de usuário precisam começar com uma letra e conter apenas letras, números e sublinhados. Devem ter entre 2 e 24 caracteres."
-"validator.profile.given_name_invalid" = "Informe um nome válido. Deve conter apenas letras, espaços, hífens e apóstrofos, com 1 a 48 caracteres."
-"validator.profile.middle_name_invalid" = "Informe um nome do meio válido. Deve conter apenas letras, espaços, hífens e apóstrofos, com 1 a 48 caracteres."
-"validator.profile.family_name_invalid" = "Informe um sobrenome válido. Deve conter apenas letras, espaços, hífens e apóstrofos, com 1 a 48 caracteres."
+"validator.profile.given_name_invalid" = "Informe um nome válido. Use letras, espaços, hífens e apóstrofos, até 48 caracteres."
+"validator.profile.middle_name_invalid" = "Informe um nome do meio válido. Use letras, espaços, hífens e apóstrofos, até 48 caracteres."
+"validator.profile.family_name_invalid" = "Informe um sobrenome válido. Use letras, espaços, hífens e apóstrofos, até 48 caracteres."
 "validator.profile.nickname_invalid" = "Apelidos não podem conter caracteres de controle, como tabulações ou quebras de linha."
 "validator.profile.nickname_too_long" = "Garanta que o apelido não tenha mais que {{.max}} caracteres."
 "validator.profile.nickname_angle_brackets" = "O apelido não pode conter os caracteres < ou >."

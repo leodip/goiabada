@@ -4589,10 +4589,22 @@ components:
           type: boolean
         givenName:
           type: string
+          description: >-
+            Trimmed of the white space around it, then stored and answered in Unicode
+            Normalization Form C (NFC), so a name sent decomposed is answered composed and can
+            differ in code points from what was sent.
         middleName:
           type: string
+          description: >-
+            Trimmed of the white space around it, then stored and answered in Unicode
+            Normalization Form C (NFC), so a name sent decomposed is answered composed and can
+            differ in code points from what was sent.
         familyName:
           type: string
+          description: >-
+            Trimmed of the white space around it, then stored and answered in Unicode
+            Normalization Form C (NFC), so a name sent decomposed is answered composed and can
+            differ in code points from what was sent.
         setPasswordType:
           type: string
           enum: [now, email]
@@ -4617,10 +4629,22 @@ components:
           type: string
         givenName:
           type: string
+          description: >-
+            Trimmed of the white space around it, then stored and answered in Unicode
+            Normalization Form C (NFC), so a name sent decomposed is answered composed and can
+            differ in code points from what was sent.
         middleName:
           type: string
+          description: >-
+            Trimmed of the white space around it, then stored and answered in Unicode
+            Normalization Form C (NFC), so a name sent decomposed is answered composed and can
+            differ in code points from what was sent.
         familyName:
           type: string
+          description: >-
+            Trimmed of the white space around it, then stored and answered in Unicode
+            Normalization Form C (NFC), so a name sent decomposed is answered composed and can
+            differ in code points from what was sent.
         nickname:
           type: string
         website:
