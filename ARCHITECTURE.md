@@ -131,9 +131,11 @@ Notes on rows that are not self-evident:
   deletion, and it does exist as a directory of generated mocks in a working tree that has run the
   mock generator, but git has never tracked a file under it. A row for it fails the completeness
   rule, which is how this was found.
-- `core/cmd` is kernel because it is one developer tool, `ownershipdump`, which writes the per-symbol
-  table described below. The row exists because the guard reads any directory under `core` holding a
-  production Go file, and rule 6 fails without it (#385).
+- `core/cmd` is kernel because it holds two developer tools: `ownershipdump`, which writes the
+  per-symbol table described below, and `imagescanreport`, which turns the weekly scan of the
+  published images into the issue listing what someone can act on (#520). The row exists because the
+  guard reads any directory under `core` holding a production Go file, and rule 6 fails without it
+  (#385).
 - `core/internal` is kernel because it holds `refgraph`, the reference-graph reader behind the
   tree-wide guards and `ownershipdump`: the census left `core/testutil`, now `core/guard`, so that
   the tool stops linking `testing` and testify, and Go's internal rule keeps it from anything
@@ -485,13 +487,13 @@ The walk starts from each shipped `main` package rather than from every producti
 module, which is where it differs from rule 5: the graph counts `core/guard`'s untagged files as
 production, so a module-wide walk would find `testing` in `core` itself. The three mains are listed
 in the guard, as `shippedMains`, rather than found by looking for `package main`, because
-`schemadump`, `droptestdb`, `ownershipdump` and the two reference-data generators are main packages
-too and ship in no release. A file belongs to a binary the way the rest of this document decides
-it: the `production` tag set and every other tag free, so a file in any of the five release targets
-counts. That is exact because every release build of all three sets `production`: the servers'
-cross-compile script, the two server Dockerfiles and the setup wizard's cross-compile script, so a
-`//go:build !production` helper anywhere in the wizard's closure stays out of the wizard as the
-generated mocks stay out of the servers. A rule test in core's unit tier,
+`schemadump`, `droptestdb`, `ownershipdump`, `imagescanreport` and the two reference-data generators
+are main packages too and ship in no release. A file belongs to a binary the way the rest of this
+document decides it: the `production` tag set and every other tag free, so a file in any of the five
+release targets counts. That is exact because every release build of all three sets `production`:
+the servers' cross-compile script, the two server Dockerfiles and the setup wizard's cross-compile
+script, so a `//go:build !production` helper anywhere in the wizard's closure stays out of the
+wizard as the generated mocks stay out of the servers. A rule test in core's unit tier,
 `TestReleaseBuilds_TheRealReleaseBuildsSetProduction`, reads those four files and fails when a
 `go build` in them does not set the tag, when one of them is missing or holds no `go build`, when the
 mains they build stop being exactly `shippedMains`, or when either script's `build_platform` calls

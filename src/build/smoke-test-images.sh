@@ -31,13 +31,16 @@
 #     mount point the image lacks owned by root, so these two directories are what
 #     lets a fresh SQLite volume or bootstrap volume be written at all.
 #
-# Each image's packages are then held to the floors PACKAGE_FLOORS names, read
-# from the image's own package database with no network: a package older than its
-# floor fails the run, and one the image doesn't carry passes. zlib 1.3.2-r1 fixes
-# CVE-2026-85091, which alpine:3.24 ships without; the release Dockerfiles' final
-# stage runs apk upgrade to get it and checks it in each platform's build, and this
-# checks it again on the images CI builds, whatever their Dockerfile says (#542). A
-# floor costs nothing once the base image carries the fix, so it can stay.
+# Each image's contents are then read from inside it with no network, and held to
+# what the release Dockerfiles' final stage keeps (#520):
+#
+#   - Its package database must list exactly FINAL_STAGE_PACKAGES, which
+#     src/core/guard/release_final_stage_test.go holds to the list both
+#     Dockerfiles check in each platform's build. A package missing or one more,
+#     at any version, fails the run, and so does a database it cannot read.
+#   - It must have no apk command, so nothing installs a package at run time.
+#   - It must have /etc/ssl/certs/ca-certificates.crt, the CA bundle the servers'
+#     TLS reads, which deleting apk-tools with --purge removes unless it is added.
 #
 # Usage: ./smoke-test-images.sh --version <version> <image>...
 set -euo pipefail
@@ -58,7 +61,8 @@ RUN_TIMEOUT=60
 UNKNOWN_TZ="Not/AZone"
 RUN_AS="10001:10001"
 AUTHSERVER_WRITABLE_DIRS=(/data /bootstrap)
-PACKAGE_FLOORS=("zlib 1.3.2-r1")
+FINAL_STAGE_PACKAGES=(alpine-baselayout alpine-baselayout-data alpine-keys alpine-release busybox busybox-binsh ca-certificates-bundle musl)
+CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 failed=0
 
 fail() {
@@ -91,28 +95,21 @@ read_user() {
     ' sh "$@"
 }
 
-# Prints, from inside the image and with no network, each floor's package with its
-# installed version and how that compares with the floor: "<", "=" or ">", the word
-# absent when the image doesn't carry it, or unreadable when the package database
-# can't be read or holds no package, which fails the run like an older version. A shell replaces the entrypoint and
-# nothing else, as in read_user.
-read_packages() {
+# Prints, from inside the image and with no network, one "package <name>" line per
+# package its database lists, or "packages unreadable" when it can't be read; then
+# "apk <path>" or "apk absent", and "<path> present" or "<path> absent" for the CA
+# bundle. A shell replaces the entrypoint and nothing else, as in read_user.
+read_contents() {
     local image="$1"
     docker run --rm --network none --entrypoint /bin/sh "$image" -c '
-        for floor in "$@"; do
-            name=${floor%% *}
-            min=${floor#* }
-            if ! version=$(awk -v p="$name" "/^P:/ { n++; current = substr(\$0, 3) } /^V:/ { if (current == p) v = substr(\$0, 3) } END { if (n == 0) exit 1; print v }" /lib/apk/db/installed); then
-                echo "$name unreadable"
-                continue
-            fi
-            if [ -z "$version" ]; then
-                echo "$name absent"
-                continue
-            fi
-            echo "$name $version $(apk version -t "$version" "$min" 2>/dev/null || echo "?") $min"
-        done
-    ' sh "${PACKAGE_FLOORS[@]}"
+        if [ -r /lib/apk/db/installed ]; then
+            awk "/^P:/ { print \"package \" substr(\$0, 3) }" /lib/apk/db/installed
+        else
+            echo "packages unreadable"
+        fi
+        if apk=$(command -v apk); then echo "apk $apk"; else echo "apk absent"; fi
+        if [ -f "$1" ]; then echo "$1 present"; else echo "$1 absent"; fi
+    ' sh "$CA_BUNDLE"
 }
 
 # Fails unless the read_user output in USER_OUTPUT carries the line exactly.
@@ -141,16 +138,26 @@ for image in "${IMAGES[@]}"; do
         expect_line "$image" "$dir writable"
     done
 
-    echo "=== $image, its package floors"
-    PACKAGES_OUTPUT=$(read_packages "$image" 2>&1) ||
-        fail "$image: unable to read its packages: $PACKAGES_OUTPUT"
-    echo "$PACKAGES_OUTPUT"
-    while read -r name version comparison floor; do
-        case "$version $comparison" in
-            "absent "|*" ="|*" >") ;;
-            *) fail "$image: $name $version is older than $floor, or could not be compared with it" ;;
-        esac
-    done <<<"$PACKAGES_OUTPUT"
+    echo "=== $image, its packages"
+    CONTENTS_OUTPUT=$(read_contents "$image" 2>&1) ||
+        fail "$image: unable to read its contents: $CONTENTS_OUTPUT"
+    echo "$CONTENTS_OUTPUT"
+    if grep -q -x -F -e "packages unreadable" <<<"$CONTENTS_OUTPUT"; then
+        fail "$image: unable to read its package database"
+    else
+        packages=$(sed -n 's/^package //p' <<<"$CONTENTS_OUTPUT" | sort)
+        expected=$(printf '%s\n' "${FINAL_STAGE_PACKAGES[@]}" | sort)
+        extra=$(comm -13 <(echo "$expected") <(echo "$packages") | xargs)
+        missing=$(comm -23 <(echo "$expected") <(echo "$packages") | xargs)
+        [ -z "$extra" ] || fail "$image holds packages the final stage must not: $extra"
+        [ -z "$missing" ] || fail "$image lacks packages the final stage keeps: $missing"
+    fi
+    if ! grep -q -x -F -e "apk absent" <<<"$CONTENTS_OUTPUT"; then
+        fail "$image still has an apk command: $(sed -n 's/^apk //p' <<<"$CONTENTS_OUTPUT")"
+    fi
+    if ! grep -q -x -F -e "$CA_BUNDLE present" <<<"$CONTENTS_OUTPUT"; then
+        fail "$image has no CA bundle at $CA_BUNDLE"
+    fi
 
     echo "=== $image, TZ=Asia/Kolkata"
     run_image "$image" "Asia/Kolkata"

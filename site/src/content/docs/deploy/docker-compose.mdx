@@ -52,6 +52,10 @@ The Compose files run the auth server, the admin console and the database on one
 - **Each server gets up to 60 seconds to stop** when you run `docker compose down` or `restart`, so requests in flight finish.
 - **The wizard's rate limiter answer,** yes unless you said no, is written as `GOIABADA_AUTHSERVER_RATELIMITER_ENABLED`. See [Rate limits](/reference/environment-variables/#rate-limits).
 
+<Aside type="note" title="Local testing">
+The wizard's **Local testing** choice writes Compose files too, serving plain HTTP on `localhost`, published on every interface, with no proxy. It's for the [Quickstart](/get-started/quickstart/), never for a deployment other people reach.
+</Aside>
+
 ## The hop to the auth server
 
 The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`, which the wizard sets to `http://goiabada-authserver:9090`: straight to the auth server's container, over the Compose network, without passing your proxy.
@@ -105,9 +109,13 @@ The auth server writes to two directories, and its image creates both owned by 1
 
 The generated file also drops every capability, keeps the root file system read-only and gives each server a `/tmp` in memory.
 
-<Aside type="note" title="Local testing">
-The wizard's **Local testing** choice writes Compose files too, serving plain HTTP on `localhost`, published on every interface, with no proxy. It's for the [Quickstart](/get-started/quickstart/), never for a deployment other people reach.
-</Aside>
+## What the images contain
+
+Each image holds the server's binary on a minimal Alpine: BusyBox, the CA certificates the servers trust, and the few files Alpine itself needs. There's no package manager, OpenSSL or `ssl_client` in it.
+
+Without `ssl_client`, the image's `wget` reaches `http://` addresses only: `wget https://…` fails with `can't execute 'ssl_client'`.
+
+To add a tool to an image of your own built on Goiabada's, install it in another stage and copy it in, with any libraries it links.
 
 ## Recover a locked-out administrator
 

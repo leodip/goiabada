@@ -49,6 +49,8 @@ The usual causes:
 
    It should print `healthy`.
 
+   For an `https` internal URL, check the auth server's `http` port instead, as above: the admin console's image has no `wget` for `https://`, [by design](/deploy/docker-compose/#what-the-images-contain). A certificate problem is the cause listed above.
+
 3. Set the admin console's `GOIABADA_AUTHSERVER_INTERNALBASEURL` to the address that answered, and restart the admin console.
 
 </Steps>

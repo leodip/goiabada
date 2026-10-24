@@ -144,6 +144,7 @@ jobs:
       unparam: ${{ steps.read.outputs.unparam }}
       govulncheck: ${{ steps.read.outputs.govulncheck }}
       mockery: ${{ steps.read.outputs.mockery }}
+      trivy: ${{ steps.read.outputs.trivy }}
       mysql-password: ${{ steps.passwords.outputs.mysql }}
       postgres-password: ${{ steps.passwords.outputs.postgres }}
       mssql-password: ${{ steps.passwords.outputs.mssql }}
@@ -167,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           f=src/authserver/versions.yaml
-          for k in go tailwind node unparam govulncheck mockery; do
+          for k in go tailwind node unparam govulncheck mockery trivy; do
             v=$(yq -r ".tools.$k" "$f")
             [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.$k missing from $f"; exit 1; }
             echo "$k=$v" >> "$GITHUB_OUTPUT"
@@ -895,6 +896,32 @@ jobs:
           )
           docker buildx build --load "${args[@]}" -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
           docker buildx build --load "${args[@]}" -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..
+      # Built from source at the pin by the install step the weekly Image scan
+      # shares, which says why: never from Trivy's release binaries, its action
+      # or its image, which were all hijacked in March 2026 (#520).
+      - name: Install Trivy
+        uses: ./.github/actions/install-scanner
+        with:
+          name: trivy
+          package: github.com/aquasecurity/trivy/cmd/trivy
+          version: ${{ needs.versions.outputs.trivy }}
+          go-version: ${{ needs.versions.outputs.go }}
+      # The images' Alpine packages only: a Go module finding is the
+      # Vulnerabilities job's, which scans the source. Stops main, and inside a
+      # release the images job, on a HIGH or CRITICAL finding that has a fixed
+      # version; one with no fix is no change anyone here can make. Not on pull
+      # requests: an Alpine advisory arrives on Alpine's schedule, not with a
+      # change, and the package set a change could alter is held in the unit
+      # tier by release_final_stage_test.go.
+      - name: Scan both images
+        run: |
+          rc=0
+          for image in goiabada-authserver:ci goiabada-adminconsole:ci; do
+            echo "::group::$image"
+            trivy image --scanners vuln --pkg-types os --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress "$image" || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
       # The images carry no zone database, so they are the one host where the
       # servers' own TZ resolution is observable (#331). Inside a release this
       # job is part of Checks, which the images job needs, so an image that
