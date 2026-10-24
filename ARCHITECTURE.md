@@ -443,9 +443,7 @@ which issue owns the cut.
 `github.com/boombuler/barcode` is listed at `no` deliberately. `otp` is the auth server's (#346),
 and since #646 it computes one-time codes and writes and reads enrolment keys with the standard
 library, so barcode, which draws the enrolment QR code, is the one module it brings in. It is not
-reachable now, it never will be, and the row states that it must not arrive. The row was
-`github.com/pquerna/otp`'s until #646 took that module out of every `go.mod`: a row for a module
-nothing requires asserts nothing, and barcode, reached only through it before, had no row.
+reachable now, it never will be, and the row states that it must not arrive.
 
 The table is a declared list, not a discovery mechanism: it asserts these modules and says nothing
 about a dependency nobody has written a row for. Closing that would mean an allowlist of every
