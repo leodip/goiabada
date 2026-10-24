@@ -352,9 +352,9 @@
 "adminconsole.error.body" = "The admin console couldn't complete your request. Try again in a moment. The server log records the cause under the request ID below."
 "adminconsole.error.request_id_label" = "Request ID:"
 "adminconsole.error.settings_unavailable_title" = "Can't reach the auth server"
-# The two middleware.SettingsCache refusals. Plain text rather than the error page
-# above: both mean the settings the page layout renders from are the thing that is
-# missing, so there is no page to render.
+# The two middleware.SettingsCache refusals, drawn on a page of their own
+# (settings_unavailable.html) rather than the error page above: both mean the settings
+# the page layout renders from are the thing that is missing.
 "adminconsole.error.settings_unavailable" = "The admin console couldn't load its settings from the auth server. Try again in a moment. The server log records the cause under the request ID below."
 "adminconsole.error.issuer_missing_title" = "The auth server is out of date"
 "adminconsole.error.issuer_missing" = "The auth server didn't report an issuer. It may be older than this admin console: update both to the same version."

@@ -26,8 +26,8 @@ type authSessionStore interface {
 
 // MaxHeldCeremonies is how many sign-ins a browser session holds at once. A sixth pushes out the one
 // least recently written, so a sign-in the user is moving through outlives the tabs they abandoned,
-// and a page sending the browser to sign in again and again pushes one out only by starting more
-// than this many (#246 decision 2).
+// and a page sending the browser to sign in again and again pushes the user's sign-in out only by
+// starting this many of its own (#246 decision 2).
 const MaxHeldCeremonies = 5
 
 // Store keeps a browser's sign-ins in progress in the server-side session, each an AuthContext,
