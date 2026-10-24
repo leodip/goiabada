@@ -7,13 +7,14 @@
 #   .placido/e2e.sh tests/oauth      # one area; any Playwright argument passes through
 #
 # There is one environment, so a lock keeps two placido runs from rebuilding it at
-# once. The machine's settings (e2e/.env) come from the main checkout, and what the
+# once, and the main checkout's suite lock keeps this run and a suite run by hand there
+# apart. The machine's settings (e2e/.env) come from the main checkout, and what the
 # run leaves in e2e/.state (the URLs, the admin password) goes back to it, so
 # e2e/test.sh there runs against the environment this run built.
 set -uo pipefail
 
 case "${1:-}" in
-  -h | --help) sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,13s/^# \{0,1\}//p' "$0"; exit 0 ;;
 esac
 
 worktree="$(git rev-parse --show-toplevel)" || exit 1
@@ -29,6 +30,17 @@ exec 9>"$main/e2e/.state/placido.lock"
 if ! flock -n 9; then
   echo "Another run is using the e2e environment; waiting for it."
   flock 9
+fi
+
+# Each suite holds e2e/.state/suite.lock in its own checkout, and this run's checkout is
+# the worktree: hold the main checkout's too, so a suite run by hand there never meets
+# this one. In the main checkout itself, test.sh takes it.
+if [[ "$main" != "$worktree" ]]; then
+  exec 8>"$main/e2e/.state/suite.lock"
+  if ! flock -n 8; then
+    echo "A suite run by hand in $main holds its suite lock; waiting for it."
+    flock 8
+  fi
 fi
 
 "$worktree/e2e/run.sh" --source "$@"
