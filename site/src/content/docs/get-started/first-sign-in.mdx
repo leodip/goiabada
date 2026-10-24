@@ -47,13 +47,13 @@ Accounts people create can manage their own account, including their profile, se
 
 ### Set up email
 
-Goiabada sends email to verify addresses and to reset passwords. Add your SMTP server under **Admin**, **Email**, and send yourself a test message from there. Turning **Send email** off later empties every field on that page, the password included, so note them first if you'll turn it back on.
+Goiabada sends email to verify addresses and to reset passwords. Add your SMTP server under **Admin**, **Email**, and send yourself a test message from there.
 
 ## How the sign-in works
 
 The admin console is a client of the auth server, like the apps you'll connect later. Clicking **Administration** starts a standard OpenID Connect sign-in: the browser goes to the auth server, you sign in there, and the auth server sends you back to the admin console with an authorization code.
 
-To open the **Admin** pages, a user needs the `authserver:manage` permission. The first administrator has it, along with `authserver:manage-account`, which opens a user's own **Account** pages and which every new user gets. A user without `authserver:manage` who signs in through **Administration** sees an "Administrators only" page.
+To open the **Admin** pages, a user needs the `authserver:manage` permission. The first administrator has it, along with `authserver:manage-account`, which opens a user's own **Account** pages and which every new user gets.
 
 The admin console's client asks for a second factor only from users who have one set up. That's why your first sign-in needs only a password, and why signing in needs a code too once you turn on two-factor authentication.
 

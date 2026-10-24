@@ -62,7 +62,7 @@ Deleting a user deletes everything attached to them: their permissions, their gr
 
 ## Passwords
 
-Every password set here, by you or by the user, must meet the **Password policy** under **Admin**, **General**, and the page shows it under the field. A new installation asks for at least 15 characters of any kind, and refuses commonly used passwords and the user's own email address or username: see [Password policy](/concepts/password-policy/). A password already set isn't checked again when the policy changes.
+Every password set here, by you or by the user, must meet the [password policy](/concepts/password-policy/), which the page shows under the field.
 
 **New password** on the **Authentication** tab gives the user a new password. It signs them out of every session and revokes their refresh tokens. A password the user changes themselves does the same, except for the session they change it from. See [credential changes](/concepts/ending-sessions/#credential-changes).
 

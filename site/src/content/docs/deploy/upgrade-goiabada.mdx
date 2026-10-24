@@ -71,13 +71,13 @@ Running the setup wizard again generates new secrets. Before you use its output 
 
 The image lines a release of the setup wizard writes name a release by its version tag, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`. A tag is mutable in the registry: a re-push under the same name, by mistake or through a compromised credential, changes what every node pulls next. A digest names the image content itself, and the release's attestations are made against it, so pinning a deployment to a digest makes the registry unable to change what runs.
 
-The wizard keeps writing the version tag: pinning is your choice, made knowing the rule at the end of this section.
+The setup wizard writes the version tag alone. Pinning is up to you, once you've read the rule at the end of this section.
 
 To pin, give each image line the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>` in `docker-compose.yml`, the same form for both images in `goiabada-k8s.yaml`.
 
 Where the digest comes from:
 
-- **The release's notes.** A release's notes list both images under **Pinned image references**, each as a full reference, `tag@sha256:digest`, with the digests that release pushed and attested. Releases made before the notes carried them don't list them: take an earlier release's digests from the registry, as below.
+- **The release's notes.** A release's notes list both images under **Pinned image references**, each as a full reference, `tag@sha256:digest`, with the digests that release pushed and attested.
 - **The registry, read through buildx.** `docker buildx imagetools inspect leodip/goiabada:authserver-<version>` prints the digest on its `Digest:` line, and the same holds for the admin console's image. That line names the multi-platform image index, the digest the release attests. A per-platform digest, the kind a registry's tags page lists beside each architecture, selects that one architecture, so a node on another one can't run it natively, and it won't verify against the release's attestation, which names the index.
 
 Verify the digest against the release's attestation before you trust it:
@@ -88,7 +88,7 @@ gh attestation verify oci://docker.io/leodip/goiabada@sha256:<digest> --repo leo
 
 `--source-ref` binds the digest to the release you're installing: an image an earlier release attested, re-pushed under this version's tag, fails it, where `--repo` alone accepts any image this repository attested.
 
-A reference carrying both a tag and a digest is pulled by the digest alone, so once a deployment is pinned, the tag and the digest change together, on an upgrade and on a rollback. A tag changed on its own keeps the old release running while the platform reports success, and a digest left in place on a rollback starts the newer server again, which migrates the schema back up. [Update to a new release](#update-to-a-new-release) and [Roll back to an earlier release](#roll-back-to-an-earlier-release) name that rule where you follow them.
+A reference carrying both a tag and a digest is pulled by the digest alone, so once a deployment is pinned, the tag and the digest change together, on an upgrade and on a rollback. A tag changed on its own keeps the old release running while the platform reports success, and a digest left in place on a rollback starts the newer server again, which migrates the schema back up.
 
 ## How migrations run
 

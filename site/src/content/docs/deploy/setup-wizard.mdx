@@ -105,7 +105,7 @@ With `--output`, the files go into the directory it names. When it names a file 
 
 The wizard never prints a password. The summary says only whether each one was set or generated, and the last message tells you where the admin password is.
 
-When you type a password at a terminal, the wizard doesn't show it. The admin password must be at least 15 characters and at most 72 bytes, and it can't be a commonly used password, the admin email, the part of the email before the `@`, or the app name, Goiabada, nor one of those with digits and symbols added or written twice. The wizard refuses any other and asks again, or stops when you gave it with `--admin-password` or `--admin-password-file`, because the auth server would refuse to start with it. It doesn't ask for any particular kind of character: a few unrelated words make a long password that's easy to remember.
+When you type a password at a terminal, the wizard doesn't show it. It refuses an admin password the auth server would refuse to start with, says why and asks again, or stops when you gave it with `--admin-password` or `--admin-password-file`. See [`GOIABADA_ADMIN_PASSWORD`](/reference/environment-variables/#initial-setup) for the rule.
 
 ## Answering with flags
 
@@ -134,7 +134,7 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 |---|---|
 | `--type` | The deployment: `local`, `production`, `kubernetes` or `native`. Giving it turns off the questions. |
 | `--db` | The database: `mysql`, `postgres`, `mssql` or `sqlite`. Required with `--type`. |
-| `--auth-url` | The auth server's URL, at most 60 characters, since the first start makes it the issuer and the auth server refuses to start on a longer one. Required with `--type`, except for `local`. |
+| `--auth-url` | The auth server's URL, at most 60 characters. Required with `--type`, except for `local`. |
 | `--admin-url` | The admin console's URL. Default: `https://admin.` and the auth server's domain, so `https://admin.example.com` for `https://auth.example.com`. Required when the auth server's host is an IP address or a single word. |
 | `--namespace` | Kubernetes: the namespace. Default: `goiabada`. |
 | `--admin-email` | The first administrator's email. Default: `admin@example.com` for `local`, otherwise `admin@` and the auth server's domain. Required when the auth server's host is an IP address or a single word. |

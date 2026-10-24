@@ -108,7 +108,7 @@ The auth server never sends a browser to a client's redirect URI with an error b
 | When | What happens |
 |---|---|
 | The client [registered itself](/concepts/clients/#self-registered-clients) | No error is sent, ever. The user sees a page naming the address the client asked to send them to, and the request stops there. |
-| The request has `prompt=none` | The error is sent at once, since a [silent request](/concepts/glossary/#silent-request) must never show a page. A request past the [rate limit](#rate-limit) is the one exception: it gets a page, and no error is sent. |
+| The request has `prompt=none` | The error is sent at once, since a [silent request](/concepts/glossary/#silent-request) must never show a page. |
 | The browser has a valid session, and the request doesn't have `prompt=login` | The error is sent at once |
 | Anything else, `prompt=login` included | The user is asked for their password, and the error is sent once they've entered it, before any one-time code. That sign-in creates no session. |
 

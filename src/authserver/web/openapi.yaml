@@ -67,59 +67,29 @@ servers:
 
 tags:
   - name: Users
-    description: >-
-      User management (Admin API). A refused value in a request body answers 400 with the refusal's
-      catalog key as its error_code, such as handler.user.email_required, except a new user's email
-      that is too long, EMAIL_TOO_LONG, and an email another user has, 409 EMAIL_ALREADY_EXISTS; a
-      malformed id and a missing expected list answer VALIDATION_ERROR.
+    description: User management (Admin API)
   - name: User Attributes
-    description: >-
-      Custom user attributes (Admin API). A refused value in a request body answers 400 with the
-      refusal's catalog key as its error_code, such as handler.attribute.key_required, except a value
-      that is too long, VALUE_TOO_LONG; a malformed id and a missing expected list answer
-      VALIDATION_ERROR.
+    description: Custom user attributes (Admin API)
   - name: User Sessions
     description: User session management (Admin API)
   - name: User Consents
     description: OAuth consent management (Admin API)
   - name: Groups
-    description: >-
-      Group management (Admin API). A refused value in a request body answers 400 with the refusal's
-      catalog key as its error_code, such as handler.group.identifier_in_use; a malformed id and a
-      missing expected list answer VALIDATION_ERROR.
+    description: Group management (Admin API)
   - name: Group Members
-    description: >-
-      Group membership management (Admin API). Adding a user who is already a member answers 400
-      with error_code handler.group_member.already_member, and removing one who is not with
-      handler.group_member.not_member; a malformed id answers VALIDATION_ERROR.
+    description: Group membership management (Admin API)
   - name: Group Attributes
-    description: >-
-      Custom group attributes (Admin API). A refused value in a request body answers 400 with the
-      refusal's catalog key as its error_code, such as handler.attribute.value_too_long; a malformed
-      id and a missing expected list answer VALIDATION_ERROR.
+    description: Custom group attributes (Admin API)
   - name: Resources
-    description: >-
-      Resource management (Admin API). A refused value in a request body answers 400 with the
-      refusal's catalog key as its error_code, such as handler.resource.identifier_in_use; a
-      malformed id and a missing expected list answer VALIDATION_ERROR.
+    description: Resource management (Admin API)
   - name: Permissions
-    description: >-
-      Permission management (Admin API). A refused value in a request body answers 400 with the
-      refusal's catalog key as its error_code, such as handler.permission.identifier_in_use; a
-      malformed id and a missing expected list answer VALIDATION_ERROR.
+    description: Permission management (Admin API)
   - name: Clients
-    description: >-
-      OAuth client management (Admin API). A refused value in a request body answers 400 with the
-      refusal's catalog key as its error_code, such as handler.client.identifier_in_use, so a caller
-      can tell which field was refused; a malformed id and a missing expected list answer
-      VALIDATION_ERROR.
+    description: OAuth client management (Admin API)
   - name: Audit Logs
     description: Audit log query (Admin API)
   - name: Settings
-    description: >-
-      System settings (Admin API). A refused value in a request body answers 400 with the refusal's
-      catalog key as its error_code, such as handler.settings_general.issuer_uri_invalid, so a
-      caller can tell which field was refused; a malformed key id answers VALIDATION_ERROR.
+    description: System settings (Admin API)
   - name: Account
     description: Self-service account management (Account API)
   - name: Browser Sessions
@@ -1045,9 +1015,8 @@ paths:
       tags: [User Sessions]
       summary: Delete session
       description: |
-        Terminate a live user session by its numeric id. The session's authorization codes are
-        marked revoked and the refresh tokens descended from them are swept, offline refresh tokens
-        included, in one transaction. A session that has passed the configured idle timeout or
+        End a live session by its numeric id. Its authorization codes are revoked, and so are the
+        refresh tokens they led to, offline ones included. A session that has passed the configured idle timeout or
         maximum lifetime is already gone: it is answered with 404, as an id naming no session is,
         and nothing is revoked.
       operationId: deleteUserSession
@@ -3659,9 +3628,8 @@ paths:
       tags: [Account]
       summary: Terminate own session
       description: |
-        Terminate one of the caller's own live sessions, the current one included. The session's
-        authorization codes are marked revoked and the refresh tokens descended from them are swept,
-        offline refresh tokens included, in one transaction. A session of another user is refused
+        End one of the caller's own live sessions, the current one included. Its authorization codes
+        are revoked, and so are the refresh tokens they led to, offline ones included. A session of another user is refused
         with 403 FORBIDDEN, whether or not it is still live. One of the caller's own sessions that
         has passed the configured idle timeout or maximum lifetime is already gone: it is answered
         with 404, as an id naming no session is, and nothing is revoked.
@@ -4736,9 +4704,7 @@ components:
           maxItems: 1000
           description: >-
             The complete set of groups the user belongs to after the call. An array naming more
-            than 1000 groups is refused with handler.user_groups.too_many before any of them is
-            read back, because every id is validated against the database and the list is read in
-            statement-sized batches.
+            than 1000 groups is refused with handler.user_groups.too_many, and nothing is written.
           items:
             type: integer
             format: int64
@@ -6077,15 +6043,7 @@ components:
           type: string
           enum: [none, low, medium, high, nist]
           description: >-
-            The policy every new password is held to: none, at least 1 character; low, at least
-            6; medium, at least 8, with a lowercase letter, an uppercase letter and a number;
-            high, at least 10, with a symbol too; nist, at least 15 characters of any kind and no
-            required character types, as NIST SP 800-63B-4 section 3.1.1.2 asks, refusing a
-            commonly used password with validator.password.too_common and one that is the
-            account's email address, its local part, its username or the app name, or one of them
-            repeated or padded with digits and symbols, with
-            validator.password.too_close_to_account. Every policy accepts at most 72 bytes.
-            Passwords already set are not checked again.
+            The policy every new password is held to. See UpdateSettingsGeneralRequest for the values.
         pkceRequired:
           type: boolean
           description: When true, confidential clients must use PKCE. Public clients always require PKCE regardless of this setting
@@ -6112,20 +6070,16 @@ components:
         appName:
           type: string
           description: >-
-            The App name, required: surrounding spaces are removed, and it is stored that way.
-            Three checks run in this order, and the first that fails is the answer: one that is
-            empty once they are is refused with 400 handler.settings_general.app_name_required,
-            one longer than 30 characters once they are with 400
-            handler.settings_general.app_name_too_long, and one holding < or > with 400
-            validator.settings.app_name_angle_brackets. The auth server's first start holds
-            GOIABADA_APPNAME to the same rule.
+            The App name, required, at most 30 characters once surrounding spaces are removed, and
+            without < or >. It is stored trimmed. A refusal is 400 with
+            handler.settings_general.app_name_required, handler.settings_general.app_name_too_long
+            or validator.settings.app_name_angle_brackets.
         issuer:
           type: string
           description: >-
             The issuer: surrounding spaces are removed, and it is stored that way. It is an https
             URL with no query, fragment or user info, or exactly the auth server's base URL
-            (GOIABADA_AUTHSERVER_BASEURL), whatever its scheme. Three checks run in this order, and
-            the first that fails is the answer: a changed issuer outside that rule is refused with
+            (GOIABADA_AUTHSERVER_BASEURL), whatever its scheme. A changed issuer outside that rule is refused with
             400 handler.settings_general.issuer_uri_invalid, any issuer longer than 60 characters
             once its spaces are removed with 400 handler.settings_general.issuer_too_long, and one
             holding < or > with 400 validator.settings.issuer_angle_brackets.
@@ -6141,13 +6095,10 @@ components:
           description: >-
             The policy every new password is held to: none, at least 1 character; low, at least
             6; medium, at least 8, with a lowercase letter, an uppercase letter and a number;
-            high, at least 10, with a symbol too; nist, at least 15 characters of any kind and no
-            required character types, as NIST SP 800-63B-4 section 3.1.1.2 asks, refusing a
-            commonly used password with validator.password.too_common and one that is the
-            account's email address, its local part, its username or the app name, or one of them
-            repeated or padded with digits and symbols, with
-            validator.password.too_close_to_account. Every policy accepts at most 72 bytes.
-            Passwords already set are not checked again.
+            high, at least 10, with a symbol too; nist, at least 15 characters of any kind,
+            refusing a commonly used password (validator.password.too_common) and one too close to
+            the account's details or the app name (validator.password.too_close_to_account). Every
+            policy accepts at most 72 bytes. Passwords already set are not checked again.
             Surrounding spaces are ignored, and any other value is refused with 400
             handler.settings_general.password_policy_invalid.
         pkceRequired:

@@ -13,9 +13,9 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 <Steps>
 
-1. In the admin console, open **Admin**, **General** and set **App name**. It's required, up to 30 characters, without `<` or `>`. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme", it signs every email, and it's the name authenticator apps list your users' accounts under.
+1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Theme** and choose a **Color theme**. It applies to the sign-in pages and the admin console alike. **Automatic**, which a new install starts with, is light or dark, following each visitor's device; **Light** and **Dark** always draw that one. To use your own colors, see [Regenerate the CSS](#regenerate-the-css).
+2. Open **Admin**, **Theme** and choose a **Color theme**. It applies to the sign-in pages and the admin console alike. A new install starts on **Automatic**, which follows each visitor's device. To use your own colors, see [Regenerate the CSS](#regenerate-the-css).
 
 3. Give each client a display name and a logo, so users see which app they're signing in to. See [Clients](/concepts/clients/#display-name-description-and-logo).
 
@@ -157,7 +157,7 @@ An email is written in its recipient's language: the **Language and region** on 
 
 ## Catalogs
 
-The text of every page, message and email subject is in the built-in English, Portuguese (Brazil), Spanish, French, Italian and German catalogs. A key with no text in the chosen language shows in English.
+The text of every page, message and email subject is in the built-in catalogs. A key with no text in the chosen language shows in English.
 
 `GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 

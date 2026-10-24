@@ -138,7 +138,7 @@ A refresh renewing `authserver:manage-account` is checked against the user's con
 | "The user has either not given consent to this client or the previously granted consent has been revoked." | The user has no consent to the client |
 | "Scope 'authserver:manage-account' is not recognized. The user has not consented to the 'authserver:manage-account' permission." | The user's consent leaves `authserver:manage-account` out |
 
-A refresh whose `scope` leaves `authserver:manage-account` out isn't checked for it, so it still works. A refresh token from the [password grant](/legacy-flows/ropc/) isn't checked either. A consent the user withdrew is different: the withdrawal revoked the client's refresh tokens, so the refresh is refused whatever `scope` it asks for.
+A refresh whose `scope` leaves `authserver:manage-account` out isn't checked for it, so it still works. A refresh token from the [password grant](/legacy-flows/ropc/) isn't checked either.
 
 ## Client credentials grant
 

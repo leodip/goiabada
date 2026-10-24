@@ -67,7 +67,7 @@ The auth server's limits counted by a user or an email always apply: wrong passw
 Not every limit holds across replicas:
 
 - **Shared:** the limits on guessing credentials, which count failed passwords (at sign-in and through the password grant), failed OTP codes, failed account password checks and failed email verification codes. They're counted in the database every pod shares, so three replicas still allow one budget, and a rollout doesn't reset it. If the database can't answer such a check within 5 seconds, the request is answered with a server error rather than let through.
-- **Per pod:** every other limit, the per-IP limits and the limits on outgoing mail. Behind the Service, three replicas give a client up to three times each budget, and a rollout resets them. For a limit across the whole deployment, use the gateway's own rate limiting.
+- **Per pod:** every other limit, the per-IP limits and the limits on outgoing mail. Behind the Service, three replicas give a client up to three times each budget, and a rollout resets them. For a limit across the whole deployment, use the gateway's own rate limiting. `/auth/authorize` writes a database row for each request it accepts, so give it a budget at the gateway when the limiter is off, or when you want one budget across the replicas.
 
 The budgets are in [Rate limits](/reference/environment-variables/#rate-limits). With the limiter on, the auth server also logs a warning at every start that it trusts one proxy hop with no list; behind Envoy alone that's expected, as [The startup warnings](/deploy/client-ip-and-proxy-trust/#the-startup-warnings) explains.
 

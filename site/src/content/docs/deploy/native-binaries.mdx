@@ -144,7 +144,7 @@ printf '%s\n' "$RECOVERY_PASSWORD" | sudo -u goiabada sh -c 'cd /var/lib/goiabad
 unset RECOVERY_PASSWORD
 ```
 
-The first line asks for the new password without showing it, and the second hands it to the command's input, so it never appears in a command line, the shell's history or a log. Each action is its own flag, `--grant-manage`, `--password-stdin` and `--remove-otp`, applied only as asked, and whatever is asked, the user's sessions end and the [audit log](/concepts/audit-log/) records the recovery. [Locked out of the admin console](/troubleshooting/locked-out-of-the-admin-console/#the-last-administrator-cant-sign-in) covers every flag and the other deployment shapes.
+The first line asks for the new password without showing it. [Recover the user with the auth server](/troubleshooting/locked-out-of-the-admin-console/#recover-the-user-with-the-auth-server) has every flag and what the command changes.
 
 ## Next steps
 
