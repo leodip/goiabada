@@ -1756,14 +1756,20 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/admin/resources/{id}/permissions:
+  /api/v1/admin/resources/{resourceId}/permissions:
     get:
       tags: [Resources]
       summary: Get resource permissions
       description: Get permissions defined for a resource
       operationId: getResourcePermissions
       parameters:
-        - $ref: '#/components/parameters/ResourceIdParam'
+        - name: resourceId
+          in: path
+          required: true
+          description: Resource ID
+          schema:
+            type: integer
+            format: int64
       responses:
         '200':
           description: |
@@ -1797,7 +1803,13 @@ paths:
         MANAGE_SCOPE_REQUIRED.
       operationId: updateResourcePermissions
       parameters:
-        - $ref: '#/components/parameters/ResourceIdParam'
+        - name: resourceId
+          in: path
+          required: true
+          description: Resource ID
+          schema:
+            type: integer
+            format: int64
       requestBody:
         required: true
         content:
@@ -1831,14 +1843,14 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/admin/permissions/{id}/users:
+  /api/v1/admin/permissions/{permissionId}/users:
     get:
       tags: [Permissions]
       summary: Get users with permission
       description: Get users that have a specific permission
       operationId: getUsersByPermission
       parameters:
-        - name: id
+        - name: permissionId
           in: path
           required: true
           description: Permission ID
