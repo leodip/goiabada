@@ -6068,22 +6068,23 @@ components:
         appName:
           type: string
           description: >-
-            The App name, required: surrounding spaces are removed, and it is stored that way. One
-            that is empty once they are is refused with 400
-            handler.settings_general.app_name_required, one longer than 30 characters once they
-            are with 400 handler.settings_general.app_name_too_long, and one holding < or > with
-            400 validator.settings.app_name_angle_brackets. The auth server's first start holds
+            The App name, required: surrounding spaces are removed, and it is stored that way.
+            Three checks run in this order, and the first that fails is the answer: one that is
+            empty once they are is refused with 400 handler.settings_general.app_name_required,
+            one longer than 30 characters once they are with 400
+            handler.settings_general.app_name_too_long, and one holding < or > with 400
+            validator.settings.app_name_angle_brackets. The auth server's first start holds
             GOIABADA_APPNAME to the same rule.
         issuer:
           type: string
           description: >-
             The issuer: surrounding spaces are removed, and it is stored that way. It is an https
             URL with no query, fragment or user info, or exactly the auth server's base URL
-            (GOIABADA_AUTHSERVER_BASEURL), whatever its scheme. A changed issuer outside that rule
-            is refused with 400 handler.settings_general.issuer_uri_invalid. Any issuer longer than
-            60 characters once its spaces are removed is refused with 400
-            handler.settings_general.issuer_too_long, and one holding < or > with 400
-            validator.settings.issuer_angle_brackets.
+            (GOIABADA_AUTHSERVER_BASEURL), whatever its scheme. Three checks run in this order, and
+            the first that fails is the answer: a changed issuer outside that rule is refused with
+            400 handler.settings_general.issuer_uri_invalid, any issuer longer than 60 characters
+            once its spaces are removed with 400 handler.settings_general.issuer_too_long, and one
+            holding < or > with 400 validator.settings.issuer_angle_brackets.
         selfRegistrationEnabled:
           type: boolean
         selfRegistrationRequiresEmailVerification:
