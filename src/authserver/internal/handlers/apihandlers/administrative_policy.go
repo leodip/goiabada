@@ -23,6 +23,14 @@ import (
 // does, to whom it does it. A granular scope keeps full control of everyone and everything else
 // (#402 decision 1).
 //
+// What reaches an administrator is what their authority in this server and their own sign-in rest
+// on: who holds an administrative permission, the administrator's record, and the settings and
+// permission descriptions the ceilings name. It is not the claims and ordinary scopes other
+// applications read. A change to an ordinary group or resource is not a write to an administrator,
+// even when an administrator is a member of the group or holds one of the resource's permissions,
+// so a granular scope renames, regrants or deletes it although the administrator's next tokens
+// change: it makes and unmakes no administrator and signs in as none (#679).
+//
 // The caller's authority is the access token's scope, as at the route gate, and a request that
 // reached a handler with no validated token holds no authority here: the policy fails closed.
 // A refusal is decided before anything is written and before any transaction opens, after the
