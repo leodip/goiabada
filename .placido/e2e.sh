@@ -5,6 +5,11 @@
 #   .placido/e2e.sh                  # the whole suite
 #   .placido/e2e.sh tests/oauth      # one area; any Playwright argument passes through
 #
+# The environment is built with the rate limiter off, whatever e2e/.env says: the
+# tests of one address's limits then skip, and they were nearly half the suite's time,
+# spent waiting out the limits' windows. The release check, e2e/run.sh --source run by
+# hand, keeps the limiter on.
+#
 # There is one environment, so a lock keeps two placido runs from rebuilding it at
 # once. The machine's settings (e2e/.env) come from the main checkout, and what the
 # run leaves in e2e/.state (the URLs, the admin password) goes back to it, so
@@ -12,7 +17,7 @@
 set -uo pipefail
 
 case "${1:-}" in
-  -h | --help) sed -n '2,11s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,16s/^# \{0,1\}//p' "$0"; exit 0 ;;
 esac
 
 worktree="$(git rev-parse --show-toplevel)" || exit 1
@@ -30,7 +35,7 @@ if ! flock -n 9; then
   flock 9
 fi
 
-"$worktree/e2e/run.sh" --source "$@"
+E2E_RATE_LIMITER=false "$worktree/e2e/run.sh" --source "$@"
 status=$?
 
 if [[ "$main" != "$worktree" && -d "$worktree/e2e/.state" ]]; then

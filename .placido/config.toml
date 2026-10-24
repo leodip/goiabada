@@ -59,7 +59,7 @@ about = "Regenerate the core symbol ownership table, after adding or moving a co
 
 [commands.e2e]
 run   = "$PLACIDO_REPO/.placido/e2e.sh"
-about = "Rebuilds the one shared e2e environment on the VPS from this worktree's src/ and runs the Playwright suite against it (e2e/run.sh --source), about ten minutes. Placido runs it as the last gate, after the review, and again on a fix of it; do not run it yourself."
+about = "Rebuilds the one shared e2e environment on the VPS from this worktree's src/, with the rate limiter off, and runs the Playwright suite against it (e2e/run.sh --source), about ten minutes; the tests of one address's rate limits skip. Placido runs it as the last gate, after the review, and again on a fix of it; do not run it yourself."
 
 [gates]
 slice = ["vet", "unit"]
