@@ -739,6 +739,27 @@ cmd_update() {
     done
 
     # -------------------------------------------------------------------------
+    # Node.js images
+    # -------------------------------------------------------------------------
+    # The docs site and the e2e test app build on the same Node.js as the dev
+    # container and the test jobs, so one pin covers every Node.js in the tree.
+    echo -e "\n${BOLD}Node.js images${NC}"
+
+    for dockerfile in "$BASE_DIR/site/Dockerfile" \
+                      "$BASE_DIR/e2e/testapp/Dockerfile"; do
+        if [ -f "$dockerfile" ]; then
+            # Node base image: node:X.Y.Z-alpine
+            if update_file "$dockerfile" \
+                "s|node:[0-9.]*-alpine|node:${NODE_VERSION}-alpine|g" \
+                "Node base image"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+        fi
+    done
+
+    # -------------------------------------------------------------------------
     # Go Module Files
     # -------------------------------------------------------------------------
     echo -e "\n${BOLD}Go Module Files${NC}"

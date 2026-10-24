@@ -7,7 +7,7 @@
 
 # Dependencies and sources, with nothing built yet. CI runs the site checks'
 # tests in this stage, so they run on the Node version the site is built with.
-FROM node:22-alpine AS sources
+FROM node:26.12.1-alpine AS sources
 
 WORKDIR /repo/site
 

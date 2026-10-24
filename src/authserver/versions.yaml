@@ -19,8 +19,9 @@
 # -----------------------------------------------------------------------------
 # go:             Go language version (used in go.mod, Dockerfiles, GitHub Actions)
 # tailwind:       Tailwind CSS CLI version (devcontainer)
-# node:           Node.js, which core/guard's script check runs acorn under (devcontainer, the
-#                 test jobs' setup action)
+# node:           Node.js: core/guard's script check runs acorn under it (devcontainer, the
+#                 test jobs' setup action), and the docs site and the e2e test app are built
+#                 and run on it (site/Dockerfile, e2e/testapp/Dockerfile)
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
 # staticcheck:    Static analyzer (devcontainer, make check)
@@ -48,7 +49,7 @@
 tools:
   go: "1.27.3"
   tailwind: "4.3.3"
-  node: "26.12.0"
+  node: "26.12.1"
   golangci-lint: "2.15.0"
   mockery: "3.8.1"
   staticcheck: "0.8.2"

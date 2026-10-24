@@ -113,7 +113,7 @@ Some committed files are written by a tool. When your change touches what one is
 
 The docs site is in `site/`, and every page follows [`site/STYLE.md`](https://github.com/leodip/goiabada/blob/main/site/STYLE.md): the voice, the shape of a page and the words the [glossary](/concepts/glossary/) gives each concept.
 
-The dev container has no Node.js, so build the site on your own machine, with Node.js 22.12 or later, from `site/`:
+The dev container has no npm, so build the site on your own machine, with the Node.js version [`site/Dockerfile`](https://github.com/leodip/goiabada/blob/main/site/Dockerfile) builds it with, from `site/`:
 
 ```sh
 npm ci
