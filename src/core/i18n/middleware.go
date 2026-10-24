@@ -192,8 +192,8 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 
 // attachLocale stores the localizer plus the primary resolved language tag
 // (the first preference used to build the localizer; "en" for the bundle's
-// English fallback). The tag is what LocaleTag answers, which the admin
-// console's CLDR-backed reference labels read.
+// English fallback). The tag is what LocaleTag answers, which an email's body
+// copy is chosen from.
 func attachLocale(ctx context.Context, loc *translator, tag string, explicit bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))

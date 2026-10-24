@@ -11,9 +11,15 @@ import (
 // The three reference-data labels the admin console's country, phone-country
 // and timezone pickers render. They were core/i18n.RefCountry,
 // RefPhoneCountry and RefTimezone until #442, which moved them here with
-// their one caller: they read nothing of i18n but the locale tag, through
-// i18n.LocaleTag, and in core they put CLDR's display tables into the auth
+// their one caller: they read nothing of i18n but the catalog tag, through
+// i18n.CatalogTag, and in core they put CLDR's display tables into the auth
 // server's binary, whose pages render none of these labels.
+//
+// "The active locale" below is the catalog the page was rendered from, not the
+// first preference asked for, so the names are in the language of the page
+// around them: a browser asking for de-DE, with no German catalog, reads an
+// English page naming Germany "Germany", and one asking for fr-CA first and
+// pt-BR third a pt-BR page naming it "Alemanha" (#645 decision 9).
 
 // refCountry returns the localized country name for an ISO 3166-1 alpha-2
 // code, resolved from CLDR (golang.org/x/text/language/display) for the
@@ -69,7 +75,7 @@ func localizedRegionName(ctx context.Context, alpha2, fallback string) string {
 	if err != nil {
 		return fallback
 	}
-	tag, err := language.Parse(i18n.LocaleTag(ctx))
+	tag, err := language.Parse(i18n.CatalogTag(ctx))
 	if err != nil {
 		return fallback
 	}

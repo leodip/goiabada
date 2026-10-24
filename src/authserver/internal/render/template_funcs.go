@@ -40,10 +40,11 @@ var templateFuncMap = template.FuncMap{
 		}
 		return i18n.T(ctx, key, args)
 	},
-	// Lang resolves the active locale's BCP 47 tag for the <html lang="...">
-	// attribute, so the document advertises the language it actually renders
-	// in (screen readers, hyphenation, translation tools). Falls back to "en".
-	"Lang": i18n.LocaleTag,
+	// Lang is the tag of the catalog the page rendered from, for the <html lang="..."> attribute,
+	// so the document advertises the language it is written in (screen readers, hyphenation,
+	// translation tools): a browser asking for de-DE, with no German catalog, reads an English page
+	// marked en, not de-DE (WCAG 2.2 SC 3.1.1, #645 decision 8).
+	"Lang": i18n.CatalogTag,
 
 	// https://dev.to/moniquelive/passing-multiple-arguments-to-golang-templates-16h8
 	"args": func(els ...any) []any {

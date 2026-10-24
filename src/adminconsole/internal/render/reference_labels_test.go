@@ -10,9 +10,10 @@ import (
 
 // localeCtx sets the locale the way a request does, through the one
 // locale-setting primitive core/i18n exports, so the assertions below read the
-// real embedded catalogs and the real tag rather than a stub.
-func localeCtx(tag string) context.Context {
-	return i18n.WithLocale(context.Background(), false, tag)
+// real embedded catalogs and the real tag rather than a stub. The tags are a
+// preference order, as a request's Accept-Language or ui_locales is.
+func localeCtx(tags ...string) context.Context {
+	return i18n.WithLocale(context.Background(), false, tags...)
 }
 
 func TestReference_FallbackChain(t *testing.T) {
@@ -23,9 +24,9 @@ func TestReference_FallbackChain(t *testing.T) {
 	// Uncurated but valid code: resolved via CLDR for the active locale.
 	assert.Equal(t, "Italy", refCountry(englishCtx, "IT", "fallback"))
 
-	// Unparseable locale tag: CLDR can't resolve, fallback wins.
+	// A locale with no catalog renders an English page, and its names are English.
 	unknownCtx := localeCtx("xx")
-	assert.Equal(t, "fallback", refCountry(unknownCtx, "BR", "fallback"))
+	assert.Equal(t, "Brazil", refCountry(unknownCtx, "BR", "fallback"))
 
 	// Unparseable country code: fallback wins.
 	assert.Equal(t, "fallback", refCountry(englishCtx, "not-a-code", "fallback"))
@@ -103,4 +104,28 @@ func TestReference_LocalizedRegionName(t *testing.T) {
 	assert.Equal(t, "fallback", localizedRegionName(ptCtx, "not-a-code", "fallback"))
 	// Empty code → fallback (skips parse).
 	assert.Equal(t, "fallback", localizedRegionName(ptCtx, "", "fallback"))
+}
+
+// The labels are in the language of the catalog the page was rendered from, not the first
+// preference asked for: de-DE has no catalog, so its page is English and names Germany "Germany",
+// not "Deutschland"; fr-CA first and pt-BR third renders pt-BR, so its names are Portuguese, not
+// French (#645 decision 9).
+func TestReference_LabelsFollowTheCatalogLanguage(t *testing.T) {
+	for _, tc := range []struct {
+		name                            string
+		tags                            []string
+		country, phoneCountry, timezone string
+	}{
+		{"a first preference with no catalog", []string{"de-DE"},
+			"Germany", "🇩🇪 - Germany (+49)", "Germany - Europe/Berlin - most of Germany"},
+		{"a third preference with a catalog", []string{"fr-CA", "fr", "pt-BR"},
+			"Alemanha", "🇩🇪 - Alemanha (+49)", "Alemanha - Europe/Berlin - most of Germany"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := localeCtx(tc.tags...)
+			assert.Equal(t, tc.country, refCountry(ctx, "DE", "fallback"))
+			assert.Equal(t, tc.phoneCountry, refPhoneCountry(ctx, "🇩🇪", "DE", "+49", "fallback"))
+			assert.Equal(t, tc.timezone, refTimezone(ctx, "Europe/Berlin", "DE", "fallback", "most of Germany"))
+		})
+	}
 }

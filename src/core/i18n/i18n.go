@@ -396,9 +396,10 @@ func T(ctx context.Context, key string, args ...any) string {
 
 // LocaleTag returns the BCP 47 language tag attached to ctx by the locale
 // middleware (or refinement helpers). Returns "en" when none is attached.
-// Used by the admin console's CLDR-backed, locale-sensitive reference labels
-// (refCountry/refPhoneCountry/refTimezone in its render package) to pick the
-// active locale.
+// It is the first preference asked for, whether or not a catalog matches it,
+// which is what an email's body copy is chosen from (#531): an operator may
+// ship a copy in a language that has no catalog. What marks a page's language
+// and the admin console's CLDR labels read CatalogTag instead (#645).
 func LocaleTag(ctx context.Context) string {
 	if ctx != nil {
 		if v := ctx.Value(ctxKeyLocaleTag); v != nil {
@@ -416,6 +417,8 @@ func LocaleTag(ctx context.Context) string {
 //
 // It differs from LocaleTag, which answers the first preference asked for whether or not any
 // catalog matches it: "fr-CA,fr;q=0.9,pt-BR;q=0.8" renders in pt-BR, and LocaleTag answers fr-CA.
+// Both servers mark a page's <html lang> with it, since it names the language the page is written
+// in, and the admin console names its CLDR country labels in it (#645 decisions 8 and 9).
 // The admin console sends this tag as Accept-Language on every admin API call, so the auth server
 // answers a refusal in the language the console's page is rendered in; the value is always one of
 // the loaded catalogs' tags, never text the browser sent (#559 decision 3).

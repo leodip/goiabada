@@ -42,3 +42,26 @@ func TestRender_SettingsUnavailable(t *testing.T) {
 	assert.Contains(t, out, `<code class="break-all font-mono text-ink">`+requestID+`</code>`)
 	assert.Regexp(t, `<link rel="stylesheet" href="/static/main.css\?v=[0-9a-f]+">`, out)
 }
+
+// The page is marked with the language it is written in, the catalog's, not the first preference
+// asked for: de-DE has no catalog and reads English, and fr-CA first with pt-BR third reads pt-BR
+// (#645 decision 8).
+func TestRender_SettingsUnavailableIsMarkedWithTheCatalogLanguage(t *testing.T) {
+	for acceptLanguage, want := range map[string]string{
+		"de-DE":                      "en",
+		"fr-CA,fr;q=0.9,pt-BR;q=0.8": "pt-BR",
+	} {
+		t.Run(acceptLanguage, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Header.Set("Accept-Language", acceptLanguage)
+			w := httptest.NewRecorder()
+			i18n.Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.New(web.TemplateFS(), web.StaticFS()).SettingsUnavailable(w, r,
+					"adminconsole.error.settings_unavailable_title", "adminconsole.error.settings_unavailable")
+			})).ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusInternalServerError, w.Code)
+			assert.Contains(t, w.Body.String(), `<html lang="`+want+`">`)
+		})
+	}
+}
