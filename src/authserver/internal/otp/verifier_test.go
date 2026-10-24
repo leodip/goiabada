@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pquerna/otp/totp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,8 +21,8 @@ const (
 	pinnedUnix = int64(1700000000)
 	pinnedStep = pinnedUnix / StepSeconds
 
-	// 16 characters of valid base32. The length matters: the library pads a secret
-	// to a multiple of 8 with "=" before decoding it, and 16 already is one, so the
+	// 16 characters of valid base32. The length matters: a secret is padded to a
+	// multiple of 8 with "=" before it is decoded, and 16 already is one, so the
 	// interior-space row below fails the decode for that reason alone.
 	validSecret = "JBSWY3DPEHPK3PXP"
 )
@@ -37,20 +37,16 @@ func stepMidpoint(step int64) time.Time {
 	return time.Unix(step*StepSeconds+15, 0).UTC()
 }
 
-// codeAtStep derives the code for a time step through the library's TOTP generator,
-// asking for it mid-step so the timestamp cannot land on a boundary either.
+// codeAtStep derives the code for a time step through otptest, asking for it mid-step
+// so the timestamp cannot land on a boundary either.
 //
-// Generating through TOTP and validating through HOTP is not two independent
-// cryptographic implementations: totp.GenerateCode delegates to
-// hotp.GenerateCodeCustom, so both sides share one HMAC. What this table pins is the
-// part that is ours, that TOTP maps a chosen timestamp to a counter while MatchStep has
-// to derive the correct counter and window from now. The step arithmetic is under test;
-// the HMAC is the library's and is not retested here.
+// otptest is a second RFC 6238 implementation sharing nothing with this package's, both
+// pinned by the RFC vectors, so this table checks the verifier against an independent
+// answer: the HMAC, the truncation and the step arithmetic MatchStep derives from now are
+// all under test, where they agree with an authenticator only if each is right.
 func codeAtStep(t *testing.T, secret string, step int64) string {
 	t.Helper()
-	code, err := totp.GenerateCode(secret, stepMidpoint(step))
-	require.NoError(t, err)
-	return code
+	return otptest.Code(t, secret, stepMidpoint(step))
 }
 
 func TestMatchStep(t *testing.T) {
@@ -98,8 +94,8 @@ func TestMatchStep(t *testing.T) {
 			secret:   validSecret,
 		},
 		{
-			// Wrong passcode length: the library returns ErrValidateInputInvalidLength on
-			// the first iteration and MatchStep collapses that to no match.
+			// Wrong passcode length: refused before any step is computed, and MatchStep
+			// collapses that to no match.
 			name:     "Empty passcode is refused",
 			passcode: "",
 			secret:   validSecret,
@@ -124,7 +120,7 @@ func TestMatchStep(t *testing.T) {
 			secret:   validSecret,
 		},
 		{
-			name:         "Passcode padded with whitespace is accepted, since the library trims it",
+			name:         "Passcode padded with whitespace is accepted, since it is trimmed",
 			passcode:     " " + codeAtPinnedStep + " ",
 			secret:       validSecret,
 			expectedStep: pinnedStep,
@@ -132,9 +128,9 @@ func TestMatchStep(t *testing.T) {
 		},
 		{
 			// Keep this. It asserts acceptance, which reads like a laxity to tighten.
-			// The library upper-cases a secret before decoding it, so Google's lower-case
-			// base32 works today and refusing it here would be a silent behaviour change.
-			name:         "Lower-case secret is accepted, since the library upper-cases it",
+			// A secret is upper-cased before it is decoded, as pquerna/otp did, so Google's
+			// lower-case base32 works and refusing it here would be a silent behaviour change.
+			name:         "Lower-case secret is accepted, since it is upper-cased",
 			passcode:     codeAtPinnedStep,
 			secret:       strings.ToLower(validSecret),
 			expectedStep: pinnedStep,
@@ -142,19 +138,19 @@ func TestMatchStep(t *testing.T) {
 		},
 		{
 			// Keep this, together with the row below. The two look contradictory: the
-			// library trims the outside of a secret and then base32-decodes it, so
-			// interior spaces fail the decode and surrounding ones do not. Both
-			// directions are stated so a later reader does not "fix" one of them.
+			// outside of a secret is trimmed and then it is base32-decoded, so interior
+			// spaces fail the decode and surrounding ones do not. Both directions are
+			// stated so a later reader does not "fix" one of them.
 			//
-			// Unparseable base32 secret: ErrValidateSecretInvalidBase32 on the first
-			// iteration, collapsed to no match.
+			// Unparseable base32 secret: refused before any step is computed, collapsed
+			// to no match.
 			name:     "Secret with interior spaces is refused",
 			passcode: codeAtPinnedStep,
 			secret:   "JBSW Y3DP EHPK 3PXP",
 		},
 		{
 			// Keep this, together with the row above.
-			name:         "Secret with surrounding spaces is accepted, since the library trims it",
+			name:         "Secret with surrounding spaces is accepted, since it is trimmed",
 			passcode:     codeAtPinnedStep,
 			secret:       " " + validSecret + " ",
 			expectedStep: pinnedStep,
@@ -167,17 +163,31 @@ func TestMatchStep(t *testing.T) {
 			secret:   "INVALID!SECRET!!",
 		},
 		{
-			// Keep this. It is the one row that deliberately diverges from
-			// totp.Validate, which accepts the empty secret: the library derives a real
-			// six-digit code from the empty key, and that code depends only on the time
-			// step, so anyone can compute it for any deployment (#111 decision 9).
+			// Keep this. HOTP derives a real six-digit code from the empty key, and that
+			// code depends only on the time step, so anyone can compute it for any
+			// deployment (#111 decision 9). pquerna/otp's totp.Validate accepted it.
 			//
-			// The passcode has to be the code the library actually derives from the empty
+			// The passcode has to be the code RFC 6238 actually derives from the empty
 			// secret at the pinned step, never arbitrary digits, or the row still passes
-			// with the guard in MatchStep deleted.
-			name:     "Empty secret is refused, even with the code the library derives from it",
+			// with the refusal in decodeSecret deleted.
+			name:     "Empty secret is refused, even with the code derived from it",
 			passcode: codeAtStep(t, "", pinnedStep),
 			secret:   "",
+		},
+		{
+			// Keep this, together with the row below. A secret's surrounding whitespace is
+			// trimmed before it is decoded, so whitespace alone decodes to the empty key and
+			// derives the same code anyone can compute, as the row above. The refusal is of
+			// the key, not the string as stored.
+			name:     "Secret of spaces alone is refused, even with the empty key's code",
+			passcode: codeAtStep(t, "", pinnedStep),
+			secret:   "   ",
+		},
+		{
+			// Keep this, together with the row above.
+			name:     "Secret of mixed whitespace alone is refused, even with the empty key's code",
+			passcode: codeAtStep(t, "", pinnedStep),
+			secret:   " \t\n ",
 		},
 	}
 
@@ -201,7 +211,7 @@ func TestMatchStep(t *testing.T) {
 // refuses every later presentation of the same passcode.
 //
 // The table above cannot pin any of this. Nothing collides within eight steps of the
-// instant it pins, so every rule decision 11 rejected passes all 15 of its rows,
+// instant it pins, so every rule decision 11 rejected passes all 17 of its rows,
 // including the shipped one that returned the step matched inside the window.
 // Colliding pairs are rare, roughly 8 authentications in a million meet one, so no
 // other test in the suite will ever reach this path by accident.
@@ -209,7 +219,9 @@ func TestMatchStep(t *testing.T) {
 // The pairs, and the expected answer at each current step, are transcribed from an
 // executed sweep of 600,000 consecutive steps of this secret, which also confirmed that
 // no third step within eight either side produces these passcodes. That is what makes the
-// answer constant rather than merely lower than it was.
+// answer constant rather than merely lower than it was. The sweep ran over pquerna/otp's
+// HMAC, so the check below that both steps still produce one passcode also shows this
+// package's HOTP and otptest's agreeing with the library at six steps no RFC vector names.
 func TestMatchStepWithCollidingSteps(t *testing.T) {
 	// Written for the skew of 1 the server runs at. Spreads are stated as literals
 	// rather than in terms of skewSteps so that #142, if it ever narrows the window,
@@ -402,7 +414,7 @@ func TestMatchStepWithAChainLongerThanTheWalk(t *testing.T) {
 	})
 }
 
-// The error branches, both of which refuse. Through MatchStep the library's two errors
+// The error branches, both of which refuse. Through MatchStep the predicate's two errors
 // are an unparseable secret and a wrong-length passcode, neither of which depends on the
 // step, so the table above reaches the window's branch and nothing can reach the walk's.
 // Over the predicate both are reachable, and the walk's is the one worth pinning: an error

@@ -15,11 +15,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,14 +45,15 @@ import (
 // no sequential caller can observe; that the marker is genuinely reset stays with
 // TestAPIAccountOTPPut_Disable_ResetsConsumedStep, which asserts it end to end on four engines.
 
-// otpTestSecret is a valid base32 TOTP secret, 32 chars of A-Z and 2-7. Nothing about the digits
-// matters, only that totp and MatchStep agree on it.
+// otpTestSecret is a valid base32 TOTP secret, 32 chars of A-Z and 2-7: RFC 4226's test key. Nothing
+// about the digits matters, only that otptest, the second implementation the codes come from, and
+// MatchStep agree on it.
 const otpTestSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
 // otpTestKeyURL is what the server actually stores for a pending enrollment: the whole otpauth://
 // URL, not the bare seed, so a repeat GET can render a byte-identical QR image from it. Written out
-// with algorithm, digits and period explicit, exactly as otp.Key.URL() serializes them, so
-// otp.SecretFromKeyURL reads otpTestSecret back off it.
+// with algorithm, digits and period explicit, exactly as otp.KeyGenerator.GenerateKeyURL writes
+// them, so otp.SecretFromKeyURL reads otpTestSecret back off it.
 const otpTestKeyURL = "otpauth://totp/Goiabada:otp@example.com?algorithm=SHA1&digits=6&issuer=Goiabada&period=30&secret=" + otpTestSecret
 
 // pendingEnrollment is the encrypted-and-timestamped pair the server writes when it issues an
@@ -98,9 +99,7 @@ func accountOTPRawRequest(t *testing.T, subject string, fields map[string]interf
 // the audit payload against that, which pins the payload without pinning the clock.
 func currentOtpCode(t *testing.T) string {
 	t.Helper()
-	code, err := totp.GenerateCode(otpTestSecret, time.Now().UTC())
-	require.NoError(t, err)
-	return code
+	return otptest.Code(t, otpTestSecret, time.Now().UTC())
 }
 
 // otpTestUser is a user part way through an enrollment: the server has issued otpTestKeyURL to them

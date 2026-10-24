@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,11 +190,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	// Setup: Create test user with OTP enabled. The address is the authenticator's
 	// account name as well as the user's, so it is drawn once.
 	otpEmail := uniqueEmail("testuser@otp.test")
-	secret, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "test",
-		AccountName: otpEmail,
-	})
-	require.NoError(t, err)
+	otpSecret := newOTPSecretForTest(t, otpEmail)
 
 	testUser := &record.User{
 		Subject:            fake.UUID(),
@@ -204,9 +200,9 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 		FamilyName:         "User",
 		EmailVerified:      true,
 		OTPEnabled:         true,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, secret.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 	}
-	err = database.CreateUser(context.Background(), nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
@@ -257,12 +253,9 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 	setUserPasswordForOTP(t, user.Id, "Correct1!")
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: "adminreset@otp.test"})
-	require.NoError(t, err)
-	secret := key.Secret()
+	keyURL, secret := newOTPKeyURLForTest(t, "adminreset@otp.test")
 
-	code, err := totp.GenerateCode(secret, time.Now())
-	require.NoError(t, err)
+	code := otptest.Code(t, secret, time.Now())
 
 	enable := api.UpdateAccountOTPRequest{
 		Enabled:  true,
@@ -274,7 +267,7 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	// to be staged against this same key rather than named in the request. A second call to the
 	// issuing endpoint would mint a different secret, and the same code could not match twice
 	// (#247).
-	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
+	installPendingEnrollmentForTest(t, user.Id, keyURL, time.Now().UTC())
 	status, body := putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the enable to succeed, got %d. body: %s", status, body)
@@ -290,7 +283,7 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	// The same code the enable already consumed. It is accepted only because the admin disable
 	// reset the marker.
 	skipIfOtpCodeOutsideWindow(t, secret, code)
-	installPendingEnrollmentForTest(t, user.Id, key.URL(), time.Now().UTC())
+	installPendingEnrollmentForTest(t, user.Id, keyURL, time.Now().UTC())
 	status, body = putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the re-enable with the same code to succeed after the admin disable reset "+

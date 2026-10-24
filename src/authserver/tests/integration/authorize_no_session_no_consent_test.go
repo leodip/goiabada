@@ -12,9 +12,9 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -268,20 +268,14 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	}
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 
@@ -335,10 +329,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -460,10 +451,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
-	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -526,20 +514,14 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 
@@ -593,10 +575,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -869,20 +848,14 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 

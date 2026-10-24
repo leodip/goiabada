@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pquerna/otp/totp"
-
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 )
 
@@ -138,20 +137,11 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		}
 		return user.Id
 	}
-	codeFor := func(t *testing.T, seed string, now time.Time) string {
-		t.Helper()
-		code, err := totp.GenerateCode(seed, now)
-		if err != nil {
-			t.Fatalf("totp.GenerateCode: %v", err)
-		}
-		return code
-	}
-
 	t.Run("the authenticator read is still the one enrolled", func(t *testing.T) {
 		read := reloadUser(t, enrolled(t))
 		now := time.Now().UTC()
 
-		result, err := otpcredential.VerifyStored(ctx, database, dataCipher, read, codeFor(t, firstSeed, now), now)
+		result, err := otpcredential.VerifyStored(ctx, database, dataCipher, read, otptest.Code(t, firstSeed, now), now)
 		if err != nil {
 			t.Fatalf("VerifyStored failed: %v", err)
 		}
@@ -179,7 +169,7 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		}
 
 		now := time.Now().UTC()
-		result, err := otpcredential.VerifyStored(ctx, database, dataCipher, read, codeFor(t, firstSeed, now), now)
+		result, err := otpcredential.VerifyStored(ctx, database, dataCipher, read, otptest.Code(t, firstSeed, now), now)
 		if err != nil {
 			t.Fatalf("VerifyStored failed: %v", err)
 		}
@@ -206,7 +196,7 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		}
 
 		// The replacement itself verifies from a read of it.
-		result, err = otpcredential.VerifyStored(ctx, database, dataCipher, replaced, codeFor(t, replacementSeed, now), now)
+		result, err = otpcredential.VerifyStored(ctx, database, dataCipher, replaced, otptest.Code(t, replacementSeed, now), now)
 		if err != nil {
 			t.Fatalf("VerifyStored of the replacement failed: %v", err)
 		}

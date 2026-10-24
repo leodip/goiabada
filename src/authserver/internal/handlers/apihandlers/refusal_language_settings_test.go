@@ -118,6 +118,14 @@ func TestSettingsGeneralSessionsTokensRefusals_AreInTheRequestsLanguage(t *testi
 			portuguese: "O nome do aplicativo é longo demais. O tamanho máximo é de 30 caracteres.",
 		},
 		{
+			name:       "a blank app name",
+			serve:      general(map[string]any{"appName": "  "}),
+			status:     http.StatusBadRequest,
+			code:       "handler.settings_general.app_name_required",
+			english:    "App name is required.",
+			portuguese: "O nome do aplicativo é obrigatório.",
+		},
+		{
 			name:       "an issuer that is neither an https URL nor the base URL",
 			serve:      general(map[string]any{"issuer": "goiabada"}),
 			status:     http.StatusBadRequest,

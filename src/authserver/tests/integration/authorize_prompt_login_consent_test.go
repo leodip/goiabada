@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -301,16 +300,10 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
 
 	// Enable OTP for user
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

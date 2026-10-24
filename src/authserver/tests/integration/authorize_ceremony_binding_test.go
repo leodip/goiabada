@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -355,10 +355,7 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 		{otpUrlA, otpPageA, clientA, redirectUriA, stateA},
 		{otpUrlB, otpPageB, clientB, redirectUriB, stateB},
 	} {
-		otpCode, err := totp.GenerateCode(otpSecret, now.Add(time.Duration(i)*30*time.Second))
-		if err != nil {
-			t.Fatal(err)
-		}
+		otpCode := otptest.Code(t, otpSecret, now.Add(time.Duration(i)*30*time.Second))
 
 		resp := authenticateWithOtp(t, httpClient, signIn.otpUrl, signIn.otpPage, otpCode)
 		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
@@ -386,18 +383,12 @@ func TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment(t *testing.T
 
 	enrolUrlA, enrolPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, fake.LetterN(8), userA, passwordA)
 	defer func() { _ = enrolPageA.Body.Close() }()
-	codeFromAsKey, err := totp.GenerateCode(getOtpSecretFromEnrollmentPage(t, enrolPageA), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	codeFromAsKey := otptest.Code(t, getOtpSecretFromEnrollmentPage(t, enrolPageA), time.Now())
 
 	stateB := fake.LetterN(8)
 	otpUrlB, otpPageB := walkToOtpPrompt(t, httpClient, clientB, redirectUriB, stateB, userB, passwordB)
 	defer func() { _ = otpPageB.Body.Close() }()
-	codeB, err := totp.GenerateCode(otpSecretB, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	codeB := otptest.Code(t, otpSecretB, time.Now())
 
 	resp := authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, codeB)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)

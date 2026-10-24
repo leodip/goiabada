@@ -498,6 +498,101 @@ func TestRun_RefusesAnAdminEmailPast254CharactersInBothModes(t *testing.T) {
 	}
 }
 
+// A first start holds GOIABADA_APPNAME to the rule the general settings save applies: trimmed, at
+// most 30 characters, counted in characters, and no angle brackets. One that breaks it is refused in
+// both bootstrap modes before any write and before the bootstrap file is staged, naming the variable
+// and why, with the database left empty for the next start, which, with the variable fixed, seeds
+// it. Without it a seeded name over 32 characters made every authenticator enrolment fail with a 500
+// (#646 decision 3).
+func TestRun_RefusesAnAppNameTheSettingsWouldRefuseInBothModes(t *testing.T) {
+	names := []struct {
+		name    string
+		appName string
+		reason  string
+	}{
+		{"31 ASCII characters", strings.Repeat("a", 31), "App name is too long. The maximum length is 30 characters."},
+		{"31 accented characters, 62 bytes", strings.Repeat("é", 31), "App name is too long. The maximum length is 30 characters."},
+		{"31 characters inside surrounding space", "  " + strings.Repeat("a", 31) + "\t", "App name is too long. The maximum length is 30 characters."},
+		{"an angle bracket", "Acme <Corp>", "The app name cannot contain the characters < or >."},
+	}
+	modes := []struct {
+		name    string
+		config  func(t *testing.T) Config
+		outcome Outcome
+	}{
+		{"single-step", func(*testing.T) Config { return singleStepConfig() }, Continue},
+		{"two-step", twoStepConfig, Exit},
+	}
+	for _, mode := range modes {
+		for _, n := range names {
+			t.Run(mode.name+", "+n.name, func(t *testing.T) {
+				db := newSeedDB(t)
+				cfg := mode.config(t)
+				cfg.AppName = n.appName
+				before := db.counts(t)
+				faults := &faultDB{runDatabase: db}
+
+				outcome, err := testRunner(faults, cfg).run(context.Background())
+
+				require.Error(t, err)
+				assert.Equal(t, Refused, outcome)
+				assert.Contains(t, err.Error(), "GOIABADA_APPNAME")
+				assert.Contains(t, err.Error(), n.reason)
+				assert.Zero(t, faults.writes, "no write was attempted")
+				isEmpty, err := db.IsEmpty(context.Background())
+				require.NoError(t, err)
+				assert.True(t, isEmpty, "the next start sees an empty database")
+				assert.Equal(t, before, db.counts(t))
+				if cfg.BootstrapEnvOutFile != "" {
+					assert.NoDirExists(t, filepath.Dir(cfg.BootstrapEnvOutFile),
+						"refused before the bootstrap file is staged, so not even its directory exists")
+				}
+
+				cfg.AppName = "Goiabada"
+				outcome, err = testRunner(db, cfg).run(context.Background())
+
+				require.NoError(t, err, "the next start, with the variable fixed, seeds")
+				assert.Equal(t, mode.outcome, outcome)
+				assertSeeded(t, db, cfg)
+			})
+		}
+	}
+}
+
+// What the first start seeds for a GOIABADA_APPNAME the rule accepts: the name trimmed, up to 30
+// characters counted in characters, and Goiabada for one that is empty once trimmed, as for an
+// empty one (#646 decision 3).
+func TestRun_SeedsTheAppNameTrimmed(t *testing.T) {
+	cases := []struct {
+		name    string
+		appName string
+		stored  string
+	}{
+		{"30 ASCII characters", strings.Repeat("a", 30), strings.Repeat("a", 30)},
+		{"30 accented characters, 60 bytes", strings.Repeat("é", 30), strings.Repeat("é", 30)},
+		{"30 characters inside surrounding space", "  " + strings.Repeat("a", 30) + "\t", strings.Repeat("a", 30)},
+		{"surrounding space", "  Acme Ltd & Co ", "Acme Ltd & Co"},
+		{"spaces alone", "   ", "Goiabada"},
+		{"empty", "", "Goiabada"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := newSeedDB(t)
+			cfg := singleStepConfig()
+			cfg.AppName = c.appName
+
+			outcome, err := testRunner(db, cfg).run(context.Background())
+
+			require.NoError(t, err)
+			assert.Equal(t, Continue, outcome)
+			settings, err := db.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			require.NotNil(t, settings)
+			assert.Equal(t, c.stored, settings.AppName)
+		})
+	}
+}
+
 var errInjected = errors.New("injected failure")
 
 // faultDB wraps the real database and fails one of the seed's writes, counted across the nine

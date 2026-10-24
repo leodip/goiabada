@@ -259,6 +259,7 @@ cause, each a whole sentence.
 | `handler.user.new_password_required` | (none) | New password is required |
 | `handler.user.otp_enable_not_supported` | (none) | Enabling OTP is not supported through this endpoint |
 | `handler.user_groups.too_many` | (none) | Too many group ids |
+| `handler.settings_general.app_name_required` | (none) | App name is required. |
 | `handler.settings_general.app_name_too_long` | `max` (int) | App name is too long. The maximum length is {{.max}} characters. |
 | `handler.settings_general.issuer_uri_invalid` | (none) | Invalid issuer. Enter an https URL with no query, fragment or user info, or the auth server's base URL. |
 | `handler.settings_general.issuer_too_long` | `max` (int) | Issuer is too long. The maximum length is {{.max}} characters. |

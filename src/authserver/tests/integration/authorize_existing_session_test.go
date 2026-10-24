@@ -10,8 +10,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -178,17 +178,11 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,10 +228,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -331,10 +322,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
-	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -381,17 +369,11 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Enable OTP for the user
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,10 +419,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -647,17 +626,11 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	// then OTP gets enabled, the user logs in again, and is prompted for OTP
 
 	// Ensure OTP is enabled for the user
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -709,10 +682,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -818,10 +788,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
-	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -876,17 +843,11 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// Ensure OTP is enabled for the user
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -932,10 +893,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -1332,10 +1290,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
-	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 

@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -217,9 +217,8 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 
 	// The same person, with an authenticator already enrolled, so the second ceremony is a
 	// step-up on the session the first one created rather than a fresh sign-in.
-	otpKey, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: user.Email})
-	require.NoError(t, err)
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpKey.Secret())
+	otpSecret := newOTPSecretForTest(t, user.Email)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 	user.OTPEnabled = true
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 
@@ -257,8 +256,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	// identifier the browser was reachable by at level 1.
 	beforeOtpId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
 
-	otpCode, err := totp.GenerateCode(otpKey.Secret(), time.Now())
-	require.NoError(t, err)
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 

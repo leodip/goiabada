@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,16 +92,10 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Enable OTP for user so level2_optional would require interaction
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -621,16 +614,10 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// Enable OTP for user
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(context.Background(), nil, user)
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -687,15 +674,9 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 	// refused by the ACR check before the counter is ever consulted.
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: user.Email,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	otpSecret := newOTPSecretForTest(t, user.Email)
 	user.OTPEnabled = true
-	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
+	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 	if updateUserErr := database.UpdateUser(context.Background(), nil, user); updateUserErr != nil {
 		t.Fatal(updateUserErr)
 	}

@@ -2,20 +2,18 @@ package otp
 
 import (
 	"time"
-
-	pquernaotp "github.com/pquerna/otp"
-	"github.com/pquerna/otp/hotp"
 )
 
-// StepSeconds is the TOTP time step in seconds. It is the library default that
-// GenerateKeyURL relies on, restated here because the step is what identifies a
-// consumed code.
+// StepSeconds is the TOTP time step in seconds, X in RFC 6238 section 4, counted from the
+// Unix epoch (T0 = 0). GenerateKeyURL writes it into every key as period=30, and the step
+// is what identifies a consumed code.
 const StepSeconds = 30
 
 const (
 	// skewSteps is how far either side of the current step a code is accepted, the
-	// library default totp.Validate applies. Narrowing it is #142, deliberately not
-	// part of this change (#111 decision 6).
+	// window pquerna/otp's totp.Validate applied before the primitive became this
+	// package's (#646). Narrowing it is #142, deliberately not part of this change (#111
+	// decision 6).
 	skewSteps = 1
 
 	// lookbackSteps is how far below a step MatchStep looks for an earlier one
@@ -59,7 +57,7 @@ const (
 )
 
 // producesPasscode reports whether the given time step produces the passcode being
-// verified. MatchStep supplies the library's HMAC over the user's secret. A test
+// verified. MatchStep supplies the HOTP of the user's secret at that step. A test
 // supplies an explicit set of steps instead, which is the only way to reach a chain of
 // colliding steps at all, since no secret anyone can enrol exhibits one (#111
 // decision 12, which amends the seams for exactly this reason).
@@ -82,29 +80,19 @@ type producesPasscode func(step int64) (bool, error)
 // decision 12). What is accepted does not change either way: only a match inside the
 // window accepts, and the walk moves nothing but the answer.
 //
-// An empty secret matches nothing (#111 decision 9). The library happily derives a
-// code from the empty key, and that code depends only on the time step, so it is the
-// same everywhere and anyone can compute it. Refusing here covers every call site at
-// once, including a stored secret that decrypts to empty.
+// A secret that decodes to no key, empty or whitespace alone, matches nothing (#111
+// decision 9), refused where every secret is decoded, in decodeSecret.
 func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
-	if secret == "" {
-		return 0, false
-	}
-
 	produces := func(step int64) (bool, error) {
 		//nolint:gosec // G115: steps count 30-second periods since 1970 from the current time, never negative
-		return hotp.ValidateCustom(passcode, uint64(step), secret, hotp.ValidateOpts{
-			Digits:    pquernaotp.DigitsSix,
-			Algorithm: pquernaotp.AlgorithmSHA1,
-		})
+		return passcodeMatches(passcode, uint64(step), secret)
 	}
 
 	step, matched, err := matchStepWith(produces, now.Unix()/StepSeconds)
 	if err != nil {
-		// Errors collapse to "no match" rather than propagating, which is what
-		// totp.Validate does today (rv, _ := ValidateCustom(...)). A wrong-length
-		// passcode or an unparseable secret stays a generic incorrect-OTP response
-		// instead of becoming a 500.
+		// Errors collapse to "no match" rather than propagating, as pquerna/otp's
+		// totp.Validate did. A wrong-length passcode, an unparseable secret or one that
+		// decodes to no key stays a generic incorrect-OTP response instead of becoming a 500.
 		return 0, false
 	}
 	if !matched {
@@ -136,9 +124,9 @@ func matchStepWith(produces producesPasscode, current int64) (int64, bool, error
 	for scans := 1; ; scans++ {
 		earlier, found, err := lowestMatch(produces, lowest-lookbackSteps, lowest-1)
 		if err != nil {
-			// Unreachable through MatchStep once the window has matched: the library's
-			// two errors are an unparseable secret and a wrong-length passcode, and
-			// neither depends on the step. Refused anyway rather than answered with a
+			// Unreachable through MatchStep once the window has matched: the
+			// predicate's errors are a secret that does not decode to a key and a
+			// wrong-length passcode, and none depends on the step. Refused anyway rather than answered with a
 			// step whose chain has not been walked to the bottom.
 			return 0, false, err
 		}

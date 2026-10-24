@@ -7,7 +7,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,18 +36,14 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	require.NoError(t, err)
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
@@ -98,18 +93,14 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	require.NoError(t, err)
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 	err = database.CreateUser(context.Background(), nil, user)
@@ -160,18 +151,14 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	userEmail := fake.Email()
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "Goiabada",
-		AccountName: userEmail,
-	})
-	require.NoError(t, err)
+	otpSecret := newOTPSecretForTest(t, userEmail)
 
 	user := &record.User{
 		Subject:            fake.UUID(),
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
+		OTPSecretEncrypted: encryptOTPSecretForTest(t, otpSecret),
 		OTPEnabled:         true,
 	}
 	err = database.CreateUser(context.Background(), nil, user)

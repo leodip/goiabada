@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,6 +18,7 @@ import (
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
@@ -311,10 +311,8 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 		auditLogger:   auditLogger,
 	})
 
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-	require.NoError(t, err)
-	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
-	require.NoError(t, err)
+	otpSecret := otpTestMintedSecret(t)
+	otpCode := otptest.Code(t, otpSecret, time.Now())
 
 	form := url.Values{}
 	form.Add(ceremony.IdField, testCeremonyId)
@@ -329,7 +327,7 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 		CeremonyId: testCeremonyId,
 		UserId:     1,
 		ClientId:   "test-client",
-		OTPKeyURL:  otpTestKeyURL(key.Secret()),
+		OTPKeyURL:  otpTestKeyURL(otpSecret),
 	}, nil)
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).

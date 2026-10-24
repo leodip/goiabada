@@ -159,6 +159,48 @@ test("a missing or wrong code at sign-in is refused", async ({ browser, users })
   await context.close();
 });
 
+// RFC 6238 section 5.2: the verifier must not accept a code a second time once it has signed in.
+// The code is still inside its window, one step either side of now, so only the replay check refuses
+// it, and the same sentence as a wrong code says nothing about why.
+test("a code used to sign in is refused at the next sign-in while still in its window, and a later one signs in", async ({ browser, users }) => {
+  // Three codes from three steps: the enrolment's, the sign-in's and the last.
+  test.setTimeout(150_000);
+  const user = await users.create();
+  const own = await signInToConsole(browser, user, "/account/otp");
+  const secret = await turnOn(own.page, user.password);
+  await own.context.close();
+
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(page, user.email, user.password);
+  await expect(page).toHaveURL(/\/auth\/otp/);
+  const used = await freshTotp(secret);
+  const usedStep = Math.floor(Date.now() / 30_000);
+  await page.locator("#otp").fill(used);
+  await page.getByRole("button", { name: "Verify" }).click();
+  await page.waitForURL(`${env.adminUrl}/account/profile`);
+
+  // Signing out ends the auth server's session too, so the next sign-in asks for the code again.
+  await page.goto(`${env.adminUrl}/auth/logout`);
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.waitForURL((url) => url.origin === env.adminUrl && url.pathname === "/");
+  await page.goto(`${env.adminUrl}/account/profile`);
+  await submitPassword(page, user.email, user.password);
+  await expect(page).toHaveURL(/\/auth\/otp/);
+  await page.locator("#otp").fill(totp(secret, usedStep * 30_000));
+  // Still the used code's step or the one after, which the window accepts.
+  expect(Math.floor(Date.now() / 30_000) - usedStep).toBeLessThanOrEqual(1);
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expectRefusal(page, "otp-error", "otp", wrongCode);
+
+  // A code from a later step signs in, so the refusal was the replay and not the account.
+  await page.locator("#otp").fill(await freshTotp(secret));
+  await page.getByRole("button", { name: "Verify" }).click();
+  await page.waitForURL(`${env.adminUrl}/account/profile`);
+  await context.close();
+});
+
 // The console's own sentence for the auth server's 429, in the page's language, where the API's is
 // English only.
 const tooManyAttempts = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again.";

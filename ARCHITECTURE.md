@@ -409,7 +409,7 @@ A row may name a package inside a module the admin console otherwise compiles le
 | `github.com/jackc/pgx/v5` | PostgreSQL driver | no | — |
 | `github.com/microsoft/go-mssqldb` | SQL Server driver | no | — |
 | `github.com/huandu/go-sqlbuilder` | SQL construction | no | — |
-| `github.com/pquerna/otp` | TOTP generation | no | — |
+| `github.com/boombuler/barcode` | QR rendering of the enrolment key | no | — |
 | `golang.org/x/crypto/bcrypt` | provider-only password hashing | no | — |
 
 Every driver used to arrive the same way, through one edge:
@@ -440,8 +440,10 @@ severing the one edge that reached `core/data` did the same job from the other e
 `reachable today` is asserted against the real closure and not derived from an argument about
 which issue owns the cut.
 
-`github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, it never will be
-now that `otp` is the auth server's (#346), and the row states that it must not arrive.
+`github.com/boombuler/barcode` is listed at `no` deliberately. `otp` is the auth server's (#346),
+and since #646 it computes one-time codes and writes and reads enrolment keys with the standard
+library, so barcode, which draws the enrolment QR code, is the one module it brings in. It is not
+reachable now, it never will be, and the row states that it must not arrive.
 
 The table is a declared list, not a discovery mechanism: it asserts these modules and says nothing
 about a dependency nobody has written a row for. Closing that would mean an allowlist of every

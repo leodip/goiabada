@@ -10,6 +10,7 @@ import (
 
 // generalErrorFields maps the general settings' refusals to the field each is about.
 var generalErrorFields = map[string]string{
+	i18n.ErrCodeSettingsGeneralAppNameRequired:  "appName",
 	i18n.ErrCodeSettingsGeneralAppNameTooLong:   "appName",
 	i18n.ErrCodeSettingsAppNameAngleBrackets:    "appName",
 	i18n.ErrCodeSettingsGeneralIssuerURIInvalid: "issuer",

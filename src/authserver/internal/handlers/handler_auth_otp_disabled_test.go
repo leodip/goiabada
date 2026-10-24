@@ -12,13 +12,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 // The refusal whose count reached record.OtpConsecutiveFailureLimit disables the authenticator, and
@@ -28,10 +27,8 @@ import (
 // which every other refused-code case in this package holds, since the audit double fails on an
 // event it was not told to expect.
 func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *testing.T) {
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "TestApp", AccountName: "test@test.com"})
-	require.NoError(t, err)
-	matching, err := totp.GenerateCode(key.Secret(), time.Now())
-	require.NoError(t, err)
+	otpSecret := otpTestMintedSecret(t)
+	matching := otptest.Code(t, otpSecret, time.Now())
 
 	for _, tc := range []struct {
 		name   string
@@ -76,7 +73,7 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 				Id:                     1,
 				Enabled:                true,
 				OTPEnabled:             true,
-				OTPSecretEncrypted:     encryptOTPForTest(t, key.Secret()),
+				OTPSecretEncrypted:     encryptOTPForTest(t, otpSecret),
 				OtpConfigGeneration:    3,
 				OtpConsecutiveFailures: record.OtpConsecutiveFailureLimit - 1,
 			}, nil)

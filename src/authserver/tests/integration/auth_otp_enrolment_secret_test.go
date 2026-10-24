@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pquerna/otp/totp"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,10 +39,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 	assert.NotEmpty(t, first, "the enrolment page must render a secret, or nothing below means anything")
 
 	// The code the user's authenticator produces from the QR code on the first render.
-	code, err := totp.GenerateCode(first, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	code := otptest.Code(t, first, time.Now())
 
 	reloaded := loadPage(t, httpClient, otpUrl)
 	second := getOtpSecretFromEnrollmentPage(t, reloaded)
