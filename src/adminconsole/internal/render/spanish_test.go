@@ -21,16 +21,17 @@ func TestSpanish_AdminPageFromRequestPreferences(t *testing.T) {
 			r := newRequest(http.MethodGet, tc.target, nil)
 			r.Header.Set("Accept-Language", tc.header)
 			w := httptest.NewRecorder()
+			var renderErr error
 			i18n.Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				err := New(web.TemplateFS(), web.StaticFS()).RenderTemplate(w, r,
+				renderErr = New(web.TemplateFS(), web.StaticFS()).RenderTemplate(w, r,
 					"layouts/menu_layout.html", "admin_clients.html", nil)
-				require.NoError(t, err)
 			})).ServeHTTP(w, r)
+			require.NoError(t, renderErr)
 			assert.Equal(t, http.StatusOK, w.Code)
 			assert.Contains(t, w.Body.String(), `<html lang="es"`)
 			assert.Contains(t, w.Body.String(), `data-catalog-lang="es"`)
 			assert.Contains(t, w.Body.String(), "Nuevo cliente")
-			assert.Contains(t, w.Body.String(), "Todavía no hay clientes.")
+			assert.Contains(t, w.Body.String(), "Todavía no hay clientes.") //nolint:misspell // the es catalog's text: "clientes" is Spanish, not a misspelling of "clients"
 		})
 	}
 }

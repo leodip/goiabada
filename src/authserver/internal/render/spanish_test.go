@@ -23,11 +23,12 @@ func TestSpanish_SignInPageFromRequestPreferences(t *testing.T) {
 			r.Header.Set("Accept-Language", tc.header)
 			r = r.WithContext(reqctx.WithSettings(r.Context(), &record.Settings{AppName: "Acme", SMTPEnabled: true}))
 			w := httptest.NewRecorder()
+			var renderErr error
 			i18n.Locale(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				err := New(web.TemplateFS(), web.StaticFS()).RenderTemplate(w, r,
+				renderErr = New(web.TemplateFS(), web.StaticFS()).RenderTemplate(w, r,
 					"layouts/auth_layout.html", "auth_pwd.html", map[string]interface{}{"registrationAvailable": true})
-				require.NoError(t, err)
 			})).ServeHTTP(w, r)
+			require.NoError(t, renderErr)
 			assert.Equal(t, http.StatusOK, w.Code)
 			assert.Contains(t, w.Body.String(), `<html lang="es"`)
 			assert.Contains(t, w.Body.String(), "Iniciar sesión")

@@ -42,9 +42,9 @@ func TestEmails_EveryBuiltInLanguageHasEveryBody(t *testing.T) {
 		}
 		languages++
 		for _, body := range english {
-			copy := strings.TrimSuffix(body, ".html") + "." + lang + ".html"
-			if _, err := fs.Stat(templateFS, copy); err != nil {
-				t.Errorf("catalog %s has no email body %s: %v", name, copy, err)
+			translated := strings.TrimSuffix(body, ".html") + "." + lang + ".html"
+			if _, err := fs.Stat(templateFS, translated); err != nil {
+				t.Errorf("catalog %s has no email body %s: %v", name, translated, err)
 			}
 		}
 	}
