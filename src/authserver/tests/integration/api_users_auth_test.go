@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -462,6 +463,59 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	assert.Equal(t, []api.SessionClientResponse{
 		{ClientIdentifier: testClient.ClientIdentifier, Name: "Session Portal", NameUnverified: false},
 	}, got.Clients)
+}
+
+// One case per scope: the users-read scopes, admin-read, manage-users and manage, read a session,
+// and the other domains' scopes are refused at the route. admin-read tells the gate from a
+// users-write one, manage-users and manage-clients from a clients-read one (#651 decision 1).
+func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
+	testUser := &record.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("testuser@session-get-scopes.test"),
+		EmailVerified: true,
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+	session.Started = time.Now().UTC()
+	session.LastAccessed = time.Now().UTC()
+	require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
+
+	testCases := []struct {
+		permission string
+		admitted   bool
+	}{
+		{builtin.AdminReadPermissionIdentifier, true},
+		{builtin.ManageUsersPermissionIdentifier, true},
+		{builtin.ManagePermissionIdentifier, true},
+		{builtin.ManageClientsPermissionIdentifier, false},
+		{builtin.ManageSettingsPermissionIdentifier, false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.permission, func(t *testing.T) {
+			token, caller := createClientWithGranularScope(t, tc.permission)
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			resp := makeAPIRequest(t, "GET", url, token, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			if tc.admitted {
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				var body api.GetUserSessionResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+				assert.Equal(t, session.Id, body.Session.Id)
+				assert.Equal(t, session.SessionIdentifier, body.Session.SessionIdentifier)
+				return
+			}
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "INSUFFICIENT_SCOPE", body.ErrorCode)
+		})
+	}
 }
 
 // A session past the idle timeout or the maximum lifetime is gone to the API, with the same answer
