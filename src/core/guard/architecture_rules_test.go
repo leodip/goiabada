@@ -876,7 +876,7 @@ More prose.
 | module | why | reachable today | cleared by |
 |---|---|---|---|
 | ` + "`modernc.org/sqlite`" + ` | SQLite driver | yes | #359 |
-| ` + "`github.com/pquerna/otp`" + ` | TOTP | no | — |
+| ` + "`github.com/boombuler/barcode`" + ` | QR rendering | no | — |
 
 ### Refused packages
 
@@ -905,7 +905,7 @@ More prose.
 	}, tables.exceptions)
 	assert.Equal(t, []foreignRow{
 		{module: "modernc.org/sqlite", reachable: true, clearedBy: "#359", line: 24},
-		{module: "github.com/pquerna/otp", reachable: false, clearedBy: "—", line: 25},
+		{module: "github.com/boombuler/barcode", reachable: false, clearedBy: "—", line: 25},
 	}, tables.foreign)
 	assert.Equal(t, []refusedPackageRow{
 		{pkg: "testing", line: 31},
