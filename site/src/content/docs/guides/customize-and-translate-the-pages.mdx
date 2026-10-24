@@ -135,7 +135,7 @@ The colors are tokens at the top of `tailwindcss/ui.css`: the light palette in i
 
    `input.css` looks for class names in `../template` and in the JavaScript in `../static`, so keep the three folders side by side.
 
-3. The new `main.css` is in the static directory you mounted, so the server serves it at once. Browsers may keep the previous one for up to five minutes: reload without the cache to check.
+3. The new `main.css` is in the static directory you mounted, so the server serves it at once. The pages link it by a fingerprint of its contents, so browsers fetch the new one on their next page load.
 
 </Steps>
 

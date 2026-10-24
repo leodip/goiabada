@@ -99,9 +99,7 @@ A browser can have up to five sign-ins in progress at once, each started by its 
 
 When a sixth starts, the one that moved least recently is pushed out. A sign-in moves whenever the user goes on to its next step, so one the user is working through outlives the tabs they abandoned. The next page of a pushed-out sign-in says "This request is no longer active", and the user starts again from your app. Signing out ends every sign-in in progress in that browser. When a password or one-time code is accepted in a browser, any sign-in in progress there for a different user stops, so one abandoned after its password was entered doesn't carry on into the next person's session.
 
-<Aside type="caution">
-A page that keeps sending a window it opened to sign in can push the user's sign-in out, by starting more than five. The auth server can't tell those requests apart from your app's own, which are just as cross-site. All it costs is a retry: a pushed-out sign-in stops, and nothing is issued for it.
-</Aside>
+A page that keeps sending a window it opened to sign in can push the user's sign-in out by starting five of its own. That costs the user a retry and nothing more: nothing is issued for a pushed-out sign-in.
 
 ## How the auth server recognizes a browser
 

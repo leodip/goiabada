@@ -17,7 +17,7 @@ It's the same trip as [a web app's](/guides/add-sign-in-to-a-web-app/): the brow
 
 2. Click your new client's identifier. On **Authentication**, choose **Public**, click **Save**, and confirm with **Save**.
 
-3. On **Redirect URIs**, add the address your app receives the code at, and click **Save**:
+3. On **Redirect URIs**, enter the address your app receives the code at, click **Add**, then **Save**:
 
    | Your app | Redirect URI |
    |---|---|
@@ -25,7 +25,7 @@ It's the same trip as [a web app's](/guides/add-sign-in-to-a-web-app/): the brow
    | A mobile app | A URI with your app's own scheme, such as `com.example.app:/oauth2redirect` |
    | A desktop app | A loopback address, such as `http://127.0.0.1/callback`. Any port matches. |
 
-4. A SPA only: on **Web origins**, add your app's origin, such as `https://app.example.com`, and click **Save**. Without it, the browser blocks your app's call to the token endpoint.
+4. A SPA only: on **Web origins**, enter your app's origin, such as `https://app.example.com`, click **Add**, then **Save**. Without it, the browser blocks your app's call to the token endpoint.
 
 5. When a user signs in, make a `state`, a `nonce` and a PKCE code verifier, with the challenge made from it, and keep them until the browser comes back. Then open the authorization request in the browser. A mobile or desktop app opens it in the system browser:
 

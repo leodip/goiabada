@@ -50,7 +50,7 @@ The page says "This application asked to send you to" an address, and "The reque
 
 These end the sign-in on a page, and nothing is sent to your app:
 
-- **"This request is no longer active"**: the page belongs to a sign-in that can't continue. It had already finished, more than five newer sign-ins in the same browser pushed it out, the user signed out, someone else signed in on the same browser, another sign-in in the browser changed the session this one was continuing, or the page came from another browser. See [Sign-ins in progress](/concepts/sessions/#sign-ins-in-progress).
+- **"This request is no longer active"**: the page belongs to a sign-in that can't continue. It had already finished, five newer sign-ins in the same browser pushed it out, the user signed out, or someone else signed in on the same browser. When the browser has no sign-in in progress at all, the user lands on their account page in the admin console instead. See [Sign-ins in progress](/concepts/sessions/#sign-ins-in-progress).
 - **"This step is no longer available"**: the user went back in the browser to a step they had finished.
 - **"Your two-factor authentication settings changed"**: the user's authenticator changed while they were setting one up.
 

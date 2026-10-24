@@ -25,7 +25,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
 2. On **OAuth2 flows**, under **Legacy flows (deprecated in OAuth 2.1)**, set **Implicit flow** to **Enabled**, and click **Save**.
 
-3. On **Redirect URIs**, add the page that receives the tokens, such as `https://app.example.com/callback`, and click **Save**.
+3. On **Redirect URIs**, enter the page that receives the tokens, such as `https://app.example.com/callback`, click **Add**, then **Save**.
 
 4. Make a new random `state` and `nonce`, keep them, and send the browser to the authorization endpoint with `response_type=id_token token`:
 
@@ -45,7 +45,7 @@ Turn it on only for an app that speaks nothing but the implicit flow and that yo
 
 </Steps>
 
-**Implicit flow** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or inherit the global **Implicit flow** under **Admin**, **General**, which is off in a new install.
+**Implicit flow** on the **OAuth2 flows** tab has three choices: **Enabled**, **Disabled**, or **Use the global setting**, which follows **Implicit flow** under **Admin**, **General**, off in a new install.
 
 ## Response types
 
@@ -105,7 +105,7 @@ Nothing in a `token` response proves the access token was issued for your reques
 
 2. On **OAuth2 flows**, turn on **Authorization code with PKCE**, and click **Save**.
 
-3. On **Web origins**, add your app's origin, such as `https://app.example.com`, so the browser lets it call the token endpoint.
+3. On **Web origins**, enter your app's origin, such as `https://app.example.com`, click **Add**, then **Save**, so the browser lets it call the token endpoint.
 
 4. Change your app to send `response_type=code` with a PKCE challenge, and redeem the code at the token endpoint. [Add sign-in to a SPA or mobile app](/guides/add-sign-in-to-a-spa-or-mobile-app/) walks through it. Your app gets refresh tokens now too.
 

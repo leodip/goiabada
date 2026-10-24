@@ -34,7 +34,7 @@ The level says who should look: `ERROR` means someone must act, `WARN` a request
 | Record (`msg`) | Level | What it says |
 |---|---|---|
 | `http request` | `INFO` | One per request, with its `method`, `target`, `ip`, `status`, `bytes` and `duration`. Written only with request logging on |
-| `a request handler panicked` | `ERROR` | A page request that crashed and was answered an empty `500`, with the `panic` value and the `stack` it was raised on. On the protocol endpoints and the APIs, a crash is the `ERROR` record of the JSON `500` they answer instead |
+| `a request handler panicked` | `ERROR` | A page request that crashed and was answered an empty `500`, with the `panic` value and the `stack` it was raised on. On the auth server's protocol endpoints and APIs, a crash is answered with a JSON `500` instead, and logged as `internal server error` with an `error` starting `recovered from a panic` |
 | `audit event` | `INFO` | One audit event, with its `event` name and `details`, written when the audit log's console target is on |
 | `worker task completed` | `INFO` | A cleanup run that reached every step, with its `duration`. A failed step writes an `ERROR` record first |
 | `a job to run after its response was dropped, too many in flight` | `WARN` | A forgot-password, registration or email-change mail that wasn't sent |

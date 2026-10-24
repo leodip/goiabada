@@ -55,7 +55,7 @@ Trust forwarded headers only when the proxy is the **only** way to reach the aut
 
 ## How the limits count
 
-A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up, even for many people behind one office or mobile network. A limit that counts every request is spent by every request, successful or not. The ones on sign-in, `pwd_ip_requests` and `ropc_ip_requests`, allow 120 a minute from one IP address, which only something signing in over and over reaches. So does `authorize`, on the authorization endpoint, which every sign-in, single sign-on and silent renew reaches once or twice.
+A limit that counts failures, such as wrong passwords, isn't spent by a success, so signing in normally never uses it up, even for many people behind one office or mobile network. A limit that counts every request is spent by every request, successful or not. The ones on sign-in, `pwd_ip_requests` and `ropc_ip_requests`, allow 120 a minute from one IP address, which only something signing in over and over reaches. `authorize` allows the same 120 a minute at the authorization endpoint, but every sign-in, single sign-on and silent renew spends one or two of it, so a busy network behind one address can reach it.
 
 Limits on failures against an account or a user are kept in the database on PostgreSQL, MySQL and SQL Server, so they hold across replicas and a restart doesn't refill them. The others, `pwd_ip`, `ropc_ip` and every limit on every request, are kept in each process: each replica allows the full budget, and a restart resets it. On SQLite, which runs one replica, all of them are kept in the process.
 

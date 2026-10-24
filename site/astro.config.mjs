@@ -204,7 +204,7 @@ export default defineConfig({
 						{ label: 'Sign-out answers 403', slug: 'troubleshooting/sign-out-answers-403' },
 						{ label: 'Too many attempts or 429', slug: 'troubleshooting/too-many-attempts-or-429' },
 						{ label: 'Locked out of the admin console', slug: 'troubleshooting/locked-out-of-the-admin-console' },
-						{ label: 'Unable to load the configuration from the auth server', slug: 'troubleshooting/unable-to-load-the-configuration-from-the-auth-server' },
+						{ label: "Can't reach the auth server", slug: 'troubleshooting/cant-reach-the-auth-server' },
 						{ label: 'A user cannot reset their password', slug: 'troubleshooting/a-user-cannot-reset-their-password' },
 						{ label: 'Certificates are not issued', slug: 'troubleshooting/certificates-are-not-issued' },
 						{ label: 'CrashLoopBackOff or unable to create the database connection', slug: 'troubleshooting/crashloopbackoff-or-unable-to-create-the-database-connection' },

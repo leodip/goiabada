@@ -126,7 +126,7 @@ When the pod network isn't one you trust, such as a cluster shared with workload
 
 - **A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/api-types/backendtlspolicy/)** for the gateway's hop, once the auth server serves HTTPS as above: it has the gateway connect to a Service port over TLS and check the certificate against your authority. Point the auth server's HTTPRoute at port 9443, and name every host name the gateway uses in the certificate.
 
-If the admin console then can't reach the auth server, see [Unable to load the configuration from the auth server](/troubleshooting/unable-to-load-the-configuration-from-the-auth-server/).
+If the admin console then can't reach the auth server, see [Can't reach the auth server](/troubleshooting/cant-reach-the-auth-server/).
 
 ## Check the database's certificate
 

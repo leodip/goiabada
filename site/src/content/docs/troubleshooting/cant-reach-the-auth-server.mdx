@@ -1,6 +1,6 @@
 ---
-title: Unable to load the configuration from the auth server
-description: Every admin console page answers 500 with "Unable to load the configuration from the auth server", or signing in fails.
+title: Can't reach the auth server
+description: Every admin console page answers 500 with "Can't reach the auth server", or signing in fails.
 ---
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
@@ -9,15 +9,15 @@ This page helps you when the admin console can't talk to the auth server.
 
 ## What you see
 
-Every admin console page answers `500` with one line of text:
+Every admin console page answers `500` with a page titled "Can't reach the auth server":
 
 ```
-Unable to load the configuration from the auth server. You can find further information in the server logs.
+The admin console couldn't load its settings from the auth server. Try again in a moment. The server log records the cause under the request ID below.
 ```
 
 The admin console's log has `unable to fetch settings from the auth server`, and its `error` says what the connection failed with: a name that doesn't resolve, a connection refused, a timeout, or a certificate the admin console doesn't trust. Or it starts `authserver returned status`, when something answered with an error instead of the settings.
 
-For up to 30 seconds after the auth server goes away, while the admin console still holds its settings, a page that needs a session answers **Server error** instead; the home page still shows to a visitor who isn't signed in.
+For up to 30 seconds after the auth server goes away, while the admin console still holds its settings, a page that needs a session answers **Something went wrong** instead; the home page still shows to a visitor who isn't signed in.
 
 The admin console's own `/health` still answers `healthy`, because it doesn't check the auth server. So a container or a pod looks fine while every page fails.
 

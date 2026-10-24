@@ -1765,8 +1765,9 @@ paths:
         one without creates it, and a stored permission the list leaves out is deleted.
 
         The built-in permissions of the `authserver` resource cannot be renamed or deleted, by
-        any caller: the save is refused with handler.permission.built_in_renamed or
-        handler.permission.built_in_deleted. Changing the description of one of its administrative permissions needs
+        any caller: the save is refused with 400 and handler.permission.built_in_renamed or
+        handler.permission.built_in_deleted. Changing the description of one of its
+        administrative permissions needs
         `authserver:manage`, because the admin console shows that description to an operator
         choosing a permission to grant: `authserver:manage-settings` is refused with 403
         MANAGE_SCOPE_REQUIRED.
@@ -5040,7 +5041,7 @@ components:
           type: string
         clientName:
           description: |
-            The name the consent screen showed the user for this client: its display name when
+            The name the consent screen shows a user for this client: its display name when
             an administrator chose to show one, else, for a client that registered itself, the
             name it registered with, else its identifier.
           type: string
