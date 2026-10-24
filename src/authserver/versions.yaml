@@ -30,7 +30,9 @@
 #                 (Dockerfile-authserver, Dockerfile-adminconsole)
 # trivy:          Image scanner, built from source in CI's Build validation, which
 #                 fails on a fixable HIGH or CRITICAL finding in the images' Alpine
-#                 packages
+#                 packages, and in the weekly Image scan of the published images
+# grype:          Image scanner, built from source in the weekly Image scan of the
+#                 published images, beside Trivy
 #
 # staticcheck, unparam and govulncheck are pinned because they gate CI. An
 # unpinned tool can turn every open PR red on an upstream release, with no
@@ -58,6 +60,10 @@
 # that is already poisoned, so `./version-manager.sh check` suggests a Trivy
 # release only once GitHub has recorded it public for 7 days; the malicious
 # v0.69.4 was public for about 12 hours (#520).
+#
+# grype is pinned, built and suggested the same way. It runs only in the weekly
+# Image scan, so a second vulnerability database catches an advisory Trivy's is
+# late on; the build-time gate stays Trivy's alone (#520).
 tools:
   go: "1.27.3"
   tailwind: "4.3.3"
@@ -69,6 +75,7 @@ tools:
   govulncheck: "1.9.0"
   alpine: "3.24"
   trivy: "0.76.0"
+  grype: "0.120.1"
 
 # -----------------------------------------------------------------------------
 # Vendored dependencies

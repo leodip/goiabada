@@ -1,0 +1,55 @@
+# Builds a scanner from source at the version versions.yaml pins, for Build validation's Trivy gate
+# and the weekly Image scan's Trivy, Grype and govulncheck (#520).
+#
+# Never a release binary, an action or an image: Trivy's were all hijacked in March 2026
+# (CVE-2026-33634). `go install module@version` builds the source Go's checksum database fixes for
+# that version, for everyone, which a takeover of the project's own accounts cannot rewrite.
+# versions.yaml says why each pin is a week old at least.
+#
+# The binary is cached under a key holding the Go version as well as the pin, as the govulncheck
+# cache is, in a directory of its own so the cache holds that binary and nothing else. A build from
+# source reports a placeholder version ("dev", "[not provided]"), so the module version the binary
+# records is what proves a restored copy is the pin. The caller sets up Go first.
+
+name: Install a scanner from source
+description: Build a scanner with go install at a pinned version, cache it, check its module version and put it on the PATH.
+
+inputs:
+  name:
+    description: The binary's name, such as trivy
+    required: true
+  package:
+    description: The command's import path, such as github.com/aquasecurity/trivy/cmd/trivy
+    required: true
+  version:
+    description: The pinned version, without the v
+    required: true
+  go-version:
+    description: The Go version the binary is built with, part of the cache key
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Cache ${{ inputs.name }}
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/scanners/${{ inputs.name }}
+        key: ${{ inputs.name }}-${{ runner.os }}-go${{ inputs.go-version }}-${{ inputs.version }}
+    - name: Install ${{ inputs.name }}
+      shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+        PACKAGE: ${{ inputs.package }}
+        VERSION: ${{ inputs.version }}
+        CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        dir="$HOME/scanners/$NAME"
+        if [ "$CACHE_HIT" != "true" ]; then
+          GOBIN="$dir" go install "$PACKAGE@v$VERSION"
+        fi
+        built=$(go version -m "$dir/$NAME" | awk '$1 == "mod" { print $3 }')
+        [ "$built" = "v$VERSION" ] || { echo "::error::$NAME is $built, not the pinned v$VERSION"; exit 1; }
+        echo "$dir" >> "$GITHUB_PATH"

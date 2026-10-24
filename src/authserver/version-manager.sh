@@ -18,7 +18,7 @@
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, the release
-# images' Alpine base, Trivy, cropperjs, acorn). It does NOT
+# images' Alpine base, Trivy, Grype, cropperjs, acorn). It does NOT
 # manage the product version.
 #
 # Workflow, for bumping a tool or CDN pin:
@@ -185,6 +185,7 @@ get_all_versions() {
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
         echo "tools.alpine=$(get_version 'tools.alpine')"
         echo "tools.trivy=$(get_version 'tools.trivy')"
+        echo "tools.grype=$(get_version 'tools.grype')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
@@ -414,6 +415,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "alpine" "$(get_version 'tools.alpine')"
     printf "  %-23s ${GREEN}%s${NC}\n" "trivy" "$(get_version 'tools.trivy')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "grype" "$(get_version 'tools.grype')"
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
@@ -603,6 +605,23 @@ cmd_check() {
             updates_available+=("Trivy|$current_trivy|$latest_trivy|https://github.com/aquasecurity/trivy/releases")
         else
             print_success "Up to date ($current_trivy)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
+    # --- Grype ---
+    # Built from source at the pin in the weekly Image scan, and suggested under
+    # the same RELEASE_MIN_AGE_DAYS as Trivy (#520).
+    echo -n "Checking Grype... "
+    local current_grype=$(get_version 'tools.grype')
+    local latest_grype=$(get_github_settled "anchore/grype")
+    if [ -n "$latest_grype" ]; then
+        if version_lt "$current_grype" "$latest_grype"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Grype|$current_grype|$latest_grype|https://github.com/anchore/grype/releases")
+        else
+            print_success "Up to date ($current_grype)"
         fi
     else
         print_warning "Check failed"

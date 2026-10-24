@@ -1,8 +1,8 @@
 package guard
 
-// version-manager.sh's check suggests a newer Trivy only once GitHub records the release public for
-// 7 days, so a bump cannot land on a release that is already poisoned: Trivy's malicious v0.69.4 was
-// public for about 12 hours (#520). The selection is github_settled_release, a function of its own,
+// version-manager.sh's check suggests a newer Trivy or Grype only once GitHub records the release
+// public for 7 days, so a bump cannot land on a release that is already poisoned: Trivy's malicious
+// v0.69.4 was public for about 12 hours (#520). The selection is github_settled_release, a function of its own,
 // driven here with a clock over a copy of
 // https://api.github.com/repos/aquasecurity/trivy/releases?per_page=10 taken on 2026-10-24T14:43:27Z,
 // each release's assets cut to the first so the file stays small, and over variants of it. The age is
@@ -21,6 +21,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+// grypeReleasesFixture is https://api.github.com/repos/anchore/grype/releases?per_page=10 as GitHub
+// served it at grypeReleasesCaptured, cut the same way. Its newest release, v0.121.0, was published
+// 2026-10-19T20:32:56Z, five days before; the one before it, v0.120.1, 2026-10-06T20:46:45Z.
+const (
+	grypeReleasesFixture  = "testdata/grype-releases.json"
+	grypeReleasesCaptured = "2026-10-24T14:56:52Z"
 )
 
 // trivyReleasesFixture is the releases API's answer as GitHub served it, pretty-printed, with every
@@ -145,4 +153,13 @@ func TestReleaseAgeCheck_FieldsInAnotherOrderSuggestNothing(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "releases.json")
 	require.NoError(t, os.WriteFile(file, out, 0o600))
 	assert.Empty(t, settledRelease(t, trivyReleasesCaptured, file))
+}
+
+// Grype's check is the same selection over its own repository's answer, which is how tools.grype came
+// to be 0.120.1 and not the newer v0.121.0.
+func TestReleaseAgeCheck_GrypesNewestReleaseIsSuggestedOnlyOnceSevenDaysOld(t *testing.T) {
+	assert.Equal(t, "0.120.1", settledRelease(t, grypeReleasesCaptured, grypeReleasesFixture),
+		"v0.121.0 was public for five days when the fixture was taken")
+	assert.Equal(t, "0.120.1", settledRelease(t, "2026-10-26T20:32:55Z", grypeReleasesFixture))
+	assert.Equal(t, "0.121.0", settledRelease(t, "2026-10-26T20:32:56Z", grypeReleasesFixture))
 }

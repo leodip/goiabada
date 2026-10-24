@@ -52,11 +52,9 @@ var packageSetCheck = `RUN [ -r /lib/apk/db/installed ] || { echo "unable to rea
 	`[ -f /etc/ssl/certs/ca-certificates.crt ] || { echo "the final stage has no /etc/ssl/certs/ca-certificates.crt" >&2; exit 1; }`
 
 // dockerInstruction is one instruction of a Dockerfile as Docker reads it: the text with its
-// continuation lines joined and the comment lines inside a continuation dropped, and the comment
-// lines directly above it, with no blank line between.
+// continuation lines joined and the comment lines inside a continuation dropped.
 type dockerInstruction struct {
-	text     string
-	comments []string
+	text string
 }
 
 var (
@@ -75,7 +73,6 @@ var (
 // it as file content or an argument (#542).
 func dockerInstructions(src string) ([]dockerInstruction, string) {
 	var out []dockerInstruction
-	var comments []string
 	continuing := false
 	for _, raw := range strings.Split(strings.ReplaceAll(src, "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(raw)
@@ -89,15 +86,10 @@ func dockerInstructions(src string) ([]dockerInstruction, string) {
 			}
 			current := &out[len(out)-1]
 			current.text += " " + strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))
-		case trimmed == "":
-			comments = nil
-			continue
-		case strings.HasPrefix(trimmed, "#"):
-			comments = append(comments, trimmed)
+		case trimmed == "" || strings.HasPrefix(trimmed, "#"):
 			continue
 		default:
-			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\")), comments: comments})
-			comments = nil
+			out = append(out, dockerInstruction{text: strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))})
 		}
 		continuing = strings.HasSuffix(trimmed, "\\")
 		// Any "<<" is refused, a heredoc of whatever delimiter BuildKit accepts, digits included,
@@ -326,7 +318,7 @@ func TestFinalStageFindings(t *testing.T) {
 		return joinedWith(t, dockerfile, smoke)
 	}
 	// replaced is the strip with one of its packages' text replaced, to alter one step of it.
-	replaced := func(old, new string) string { return strings.Replace(strip, old, new, 1) }
+	replaced := func(old, with string) string { return strings.Replace(strip, old, with, 1) }
 
 	t.Run("the strip and its check in the final stage", func(t *testing.T) {
 		assert.Empty(t, joined(t, build+final+strip+check+user))

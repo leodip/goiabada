@@ -896,33 +896,16 @@ jobs:
           )
           docker buildx build --load "${args[@]}" -f Dockerfile-authserver   -t goiabada-authserver:ci   ..
           docker buildx build --load "${args[@]}" -f Dockerfile-adminconsole -t goiabada-adminconsole:ci ..
-      # Trivy is built from source at the pin, never taken from its release
-      # binaries, its action or its image, which were all hijacked in March 2026
-      # (CVE-2026-33634): Go's checksum database fixes what source a version is,
-      # and the project's accounts cannot rewrite it. versions.yaml says why the
-      # pin is a week old at least (#520). Keyed on the Go version as well as the
-      # pin, as the govulncheck cache is, and kept apart from ~/go/bin so the
-      # cache holds nothing but this binary.
-      - name: Cache Trivy
-        id: trivy-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/scanners
-          key: trivy-${{ runner.os }}-go${{ needs.versions.outputs.go }}-${{ needs.versions.outputs.trivy }}
-      # A build from source reports its version as "dev", so the module version
-      # the binary records is what proves a restored copy is the pin.
+      # Built from source at the pin by the install step the weekly Image scan
+      # shares, which says why: never from Trivy's release binaries, its action
+      # or its image, which were all hijacked in March 2026 (#520).
       - name: Install Trivy
-        env:
-          TRIVY_VERSION: ${{ needs.versions.outputs.trivy }}
-          CACHE_HIT: ${{ steps.trivy-cache.outputs.cache-hit }}
-        run: |
-          set -euo pipefail
-          if [ "$CACHE_HIT" != "true" ]; then
-            GOBIN="$HOME/scanners" go install "github.com/aquasecurity/trivy/cmd/trivy@v$TRIVY_VERSION"
-          fi
-          built=$(go version -m "$HOME/scanners/trivy" | awk '$1 == "mod" { print $3 }')
-          [ "$built" = "v$TRIVY_VERSION" ] || { echo "::error::trivy is $built, not the pinned v$TRIVY_VERSION"; exit 1; }
-          echo "$HOME/scanners" >> "$GITHUB_PATH"
+        uses: ./.github/actions/install-scanner
+        with:
+          name: trivy
+          package: github.com/aquasecurity/trivy/cmd/trivy
+          version: ${{ needs.versions.outputs.trivy }}
+          go-version: ${{ needs.versions.outputs.go }}
       # The images' Alpine packages only: a Go module finding is the
       # Vulnerabilities job's, which scans the source. Stops main, and inside a
       # release the images job, on a HIGH or CRITICAL finding that has a fixed
