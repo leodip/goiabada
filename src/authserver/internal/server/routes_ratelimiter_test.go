@@ -93,6 +93,8 @@ const (
 	emailVerificationWindow     = 900
 	emailVerificationSendBudget = 5 // requests per 60 minutes per token subject
 	emailVerificationSendWindow = 3600
+	accountEmailChangeBudget    = 5 // requests per 60 minutes per token subject
+	accountEmailChangeWindow    = 3600
 	accountPasswordBudget       = 5 // failures per 15 minutes per token subject, shared by two routes
 	accountPasswordWindow       = 900
 	otpBudget                   = 5 // failures per 15 minutes per user id
@@ -579,8 +581,29 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
 		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
 			accountPasswordWindow, shapeAPI)
+		// The sixth change has spent the email change's own budget too, and that tier is
+		// mounted first, so it is the one that refuses: a request it refuses never reaches the
+		// password check.
 		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/email", emailBody)),
-			accountPasswordWindow, shapeAPI)
+			accountEmailChangeWindow, shapeAPI)
+	})
+
+	t.Run("PUT /api/v1/account/email counts every change", func(t *testing.T) {
+		// Past the password the change says whether an address is taken, so every request
+		// counts, not only a wrong password. A blank password is refused before it is checked
+		// and spends nothing on the shared bucket, which keeps the case about this tier: the
+		// password route still reaches its handler once the email change's budget is gone.
+		server := newRoutesTestServer(t)
+		changeOf := func(attempt int) *http.Request {
+			return apiRequest(http.MethodPut, "/api/v1/account/email",
+				fmt.Sprintf(`{"email":"probe%d@example.com","currentPassword":""}`, attempt))
+		}
+		assertRefused(t, exhaust(t, server, accountEmailChangeBudget, changeOf),
+			accountEmailChangeWindow, shapeAPI)
+
+		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
+		assert.True(t, reachesHandler(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
+			"the shared password bucket keeps its own budget when the email change's is spent")
 	})
 
 	// The cases above pin every registration whose window or reject class differs from its
