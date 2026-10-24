@@ -254,6 +254,72 @@ func TestHandleLogoutGet(t *testing.T) {
 		httpSession.AssertExpectations(t)
 	})
 
+	// A self-registered client loses the hintless redirect, but not this one: a confirmed hint proves
+	// the End-User signed in to the client its signed aud names, which is what registration alone
+	// cannot show.
+	t.Run("A confirmed hint redirects to a self-registered client", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		httpSession := sessionstoremocks.NewStore(t)
+		database := datamocks.NewDatabase(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{
+			"id_token_hint":            {hintedToken},
+			"post_logout_redirect_uri": {hintedRegisteredURI},
+		}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		client := stubConfirmedHint(database, tokenParser, hintedClaims())
+		client.CreatedViaDCR = true
+		stubRegisteredURI(database, client, hintedRegisteredURI)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+
+		mockSession := expectCookieWipedBeforeSave(t, httpSession)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location, err := url.Parse(rr.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, hintedRegisteredURI, location.Scheme+"://"+location.Host+location.Path)
+		assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
+		pageRenderer.AssertExpectations(t)
+		database.AssertExpectations(t)
+		httpSession.AssertExpectations(t)
+	})
+
+	// The GET half of the self-registered refusal, whose POST half is a row of TestHandleLogoutPost's
+	// declined table: a hintless GET asks, and the redirect can only follow the confirming POST.
+	t.Run("A hintless GET naming a self-registered client asks rather than redirecting", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		httpSession := sessionstoremocks.NewStore(t)
+		database := datamocks.NewDatabase(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{
+			"client_id":                {"dcr_client"},
+			"post_logout_redirect_uri": {"https://evil.example/landing"},
+		}, "test-session")
+		rr := httptest.NewRecorder()
+
+		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
+			mock.Anything).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Empty(t, rr.Header().Get("Location"))
+		pageRenderer.AssertExpectations(t)
+		database.AssertExpectations(t)
+		httpSession.AssertExpectations(t)
+	})
+
 	// The confirmed half of "whether a redirect can be honoured is a question about the response". The
 	// hintless half of this property has its own table above; this row is what says the hinted path
 	// answers it the same way rather than returning before the teardown as all seven of its error
@@ -1062,8 +1128,11 @@ func TestHandleLogoutPost(t *testing.T) {
 		}), "test-session")
 		rr := httptest.NewRecorder()
 
+		// Registered by an administrator, which is what lets client_id vouch for the target. A
+		// self-registered client is refused the same request, in the table below.
 		client := &record.Client{
 			ClientIdentifier: "test_client",
+			CreatedViaDCR:    false,
 			RedirectURIs:     []record.RedirectURI{{URI: "https://example.com/out?state=registered&lang=en"}},
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
@@ -1159,6 +1228,23 @@ func TestHandleLogoutPost(t *testing.T) {
 				name:     "no client_id, so nothing can confirm the target",
 				clientId: "",
 				stubDB:   func(database *datamocks.Database) {},
+			},
+			{
+				// The client's URI is registered and the request is otherwise in order, but whoever
+				// registered the client chose that URI, so the registration confirms nothing about
+				// the target. Without a hint this would make the sign-out page a redirector to any
+				// host an anonymous caller registers, RFC 9700 section 4.11.2.
+				name:     "client_id names a self-registered client",
+				clientId: "dcr_client",
+				stubDB: func(database *datamocks.Database) {
+					client := &record.Client{
+						ClientIdentifier: "dcr_client",
+						CreatedViaDCR:    true,
+						RedirectURIs:     []record.RedirectURI{{URI: "https://example.com/out"}},
+					}
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "dcr_client").Return(client, nil)
+					database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil).Maybe()
+				},
 			},
 			{
 				name:     "client_id names no client",

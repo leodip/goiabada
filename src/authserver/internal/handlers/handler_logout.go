@@ -862,7 +862,7 @@ func deleteWholeUserSession(
 
 // clientForPostLogoutRedirect resolves the client whose registered URIs may authorize a post-logout
 // redirect for a request that carried no confirmable id_token_hint. Returns nil for a client_id that
-// is absent, unknown or unreadable, and nil means no redirect.
+// is absent, unknown or unreadable, or that names a self-registered client, and nil means no redirect.
 //
 // client_id is unauthenticated, so a caller can name any client. It is trusted for exactly one
 // thing, deciding whether a supplied URI is registered to the client it names, which is
@@ -891,6 +891,17 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 	}
 	if client == nil {
 		slog.WarnContext(ctx, "client_id names no client, not redirecting", "client_identifier", clientId)
+		return nil
+	}
+	if client.CreatedViaDCR {
+		// A self-registered client's URIs confirm nothing about a target: whoever registered the
+		// client chose them, with no account, so honouring one here would make this server's own
+		// sign-out page a redirector to a host the caller picked. RFC 9700 section 4.11.2 is the
+		// same reason ClientErrorResponder.RedirectWillBeEmitted never redirects an error to such a
+		// client. A confirmed hint still earns the redirect, since it proves the End-User signed in
+		// to the client its aud names, and that path does not come through here.
+		slog.WarnContext(ctx, "client_id names a self-registered client and there is no id_token_hint, not redirecting",
+			"client_identifier", clientId)
 		return nil
 	}
 

@@ -254,6 +254,7 @@ Because nobody has reviewed them, self-registered clients are treated more caref
 - **Their identifier can't be changed.** It's generated, `dcr_` followed by a UUID.
 - **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both.
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
+- **A sign-out without a hint sends them nowhere.** Their redirect URIs prove nothing about where the user should go, so a [sign-out](/reference/endpoints/logout/#where-the-user-lands) with no `id_token_hint` ends on the auth server's "Signed out" page. One with a hint the auth server confirms still goes back to the client.
 
 Once you've reviewed a self-registered client, you can change its settings like any other, **Ask users for consent** included.
 
