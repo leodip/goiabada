@@ -94,10 +94,11 @@ func formatSince(ctx context.Context, t *time.Time, now time.Time) string {
 	}
 
 	// ceiling: the plural form is chosen by count == 1, which is the rule for
-	// both locales this tree ships, en and pt-BR. A locale with a few or many
-	// form — ru, pl, ar — would take the "other" key for counts its grammar
-	// treats differently. Revisit when a third locale is added; CLDR plural
-	// rules keyed by the locale tag are the next shape (#373).
+	// en, pt-BR and es, and for fr, it, de and hi among the positive whole
+	// counts above (fr and hi also use one for zero, which never reaches here).
+	// ja, zh-Hans, ko and id can repeat their one form in both keys. Locales
+	// with a few or many form — ru, pl, ar — need CLDR plural selection before
+	// they ship; count == 1 cannot express their grammar (#373, #658).
 	form := "other"
 	if count == 1 {
 		form = "one"

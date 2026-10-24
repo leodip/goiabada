@@ -332,7 +332,7 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 
 // The activation mail takes the language the registration page was matched to, not the first
 // Accept-Language tag alone. The page's matcher reads every preference and answers pt-BR for
-// "fr-CA,fr;q=0.9,pt-BR;q=0.8", which is the language the guide says these emails are written in;
+// "nl-BE,nl;q=0.9,pt-BR;q=0.8", which is the language the guide says these emails are written in;
 // the first tag alone sent the mail in English, and for a first tag naming no catalog of its own
 // let the subject's catalog guess and the body's exact-tag copy disagree (#607). The locale is
 // attached the way the request chain attaches it, so the page's matcher is the production one. A
@@ -348,13 +348,14 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 		wantSubject string
 	}{
 		{name: "the page's matched language, not the first Accept-Language tag alone",
-			accept: "fr-CA,fr;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
+			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
 		{name: "a lone base language is sent under its catalog's tag",
 			accept: "pt", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
-		{name: "a cross-language guess gets its subject and body in the same language",
-			accept: "gl", spanish: true, wantTag: "es", wantSubject: spanishActivateSubject},
+		{name: "a cross-language guess gets English for both subject and body",
+			accept: "gl", spanish: true, wantTag: "en", wantSubject: "Activate your account"},
+		{name: "a Spanish recipient keeps the operator override", accept: "es-MX", spanish: true, wantTag: "es", wantSubject: spanishActivateSubject},
 		{name: "ui_locales, the ceremony's explicit intent, also follows the page",
-			uiLocales: "fr pt-BR", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
+			uiLocales: "nl pt-BR", wantTag: "pt-BR", wantSubject: "Ative sua conta"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.spanish {
@@ -409,10 +410,9 @@ const (
 	spanishConfirmationSubject = "¡Bienvenido!"
 )
 
-// installSpanishOverrideCatalog installs an operator's es catalog for the two registration mails'
-// subjects, until the test ends. The catalog matcher then guesses es for a lone gl, a language with
-// no catalog of its own, which is the cross-language case #607 is about: the first tag alone gave
-// the subject that guess and the body the English copy, the body being matched with gl itself.
+// installSpanishOverrideCatalog installs an operator's es subjects until the test ends.
+// A regional Spanish request uses them; Galician, which has no catalog of its own,
+// still gets English rather than a guessed Spanish match (#658).
 func installSpanishOverrideCatalog(t *testing.T) {
 	t.Helper()
 	overrides := t.TempDir()

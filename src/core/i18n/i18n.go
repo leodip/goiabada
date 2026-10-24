@@ -3,8 +3,8 @@
 // At a high level:
 //
 //   - The embedded message catalogs are served without any setup: they are
-//     built once, on first use, so a test or a tool renders English and
-//     pt-BR with no call to make first.
+//     built once, on first use, so a test or a tool renders any built-in
+//     language with no call to make first.
 //   - LoadBundle is called once by each main, with the overrides directory its
 //     configuration read. It merges that directory's catalogs over the embedded
 //     ones (override files win on conflict) and refuses a catalog that does not
@@ -307,8 +307,11 @@ func loadEmbeddedCatalogs() ([]catalogFile, error) {
 // may be a full Accept-Language list. Every preference is parsed with
 // language.ParseAcceptLanguage — which drops q=0 ranges and orders the rest by
 // quality — unparseable ones are skipped, and the bundle's matcher picks one
-// tag from what is left. RFC 9110 section 12.5.4 leaves the matching scheme to
-// the implementation; this is the one go-i18n applied, kept verbatim.
+// tag from what is left, followed by English. That final preference prevents
+// a guessed match to a different language (gl or eu to es, for example) from
+// winning over English, while regional variants still match their language
+// and an explicitly listed second language still wins (#658).
+// RFC 9110 section 12.5.4 leaves the matching scheme to the implementation.
 func (b *bundle) localizerFor(tags []string) *translator {
 	if len(tags) == 0 {
 		return b.english
@@ -324,7 +327,7 @@ func (b *bundle) localizerFor(tags []string) *translator {
 	if len(parsed) == 0 {
 		return b.english
 	}
-	_, idx, _ := b.matcher.Match(parsed...)
+	_, idx, _ := b.matcher.Match(append(parsed, language.English)...)
 	return &translator{bundle: b, tag: b.tags[idx]}
 }
 
@@ -411,12 +414,12 @@ func LocaleTag(ctx context.Context) string {
 	return "en"
 }
 
-// CatalogTag returns the language tag of the catalog T renders from on ctx: "pt-BR" or "en" with
-// the embedded catalogs, or an override-only catalog's tag. Returns "en" when no localizer is
+// CatalogTag returns the language tag of the catalog T renders from on ctx, whether a built-in
+// catalog or an override-only one. Returns "en" when no localizer is
 // attached, which is the catalog T then renders from.
 //
 // It differs from LocaleTag, which answers the first preference asked for whether or not any
-// catalog matches it: "fr-CA,fr;q=0.9,pt-BR;q=0.8" renders in pt-BR, and LocaleTag answers fr-CA.
+// catalog matches it: "nl-BE,nl;q=0.9,pt-BR;q=0.8" renders in pt-BR, and LocaleTag answers nl-BE.
 // Both servers mark a page's <html lang> with it, since it names the language the page is written
 // in, and the admin console names its CLDR country labels in it (#645 decisions 8 and 9).
 // The admin console sends this tag as Accept-Language on every admin API call, so the auth server

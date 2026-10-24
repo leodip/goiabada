@@ -1,0 +1,18 @@
+{{define "title"}}{{ .appName }} - Activa tu cuenta{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Hola:</p>
+
+    <p>Para terminar de crear tu cuenta de {{ .appName }}, abre este enlace y elige una contraseña:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>El enlace caduca a los 5 minutos. Si no puedes abrirlo, copia y pega la dirección en tu navegador.</p>
+
+    <p>Si no has solicitado crear una cuenta, puedes ignorar este mensaje: la cuenta no se creará si no se usa el enlace.</p>
+
+    <p>Un saludo,<br />{{ .appName }}</p>
+</div>
+{{end}}

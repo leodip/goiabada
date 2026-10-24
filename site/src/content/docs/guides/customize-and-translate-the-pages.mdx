@@ -23,19 +23,19 @@ There are three levels, from a setting in the admin console to your own copy of 
 
 ## Add a language
 
-The pages come in English and Portuguese (Brazil). To add another language, you translate one file of text and point both servers at it, with no rebuild.
+The pages come in English, Portuguese (Brazil), Spanish and French. To add another language, you translate one file of text and point both servers at it, with no rebuild.
 
 <Steps>
 
 1. Get the English text of the release you run: `src/core/i18n/catalogs/active.en.toml` in [the source](https://github.com/leodip/goiabada) at that release's tag, such as `v1.7.0`. The release is in the image tag and in the `build information` line each server logs when it starts.
 
-2. Copy it into a folder named `catalogs`, as `active.<language>.toml`, named with the language's [BCP 47](https://www.rfc-editor.org/info/bcp47) tag: `active.es.toml` for Spanish. Translate the text on the right of each `=` and leave the keys on the left as they are:
+2. Copy it into a folder named `catalogs`, as `active.<language>.toml`, named with the language's [BCP 47](https://www.rfc-editor.org/info/bcp47) tag: `active.nl.toml` for Dutch. Translate the text on the right of each `=` and leave the keys on the left as they are:
 
-   ```toml title="catalogs/active.es.toml"
-   "auth.pwd.title" = "Iniciar sesión"
-   "auth.pwd.email_label" = "Correo electrónico"
-   "auth.pwd.password_label" = "Contraseña"
-   "auth.pwd.button" = "Entrar"
+   ```toml title="catalogs/active.nl.toml"
+   "auth.pwd.title" = "Aanmelden"
+   "auth.pwd.email_label" = "E-mailadres"
+   "auth.pwd.password_label" = "Wachtwoord"
+   "auth.pwd.button" = "Aanmelden"
    ```
 
    Keep a placeholder such as `{{.appName}}` exactly as it is: the server writes the value there. A key you leave out, or leave empty, shows in English.
@@ -149,7 +149,7 @@ On the auth server's pages, the sign-in, one-time code, consent, sign-out, regis
 
 In the admin console, the user's own choice comes first: the **Language and region** they picked under **Account**, **Profile**, which reaches the console as the `locale` claim of their ID token. The console picks a change up the next time it refreshes the user's tokens, within five minutes with the default token lifetime. Without one, the browser's `Accept-Language` decides, then English.
 
-Whichever of these decides, it gets the first of its languages Goiabada has text for, or English when it has none of them: `ui_locales=fr es` shows Spanish when you've added Spanish but not French, and `ui_locales=fr` alone shows English.
+Whichever of these decides, it gets the first of its languages Goiabada has text for, or English when it has none of them: `ui_locales=sv nl` shows Dutch when you've added Dutch but not Swedish, and `ui_locales=sv` alone shows English.
 
 A value an admin console form won't take is refused by the auth server, in the console page's language, which is why both servers need your override catalogs.
 
@@ -157,7 +157,7 @@ An email is written in its recipient's language: the **Language and region** on 
 
 ## Catalogs
 
-The text of every page, message and email subject is in two built-in catalogs, English, which is complete, and Portuguese (Brazil). A key with no text in the chosen language shows in English.
+The text of every page, message and email subject is in the built-in English, Portuguese (Brazil), Spanish and French catalogs. A key with no text in the chosen language shows in English.
 
 `GOIABADA_I18N_OVERRIDES_DIR` names a folder whose `catalogs` subfolder holds `active.<language>.toml` files. Nothing else in the folder is read: files put in the folder itself are ignored, and the server logs `override directory has no catalogs subdirectory, skipping it` when it starts. Each file is merged over the built-in catalog of its language, key by key, and the file wins. A value left empty removes the built-in text, so the key shows in English. Every value is a plain string: a `[table]` section stops the server at start.
 
@@ -167,7 +167,7 @@ The durations the admin console writes in words, under a duration field and in h
 
 ## Email bodies
 
-An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.es.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `es` serves a recipient reading `es-MX`, and `pt-BR` serves one reading `pt`. A recipient with no copy in their language gets the English template.
+An email's subject is in the catalogs, and its body is a template under `emails/` in the auth server's templates. To translate a body, add a copy beside the English one named with the language, such as `emails/email_forgot_password.nl.html`, in your own [templates directory](#change-the-templates). A copy named for exactly the recipient's language wins. Otherwise the closest copy in their language does: `nl` serves a recipient reading `nl-BE`, and `pt-BR` serves one reading `pt`. A recipient with no copy in their language gets the English template.
 
 ## Templates and static files
 

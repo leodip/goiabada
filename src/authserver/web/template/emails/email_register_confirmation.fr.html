@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Bienvenue !{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bienvenue ! Votre compte a été créé.</p>
+
+    <p>Pour vous connecter, cliquez sur le lien ci-dessous :</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Si le lien ne s’ouvre pas, copiez-le et collez-le dans votre navigateur.</p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

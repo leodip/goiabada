@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/language"
 )
 
 type stubUILocalesReader struct {
@@ -97,7 +98,7 @@ func TestSanitizeUILocales_ByteCap(t *testing.T) {
 func TestLocale_QueryParamWins(t *testing.T) {
 	mw := Locale(nil)
 	req := httptest.NewRequest("GET", "/auth/authorize?ui_locales=pt-BR", nil)
-	req.Header.Set("Accept-Language", "fr-FR")
+	req.Header.Set("Accept-Language", "nl-NL")
 	rr := httptest.NewRecorder()
 
 	var seen string
@@ -117,7 +118,7 @@ func TestLocale_UILocalesUsesTheSharedGrammar(t *testing.T) {
 
 	run := func(query string) (title string, explicit bool) {
 		req := httptest.NewRequest("GET", "/auth/authorize?ui_locales="+query, nil)
-		req.Header.Set("Accept-Language", "fr-FR")
+		req.Header.Set("Accept-Language", "nl-NL")
 		rr := httptest.NewRecorder()
 		mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			title = T(r.Context(), "auth.pwd.title")
@@ -140,7 +141,7 @@ func TestLocale_UILocalesUsesTheSharedGrammar(t *testing.T) {
 func TestLocale_UILocalesReaderWinsOverHeader(t *testing.T) {
 	mw := Locale(&stubUILocalesReader{locales: []string{"pt-BR"}})
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
-	req.Header.Set("Accept-Language", "fr-FR")
+	req.Header.Set("Accept-Language", "nl-NL")
 	rr := httptest.NewRecorder()
 
 	var seen string
@@ -215,13 +216,13 @@ func TestLocale_DoesNotConsumePostBody(t *testing.T) {
 // replaced, each against the expression that replaced it (#385).
 
 func TestWithLocale_TagsResolveInOrderAndTheWholeListReachesTheMatcher(t *testing.T) {
-	// "fr pt-BR" is the shape an RP's ui_locales arrives in. fr has no catalog,
+	// "nl pt-BR" is the shape an RP's ui_locales arrives in. nl has no catalog,
 	// so the answer is pt-BR only because every usable tag reaches the matcher:
 	// resolving usable[0] alone would answer English and silently discard the
 	// RP's second choice.
-	ctx := WithLocale(context.Background(), true, "fr", "pt-BR")
+	ctx := WithLocale(context.Background(), true, "nl", "pt-BR")
 	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
-	assert.Equal(t, "fr", LocaleTag(ctx), "the recorded tag is the first usable one, not the matched one")
+	assert.Equal(t, "nl", LocaleTag(ctx), "the recorded tag is the first usable one, not the matched one")
 }
 
 func TestWithLocale_EmptyTagIsSkippedRatherThanEndingTheSearch(t *testing.T) {
@@ -367,10 +368,10 @@ func TestResolveRequestLocale(t *testing.T) {
 		acceptLanguage string
 		want           string
 	}{
-		{"ui_locales wins over the header", "/auth/pwd?ui_locales=pt-BR", "fr-FR", "Entrar"},
+		{"ui_locales wins over the header", "/auth/pwd?ui_locales=pt-BR", "nl-NL", "Entrar"},
 		{"Accept-Language is honoured", "/auth/pwd", "pt-BR,en;q=0.9", "Entrar"},
 		{"nothing to go on falls back to English", "/auth/pwd", "", "Sign in"},
-		{"an unsupported language falls back to English", "/auth/pwd", "fr-FR", "Sign in"},
+		{"an unsupported language falls back to English", "/auth/pwd", "nl-NL", "Sign in"},
 	}
 
 	for _, tt := range tests {
@@ -411,9 +412,9 @@ func TestLocaleTag_FromContext(t *testing.T) {
 
 // TestCatalogTag_NamesTheCatalogTheRequestRendersIn: CatalogTag answers the catalog the localizer
 // renders from, which is what the admin console names to the auth server, and not the first
-// preference LocaleTag answers. The fr-CA and es-MX rows are the two the #559 probe found
-// rendering the console in pt-BR while their first preference has no catalog: forwarding that
-// preference would get the API's answer in English on a Portuguese page.
+// preference LocaleTag answers. The preference-list rows render the console in pt-BR while
+// their first preference has no catalog: forwarding that preference would get the API's answer
+// in English on a Portuguese page (#559).
 func TestCatalogTag_NamesTheCatalogTheRequestRendersIn(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -423,8 +424,8 @@ func TestCatalogTag_NamesTheCatalogTheRequestRendersIn(t *testing.T) {
 	}{
 		{"a catalog asked for by name", "/", "pt-BR", "pt-BR"},
 		{"a list led by a catalog", "/", "pt-BR,pt;q=0.9,en;q=0.8", "pt-BR"},
-		{"a first preference with no catalog", "/", "fr-CA,fr;q=0.9,pt-BR;q=0.8", "pt-BR"},
-		{"a later preference at a lower quality", "/", "es-MX, pt-BR;q=0.5", "pt-BR"},
+		{"a first preference with no catalog", "/", "nl-BE,nl;q=0.9,pt-BR;q=0.8", "pt-BR"},
+		{"a later preference at a lower quality", "/", "sv-SE, pt-BR;q=0.5", "pt-BR"},
 		{"a language matched to its regional catalog", "/", "pt-PT", "pt-BR"},
 		{"a language with no catalog", "/", "de", "en"},
 		{"a regional English", "/", "en-US,en;q=0.9", "en"},
@@ -456,9 +457,9 @@ func TestCatalogTag_FollowsWithLocaleAndDefaultsToEnglish(t *testing.T) {
 	//nolint:staticcheck // SA1012: the nil tolerance is the behaviour under test, as LocaleTag's is.
 	assert.Equal(t, "en", CatalogTag(nil))
 
-	refined := WithLocale(context.Background(), false, "fr", "pt-BR")
+	refined := WithLocale(context.Background(), false, "nl", "pt-BR")
 	assert.Equal(t, "pt-BR", CatalogTag(refined))
-	assert.Equal(t, "fr", LocaleTag(refined), "LocaleTag still answers the first preference")
+	assert.Equal(t, "nl", LocaleTag(refined), "LocaleTag still answers the first preference")
 }
 
 // An override-only catalog is a catalog like the embedded ones: a request matching it names it.
@@ -467,8 +468,45 @@ func TestCatalogTag_NamesAnOverrideOnlyCatalog(t *testing.T) {
 	t.Cleanup(func() { installed.Store(saved) })
 
 	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
-		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",
+		"active.nl.toml": "\"auth.pwd.title\" = \"Aanmelden\"\n",
 	})))
 
-	assert.Equal(t, "fr", CatalogTag(WithLocale(context.Background(), false, "fr-CA")))
+	assert.Equal(t, "nl", CatalogTag(WithLocale(context.Background(), false, "nl-BE")))
+}
+
+// The whole planned language set exercises cross-language guesses even before
+// those catalogs ship. WithLocale must prefer English to a guessed language,
+// preserve regional variants, and still honor a listed second choice (#658).
+func TestWithLocale_EnglishWinsOverGuessedLanguages(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+	var files []catalogFile
+	for _, tag := range []string{"en", "pt-BR", "es", "fr", "it", "de", "ja", "zh-Hans", "ko", "pl", "ru", "ar", "id", "hi"} {
+		files = append(files, catalogFile{tag: language.Make(tag), messages: map[string]string{"test.language": tag}})
+	}
+	installed.Store(build(files))
+	for _, tag := range []string{"uk", "sr", "bg", "ba", "be", "kk", "ky", "fa", "zh-TW", "zh-HK", "zh-Hant", "gl", "eu", "gsw", "lb", "ms", "jv", "su", "mr", "gu"} {
+		t.Run(tag, func(t *testing.T) {
+			ctx := WithLocale(context.Background(), true, tag)
+			assert.Equal(t, "en", CatalogTag(ctx))
+			assert.Equal(t, "en", T(ctx, "test.language"))
+			assert.Equal(t, tag, LocaleTag(ctx), "the requested locale is still recorded for email copies")
+		})
+	}
+	for _, tc := range []struct {
+		tags []string
+		want string
+	}{
+		{[]string{"es-MX"}, "es"}, {[]string{"es-419"}, "es"}, {[]string{"es-AR"}, "es"},
+		{[]string{"de-CH"}, "de"}, {[]string{"fr-CA"}, "fr"}, {[]string{"ar-SA"}, "ar"}, {[]string{"zh-SG"}, "zh-Hans"},
+		{[]string{"uk", "ru"}, "ru"}, {[]string{"gl", "es"}, "es"},
+		{[]string{"uk,ru;q=0.8"}, "ru"}, {[]string{"gl,es-MX;q=0.8"}, "es"},
+		{[]string{"es;q=0,en;q=0.5"}, "en"},
+	} {
+		t.Run(strings.Join(tc.tags, " "), func(t *testing.T) {
+			ctx := WithLocale(context.Background(), true, tc.tags...)
+			assert.Equal(t, tc.want, CatalogTag(ctx))
+			assert.Equal(t, tc.want, T(ctx, "test.language"))
+		})
+	}
 }

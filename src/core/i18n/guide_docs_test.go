@@ -34,14 +34,14 @@ func TestGuideDocs_TheOverrideExamplesLoadAsShown(t *testing.T) {
 func TestGuideDocs_AnOverrideExampleNamingAnUnknownKeyFails(t *testing.T) {
 	root := t.TempDir()
 	writeGuideFixture(t, root, "site/translate.mdx", "## Add a language\n\n"+
-		"```toml title=\"catalogs/active.es.toml\"\n"+
-		"\"auth.pwd.title\" = \"Iniciar sesión\"\n"+
+		"```toml title=\"catalogs/active.nl.toml\"\n"+
+		"\"auth.pwd.title\" = \"Aanmelden\"\n"+
 		"\"auth.pwd.no_such_key\" = \"Nada\"\n"+
 		"```\n")
 
 	report := guard.Run(func(r guard.Reporter) { assertOverrideExamples(r, root, "site/translate.mdx") })
 
-	want := []string{`site/translate.mdx: catalogs/active.es.toml names "auth.pwd.no_such_key", which no screen uses`}
+	want := []string{`site/translate.mdx: catalogs/active.nl.toml names "auth.pwd.no_such_key", which no screen uses`}
 	if report.Stopped || !slices.Equal(report.Errors, want) {
 		t.Errorf("failures %+v\nwant %q", report, want)
 	}
@@ -50,13 +50,13 @@ func TestGuideDocs_AnOverrideExampleNamingAnUnknownKeyFails(t *testing.T) {
 func TestGuideDocs_AnOverrideExampleOutsideTheCatalogsDirectoryFails(t *testing.T) {
 	root := t.TempDir()
 	writeGuideFixture(t, root, "site/translate.mdx", "## Add a language\n\n"+
-		"```toml title=\"active.es.toml\"\n"+
-		"\"auth.pwd.title\" = \"Iniciar sesión\"\n"+
+		"```toml title=\"active.nl.toml\"\n"+
+		"\"auth.pwd.title\" = \"Aanmelden\"\n"+
 		"```\n")
 
 	report := guard.Run(func(r guard.Reporter) { assertOverrideExamples(r, root, "site/translate.mdx") })
 
-	want := []string{`site/translate.mdx: active.es.toml renders "Sign in" for "auth.pwd.title" in es, not "Iniciar sesión"`}
+	want := []string{`site/translate.mdx: active.nl.toml renders "Sign in" for "auth.pwd.title" in nl, not "Aanmelden"`}
 	if report.Stopped || !slices.Equal(report.Errors, want) {
 		t.Errorf("failures %+v\nwant %q", report, want)
 	}
@@ -65,9 +65,9 @@ func TestGuideDocs_AnOverrideExampleOutsideTheCatalogsDirectoryFails(t *testing.
 func TestGuideDocs_AnOverrideExampleLoadingAsShownPasses(t *testing.T) {
 	root := t.TempDir()
 	writeGuideFixture(t, root, "site/translate.mdx", "## Add a language\n\n"+
-		"```toml title=\"catalogs/active.es.toml\"\n"+
-		"\"auth.pwd.title\" = \"Iniciar sesión\"\n"+
-		"\"auth.pwd.button\" = \"Entrar\"\n"+
+		"```toml title=\"catalogs/active.nl.toml\"\n"+
+		"\"auth.pwd.title\" = \"Aanmelden\"\n"+
+		"\"auth.pwd.button\" = \"Aanmelden\"\n"+
 		"```\n\n## Change a few words\n\n"+
 		"```toml title=\"catalogs/active.en.toml\"\n"+
 		"\"auth.pwd.title\" = \"Welcome back\"\n"+

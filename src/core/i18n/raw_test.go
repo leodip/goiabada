@@ -42,10 +42,10 @@ func TestRaw_ResolvesTheLocaleTheSameWayTAsDoes(t *testing.T) {
 		{"pt-BR", "Erro", "Entrar"},
 		{"pt", "Erro", "Entrar"},
 		{"pt-PT", "Erro", "Entrar"},
-		// The primary tag is fr-FR, which matches no catalog, while the
+		// The primary tag is nl-NL, which matches no catalog, while the
 		// matcher takes the second range: the page is pt-BR, so the JS
 		// strings must be too.
-		{"fr-FR,pt;q=0.8", "Erro", "Entrar"},
+		{"nl-NL,pt;q=0.8", "Erro", "Entrar"},
 		// English outranks pt-BR here, and both surfaces must say so.
 		{"en-US,pt-BR;q=0.5", "Error", "Sign in"},
 	} {

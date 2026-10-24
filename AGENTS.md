@@ -846,8 +846,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served
   signs in with this client"). Every sentence is true when it is read, its tense included: a
   question asked before an action says what will happen ("The key will be deleted"), a notice after
   it what was done, and help about standing behaviour the present. Sentence case; a
-  button says what it does ("Save", "New user"); a page title reads "Page – app name". Both catalogs
-  change together, a message ID is kept, and a renamed one goes in the release notes, since
+  button says what it does ("Save", "New user"); a page title reads "Page – app name". All built-in
+  catalogs change together, a message ID is kept, and a renamed one goes in the release notes, since
   operators' override catalogs are keyed by it.
 
 ## Standards

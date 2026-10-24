@@ -141,6 +141,12 @@ func durationCases() []durationCase {
 		)
 	}
 	return append(cases,
+		// Spanish uses the same browser formatter for settings and verification waits.
+		formatIn("es", "5400", settingsUnits, "1 hora y 30 minutos"),
+		formatIn("es", "90061", waitUnits, "25 horas, 1 minuto y 1 segundo"),
+		formatIn("es", "86400", settingsUnits, "1 día"),
+		formatIn("es", "172800", settingsUnits, "2 días"),
+		describeIn("es", `"0"`, `{durationZero: "Usa la configuración global", durationGlobal: "5400"}`, "Usa la configuración global (1 hora y 30 minutos)"),
 		// A settings field's readout: trimmed, digits only, zero meaning the global setting where the
 		// form says so, and the cap of about five years.
 		describeIn("en", `" 5400 "`, englishMessages, "1 hour, 30 minutes"),

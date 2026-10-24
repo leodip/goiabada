@@ -1,7 +1,7 @@
 // Every page is marked with the language it is written in, the catalog's, whatever the first
 // language asked for (WCAG 2.2 SC 3.1.1, Language of Page): a screen reader chooses its voice from
-// <html lang>. A language with no catalog (de) reads an English page, marked en; fr then pt-BR reads
-// a pt-BR page, marked pt-BR, not fr. The console's country names follow the page too, so an English
+// <html lang>. A language with no catalog (de) reads an English page, marked en; nl then pt-BR reads
+// a pt-BR page, marked pt-BR, not nl. The console's country names follow the page too, so an English
 // page asked for in German names Germany in English.
 import { userUrl } from "../../lib/admin-console";
 import { openSignIn } from "../../lib/browser-sign-in";
@@ -10,8 +10,12 @@ import { expect, test } from "../../lib/fixtures";
 import { browserSignInClient } from "../../lib/test-clients";
 
 const asked = [
+  { uiLocales: "es", lang: "es" },
+  { uiLocales: "es-MX", lang: "es" },
+  { uiLocales: "gl", lang: "en" },
+  { uiLocales: "eu", lang: "en" },
   { uiLocales: "de", lang: "en" },
-  { uiLocales: "fr pt-BR", lang: "pt-BR" },
+  { uiLocales: "nl pt-BR", lang: "pt-BR" },
 ];
 
 for (const { uiLocales, lang } of asked) {

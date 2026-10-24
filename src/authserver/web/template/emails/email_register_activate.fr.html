@@ -1,0 +1,21 @@
+{{define "title"}}{{ .appName }} - Activez votre compte{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bonjour,</p>
+
+    <p>Pour terminer la création de votre compte {{ .appName }}, cliquez sur le lien ci-dessous et choisissez un mot de passe :</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Le lien expire dans 5 minutes. S’il ne s’ouvre pas, copiez-le et collez-le dans votre navigateur.</p>
+
+    <p>Si vous n’avez pas demandé à créer un compte, ignorez ce message : aucun compte ne sera créé tant que le lien ne sera pas utilisé.</p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

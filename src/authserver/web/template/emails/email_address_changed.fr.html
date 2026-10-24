@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Votre adresse e-mail a été modifiée{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bonjour {{.name}},</p>
+
+    <p>L’adresse e-mail de votre compte {{ .appName }} a été modifiée. Cette adresse ne recevra donc plus les messages concernant ce compte, y compris les liens de réinitialisation du mot de passe.</p>
+
+    <p>Si vous avez effectué cette modification, vous n’avez rien à faire.</p>
+
+    <p><strong>Sinon, une autre personne connaît peut-être votre mot de passe.</strong> Connectez-vous, changez votre mot de passe et rétablissez votre adresse e-mail, ou contactez votre administrateur.</p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

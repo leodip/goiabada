@@ -58,7 +58,7 @@ func TestAPIRefusals_AreAnsweredInTheRequestsLanguage(t *testing.T) {
 				{"pt-BR", "pt-BR", test.portuguese},
 				// The console's own resolution names a catalog's tag, but a caller sending a browser's
 				// whole list is matched against the catalogs the same way.
-				{"a list whose first match is pt-BR", "fr-CA,fr;q=0.9,pt-BR;q=0.8", test.portuguese},
+				{"a list whose first match is pt-BR", "nl-BE,nl;q=0.9,pt-BR;q=0.8", test.portuguese},
 			} {
 				t.Run(language.name, func(t *testing.T) {
 					jsonBody, err := json.Marshal(test.body)

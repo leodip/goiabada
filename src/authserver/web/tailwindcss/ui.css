@@ -1332,6 +1332,7 @@
 
   .identity-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem;
@@ -1342,7 +1343,7 @@
   .identity-row-who {
     display: grid;
     min-width: 0;
-    flex: 1;
+    flex: 1 1 8rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
   }

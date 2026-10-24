@@ -1,0 +1,16 @@
+{{define "title"}}{{ .appName }} - Tu dirección de correo electrónico ha cambiado{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Hola, {{.name}}:</p>
+
+    <p>La dirección de correo electrónico de tu cuenta de {{ .appName }} ha cambiado. Esta dirección dejará de recibir mensajes sobre tu cuenta, incluidos los enlaces para restablecer la contraseña.</p>
+
+    <p>Si has hecho este cambio, no necesitas hacer nada.</p>
+
+    <p><strong>Si no has sido tú, puede que otra persona conozca tu contraseña.</strong> Inicia sesión, cambia tu contraseña y restablece tu dirección de correo electrónico, o contacta con tu administrador.</p>
+
+    <p>Un saludo,<br />{{ .appName }}</p>
+</div>
+{{end}}

@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Vous avez déjà un compte{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bonjour,</p>
+
+    <p>Une personne, peut-être vous, a essayé de créer un compte {{ .appName }} avec cette adresse e-mail. Cette adresse correspond déjà à un compte. Aucun nouveau compte n’a donc été créé.</p>
+
+    <p>Si c’était vous, connectez-vous à votre compte existant. Si vous avez oublié votre mot de passe, vous pouvez le réinitialiser ici : <a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Sinon, vous pouvez ignorer ce message. Votre compte n’a pas été modifié.</p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

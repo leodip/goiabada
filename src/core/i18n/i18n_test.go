@@ -69,7 +69,6 @@ func TestLoad_EmptyDirIsTheEmbeddedCatalogs(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, tagStrings(embedded()), tagStrings(b))
-	assert.Equal(t, []string{"en", "pt-BR"}, tagStrings(b))
 	assert.Equal(t, "Entrar", T(ctxForBundle(b, "pt-BR"), "auth.pwd.title"))
 	assert.Equal(t, "Sign in", T(ctxForBundle(b, "en"), "auth.pwd.title"))
 }
@@ -109,7 +108,7 @@ func TestOverrideDir_NoCatalogsSubdir_IsNoOp(t *testing.T) {
 	// An override dir without a catalogs/ subdir is valid — log + skip.
 	b, err := load(t.TempDir())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"en", "pt-BR"}, tagStrings(b))
+	assert.Equal(t, tagStrings(embedded()), tagStrings(b))
 }
 
 // TestOverrideDir_ACatalogsPathThatIsNotADirectoryIsRefused: the directory exists but cannot be
@@ -130,15 +129,15 @@ func TestOverrideOnlyLocale_IsSupported(t *testing.T) {
 	// the embedded set. The bundle must carry that locale in its tags, or the
 	// matcher answers English for a request asking for it.
 	b, err := loadWithOverrides(t, map[string]string{
-		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",
+		"active.nl.toml": "\"auth.pwd.title\" = \"Aanmelden\"\n",
 	})
 	require.NoError(t, err)
 
 	// Embedded locales first, the override-only one after them.
-	assert.Equal(t, []string{"en", "pt-BR", "fr"}, tagStrings(b))
+	assert.Equal(t, append(tagStrings(embedded()), "nl"), tagStrings(b))
 
 	// And the override translation actually works.
-	assert.Equal(t, "Connexion", T(ctxForBundle(b, "fr"), "auth.pwd.title"))
+	assert.Equal(t, "Aanmelden", T(ctxForBundle(b, "nl"), "auth.pwd.title"))
 }
 
 // TestLoadBundle_InstallsTheOverrides: after LoadBundle, every rendering surface reads the
@@ -268,12 +267,12 @@ func TestT_KeyMissingInMatchedLocaleFallsBackToEnglish(t *testing.T) {
 	// guides/customize-and-translate-the-pages.mdx promises; T used to render
 	// the key itself here (#273).
 	b, err := loadWithOverrides(t, map[string]string{
-		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",
+		"active.nl.toml": "\"auth.pwd.title\" = \"Aanmelden\"\n",
 	})
 	require.NoError(t, err)
 
-	ctx := ctxForBundle(b, "fr")
-	assert.Equal(t, "Connexion", T(ctx, "auth.pwd.title"))
+	ctx := ctxForBundle(b, "nl")
+	assert.Equal(t, "Aanmelden", T(ctx, "auth.pwd.title"))
 	assert.Equal(t, "Password", T(ctx, "auth.pwd.password_label"))
 }
 
@@ -316,7 +315,7 @@ func TestT_TemplatedValueThatFailsToExecuteRendersTheKey(t *testing.T) {
 // this one side by side over the same input, and every row is self-contained
 // here. The rows that decide it, because nothing else observes them: a later
 // range winning
-// ("fr-FR,pt;q=0.8"), a q=0 range being excluded, quality reordering the list,
+// ("nl-NL,pt;q=0.8"), a q=0 range being excluded, quality reordering the list,
 // unparseable input falling to English, and the ui_locales shape where the
 // first tag is unsupported.
 func TestLocalizerFor_MatchesAsGoI18nDid(t *testing.T) {
@@ -334,14 +333,14 @@ func TestLocalizerFor_MatchesAsGoI18nDid(t *testing.T) {
 		{[]string{"en"}, en},
 		{[]string{"en-US"}, en},
 		{[]string{"xx"}, en},
-		{[]string{"fr"}, en},
-		{[]string{"fr-FR"}, en},
+		{[]string{"nl"}, en},
+		{[]string{"nl-NL"}, en},
 		{[]string{""}, en},
 		{[]string{"pt-BR,en;q=0.9"}, pt},
-		{[]string{"fr-FR,pt;q=0.8"}, pt},
+		{[]string{"nl-NL,pt;q=0.8"}, pt},
 		{[]string{"garbage!!"}, en},
 		{[]string{"*"}, en},
-		{[]string{"fr", "pt-BR"}, pt},
+		{[]string{"nl", "pt-BR"}, pt},
 		{[]string{"xx", "pt-BR"}, pt},
 		{[]string{"pt-BR;q=0"}, en},
 		{[]string{"en;q=0.1,pt-BR;q=0.9"}, pt},

@@ -178,11 +178,11 @@ func TestAuthServerClient_EveryMethodPutsTheSameRequestOnTheWire(t *testing.T) {
 
 // #559 decision 3: every call names the language the console's page renders in, so the API answers
 // a refusal in that language when it has the sentence translated. The value is the catalog the
-// request resolved to, not the browser's first preference: this header's first preference, fr-CA,
+// request resolved to, not the browser's first preference: this header's first preference, nl-BE,
 // has no catalog and the console renders the page in pt-BR, which is what the API must be told.
 func TestAuthServerClient_EveryMethodNamesTheCatalogLanguageTheRequestResolvedTo(t *testing.T) {
 	browser := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
-	browser.Header.Set("Accept-Language", "fr-CA,fr;q=0.9,pt-BR;q=0.8")
+	browser.Header.Set("Accept-Language", "nl-BE,nl;q=0.9,pt-BR;q=0.8")
 	ctx := i18n.ResolveRequestLocale(context.Background(), browser)
 
 	for _, tc := range wireCharacterization() {

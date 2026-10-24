@@ -44,12 +44,12 @@ func TestRender_SettingsUnavailable(t *testing.T) {
 }
 
 // The page is marked with the language it is written in, the catalog's, not the first preference
-// asked for: de-DE has no catalog and reads English, and fr-CA first with pt-BR third reads pt-BR
+// asked for: de-DE has no catalog and reads English, and nl-BE first with pt-BR third reads pt-BR
 // (#645 decision 8).
 func TestRender_SettingsUnavailableIsMarkedWithTheCatalogLanguage(t *testing.T) {
 	for acceptLanguage, want := range map[string]string{
 		"de-DE":                      "en",
-		"fr-CA,fr;q=0.9,pt-BR;q=0.8": "pt-BR",
+		"nl-BE,nl;q=0.9,pt-BR;q=0.8": "pt-BR",
 	} {
 		t.Run(acceptLanguage, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/", nil)

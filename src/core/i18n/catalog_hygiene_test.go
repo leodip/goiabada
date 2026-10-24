@@ -1,7 +1,9 @@
 package i18n
 
 import (
+	"io/fs"
 	"regexp"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,27 +45,73 @@ other = "hi"
 // leaves nothing to render but the key. An intentionally-empty slot can
 // therefore never work.
 func TestCatalog_NoEmptyValues(t *testing.T) {
-	for _, name := range []string{"active.en.toml", "active.pt-BR.toml"} {
+	for _, name := range catalogNames(t) {
 		for k, v := range loadCatalogFlat(t, name) {
 			assert.NotEmptyf(t, v, "%s: key %q has an empty value; the loader treats it as absent, so the key renders English or leaks into the UI", name, k)
 		}
 	}
 }
 
-// TestCatalog_ParityEnPtBR asserts the English source of truth and pt-BR
-// translation have identical key sets. A key present in only one locale means
-// either an untranslated string (leaks English or the raw key) or an orphan.
-func TestCatalog_ParityEnPtBR(t *testing.T) {
-	en := loadCatalogFlat(t, "active.en.toml")
-	pt := loadCatalogFlat(t, "active.pt-BR.toml")
-
-	for k := range en {
-		_, ok := pt[k]
-		assert.Truef(t, ok, "key %q is in active.en.toml but missing from active.pt-BR.toml", k)
+// catalogNames reads the same embedded set startup loads, so adding a language
+// automatically adds it to every catalog check below.
+func catalogNames(t *testing.T) []string {
+	t.Helper()
+	names, err := fs.Glob(embeddedCatalogs, "catalogs/*.toml")
+	require.NoError(t, err)
+	require.NotEmpty(t, names)
+	for i := range names {
+		names[i] = names[i][len("catalogs/"):]
 	}
-	for k := range pt {
-		_, ok := en[k]
-		assert.Truef(t, ok, "key %q is in active.pt-BR.toml but missing from active.en.toml (orphan)", k)
+	return names
+}
+
+// Every built-in translation has exactly English's keys and placeholder names.
+// The dotted Go placeholders and bare JavaScript placeholders are distinct:
+// changing {{.count}} to {{count}} changes who substitutes it.
+func TestCatalog_TranslationsMatchEnglish(t *testing.T) {
+	en := loadCatalogFlat(t, "active.en.toml")
+	for _, name := range catalogNames(t) {
+		t.Run(name, func(t *testing.T) {
+			translated := loadCatalogFlat(t, name)
+			for key, value := range en {
+				got, ok := translated[key]
+				if assert.Truef(t, ok, "%s is missing %q", name, key) {
+					assert.Equalf(t, catalogPlaceholders(value), catalogPlaceholders(got), "%s: %q changed placeholders", name, key)
+				}
+			}
+			for key := range translated {
+				_, ok := en[key]
+				assert.Truef(t, ok, "%s has orphan key %q", name, key)
+			}
+		})
+	}
+}
+
+var catalogPlaceholder = regexp.MustCompile(`{{\s*(\.?[A-Za-z_][A-Za-z0-9_]*)\s*}}`)
+
+func catalogPlaceholders(value string) []string {
+	var names []string
+	for _, match := range catalogPlaceholder.FindAllStringSubmatch(value, -1) {
+		names = append(names, match[1])
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
+func TestCatalogPlaceholders(t *testing.T) {
+	for _, tc := range []struct {
+		name, value string
+		want        []string
+	}{
+		{"plain", "No parameters.", nil},
+		{"Go", "Hello {{.name}}, {{.count}} times", []string{".count", ".name"}},
+		{"JavaScript", "{{count}} matches ({{detail}})", []string{"count", "detail"}},
+		{"reordered and repeated", "{{.name}} {{ .count }} {{.name}}", []string{".count", ".name"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) { assert.Equal(t, tc.want, catalogPlaceholders(tc.value)) })
+	}
+	for _, value := range []string{"{{.renamed}}", "No value", "{{count}}", "{{.count}"} {
+		assert.NotEqual(t, catalogPlaceholders("{{.count}}"), catalogPlaceholders(value), "a renamed, dropped or broken placeholder must differ")
 	}
 }
 

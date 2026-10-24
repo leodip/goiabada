@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - Vérification de l’adresse e-mail{{end}}
+{{define "head"}}
+{{end}}
+
+{{define "body"}}
+
+<div>
+    <p>Bonjour {{.name}},</p>
+
+    <p>Voici votre code de vérification de l’adresse e-mail :</p>
+
+    <p>{{.verificationCode}}</p>
+
+    <p>Vous pouvez saisir ce code ici : <a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Cordialement,<br />{{ .appName }}</p>
+</div>
+
+{{end}}

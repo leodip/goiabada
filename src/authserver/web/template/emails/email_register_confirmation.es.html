@@ -1,0 +1,16 @@
+{{define "title"}}{{ .appName }} - Tu cuenta está lista{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>¡Tu cuenta ya está creada!</p>
+
+    <p>Puedes iniciar sesión desde este enlace:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Si no puedes abrirlo, copia y pega la dirección en tu navegador.</p>
+
+    <p>Un saludo,<br />{{ .appName }}</p>
+</div>
+{{end}}

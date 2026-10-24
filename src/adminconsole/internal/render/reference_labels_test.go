@@ -108,8 +108,8 @@ func TestReference_LocalizedRegionName(t *testing.T) {
 
 // The labels are in the language of the catalog the page was rendered from, not the first
 // preference asked for: de-DE has no catalog, so its page is English and names Germany "Germany",
-// not "Deutschland"; fr-CA first and pt-BR third renders pt-BR, so its names are Portuguese, not
-// French (#645 decision 9).
+// not "Deutschland"; nl-BE first and pt-BR third renders pt-BR, so its names are Portuguese, not
+// Dutch (#645 decision 9).
 func TestReference_LabelsFollowTheCatalogLanguage(t *testing.T) {
 	for _, tc := range []struct {
 		name                            string
@@ -118,7 +118,7 @@ func TestReference_LabelsFollowTheCatalogLanguage(t *testing.T) {
 	}{
 		{"a first preference with no catalog", []string{"de-DE"},
 			"Germany", "🇩🇪 - Germany (+49)", "Germany - Europe/Berlin - most of Germany"},
-		{"a third preference with a catalog", []string{"fr-CA", "fr", "pt-BR"},
+		{"a third preference with a catalog", []string{"nl-BE", "nl", "pt-BR"},
 			"Alemanha", "🇩🇪 - Alemanha (+49)", "Alemanha - Europe/Berlin - most of Germany"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -881,7 +881,7 @@ func TestHandleRegisterPost(t *testing.T) {
 }
 
 // The welcome mail takes the language the registration page was matched to, as the activation
-// mail does: the page's matcher answers pt-BR for "fr-CA,fr;q=0.9,pt-BR;q=0.8", and the first
+// mail does: the page's matcher answers pt-BR for "nl-BE,nl;q=0.9,pt-BR;q=0.8", and the first
 // Accept-Language tag alone sent the mail in English (#607). The rows are the activation mail's:
 // a cross-language guess and a ui_locales the sign-in page carried follow the page too. The locale
 // is attached the way the request chain attaches it, so the page's matcher is the production one.
@@ -895,11 +895,12 @@ func TestHandleRegisterPost_TheWelcomeMailTakesThePageLanguage(t *testing.T) {
 		wantSubject string
 	}{
 		{name: "the page's matched language, not the first Accept-Language tag alone",
-			accept: "fr-CA,fr;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR", wantSubject: "Bem-vindo(a)!"},
-		{name: "a cross-language guess gets its subject and body in the same language",
-			accept: "gl", spanish: true, wantTag: "es", wantSubject: spanishConfirmationSubject},
+			accept: "nl-BE,nl;q=0.9,pt-BR;q=0.8", wantTag: "pt-BR", wantSubject: "Bem-vindo(a)!"},
+		{name: "a cross-language guess gets English for both subject and body",
+			accept: "gl", spanish: true, wantTag: "en", wantSubject: "Welcome!"},
+		{name: "a Spanish recipient keeps the operator override", accept: "es-MX", spanish: true, wantTag: "es", wantSubject: spanishConfirmationSubject},
 		{name: "ui_locales, the ceremony's explicit intent, also follows the page",
-			uiLocales: "fr pt-BR", wantTag: "pt-BR", wantSubject: "Bem-vindo(a)!"},
+			uiLocales: "nl pt-BR", wantTag: "pt-BR", wantSubject: "Bem-vindo(a)!"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.spanish {

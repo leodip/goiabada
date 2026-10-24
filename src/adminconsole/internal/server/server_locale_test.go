@@ -58,9 +58,9 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 	// English and Portuguese must differ for any of this to mean anything: a chain
 	// that never resolved a locale would still match a key whose two entries agree.
 	english := func(key string) string { return i18n.T(context.Background(), key) }
-	portuguese := func(t *testing.T, key string) string {
+	translated := func(t *testing.T, key, locale string) string {
 		t.Helper()
-		req := httptest.NewRequest(http.MethodGet, "/?ui_locales=pt-BR", nil)
+		req := httptest.NewRequest(http.MethodGet, "/?ui_locales="+locale, nil)
 		out := i18n.T(i18n.ResolveRequestLocale(req.Context(), req), key)
 		if out == english(key) {
 			t.Fatalf("the two catalogs answer %q identically, so no assertion below can tell a "+
@@ -69,15 +69,16 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 		return out
 	}
 
-	tests := []struct {
+	type refusalCase struct {
 		name string
 		// request builds the request under test; the response it draws is one of the
 		// two refusals, never the handler.
 		request func() *http.Request
 		key     string
 		status  int
-		ptBR    bool
-	}{
+		locale  string
+	}
+	tests := []refusalCase{
 		{
 			name: "the settings refusal answers in the language the browser asked for",
 			request: func() *http.Request {
@@ -87,7 +88,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 			},
 			key:    "adminconsole.error.settings_unavailable",
 			status: http.StatusInternalServerError,
-			ptBR:   true,
+			locale: "pt-BR",
 		},
 		{
 			name: "the settings refusal honours ui_locales",
@@ -96,7 +97,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 			},
 			key:    "adminconsole.error.settings_unavailable",
 			status: http.StatusInternalServerError,
-			ptBR:   true,
+			locale: "pt-BR",
 		},
 		{
 			name: "the settings refusal falls back to English when the request says nothing",
@@ -123,7 +124,7 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 			},
 			key:    "error.csrf_refused",
 			status: http.StatusForbidden,
-			ptBR:   true,
+			locale: "pt-BR",
 		},
 		{
 			name: "the CSRF refusal falls back to English when the request says nothing",
@@ -140,11 +141,24 @@ func TestInitMiddleware_RefusalsAreLocalized(t *testing.T) {
 		},
 	}
 
+	for _, locale := range []string{"es", "es-MX"} {
+		tests = append(tests, refusalCase{
+			name: "settings refusal in " + locale,
+			request: func() *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
+				req.Header.Set("Accept-Language", locale)
+				return req
+			},
+			key:    "adminconsole.error.settings_unavailable",
+			status: http.StatusInternalServerError,
+			locale: locale,
+		})
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			want := english(tt.key)
-			if tt.ptBR {
-				want = portuguese(t, tt.key)
+			if tt.locale != "" {
+				want = translated(t, tt.key, tt.locale)
 			}
 
 			rr := httptest.NewRecorder()
