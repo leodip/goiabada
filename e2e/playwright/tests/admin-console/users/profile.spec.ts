@@ -78,25 +78,36 @@ test("one-character names are saved, shown again, and reach the profile claims",
 });
 
 // A name is written with the marks on its letters, as Hindi's vowel signs are, and with the
-// typographic apostrophe an iPhone types (#669).
+// typographic apostrophe an iPhone types, and has one spelling: a name typed decomposed is stored,
+// shown and claimed composed (#669).
 test("names written with marks and the typographic apostrophe are saved, shown again, and reach the profile claims", async ({ page, request, clients, users }) => {
   const user = await users.create();
   // अमित: a, ma, the vowel sign i (a spacing mark), ta.
   const givenName = "\u0905\u092E\u093F\u0924";
+  // José typed decomposed, an e and a combining acute accent, comes back with the one é.
+  const middleNameTyped = "Jose\u0301";
+  const middleName = "Jos\u00E9";
   const familyName = "O\u2019Brien";
   await page.goto(userUrl(user.id, "profile"));
   await page.locator('input[name="givenName"]').fill(givenName);
+  await page.locator('input[name="middleName"]').fill(middleNameTyped);
   await page.locator('input[name="familyName"]').fill(familyName);
   await page.locator("#btnSave").click();
   await expect(page.getByText(saved)).toBeVisible();
 
   await page.reload();
   await expect(page.locator('input[name="givenName"]')).toHaveValue(givenName);
+  await expect(page.locator('input[name="middleName"]')).toHaveValue(middleName);
   await expect(page.locator('input[name="familyName"]')).toHaveValue(familyName);
 
   const { client, secret } = await passwordGrantClient(page, clients);
   const { id } = await userTokens(request, client.identifier, secret, user, "openid profile");
-  expect(id).toMatchObject({ given_name: givenName, family_name: familyName, name: `${givenName} ${familyName}` });
+  expect(id).toMatchObject({
+    given_name: givenName,
+    middle_name: middleName,
+    family_name: familyName,
+    name: `${givenName} ${middleName} ${familyName}`,
+  });
 });
 
 // A nickname is a casual name, free text rather than a username's shape (#632).

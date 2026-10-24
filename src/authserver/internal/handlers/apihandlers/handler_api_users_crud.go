@@ -367,7 +367,12 @@ func HandleUserCreatePost(
 			return
 		}
 
-		// Name validations
+		// Names are checked as they are stored: trimmed and normalized to NFC first, as the two
+		// profile updates do (#669 decisions 2 and 6).
+		req.GivenName = accountvalidation.NormalizeName(req.GivenName)
+		req.MiddleName = accountvalidation.NormalizeName(req.MiddleName)
+		req.FamilyName = accountvalidation.NormalizeName(req.FamilyName)
+
 		err = profileValidator.ValidateName(req.GivenName, i18n.ErrCodeProfileGivenNameInvalid)
 		if err != nil {
 			writeValidationError(w, r, err)
@@ -436,11 +441,6 @@ func HandleUserCreatePost(
 				return
 			}
 		}
-
-		// Sanitize names
-		req.GivenName = strings.TrimSpace(req.GivenName)
-		req.MiddleName = strings.TrimSpace(req.MiddleName)
-		req.FamilyName = strings.TrimSpace(req.FamilyName)
 
 		input := &usercreation.Input{
 			Email:         req.Email,

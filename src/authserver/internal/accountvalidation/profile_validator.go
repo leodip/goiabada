@@ -170,6 +170,15 @@ func ParseGender(value string) (gender.Gender, bool) {
 	return 0, false
 }
 
+// NormalizeName is the one spelling a name is checked and stored in: trimmed of the white space
+// around it, then in Unicode Normalization Form C, so a decomposed José is stored, and answered,
+// as the composed one. Every write of a name passes it through here before ValidateName, so what
+// is checked is exactly what is stored: a `<` followed by U+0338 is checked as the ≮ it composes
+// to, and the bounds count the stored form (#669 decision 2).
+func NormalizeName(name string) string {
+	return norm.NFC.String(strings.TrimSpace(name))
+}
+
 // ValidateName checks a name field against the shared name rule: 1 to 48
 // characters, well formed (nameIsWellFormed) and stacking no marks beyond the
 // bound (nameStacksMarks). invalidNameCode is the i18n error code returned on

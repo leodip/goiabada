@@ -282,6 +282,63 @@ func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	assert.Equal(t, "female", stored.Gender)
 }
 
+// A name keeps the marks it is written with and has one spelling (#669 decisions 1, 2 and 4): a
+// Hindi given name with its vowel sign, a middle name sent decomposed (José as e and U+0301) and a
+// family name with the typographic apostrophe come back from GET, through the real server and
+// database, as sent but for the middle name, which is answered and stored composed.
+func TestAPIUserProfilePut_NamesWithMarksRoundTripInOneSpelling(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &record.User{
+		Subject:    fake.UUID(),
+		Enabled:    true,
+		Email:      uniqueEmail("testuser@name-marks.test"),
+		GivenName:  "Test",
+		FamilyName: "User",
+	}
+	err := database.CreateUser(context.Background(), nil, testUser)
+	require.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+	}()
+
+	const (
+		givenName          = "अमित" // अमित
+		middleNameSent     = "José"
+		middleNameComposed = "José"
+		familyName         = "O’Brien" // O’Brien
+	)
+
+	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	putResp := makeAPIRequest(t, "PUT", userURL+"/profile", accessToken, api.UpdateUserProfileRequest{
+		GivenName:  givenName,
+		MiddleName: middleNameSent,
+		FamilyName: familyName,
+	})
+	defer func() { _ = putResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, putResp.StatusCode)
+	var updated api.UpdateUserResponse
+	require.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
+	assert.Equal(t, givenName, updated.User.GivenName)
+	assert.Equal(t, middleNameComposed, updated.User.MiddleName)
+	assert.Equal(t, familyName, updated.User.FamilyName)
+
+	getResp := makeAPIRequest(t, "GET", userURL, accessToken, nil)
+	defer func() { _ = getResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+	var got api.GetUserResponse
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&got))
+	assert.Equal(t, givenName, got.User.GivenName)
+	assert.Equal(t, middleNameComposed, got.User.MiddleName)
+	assert.Equal(t, familyName, got.User.FamilyName)
+
+	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	require.NoError(t, err)
+	assert.Equal(t, givenName, stored.GivenName)
+	assert.Equal(t, middleNameComposed, stored.MiddleName)
+	assert.Equal(t, familyName, stored.FamilyName)
+}
+
 // The nickname is free text (#632 item 4): a casual name with spaces, dots, apostrophes, letters
 // of any script, or 24 characters outside the Basic Multilingual Plane, the 48 UTF-16 code units
 // of its bound, comes back from the admin API, from the database and in the ID token's nickname
