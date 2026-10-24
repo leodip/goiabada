@@ -16,8 +16,8 @@ import (
 // These two tags are not hygiene, and the reason they are load-bearing is invisible from the row
 // state they protect. SQL Server re-checks a foreign key whenever its column appears in an
 // UPDATE's SET list, unchanged value or not, by taking a shared lock on the parent row.
-// UpdateRefreshToken and UpdateUserSessionClient are both full-row updates through sqlbuilder, so
-// every column not tagged is in that list.
+// UpdateRefreshToken and UpdateUserSessionClient are both full-row updates, so every column their
+// UPDATE's text names is in that list, and the tagged ones are the columns it leaves out (#644).
 //
 // What that cost. revocation.RevokeRefreshTokens calls UpdateRefreshToken, and it is what EVERY session-side
 // transaction on this branch ends with: the credential sweep, the two other revocation paths and

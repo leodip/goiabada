@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
@@ -45,22 +44,38 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 		}
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("settings")
+	engine := engineOf(t)
+	var query string
+	var args []any
 	if at == nil {
 		settings.LastCleanupAt = sql.NullTime{}
-		ub.Set("last_cleanup_at = NULL")
+		query = clearLastCleanupAt[engine.Dialect]
+		args = []any{1}
 	} else {
 		settings.LastCleanupAt = sql.NullTime{Time: *at, Valid: true}
-		ub.Set(ub.Assign("last_cleanup_at", *at))
+		query = setLastCleanupAtTo[engine.Dialect]
+		args = []any{*at, 1}
 	}
-	ub.Where(ub.Equal("id", 1))
-	engine := engineOf(t)
-	query, args := ub.BuildWithFlavor(engine.Flavor)
 	if _, execErr := engine.ExecSQL(context.Background(), nil, query, args...); execErr != nil {
 		t.Fatalf("Failed to set last_cleanup_at: %v", execErr)
 	}
 	return settings
+}
+
+// setLastCleanupAtTo and clearLastCleanupAt are setLastCleanupAt's two statements in each engine's
+// text: the time and then the id, or the id alone.
+var setLastCleanupAtTo = map[data.Dialect]string{
+	data.SQLite:   "UPDATE settings SET last_cleanup_at = ? WHERE id = ?",
+	data.MySQL:    "UPDATE settings SET last_cleanup_at = ? WHERE id = ?",
+	data.Postgres: "UPDATE settings SET last_cleanup_at = $1 WHERE id = $2",
+	data.MSSQL:    "UPDATE settings SET last_cleanup_at = @p1 WHERE id = @p2",
+}
+
+var clearLastCleanupAt = map[data.Dialect]string{
+	data.SQLite:   "UPDATE settings SET last_cleanup_at = NULL WHERE id = ?",
+	data.MySQL:    "UPDATE settings SET last_cleanup_at = NULL WHERE id = ?",
+	data.Postgres: "UPDATE settings SET last_cleanup_at = NULL WHERE id = $1",
+	data.MSSQL:    "UPDATE settings SET last_cleanup_at = NULL WHERE id = @p1",
 }
 
 func TestTryClaimCleanupRun_ClaimableWhenNeverRun(t *testing.T) {

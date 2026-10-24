@@ -20,7 +20,8 @@ import (
 // It is also the only tier that sees each engine's own blob and datetime handling, which the pair
 // depends on completely: the ciphertext is a BLOB / longblob / bytea / VARBINARY(MAX) and the
 // timestamp a DATETIME / datetime(6) / timestamp(6) / DATETIME2(6), and the clear writes a literal
-// NULL into the first of those precisely because sqlbuilder's typed nil is refused by one of them.
+// NULL into the first of those precisely because a bound Go nil is refused by one of them: the SQL
+// Server driver types it as nvarchar, which it will not convert to varbinary(max).
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 

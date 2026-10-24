@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -32,9 +31,11 @@ import (
 // method by omission; what it cannot check is that a method promoted from here is right for
 // that engine.
 type Database struct {
-	DB     *sql.DB
-	Flavor sqlbuilder.Flavor
-	logSQL bool
+	DB *sql.DB
+	// Dialect names the engine this handle runs on, and picks the version of every statement
+	// written per engine (#644).
+	Dialect data.Dialect
+	logSQL  bool
 
 	// IsDeadlock reports whether an error is the engine aborting a transaction as a deadlock
 	// victim, which is the one class of failure RunInTransaction reruns. Each dialect sets it
@@ -56,18 +57,6 @@ type Database struct {
 	// (#279).
 	IsUniqueViolation func(error) bool
 
-	// InsertReturningIdSQL rewrites a built INSERT so that the engine reports the new row's id
-	// in a result set. Each dialect sets it in its constructor, because only the engine's own
-	// grammar says how: PostgreSQL appends RETURNING id, SQL Server splices OUTPUT INSERTED.id
-	// in front of VALUES. Left nil, the insert goes through ExecSQL and the id is read from
-	// LastInsertId, which is what SQLite and MySQL do, and which is what a handle built
-	// directly on this type gets by default rather than by remembering to opt out.
-	//
-	// insertReturningId is the only consumer, and it is the only place the 25 Create* methods
-	// obtain an id. Until #416 the two engines whose drivers refuse LastInsertId wrote all 25
-	// out by hand: fifty bodies of forty lines, differing in this one expression.
-	InsertReturningIdSQL func(insertSQL string) (string, error)
-
 	// ExplicitIdInsertSQL answers the statements an INSERT naming its own id needs around it on
 	// table, run on the same transaction. Each dialect that needs any sets it in its constructor:
 	// SQL Server refuses an explicit identity value unless IDENTITY_INSERT is on for the table,
@@ -85,14 +74,14 @@ type Database struct {
 	sleep func(ctx context.Context, d time.Duration) error
 }
 
-// New builds the shared implementation over db, writing SQL for flavor. The engine packages call
-// it and then install their classifiers and hooks on the result.
-func New(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *Database {
+// New builds the shared implementation over db, running each statement's version for dialect.
+// The engine packages call it and then install their classifiers and hooks on the result.
+func New(db *sql.DB, dialect data.Dialect, logSQL bool) *Database {
 	return &Database{
-		DB:     db,
-		Flavor: flavor,
-		logSQL: logSQL,
-		sleep:  waitOrCancel,
+		DB:      db,
+		Dialect: dialect,
+		logSQL:  logSQL,
+		sleep:   waitOrCancel,
 	}
 }
 
@@ -483,46 +472,53 @@ func (d *Database) QuerySQL(ctx context.Context, tx *sql.Tx, sql string, args ..
 	return rows, nil
 }
 
-// insertReturningId runs a built INSERT and returns the id the engine gave the new row. It is
-// the one place the four engines differ on how that id comes back, and the only place the 25
-// Create* methods obtain one.
+// insert runs one of a record's whole-row INSERTs and returns the id the engine gave the new row.
+// Where that id comes back is each engine's own grammar, and each version of s says it in its own
+// text: PostgreSQL's names RETURNING id and SQL Server's OUTPUT INSERTED.id, because pgx and
+// go-mssqldb both refuse LastInsertId, so those two run as a query answering the id; SQLite and
+// MySQL run as a statement and report it through LastInsertId. Nothing rewrites the text (#644).
 //
-// noun names the thing being inserted and reaches the two messages this can fail with,
-// "unable to insert <noun>" and "unable to scan <noun> id". Both are what each engine's
-// hand-written copy printed before they collapsed onto this, so no error text moved (#416).
-//
-// It takes the builder rather than a built statement so that the Build call, and with it the
-// local named sql that shadows the database/sql import, leaves all 25 callers.
-//
-// THE DEFERRED VIOLATION is why the returning arm ends the way it does. pgx and go-mssqldb can
-// both report a constraint violation through the result set rather than from the query call, and
-// then Next() simply reports no row. Without the rows.Err() check the insert would read as a
-// success with id 0, and data.ErrUniqueViolation -- which the handler above needs to answer 409
-// rather than 500 -- would be unreachable on exactly the two engines that take this arm. It goes
-// through wrapSQLError rather than errs.Wrap for that reason; the failure QuerySQL itself returns
-// has already been through wrapSQLError (#279).
-func (d *Database) insertReturningId(ctx context.Context, tx *sql.Tx,
-	insertBuilder *sqlbuilder.InsertBuilder, noun string) (int64, error) {
-
-	statement, args := insertBuilder.Build()
-
-	if d.InsertReturningIdSQL == nil {
-		result, err := d.ExecSQL(ctx, tx, statement, args...)
-		if err != nil {
-			return 0, errs.Wrap(err, "unable to insert "+noun)
-		}
-
-		id, err := result.LastInsertId()
-		if err != nil {
-			return 0, errs.Wrap(err, "unable to get last insert id")
-		}
-		return id, nil
+// noun names the thing being inserted and reaches the two messages this can fail with, "unable to
+// insert <noun>" and "unable to scan <noun> id". Both are what each engine's hand-written copy
+// printed before they collapsed onto one helper, so no error text moved (#416).
+func (d *Database) insert(ctx context.Context, tx *sql.Tx, s statement, noun string, args ...any) (int64, error) {
+	switch d.Dialect {
+	case data.Postgres, data.MSSQL:
+		return d.insertReadingReturnedId(ctx, tx, s.text(d.Dialect), noun, args)
+	default:
+		return d.insertReadingLastInsertId(ctx, tx, s.text(d.Dialect), noun, args)
 	}
+}
 
-	statement, err := d.InsertReturningIdSQL(statement)
+// insertReadingLastInsertId is the SQLite and MySQL arm: the insert runs as a statement and the
+// id is what the driver reports for it.
+func (d *Database) insertReadingLastInsertId(ctx context.Context, tx *sql.Tx,
+	statement string, noun string, args []any) (int64, error) {
+
+	result, err := d.ExecSQL(ctx, tx, statement, args...)
 	if err != nil {
-		return 0, err
+		return 0, errs.Wrap(err, "unable to insert "+noun)
 	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to get last insert id")
+	}
+	return id, nil
+}
+
+// insertReadingReturnedId is the PostgreSQL and SQL Server arm: the insert runs as a query and
+// the id is the one row it answers with.
+//
+// THE DEFERRED VIOLATION is why it ends the way it does. pgx and go-mssqldb can both report a
+// constraint violation through the result set rather than from the query call, and then Next()
+// simply reports no row. Without the rows.Err() check the insert would read as a success with id
+// 0, and data.ErrUniqueViolation -- which the handler above needs to answer 409 rather than 500 --
+// would be unreachable on exactly the two engines that take this arm. It goes through
+// wrapSQLError rather than errs.Wrap for that reason; the failure QuerySQL itself returns has
+// already been through wrapSQLError (#279).
+func (d *Database) insertReadingReturnedId(ctx context.Context, tx *sql.Tx,
+	statement string, noun string, args []any) (int64, error) {
 
 	rows, err := d.QuerySQL(ctx, tx, statement, args...)
 	if err != nil {

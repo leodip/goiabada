@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,11 +54,19 @@ type scriptedDriver struct {
 	// because reporting NO row changed is how a compare-and-set says it lost a race.
 	execs []*scriptedExec
 
+	// answer, when set, answers every query in place of rows, from the statement's text and
+	// arguments as they reached the driver. It is how the record mapping test scripts a row whose
+	// columns follow the select list the statement actually named, which only the text says.
+	answer func(query string, args []driver.Value) *scriptedRows
+
 	queryCount int
 	execCount  int
 	// execArgs is every statement's arguments, in order, which is how a test asserts which row
 	// a compare-and-set addressed without reading the query text.
 	execArgs [][]driver.Value
+	// queryArgs is every query's arguments, in order, as execArgs is every statement's. An
+	// INSERT that reports its new id as a row arrives here rather than there.
+	queryArgs [][]driver.Value
 	// statements is every statement's TEXT, queries and execs interleaved in the order they
 	// reached the connection. The tests above deliberately read arguments rather than text, so
 	// that a rewritten clause breaks nothing; a test about the ORDER of statements against
@@ -103,8 +111,7 @@ type scriptedDriver struct {
 // lastInsertId is opt-in, and the default is the one that matters: with it unset the statement
 // answers with driver.RowsAffected, whose LastInsertId returns an error. That is pgx's and
 // go-mssqldb's behaviour, so a test gets the REFUSING driver unless it asks for the other one,
-// which is the right way round for the arm of insertReturningId that reads an id that way (#283,
-// #416).
+// which is the right way round for the arm of insert that reads an id that way (#283, #416).
 type scriptedExec struct {
 	rowsAffected int64
 	lastInsertId int64
@@ -310,16 +317,19 @@ func (s *scriptedStmt) QueryContext(ctx context.Context, args []driver.NamedValu
 	return s.runQuery(ctx, namedToValues(args))
 }
 
-func (s *scriptedStmt) runQuery(ctx context.Context, _ []driver.Value) (driver.Rows, error) {
+func (s *scriptedStmt) runQuery(ctx context.Context, args []driver.Value) (driver.Rows, error) {
 	s.noteStatement()
 
 	d := s.c.d
 	d.mu.Lock()
 	i := d.queryCount
 	d.queryCount++
+	d.queryArgs = append(d.queryArgs, args)
 	d.statements = append(d.statements, s.query)
 	var scripted *scriptedRows
-	if i < len(d.rows) {
+	if d.answer != nil {
+		scripted = d.answer(s.query, args)
+	} else if i < len(d.rows) {
 		scripted = d.rows[i]
 	}
 	d.mu.Unlock()
@@ -404,15 +414,22 @@ func (r *scriptedRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-// scriptedDB wraps a script in the type BackfillLowercaseEmails is a method on. The flavor is
-// SQLite because the pass builds one statement for every engine and the flavor only decides the
-// placeholder, which this driver ignores.
+// scriptedDB wraps a script in the shared implementation, running SQLite's version of each
+// statement: most tests here are about what happens around a statement, which is the same on
+// every engine, and the driver ignores the placeholders that differ.
 func scriptedDB(t *testing.T, d *scriptedDriver) *Database {
+	t.Helper()
+	return scriptedDBFor(t, d, data.SQLite)
+}
+
+// scriptedDBFor is scriptedDB running dialect's version of each statement, for a test about what
+// one engine receives.
+func scriptedDBFor(t *testing.T, d *scriptedDriver, dialect data.Dialect) *Database {
 	t.Helper()
 	db := sql.OpenDB(d)
 	t.Cleanup(func() { _ = db.Close() })
 	t.Cleanup(func() { assertNothingEscapedItsTransaction(t, d) })
-	return New(db, sqlbuilder.SQLite, false)
+	return New(db, dialect, false)
 }
 
 // assertNothingEscapedItsTransaction holds every test in this file to the enlistment property,

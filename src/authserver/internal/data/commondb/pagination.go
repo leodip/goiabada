@@ -10,18 +10,19 @@ import "math"
 // parameter -- the admin console's, and the auth server admin API's, which
 // validated it as "> 0" and nothing more -- and reaches every paginated read
 // through this multiplication. At a page near math.MaxInt the product wraps
-// negative, and a negative offset goes two different ways, neither of them the
-// empty page the caller asked for (#305):
+// negative, and a negative offset is never the empty page the caller asked for.
+// Every read binds the offset as a parameter, and the engines disagree about a
+// negative one: SQLite reads it as no offset at all and returns the FIRST
+// page's rows, labelled as the page that was asked for, a wrong answer rather
+// than an error and the quieter of the two, while SQL Server refuses it -- "The
+// offset specified in a OFFSET clause may not be negative" -- and the API turns
+// the refusal into a 500.
 //
-//   - Through sqlbuilder, which is six of the seven reads: SelectBuilder.Offset
-//     drops the clause entirely when its argument is negative (select.go:316).
-//     The query then runs with no offset at all and returns the FIRST page's
-//     rows, labelled as the page that was asked for. A wrong answer rather than
-//     an error, and the quieter of the two.
-//   - Through the SQL Server audit log override in mssqldb, which formats the
-//     number into the statement itself and so has no such guard: SQL Server
-//     rejects it -- "The offset specified in a OFFSET clause may not be
-//     negative" -- and the API turns that into a 500.
+// When #305 found it the split ran differently: six of the seven reads went
+// through the query builder the data layer used until #644, whose Offset
+// dropped the clause when its argument was negative, so three engines answered
+// with the first page, and the seventh, the SQL Server audit log override,
+// formatted the number into the statement and was refused.
 //
 // Saturating gives the answer every other page past the end already gets: no
 // rows, and the total beside them. The largest multiple of pageSize that fits

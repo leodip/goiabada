@@ -5,10 +5,85 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// userConsentColumns is the user_consents table as scanUserConsent reads it.
+var userConsentColumns = columnList{
+	sqlite:   "id, created_at, updated_at, user_id, client_id, scope, granted_at",
+	mysql:    "id, created_at, updated_at, user_id, client_id, scope, granted_at",
+	postgres: "id, created_at, updated_at, user_id, client_id, scope, granted_at",
+	mssql:    "id, created_at, updated_at, user_id, client_id, scope, granted_at",
+}
+
+// scanUserConsent reads one row selected with userConsentColumns.
+func scanUserConsent(row rowScanner, userConsent *record.UserConsent) error {
+	return row.Scan(
+		&userConsent.Id,
+		&userConsent.CreatedAt,
+		&userConsent.UpdatedAt,
+		&userConsent.UserId,
+		&userConsent.ClientId,
+		&userConsent.Scope,
+		&userConsent.GrantedAt,
+	)
+}
+
+var insertUserConsent = statement{
+	sqlite: "INSERT INTO user_consents (created_at, updated_at, user_id, client_id, scope, granted_at) " +
+		"VALUES (?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO user_consents (created_at, updated_at, user_id, client_id, scope, granted_at) " +
+		"VALUES (?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO user_consents (created_at, updated_at, user_id, client_id, scope, granted_at) " +
+		"VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+	mssql: "INSERT INTO user_consents (created_at, updated_at, user_id, client_id, scope, granted_at) " +
+		"OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6)",
+}
+
+// updateUserConsent writes the whole row but created_at, which is dont-update.
+var updateUserConsent = statement{
+	sqlite:   "UPDATE user_consents SET updated_at = ?, user_id = ?, client_id = ?, scope = ?, granted_at = ? WHERE id = ?",
+	mysql:    "UPDATE user_consents SET updated_at = ?, user_id = ?, client_id = ?, scope = ?, granted_at = ? WHERE id = ?",
+	postgres: "UPDATE user_consents SET updated_at = $1, user_id = $2, client_id = $3, scope = $4, granted_at = $5 WHERE id = $6",
+	mssql: "UPDATE user_consents SET updated_at = @p1, user_id = @p2, client_id = @p3, scope = @p4, granted_at = @p5 " +
+		"WHERE id = @p6",
+}
+
+var selectUserConsentById = statement{
+	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE id = ?",
+	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE id = ?",
+	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE id = $1",
+	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WHERE id = @p1",
+}
+
+var selectUserConsentByUserIdAndClientId = statement{
+	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ? AND client_id = ?",
+	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ? AND client_id = ?",
+	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE user_id = $1 AND client_id = $2",
+	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WHERE user_id = @p1 AND client_id = @p2",
+}
+
+var selectUserConsentsByUserId = statement{
+	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ?",
+	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ?",
+	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE user_id = $1",
+	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WHERE user_id = @p1",
+}
+
+var deleteUserConsent = statement{
+	sqlite:   "DELETE FROM user_consents WHERE id = ?",
+	mysql:    "DELETE FROM user_consents WHERE id = ?",
+	postgres: "DELETE FROM user_consents WHERE id = $1",
+	mssql:    "DELETE FROM user_consents WHERE id = @p1",
+}
+
+var deleteAllUserConsents = statement{
+	sqlite:   "DELETE FROM user_consents",
+	mysql:    "DELETE FROM user_consents",
+	postgres: "DELETE FROM user_consents",
+	mssql:    "DELETE FROM user_consents",
+}
 
 func (d *Database) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error {
 
@@ -27,12 +102,9 @@ func (d *Database) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 	userConsent.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userConsent.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
-
-	insertBuilder := userConsentStruct.WithoutTag("pk").InsertInto("user_consents", userConsent)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "userConsent")
+	id, err := d.insert(ctx, tx, insertUserConsent, "userConsent",
+		userConsent.CreatedAt, userConsent.UpdatedAt, userConsent.UserId, userConsent.ClientId, userConsent.Scope,
+		userConsent.GrantedAt)
 	if err != nil {
 		userConsent.CreatedAt = originalCreatedAt
 		userConsent.UpdatedAt = originalUpdatedAt
@@ -52,14 +124,9 @@ func (d *Database) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 	originalUpdatedAt := userConsent.UpdatedAt
 	userConsent.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
-
-	updateBuilder := userConsentStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_consents", userConsent)
-	updateBuilder.Where(updateBuilder.Equal("id", userConsent.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateUserConsent.text(d.Dialect),
+		userConsent.UpdatedAt, userConsent.UserId, userConsent.ClientId, userConsent.Scope, userConsent.GrantedAt,
+		userConsent.Id)
 	if err != nil {
 		userConsent.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userConsent")
@@ -68,63 +135,14 @@ func (d *Database) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 	return nil
 }
 
-func (d *Database) getUserConsentCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userConsentStruct *sqlbuilder.Struct) (*record.UserConsent, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var userConsent record.UserConsent
-	if rows.Next() {
-		addr := userConsentStruct.Addr(&userConsent)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userConsent")
-		}
-		return &userConsent, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error) {
-
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
-
-	selectBuilder := userConsentStruct.SelectFrom("user_consents")
-	selectBuilder.Where(selectBuilder.Equal("id", userConsentId))
-
-	userConsent, err := d.getUserConsentCommon(ctx, tx, selectBuilder, userConsentStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return userConsent, nil
+	return queryOne(ctx, d, tx, selectUserConsentById.text(d.Dialect), []any{userConsentId},
+		scanUserConsent, "userConsent")
 }
 
 func (d *Database) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
-
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
-
-	selectBuilder := userConsentStruct.SelectFrom("user_consents")
-	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
-	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
-
-	userConsent, err := d.getUserConsentCommon(ctx, tx, selectBuilder, userConsentStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return userConsent, nil
+	return queryOne(ctx, d, tx, selectUserConsentByUserIdAndClientId.text(d.Dialect), []any{userId, clientId},
+		scanUserConsent, "userConsent")
 }
 
 func (d *Database) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error {
@@ -160,48 +178,13 @@ func (d *Database) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, user
 }
 
 func (d *Database) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error) {
-
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
-
-	selectBuilder := userConsentStruct.SelectFrom("user_consents")
-	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var userConsents []record.UserConsent
-	for rows.Next() {
-		var userConsent record.UserConsent
-		addr := userConsentStruct.Addr(&userConsent)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userConsent")
-		}
-		userConsents = append(userConsents, userConsent)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return userConsents, nil
+	return queryAll(ctx, d, tx, nil, selectUserConsentsByUserId.text(d.Dialect), []any{userId},
+		scanUserConsent, "userConsent")
 }
 
 func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error {
 
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
-
-	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
-	deleteBuilder.Where(deleteBuilder.Equal("id", userConsentId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteUserConsent.text(d.Dialect), userConsentId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userConsent")
 	}
@@ -210,13 +193,8 @@ func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 }
 
 func (d *Database) DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error {
-	userConsentStruct := sqlbuilder.NewStruct(new(record.UserConsent)).
-		For(d.Flavor)
 
-	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteAllUserConsents.text(d.Dialect))
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userConsent")
 	}

@@ -13,7 +13,7 @@ package commondb
 // read in several statements is no longer one snapshot -- a row deleted between two of them is
 // absent from the result, which is what the same delete already does between loading a session
 // and loading its clients. Revisit when a deployment is measured spending real time on the extra
-// round trip; a per-flavor budget is the next shape, and it owes a data tier case per engine.
+// round trip; a per-engine budget is the next shape, and it owes a data tier case per engine.
 const maxIdsPerStatement = 1000
 
 // forEachIdBatch calls fn once per batch of ids that one statement may carry, and is how every

@@ -25,6 +25,53 @@ var errNoRateLimitCounter = errors.New("no rate limit counter for this window")
 // never leaves this file.
 var errRateLimitRefused = errors.New("rate limit refused")
 
+// lockRateLimitCounter assigns hits to itself on one window's row, which takes the row and changes
+// nothing, as AcquireUserRow does.
+var lockRateLimitCounter = statement{
+	sqlite:   "UPDATE rate_limit_counters SET hits = hits WHERE key_hash = ? AND window_start = ?",
+	mysql:    "UPDATE rate_limit_counters SET hits = hits WHERE key_hash = ? AND window_start = ?",
+	postgres: "UPDATE rate_limit_counters SET hits = hits WHERE key_hash = $1 AND window_start = $2",
+	mssql:    "UPDATE rate_limit_counters SET hits = hits WHERE key_hash = @p1 AND window_start = @p2",
+}
+
+var chargeRateLimitCounter = statement{
+	sqlite:   "UPDATE rate_limit_counters SET hits = hits + 1 WHERE key_hash = ? AND window_start = ?",
+	mysql:    "UPDATE rate_limit_counters SET hits = hits + 1 WHERE key_hash = ? AND window_start = ?",
+	postgres: "UPDATE rate_limit_counters SET hits = hits + 1 WHERE key_hash = $1 AND window_start = $2",
+	mssql:    "UPDATE rate_limit_counters SET hits = hits + 1 WHERE key_hash = @p1 AND window_start = @p2",
+}
+
+// refundRateLimitCounter's hits > 0 term keeps a count from going below zero.
+var refundRateLimitCounter = statement{
+	sqlite:   "UPDATE rate_limit_counters SET hits = hits - 1 WHERE key_hash = ? AND window_start = ? AND hits > 0",
+	mysql:    "UPDATE rate_limit_counters SET hits = hits - 1 WHERE key_hash = ? AND window_start = ? AND hits > 0",
+	postgres: "UPDATE rate_limit_counters SET hits = hits - 1 WHERE key_hash = $1 AND window_start = $2 AND hits > 0",
+	mssql:    "UPDATE rate_limit_counters SET hits = hits - 1 WHERE key_hash = @p1 AND window_start = @p2 AND hits > 0",
+}
+
+// insertRateLimitCounter creates a window's row at zero hits.
+var insertRateLimitCounter = statement{
+	sqlite:   "INSERT INTO rate_limit_counters (key_hash, window_start, hits, expires_at) VALUES (?, ?, 0, ?)",
+	mysql:    "INSERT INTO rate_limit_counters (key_hash, window_start, hits, expires_at) VALUES (?, ?, 0, ?)",
+	postgres: "INSERT INTO rate_limit_counters (key_hash, window_start, hits, expires_at) VALUES ($1, $2, 0, $3)",
+	mssql:    "INSERT INTO rate_limit_counters (key_hash, window_start, hits, expires_at) VALUES (@p1, @p2, 0, @p3)",
+}
+
+// selectRateLimitCounters is the key's rows from a window on.
+var selectRateLimitCounters = statement{
+	sqlite:   "SELECT key_hash, window_start, hits FROM rate_limit_counters WHERE key_hash = ? AND window_start >= ?",
+	mysql:    "SELECT key_hash, window_start, hits FROM rate_limit_counters WHERE key_hash = ? AND window_start >= ?",
+	postgres: "SELECT key_hash, window_start, hits FROM rate_limit_counters WHERE key_hash = $1 AND window_start >= $2",
+	mssql:    "SELECT key_hash, window_start, hits FROM rate_limit_counters WHERE key_hash = @p1 AND window_start >= @p2",
+}
+
+var deleteExpiredRateLimitCounters = statement{
+	sqlite:   "DELETE FROM rate_limit_counters WHERE expires_at < ?",
+	mysql:    "DELETE FROM rate_limit_counters WHERE expires_at < ?",
+	postgres: "DELETE FROM rate_limit_counters WHERE expires_at < $1",
+	mssql:    "DELETE FROM rate_limit_counters WHERE expires_at < @p1",
+}
+
 // ReserveRateLimitHit charges one hit to keyHash's current window when admit allows it, and
 // reports whether it did.
 //
@@ -114,30 +161,14 @@ func (d *Database) chargeRateLimitHit(ctx context.Context, keyHash string, curre
 
 	var found rateLimitRows
 	err := d.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		// The previous row first. Assigning a column to itself is portable through sqlbuilder and
-		// locks the row on every engine, as AcquireUserRow does; whether the row exists is the read
-		// below's to say, since MySQL counts a row whose columns did not change as unaffected.
-		lockBuilder := d.Flavor.NewUpdateBuilder()
-		lockBuilder.Update("rate_limit_counters")
-		lockBuilder.Set("hits = hits")
-		lockBuilder.Where(
-			lockBuilder.Equal("key_hash", keyHash),
-			lockBuilder.Equal("window_start", previous),
-		)
-		query, args := lockBuilder.Build()
-		if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+		// The previous row first. Assigning a column to itself is the same text on every engine and
+		// locks the row on each, as AcquireUserRow does; whether the row exists is the read below's
+		// to say, since MySQL counts a row whose columns did not change as unaffected.
+		if _, err := d.ExecSQL(ctx, tx, lockRateLimitCounter.text(d.Dialect), keyHash, previous); err != nil {
 			return errs.Wrap(err, "unable to lock the previous rate limit counter")
 		}
 
-		updateBuilder := d.Flavor.NewUpdateBuilder()
-		updateBuilder.Update("rate_limit_counters")
-		updateBuilder.Set(updateBuilder.Incr("hits"))
-		updateBuilder.Where(
-			updateBuilder.Equal("key_hash", keyHash),
-			updateBuilder.Equal("window_start", current),
-		)
-		query, args = updateBuilder.Build()
-		if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+		if _, err := d.ExecSQL(ctx, tx, chargeRateLimitCounter.text(d.Dialect), keyHash, current); err != nil {
 			return errs.Wrap(err, "unable to charge rate limit counter")
 		}
 
@@ -188,38 +219,22 @@ func (d *Database) createMissingRateLimitCounters(ctx context.Context, keyHash s
 // createRateLimitCounter inserts a window's row at zero hits, on no transaction. A row already
 // there is what a lost race on the key means, and is no error.
 func (d *Database) createRateLimitCounter(ctx context.Context, keyHash string, windowStart, expiresAt time.Time) error {
-	insertBuilder := d.Flavor.NewInsertBuilder()
-	insertBuilder.InsertInto("rate_limit_counters")
-	insertBuilder.Cols("key_hash", "window_start", "hits", "expires_at")
-	insertBuilder.Values(keyHash, windowStart, 0, expiresAt)
-
-	query, args := insertBuilder.Build()
-	_, err := d.ExecSQL(ctx, nil, query, args...)
+	_, err := d.ExecSQL(ctx, nil, insertRateLimitCounter.text(d.Dialect), keyHash, windowStart, expiresAt)
 	if err != nil && !errors.Is(err, data.ErrUniqueViolation) {
 		return errs.Wrap(err, "unable to create rate limit counter")
 	}
 	return nil
 }
 
-// RefundRateLimitHit takes one hit back from the window it was charged in. The hits > 0 term keeps
-// a count from going below zero, and a row that is gone, swept or never written, is nothing to
-// refund.
+// RefundRateLimitHit takes one hit back from the window it was charged in, never below zero. A row
+// that is gone, swept or never written, is nothing to refund.
 func (d *Database) RefundRateLimitHit(ctx context.Context, tx *sql.Tx, keyHash string, windowStart time.Time) error {
 
 	if keyHash == "" {
 		return errs.New("can't refund a rate limit hit with an empty key hash")
 	}
 
-	updateBuilder := d.Flavor.NewUpdateBuilder()
-	updateBuilder.Update("rate_limit_counters")
-	updateBuilder.Set(updateBuilder.Decr("hits"))
-	updateBuilder.Where(
-		updateBuilder.Equal("key_hash", keyHash),
-		updateBuilder.Equal("window_start", windowStart.UTC()),
-		updateBuilder.GreaterThan("hits", 0),
-	)
-	query, args := updateBuilder.Build()
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, refundRateLimitCounter.text(d.Dialect), keyHash, windowStart.UTC()); err != nil {
 		return errs.Wrap(err, "unable to refund rate limit counter")
 	}
 	return nil
@@ -258,15 +273,7 @@ func (d *Database) readRateLimitRows(ctx context.Context, tx *sql.Tx, keyHash st
 		return rateLimitRows{}, errs.New("can't read rate limit counts with an empty key hash")
 	}
 
-	selectBuilder := d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("key_hash", "window_start", "hits").From("rate_limit_counters")
-	selectBuilder.Where(
-		selectBuilder.Equal("key_hash", keyHash),
-		selectBuilder.GreaterEqualThan("window_start", previous),
-	)
-
-	query, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, selectRateLimitCounters.text(d.Dialect), keyHash, previous)
 	if err != nil {
 		return rateLimitRows{}, errs.Wrap(err, "unable to query database")
 	}
@@ -302,12 +309,7 @@ func (d *Database) readRateLimitRows(ctx context.Context, tx *sql.Tx, keyHash st
 // table.
 func (d *Database) DeleteExpiredRateLimitCounters(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
-	deleteBuilder := d.Flavor.NewDeleteBuilder()
-	deleteBuilder.DeleteFrom("rate_limit_counters")
-	deleteBuilder.Where(deleteBuilder.LessThan("expires_at", now.UTC()))
-
-	query, args := deleteBuilder.Build()
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, deleteExpiredRateLimitCounters.text(d.Dialect), now.UTC()); err != nil {
 		return errs.Wrap(err, "unable to delete expired rate limit counters")
 	}
 	return nil

@@ -5,10 +5,69 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// webOriginColumns is the web_origins table as scanWebOrigin reads it.
+var webOriginColumns = columnList{
+	sqlite:   "id, created_at, origin, client_id",
+	mysql:    "id, created_at, origin, client_id",
+	postgres: "id, created_at, origin, client_id",
+	mssql:    "id, created_at, origin, client_id",
+}
+
+// scanWebOrigin reads one row selected with webOriginColumns.
+func scanWebOrigin(row rowScanner, webOrigin *record.WebOrigin) error {
+	return row.Scan(
+		&webOrigin.Id,
+		&webOrigin.CreatedAt,
+		&webOrigin.Origin,
+		&webOrigin.ClientId,
+	)
+}
+
+var insertWebOrigin = statement{
+	sqlite:   "INSERT INTO web_origins (created_at, origin, client_id) VALUES (?, ?, ?)",
+	mysql:    "INSERT INTO web_origins (created_at, origin, client_id) VALUES (?, ?, ?)",
+	postgres: "INSERT INTO web_origins (created_at, origin, client_id) VALUES ($1, $2, $3) RETURNING id",
+	mssql:    "INSERT INTO web_origins (created_at, origin, client_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
+}
+
+var selectWebOriginById = statement{
+	sqlite:   "SELECT " + webOriginColumns.sqlite + " FROM web_origins WHERE id = ?",
+	mysql:    "SELECT " + webOriginColumns.mysql + " FROM web_origins WHERE id = ?",
+	postgres: "SELECT " + webOriginColumns.postgres + " FROM web_origins WHERE id = $1",
+	mssql:    "SELECT " + webOriginColumns.mssql + " FROM web_origins WHERE id = @p1",
+}
+
+var selectWebOriginsByClientId = statement{
+	sqlite:   "SELECT " + webOriginColumns.sqlite + " FROM web_origins WHERE client_id = ?",
+	mysql:    "SELECT " + webOriginColumns.mysql + " FROM web_origins WHERE client_id = ?",
+	postgres: "SELECT " + webOriginColumns.postgres + " FROM web_origins WHERE client_id = $1",
+	mssql:    "SELECT " + webOriginColumns.mssql + " FROM web_origins WHERE client_id = @p1",
+}
+
+var selectAllWebOrigins = statement{
+	sqlite:   "SELECT " + webOriginColumns.sqlite + " FROM web_origins",
+	mysql:    "SELECT " + webOriginColumns.mysql + " FROM web_origins",
+	postgres: "SELECT " + webOriginColumns.postgres + " FROM web_origins",
+	mssql:    "SELECT " + webOriginColumns.mssql + " FROM web_origins",
+}
+
+var countWebOriginsByOrigin = statement{
+	sqlite:   "SELECT count(*) FROM web_origins WHERE origin = ?",
+	mysql:    "SELECT count(*) FROM web_origins WHERE origin = ?",
+	postgres: "SELECT count(*) FROM web_origins WHERE origin = $1",
+	mssql:    "SELECT count(*) FROM web_origins WHERE origin = @p1",
+}
+
+var deleteWebOrigin = statement{
+	sqlite:   "DELETE FROM web_origins WHERE id = ?",
+	mysql:    "DELETE FROM web_origins WHERE id = ?",
+	postgres: "DELETE FROM web_origins WHERE id = $1",
+	mssql:    "DELETE FROM web_origins WHERE id = @p1",
+}
 
 func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error {
 
@@ -21,12 +80,8 @@ func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *r
 	originalCreatedAt := webOrigin.CreatedAt
 	webOrigin.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
-	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
-		For(d.Flavor)
-
-	insertBuilder := webOriginStruct.WithoutTag("pk").InsertInto("web_origins", webOrigin)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "webOrigin")
+	id, err := d.insert(ctx, tx, insertWebOrigin, "webOrigin",
+		webOrigin.CreatedAt, webOrigin.Origin, webOrigin.ClientId)
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
 		return err
@@ -36,111 +91,17 @@ func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *r
 	return nil
 }
 
-func (d *Database) getWebOriginCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	webOriginStruct *sqlbuilder.Struct) (*record.WebOrigin, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var webOrigin record.WebOrigin
-	if rows.Next() {
-		addr := webOriginStruct.Addr(&webOrigin)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan webOrigin")
-		}
-		return &webOrigin, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*record.WebOrigin, error) {
-
-	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
-		For(d.Flavor)
-
-	selectBuilder := webOriginStruct.SelectFrom("web_origins")
-	selectBuilder.Where(selectBuilder.Equal("id", webOriginId))
-
-	webOrigin, err := d.getWebOriginCommon(ctx, tx, selectBuilder, webOriginStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return webOrigin, nil
+	return queryOne(ctx, d, tx, selectWebOriginById.text(d.Dialect), []any{webOriginId}, scanWebOrigin, "webOrigin")
 }
 
 func (d *Database) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.WebOrigin, error) {
-
-	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
-		For(d.Flavor)
-
-	selectBuilder := webOriginStruct.SelectFrom("web_origins")
-	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var webOrigins []record.WebOrigin
-	for rows.Next() {
-		var webOrigin record.WebOrigin
-		addr := webOriginStruct.Addr(&webOrigin)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan webOrigin")
-		}
-		webOrigins = append(webOrigins, webOrigin)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return webOrigins, nil
+	return queryAll(ctx, d, tx, nil, selectWebOriginsByClientId.text(d.Dialect), []any{clientId},
+		scanWebOrigin, "webOrigin")
 }
 
 func (d *Database) GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]record.WebOrigin, error) {
-
-	webOriginStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
-		For(d.Flavor)
-
-	selectBuilder := webOriginStruct.SelectFrom("web_origins")
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var webOrigins []record.WebOrigin
-	for rows.Next() {
-		var webOrigin record.WebOrigin
-		addr := webOriginStruct.Addr(&webOrigin)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan webOrigin")
-		}
-		webOrigins = append(webOrigins, webOrigin)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return webOrigins, nil
+	return queryAll(ctx, d, tx, nil, selectAllWebOrigins.text(d.Dialect), nil, scanWebOrigin, "webOrigin")
 }
 
 // WebOriginExists reports whether any client has registered origin. It answers the CORS
@@ -156,12 +117,7 @@ func (d *Database) GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]record.W
 // one that reported true would fail open; either way every mock-backed test above stays green.
 func (d *Database) WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error) {
 
-	selectBuilder := d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From("web_origins")
-	selectBuilder.Where(selectBuilder.Equal("origin", origin))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, countWebOriginsByOrigin.text(d.Dialect), origin)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -183,14 +139,7 @@ func (d *Database) WebOriginExists(ctx context.Context, tx *sql.Tx, origin strin
 
 func (d *Database) DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.WebOrigin)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom("web_origins")
-	deleteBuilder.Where(deleteBuilder.Equal("id", webOriginId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteWebOrigin.text(d.Dialect), webOriginId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete webOrigin")
 	}

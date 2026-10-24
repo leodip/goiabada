@@ -49,8 +49,10 @@ type unboundedIdList struct {
 }
 
 // findUnboundedIdLists walks root for non-test Go files and reports every function whose body
-// contains a call to a method named In -- which is how github.com/huandu/go-sqlbuilder spells an
-// IN list, on a select builder and on an update builder alike -- and no call to forEachIdBatch.
+// contains a call that writes an IN list and no call to forEachIdBatch. One call writes one:
+// inList, the helper every statement spells its IN list with, called as a function or as a method
+// (#644). Until #644 a method named In did too, which is how the query builder the data layer used
+// then spelled an IN list on a select builder and on an update builder alike.
 //
 // It returns the number of functions that build an IN list at all, not the number of files, so an
 // empty walk and a walk that reached files holding no IN list are the same answer: nothing was
@@ -93,10 +95,13 @@ func findUnboundedIdLists(root string) ([]unboundedIdList, int, error) {
 				}
 				switch fun := call.Fun.(type) {
 				case *ast.SelectorExpr:
-					if fun.Sel.Name == "In" && inLine == 0 {
+					if fun.Sel.Name == "inList" && inLine == 0 {
 						inLine = fset.Position(call.Pos()).Line
 					}
 				case *ast.Ident:
+					if fun.Name == "inList" && inLine == 0 {
+						inLine = fset.Position(call.Pos()).Line
+					}
 					if fun.Name == "forEachIdBatch" {
 						batched = true
 					}
@@ -137,7 +142,7 @@ func assertIdListsAreBounded(r guard.Reporter, root string) {
 	// A root holding no IN list at all checks nothing and would otherwise pass, which is the one
 	// way a guard like this fails silently in the direction that matters.
 	if builders == 0 {
-		r.Fatalf("found no IN lists under %s; the builder's method name or the package layout has moved", root)
+		r.Fatalf("found no IN lists under %s; inList's name or the package layout has moved", root)
 	}
 
 	if len(findings) == 0 {
@@ -164,22 +169,22 @@ func assertIdListsAreBounded(r guard.Reporter, root string) {
 func TestIdListsAreBounded_TheCheckerTellsABatchedLookupFromAnUnboundedOne(t *testing.T) {
 	root := t.TempDir()
 
-	// Accepted: the literal passed straight to the helper, which is how ten of the lookups read.
+	// Accepted: the literal passed straight to the helper, which is how most of the lookups read.
 	writeLintFixture(t, root, "batched.go", "package commondb\n\n"+
 		"func forEachIdBatch(ids []int64, fn func(batch []int64) error) error { return fn(ids) }\n\n"+
-		"func batched(sb builder, ids []int64) error {\n"+
+		"func inList(dialect string, column string, first, n int) string { return column }\n\n"+
+		"func batched(ids []int64) error {\n"+
 		"\treturn forEachIdBatch(ids, func(batch []int64) error {\n"+
-		"\t\tsb.In(\"id\", batch)\n"+
+		"\t\t_ = \"SELECT id FROM t WHERE \" + inList(\"sqlite\", \"id\", 1, len(batch))\n"+
 		"\t\treturn nil\n"+
 		"\t})\n"+
-		"}\n\n"+
-		"type builder interface{ In(string, ...interface{}) string }\n")
+		"}\n")
 
-	// Accepted: the literal held in a variable and handed over afterwards, which is readEmailGroup.
+	// Accepted: the literal held in a variable and handed over afterwards.
 	writeLintFixture(t, root, "indirect.go", "package commondb\n\n"+
-		"func indirect(sb builder, ids []int64) error {\n"+
+		"func indirect(ids []int64) error {\n"+
 		"\tread := func(batch []int64) error {\n"+
-		"\t\tsb.In(\"id\", batch)\n"+
+		"\t\t_ = inList(\"mysql\", \"id\", 1, len(batch))\n"+
 		"\t\treturn nil\n"+
 		"\t}\n"+
 		"\treturn forEachIdBatch(ids, read)\n"+
@@ -187,27 +192,34 @@ func TestIdListsAreBounded_TheCheckerTellsABatchedLookupFromAnUnboundedOne(t *te
 
 	// Accepted: a function with no IN list at all is not a lookup.
 	writeLintFixture(t, root, "unrelated.go", "package commondb\n\n"+
-		"func unrelated(sb builder) string { return sb.Equal(\"id\", 1) }\n")
+		"func unrelated() string { return \"SELECT id FROM t WHERE id = ?\" }\n")
 
 	// Accepted: a test file, which may query however it likes.
 	writeLintFixture(t, root, "lookup_test.go", "package commondb\n\n"+
-		"func fixture(sb builder, ids []int64) { sb.In(\"id\", ids) }\n")
+		"func fixture(ids []int64) string { return inList(\"sqlite\", \"id\", 1, len(ids)) }\n")
 
-	// Reported: the shape the twelve had, and an update builder, which spells In the same way.
+	// Not an IN list: a method named In. It was the query builder's spelling of one, and the
+	// builder is gone (#644), so a method of that name is whatever its own type says it is.
+	writeLintFixture(t, root, "builder_in.go", "package commondb\n\n"+
+		"type set interface{ In(string, ...interface{}) bool }\n\n"+
+		"func member(s set, ids []int64) bool { return s.In(\"id\", ids) }\n")
+
+	// Reported: an IN list written with inList over the caller's whole list, as a function and
+	// as a method.
 	writeLintFixture(t, root, "unbounded.go", "package commondb\n\n"+
-		"func unbounded(sb builder, ids []int64) {\n"+
-		"\tsb.In(\"id\", ids)\n"+
+		"func unbounded(ids []int64) string {\n"+
+		"\treturn \"SELECT id FROM t WHERE \" + inList(\"sqlite\", \"id\", 1, len(ids))\n"+
 		"}\n\n"+
-		"func unboundedUpdate(ub builder, ids []int64) {\n"+
-		"\tub.In(\"id\", ids)\n"+
+		"func unboundedMethod(d db, ids []int64) string {\n"+
+		"\treturn d.inList(\"id\", len(ids))\n"+
 		"}\n")
 
 	findings, builders, err := findUnboundedIdLists(root)
 	require.NoError(t, err)
-	assert.Equal(t, 4, builders, "every non-test function building an IN list is counted")
+	assert.Equal(t, 4, builders, "every non-test function building an IN list is counted, and only those")
 	assert.Equal(t, []unboundedIdList{
 		{file: "unbounded.go", line: 4, function: "unbounded"},
-		{file: "unbounded.go", line: 8, function: "unboundedUpdate"},
+		{file: "unbounded.go", line: 8, function: "unboundedMethod"},
 	}, findings)
 }
 
@@ -218,9 +230,9 @@ func TestIdListsAreBounded_TheCheckerTellsABatchedLookupFromAnUnboundedOne(t *te
 func TestIdListsAreBounded_TheGuardFailsOnAnUnboundedLookup(t *testing.T) {
 	root := t.TempDir()
 	writeLintFixture(t, root, "lookup.go", "package commondb\n\n"+
-		"type builder interface{ In(string, ...interface{}) string }\n\n"+
-		"func unbounded(sb builder, ids []int64) {\n"+
-		"\tsb.In(\"id\", ids)\n"+
+		"func inList(dialect string, column string, first, n int) string { return column }\n\n"+
+		"func unbounded(ids []int64) string {\n"+
+		"\treturn inList(\"sqlite\", \"id\", 1, len(ids))\n"+
 		"}\n")
 
 	report := guard.Run(func(r guard.Reporter) {
@@ -239,11 +251,11 @@ func TestIdListsAreBounded_TheGuardFailsOnAnUnboundedLookup(t *testing.T) {
 func TestIdListsAreBounded_TheGuardPassesABatchedLookup(t *testing.T) {
 	root := t.TempDir()
 	writeLintFixture(t, root, "lookup.go", "package commondb\n\n"+
-		"type builder interface{ In(string, ...interface{}) string }\n\n"+
+		"func inList(dialect string, column string, first, n int) string { return column }\n\n"+
 		"func forEachIdBatch(ids []int64, fn func(batch []int64) error) error { return fn(ids) }\n\n"+
-		"func batched(sb builder, ids []int64) error {\n"+
+		"func batched(ids []int64) error {\n"+
 		"\treturn forEachIdBatch(ids, func(batch []int64) error {\n"+
-		"\t\tsb.In(\"id\", batch)\n"+
+		"\t\t_ = inList(\"sqlite\", \"id\", 1, len(batch))\n"+
 		"\t\treturn nil\n"+
 		"\t})\n"+
 		"}\n")

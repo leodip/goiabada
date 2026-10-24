@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -18,6 +17,115 @@ import (
 // AcquireUserSessionRow states. No row carries an empty owner or an empty hash, so an
 // empty value can only be a caller bug, and matching on one would either return
 // somebody else's row or sweep rows the caller never named.
+
+// browserSessionColumns is the browser_sessions table as scanBrowserSession reads it.
+var browserSessionColumns = columnList{
+	sqlite:   "id, created_at, updated_at, owner, session_id_hash, data, last_accessed, expires_at",
+	mysql:    "id, created_at, updated_at, owner, session_id_hash, data, last_accessed, expires_at",
+	postgres: "id, created_at, updated_at, owner, session_id_hash, data, last_accessed, expires_at",
+	mssql:    "id, created_at, updated_at, owner, session_id_hash, data, last_accessed, expires_at",
+}
+
+// scanBrowserSession reads one row selected with browserSessionColumns.
+func scanBrowserSession(row rowScanner, browserSession *record.BrowserSession) error {
+	return row.Scan(
+		&browserSession.Id,
+		&browserSession.CreatedAt,
+		&browserSession.UpdatedAt,
+		&browserSession.Owner,
+		&browserSession.SessionIdHash,
+		&browserSession.Data,
+		&browserSession.LastAccessed,
+		&browserSession.ExpiresAt,
+	)
+}
+
+var insertBrowserSession = statement{
+	sqlite: "INSERT INTO browser_sessions (created_at, updated_at, owner, session_id_hash, data, last_accessed, " +
+		"expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO browser_sessions (created_at, updated_at, owner, session_id_hash, data, last_accessed, " +
+		"expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO browser_sessions (created_at, updated_at, owner, session_id_hash, data, last_accessed, " +
+		"expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+	mssql: "INSERT INTO browser_sessions (created_at, updated_at, owner, session_id_hash, data, last_accessed, " +
+		"expires_at) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)",
+}
+
+// selectLiveBrowserSession binds the owner, the hash, then now.
+var selectLiveBrowserSession = statement{
+	sqlite: "SELECT " + browserSessionColumns.sqlite + " FROM browser_sessions " +
+		"WHERE owner = ? AND session_id_hash = ? AND expires_at > ?",
+	mysql: "SELECT " + browserSessionColumns.mysql + " FROM browser_sessions " +
+		"WHERE owner = ? AND session_id_hash = ? AND expires_at > ?",
+	postgres: "SELECT " + browserSessionColumns.postgres + " FROM browser_sessions " +
+		"WHERE owner = $1 AND session_id_hash = $2 AND expires_at > $3",
+	mssql: "SELECT " + browserSessionColumns.mssql + " FROM browser_sessions " +
+		"WHERE owner = @p1 AND session_id_hash = @p2 AND expires_at > @p3",
+}
+
+// updateLiveBrowserSessionData binds the data, now as last_accessed, the new expires_at, now as
+// updated_at, then the owner, the hash and now for the condition.
+var updateLiveBrowserSessionData = statement{
+	sqlite: "UPDATE browser_sessions SET data = ?, last_accessed = ?, expires_at = ?, updated_at = ? " +
+		"WHERE owner = ? AND session_id_hash = ? AND expires_at > ?",
+	mysql: "UPDATE browser_sessions SET data = ?, last_accessed = ?, expires_at = ?, updated_at = ? " +
+		"WHERE owner = ? AND session_id_hash = ? AND expires_at > ?",
+	postgres: "UPDATE browser_sessions SET data = $1, last_accessed = $2, expires_at = $3, updated_at = $4 " +
+		"WHERE owner = $5 AND session_id_hash = $6 AND expires_at > $7",
+	mssql: "UPDATE browser_sessions SET data = @p1, last_accessed = @p2, expires_at = @p3, updated_at = @p4 " +
+		"WHERE owner = @p5 AND session_id_hash = @p6 AND expires_at > @p7",
+}
+
+// touchLiveBrowserSession binds now as last_accessed, the new expires_at, now as updated_at, then
+// the owner, the hash and now for the condition.
+var touchLiveBrowserSession = statement{
+	sqlite: "UPDATE browser_sessions SET last_accessed = ?, expires_at = ?, updated_at = ? " +
+		"WHERE owner = ? AND session_id_hash = ? AND expires_at > ?",
+	mysql: "UPDATE browser_sessions SET last_accessed = ?, expires_at = ?, updated_at = ? " +
+		"WHERE owner = ? AND session_id_hash = ? AND expires_at > ?",
+	postgres: "UPDATE browser_sessions SET last_accessed = $1, expires_at = $2, updated_at = $3 " +
+		"WHERE owner = $4 AND session_id_hash = $5 AND expires_at > $6",
+	mssql: "UPDATE browser_sessions SET last_accessed = @p1, expires_at = @p2, updated_at = @p3 " +
+		"WHERE owner = @p4 AND session_id_hash = @p5 AND expires_at > @p6",
+}
+
+var deleteBrowserSession = statement{
+	sqlite:   "DELETE FROM browser_sessions WHERE owner = ? AND session_id_hash = ?",
+	mysql:    "DELETE FROM browser_sessions WHERE owner = ? AND session_id_hash = ?",
+	postgres: "DELETE FROM browser_sessions WHERE owner = $1 AND session_id_hash = $2",
+	mssql:    "DELETE FROM browser_sessions WHERE owner = @p1 AND session_id_hash = @p2",
+}
+
+// updateBrowserSessionDataIfUnchanged is updateLiveBrowserSessionData with the data the row must
+// still hold bound before now in the condition.
+var updateBrowserSessionDataIfUnchanged = statement{
+	sqlite: "UPDATE browser_sessions SET data = ?, last_accessed = ?, expires_at = ?, updated_at = ? " +
+		"WHERE owner = ? AND session_id_hash = ? AND data = ? AND expires_at > ?",
+	mysql: "UPDATE browser_sessions SET data = ?, last_accessed = ?, expires_at = ?, updated_at = ? " +
+		"WHERE owner = ? AND session_id_hash = ? AND data = ? AND expires_at > ?",
+	postgres: "UPDATE browser_sessions SET data = $1, last_accessed = $2, expires_at = $3, updated_at = $4 " +
+		"WHERE owner = $5 AND session_id_hash = $6 AND data = $7 AND expires_at > $8",
+	mssql: "UPDATE browser_sessions SET data = @p1, last_accessed = @p2, expires_at = @p3, updated_at = @p4 " +
+		"WHERE owner = @p5 AND session_id_hash = @p6 AND data = @p7 AND expires_at > @p8",
+}
+
+// deleteBrowserSessionIfUnchanged binds the owner, the hash, the data the row must still hold, then
+// now.
+var deleteBrowserSessionIfUnchanged = statement{
+	sqlite: "DELETE FROM browser_sessions WHERE owner = ? AND session_id_hash = ? AND data = ? AND expires_at > ?",
+	mysql:  "DELETE FROM browser_sessions WHERE owner = ? AND session_id_hash = ? AND data = ? AND expires_at > ?",
+	postgres: "DELETE FROM browser_sessions " +
+		"WHERE owner = $1 AND session_id_hash = $2 AND data = $3 AND expires_at > $4",
+	mssql: "DELETE FROM browser_sessions " +
+		"WHERE owner = @p1 AND session_id_hash = @p2 AND data = @p3 AND expires_at > @p4",
+}
+
+var deleteExpiredBrowserSessions = statement{
+	sqlite:   "DELETE FROM browser_sessions WHERE expires_at < ?",
+	mysql:    "DELETE FROM browser_sessions WHERE expires_at < ?",
+	postgres: "DELETE FROM browser_sessions WHERE expires_at < $1",
+	mssql:    "DELETE FROM browser_sessions WHERE expires_at < @p1",
+}
 
 func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error {
 
@@ -36,12 +144,9 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 	browserSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	browserSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
-		For(d.Flavor)
-
-	insertBuilder := browserSessionStruct.WithoutTag("pk").InsertInto("browser_sessions", browserSession)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "browser session")
+	id, err := d.insert(ctx, tx, insertBrowserSession, "browser session",
+		browserSession.CreatedAt, browserSession.UpdatedAt, browserSession.Owner, browserSession.SessionIdHash,
+		browserSession.Data, browserSession.LastAccessed, browserSession.ExpiresAt)
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
@@ -76,37 +181,8 @@ func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context,
 		return nil, errs.New("can't get a browser session with an empty session id hash")
 	}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
-		For(d.Flavor)
-
-	selectBuilder := browserSessionStruct.SelectFrom("browser_sessions")
-	selectBuilder.Where(
-		selectBuilder.Equal("owner", owner),
-		selectBuilder.Equal("session_id_hash", sessionIdHash),
-		selectBuilder.GreaterThan("expires_at", now),
-	)
-
-	query, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var browserSession record.BrowserSession
-	if rows.Next() {
-		addr := browserSessionStruct.Addr(&browserSession)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan browser session")
-		}
-		return &browserSession, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
+	return queryOne(ctx, d, tx, selectLiveBrowserSession.text(d.Dialect), []any{owner, sessionIdHash, now},
+		scanBrowserSession, "browser session")
 }
 
 // UpdateBrowserSessionData replaces one session's contents and moves its deadlines,
@@ -141,22 +217,8 @@ func (d *Database) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, own
 		return false, errs.New("can't update a browser session with an empty session id hash")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("browser_sessions")
-	ub.Set(
-		ub.Assign("data", data),
-		ub.Assign("last_accessed", now),
-		ub.Assign("expires_at", expiresAt),
-		ub.Assign("updated_at", now),
-	)
-	ub.Where(
-		ub.Equal("owner", owner),
-		ub.Equal("session_id_hash", sessionIdHash),
-		ub.GreaterThan("expires_at", now),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, updateLiveBrowserSessionData.text(d.Dialect),
+		data, now, expiresAt, now, owner, sessionIdHash, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update browser session data")
 	}
@@ -191,21 +253,8 @@ func (d *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, s
 		return false, errs.New("can't touch a browser session with an empty session id hash")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("browser_sessions")
-	ub.Set(
-		ub.Assign("last_accessed", now),
-		ub.Assign("expires_at", expiresAt),
-		ub.Assign("updated_at", now),
-	)
-	ub.Where(
-		ub.Equal("owner", owner),
-		ub.Equal("session_id_hash", sessionIdHash),
-		ub.GreaterThan("expires_at", now),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, touchLiveBrowserSession.text(d.Dialect),
+		now, expiresAt, now, owner, sessionIdHash, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to touch browser session")
 	}
@@ -255,17 +304,7 @@ func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, 
 		return errs.New("can't delete a browser session with an empty session id hash")
 	}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
-		For(d.Flavor)
-
-	deleteBuilder := browserSessionStruct.DeleteFrom("browser_sessions")
-	deleteBuilder.Where(
-		deleteBuilder.Equal("owner", owner),
-		deleteBuilder.Equal("session_id_hash", sessionIdHash),
-	)
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteBrowserSession.text(d.Dialect), owner, sessionIdHash)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete browser session")
 	}
@@ -296,23 +335,8 @@ func (d *Database) UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *
 		return false, errs.New("can't update a browser session with an empty session id hash")
 	}
 
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("browser_sessions")
-	ub.Set(
-		ub.Assign("data", data),
-		ub.Assign("last_accessed", now),
-		ub.Assign("expires_at", expiresAt),
-		ub.Assign("updated_at", now),
-	)
-	ub.Where(
-		ub.Equal("owner", owner),
-		ub.Equal("session_id_hash", sessionIdHash),
-		ub.Equal("data", expectedData),
-		ub.GreaterThan("expires_at", now),
-	)
-
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, updateBrowserSessionDataIfUnchanged.text(d.Dialect),
+		data, now, expiresAt, now, owner, sessionIdHash, expectedData, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update browser session data")
 	}
@@ -342,19 +366,8 @@ func (d *Database) DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.
 		return false, errs.New("can't delete a browser session with an empty session id hash")
 	}
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
-		For(d.Flavor)
-
-	deleteBuilder := browserSessionStruct.DeleteFrom("browser_sessions")
-	deleteBuilder.Where(
-		deleteBuilder.Equal("owner", owner),
-		deleteBuilder.Equal("session_id_hash", sessionIdHash),
-		deleteBuilder.Equal("data", expectedData),
-		deleteBuilder.GreaterThan("expires_at", now),
-	)
-
-	query, args := deleteBuilder.Build()
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, deleteBrowserSessionIfUnchanged.text(d.Dialect),
+		owner, sessionIdHash, expectedData, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to delete browser session")
 	}
@@ -373,14 +386,7 @@ func (d *Database) DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.
 // a session end.
 func (d *Database) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
 
-	browserSessionStruct := sqlbuilder.NewStruct(new(record.BrowserSession)).
-		For(d.Flavor)
-
-	deleteBuilder := browserSessionStruct.DeleteFrom("browser_sessions")
-	deleteBuilder.Where(deleteBuilder.LessThan("expires_at", now))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteExpiredBrowserSessions.text(d.Dialect), now)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired browser sessions")
 	}

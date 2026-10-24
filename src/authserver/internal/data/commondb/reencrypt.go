@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -79,12 +78,7 @@ func (d *Database) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table,
 		if err != nil {
 			return err
 		}
-		ub := sqlbuilder.NewUpdateBuilder()
-		ub.Update(table)
-		ub.Set(ub.Assign(column, newCt))
-		ub.Where(ub.Equal("id", it.id))
-		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSQL(ctx, tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSQL(ctx, tx, writeProtectedColumn(table, column).text(d.Dialect), newCt, it.id); err != nil {
 			return err
 		}
 	}
@@ -121,12 +115,7 @@ func (d *Database) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey,
 		if err != nil {
 			return err
 		}
-		ub := sqlbuilder.NewUpdateBuilder()
-		ub.Update("key_pairs")
-		ub.Set(ub.Assign("private_key_pem", enc))
-		ub.Where(ub.Equal("id", it.id))
-		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSQL(ctx, tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSQL(ctx, tx, writeProtectedColumn("key_pairs", "private_key_pem").text(d.Dialect), enc, it.id); err != nil {
 			return err
 		}
 	}
@@ -139,15 +128,30 @@ type storedValue struct {
 	value []byte
 }
 
+// readProtectedColumn is the read of every row's id and one protected column, the same text on every
+// engine. table and column are always a pair from aesProtectedColumns or the private-key column,
+// literals in this file, never input.
+func readProtectedColumn(table, column string) statement {
+	query := "SELECT id, " + column + " FROM " + table
+	return statement{sqlite: query, mysql: query, postgres: query, mssql: query}
+}
+
+// writeProtectedColumn is the write of one row's protected column, its new ciphertext and then its
+// id, for the same pairs as readProtectedColumn.
+func writeProtectedColumn(table, column string) statement {
+	return statement{
+		sqlite:   "UPDATE " + table + " SET " + column + " = ? WHERE id = ?",
+		mysql:    "UPDATE " + table + " SET " + column + " = ? WHERE id = ?",
+		postgres: "UPDATE " + table + " SET " + column + " = $1 WHERE id = $2",
+		mssql:    "UPDATE " + table + " SET " + column + " = @p1 WHERE id = @p2",
+	}
+}
+
 // readNonEmptyColumn reads every row's id and column from table, skipping the rows whose column is
 // empty or NULL. The rows are closed before it returns, because its callers write next and SQLite
 // runs on a single connection.
 func (d *Database) readNonEmptyColumn(ctx context.Context, tx *sql.Tx, table, column string) ([]storedValue, error) {
-	sb := sqlbuilder.NewSelectBuilder()
-	sb.Select("id", column).From(table)
-	query, args := sb.BuildWithFlavor(d.Flavor)
-
-	rows, err := d.QuerySQL(ctx, tx, query, args...)
+	rows, err := d.QuerySQL(ctx, tx, readProtectedColumn(table, column).text(d.Dialect))
 	if err != nil {
 		return nil, err
 	}

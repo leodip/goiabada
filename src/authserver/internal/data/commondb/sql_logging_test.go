@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func loggingDB(t *testing.T, logSQL bool) *Database {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	database := New(db, sqlbuilder.SQLite, logSQL)
+	database := New(db, data.SQLite, logSQL)
 	_, err = database.DB.Exec(`CREATE TABLE secrets (id INTEGER PRIMARY KEY, value TEXT)`)
 	require.NoError(t, err, "the table is created behind the logger's back, so nothing it writes is under test yet")
 	return database
@@ -93,8 +93,8 @@ func TestDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 
 // A statement carrying a literal is the one shape where the statement text is itself a value.
 // It is logged, and deliberately: the flag exists to show which queries run, the statements this
-// tree builds come from sqlbuilder with placeholders rather than interpolation, and a caller that
-// concatenated a credential into a statement has a defect this logger is not the place to fix.
+// tree writes bind their values through placeholders rather than interpolating them, and a caller
+// that concatenated a credential into a statement has a defect this logger is not the place to fix.
 func TestDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)

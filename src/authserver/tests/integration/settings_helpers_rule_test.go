@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
@@ -241,17 +242,28 @@ func setLastCleanupAt(t *testing.T, at sql.NullTime) {
 		t.Fatalf("no engine for database type %T", database)
 	}
 
-	update := engine.Flavor.NewUpdateBuilder()
-	update.Update("settings")
+	query, args := clearLastCleanupAtSQL[engine.Dialect], []any{1}
 	if at.Valid {
-		update.Set(update.Assign("last_cleanup_at", at.Time))
-	} else {
-		update.Set("last_cleanup_at = NULL")
+		query, args = setLastCleanupAtSQL[engine.Dialect], []any{at.Time, 1}
 	}
-	update.Where(update.Equal("id", 1))
-	query, args := update.Build()
 	_, err := engine.ExecSQL(context.Background(), nil, query, args...)
 	require.NoError(t, err, "unable to set last_cleanup_at")
+}
+
+// setLastCleanupAtSQL and clearLastCleanupAtSQL are setLastCleanupAt's two statements in each
+// engine's text: the time and then the id, or the id alone.
+var setLastCleanupAtSQL = map[data.Dialect]string{
+	data.SQLite:   "UPDATE settings SET last_cleanup_at = ? WHERE id = ?",
+	data.MySQL:    "UPDATE settings SET last_cleanup_at = ? WHERE id = ?",
+	data.Postgres: "UPDATE settings SET last_cleanup_at = $1 WHERE id = $2",
+	data.MSSQL:    "UPDATE settings SET last_cleanup_at = @p1 WHERE id = @p2",
+}
+
+var clearLastCleanupAtSQL = map[data.Dialect]string{
+	data.SQLite:   "UPDATE settings SET last_cleanup_at = NULL WHERE id = ?",
+	data.MySQL:    "UPDATE settings SET last_cleanup_at = NULL WHERE id = ?",
+	data.Postgres: "UPDATE settings SET last_cleanup_at = NULL WHERE id = $1",
+	data.MSSQL:    "UPDATE settings SET last_cleanup_at = NULL WHERE id = @p1",
 }
 
 // A claim the background worker makes while a test holds the row survives that test's restore:

@@ -277,10 +277,11 @@ func TestParsePage_ThenClampPage(t *testing.T) {
 // it stands. There it becomes "OFFSET (page-1)*size" in SQL. Unbounded,
 // math.MaxInt wrapped that product negative, and the clamp below never got a
 // usable answer to work from: the query either came back with the first page's
-// rows, because sqlbuilder drops a negative OFFSET clause, or failed outright
-// on the one read that formats the offset into SQL itself, which the handler
-// then answered 500 to. On the groups-with-permission page the same product is
-// a slice offset, and there it panicked (#305).
+// rows, because the query builder the auth server used then dropped a negative
+// OFFSET clause, or failed outright on the one read that formatted the offset
+// into SQL itself, which the handler then answered 500 to. On the
+// groups-with-permission page the same product is a slice offset, and there it
+// panicked (#305).
 //
 // So: whatever a browser puts in "?page=", the offset built from the result is
 // non-negative, at every page size that can reach the database.

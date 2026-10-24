@@ -45,10 +45,11 @@ import (
 // assert on log output. A caller that actually used the returned id would get a hard error
 // rather than a false alarm.
 //
-// THAT PARTICULAR DIVERGENCE IS GONE, and the guard is not. #416 gave Database an
-// InsertReturningIdSQL hook, so the id an INSERT reports comes back through one shared helper and
-// the fifty Create* overrides that carried the difference were deleted. A self-call to
-// CreateAuditLog is safe today. The next divergent method is what this reads for.
+// THAT PARTICULAR DIVERGENCE IS GONE, and the guard is not. #416 gave Database a hook rewriting
+// a built INSERT into each engine's id-returning form, so the id an INSERT reports came back
+// through one shared helper and the fifty Create* overrides that carried the difference were
+// deleted; since #644 each engine's INSERT says it in its own text, and the hook is gone too. A
+// self-call to CreateAuditLog is safe today. The next divergent method is what this reads for.
 //
 // THE BOUNDARY, stated because it decides what this file is worth. It compares method NAMES: a
 // name any dialect declares at all is treated as divergent, and this package may not take it on
@@ -185,9 +186,9 @@ type selfCall struct {
 //
 // The over-approximation also runs the other way, since a selector is matched by name alone: a
 // FIELD on Database sharing a name with a divergent dialect method would be reported. There
-// are eight fields (DB, Flavor, logSQL, IsDeadlock, IsUniqueViolation, InsertReturningIdSQL,
-// ExplicitIdInsertSQL, sleep), none of them a method name on any dialect, so the case
-// is theoretical today and a false report would name a line and be dismissed in a second.
+// are seven fields (DB, Dialect, logSQL, IsDeadlock, IsUniqueViolation, ExplicitIdInsertSQL,
+// sleep), none of them a method name on any dialect, so the case is theoretical today and a
+// false report would name a line and be dismissed in a second.
 func selfCalls(t *testing.T, dir string) []selfCall {
 	t.Helper()
 

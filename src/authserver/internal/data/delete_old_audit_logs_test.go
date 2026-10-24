@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
@@ -34,16 +33,16 @@ func TestDeleteOldAuditLogs_EveryEngineWrapsBothFailures(t *testing.T) {
 		open func(db *sql.DB) data.Database
 	}{
 		{"sqlite", func(db *sql.DB) data.Database {
-			return &sqlitedb.Database{Database: commondb.New(db, sqlbuilder.SQLite, false)}
+			return &sqlitedb.Database{Database: commondb.New(db, data.SQLite, false)}
 		}},
 		{"mysql", func(db *sql.DB) data.Database {
-			return &mysqldb.Database{Database: commondb.New(db, sqlbuilder.MySQL, false)}
+			return &mysqldb.Database{Database: commondb.New(db, data.MySQL, false)}
 		}},
 		{"postgres", func(db *sql.DB) data.Database {
-			return &postgresdb.Database{Database: commondb.New(db, sqlbuilder.PostgreSQL, false)}
+			return &postgresdb.Database{Database: commondb.New(db, data.Postgres, false)}
 		}},
 		{"mssql", func(db *sql.DB) data.Database {
-			return &mssqldb.Database{Database: commondb.New(db, sqlbuilder.SQLServer, false)}
+			return &mssqldb.Database{Database: commondb.New(db, data.MSSQL, false)}
 		}},
 	}
 

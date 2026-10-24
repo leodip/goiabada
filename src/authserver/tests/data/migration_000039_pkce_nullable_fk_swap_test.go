@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -440,23 +440,10 @@ func refreshTokenFields000039(token *record.RefreshToken) []any {
 	}
 }
 
-// flavor000039 is the configured engine's placeholder dialect, so the seed and the read bind their
-// values rather than formatting timestamps into literals four ways.
-func flavor000039() sqlbuilder.Flavor {
-	switch dbType() {
-	case data.MySQL:
-		return sqlbuilder.MySQL
-	case data.Postgres:
-		return sqlbuilder.PostgreSQL
-	case data.MSSQL:
-		return sqlbuilder.SQLServer
-	default:
-		return sqlbuilder.SQLite
-	}
-}
-
 // seedRefreshToken000039 fills every column that is not part of the caller's chosen shape,
-// for the same reason seedCode000039 does, over refreshTokenColumns000039.
+// for the same reason seedCode000039 does, over refreshTokenColumns000039. The seed and the read
+// bind their values through the engine's placeholders (seedBinds) rather than formatting
+// timestamps into literals four ways.
 func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape record.RefreshToken) *record.RefreshToken {
 	t.Helper()
 
@@ -480,16 +467,14 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape record.RefreshTok
 	for _, field := range refreshTokenFields000039(&token) {
 		values = append(values, reflect.ValueOf(field).Elem().Interface())
 	}
-	insert := sqlbuilder.NewInsertBuilder()
-	insert.InsertInto("refresh_tokens").Cols(refreshTokenColumns000039...).Values(values...)
-	q, args := insert.BuildWithFlavor(flavor000039())
-	_, err := h.SQL.ExecContext(context.Background(), q, args...)
+	insert := "INSERT INTO refresh_tokens (" + strings.Join(refreshTokenColumns000039, ", ") +
+		") VALUES (" + seedBinds(len(values)) + ")"
+	_, err := h.SQL.ExecContext(context.Background(), insert, values...)
 	require.NoError(t, err, "seed refresh token")
 
-	lookup := sqlbuilder.NewSelectBuilder()
-	lookup.Select("id").From("refresh_tokens").Where(lookup.Equal("refresh_token_jti", token.RefreshTokenJti))
-	q, args = lookup.BuildWithFlavor(flavor000039())
-	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&token.Id),
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(),
+		"SELECT id FROM refresh_tokens WHERE refresh_token_jti = "+seedBindAt(1),
+		token.RefreshTokenJti).Scan(&token.Id),
 		"read back the seeded refresh token's id")
 	return &token
 }
@@ -534,10 +519,9 @@ func readCode000039(t *testing.T, h *isolatedDB, id int64) *record.Code {
 func readRefreshToken000039(t *testing.T, h *isolatedDB, id int64) *record.RefreshToken {
 	t.Helper()
 	token := &record.RefreshToken{Id: id}
-	read := sqlbuilder.NewSelectBuilder()
-	read.Select(refreshTokenColumns000039...).From("refresh_tokens").Where(read.Equal("id", id))
-	q, args := read.BuildWithFlavor(flavor000039())
-	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(refreshTokenFields000039(token)...),
+	read := "SELECT " + strings.Join(refreshTokenColumns000039, ", ") + " FROM refresh_tokens WHERE id = " +
+		seedBindAt(1)
+	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), read, id).Scan(refreshTokenFields000039(token)...),
 		"read refresh token %d back", id)
 	return token
 }

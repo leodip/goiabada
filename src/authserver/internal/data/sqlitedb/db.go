@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
@@ -97,7 +96,7 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	}
 
 	slog.InfoContext(ctx, "connected to sqlite database with required PRAGMA settings")
-	commonDb := commondb.New(db, sqlbuilder.SQLite, logSQL)
+	commonDb := commondb.New(db, data.SQLite, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	sqliteDb := Database{

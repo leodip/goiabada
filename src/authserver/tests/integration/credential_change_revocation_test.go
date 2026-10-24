@@ -32,10 +32,10 @@ import (
 // as JSON at issuance, parsed back as a float64, read through IntClaim and enforced by the
 // middleware, against real signed tokens.
 //
-// What this tier does NOT own, despite the temptation to assert it here: that the `dont-update`
-// field tag stops a full-row write from regressing a stored generation. That is a property of the
-// SQL the query builder emits, and it belongs to the data tests, which run against all four
-// engines. See TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration and its three siblings.
+// What this tier does NOT own, despite the temptation to assert it here: that a full-row write
+// cannot regress a stored generation. That is a property of each engine's whole-row UPDATE, whose
+// text leaves out the column tagged `dont-update`, and it belongs to the data tests, which run
+// against all four engines. See TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration and its three siblings.
 // An earlier version of the rotation test below claimed to cover it and did not: removing the tag
 // left that test passing, because rotation loads the parent AFTER the sweep promoted it and so
 // writes the promoted value back either way.

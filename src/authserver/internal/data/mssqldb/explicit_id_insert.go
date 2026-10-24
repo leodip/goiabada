@@ -13,8 +13,8 @@ package mssqldb
 // 14). db_owner, which the application's login holds in its own database, carries the ALTER
 // permission the statement needs.
 //
-// It is wired onto commondb.Database in the constructor, beside insertReturningIdSQL. table
-// is always a literal from the caller's code, never input.
+// It is wired onto commondb.Database in the constructor, beside the deadlock and unique-violation
+// classifiers. table is always a literal from the caller's code, never input.
 func explicitIdInsertSQL(table string) (before []string, after []string) {
 	return []string{"SET IDENTITY_INSERT " + table + " ON"},
 		[]string{"SET IDENTITY_INSERT " + table + " OFF"}

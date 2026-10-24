@@ -5,10 +5,79 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// userGroupColumns is the users_groups table as scanUserGroup reads it.
+var userGroupColumns = columnList{
+	sqlite:   "id, created_at, updated_at, user_id, group_id",
+	mysql:    "id, created_at, updated_at, user_id, group_id",
+	postgres: "id, created_at, updated_at, user_id, group_id",
+	mssql:    "id, created_at, updated_at, user_id, group_id",
+}
+
+// scanUserGroup reads one row selected with userGroupColumns.
+func scanUserGroup(row rowScanner, userGroup *record.UserGroup) error {
+	return row.Scan(
+		&userGroup.Id,
+		&userGroup.CreatedAt,
+		&userGroup.UpdatedAt,
+		&userGroup.UserId,
+		&userGroup.GroupId,
+	)
+}
+
+var insertUserGroup = statement{
+	sqlite:   "INSERT INTO users_groups (created_at, updated_at, user_id, group_id) VALUES (?, ?, ?, ?)",
+	mysql:    "INSERT INTO users_groups (created_at, updated_at, user_id, group_id) VALUES (?, ?, ?, ?)",
+	postgres: "INSERT INTO users_groups (created_at, updated_at, user_id, group_id) VALUES ($1, $2, $3, $4) RETURNING id",
+	mssql:    "INSERT INTO users_groups (created_at, updated_at, user_id, group_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4)",
+}
+
+// updateUserGroup writes the whole row but created_at, which is dont-update.
+var updateUserGroup = statement{
+	sqlite:   "UPDATE users_groups SET updated_at = ?, user_id = ?, group_id = ? WHERE id = ?",
+	mysql:    "UPDATE users_groups SET updated_at = ?, user_id = ?, group_id = ? WHERE id = ?",
+	postgres: "UPDATE users_groups SET updated_at = $1, user_id = $2, group_id = $3 WHERE id = $4",
+	mssql:    "UPDATE users_groups SET updated_at = @p1, user_id = @p2, group_id = @p3 WHERE id = @p4",
+}
+
+var selectUserGroupById = statement{
+	sqlite:   "SELECT " + userGroupColumns.sqlite + " FROM users_groups WHERE id = ?",
+	mysql:    "SELECT " + userGroupColumns.mysql + " FROM users_groups WHERE id = ?",
+	postgres: "SELECT " + userGroupColumns.postgres + " FROM users_groups WHERE id = $1",
+	mssql:    "SELECT " + userGroupColumns.mssql + " FROM users_groups WHERE id = @p1",
+}
+
+var selectUserGroupByUserIdAndGroupId = statement{
+	sqlite:   "SELECT " + userGroupColumns.sqlite + " FROM users_groups WHERE user_id = ? AND group_id = ?",
+	mysql:    "SELECT " + userGroupColumns.mysql + " FROM users_groups WHERE user_id = ? AND group_id = ?",
+	postgres: "SELECT " + userGroupColumns.postgres + " FROM users_groups WHERE user_id = $1 AND group_id = $2",
+	mssql:    "SELECT " + userGroupColumns.mssql + " FROM users_groups WHERE user_id = @p1 AND group_id = @p2",
+}
+
+var selectUserGroupsByUserId = statement{
+	sqlite:   "SELECT " + userGroupColumns.sqlite + " FROM users_groups WHERE user_id = ?",
+	mysql:    "SELECT " + userGroupColumns.mysql + " FROM users_groups WHERE user_id = ?",
+	postgres: "SELECT " + userGroupColumns.postgres + " FROM users_groups WHERE user_id = $1",
+	mssql:    "SELECT " + userGroupColumns.mssql + " FROM users_groups WHERE user_id = @p1",
+}
+
+// selectUserGroupsWhere is completed by an IN list of user ids.
+var selectUserGroupsWhere = statement{
+	sqlite:   "SELECT " + userGroupColumns.sqlite + " FROM users_groups WHERE ",
+	mysql:    "SELECT " + userGroupColumns.mysql + " FROM users_groups WHERE ",
+	postgres: "SELECT " + userGroupColumns.postgres + " FROM users_groups WHERE ",
+	mssql:    "SELECT " + userGroupColumns.mssql + " FROM users_groups WHERE ",
+}
+
+var deleteUserGroup = statement{
+	sqlite:   "DELETE FROM users_groups WHERE id = ?",
+	mysql:    "DELETE FROM users_groups WHERE id = ?",
+	postgres: "DELETE FROM users_groups WHERE id = $1",
+	mssql:    "DELETE FROM users_groups WHERE id = @p1",
+}
 
 func (d *Database) CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error {
 
@@ -27,12 +96,8 @@ func (d *Database) CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *r
 	userGroup.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	userGroup.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	userGroupStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-		For(d.Flavor)
-
-	insertBuilder := userGroupStruct.WithoutTag("pk").InsertInto("users_groups", userGroup)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "userGroup")
+	id, err := d.insert(ctx, tx, insertUserGroup, "userGroup",
+		userGroup.CreatedAt, userGroup.UpdatedAt, userGroup.UserId, userGroup.GroupId)
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
@@ -52,14 +117,9 @@ func (d *Database) UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *r
 	originalUpdatedAt := userGroup.UpdatedAt
 	userGroup.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	userGroupStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-		For(d.Flavor)
-
-	updateBuilder := userGroupStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users_groups", userGroup)
-	updateBuilder.Where(updateBuilder.Equal("id", userGroup.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateUserGroup.text(d.Dialect),
+		userGroup.UpdatedAt, userGroup.UserId, userGroup.GroupId,
+		userGroup.Id)
 	if err != nil {
 		userGroup.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userGroup")
@@ -68,46 +128,8 @@ func (d *Database) UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *r
 	return nil
 }
 
-func (d *Database) getUserGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	userGroupStruct *sqlbuilder.Struct) (*record.UserGroup, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var userGroup record.UserGroup
-	if rows.Next() {
-		addr := userGroupStruct.Addr(&userGroup)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userGroup")
-		}
-		return &userGroup, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetUserGroupById(ctx context.Context, tx *sql.Tx, userGroupId int64) (*record.UserGroup, error) {
-
-	userGroupStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-		For(d.Flavor)
-
-	selectBuilder := userGroupStruct.SelectFrom("users_groups")
-	selectBuilder.Where(selectBuilder.Equal("id", userGroupId))
-
-	userGroup, err := d.getUserGroupCommon(ctx, tx, selectBuilder, userGroupStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return userGroup, nil
+	return queryOne(ctx, d, tx, selectUserGroupById.text(d.Dialect), []any{userGroupId}, scanUserGroup, "userGroup")
 }
 
 func (d *Database) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]record.UserGroup, error) {
@@ -119,34 +141,10 @@ func (d *Database) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userI
 	var userGroups []record.UserGroup
 
 	err := forEachIdBatch(userIds, func(batch []int64) error {
-		userGroupStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-			For(d.Flavor)
-
-		selectBuilder := userGroupStruct.SelectFrom("users_groups")
-		selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(batch)...))
-
-		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySQL(ctx, tx, sql, args...)
-		if err != nil {
-			return errs.Wrap(err, "unable to query database")
-		}
-		defer func() { _ = rows.Close() }()
-
-		for rows.Next() {
-			var userGroup record.UserGroup
-			addr := userGroupStruct.Addr(&userGroup)
-			err = rows.Scan(addr...)
-			if err != nil {
-				return errs.Wrap(err, "unable to scan userGroup")
-			}
-			userGroups = append(userGroups, userGroup)
-		}
-
-		if err := rows.Err(); err != nil {
-			return errs.Wrap(err, "unable to read query results")
-		}
-
-		return nil
+		query := selectUserGroupsWhere.text(d.Dialect) + inList(d.Dialect, "user_id", 1, len(batch))
+		var err error
+		userGroups, err = queryAll(ctx, d, tx, userGroups, query, int64Args(batch), scanUserGroup, "userGroup")
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -156,65 +154,17 @@ func (d *Database) GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userI
 }
 
 func (d *Database) GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error) {
-
-	userGroupStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-		For(d.Flavor)
-
-	selectBuilder := userGroupStruct.SelectFrom("users_groups")
-	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var userGroups []record.UserGroup
-	for rows.Next() {
-		var userGroup record.UserGroup
-		addr := userGroupStruct.Addr(&userGroup)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userGroup")
-		}
-		userGroups = append(userGroups, userGroup)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return userGroups, nil
+	return queryAll(ctx, d, tx, nil, selectUserGroupsByUserId.text(d.Dialect), []any{userId}, scanUserGroup, "userGroup")
 }
 
 func (d *Database) GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*record.UserGroup, error) {
-
-	userGroupStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-		For(d.Flavor)
-
-	selectBuilder := userGroupStruct.SelectFrom("users_groups")
-	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
-	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
-
-	userGroup, err := d.getUserGroupCommon(ctx, tx, selectBuilder, userGroupStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return userGroup, nil
+	return queryOne(ctx, d, tx, selectUserGroupByUserIdAndGroupId.text(d.Dialect), []any{userId, groupId},
+		scanUserGroup, "userGroup")
 }
 
 func (d *Database) DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.UserGroup)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom("users_groups")
-	deleteBuilder.Where(deleteBuilder.Equal("id", userGroupId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteUserGroup.text(d.Dialect), userGroupId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userGroup")
 	}

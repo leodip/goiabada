@@ -5,10 +5,240 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// clientColumns is the clients table as scanClient reads it.
+var clientColumns = columnList{
+	sqlite: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
+		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
+		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
+		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level",
+	mysql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
+		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
+		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
+		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level",
+	postgres: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
+		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
+		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
+		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level",
+	mssql: "id, created_at, updated_at, client_identifier, client_secret_encrypted, description, " +
+		"website_url, display_name, enabled, consent_required, created_via_dcr, " +
+		"administrative_scopes_allowed, show_logo, show_display_name, show_description, " +
+		"show_website_url, is_public, authorization_code_enabled, client_credentials_enabled, " +
+		"pkce_required, implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level",
+}
+
+// scanClient reads one row selected with clientColumns.
+func scanClient(row rowScanner, client *record.Client) error {
+	return row.Scan(
+		&client.Id,
+		&client.CreatedAt,
+		&client.UpdatedAt,
+		&client.ClientIdentifier,
+		&client.ClientSecretEncrypted,
+		&client.Description,
+		&client.WebsiteURL,
+		&client.DisplayName,
+		&client.Enabled,
+		&client.ConsentRequired,
+		&client.CreatedViaDCR,
+		&client.AdministrativeScopesAllowed,
+		&client.ShowLogo,
+		&client.ShowDisplayName,
+		&client.ShowDescription,
+		&client.ShowWebsiteURL,
+		&client.IsPublic,
+		&client.AuthorizationCodeEnabled,
+		&client.ClientCredentialsEnabled,
+		&client.PKCERequired,
+		&client.ImplicitGrantEnabled,
+		&client.ResourceOwnerPasswordCredentialsEnabled,
+		&client.TokenExpirationInSeconds,
+		&client.RefreshTokenOfflineIdleTimeoutInSeconds,
+		&client.RefreshTokenOfflineMaxLifetimeInSeconds,
+		&client.IncludeOpenIDConnectClaimsInAccessToken,
+		&client.IncludeOpenIDConnectClaimsInIdToken,
+		&client.DefaultAcrLevel,
+	)
+}
+
+var insertClient = statement{
+	sqlite: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
+		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"show_display_name, show_description, show_website_url, is_public, " +
+		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
+		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
+		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"show_display_name, show_description, show_website_url, is_public, " +
+		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
+		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES (?, ?, ?, ?, ?, " +
+		"?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
+		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"show_display_name, show_description, show_website_url, is_public, " +
+		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
+		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, default_acr_level) VALUES ($1, $2, $3, $4, " +
+		"$5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, " +
+		"$23, $24, $25, $26, $27) RETURNING id",
+	mssql: "INSERT INTO clients (created_at, updated_at, client_identifier, " +
+		"client_secret_encrypted, description, website_url, display_name, enabled, " +
+		"consent_required, created_via_dcr, administrative_scopes_allowed, show_logo, " +
+		"show_display_name, show_description, show_website_url, is_public, " +
+		"authorization_code_enabled, client_credentials_enabled, pkce_required, " +
+		"implicit_grant_enabled, resource_owner_password_credentials_enabled, " +
+		"token_expiration_in_seconds, refresh_token_offline_idle_timeout_in_seconds, " +
+		"refresh_token_offline_max_lifetime_in_seconds, " +
+		"include_open_id_connect_claims_in_access_token, " +
+		"include_open_id_connect_claims_in_id_token, " +
+		"default_acr_level) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, " +
+		"@p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20, @p21, @p22, " +
+		"@p23, @p24, @p25, @p26, @p27)",
+}
+
+// updateClient writes the whole row but created_at and administrative_scopes_allowed, which are
+// dont-update: the allowance has one writer, SetClientAdministrativeScopesAllowed.
+var updateClient = statement{
+	sqlite: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
+		"description = ?, website_url = ?, display_name = ?, enabled = ?, consent_required = ?, " +
+		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
+		"show_website_url = ?, is_public = ?, authorization_code_enabled = ?, " +
+		"client_credentials_enabled = ?, pkce_required = ?, implicit_grant_enabled = ?, " +
+		"resource_owner_password_credentials_enabled = ?, token_expiration_in_seconds = ?, " +
+		"refresh_token_offline_idle_timeout_in_seconds = ?, " +
+		"refresh_token_offline_max_lifetime_in_seconds = ?, " +
+		"include_open_id_connect_claims_in_access_token = ?, " +
+		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
+	mysql: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
+		"description = ?, website_url = ?, display_name = ?, enabled = ?, consent_required = ?, " +
+		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
+		"show_website_url = ?, is_public = ?, authorization_code_enabled = ?, " +
+		"client_credentials_enabled = ?, pkce_required = ?, implicit_grant_enabled = ?, " +
+		"resource_owner_password_credentials_enabled = ?, token_expiration_in_seconds = ?, " +
+		"refresh_token_offline_idle_timeout_in_seconds = ?, " +
+		"refresh_token_offline_max_lifetime_in_seconds = ?, " +
+		"include_open_id_connect_claims_in_access_token = ?, " +
+		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
+	postgres: "UPDATE clients SET updated_at = $1, client_identifier = $2, " +
+		"client_secret_encrypted = $3, description = $4, website_url = $5, display_name = $6, " +
+		"enabled = $7, consent_required = $8, created_via_dcr = $9, show_logo = $10, " +
+		"show_display_name = $11, show_description = $12, show_website_url = $13, " +
+		"is_public = $14, authorization_code_enabled = $15, client_credentials_enabled = $16, " +
+		"pkce_required = $17, implicit_grant_enabled = $18, " +
+		"resource_owner_password_credentials_enabled = $19, token_expiration_in_seconds = $20, " +
+		"refresh_token_offline_idle_timeout_in_seconds = $21, " +
+		"refresh_token_offline_max_lifetime_in_seconds = $22, " +
+		"include_open_id_connect_claims_in_access_token = $23, " +
+		"include_open_id_connect_claims_in_id_token = $24, default_acr_level = $25 WHERE id = $26",
+	mssql: "UPDATE clients SET updated_at = @p1, client_identifier = @p2, " +
+		"client_secret_encrypted = @p3, description = @p4, website_url = @p5, " +
+		"display_name = @p6, enabled = @p7, consent_required = @p8, created_via_dcr = @p9, " +
+		"show_logo = @p10, show_display_name = @p11, show_description = @p12, " +
+		"show_website_url = @p13, is_public = @p14, authorization_code_enabled = @p15, " +
+		"client_credentials_enabled = @p16, pkce_required = @p17, implicit_grant_enabled = @p18, " +
+		"resource_owner_password_credentials_enabled = @p19, token_expiration_in_seconds = @p20, " +
+		"refresh_token_offline_idle_timeout_in_seconds = @p21, " +
+		"refresh_token_offline_max_lifetime_in_seconds = @p22, " +
+		"include_open_id_connect_claims_in_access_token = @p23, " +
+		"include_open_id_connect_claims_in_id_token = @p24, " +
+		"default_acr_level = @p25 WHERE id = @p26",
+}
+
+var setClientAdministrativeScopesAllowed = statement{
+	sqlite:   "UPDATE clients SET administrative_scopes_allowed = ?, updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE clients SET administrative_scopes_allowed = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE clients SET administrative_scopes_allowed = $1, updated_at = $2 WHERE id = $3",
+	mssql:    "UPDATE clients SET administrative_scopes_allowed = @p1, updated_at = @p2 WHERE id = @p3",
+}
+
+// acquireClientRow writes updated_at alone; see AcquireClientRow.
+var acquireClientRow = statement{
+	sqlite:   "UPDATE clients SET updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE clients SET updated_at = ? WHERE id = ?",
+	postgres: "UPDATE clients SET updated_at = $1 WHERE id = $2",
+	mssql:    "UPDATE clients SET updated_at = @p1 WHERE id = @p2",
+}
+
+// makeClientPublic changes a row only where it is still confidential; see SetClientPublic.
+var makeClientPublic = statement{
+	sqlite:   "UPDATE clients SET is_public = ?, updated_at = ? WHERE id = ? AND is_public = ?",
+	mysql:    "UPDATE clients SET is_public = ?, updated_at = ? WHERE id = ? AND is_public = ?",
+	postgres: "UPDATE clients SET is_public = $1, updated_at = $2 WHERE id = $3 AND is_public = $4",
+	mssql:    "UPDATE clients SET is_public = @p1, updated_at = @p2 WHERE id = @p3 AND is_public = @p4",
+}
+
+var selectClientById = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ?",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE id = @p1",
+}
+
+var selectClientByClientIdentifier = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE client_identifier = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE client_identifier = ?",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE client_identifier = $1",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE client_identifier = @p1",
+}
+
+// selectClientsWhere is completed by an IN list of client ids.
+var selectClientsWhere = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE ",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE ",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE ",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE ",
+}
+
+var selectAllClients = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients",
+}
+
+var deleteClient = statement{
+	sqlite:   "DELETE FROM clients WHERE id = ?",
+	mysql:    "DELETE FROM clients WHERE id = ?",
+	postgres: "DELETE FROM clients WHERE id = $1",
+	mssql:    "DELETE FROM clients WHERE id = @p1",
+}
 
 func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
@@ -19,12 +249,16 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.
 	client.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	client.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-		For(d.Flavor)
-
-	insertBuilder := clientStruct.WithoutTag("pk").InsertInto("clients", client)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "client")
+	id, err := d.insert(ctx, tx, insertClient, "client",
+		client.CreatedAt, client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted,
+		client.Description, client.WebsiteURL, client.DisplayName, client.Enabled, client.ConsentRequired,
+		client.CreatedViaDCR, client.AdministrativeScopesAllowed, client.ShowLogo, client.ShowDisplayName,
+		client.ShowDescription, client.ShowWebsiteURL, client.IsPublic, client.AuthorizationCodeEnabled,
+		client.ClientCredentialsEnabled, client.PKCERequired, client.ImplicitGrantEnabled,
+		client.ResourceOwnerPasswordCredentialsEnabled, client.TokenExpirationInSeconds,
+		client.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineMaxLifetimeInSeconds,
+		client.IncludeOpenIDConnectClaimsInAccessToken, client.IncludeOpenIDConnectClaimsInIdToken,
+		client.DefaultAcrLevel)
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
@@ -44,14 +278,16 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 	originalUpdatedAt := client.UpdatedAt
 	client.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-		For(d.Flavor)
-
-	updateBuilder := clientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("clients", client)
-	updateBuilder.Where(updateBuilder.Equal("id", client.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateClient.text(d.Dialect),
+		client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted, client.Description,
+		client.WebsiteURL, client.DisplayName, client.Enabled, client.ConsentRequired, client.CreatedViaDCR,
+		client.ShowLogo, client.ShowDisplayName, client.ShowDescription, client.ShowWebsiteURL,
+		client.IsPublic, client.AuthorizationCodeEnabled, client.ClientCredentialsEnabled,
+		client.PKCERequired, client.ImplicitGrantEnabled, client.ResourceOwnerPasswordCredentialsEnabled,
+		client.TokenExpirationInSeconds, client.RefreshTokenOfflineIdleTimeoutInSeconds,
+		client.RefreshTokenOfflineMaxLifetimeInSeconds, client.IncludeOpenIDConnectClaimsInAccessToken,
+		client.IncludeOpenIDConnectClaimsInIdToken, client.DefaultAcrLevel,
+		client.Id)
 	if err != nil {
 		client.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client")
@@ -74,16 +310,8 @@ func (d *Database) SetClientAdministrativeScopesAllowed(ctx context.Context, tx 
 		return errs.New("can't set the administrative scopes allowance of a client with an id of 0")
 	}
 
-	update := sqlbuilder.NewUpdateBuilder()
-	update.Update("clients")
-	update.Set(
-		update.Assign("administrative_scopes_allowed", allowed),
-		update.Assign("updated_at", time.Now().UTC()),
-	)
-	update.Where(update.Equal("id", clientId))
-
-	query, args := update.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, setClientAdministrativeScopesAllowed.text(d.Dialect),
+		allowed, time.Now().UTC(), clientId); err != nil {
 		return errs.Wrap(err, "unable to set the client's administrative scopes allowance")
 	}
 	return nil
@@ -123,13 +351,7 @@ func (d *Database) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId in
 		return errs.New("can't acquire a client row with an id of 0")
 	}
 
-	acquire := sqlbuilder.NewUpdateBuilder()
-	acquire.Update("clients")
-	acquire.Set(acquire.Assign("updated_at", time.Now().UTC()))
-	acquire.Where(acquire.Equal("id", clientId))
-
-	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSQL(ctx, tx, query, args...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireClientRow.text(d.Dialect), time.Now().UTC(), clientId); err != nil {
 		return errs.Wrap(err, "unable to acquire client row")
 	}
 
@@ -186,21 +408,7 @@ func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int
 		return false, err
 	}
 
-	now := time.Now().UTC()
-
-	classify := sqlbuilder.NewUpdateBuilder()
-	classify.Update("clients")
-	classify.Set(
-		classify.Assign("is_public", true),
-		classify.Assign("updated_at", now),
-	)
-	classify.Where(
-		classify.Equal("id", clientId),
-		classify.Equal("is_public", false),
-	)
-
-	query, args := classify.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSQL(ctx, tx, query, args...)
+	result, err := d.ExecSQL(ctx, tx, makeClientPublic.text(d.Dialect), true, time.Now().UTC(), clientId, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to make client public")
 	}
@@ -227,57 +435,14 @@ func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int
 	return false, nil
 }
 
-func (d *Database) getClientCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	clientStruct *sqlbuilder.Struct) (*record.Client, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var client record.Client
-	if rows.Next() {
-		addr := clientStruct.Addr(&client)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan client")
-		}
-		return &client, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
-
-	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-		For(d.Flavor)
-
-	selectBuilder := clientStruct.SelectFrom("clients")
-	selectBuilder.Where(selectBuilder.Equal("id", clientId))
-
-	client, err := d.getClientCommon(ctx, tx, selectBuilder, clientStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	return queryOne(ctx, d, tx, selectClientById.text(d.Dialect), []any{clientId}, scanClient, "client")
 }
 
 func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error) {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-		For(d.Flavor)
-
-	selectBuilder := clientStruct.SelectFrom("clients")
-	selectBuilder.Where(selectBuilder.Equal("client_identifier", clientIdentifier))
-
-	client, err := d.getClientCommon(ctx, tx, selectBuilder, clientStruct)
+	client, err := queryOne(ctx, d, tx, selectClientByClientIdentifier.text(d.Dialect), []any{clientIdentifier},
+		scanClient, "client")
 	if err != nil {
 		return nil, err
 	}
@@ -329,36 +494,10 @@ func (d *Database) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []
 	clients := make([]record.Client, 0, len(clientIds))
 
 	err := forEachIdBatch(clientIds, func(batch []int64) error {
-		clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-			For(d.Flavor)
-
-		selectBuilder := clientStruct.SelectFrom("clients")
-		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
-
-		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySQL(ctx, tx, sql, args...)
-		if err != nil {
-			return errs.Wrap(err, "unable to query database")
-		}
-		// Deferred inside the closure, so each statement's rows are released before the next
-		// one is issued rather than all of them at the end.
-		defer func() { _ = rows.Close() }()
-
-		for rows.Next() {
-			var client record.Client
-			addr := clientStruct.Addr(&client)
-			err = rows.Scan(addr...)
-			if err != nil {
-				return errs.Wrap(err, "unable to scan client")
-			}
-			clients = append(clients, client)
-		}
-
-		if err := rows.Err(); err != nil {
-			return errs.Wrap(err, "unable to read query results")
-		}
-
-		return nil
+		query := selectClientsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
+		var err error
+		clients, err = queryAll(ctx, d, tx, clients, query, int64Args(batch), scanClient, "client")
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -392,35 +531,7 @@ func (d *Database) ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client
 }
 
 func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error) {
-
-	clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-		For(d.Flavor)
-
-	selectBuilder := clientStruct.SelectFrom("clients")
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	clients := make([]record.Client, 0)
-	for rows.Next() {
-		var client record.Client
-		addr := clientStruct.Addr(&client)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan client")
-		}
-		clients = append(clients, client)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return clients, nil
+	return queryAll(ctx, d, tx, make([]record.Client, 0), selectAllClients.text(d.Dialect), nil, scanClient, "client")
 }
 
 // DeleteClient removes the client and, by ON DELETE CASCADE, every row that references it.
@@ -440,14 +551,7 @@ func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64)
 			return err
 		}
 
-		clientStruct := sqlbuilder.NewStruct(new(record.Client)).
-			For(d.Flavor)
-
-		deleteBuilder := clientStruct.DeleteFrom("clients")
-		deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
-
-		sql, args := deleteBuilder.Build()
-		_, err := d.ExecSQL(ctx, tx, sql, args...)
+		_, err := d.ExecSQL(ctx, tx, deleteClient.text(d.Dialect), clientId)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete client")
 		}

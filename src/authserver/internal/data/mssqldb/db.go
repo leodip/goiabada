@@ -15,7 +15,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
@@ -131,10 +130,9 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		return nil, errs.Wrap(err, "unable to connect to database")
 	}
 
-	commonDb := commondb.New(db, sqlbuilder.SQLServer, logSQL)
+	commonDb := commondb.New(db, data.MSSQL, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
-	commonDb.InsertReturningIdSQL = insertReturningIdSQL
 	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
 
 	mssqlDb := Database{

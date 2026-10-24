@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -22,7 +21,7 @@ func (e *driverUniqueError) Error() string { return e.msg }
 // classifyingDB is a Database whose classifier answers for driverUniqueError and nothing
 // else, which is the shape every dialect wires in its constructor.
 func classifyingDB() *Database {
-	d := New(nil, sqlbuilder.SQLite, false)
+	d := New(nil, data.SQLite, false)
 	d.IsUniqueViolation = func(err error) bool {
 		var target *driverUniqueError
 		return errors.As(err, &target)
@@ -77,7 +76,7 @@ func TestWrapSQLError_LeavesAnUnclassifiedErrorExactlyAsItWas(t *testing.T) {
 // a fifth engine added later without wiring IsUniqueViolation degrades to today's behaviour rather
 // than tagging by accident.
 func TestWrapSQLError_WithNoClassifierTagsNothing(t *testing.T) {
-	d := New(nil, sqlbuilder.SQLite, false)
+	d := New(nil, data.SQLite, false)
 
 	err := d.wrapSQLError(&driverUniqueError{msg: "UNIQUE constraint failed: users.email"},
 		"unable to execute SQL")

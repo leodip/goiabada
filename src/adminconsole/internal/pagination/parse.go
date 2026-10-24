@@ -18,9 +18,10 @@ const maxApiPageSize = 200
 // groups-with-permission page, in a slice expression here. A page large enough
 // to overflow that product is not a page at all -- it is the value that
 // panicked the slice, and that turns a SQL OFFSET negative, where it went two
-// ways: sqlbuilder drops a negative OFFSET clause, so the query came back with
-// the FIRST page's rows labelled as the page asked for, and the one read that
-// formats the offset into SQL itself got the engine's refusal and a 500 (#305).
+// ways: the query builder the auth server used then dropped a negative OFFSET
+// clause, so the query came back with the FIRST page's rows labelled as the
+// page asked for, and the one read that formatted the offset into SQL itself
+// got the engine's refusal and a 500 (#305).
 //
 // commondb.PageOffset now saturates the offset on the far side of that call, so
 // neither half can happen any more. Bounding the page here is still this

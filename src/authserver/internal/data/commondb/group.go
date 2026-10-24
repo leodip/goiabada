@@ -5,10 +5,142 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// groupColumns is the groups table as scanGroup reads it. The table's name is a reserved word,
+// quoted in every statement naming it: with backticks on MySQL, double quotes on the other three.
+var groupColumns = columnList{
+	sqlite:   "id, created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token",
+	mysql:    "id, created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token",
+	postgres: "id, created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token",
+	mssql:    "id, created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token",
+}
+
+// scanGroup reads one row selected with groupColumns.
+func scanGroup(row rowScanner, group *record.Group) error {
+	return row.Scan(
+		&group.Id,
+		&group.CreatedAt,
+		&group.UpdatedAt,
+		&group.GroupIdentifier,
+		&group.Description,
+		&group.IncludeInIdToken,
+		&group.IncludeInAccessToken,
+	)
+}
+
+var insertGroup = statement{
+	sqlite: `INSERT INTO "groups" (created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token) ` +
+		`VALUES (?, ?, ?, ?, ?, ?)`,
+	mysql: "INSERT INTO `groups` (created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token) " +
+		"VALUES (?, ?, ?, ?, ?, ?)",
+	postgres: `INSERT INTO "groups" (created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token) ` +
+		`VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+	mssql: `INSERT INTO "groups" (created_at, updated_at, group_identifier, description, include_in_id_token, include_in_access_token) ` +
+		`OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`,
+}
+
+// updateGroup writes the whole row but created_at, which is dont-update.
+var updateGroup = statement{
+	sqlite: `UPDATE "groups" SET updated_at = ?, group_identifier = ?, description = ?, include_in_id_token = ?, ` +
+		`include_in_access_token = ? WHERE id = ?`,
+	mysql: "UPDATE `groups` SET updated_at = ?, group_identifier = ?, description = ?, include_in_id_token = ?, " +
+		"include_in_access_token = ? WHERE id = ?",
+	postgres: `UPDATE "groups" SET updated_at = $1, group_identifier = $2, description = $3, include_in_id_token = $4, ` +
+		`include_in_access_token = $5 WHERE id = $6`,
+	mssql: `UPDATE "groups" SET updated_at = @p1, group_identifier = @p2, description = @p3, include_in_id_token = @p4, ` +
+		`include_in_access_token = @p5 WHERE id = @p6`,
+}
+
+var selectGroupById = statement{
+	sqlite:   "SELECT " + groupColumns.sqlite + ` FROM "groups" WHERE id = ?`,
+	mysql:    "SELECT " + groupColumns.mysql + " FROM `groups` WHERE id = ?",
+	postgres: "SELECT " + groupColumns.postgres + ` FROM "groups" WHERE id = $1`,
+	mssql:    "SELECT " + groupColumns.mssql + ` FROM "groups" WHERE id = @p1`,
+}
+
+var selectGroupByGroupIdentifier = statement{
+	sqlite:   "SELECT " + groupColumns.sqlite + ` FROM "groups" WHERE group_identifier = ?`,
+	mysql:    "SELECT " + groupColumns.mysql + " FROM `groups` WHERE group_identifier = ?",
+	postgres: "SELECT " + groupColumns.postgres + ` FROM "groups" WHERE group_identifier = $1`,
+	mssql:    "SELECT " + groupColumns.mssql + ` FROM "groups" WHERE group_identifier = @p1`,
+}
+
+// selectGroupsWhere is completed by an IN list of group ids.
+var selectGroupsWhere = statement{
+	sqlite:   "SELECT " + groupColumns.sqlite + ` FROM "groups" WHERE `,
+	mysql:    "SELECT " + groupColumns.mysql + " FROM `groups` WHERE ",
+	postgres: "SELECT " + groupColumns.postgres + ` FROM "groups" WHERE `,
+	mssql:    "SELECT " + groupColumns.mssql + ` FROM "groups" WHERE `,
+}
+
+var selectAllGroups = statement{
+	sqlite:   "SELECT " + groupColumns.sqlite + ` FROM "groups"`,
+	mysql:    "SELECT " + groupColumns.mysql + " FROM `groups`",
+	postgres: "SELECT " + groupColumns.postgres + ` FROM "groups"`,
+	mssql:    "SELECT " + groupColumns.mssql + ` FROM "groups"`,
+}
+
+// selectGroupsPage binds the page size, then the offset. SQL Server pages with OFFSET … FETCH
+// after its ORDER BY, naming the offset first, so its text numbers the two the other way round.
+var selectGroupsPage = statement{
+	sqlite:   "SELECT " + groupColumns.sqlite + ` FROM "groups" ORDER BY group_identifier ASC LIMIT ? OFFSET ?`,
+	mysql:    "SELECT " + groupColumns.mysql + " FROM `groups` ORDER BY group_identifier ASC LIMIT ? OFFSET ?",
+	postgres: "SELECT " + groupColumns.postgres + ` FROM "groups" ORDER BY group_identifier ASC LIMIT $1 OFFSET $2`,
+	mssql: "SELECT " + groupColumns.mssql + ` FROM "groups" ORDER BY group_identifier ASC ` +
+		`OFFSET @p2 ROWS FETCH NEXT @p1 ROWS ONLY`,
+}
+
+var countGroups = statement{
+	sqlite:   `SELECT count(*) FROM "groups"`,
+	mysql:    "SELECT count(*) FROM `groups`",
+	postgres: `SELECT count(*) FROM "groups"`,
+	mssql:    `SELECT count(*) FROM "groups"`,
+}
+
+// selectGroupMembersPage is the members of one group, a page at a time: the group id, then the
+// page size, then the offset, which SQL Server's OFFSET … FETCH names before the page size.
+// given_name does not order the rows totally, so paging over it alone can repeat a user on the
+// next page and skip another; see selectUsersPage in user.go for the full reason (#112).
+var selectGroupMembersPage = statement{
+	sqlite: "SELECT " + userColumns.sqlite + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ? ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	mysql: "SELECT " + userColumns.mysql + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ? ORDER BY users.given_name ASC, users.id ASC LIMIT ? OFFSET ?",
+	postgres: "SELECT " + userColumns.postgres + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = $1 ORDER BY users.given_name ASC, users.id ASC LIMIT $2 OFFSET $3",
+	mssql: "SELECT " + userColumns.mssql + " FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = @p1 ORDER BY users.given_name ASC, users.id ASC " +
+		"OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
+}
+
+// countGroupMembersJoined counts the rows selectGroupMembersPage pages through, over the same join.
+var countGroupMembersJoined = statement{
+	sqlite: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ?",
+	mysql: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = ?",
+	postgres: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = $1",
+	mssql: "SELECT count(*) FROM users INNER JOIN users_groups ON users.id = users_groups.user_id " +
+		"WHERE users_groups.group_id = @p1",
+}
+
+var countGroupMembers = statement{
+	sqlite:   "SELECT count(*) FROM users_groups WHERE group_id = ?",
+	mysql:    "SELECT count(*) FROM users_groups WHERE group_id = ?",
+	postgres: "SELECT count(*) FROM users_groups WHERE group_id = $1",
+	mssql:    "SELECT count(*) FROM users_groups WHERE group_id = @p1",
+}
+
+var deleteGroup = statement{
+	sqlite:   `DELETE FROM "groups" WHERE id = ?`,
+	mysql:    "DELETE FROM `groups` WHERE id = ?",
+	postgres: `DELETE FROM "groups" WHERE id = $1`,
+	mssql:    `DELETE FROM "groups" WHERE id = @p1`,
+}
 
 func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error {
 
@@ -19,12 +151,9 @@ func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 	group.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	group.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
-	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
-
-	insertBuilder := groupStruct.WithoutTag("pk").InsertInto(d.Flavor.Quote("groups"), group)
-
-	id, err := d.insertReturningId(ctx, tx, insertBuilder, "group")
+	id, err := d.insert(ctx, tx, insertGroup, "group",
+		group.CreatedAt, group.UpdatedAt, group.GroupIdentifier, group.Description, group.IncludeInIdToken,
+		group.IncludeInAccessToken)
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
@@ -44,14 +173,9 @@ func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 	originalUpdatedAt := group.UpdatedAt
 	group.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
-
-	updateBuilder := groupStruct.WithoutTag("pk").WithoutTag("dont-update").Update(d.Flavor.Quote("groups"), group)
-	updateBuilder.Where(updateBuilder.Equal("id", group.Id))
-
-	sql, args := updateBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, updateGroup.text(d.Dialect),
+		group.UpdatedAt, group.GroupIdentifier, group.Description, group.IncludeInIdToken, group.IncludeInAccessToken,
+		group.Id)
 	if err != nil {
 		group.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update group")
@@ -60,46 +184,8 @@ func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 	return nil
 }
 
-func (d *Database) getGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
-	groupStruct *sqlbuilder.Struct) (*record.Group, error) {
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var group record.Group
-	if rows.Next() {
-		addr := groupStruct.Addr(&group)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan group")
-		}
-		return &group, nil
-	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return nil, nil
-}
-
 func (d *Database) GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error) {
-
-	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
-
-	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
-	selectBuilder.Where(selectBuilder.Equal("id", groupId))
-
-	group, err := d.getGroupCommon(ctx, tx, selectBuilder, groupStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return group, nil
+	return queryOne(ctx, d, tx, selectGroupById.text(d.Dialect), []any{groupId}, scanGroup, "group")
 }
 
 func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error) {
@@ -111,34 +197,10 @@ func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []in
 	var groups []record.Group
 
 	err := forEachIdBatch(groupIds, func(batch []int64) error {
-		groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-			For(d.Flavor)
-
-		selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
-		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
-
-		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySQL(ctx, tx, sql, args...)
-		if err != nil {
-			return errs.Wrap(err, "unable to query database")
-		}
-		defer func() { _ = rows.Close() }()
-
-		for rows.Next() {
-			var group record.Group
-			addr := groupStruct.Addr(&group)
-			err = rows.Scan(addr...)
-			if err != nil {
-				return errs.Wrap(err, "unable to scan group")
-			}
-			groups = append(groups, group)
-		}
-
-		if err := rows.Err(); err != nil {
-			return errs.Wrap(err, "unable to read query results")
-		}
-
-		return nil
+		query := selectGroupsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
+		var err error
+		groups, err = queryAll(ctx, d, tx, groups, query, int64Args(batch), scanGroup, "group")
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -252,13 +314,8 @@ func (d *Database) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups 
 
 func (d *Database) GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error) {
 
-	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
-
-	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
-	selectBuilder.Where(selectBuilder.Equal("group_identifier", groupIdentifier))
-
-	group, err := d.getGroupCommon(ctx, tx, selectBuilder, groupStruct)
+	group, err := queryOne(ctx, d, tx, selectGroupByGroupIdentifier.text(d.Dialect), []any{groupIdentifier},
+		scanGroup, "group")
 	if err != nil {
 		return nil, err
 	}
@@ -272,35 +329,7 @@ func (d *Database) GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, gr
 }
 
 func (d *Database) GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error) {
-
-	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
-
-	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	var groups []record.Group
-	for rows.Next() {
-		var group record.Group
-		addr := groupStruct.Addr(&group)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan group")
-		}
-		groups = append(groups, group)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
-	}
-
-	return groups, nil
+	return queryAll(ctx, d, tx, nil, selectAllGroups.text(d.Dialect), nil, scanGroup, "group")
 }
 
 func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]record.Group, int, error) {
@@ -312,54 +341,26 @@ func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page i
 		pageSize = 10
 	}
 
-	groupStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
+	groups, err := queryAll(ctx, d, tx, nil, selectGroupsPage.text(d.Dialect),
+		[]any{pageSize, PageOffset(page, pageSize)}, scanGroup, "group")
+	if err != nil {
+		return nil, 0, err
+	}
 
-	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
-	selectBuilder.OrderByAsc("group_identifier")
-	selectBuilder.Offset(PageOffset(page, pageSize))
-	selectBuilder.Limit(pageSize)
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, countGroups.text(d.Dialect))
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
-	var groups []record.Group
-	for rows.Next() {
-		var group record.Group
-		addr := groupStruct.Addr(&group)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, 0, errs.Wrap(err, "unable to scan group")
-		}
-		groups = append(groups, group)
-	}
-
-	selectBuilder = d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From(d.Flavor.Quote("groups"))
-
-	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, 0, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows2.Close() }()
-
 	var total int
-	if rows2.Next() {
-		err = rows2.Scan(&total)
+	if rows.Next() {
+		err = rows.Scan(&total)
 		if err != nil {
 			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, 0, errs.Wrap(err, "unable to read query results")
-	}
-	if err := rows2.Err(); err != nil {
 		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
@@ -379,60 +380,26 @@ func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, gro
 		pageSize = 10
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(record.User)).
-		For(d.Flavor)
+	users, err := queryAll(ctx, d, tx, nil, selectGroupMembersPage.text(d.Dialect),
+		[]any{groupId, pageSize, PageOffset(page, pageSize)}, scanUser, "user")
+	if err != nil {
+		return nil, 0, err
+	}
 
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
-	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
-	// given_name does not order the rows totally, so paging over it alone can repeat a user on
-	// the next page and skip another. See SearchUsersPaginated in user.go for the full reason (#112).
-	selectBuilder.OrderByAsc("users.given_name").OrderByAsc("users.id")
-	selectBuilder.Offset(PageOffset(page, pageSize))
-	selectBuilder.Limit(pageSize)
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, countGroupMembersJoined.text(d.Dialect), groupId)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
 	defer func() { _ = rows.Close() }()
 
-	var users []record.User
-	for rows.Next() {
-		var user record.User
-		addr := userStruct.Addr(&user)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, 0, errs.Wrap(err, "unable to scan user")
-		}
-		users = append(users, user)
-	}
-
-	selectBuilder = d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From("users")
-	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
-	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
-
-	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySQL(ctx, tx, sql, args...)
-	if err != nil {
-		return nil, 0, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows2.Close() }()
-
 	var total int
-	if rows2.Next() {
-		err = rows2.Scan(&total)
+	if rows.Next() {
+		err = rows.Scan(&total)
 		if err != nil {
 			return nil, 0, errs.Wrap(err, "unable to scan count")
 		}
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, 0, errs.Wrap(err, "unable to read query results")
-	}
-	if err := rows2.Err(); err != nil {
 		return nil, 0, errs.Wrap(err, "unable to read count results")
 	}
 
@@ -444,12 +411,7 @@ func (d *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId in
 		return 0, errs.New("group id must be greater than 0")
 	}
 
-	selectBuilder := d.Flavor.NewSelectBuilder()
-	selectBuilder.Select("count(*)").From("users_groups")
-	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySQL(ctx, tx, sql, args...)
+	rows, err := d.QuerySQL(ctx, tx, countGroupMembers.text(d.Dialect), groupId)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to query database")
 	}
@@ -472,14 +434,7 @@ func (d *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId in
 
 func (d *Database) DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error {
 
-	clientStruct := sqlbuilder.NewStruct(new(record.Group)).
-		For(d.Flavor)
-
-	deleteBuilder := clientStruct.DeleteFrom(d.Flavor.Quote("groups"))
-	deleteBuilder.Where(deleteBuilder.Equal("id", groupId))
-
-	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSQL(ctx, tx, sql, args...)
+	_, err := d.ExecSQL(ctx, tx, deleteGroup.text(d.Dialect), groupId)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete group")
 	}

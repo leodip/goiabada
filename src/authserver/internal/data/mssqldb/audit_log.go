@@ -3,25 +3,25 @@ package mssqldb
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// deleteOldAuditLogs binds the cutoff, then the bound. SQL Server has no LIMIT at all; DELETE TOP
+// (n) is its bound on a delete, and n may be a parameter.
+const deleteOldAuditLogs = "DELETE TOP (@p2) FROM audit_logs WHERE created_at < @p1"
+
 // DeleteOldAuditLogs deletes up to maxDeletions audit rows older than cutoff and reports how many
-// went. SQL Server has no LIMIT at all; DELETE TOP (n) is its bound on a delete.
+// went.
 //
 // commondb declares no DeleteOldAuditLogs, so each engine has to write its own and an engine that
 // forgets fails to compile against data.Database rather than inheriting another engine's syntax
 // (#438 decision 7).
 func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
-	sqlStr := fmt.Sprintf("DELETE TOP (%d) FROM audit_logs WHERE created_at < @p1", maxDeletions)
-
-	result, err := d.ExecSQL(ctx, tx, sqlStr, cutoff)
+	result, err := d.ExecSQL(ctx, tx, deleteOldAuditLogs, cutoff, maxDeletions)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -34,30 +34,65 @@ func (d *Database) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff ti
 	return int(rowsAffected), nil
 }
 
-// requestIdIsByteExact is the predicate that holds SQL Server to the bytes of the request id,
-// written once because the page query and the count query must carry the same one.
+// The page of audit logs and its count, one pair per combination of the two filters, in SQL Server's
+// own text. A page binds the filters it carries, the event before the request id, then the offset,
+// then the page size, as OFFSET … FETCH names them. The order is total, created_at DESC and then
+// id DESC, so tied rows cannot drift between pages.
 //
-// `=` is not exact on this engine: it pads, so request_id = 'corr' is true of a row holding
-// 'corr ' under every collation SQL Server has, Latin1_General_100_BIN2_UTF8 included, and no
-// collation turns that off (see commondb.engineFoldedTheMatch). commondb answers that by
-// dropping the folded rows after the scan, which cannot work here: this body pages with
-// OFFSET/FETCH, so a row dropped after the fetch leaves a short page, and the count query has
-// no rows to drop at all. Measured against the live engine, a guard applied after the fetch
-// gave an empty page under a total of 1 (#328).
+// THE REQUEST-ID FILTER COMPARES THE BYTES, in the page and the count alike. `=` is not exact on
+// this engine: it pads, so request_id = 'corr' is true of a row holding 'corr ' under every
+// collation SQL Server has, Latin1_General_100_BIN2_UTF8 included, and no collation turns that off
+// (see commondb.engineFoldedTheMatch). commondb answers that by dropping the folded rows after the
+// scan, which cannot work here: this body pages with OFFSET/FETCH, so a row dropped after the fetch
+// leaves a short page, and the count query has no rows to drop at all. Measured against the live
+// engine, a guard applied after the fetch gave an empty page under a total of 1 (#328).
 //
 // So the fold is closed in the statement instead, and in both statements. The equality stays
-// beside it so the index on request_id can still seek; the CAST is the filter. VARBINARY(512)
-// is the column's whole width: request_id is NVARCHAR(256), which stores UTF-16 even under the
-// UTF-8 collation, so 256 characters are 512 bytes and nothing that fits the column is clipped
-// by the cast.
-func requestIdIsByteExact(b interface{ Var(arg any) string }, requestId string) string {
-	return "CAST(request_id AS VARBINARY(512)) = CAST(" + b.Var(requestId) + " AS VARBINARY(512))"
+// beside it so the index on request_id can still seek; the CAST is the filter, and reads the same
+// parameter. VARBINARY(512) is the column's whole width: request_id is NVARCHAR(256), which stores
+// UTF-16 even under the UTF-8 collation, so 256 characters are 512 bytes and nothing that fits the
+// column is clipped by the cast.
+const (
+	auditLogColumns = "id, created_at, audit_event, details, request_id"
+
+	selectAuditLogsPage = "SELECT " + auditLogColumns + " FROM audit_logs " +
+		"ORDER BY created_at DESC, id DESC OFFSET @p1 ROWS FETCH NEXT @p2 ROWS ONLY"
+	countAuditLogs = "SELECT COUNT(*) FROM audit_logs"
+
+	selectAuditLogsPageByEvent = "SELECT " + auditLogColumns + " FROM audit_logs WHERE audit_event = @p1 " +
+		"ORDER BY created_at DESC, id DESC OFFSET @p2 ROWS FETCH NEXT @p3 ROWS ONLY"
+	countAuditLogsByEvent = "SELECT COUNT(*) FROM audit_logs WHERE audit_event = @p1"
+
+	selectAuditLogsPageByRequestId = "SELECT " + auditLogColumns + " FROM audit_logs " +
+		"WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512)) " +
+		"ORDER BY created_at DESC, id DESC OFFSET @p2 ROWS FETCH NEXT @p3 ROWS ONLY"
+	countAuditLogsByRequestId = "SELECT COUNT(*) FROM audit_logs " +
+		"WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512))"
+
+	selectAuditLogsPageByEventAndRequestId = "SELECT " + auditLogColumns + " FROM audit_logs " +
+		"WHERE audit_event = @p1 AND request_id = @p2 AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512)) " +
+		"ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p4 ROWS ONLY"
+	countAuditLogsByEventAndRequestId = "SELECT COUNT(*) FROM audit_logs " +
+		"WHERE audit_event = @p1 AND request_id = @p2 AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512))"
+)
+
+// auditLogsQueries answers the page and the count for the filters given.
+func auditLogsQueries(byEvent, byRequestId bool) (page string, count string) {
+	switch {
+	case byEvent && byRequestId:
+		return selectAuditLogsPageByEventAndRequestId, countAuditLogsByEventAndRequestId
+	case byEvent:
+		return selectAuditLogsPageByEvent, countAuditLogsByEvent
+	case byRequestId:
+		return selectAuditLogsPageByRequestId, countAuditLogsByRequestId
+	default:
+		return selectAuditLogsPage, countAuditLogs
+	}
 }
 
-// GetAuditLogsPaginated replaces commondb's for two reasons. SQL Server pages only with
-// ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY, which this body appends to the built
-// statement. And its `=` pads, so a request-id filter needs requestIdIsByteExact in the page query
-// and the count query alike, where commondb drops the folded rows after the scan (#328).
+// GetAuditLogsPaginated replaces commondb's because SQL Server's `=` pads, so a request-id filter
+// has to compare the bytes in the page query and the count query alike, where commondb drops the
+// folded rows after the scan (#328).
 func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
 	requestId string) ([]record.AuditLog, int, error) {
 	if page < 1 {
@@ -72,25 +107,17 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 
 	offset := commondb.PageOffset(page, pageSize)
 
-	auditLogStruct := sqlbuilder.NewStruct(new(record.AuditLog)).
-		For(sqlbuilder.SQLServer)
-
-	selectBuilder := auditLogStruct.SelectFrom("audit_logs")
+	pageQuery, countQuery := auditLogsQueries(auditEvent != "", requestId != "")
+	var filterArgs []any
 	if auditEvent != "" {
-		selectBuilder.Where(selectBuilder.Equal("audit_event", auditEvent))
+		filterArgs = append(filterArgs, auditEvent)
 	}
 	if requestId != "" {
-		selectBuilder.Where(selectBuilder.Equal("request_id", requestId),
-			requestIdIsByteExact(selectBuilder, requestId))
+		filterArgs = append(filterArgs, requestId)
 	}
-	// MSSQL pagination: ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY
-	selectBuilder.OrderBy("created_at DESC", "id DESC")
+	pageArgs := append(append([]any{}, filterArgs...), offset, pageSize)
 
-	sqlStr, args := selectBuilder.Build()
-	// MSSQL requires OFFSET...FETCH syntax for pagination
-	sqlStr = fmt.Sprintf("%s OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", sqlStr, offset, pageSize)
-
-	rows, err := d.QuerySQL(ctx, tx, sqlStr, args...)
+	rows, err := d.QuerySQL(ctx, tx, pageQuery, pageArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -99,27 +126,14 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	var auditLogs []record.AuditLog
 	for rows.Next() {
 		var auditLog record.AuditLog
-		addr := auditLogStruct.Addr(&auditLog)
-		err = rows.Scan(addr...)
+		err = rows.Scan(&auditLog.Id, &auditLog.CreatedAt, &auditLog.AuditEvent, &auditLog.Details, &auditLog.RequestId)
 		if err != nil {
 			return nil, 0, errs.Wrap(err, "unable to scan audit log")
 		}
 		auditLogs = append(auditLogs, auditLog)
 	}
 
-	// Get total count
-	countBuilder := sqlbuilder.SQLServer.NewSelectBuilder()
-	countBuilder.Select("COUNT(*)").From("audit_logs")
-	if auditEvent != "" {
-		countBuilder.Where(countBuilder.Equal("audit_event", auditEvent))
-	}
-	if requestId != "" {
-		countBuilder.Where(countBuilder.Equal("request_id", requestId),
-			requestIdIsByteExact(countBuilder, requestId))
-	}
-
-	countSql, countArgs := countBuilder.Build()
-	countRows, err := d.QuerySQL(ctx, tx, countSql, countArgs...)
+	countRows, err := d.QuerySQL(ctx, tx, countQuery, filterArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query count")
 	}

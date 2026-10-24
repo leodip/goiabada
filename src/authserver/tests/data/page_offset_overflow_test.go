@@ -17,13 +17,18 @@ import (
 // product wrapped negative, and what happened then depended on the engine and
 // on how the number reached it (#305):
 //
-//   - Six of the seven reads hand the offset to sqlbuilder, which drops the
-//     clause when it is negative, so on sqlite, mysql and postgres the query
-//     ran with no offset and returned the FIRST page's rows -- labelled as the
-//     page asked for. Not an error. A wrong answer.
-//   - The SQL Server audit log override formats the number into the statement
-//     itself, so SQL Server saw it and refused: "The offset specified in a
-//     OFFSET clause may not be negative", which the API turns into a 500.
+//   - Six of the seven reads handed the offset to the query builder the data
+//     layer used until #644, which dropped the clause when it was negative, so
+//     on sqlite, mysql and postgres the query ran with no offset and returned
+//     the FIRST page's rows -- labelled as the page asked for. Not an error. A
+//     wrong answer.
+//   - The SQL Server audit log override formatted the number into the
+//     statement itself, so SQL Server saw it and refused: "The offset
+//     specified in a OFFSET clause may not be negative", which the API turns
+//     into a 500.
+//
+// Every read binds the offset now, and a negative one still splits the
+// engines: SQLite reads it as no offset, and SQL Server refuses it.
 //
 // That is why the assertion below is "no error AND no rows": an error-only
 // assertion passes on three engines while they hand back page 1, and a
