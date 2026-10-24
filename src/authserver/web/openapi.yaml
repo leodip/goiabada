@@ -1003,19 +1003,27 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/admin/user-sessions/{sessionIdentifier}:
+  /api/v1/admin/user-sessions/{id}:
     get:
       tags: [User Sessions]
       summary: Get session
-      description: Get session details by identifier
+      description: |
+        Get one live session by its numeric id, the `id` a session list returns, as a session list
+        carries it: its device, IP address and the clients it authorized. A session that has passed
+        the configured idle timeout or maximum lifetime is answered with 404, as an id naming no
+        session is.
+
+        `isCurrent` marks the session the calling token was issued through. A token carrying no
+        `sid` claim, such as one from the client credentials grant, gets `false`.
       operationId: getUserSession
       parameters:
-        - name: sessionIdentifier
+        - name: id
           in: path
           required: true
-          description: Session identifier
+          description: Session ID
           schema:
-            type: string
+            type: integer
+            format: int64
       responses:
         '200':
           description: Session details
@@ -1040,16 +1048,12 @@ paths:
         Terminate a user session. The session's authorization codes are marked revoked and the
         refresh tokens descended from them are swept, offline refresh tokens included, in one
         transaction.
-
-        Note: while GET takes the sessionIdentifier, DELETE takes the numeric session id at the
-        same position. It does not accept the identifier: a value that is not an integer is
-        refused with 400 and error_code VALIDATION_ERROR.
       operationId: deleteUserSession
       parameters:
-        - name: sessionIdentifier
+        - name: id
           in: path
           required: true
-          description: Session ID (numeric)
+          description: Session ID
           schema:
             type: integer
             format: int64
@@ -4993,7 +4997,7 @@ components:
       type: object
       properties:
         session:
-          $ref: '#/components/schemas/UserSessionResponse'
+          $ref: '#/components/schemas/UserSessionDetailResponse'
       required:
         - session
 

@@ -247,7 +247,7 @@ func TestDeviceCookie_ASignInThatStartsASessionSetsIt(t *testing.T) {
 	t.Run("no API returns the identifier or its digest", func(t *testing.T) {
 		for _, path := range []string{
 			"/api/v1/admin/users/" + strconv.FormatInt(f.user.Id, 10) + "/sessions",
-			"/api/v1/admin/user-sessions/" + sessions[0].SessionIdentifier,
+			"/api/v1/admin/user-sessions/" + strconv.FormatInt(sessions[0].Id, 10),
 		} {
 			resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+path, f.adminToken, nil)
 			body, err := io.ReadAll(resp.Body)
