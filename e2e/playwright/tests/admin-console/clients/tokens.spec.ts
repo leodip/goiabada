@@ -60,10 +60,24 @@ test("each duration is read back in Portuguese on a page in Portuguese", async (
 });
 
 // Back may bring the page back with what was typed put back in the field, without an input event, or
-// with the stored value: either way the readout says what the field then holds.
-for (const { locale, query, typed, global } of [
-  { locale: "English", query: "", typed: "10 minutes", global: /^Uses the global setting \(.+\)$/ },
-  { locale: "Portuguese", query: "?ui_locales=pt-BR", typed: "10 minutos", global: /^Usa a configuração global \(.+\)$/ },
+// with the stored value: either way the readout says what the field then holds. Which one Chromium
+// does is its own choice, so the restoration itself is then played as a browser plays it: a value put
+// in the field with no input event, then pageshow. Only the readout's pageshow listener can say it.
+for (const { locale, query, typed, global, restored } of [
+  {
+    locale: "English",
+    query: "",
+    typed: "10 minutes",
+    global: /^Uses the global setting \(.+\)$/,
+    restored: "1 hour, 30 minutes",
+  },
+  {
+    locale: "Portuguese",
+    query: "?ui_locales=pt-BR",
+    typed: "10 minutos",
+    global: /^Usa a configuração global \(.+\)$/,
+    restored: "1 hora e 30 minutos",
+  },
 ]) {
   test(`a duration the browser restores on Back is read back as the field holds it, in ${locale}`, async ({ page, clients }) => {
     const client = await clients.create();
@@ -79,6 +93,11 @@ for (const { locale, query, typed, global } of [
     const value = await field.inputValue();
     expect(["600", "0"], "the field holds what was typed or what is stored").toContain(value);
     await expect(readout).toHaveText(value === "600" ? typed : global);
+    await field.evaluate((input: HTMLInputElement) => {
+      input.value = "5400";
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    });
+    await expect(readout).toHaveText(restored);
   });
 }
 
