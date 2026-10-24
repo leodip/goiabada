@@ -56,8 +56,8 @@ const (
 	// moves these two (see the steps above). The latest release used to be
 	// scraped from IANA's page at run time, which made two runs of one tree
 	// disagree and broke once when the page changed (#432).
-	pinnedRelease       = "2026d"
-	pinnedTarballSHA256 = "0cb2aa8e333c3dc049badc42a0c61f21987b8cd44e107fa900bad764aacc7767"
+	pinnedRelease       = "2026e"
+	pinnedTarballSHA256 = "b26882805f26aac59d5b222978e6580484b834ccdc98be89df2f05a6dc53a652"
 
 	// releaseURLFmt is a release's tarball URL (%s = release name).
 	releaseURLFmt = "https://data.iana.org/time-zones/releases/tzdata%s.tar.gz"
