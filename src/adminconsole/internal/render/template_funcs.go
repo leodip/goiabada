@@ -131,15 +131,15 @@ var templateFuncMap = template.FuncMap{
 		}
 		return i18n.T(ctx, key, args)
 	},
-	// Lang resolves the active locale's BCP 47 tag for the <html lang="...">
-	// attribute, so the document advertises the language it actually renders
-	// in (screen readers, hyphenation, translation tools). Falls back to "en".
-	"Lang": i18n.LocaleTag,
-	// CatalogLang is the tag of the catalog the page rendered from, which can differ from Lang:
-	// a browser asking for fr-CA first and pt-BR third renders pt-BR. The layouts publish it as
-	// data-catalog-lang, and every request a page script sends names it back as ui_locales, so a
-	// refusal in that page's dialog is in the page's language whatever the browser or the profile
-	// says (#559 decisions 3 and 7).
+	// Lang is the tag of the catalog the page rendered from, for the <html lang="..."> attribute,
+	// so the document advertises the language it is written in (screen readers, hyphenation,
+	// translation tools): a browser asking for de-DE, with no German catalog, reads an English page
+	// marked en, not de-DE (WCAG 2.2 SC 3.1.1, #645 decision 8).
+	"Lang": i18n.CatalogTag,
+	// CatalogLang is the same tag, kept under its own name because operators' templates and the
+	// page scripts of #559 name it: the layouts publish it as data-catalog-lang, and every request a
+	// page script sends names it back as ui_locales, so a refusal in that page's dialog is in the
+	// page's language whatever the browser or the profile says (#559 decisions 3 and 7).
 	"CatalogLang": i18n.CatalogTag,
 
 	// DateTime renders an instant as an absolute date and time in the active

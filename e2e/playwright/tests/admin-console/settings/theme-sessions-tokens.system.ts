@@ -107,8 +107,26 @@ test("a duration is read out in words under its field as it is typed", async ({ 
   const readout = page.locator('[data-duration-for="userSessionIdleTimeoutInSeconds"]');
   for (const [value, words] of [
     ["5400", "1 hour, 30 minutes"],
+    ["90061", "1 day, 1 hour, 1 minute, 1 second"],
     ["abc", "Enter a whole number of seconds."],
     ["999999999", "That's too long. Enter a shorter duration."],
+  ]) {
+    await idleTimeout.fill(value);
+    await expect(readout).toHaveText(words);
+  }
+});
+
+test("a duration is read out in Portuguese on a page in Portuguese", async ({ page }) => {
+  // Nothing is saved: the readout is the page's own.
+  await page.goto(`${env.adminUrl}${sessionsPath}?ui_locales=pt-BR`);
+  await expect(page.locator("html")).toHaveAttribute("data-catalog-lang", "pt-BR");
+  const idleTimeout = page.locator("#userSessionIdleTimeoutInSeconds");
+  const readout = page.locator('[data-duration-for="userSessionIdleTimeoutInSeconds"]');
+  for (const [value, words] of [
+    ["5400", "1 hora e 30 minutos"],
+    ["90061", "1 dia, 1 hora, 1 minuto e 1 segundo"],
+    ["abc", "Informe um número inteiro de segundos."],
+    ["999999999", "Tempo longo demais. Informe uma duração menor."],
   ]) {
     await idleTimeout.fill(value);
     await expect(readout).toHaveText(words);

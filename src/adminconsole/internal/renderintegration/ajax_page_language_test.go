@@ -33,7 +33,10 @@ import (
 
 // TestRender_LayoutsPublishTheCatalogLanguage holds both layouts to naming the catalog the page
 // rendered from, not the first preference asked for: a browser asking for fr-CA first and pt-BR
-// third renders pt-BR, and a script naming fr-CA back would get English.
+// third renders pt-BR, and a script naming fr-CA back would get English. <html lang> names the same
+// catalog, since that is the language the page is written in: a browser asking for de-DE, with no
+// German catalog, reads an English page, and a screen reader choosing its voice from a lang of de-DE
+// would read it in German (WCAG 2.2 SC 3.1.1, #645 decisions 7 and 8).
 func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 	for _, tc := range []struct {
 		layout, page string
@@ -52,6 +55,7 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 		for acceptLanguage, want := range map[string]string{
 			"fr-CA,fr;q=0.9,pt-BR;q=0.8": "pt-BR",
 			"en-US":                      "en",
+			"de-DE":                      "en",
 		} {
 			t.Run(tc.layout+" "+acceptLanguage, func(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -65,7 +69,7 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 				})).ServeHTTP(w, req)
 
 				require.NoError(t, renderErr)
-				assert.Contains(t, w.Body.String(), `data-catalog-lang="`+want+`"`)
+				assert.Contains(t, w.Body.String(), `<html lang="`+want+`" data-catalog-lang="`+want+`"`)
 			})
 		}
 	}

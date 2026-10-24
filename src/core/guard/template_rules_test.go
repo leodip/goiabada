@@ -106,9 +106,10 @@ func TestTemplates_TheCsrfFieldTable(t *testing.T) {
 	assert.Equal(t, 6, n)
 }
 
-// TestTemplates_TheHtmlLangTable holds the hardcoded-lang rule, which is scoped by path twice over:
-// only under a layouts/ directory, and never on an email layout, because emails are per-locale
-// sibling files with no active locale to read.
+// TestTemplates_TheHtmlLangTable holds the hardcoded-lang rule, which is scoped by path: only under a
+// layouts/ directory. An email layout is held to it like any other: the bodies are per-locale sibling
+// files, but the one layout they are drawn in is shared, so a hardcoded "en" marked every pt-BR email
+// and every operator copy English (#645 decision 10).
 //
 // The last admitted row is the rule's stated boundary rather than an oversight. It matches the one
 // spelling <html lang="en", so a layout hardcoding some other language passes. That is where both
@@ -120,25 +121,30 @@ func TestTemplates_TheHtmlLangTable(t *testing.T) {
 	driven := []byte(`<html lang="{{ Lang $.ctx }}" class="h-full">`)
 
 	fsys := fstest.MapFS{
-		// Rejected: a page layout advertising a language it does not necessarily render in.
-		"template/layouts/auth_layout.html": {Data: hardcoded},
-		"template/layouts/nested/deep.html": {Data: hardcoded},
-		// Admitted: driven by the locale; an email layout, which is exempt; outside layouts/
-		// entirely; and a hardcoded language that is not the one spelling this rule matches.
-		"template/layouts/no_menu_layout.html":  {Data: driven},
+		// Rejected: a layout advertising a language it does not necessarily render in, an email
+		// layout among them.
+		"template/layouts/auth_layout.html":     {Data: hardcoded},
+		"template/layouts/nested/deep.html":     {Data: hardcoded},
 		"template/layouts/email_layout.html":    {Data: hardcoded},
 		"template/layouts/email_layout_pt.html": {Data: hardcoded},
-		"template/account_profile.html":         {Data: hardcoded},
-		"template/layouts/other_language.html":  {Data: []byte(`<html lang="pt">`)},
+		// Admitted: driven by the locale; an email layout driven by its body copy; outside
+		// layouts/ entirely; and a hardcoded language that is not the one spelling this rule
+		// matches.
+		"template/layouts/no_menu_layout.html": {Data: driven},
+		"template/layouts/email_driven.html":   {Data: []byte(`<html lang="{{ .emailLang }}">`)},
+		"template/account_profile.html":        {Data: hardcoded},
+		"template/layouts/other_language.html": {Data: []byte(`<html lang="pt">`)},
 	}
 
 	found, n := runRule(t, fsys, findHardcodedHTMLLang)
 
 	assert.Equal(t, []string{
 		"template/layouts/auth_layout.html",
+		"template/layouts/email_layout.html",
+		"template/layouts/email_layout_pt.html",
 		"template/layouts/nested/deep.html",
 	}, found)
-	assert.Equal(t, 7, n)
+	assert.Equal(t, 8, n)
 }
 
 // TestTemplates_TheWalkReachesEveryHTMLFileAndNothingElse pins what the shared walk hands the rules:
@@ -210,7 +216,8 @@ func TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule(t *testing.T) {
 	fsys := fstest.MapFS{
 		"template/page.html": {Data: []byte(`{{define "title"}}<b>Users</b>{{end}}` + "\n" +
 			`<form>{{ csrfField }}</form>`)},
-		"template/layouts/base.html": {Data: []byte(`<html lang="en">`)},
+		"template/layouts/base.html":         {Data: []byte(`<html lang="en">`)},
+		"template/layouts/email_layout.html": {Data: []byte(`<html lang="en">`)},
 	}
 
 	title := Run(func(r Reporter) { assertTemplatesNoHTMLInTitle(r, fsys, "template") })
@@ -227,6 +234,7 @@ func TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule(t *testing.T) {
 	lang := Run(func(r Reporter) { assertTemplatesHtmlLangNotHardcoded(r, fsys, "template") })
 	require.True(t, lang.Failed(), "a hardcoded lang attribute passed the guard")
 	assert.Contains(t, lang.Text(), "template/layouts/base.html")
+	assert.Contains(t, lang.Text(), "template/layouts/email_layout.html")
 	assert.Contains(t, lang.Text(), "{{ Lang $.ctx }}")
 }
 

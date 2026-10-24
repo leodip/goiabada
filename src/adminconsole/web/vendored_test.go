@@ -3,36 +3,53 @@ package web
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/guard"
 )
 
 // versionsYAML is the file the vendored web dependencies are pinned in, read from the source tree
 // rather than embedded, since it ships in neither binary.
 const versionsYAML = "../../authserver/versions.yaml"
 
-// vendoredPin reads one key of versions.yaml's vendored section, a quoted string on a line of its
-// own, which is the shape version-manager.sh writes.
-func vendoredPin(t *testing.T, key string) string {
-	t.Helper()
-	content, err := os.ReadFile(versionsYAML)
-	if err != nil {
-		t.Fatalf("reading %s: %v", versionsYAML, err)
+// vendoredDigest matches one digest of versions.yaml's vendored section, a key ending in -sha256 and
+// its quoted value on a line of their own, which is the shape version-manager.sh writes.
+var vendoredDigest = regexp.MustCompile(`^  ([A-Za-z0-9._-]+-sha256): "([^"]*)"$`)
+
+// vendoredDigests reads every digest of versions.yaml's vendored section, which runs from its
+// vendored: line to the next line that is neither indented, a comment nor blank.
+func vendoredDigests(versions []byte) (map[string]string, error) {
+	lines := strings.Split(string(versions), "\n")
+	at := -1
+	for i, line := range lines {
+		if strings.TrimRight(line, "\r") == "vendored:" {
+			at = i
+			break
+		}
 	}
-	section := string(content)
-	at := strings.Index(section, "\nvendored:\n")
 	if at < 0 {
-		t.Fatalf("%s has no vendored section", versionsYAML)
+		return nil, errs.New("versions.yaml has no vendored section")
 	}
-	m := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(key) + `: "([^"]*)"$`).FindStringSubmatch(section[at:])
-	if m == nil {
-		t.Fatalf("%s pins no vendored.%s", versionsYAML, key)
+	digests := map[string]string{}
+	for _, line := range lines[at+1:] {
+		line = strings.TrimRight(line, "\r")
+		if line != "" && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "#") {
+			break
+		}
+		if m := vendoredDigest.FindStringSubmatch(line); m != nil {
+			digests[m[1]] = m[2]
+		}
 	}
-	return m[1]
+	return digests, nil
 }
 
 func sha256Hex(b []byte) string {
@@ -107,27 +124,113 @@ func TestMainCSS_HoldsEveryClassTheCatalogsWrite(t *testing.T) {
 	}
 }
 
-// The vendored libraries the admin console serves are the files versions.yaml pins, byte for byte:
-// version-manager.sh update downloads them and writes each digest, so a pin moved without them,
-// or a file edited by hand, fails here (#542).
+// vendoredLibraries are the libraries the admin console serves, each file under static with the
+// versions.yaml key pinning its SHA-256. A library's LICENSE sits beside it.
+var vendoredLibraries = map[string]string{
+	"static/vendor/cropperjs/cropper.min.js": "cropperjs-js-sha256",
+}
+
+// pinsCheckedElsewhere are the vendored digests versions.yaml pins for files the console does not
+// serve, each with the test that holds it.
+var pinsCheckedElsewhere = map[string]string{
+	"acorn-sha256": "core/guard's TestScriptSyntax_AcornIsThePinnedRelease",
+}
+
+// The vendored libraries the admin console serves are the files versions.yaml pins, byte for byte,
+// in both directions: every file under static/vendor is a pinned library or its LICENSE, every
+// pinned library ships with its license, and every vendored digest versions.yaml pins is checked
+// here or by the test pinsCheckedElsewhere names. version-manager.sh update downloads the files and
+// writes each digest, so a pin moved without them, a file edited by hand, a file left behind when a
+// library is dropped, or a digest left behind with it, fails here (#542, #645).
 func TestVendoredLibraries_AreTheFilesVersionsYAMLPins(t *testing.T) {
-	for path, key := range map[string]string{
-		"static/vendor/humanize-duration/humanize-duration.js": "humanize-duration-sha256",
-		"static/vendor/cropperjs/cropper.min.js":               "cropperjs-js-sha256",
-	} {
-		content, err := staticFS.ReadFile(path)
-		if err != nil {
-			t.Errorf("%s is not embedded: %v", path, err)
+	content, err := os.ReadFile(versionsYAML)
+	if err != nil {
+		t.Fatalf("reading %s: %v", versionsYAML, err)
+	}
+	assertVendoredLibraries(t, staticFS, content, vendoredLibraries, pinsCheckedElsewhere)
+}
+
+// vendoredReach counts what a check reached, so the reporting half can tell a clean tree from one
+// in which it read nothing.
+type vendoredReach struct {
+	files, pins int
+}
+
+// assertVendoredLibraries is the reporting half. A walk that reached no file under static/vendor,
+// or a versions.yaml with no vendored digest, is fatal, because every rule passes vacuously over
+// nothing.
+func assertVendoredLibraries(r guard.Reporter, static fs.FS, versions []byte, libraries, elsewhere map[string]string) {
+	r.Helper()
+
+	faults, reach, err := findVendoredFaults(static, versions, libraries, elsewhere)
+	if err != nil {
+		r.Fatalf("checking the vendored libraries: %v", err)
+	}
+	for _, f := range faults {
+		r.Errorf("%s", f)
+	}
+	if reach.files == 0 || reach.pins == 0 {
+		r.Fatalf("reached %d files under static/vendor and %d vendored digests in versions.yaml; "+
+			"this check is checking nothing", reach.files, reach.pins)
+	}
+}
+
+// findVendoredFaults holds static's vendor folder and the vendored section of versions to each
+// other and to libraries, and returns one fault per mismatch, sorted.
+func findVendoredFaults(static fs.FS, versions []byte, libraries, elsewhere map[string]string) ([]string, vendoredReach, error) {
+	var reach vendoredReach
+	digests, err := vendoredDigests(versions)
+	if err != nil {
+		return nil, reach, err
+	}
+	reach.pins = len(digests)
+
+	var faults []string
+	fault := func(format string, args ...any) {
+		faults = append(faults, fmt.Sprintf(format, args...)+"; run ./version-manager.sh update, or drop what it left (#645)")
+	}
+
+	shipped := map[string]bool{}
+	checked := map[string]bool{}
+	for path, key := range libraries {
+		license := filepath.Dir(path) + "/LICENSE"
+		shipped[path], shipped[license], checked[key] = true, true, true
+		content, readErr := fs.ReadFile(static, path)
+		if readErr != nil {
+			fault("%s is not embedded", path)
 			continue
 		}
-		if got, want := sha256Hex(content), vendoredPin(t, key); got != want {
-			t.Errorf("%s has SHA-256 %s, and versions.yaml pins %s: run ./version-manager.sh update", path, got, want)
+		if pin, ok := digests[key]; !ok {
+			fault("versions.yaml pins no vendored.%s for %s", key, path)
+		} else if got := sha256Hex(content); got != pin {
+			fault("%s has SHA-256 %s, and versions.yaml pins %s", path, got, pin)
 		}
-		license := filepath.Dir(path) + "/LICENSE"
-		if _, err := staticFS.ReadFile(license); err != nil {
-			t.Errorf("%s ships without its license, %s", path, license)
+		if _, statErr := fs.Stat(static, license); statErr != nil {
+			fault("%s ships without its license, %s", path, license)
 		}
 	}
+
+	err = fs.WalkDir(static, "static/vendor", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		reach.files++
+		if !shipped[path] {
+			fault("%s is under static/vendor and is no pinned library or its LICENSE", path)
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, reach, err
+	}
+
+	for key := range digests {
+		if _, ok := elsewhere[key]; !ok && !checked[key] {
+			fault("versions.yaml pins vendored.%s, which no test checks", key)
+		}
+	}
+	sort.Strings(faults)
+	return faults, reach, nil
 }
 
 // ui.css, the design tokens and components both servers' pages are drawn with, is one file kept

@@ -165,9 +165,10 @@ func findCsrfField(path, content string) []templateFinding {
 	return []templateFinding{{path: path}}
 }
 
-// AssertTemplatesHtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
-// lang attribute from the active locale so the document advertises the language it renders in. Email
-// layouts are exempt (emails are per-locale sibling files, not context-driven).
+// AssertTemplatesHtmlLangNotHardcoded guards the <html lang="en"> bug: layouts must render the lang
+// attribute from the language the document renders in, a page's from the active locale and an email's
+// from the body copy the renderer chose. Email layouts are held to it too: the bodies are per-locale
+// sibling files, but the one layout they are drawn in is shared (#645 decision 10).
 func AssertTemplatesHtmlLangNotHardcoded(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
@@ -181,14 +182,15 @@ func assertTemplatesHtmlLangNotHardcoded(r Reporter, fsys fs.FS, root string) {
 
 	walkOrFail(r, fsys, root, func(path, content string) {
 		for _, f := range findHardcodedHTMLLang(path, content) {
-			r.Errorf(`%s: <html lang="en"> is hardcoded; use lang="{{ Lang $.ctx }}"`, f.path)
+			r.Errorf(`%s: <html lang="en"> is hardcoded; use lang="{{ Lang $.ctx }}", or in an `+
+				`email layout the language of the body copy the renderer chose`, f.path)
 		}
 	})
 }
 
-// findHardcodedHTMLLang returns a finding when a non-email layout hardcodes the lang attribute.
+// findHardcodedHTMLLang returns a finding when a layout hardcodes the lang attribute.
 func findHardcodedHTMLLang(path, content string) []templateFinding {
-	if !strings.Contains(path, "layouts/") || strings.Contains(path, "email") {
+	if !strings.Contains(path, "layouts/") {
 		return nil
 	}
 	if !strings.Contains(content, `<html lang="en"`) {

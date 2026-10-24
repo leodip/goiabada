@@ -335,7 +335,7 @@ func newFormPostPage(ctx context.Context, settings *record.Settings) (formPostPa
 		return formPostPage{}, err
 	}
 	page := formPostPage{
-		Lang:       i18n.LocaleTag(ctx),
+		Lang:       i18n.CatalogTag(ctx),
 		AppName:    settings.AppName,
 		Title:      i18n.T(ctx, "form_post.title"),
 		Message:    i18n.T(ctx, "form_post.message"),

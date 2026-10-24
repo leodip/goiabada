@@ -569,7 +569,7 @@ function describeSeconds(value, messages) {
   const seconds = Number(text);
   if (seconds === 0 && messages.durationZero) {
     if (/^[0-9]+$/.test(messages.durationGlobal || "")) {
-      return messages.durationZero + " (" + humanSeconds(Number(messages.durationGlobal)) + ")";
+      return messages.durationZero + " (" + formatDuration(Number(messages.durationGlobal), settingsDurationUnits) + ")";
     }
     return messages.durationZero;
   }
@@ -577,17 +577,61 @@ function describeSeconds(value, messages) {
   if (seconds > 160000000) {
     return messages.durationTooLong;
   }
-  return humanSeconds(seconds);
+  return formatDuration(seconds, settingsDurationUnits);
 }
 
-// humanSeconds says a number of seconds as a duration, in the page's language.
-function humanSeconds(seconds) {
-  const language = (document.documentElement.lang || "en").toLowerCase().split("-")[0];
-  return humanizeDuration(seconds * 1000, {
-    units: ["d", "h", "m", "s"],
-    language: language,
-    fallbacks: ["en"]
+// settingsDurationUnits are the units a settings field's readout counts in, days down to seconds.
+const settingsDurationUnits = ["day", "hour", "minute", "second"];
+
+// durationUnitSeconds is how many seconds each unit formatDuration counts in holds.
+const durationUnitSeconds = { day: 86400, hour: 3600, minute: 60, second: 1 };
+
+// formatDuration writes a number of seconds as a duration a person reads, such as "1 hour, 30
+// minutes", counted in units, the largest first and the last "second": each unit in its long form,
+// those whose count is zero left out, and 0 written in seconds, joined as the language joins a list
+// of units, with its own plural rules and digit grouping (#645 decision 2). A fraction of a second
+// counts as a whole second, the one direction that never says a wait is shorter than it is, and
+// anything that is not a finite number of zero or more writes nothing rather than a false duration
+// (decision 3). The language is the one durationLanguage names.
+function formatDuration(seconds, units) {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) {
+    return "";
+  }
+  const language = durationLanguage();
+  const unitText = function (count, unit) {
+    return new Intl.NumberFormat(language, { style: "unit", unit: unit, unitDisplay: "long" }).format(count);
+  };
+  let rest = Math.ceil(seconds);
+  const parts = [];
+  units.forEach(function (unit) {
+    const count = Math.floor(rest / durationUnitSeconds[unit]);
+    rest -= count * durationUnitSeconds[unit];
+    if (count > 0) {
+      parts.push(unitText(count, unit));
+    }
   });
+  if (parts.length === 0) {
+    parts.push(unitText(0, units[units.length - 1]));
+  }
+  return new Intl.ListFormat(language, { type: "unit", style: "long" }).format(parts);
+}
+
+// durationLanguage names the language formatDuration writes in: the catalog this page rendered
+// from, data-catalog-lang, since a duration is a fragment of one of its sentences, rather than the
+// page's lang (#645 decision 1). An operator's added catalog gets its words from the browser's own
+// CLDR data, with nothing to translate. Where the browser has no data for that language, for its
+// unit names or for its list joining, or the tag is missing or one Intl refuses as malformed, it is
+// English, never the browser's own default language, so a duration is written wholly in one.
+function durationLanguage() {
+  const lang = document.documentElement.dataset.catalogLang;
+  try {
+    if (lang && Intl.NumberFormat.supportedLocalesOf(lang).length > 0 && Intl.ListFormat.supportedLocalesOf(lang).length > 0) {
+      return lang;
+    }
+  } catch (err) {
+    // A malformed tag, which Intl refuses with a RangeError.
+  }
+  return "en";
 }
 
 // setUpDurations writes, under each duration field, the number of seconds typed as a duration a

@@ -32,7 +32,7 @@ type settingsUnavailablePage struct {
 func (h *Renderer) SettingsUnavailable(w http.ResponseWriter, r *http.Request, titleKey, messageKey string) {
 	ctx := r.Context()
 	page := settingsUnavailablePage{
-		Lang:           i18n.LocaleTag(ctx),
+		Lang:           i18n.CatalogTag(ctx),
 		Title:          i18n.T(ctx, titleKey),
 		Message:        i18n.T(ctx, messageKey),
 		RequestIDLabel: i18n.T(ctx, "adminconsole.error.request_id_label"),
