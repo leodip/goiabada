@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -53,17 +55,46 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).Return(nil).Once()
 }
 
-// adminSessionDeleteRequest builds the DELETE with the path value the handler reads and
-// the validated bearer token the chain puts on the context.
+// adminSessionDeleteRequest builds the DELETE with the path value the handler reads, the settings
+// its liveness rule reads, and the validated bearer token the chain puts on the context.
 //
 // The token is what the audit payload's "logged_in_user" now comes from. It used to come from a
 // mocked AuthHelper.GetLoggedInSubject, which is why nothing here noticed that the real accessor
 // read a session key no auth server middleware writes and returned "" at every one of these sites
 // (#385). A caller with no token is a separate case, covered below.
 func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
+	return adminSessionDeleteRequestWithScope(sessionId, subject, "authserver:manage")
+}
+
+// adminSessionDeleteRequestWithScope is adminSessionDeleteRequest with the token's scope named.
+func adminSessionDeleteRequestWithScope(sessionId string, subject string, scope string) *http.Request {
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionId, nil)
 	req.SetPathValue("id", sessionId)
-	return setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": subject})
+	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
+	return setTokenContextWithClaims(req, map[string]interface{}{"scope": scope, "sub": subject})
+}
+
+// liveSessionOf is liveSession for the user given: a session the DELETEs end, not one they answer
+// 404 as already gone (#651 decision 5).
+func liveSessionOf(id int64, identifier string, userId int64) *record.UserSession {
+	session := liveSession(id, identifier)
+	session.UserId = userId
+	return &session
+}
+
+// deadSessions are a session of the user given past the idle timeout and one past the maximum
+// lifetime under sessionSettings, each by a minute: stored rows the background worker has not swept
+// yet, which every session endpoint treats as gone (#651 decisions 4 and 5).
+func deadSessions(id int64, userId int64) map[string]*record.UserSession {
+	now := time.Now().UTC()
+
+	idle := liveSessionOf(id, "sid-idle", userId)
+	idle.LastAccessed = now.Add(-time.Duration(sessionSettings.UserSessionIdleTimeoutInSeconds+60) * time.Second)
+
+	old := liveSessionOf(id, "sid-old", userId)
+	old.Started = now.Add(-time.Duration(sessionSettings.UserSessionMaxLifetimeInSeconds+60) * time.Second)
+
+	return map[string]*record.UserSession{"past the idle timeout": idle, "past the maximum lifetime": old}
 }
 
 // TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
@@ -73,7 +104,7 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
+	userSession := liveSessionOf(100, "sid-terminated", 42)
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// One live token and one already revoked, so the JTI list below proves the payload reports what
@@ -140,7 +171,7 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
+	userSession := liveSessionOf(100, "sid-terminated", 42)
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// No token holds no authority, so the target ceiling reads what the user holds; an ordinary
@@ -155,6 +186,7 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 		}).Return().Twice()
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/100", nil)
+	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	rr := httptest.NewRecorder()
 	handler := HandleUserSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, withPathValue(req, "id", "100"))
@@ -177,7 +209,7 @@ func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	userSession := &record.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
+	userSession := liveSessionOf(100, "sid-terminated", 42)
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
@@ -216,4 +248,54 @@ func TestHandleUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	// No transaction is opened for a session that does not exist.
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestHandleUserSessionDelete_ASessionNoLongerLiveIsNotFound pins #651 decision 5's administrative
+// half: a session past the idle timeout or the maximum lifetime, stored until the worker sweeps it,
+// is the same 404 as an id naming no session, and nothing is ended, revoked or audited.
+//
+// The session is an administrator's and the token granular, so the target ceiling, had it judged,
+// would read what the user holds and refuse with an administrator_change_refused record. The
+// liveness 404 answers before it: the strict mock has none of the ceiling's reads registered and
+// the audit logger no record, so either one reached fails the test.
+func TestHandleUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
+	for name, session := range deadSessions(100, targetUserId) {
+		t.Run(name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleUserSessionDelete(database, auditLogger).
+				ServeHTTP(rr, adminSessionDeleteRequestWithScope("100", grantCaller, granularScopeOfTarget))
+
+			require.Equal(t, http.StatusNotFound, rr.Code)
+			assert.Equal(t, "NOT_FOUND", decodeAPIError(t, rr))
+			database.AssertExpectations(t)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetUserPermissionsByUserId", mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// The dead session's 404 is the one an id naming no session gets, body and all, so a caller cannot
+// tell a swept row from one waiting for the sweep.
+func TestHandleUserSessionDelete_ADeadSessionAnswersAsAMissingOne(t *testing.T) {
+	serve := func(session *record.UserSession) *httptest.ResponseRecorder {
+		database := datamocks.NewDatabase(t)
+		database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+		rr := httptest.NewRecorder()
+		HandleUserSessionDelete(database, handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, adminSessionDeleteRequest("100", adminSubject))
+		return rr
+	}
+
+	missing := serve(nil)
+	require.Equal(t, http.StatusNotFound, missing.Code)
+	for name, session := range deadSessions(100, 42) {
+		dead := serve(session)
+		assert.Equal(t, missing.Code, dead.Code, name)
+		assert.JSONEq(t, missing.Body.String(), dead.Body.String(), name)
+	}
 }

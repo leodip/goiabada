@@ -137,6 +137,19 @@ func HandleUserSessionDelete(
 			return
 		}
 
+		// A session no longer live is already gone, with the same answer as one swept: ending it
+		// would revoke what its expiry does not (#651 decision 5). Judged beside the 404 above and
+		// before the ceiling, so a dead administrator's session is 404 and audits no refusal.
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+		if !sessionIsLive(userSession, settings) {
+			writeJSONError(w, "User session not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, userSession.UserId) {
 			return
@@ -145,8 +158,8 @@ func HandleUserSessionDelete(
 		// Terminate the session rather than merely deleting it: this is the explicit
 		// administrative "end this session" action, so it also marks the codes issued through the
 		// session revoked and sweeps the refresh tokens those grants produced, all in one
-		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
-		// opens one.
+		// transaction (#129 decision 5). The 404s above answer first, so a missing or dead session
+		// never opens one.
 		result, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
 		if err != nil {
 			writeInternalServerError(w, r, err)

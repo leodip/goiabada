@@ -1045,9 +1045,11 @@ paths:
       tags: [User Sessions]
       summary: Delete session
       description: |
-        Terminate a user session. The session's authorization codes are marked revoked and the
-        refresh tokens descended from them are swept, offline refresh tokens included, in one
-        transaction.
+        Terminate a live user session by its numeric id. The session's authorization codes are
+        marked revoked and the refresh tokens descended from them are swept, offline refresh tokens
+        included, in one transaction. A session that has passed the configured idle timeout or
+        maximum lifetime is already gone: it is answered with 404, as an id naming no session is,
+        and nothing is revoked.
       operationId: deleteUserSession
       parameters:
         - name: id
@@ -3645,10 +3647,12 @@ paths:
       tags: [Account]
       summary: Terminate own session
       description: |
-        Terminate one of the caller's own sessions, the current one included. The session's
+        Terminate one of the caller's own live sessions, the current one included. The session's
         authorization codes are marked revoked and the refresh tokens descended from them are swept,
         offline refresh tokens included, in one transaction. A session of another user is refused
-        with 403 FORBIDDEN.
+        with 403 FORBIDDEN, whether or not it is still live. One of the caller's own sessions that
+        has passed the configured idle timeout or maximum lifetime is already gone: it is answered
+        with 404, as an id naming no session is, and nothing is revoked.
       operationId: deleteAccountSession
       parameters:
         - name: id

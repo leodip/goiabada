@@ -127,6 +127,20 @@ func HandleAccountSessionDelete(
 			return
 		}
 
+		// A session no longer live is already gone, with the same answer as one swept: ending it
+		// would revoke what its expiry does not (#651 decision 5). Judged after the ownership
+		// check, so another user's session is 403 dead or live, and this tells no one whether
+		// someone else is still signed in.
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+		if !sessionIsLive(us, settings) {
+			writeJSONError(w, "User session not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
 		// Terminate the session, including the current one, rather than merely deleting it: this is
 		// the explicit self-service "end this session" action, so it also marks the codes issued
 		// through the session revoked and sweeps the refresh tokens those grants produced, in one

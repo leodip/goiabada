@@ -319,3 +319,53 @@ func TestAPIAccountSessionDelete_NotFound(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "User session not found", errResp.ErrorDescription)
 }
+
+// TestAPIAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound is #651 decision 5's self-service
+// half end to end: the caller's own session past the idle timeout or the maximum lifetime, still
+// stored, gets the same 404 as an id naming no session, and its offline grant is not cut. The bearer
+// is the grant's own access token, which carries no sid and so outlives the session too.
+func TestAPIAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound(t *testing.T) {
+	for _, dead := range deadSessionCases(t) {
+		t.Run(dead.name, func(t *testing.T) {
+			grant := createOfflineGrant(t)
+			session := killGrantSession(t, grant, dead)
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+			resp := makeAPIRequest(t, "DELETE", url, grant.accessToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "NOT_FOUND", body.ErrorCode)
+			assert.Equal(t, "User session not found", body.ErrorDescription, "the answer an id naming no session gets")
+
+			assertDeadSessionNotEnded(t, grant, session)
+		})
+	}
+}
+
+// TestAPIAccountSessionDelete_AnotherUsersDeadSessionIsForbidden keeps the ownership check first:
+// another user's session is 403 dead as it is live, so the endpoint tells no one whether someone
+// else is still signed in (#651 decision 5).
+func TestAPIAccountSessionDelete_AnotherUsersDeadSessionIsForbidden(t *testing.T) {
+	callerToken, _ := getUserAccessTokenWithAccountScope(t)
+
+	for _, dead := range deadSessionCases(t) {
+		t.Run(dead.name, func(t *testing.T) {
+			victim := createOfflineGrant(t)
+			session := killGrantSession(t, victim, dead)
+
+			url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+			resp := makeAPIRequest(t, "DELETE", url, callerToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+			var body api.ErrorResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, "FORBIDDEN", body.ErrorCode)
+
+			assertDeadSessionNotEnded(t, victim, session)
+		})
+	}
+}
