@@ -447,38 +447,45 @@ func assertNarrowWritesOnEveryEngine(t *testing.T, writes []narrowWrite, elideCo
 	for _, w := range writes {
 		for _, dialect := range allDialects {
 			t.Run(w.name+"/"+string(dialect), func(t *testing.T) {
-				script := &scriptedDriver{execs: w.execs, rows: w.rows}
-				started := time.Now().UTC()
-
-				answer, err := w.run(context.Background(), scriptedDBFor(t, script, dialect))
-				require.NoError(t, err)
-				assert.Equal(t, w.answer, answer)
-
-				var got, problems []string
-				var execs, queries int
-				for _, query := range script.statements {
-					var args []driver.Value
-					if strings.HasPrefix(query, "SELECT") {
-						require.Less(t, queries, len(script.queryArgs))
-						args = script.queryArgs[queries]
-						queries++
-					} else {
-						require.Less(t, execs, len(script.execArgs))
-						args = script.execArgs[execs]
-						execs++
-					}
-					rendered, found := renderStatement(dialect, query, args, started)
-					if elideColumns {
-						rendered = severalColumns.ReplaceAllString(rendered, "SELECT <columns> FROM")
-					}
-					got = append(got, rendered)
-					problems = append(problems, found...)
-				}
-				assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
-				assert.Equal(t, w.statements, got)
+				assertNarrowWriteOn(t, w, dialect, elideColumns)
 			})
 		}
 	}
+}
+
+// assertNarrowWriteOn runs one write on one engine and holds what it sent, rendered, to its
+// expected statements, for a write whose expected statements differ between engines.
+func assertNarrowWriteOn(t *testing.T, w narrowWrite, dialect data.Dialect, elideColumns bool) {
+	t.Helper()
+	script := &scriptedDriver{execs: w.execs, rows: w.rows}
+	started := time.Now().UTC()
+
+	answer, err := w.run(context.Background(), scriptedDBFor(t, script, dialect))
+	require.NoError(t, err)
+	assert.Equal(t, w.answer, answer)
+
+	var got, problems []string
+	var execs, queries int
+	for _, query := range script.statements {
+		var args []driver.Value
+		if strings.HasPrefix(query, "SELECT") {
+			require.Less(t, queries, len(script.queryArgs))
+			args = script.queryArgs[queries]
+			queries++
+		} else {
+			require.Less(t, execs, len(script.execArgs))
+			args = script.execArgs[execs]
+			execs++
+		}
+		rendered, found := renderStatement(dialect, query, args, started)
+		if elideColumns {
+			rendered = severalColumns.ReplaceAllString(rendered, "SELECT <columns> FROM")
+		}
+		got = append(got, rendered)
+		problems = append(problems, found...)
+	}
+	assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
+	assert.Equal(t, w.statements, got)
 }
 
 // The renderer's own cases: without them the test above would pass on a renderer that had stopped

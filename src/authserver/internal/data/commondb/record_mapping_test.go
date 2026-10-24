@@ -586,6 +586,113 @@ func authorizeRequestMapping() mappingCase {
 	}
 }
 
+// userSessionMapping covers every read answering whole sessions, the page of a client's sessions
+// among them, which joins user_session_clients and so selects each column qualified by its table.
+// Its whole-row UPDATE leaves created_at, auth_state_generation, otp_config_generation and user_id
+// alone, the four dont-update columns.
+func userSessionMapping() mappingCase {
+	return mappingCase{
+		name:   "user session",
+		table:  "user_sessions",
+		record: reflect.TypeOf(record.UserSession{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserSessionById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserSessionById(ctx, nil, 1)
+			},
+			"GetUserSessionBySessionIdentifier": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserSessionBySessionIdentifier(ctx, nil, distinctString("session_identifier"))
+			},
+			"GetUserSessionsByClientIdPaginated": func(ctx context.Context, d *Database) (any, error) {
+				sessions, _, err := d.GetUserSessionsByClientIdPaginated(ctx, nil, 1, 2, 10)
+				return firstOf(sessions, err)
+			},
+			"GetUserSessionsByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionsByUserId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserSession(ctx, nil, rec.(*record.UserSession))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserSession(ctx, nil, rec.(*record.UserSession))
+		},
+	}
+}
+
+// userSessionClientMapping's whole-row UPDATE leaves created_at, user_session_id and client_id
+// alone, the three dont-update columns.
+func userSessionClientMapping() mappingCase {
+	return mappingCase{
+		name:   "user session client",
+		table:  "user_session_clients",
+		record: reflect.TypeOf(record.UserSessionClient{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserSessionClientById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserSessionClientById(ctx, nil, 1)
+			},
+			"GetUserSessionClientsByUserSessionId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionClientsByUserSessionId(ctx, nil, 1))
+			},
+			"GetUserSessionClientsByUserSessionIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionClientsByUserSessionIds(ctx, nil, []int64{1, 2}))
+			},
+			"GetUserSessionsClientByIds": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionsClientByIds(ctx, nil, []int64{1, 2}))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserSessionClient(ctx, nil, rec.(*record.UserSessionClient))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserSessionClient(ctx, nil, rec.(*record.UserSessionClient))
+		},
+	}
+}
+
+// browserSessionMapping has no update: a browser session's contents and deadlines are written by
+// narrow statements keyed on its owner and identifier hash, never as a whole row.
+func browserSessionMapping() mappingCase {
+	return mappingCase{
+		name:   "browser session",
+		table:  "browser_sessions",
+		record: reflect.TypeOf(record.BrowserSession{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetBrowserSessionByOwnerAndSessionIdHash": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, distinctString("owner"),
+					distinctString("session_id_hash"), time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateBrowserSession(ctx, nil, rec.(*record.BrowserSession))
+		},
+	}
+}
+
+func userConsentMapping() mappingCase {
+	return mappingCase{
+		name:   "user consent",
+		table:  "user_consents",
+		record: reflect.TypeOf(record.UserConsent{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetUserConsentById": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserConsentById(ctx, nil, 1)
+			},
+			"GetConsentByUserIdAndClientId": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetConsentByUserIdAndClientId(ctx, nil, 1, 2)
+			},
+			"GetConsentsByUserId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetConsentsByUserId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateUserConsent(ctx, nil, rec.(*record.UserConsent))
+		},
+		update: func(ctx context.Context, d *Database, rec any) error {
+			return d.UpdateUserConsent(ctx, nil, rec.(*record.UserConsent))
+		},
+	}
+}
+
 // TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine holds each record written per engine
 // to its tags. A record joins this list in the slice that writes its SQL per engine.
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
@@ -595,6 +702,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),
+		userSessionMapping(), userSessionClientMapping(), browserSessionMapping(), userConsentMapping(),
 	} {
 		for _, dialect := range allDialects {
 			t.Run(c.name+"/"+string(dialect), func(t *testing.T) {
