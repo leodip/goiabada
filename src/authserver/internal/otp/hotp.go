@@ -19,6 +19,7 @@ const passcodeDigits = 6
 var (
 	errPasscodeLength = errors.New("the passcode is not six characters")
 	errSecretBase32   = errors.New("the secret is not base32")
+	errSecretEmpty    = errors.New("the secret decodes to no key")
 )
 
 // decodeSecret reads a base32 secret into the key its HMAC is keyed with, exactly as pquerna/otp
@@ -27,6 +28,12 @@ var (
 // stored was read this way, the library's own unpadded ones and those the account API accepted
 // before #247, so each keeps its key: a lower-case secret and one with surrounding spaces still
 // read, and one with interior spaces still does not.
+//
+// A secret that decodes to no key, the empty string or whitespace alone, is refused, where the
+// library keyed the HMAC with nothing. HOTP happily derives a code from the empty key, and that code
+// depends only on the time step, so it is the same everywhere and anyone can compute it (#111
+// decision 9). Refusing it here covers every caller at once, including a stored secret that
+// decrypts to empty or to whitespace alone.
 func decodeSecret(secret string) ([]byte, error) {
 	secret = strings.TrimSpace(secret)
 	if n := len(secret) % 8; n != 0 {
@@ -35,6 +42,9 @@ func decodeSecret(secret string) ([]byte, error) {
 	key, err := base32.StdEncoding.DecodeString(strings.ToUpper(secret))
 	if err != nil {
 		return nil, errSecretBase32
+	}
+	if len(key) == 0 {
+		return nil, errSecretEmpty
 	}
 	return key, nil
 }

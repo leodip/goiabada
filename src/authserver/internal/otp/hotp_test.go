@@ -86,7 +86,8 @@ func TestTOTP_RFC6238AppendixB(t *testing.T) {
 
 // A secret is read as the library read it, in this order: surrounding whitespace trimmed, padded
 // with "=" to a multiple of eight, upper-cased, then decoded with the standard base32 alphabet
-// (RFC 4648 section 6). So every secret stored before keeps the key it had.
+// (RFC 4648 section 6). So every secret stored before keeps the key it had, but for one that
+// decodes to no key, which is refused.
 func TestDecodeSecret(t *testing.T) {
 	accepted := []struct{ name, secret string }{
 		{"as minted, 32 characters", rfcKeyBase32},
@@ -120,6 +121,15 @@ func TestDecodeSecret(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			_, err := decodeSecret(c.secret)
 			assert.Error(t, err)
+		})
+	}
+
+	// Each of these is valid base32 for the empty key, which every deployment derives the same
+	// codes from (#111 decision 9).
+	for _, secret := range []string{"", "   ", " \t\n "} {
+		t.Run(fmt.Sprintf("no key, from %q", secret), func(t *testing.T) {
+			_, err := decodeSecret(secret)
+			require.ErrorIs(t, err, errSecretEmpty)
 		})
 	}
 }

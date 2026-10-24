@@ -169,10 +169,25 @@ func TestMatchStep(t *testing.T) {
 			//
 			// The passcode has to be the code RFC 6238 actually derives from the empty
 			// secret at the pinned step, never arbitrary digits, or the row still passes
-			// with the guard in MatchStep deleted.
+			// with the refusal in decodeSecret deleted.
 			name:     "Empty secret is refused, even with the code derived from it",
 			passcode: codeAtStep(t, "", pinnedStep),
 			secret:   "",
+		},
+		{
+			// Keep this, together with the row below. A secret's surrounding whitespace is
+			// trimmed before it is decoded, so whitespace alone decodes to the empty key and
+			// derives the same code anyone can compute, as the row above. The refusal is of
+			// the key, not the string as stored.
+			name:     "Secret of spaces alone is refused, even with the empty key's code",
+			passcode: codeAtStep(t, "", pinnedStep),
+			secret:   "   ",
+		},
+		{
+			// Keep this, together with the row above.
+			name:     "Secret of mixed whitespace alone is refused, even with the empty key's code",
+			passcode: codeAtStep(t, "", pinnedStep),
+			secret:   " \t\n ",
 		},
 	}
 
@@ -196,7 +211,7 @@ func TestMatchStep(t *testing.T) {
 // refuses every later presentation of the same passcode.
 //
 // The table above cannot pin any of this. Nothing collides within eight steps of the
-// instant it pins, so every rule decision 11 rejected passes all 15 of its rows,
+// instant it pins, so every rule decision 11 rejected passes all 17 of its rows,
 // including the shipped one that returned the step matched inside the window.
 // Colliding pairs are rare, roughly 8 authentications in a million meet one, so no
 // other test in the suite will ever reach this path by accident.

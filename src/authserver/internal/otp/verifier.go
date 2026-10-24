@@ -80,15 +80,9 @@ type producesPasscode func(step int64) (bool, error)
 // decision 12). What is accepted does not change either way: only a match inside the
 // window accepts, and the walk moves nothing but the answer.
 //
-// An empty secret matches nothing (#111 decision 9). HOTP happily derives a code from
-// the empty key, and that code depends only on the time step, so it is the same
-// everywhere and anyone can compute it. Refusing here covers every call site at once,
-// including a stored secret that decrypts to empty.
+// A secret that decodes to no key, empty or whitespace alone, matches nothing (#111
+// decision 9), refused where every secret is decoded, in decodeSecret.
 func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
-	if secret == "" {
-		return 0, false
-	}
-
 	produces := func(step int64) (bool, error) {
 		//nolint:gosec // G115: steps count 30-second periods since 1970 from the current time, never negative
 		return passcodeMatches(passcode, uint64(step), secret)
@@ -97,8 +91,8 @@ func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
 	step, matched, err := matchStepWith(produces, now.Unix()/StepSeconds)
 	if err != nil {
 		// Errors collapse to "no match" rather than propagating, as pquerna/otp's
-		// totp.Validate did. A wrong-length passcode or an unparseable secret stays a
-		// generic incorrect-OTP response instead of becoming a 500.
+		// totp.Validate did. A wrong-length passcode, an unparseable secret or one that
+		// decodes to no key stays a generic incorrect-OTP response instead of becoming a 500.
 		return 0, false
 	}
 	if !matched {
@@ -131,8 +125,8 @@ func matchStepWith(produces producesPasscode, current int64) (int64, bool, error
 		earlier, found, err := lowestMatch(produces, lowest-lookbackSteps, lowest-1)
 		if err != nil {
 			// Unreachable through MatchStep once the window has matched: the
-			// predicate's two errors are an unparseable secret and a wrong-length
-			// passcode, and neither depends on the step. Refused anyway rather than answered with a
+			// predicate's errors are a secret that does not decode to a key and a
+			// wrong-length passcode, and none depends on the step. Refused anyway rather than answered with a
 			// step whose chain has not been walked to the bottom.
 			return 0, false, err
 		}
