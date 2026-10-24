@@ -1,0 +1,18 @@
+{{define "title"}}{{ .appName }} - Attiva il tuo account{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Ciao,</p>
+
+    <p>Per completare la creazione del tuo account {{ .appName }}, apri questo link e scegli una password:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Il link scade tra 5 minuti. Se non riesci ad aprirlo, copialo e incollalo nel browser.</p>
+
+    <p>Se non hai chiesto di creare un account, ignora questo messaggio: non viene creato alcun account finché il link non viene usato.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+{{end}}

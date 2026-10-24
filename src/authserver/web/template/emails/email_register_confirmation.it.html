@@ -1,0 +1,16 @@
+{{define "title"}}{{ .appName }} - Benvenuto!{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Il tuo account è stato creato.</p>
+
+    <p>Puoi accedere aprendo questo link:</p>
+
+    <p><a href="{{.link}}">{{.link}}</a></p>
+
+    <p>Se non riesci ad aprire il link, copialo e incollalo nel browser.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+{{end}}

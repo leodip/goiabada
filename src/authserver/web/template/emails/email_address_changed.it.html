@@ -1,0 +1,16 @@
+{{define "title"}}{{ .appName }} - Il tuo indirizzo email è stato cambiato{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<div>
+    <p>Ciao {{.name}},</p>
+
+    <p>L'indirizzo email del tuo account {{ .appName }} è stato cambiato. Questo indirizzo non riceverà più messaggi sull'account, compresi i link per reimpostare la password.</p>
+
+    <p>Se hai effettuato tu la modifica, non devi fare nulla.</p>
+
+    <p><strong>Altrimenti, qualcun altro potrebbe conoscere la tua password.</strong> Accedi, cambia la password e ripristina il tuo indirizzo email, oppure contatta il tuo amministratore.</p>
+
+    <p>Un saluto,<br />{{ .appName }}</p>
+</div>
+{{end}}
