@@ -86,7 +86,7 @@ If you're writing the tool, this is what it does the first time it runs.
 <Aside type="caution">
 A self-registered client is never sent an error. When a sign-in fails, the user sees a page on the auth server and nothing comes back to your app, so give up waiting for the callback after a while and let the user start over. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 
-To send the browser back after a sign-out, send `id_token_hint` and a `post_logout_redirect_uri` exactly as registered, port included: unlike sign-in, sign-out compares a loopback port. Without a hint, the browser [stays on the auth server's "Signed out" page](/guides/sign-users-out/#where-the-user-lands).
+Sign-out, unlike sign-in, compares a loopback port. So if your app listens on a port it picks each time, the browser can't be sent back to it after a sign-out: leave out `post_logout_redirect_uri`, and the user [stays on the auth server's "Signed out" page](/guides/sign-users-out/#where-the-user-lands). To get the browser back, register a redirect URI on a port your app will be listening on, such as `http://127.0.0.1:53682/callback`, and send it with `id_token_hint` exactly as registered.
 </Aside>
 
 ## Review what registered

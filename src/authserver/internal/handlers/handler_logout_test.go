@@ -1368,7 +1368,8 @@ func TestHandleLogoutPost(t *testing.T) {
 				// from whatever port it listens on. Sign-out has no such exception: RP-Initiated
 				// Logout 1.0 section 3 asks for an exact match, so a matcher reused from sign-in
 				// would accept this pair and exact comparison refuses it. The DCR guide tells such a
-				// client to send the URI as registered, port included, which this row pins.
+				// client to leave the target out, or to register the port it will listen on and send
+				// the URI exactly as registered, which this row pins.
 				name:        "the requested URI adds a port to a registered loopback one",
 				clientId:    "test_client",
 				redirectURI: "http://127.0.0.1:53682/callback",
