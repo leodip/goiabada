@@ -24,6 +24,25 @@ import (
 // ROPC (Resource Owner Password Credentials) Tests - RFC 6749 Section 4.3
 // =============================================================================
 
+// passwordComparison is one call to the validator's password verifier.
+type passwordComparison struct {
+	hashedPassword string
+	password       string
+}
+
+// passwordVerifierRecorder stands in for the validator's password verifier: it records every
+// comparison and answers what the test chose, so a refusal can be held to exactly one comparison
+// against the hash it should compare (#681 decision 1).
+type passwordVerifierRecorder struct {
+	answer bool
+	calls  []passwordComparison
+}
+
+func (r *passwordVerifierRecorder) verify(hashedPassword string, password string) bool {
+	r.calls = append(r.calls, passwordComparison{hashedPassword: hashedPassword, password: password})
+	return r.answer
+}
+
 func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
@@ -362,6 +381,10 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "nonexistent@example.com").Return(nil, nil).Once()
 
+	// The recorder answers "match", so only ignoring the dummy comparison's result refuses.
+	recorder := &passwordVerifierRecorder{answer: true}
+	validator.verifyPassword = recorder.verify
+
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
@@ -372,6 +395,70 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	assert.Equal(t, "invalid_grant", customErr.Code())
 	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
 	assert.Equal(t, 400, customErr.HTTPStatus())
+	require.Len(t, recorder.calls, 1)
+	assert.Equal(t, "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", recorder.calls[0].hashedPassword)
+	assert.Equal(t, "password", recorder.calls[0].password)
+}
+
+// TestValidateTokenRequest_ROPC_UserWithoutPassword pins the refusal for an account with no
+// password yet, as one an administrator created with the setup email keeps until its user sets
+// one. bcrypt refuses an empty hash before doing any work, so comparing against it would answer
+// such an account fast; the grant compares against the dummy hash instead, and refuses whatever
+// that comparison says, with the wrong-password answer (#681 decision 3).
+func TestValidateTokenRequest_ROPC_UserWithoutPassword(t *testing.T) {
+	mockDB := datamocks.NewDatabase(t)
+	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
+	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
+
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker, testDataCipher)
+
+	settings := &record.Settings{
+		ResourceOwnerPasswordCredentialsEnabled: true,
+	}
+	ctx := context.Background()
+
+	user := &record.User{
+		Id:           1,
+		Email:        "user@example.com",
+		PasswordHash: "",
+		Enabled:      true,
+	}
+
+	ropcEnabled := true
+	client := &record.Client{
+		ClientIdentifier:                        "ropc-client",
+		Enabled:                                 true,
+		IsPublic:                                true,
+		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+	}
+
+	input := &ValidateTokenRequestInput{
+		GrantType: "password",
+		ClientId:  "ropc-client",
+		Username:  "user@example.com",
+		Password:  "guessedpassword",
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+
+	// The recorder answers "match", so only ignoring the dummy comparison's result refuses.
+	recorder := &passwordVerifierRecorder{answer: true}
+	validator.verifyPassword = recorder.verify
+
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
+
+	assert.Nil(t, result)
+	require.Error(t, err)
+	var customErr *oauth.ErrorDetail
+	ok := errors.As(err, &customErr)
+	assert.True(t, ok)
+	assert.Equal(t, "invalid_grant", customErr.Code())
+	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
+	assert.Equal(t, 400, customErr.HTTPStatus())
+	require.Len(t, recorder.calls, 1)
+	assert.Equal(t, "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", recorder.calls[0].hashedPassword)
+	assert.Equal(t, "guessedpassword", recorder.calls[0].password)
 }
 
 // TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup pins that the username
@@ -481,11 +568,10 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
 		Id:           1,
 		Email:        "user@example.com",
-		PasswordHash: passwordHash,
+		PasswordHash: "$2a$10$abcdefghijklmnopqrstuuVkFBHFf8f6TBkO6PkS5Lg2Y4LZHn8a2",
 		Enabled:      true,
 	}
 
@@ -507,6 +593,9 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
+	recorder := &passwordVerifierRecorder{answer: false}
+	validator.verifyPassword = recorder.verify
+
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
@@ -517,6 +606,9 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	assert.Equal(t, "invalid_grant", customErr.Code())
 	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
 	assert.Equal(t, 400, customErr.HTTPStatus())
+	require.Len(t, recorder.calls, 1)
+	assert.Equal(t, "$2a$10$abcdefghijklmnopqrstuuVkFBHFf8f6TBkO6PkS5Lg2Y4LZHn8a2", recorder.calls[0].hashedPassword)
+	assert.Equal(t, "wrongpassword", recorder.calls[0].password)
 }
 
 func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
