@@ -49,7 +49,7 @@ The admin console calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBA
 
 The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can commit it:
 
-- **A Namespace,** labelled to warn about any pod that breaks the restricted Pod Security Standard. See [Security](/deploy/kubernetes/security/#pod-security).
+- **A Namespace,** labelled to warn about any pod that breaks the restricted Pod Security Standard, unless you answer that it [already exists](#a-namespace-that-already-exists). See [Security](/deploy/kubernetes/security/#pod-security).
 - **Two ConfigMaps,** `goiabada-authserver-config` and `goiabada-adminconsole-config`, each holding only what its server reads. The three URLs are in both, written from the same answers, so change them in both.
 - **A third ConfigMap, `goiabada-db-ca`,** if you gave the wizard a CA file for the database's certificate. It's mounted into the auth server's pods. See [Check the database's certificate](/deploy/kubernetes/security/#check-the-databases-certificate).
 - **Two Deployments,** one per server, at one replica each, with a rolling update that never runs fewer pods than replicas and a spread over nodes. See [High availability](/deploy/kubernetes/high-availability/).
@@ -66,6 +66,14 @@ Both servers trust one proxy hop, the gateway, to tell them each client's IP add
 
 <Aside type="note">
 The wizard takes a lowercase domain name for each host, never an IP address, and refuses the same host for both servers: the Gateway routes by host name, and two listeners on one host and port are both rejected.
+</Aside>
+
+## A namespace that already exists
+
+Both files declare the Namespace, so applying either creates it. When someone else provides the namespace, such as a platform team with its own labels, quotas and access, answer no when the wizard asks whether to create it, or pass `--create-namespace=false`. Neither file declares it then, so applying them needs rights inside the namespace alone, and the labels its owner set stay as they are. The manifest's header has the command that adds the Pod Security labels.
+
+<Aside type="danger" title="Switching a running deployment">
+Answering no for a namespace the files created takes the Namespace out of the manifest. A GitOps tool that prunes what leaves its source then deletes the namespace and everything in it, the AES key's Secret included. Before you switch, have the tool leave the Namespace alone, and let it apply that: Flux's [`kustomize.toolkit.fluxcd.io/prune: disabled`](https://fluxcd.io/flux/components/kustomize/kustomizations/#prune) annotation, or Argo CD's [`Prune=false`](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#no-prune-resources).
 </Aside>
 
 ## Recover a locked-out administrator

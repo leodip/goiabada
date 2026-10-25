@@ -51,6 +51,8 @@ type CLIFlags struct {
 	// Kubernetes alone. The policy is empty when the flag was left out.
 	GatewayTrafficPolicy trafficPolicy
 	NetworkPolicy        bool
+	// CreateNamespace is --create-namespace, read by Kubernetes alone.
+	CreateNamespace optionalBool
 	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
 	RateLimiter optionalBool
 	// Metrics is --metrics, empty when left out, PodMonitorLabels --podmonitor-labels and
@@ -159,6 +161,7 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.BoolVar(&flags.Overwrite, "overwrite", false, "Overwrite output files that already exist, and the secrets in them")
+	fs.Var(&flags.CreateNamespace, "create-namespace", "Kubernetes: declare the namespace in both files, so applying them creates it; false for one that already exists (default: true)")
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only Envoy and the admin console to the servers with NetworkPolicies")
 	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
@@ -226,6 +229,10 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("                         false for kubernetes under the cluster traffic policy, where its\n")
 		p("                         per-IP limits count every client arriving through one node together)\n\n")
 		p("Kubernetes Options:\n")
+		p("  --create-namespace=BOOL\n")
+		p("                         Declare the namespace in both files, so applying them creates it\n")
+		p("                         (default: true). false, for a namespace that already exists,\n")
+		p("                         declares it in neither, and applying them needs rights inside it alone\n")
 		p("  --gateway-traffic-policy=POLICY\n")
 		p("                         The externalTrafficPolicy of Envoy Gateway's load balancer Service\n")
 		p("                         (default: cluster). cluster works behind every load balancer, and\n")

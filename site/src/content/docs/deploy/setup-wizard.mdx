@@ -55,6 +55,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | 1, MySQL (`--db` has none) |
 | Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. The auth server's is at most 60 characters, since the first start makes it the issuer. | `https://auth.example.com`, then the admin console's on the same domain: `https://admin.example.com` |
 | Kubernetes namespace | Kubernetes | `goiabada` |
+| Namespace creation | Kubernetes. Yes declares the namespace in both files, so applying them creates it. No is for a namespace that [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists), such as one a platform team provides: neither file declares it, so applying them needs rights inside the namespace alone. | Yes |
 | Gateway traffic policy | Kubernetes. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
 | Network policy | Kubernetes. Yes admits only Envoy to both servers, and the admin console to the auth server. It needs a network plugin that enforces NetworkPolicies. | No |
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
@@ -88,7 +89,7 @@ Under the Cluster policy, Goiabada sees a node's address for every client. The p
 The wizard keeps every secret in one file, and the rest of the configuration in another, so you can commit the second one.
 
 - **Docker Compose:** the secrets are in `docker-compose.override.yml`. Docker Compose merges it into `docker-compose.yml` by itself, so `docker compose up -d` starts both.
-- **Kubernetes:** the secrets are in `goiabada-secrets.yaml`. Apply it before the manifest, so no pod starts with an older copy of the Secrets; both files create the namespace: `kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml`.
+- **Kubernetes:** the secrets are in `goiabada-secrets.yaml`. Apply it before the manifest, so no pod starts with an older copy of the Secrets; both files create the namespace, unless you said it already exists: `kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml`.
 - **Native binaries:** `goiabada.env` is a single file that holds everything, secrets included.
 
 <Aside type="danger">
@@ -137,6 +138,7 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--auth-url` | The auth server's URL, at most 60 characters. Required with `--type`, except for `local`. |
 | `--admin-url` | The admin console's URL. Default: `https://admin.` and the auth server's domain, so `https://admin.example.com` for `https://auth.example.com`. Required when the auth server's host is an IP address or a single word. |
 | `--namespace` | Kubernetes: the namespace. Default: `goiabada`. |
+| `--create-namespace` | Kubernetes: `true` or `false`. `false` is for a namespace that [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists), which neither file then declares. Default: `true`. |
 | `--admin-email` | The first administrator's email. Default: `admin@example.com` for `local`, otherwise `admin@` and the auth server's domain. Required when the auth server's host is an IP address or a single word. |
 | `--admin-password` | The first administrator's password. Generated when you leave it out. |
 | `--admin-password-file` | Reads the admin password from a file, or from standard input with `-`. |
