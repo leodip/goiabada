@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -52,6 +53,13 @@ func validateURL(urlStr string) error {
 	if u.User != nil {
 		return errs.New("URL cannot carry a user name or password")
 	}
+	// A port is one a client can dial, written as a plain number: url.Parse takes any digits, and
+	// 02000 reached a Kubernetes manifest as YAML's octal 1024 (#686 section 3).
+	if port := u.Port(); port != "" {
+		if number, err := strconv.Atoi(port); err != nil || number < 1 || number > 65535 || port[0] == '0' {
+			return errs.Errorf("URL port %s is not a port from 1 to 65535 written without leading zeros", port)
+		}
+	}
 	return nil
 }
 
@@ -80,6 +88,16 @@ func hostOf(urlStr string) string {
 	return u.Hostname()
 }
 
+// httpsPortOf is the port an https URL names, empty for none, for 443, the scheme's own, and for
+// a URL that isn't https, whose port is no HTTPS port.
+func httpsPortOf(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil || u.Scheme != "https" || u.Port() == "443" {
+		return ""
+	}
+	return u.Port()
+}
+
 // parentDomain is the domain a host sits in: the host minus its first label when it has three or
 // more, and the host itself when it has two. An IP literal or a single-label host has none. Taking
 // the last two labels made https://auth.example.co.uk default the admin console to
@@ -101,10 +119,16 @@ func parentDomain(host string) (string, bool) {
 
 // defaultAdminURL is the admin console URL offered for an auth server URL, https://admin. plus
 // the auth host's parent, and false when the host has no parent to offer one from.
-func defaultAdminURL(authServerURL string) (string, bool) {
+func defaultAdminURL(authServerURL string, keepPort bool) (string, bool) {
 	parent, ok := parentDomain(hostOf(authServerURL))
 	if !ok {
 		return "", false
+	}
+	// With keepPort, for Kubernetes, an https auth server URL's port goes with it: a Gateway serves
+	// both hosts on one HTTPS port, and the wizard refuses URLs naming two. Elsewhere a proxy may
+	// serve each host on a port of its own (#686 section 3).
+	if port := httpsPortOf(authServerURL); keepPort && port != "" {
+		return "https://admin." + parent + ":" + port, true
 	}
 	return "https://admin." + parent, true
 }
@@ -259,6 +283,34 @@ func validateNamespace(ns string) error {
 	}
 	if ns[len(ns)-1] == '-' {
 		return errs.Errorf("namespace cannot end with '-'")
+	}
+	return nil
+}
+
+// validateObjectName holds a name the manifest refers to another object by, a GatewayClass, Gateway,
+// listener, IngressClass, issuer or Secret, to the DNS subdomain all of these must be (RFC 1123:
+// lowercase alphanumeric labels, inner '-', joined by '.', at most 253 characters), so the API server
+// accepts the reference. Gateway API v1.6.1 holds a Gateway's name and a listener's sectionName to
+// the same pattern (apis/v1/shared_types.go, ObjectName and SectionName).
+func validateObjectName(name string) error {
+	if name == "" {
+		return errs.Errorf("the name cannot be empty")
+	}
+	if len(name) > 253 {
+		return errs.Errorf("%s is too long (max 253 characters)", name)
+	}
+	for _, label := range strings.Split(name, ".") {
+		if label == "" {
+			return errs.Errorf("%s has an empty part between dots", name)
+		}
+		for _, c := range label {
+			if !isASCIILowerAlphaNum(c) && c != '-' {
+				return errs.Errorf("%s has '%c', and a Kubernetes name is lowercase a-z, 0-9, '-' and '.'", name, c)
+			}
+		}
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return errs.Errorf("%s has a part starting or ending with '-'", name)
+		}
 	}
 	return nil
 }

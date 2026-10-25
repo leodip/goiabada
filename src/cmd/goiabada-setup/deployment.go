@@ -43,9 +43,9 @@ type deployment struct {
 	// asksLocalProxy says the type asks whether a reverse proxy on the same machine forwards to it,
 	// which decides the env file's listen hosts and proxy trust (#396 decision 7).
 	asksLocalProxy bool
-	// servedByEnvoyGateway says the manifest is served through Envoy Gateway, so the type asks its
-	// traffic policy and whether a NetworkPolicy admits only Envoy (#396 decisions 4 and 5).
-	servedByEnvoyGateway bool
+	// asksRouting says the type asks how traffic reaches the servers, and whether a NetworkPolicy
+	// admits only the routing layer (#396 decision 5, #686 section 3).
+	asksRouting bool
 	// asksRateLimiter says the type asks whether to turn the auth server's rate limiter on, and
 	// writes the answer explicitly (#396 decision 9). Local testing never asks.
 	asksRateLimiter bool
@@ -102,25 +102,25 @@ var deployments = []*deployment{
 		printInstructions: printComposeInstructions,
 	},
 	{
-		kind:                 deploymentKubernetes,
-		number:               "3",
-		name:                 "kubernetes",
-		aliases:              []string{"k8s"},
-		menuLabel:            "Kubernetes cluster",
-		displayName:          "Kubernetes",
-		asksURLs:             true,
-		asksNamespace:        true,
-		externalDatabase:     true,
-		routesByHost:         true,
-		servedByEnvoyGateway: true,
-		asksRateLimiter:      true,
-		asksMetrics:          true,
-		outputFile:           "goiabada-k8s.yaml",
-		secretsFile:          "goiabada-secrets.yaml",
-		secretsSuffix:        "-secrets",
-		generate:             generateKubernetesManifests,
-		generateSecrets:      generateKubernetesSecrets,
-		printInstructions:    printKubernetesInstructions,
+		kind:              deploymentKubernetes,
+		number:            "3",
+		name:              "kubernetes",
+		aliases:           []string{"k8s"},
+		menuLabel:         "Kubernetes cluster",
+		displayName:       "Kubernetes",
+		asksURLs:          true,
+		asksNamespace:     true,
+		externalDatabase:  true,
+		routesByHost:      true,
+		asksRouting:       true,
+		asksRateLimiter:   true,
+		asksMetrics:       true,
+		outputFile:        "goiabada-k8s.yaml",
+		secretsFile:       "goiabada-secrets.yaml",
+		secretsSuffix:     "-secrets",
+		generate:          generateKubernetesManifests,
+		generateSecrets:   generateKubernetesSecrets,
+		printInstructions: printKubernetesInstructions,
 	},
 	{
 		kind:              deploymentNative,

@@ -55,20 +55,20 @@ The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted
 
 ## Who can reach Goiabada
 
-Without a NetworkPolicy, any pod in the cluster can call the `goiabada-authserver` and `goiabada-adminconsole` Services directly, around Envoy. Besides reaching the admin console from inside the cluster, such a pod chooses the address it's rate limited and audited under, by sending its own `X-Forwarded-For` (see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes)). The wizard asks whether to close that; the answer is no unless you say yes, or pass `--network-policy`.
+Without a NetworkPolicy, any pod in the cluster can call the `goiabada-authserver` and `goiabada-adminconsole` Services directly, around Envoy or whatever routes to them. Besides reaching the admin console from inside the cluster, such a pod chooses the address it's rate limited and audited under, by sending its own `X-Forwarded-For` (see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes)). The wizard asks whether to close that; the answer is no unless you say yes, or pass `--network-policy`.
 
 On yes, the manifest carries one ingress-only NetworkPolicy per Deployment:
 
 | Pods | Admitted on | From |
 |------|-------------|------|
-| `goiabada-authserver` | TCP 9090 | Envoy's namespace, `envoy-gateway-system`; the admin console's pods |
-| `goiabada-adminconsole` | TCP 9091 | Envoy's namespace, `envoy-gateway-system` |
+| `goiabada-authserver` | TCP 9090 | Your routing layer's namespace, `envoy-gateway-system` for Envoy Gateway; the admin console's pods |
+| `goiabada-adminconsole` | TCP 9091 | Your routing layer's namespace, `envoy-gateway-system` for Envoy Gateway |
 | `goiabada-authserver` | TCP 9190, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
 | `goiabada-adminconsole` | TCP 9191, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
 
-The metrics ports are a second rule of each policy, so the scraper's namespace reaches the metrics port and nothing else, and Envoy and the admin console don't reach it at all (see [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes)).
+The metrics ports are a second rule of each policy, so the scraper's namespace reaches the metrics port and nothing else, and the routing layer and the admin console don't reach it at all (see [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes)).
 
-Envoy's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on every namespace. `envoy-gateway-system` is where Envoy Gateway runs its proxies by default; if yours runs them elsewhere, change the name in both policies. The kubelet's probes come from the pod's own node, which a NetworkPolicy can't block, and cert-manager's HTTP-01 solver pods carry other labels, so neither is affected.
+The routing layer's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on every namespace. On yes, the wizard asks which namespace that is: `envoy-gateway-system`, where Envoy Gateway runs its proxies by default, under the [Envoy Gateway recipe](/deploy/kubernetes/gateway-and-certificates/), and whatever you answer under [any other routing](/deploy/kubernetes/routing/#who-can-reach-goiabada), with `--proxy-namespace` answering it without the prompt. The kubelet's probes come from the pod's own node, which a NetworkPolicy can't block, and cert-manager's HTTP-01 solver pods carry other labels, so neither is affected.
 
 Before you answer yes, check two things:
 
@@ -80,7 +80,7 @@ Before you answer yes, check two things:
   - from:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: envoy-gateway-system
+          kubernetes.io/metadata.name: "envoy-gateway-system"
     - podSelector:
         matchLabels:
           app: goiabada-adminconsole
@@ -89,7 +89,7 @@ Before you answer yes, check two things:
           kubernetes.io/metadata.name: my-resource-server
   ```
 
-  A workload that calls the auth server's public URL goes through Envoy and needs nothing.
+  A workload that calls the auth server's public URL goes through the routing layer and needs nothing.
 
 The policies state no egress rules, so they restrict nothing the servers connect to. An egress rule would have to name every destination, and two can't be named: the SMTP host and port are settings in the database, changed in the admin console, and the database host is often a DNS name, while a NetworkPolicy selects only pods, namespaces and IP blocks. A rule written for today's addresses would cut email or the database when either moved.
 

@@ -497,8 +497,6 @@ spec:
 #   - namespaceSelector:
 #       matchLabels:
 #         kubernetes.io/metadata.name: <its namespace>
-# If Envoy Gateway runs its proxies in a namespace other than envoy-gateway-system, its
-# default, name that one below instead.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -514,7 +512,7 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: envoy-gateway-system
+          kubernetes.io/metadata.name: "envoy-gateway-system"
     - podSelector:
         matchLabels:
           app: goiabada-adminconsole
@@ -541,7 +539,7 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: envoy-gateway-system
+          kubernetes.io/metadata.name: "envoy-gateway-system"
     ports:
     - protocol: TCP
       port: 9091
@@ -555,7 +553,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
-  gatewayClassName: eg
+  gatewayClassName: "eg"
   listeners:
   - name: http
     protocol: HTTP
@@ -567,7 +565,7 @@ spec:
     tls:
       mode: Terminate
       certificateRefs:
-      - name: goiabada-tls-auth
+      - name: "goiabada-tls-auth"
   - name: admin-https
     protocol: HTTPS
     port: 443
@@ -575,7 +573,7 @@ spec:
     tls:
       mode: Terminate
       certificateRefs:
-      - name: goiabada-tls-admin
+      - name: "goiabada-tls-admin"
 
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -585,8 +583,8 @@ metadata:
   namespace: "goiabada"
 spec:
   parentRefs:
-  - name: goiabada
-    sectionName: auth-https
+  - name: "goiabada"
+    sectionName: "auth-https"
   hostnames:
   - "auth.example.com"
   rules:
@@ -602,8 +600,8 @@ metadata:
   namespace: "goiabada"
 spec:
   parentRefs:
-  - name: goiabada
-    sectionName: admin-https
+  - name: "goiabada"
+    sectionName: "admin-https"
   hostnames:
   - "admin.example.com"
   rules:

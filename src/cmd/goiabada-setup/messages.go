@@ -29,10 +29,23 @@ func printSummary(out *console, config *Config) {
 		}
 		out.printf("  K8s Namespace:    %s%s\n", config.K8sNamespace, existing)
 	}
-	if config.Deployment.servedByEnvoyGateway {
-		out.printf("  Traffic policy:   %s\n", config.GatewayTrafficPolicy)
+	if config.Deployment.asksRouting {
+		out.printf("  Routing:          %s\n", config.routingAnswer())
+		if config.asksTLS() {
+			out.printf("  TLS certificates: %s\n", config.tlsAnswer())
+		}
+		if config.Routing == routingGateway {
+			if config.endsTLS() {
+				out.printf("  Listeners:        HTTP on %d, HTTPS on %d\n", config.GatewayHTTPPort, config.GatewayHTTPSPort)
+			} else {
+				out.printf("  Listeners:        HTTP on %d\n", config.GatewayHTTPPort)
+			}
+		}
+		if config.servedByEnvoyGateway() {
+			out.printf("  Traffic policy:   %s\n", config.GatewayTrafficPolicy)
+		}
 		if config.NetworkPolicy {
-			out.println("  NetworkPolicies:  admit only Envoy and the admin console")
+			out.printf("  NetworkPolicies:  admit only the namespace %s and the admin console\n", config.ProxyNamespace)
 		} else {
 			out.println("  NetworkPolicies:  none")
 		}
@@ -107,15 +120,23 @@ func printCompletionMessage(out *console, config *Config, paths outputPaths) {
 	printSecretsAdvice(out, paths)
 }
 
-// gatewayDocsURL is the page the Kubernetes completion message follows step by step.
-const gatewayDocsURL = "https://goiabada.dev/deploy/kubernetes/gateway-and-certificates/"
+// gatewayDocsURL is the page the Kubernetes completion message follows step by step for the Envoy
+// Gateway recipe, and routingDocsURL the one it follows for every other routing mode.
+const (
+	gatewayDocsURL = "https://goiabada.dev/deploy/kubernetes/gateway-and-certificates/"
+	routingDocsURL = "https://goiabada.dev/deploy/kubernetes/routing/"
+)
 
-// printKubernetesInstructions prints the steps in the order an operator takes them, the order of the
-// page at gatewayDocsURL: what the cluster needs, the deploy, DNS, and only then the ClusterIssuer,
-// so cert-manager looks no host name up before its record exists (#542).
+// printKubernetesInstructions prints the steps of the routing mode answered: the Envoy Gateway
+// recipe's, which install what the cluster needs, or those of a mode that attaches to what it
+// already has (#686 section 3).
 func printKubernetesInstructions(out *console, config *Config, paths outputPaths) {
+	docsURL := routingDocsURL
+	if config.servedByEnvoyGateway() {
+		docsURL = gatewayDocsURL
+	}
 	out.println("To deploy Goiabada to Kubernetes, follow these steps in order. Each is explained at")
-	out.printf("%s.\n", gatewayDocsURL)
+	out.printf("%s.\n", docsURL)
 	out.println()
 	// A release build stamps its version as the tag; only a source build reaches here with latest
 	// (#396 decision 10).
@@ -125,7 +146,17 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 		out.println("   version in both image lines to pin them.")
 		out.println()
 	}
+	if config.servedByEnvoyGateway() {
+		printEnvoyGatewayInstructions(out, config, paths)
+	} else {
+		printRoutingInstructions(out, config, paths)
+	}
+}
 
+// printEnvoyGatewayInstructions prints the recipe's steps in the order an operator takes them, the
+// order of the page at gatewayDocsURL: what the cluster needs, the deploy, DNS, and only then the
+// ClusterIssuer, so cert-manager looks no host name up before its record exists (#542).
+func printEnvoyGatewayInstructions(out *console, config *Config, paths outputPaths) {
 	out.printf("%s%sSTEPS%s\n", out.bold, out.yellow, out.reset)
 	out.println()
 	out.println("Skip step 1, 2 or 3 for what your cluster already runs.")
@@ -163,19 +194,7 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.printf("     %skubectl -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m%s\n", out.cyan, out.reset)
 	out.printf("     %skubectl -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m%s\n", out.cyan, out.reset)
 	out.println()
-	out.println("  4. Deploy Goiabada, the Secrets first, so no pod starts with an older copy of them:")
-	out.printf("     %s%s%s\n", out.cyan, kubernetesApplyCommand(paths), out.reset)
-	out.println()
-	if config.NamespaceExists {
-		out.printf("     The namespace %s must already exist: neither file creates it. The manifest's header\n", config.K8sNamespace)
-		out.println("     has the Pod Security labels its owner can set.")
-		out.println()
-	}
-	out.printf("     %sFor a deployment that already runs, apply only %s.%s %s holds\n", out.bold, filepath.Base(paths.description), out.reset, filepath.Base(paths.secrets))
-	out.println("     newly generated secrets, which its database isn't under: a pod reads its Secrets")
-	out.println("     only when it starts, so nothing changes until the next restart, and then the auth")
-	out.println("     server and the admin console refuse to start.")
-	out.println()
+	printDeployStep(out, config, paths, 4)
 	out.println("  5. Point DNS at the Gateway. Read its address, which can take a minute to appear:")
 	out.printf("     %skubectl get gateway goiabada -n %s -o jsonpath='{.status.addresses[0].value}'%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println("     Then create a record for each host name, an A record when the address is an IP")
@@ -219,17 +238,7 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.printf("     %skubectl get certificates -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println()
 
-	out.printf("%s%sIMPORTANT NOTES%s\n", out.bold, out.yellow, out.reset)
-	out.println()
-	out.println("  • The database must be empty for a fresh deployment. Goiabada will")
-	out.println("    automatically seed the database with initial data including the")
-	out.println("    admin user and OAuth clients configured with the URLs above.")
-	out.println("    If redeploying with different URLs, use a fresh database.")
-	out.println()
-	out.println("  • If using a managed database service (Supabase, PlanetScale, etc.),")
-	out.println("    use the connection pooler endpoint for better compatibility (IPv4).")
-	out.println()
-	printMetricsNotes(out, config)
+	printImportantNotes(out, config)
 
 	out.printf("%s%sTROUBLESHOOTING TIPS%s\n", out.bold, out.yellow, out.reset)
 	out.println()
@@ -259,12 +268,7 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 		out.printf("      %skubectl logs -n %s deployment/goiabada-authserver | grep 'http request' | tail -3%s\n", out.cyan, config.K8sNamespace, out.reset)
 		out.println()
 	}
-	if config.NetworkPolicy {
-		out.println("  • A connection a NetworkPolicy blocks either times out or is refused at once, depending on")
-		out.println("    the network plugin. If a workload cannot reach a server, check what the policies admit:")
-		out.printf("      %skubectl describe networkpolicy -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
-		out.println()
-	}
+	printNetworkPolicyTip(out, config)
 	out.println("  • Check Gateway and route status:")
 	out.printf("      %skubectl get gateway,httproute -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.printf("      %skubectl describe gateway goiabada -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
@@ -272,6 +276,224 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.println("  • Check certificates:")
 	out.printf("      %skubectl get certificates -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println()
+	printPodTips(out, config)
+}
+
+// printRoutingInstructions prints the steps of a routing mode that attaches to what the cluster
+// already has, in the order an operator takes them: check what the manifest names, deploy, point DNS
+// at the address that serves the hosts, and check it, plain HTTP's redirect included wherever the
+// manifest writes none (#686 section 3).
+func printRoutingInstructions(out *console, config *Config, paths outputPaths) {
+	ns := config.K8sNamespace
+	out.printf("%s%sSTEPS%s\n", out.bold, out.yellow, out.reset)
+	out.println()
+	printRoutingPrerequisites(out, config)
+	printDeployStep(out, config, paths, 2)
+
+	authHost, adminHost := hostOf(config.AuthServerURL), hostOf(config.AdminConsoleURL)
+	var target string
+	switch {
+	case config.Routing == routingNone:
+		out.println("  3. Point DNS at what you route the Services with:")
+		target = "<its address>"
+	case !config.endsTLS() && config.Routing != routingExistingGateway:
+		out.println("  3. Point DNS at the load balancer or CDN in front, which ends TLS, and point it at")
+		out.println("     the routing layer's address, which can take a minute to appear:")
+		target = "<the address in front>"
+	case config.Routing == routingIngress:
+		out.println("  3. Point DNS at the Ingress controller. Read its address, which can take a minute to")
+		out.println("     appear:")
+		target = "<the Ingress's address>"
+	default:
+		out.println("  3. Point DNS at the Gateway. Read its address, which can take a minute to appear:")
+		target = "<the Gateway's address>"
+	}
+	switch {
+	case config.ownsGateway():
+		out.printf("     %skubectl get gateway goiabada -n %s -o jsonpath='{.status.addresses[0].value}'%s\n", out.cyan, ns, out.reset)
+	case config.Routing == routingExistingGateway:
+		out.printf("     %skubectl get gateway %s -n %s -o jsonpath='{.status.addresses[0].value}'%s\n", out.cyan, config.GatewayName, config.GatewayNamespace, out.reset)
+	case config.Routing == routingIngress:
+		out.printf("     %skubectl get ingress goiabada-authserver -n %s -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}'%s\n", out.cyan, ns, out.reset)
+	}
+	then := "Then create"
+	if config.Routing == routingNone {
+		then = "Create"
+	}
+	out.printf("     %s a record for each host name, an A record when the address is an IP\n", then)
+	out.println("     address and a CNAME when it is a host name:")
+	width := max(len(authHost), len(adminHost))
+	out.printf("     %s%-*s -> %s%s\n", out.cyan, width, authHost, target, out.reset)
+	out.printf("     %s%-*s -> %s%s\n", out.cyan, width, adminHost, target, out.reset)
+	out.println()
+
+	out.println("  4. Check it is up: both pods Running, then the route in.")
+	out.printf("     %skubectl get pods -n %s%s\n", out.cyan, ns, out.reset)
+	switch {
+	case config.routesThroughGateway():
+		out.printf("     %skubectl describe httproute -n %s%s\n", out.cyan, ns, out.reset)
+		out.println("     Each route's parent condition Accepted is True once the Gateway admits it.")
+	case config.Routing == routingIngress:
+		out.printf("     %skubectl get ingress -n %s%s\n", out.cyan, ns, out.reset)
+	}
+	if config.issuesWithCertManager() {
+		out.printf("     %skubectl get certificates -n %s%s\n", out.cyan, ns, out.reset)
+		out.println("     Both certificates READY True, within a few minutes.")
+	}
+	if !config.writesRedirect() {
+		out.printf("     Then check that %s redirects plain HTTP to HTTPS, which the\n", config.redirector())
+		out.println("     manifest leaves to it: the answer should be a redirect, such as a 301, 302 or 308,")
+		out.println("     whose location starts with https://, never a 200.")
+		out.printf("     %scurl -sI http://%s/ | grep -i -E '^(HTTP|location)'%s\n", out.cyan, authHost, out.reset)
+	}
+	out.println()
+
+	printImportantNotes(out, config)
+
+	out.printf("%s%sTROUBLESHOOTING TIPS%s\n", out.bold, out.yellow, out.reset)
+	out.println()
+	printNetworkPolicyTip(out, config)
+	if config.Routing == routingExistingGateway {
+		out.println("  • A route whose Accepted condition is False with the reason NotAllowedByListeners is")
+		out.printf("    refused by the Gateway's allowedRoutes: its owner must admit the namespace %s.\n", ns)
+		out.println("    NoMatchingParent names a listener the Gateway has not got.")
+		out.println()
+	}
+	if config.issuesWithCertManager() {
+		out.println("  • A certificate that stays not READY: read why, and check the issuer is READY:")
+		out.printf("      %skubectl describe certificate -n %s%s\n", out.cyan, ns, out.reset)
+		out.println()
+	}
+	printPodTips(out, config)
+}
+
+// printRoutingPrerequisites prints the first step of a mode that attaches to what the cluster has:
+// what the manifest names, and what must already exist or be set up for it.
+func printRoutingPrerequisites(out *console, config *Config) {
+	ns := config.K8sNamespace
+	switch config.Routing {
+	case routingGateway:
+		out.printf("  1. The cluster must have the GatewayClass %s, ACCEPTED True:\n", config.GatewayClass)
+		out.printf("     %skubectl get gatewayclass %s%s\n", out.cyan, config.GatewayClass, out.reset)
+	case routingExistingGateway:
+		out.printf("  1. The Gateway %s in %s must admit routes from the namespace %s on its\n", config.GatewayName, config.GatewayNamespace, ns)
+		out.printf("     %s (allowedRoutes), serve HTTPS there with a certificate for each host,\n", config.listenersAnswer())
+		out.println("     and redirect plain HTTP to HTTPS. Agree it with whoever runs it:")
+		out.printf("     %skubectl get gateway %s -n %s -o yaml%s\n", out.cyan, config.GatewayName, config.GatewayNamespace, out.reset)
+	case routingIngress:
+		if config.IngressClass == "" {
+			out.println("  1. The cluster must have an Ingress controller of its default IngressClass:")
+		} else {
+			out.printf("  1. The cluster must have an Ingress controller of the IngressClass %s:\n", config.IngressClass)
+		}
+		out.printf("     %skubectl get ingressclass%s\n", out.cyan, out.reset)
+		if config.endsTLS() {
+			out.println("     It must redirect plain HTTP to HTTPS, which no Ingress field asks for: Traefik, for")
+			out.println("     one, serves an Ingress over plain HTTP too until its web entry point redirects.")
+		}
+	case routingNone:
+		out.println("  1. Route both hosts over HTTPS to the Services, and redirect plain HTTP to HTTPS:")
+		authHost, adminHost := hostOf(config.AuthServerURL), hostOf(config.AdminConsoleURL)
+		width := max(len(authHost), len(adminHost))
+		out.printf("     %s%-*s -> goiabada-authserver, port 9090%s\n", out.cyan, width, authHost, out.reset)
+		out.printf("     %s%-*s -> goiabada-adminconsole, port 9091%s\n", out.cyan, width, adminHost, out.reset)
+		out.println("     The ConfigMaps' comments say what the servers trust of the X-Forwarded-For header.")
+	}
+	switch {
+	case !config.asksTLS():
+	case config.TLS == tlsClusterIssuer:
+		out.printf("     cert-manager issues the certificates from the ClusterIssuer %s, READY True:\n", config.TLSIssuer)
+		out.printf("     %skubectl get clusterissuer %s%s\n", out.cyan, config.TLSIssuer, out.reset)
+	case config.TLS == tlsIssuer:
+		out.printf("     cert-manager issues the certificates from the Issuer %s in %s, READY True:\n", config.TLSIssuer, ns)
+		out.printf("     %skubectl get issuer %s -n %s%s\n", out.cyan, config.TLSIssuer, ns, out.reset)
+	case config.TLS == tlsSecrets && !config.NamespaceExists:
+		out.printf("     The TLS Secrets %s and %s hold the certificates:\n", config.TLSSecretAuth, config.TLSSecretAdmin)
+		out.printf("     create them in %s once step 2 has created it, and renew them.\n", ns)
+	case config.TLS == tlsSecrets:
+		out.printf("     The TLS Secrets %s and %s in %s hold the certificates, which you create\n", config.TLSSecretAuth, config.TLSSecretAdmin, ns)
+		out.println("     and renew, for instance:")
+		printCreateTLSSecret(out, config)
+	default:
+		out.println("     TLS ends in front, at a load balancer or a CDN that forwards plain HTTP to the routing")
+		out.println("     layer and redirects plain HTTP to HTTPS itself. The routing layer must not redirect:")
+		out.println("     every request reaches it as plain HTTP, and would be sent back to HTTPS in a loop.")
+		out.println("     Let nothing else reach the routing layer.")
+	}
+	if config.Routing == routingGateway && config.issuesWithCertManager() {
+		out.println("     cert-manager reads a Gateway's annotation only with its Gateway API support on: see")
+		out.printf("     %s.\n", gatewayDocsURL)
+	}
+	out.println()
+}
+
+// printCreateTLSSecret prints the command creating the auth server's TLS Secret, for the operator to
+// repeat for the admin console's.
+func printCreateTLSSecret(out *console, config *Config) {
+	out.printf("     %skubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key%s\n", out.cyan, config.TLSSecretAuth, config.K8sNamespace, out.reset)
+}
+
+// printDeployStep prints the deploy, step number of the steps: both files, the Secrets first, and
+// only the manifest over a deployment that already runs, whose Secrets a new run's would replace
+// (#542). TLS Secrets the operator supplies follow it when the files create the namespace, which a
+// namespaced Secret needs first: until they exist, a Gateway's HTTPS listeners are refused as
+// InvalidCertificateRef, and an Ingress controller serves a certificate of its own (#686 section 3).
+func printDeployStep(out *console, config *Config, paths outputPaths, number int) {
+	out.printf("  %d. Deploy Goiabada, the Secrets first, so no pod starts with an older copy of them:\n", number)
+	out.printf("     %s%s%s\n", out.cyan, kubernetesApplyCommand(paths), out.reset)
+	out.println()
+	if config.asksTLS() && config.TLS == tlsSecrets && !config.NamespaceExists {
+		out.printf("     Then create the TLS Secrets %s and %s,\n", config.TLSSecretAuth, config.TLSSecretAdmin)
+		out.println("     now that the namespace exists: until then the hosts are served without their")
+		out.println("     certificates. For instance:")
+		printCreateTLSSecret(out, config)
+		out.println()
+	}
+	if config.NamespaceExists {
+		out.printf("     The namespace %s must already exist: neither file creates it. The manifest's header\n", config.K8sNamespace)
+		out.println("     has the Pod Security labels its owner can set.")
+		out.println()
+	}
+	out.printf("     %sFor a deployment that already runs, apply only %s.%s %s holds\n", out.bold, filepath.Base(paths.description), out.reset, filepath.Base(paths.secrets))
+	out.println("     newly generated secrets, which its database isn't under: a pod reads its Secrets")
+	out.println("     only when it starts, so nothing changes until the next restart, and then the auth")
+	out.println("     server and the admin console refuse to start.")
+	out.println()
+}
+
+// printImportantNotes prints the notes every Kubernetes completion message has.
+func printImportantNotes(out *console, config *Config) {
+	out.printf("%s%sIMPORTANT NOTES%s\n", out.bold, out.yellow, out.reset)
+	out.println()
+	out.println("  • The database must be empty for a fresh deployment. Goiabada will")
+	out.println("    automatically seed the database with initial data including the")
+	out.println("    admin user and OAuth clients configured with the URLs above.")
+	out.println("    If redeploying with different URLs, use a fresh database.")
+	out.println()
+	out.println("  • If using a managed database service (Supabase, PlanetScale, etc.),")
+	out.println("    use the connection pooler endpoint for better compatibility (IPv4).")
+	out.println()
+	printMetricsNotes(out, config)
+}
+
+// printNetworkPolicyTip says, with the NetworkPolicies on, how a blocked connection looks and how
+// to read what they admit.
+func printNetworkPolicyTip(out *console, config *Config) {
+	if !config.NetworkPolicy {
+		return
+	}
+	out.println("  • A connection a NetworkPolicy blocks either times out or is refused at once, depending on")
+	out.println("    the network plugin. If a workload cannot reach a server, check what the policies admit:")
+	out.printf("      %skubectl describe networkpolicy -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
+	if !config.servedByEnvoyGateway() {
+		out.printf("    A route that answers 502 or times out may come from proxies outside %s, which\n", config.ProxyNamespace)
+		out.println("    the policies refuse: check where your routing layer's pods run.")
+	}
+	out.println()
+}
+
+// printPodTips prints the troubleshooting tips on the pods every Kubernetes message ends with.
+func printPodTips(out *console, config *Config) {
 	out.println("  • Verify pods are running:")
 	out.printf("      %skubectl get pods -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println()

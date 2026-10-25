@@ -38,7 +38,7 @@ The first question picks one of four deployments. Each writes its own files, in 
 |---|---|---|
 | 1. Local testing | Trying Goiabada on your machine. Plain HTTP on `localhost`. The [Quickstart](/get-started/quickstart/) walks through it. | `docker-compose.yml` and `docker-compose.override.yml` |
 | 2. Production with reverse proxy | Docker Compose behind a proxy that serves HTTPS, such as Nginx or Cloudflare. | `docker-compose.yml` and `docker-compose.override.yml` |
-| 3. Kubernetes cluster | A cluster with Envoy Gateway and cert-manager. | `goiabada-k8s.yaml` and `goiabada-secrets.yaml` |
+| 3. Kubernetes cluster | A cluster, behind Envoy Gateway and cert-manager, or behind the Gateway, Ingress controller or routing it already has. See [Routing](/deploy/kubernetes/routing/). | `goiabada-k8s.yaml` and `goiabada-secrets.yaml` |
 | 4. Native binaries | Running the two binaries yourself, without containers. | `goiabada.env` |
 
 <Aside type="caution">
@@ -53,13 +53,16 @@ The wizard asks only the questions that apply to your deployment, in this order,
 |---|---|---|
 | Deployment type | Every deployment. See [Deployment types](#deployment-types). | 1, Local testing (`--type` has none) |
 | Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | 1, MySQL (`--db` has none) |
-| Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. The auth server's is at most 60 characters, since the first start makes it the issuer. | `https://auth.example.com`, then the admin console's on the same domain: `https://admin.example.com` |
+| Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. The auth server's is at most 60 characters, since the first start makes it the issuer. | `https://auth.example.com`, then the admin console's on the same domain, and on Kubernetes on the auth server's HTTPS port when it names one: `https://admin.example.com` |
 | Kubernetes namespace | Kubernetes | `goiabada` |
 | Namespace creation | Kubernetes. Yes declares the namespace in both files, so applying them creates it. No is for a namespace that [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists), such as one a platform team provides: neither file declares it, so applying them needs rights inside the namespace alone. | Yes |
-| Gateway traffic policy | Kubernetes. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
-| Network policy | Kubernetes. Yes admits only Envoy to both servers, and the admin console to the auth server. It needs a network plugin that enforces NetworkPolicies. | No |
+| Routing | Kubernetes: how traffic reaches the servers. Envoy Gateway, as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) installs it; a Gateway of a class your cluster has; a Gateway someone else runs; an Ingress per host; or none. The Gateway modes and Ingress then ask what they attach to: see [Routing](/deploy/kubernetes/routing/). | 1, Envoy Gateway |
+| TLS certificates | Kubernetes, with a Gateway of your cluster's class or Ingresses: a cert-manager ClusterIssuer or Issuer, TLS Secrets you supply, or TLS ended in front, at a load balancer or a CDN. See [Where the certificates come from](/deploy/kubernetes/routing/#where-the-certificates-come-from). | 1, a ClusterIssuer |
+| Gateway listeners | Kubernetes, with a Gateway of your cluster's class: the HTTP and HTTPS listeners' ports. Some implementations take only their proxy's own ports, such as Traefik's 8000 and 8443. | 80 and 443 |
+| Gateway traffic policy | Kubernetes, with Envoy Gateway. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
+| Network policy | Kubernetes. Yes admits only your routing layer's namespace to both servers, and the admin console to the auth server, and asks that namespace. It needs a network plugin that enforces NetworkPolicies. | No, and `envoy-gateway-system` with Envoy Gateway |
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
-| Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off under Cluster](#the-rate-limiter-under-the-cluster-traffic-policy). | On, but off on Kubernetes under the Cluster policy |
+| Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off on Kubernetes](#the-rate-limiter-on-kubernetes). | On, but off on Kubernetes unless Envoy Gateway's policy is Local |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
 | Admin credentials | Every deployment: the admin's email and password. | `admin@example.com` for local testing, otherwise `admin@` and the auth server's domain. A generated password. |
 | Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user, password, and [the connection's TLS](#the-database-connections-tls): its mode, and the CA file, client certificate and host name each mode asks for. Then an optional connection test, which connects as the auth server will. If it fails, you can enter them all again. | The database's usual port and user, the name `goiabada`, the TLS mode `prefer`, the system's roots, no client certificate, and the database host as the name checked |
@@ -78,11 +81,11 @@ The wizard writes `GOIABADA_DB_TLS_MODE`, which decides how the auth server prot
 
 The wizard warns you whenever the mode it writes checks no certificate.
 
-## The rate limiter under the Cluster traffic policy
+## The rate limiter on Kubernetes
 
 The auth server's limits counted by a user or an email apply whether the rate limiter is on or off: wrong one-time codes, wrong passwords per account, and password-reset and registration mails per address among them. The rate limiter adds the limits counted by an IP address.
 
-Under the Cluster policy, Goiabada sees a node's address for every client. The per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Turned on, it also limits wrong passwords per email from one network, and every client through a node counts as one network: 10 wrong passwords block an email's password sign-ins for 15 minutes for every client through that node. See the [rate limits](/reference/environment-variables/#rate-limits).
+Under Envoy Gateway's Cluster policy, Goiabada sees a node's address for every client. The per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Behind any other routing, the wizard can't know which address Goiabada sees, so it's off by default too: read the `ip=` of your own request in the auth server's log once it runs, and turn it on when that's your own address. Turned on, it also limits wrong passwords per email from one network, and every client through a node counts as one network: 10 wrong passwords block an email's password sign-ins for 15 minutes for every client through that node. See the [rate limits](/reference/environment-variables/#rate-limits).
 
 ## Where the secrets go
 
@@ -136,7 +139,7 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--type` | The deployment: `local`, `production`, `kubernetes` or `native`. Giving it turns off the questions. |
 | `--db` | The database: `mysql`, `postgres`, `mssql` or `sqlite`. Required with `--type`. |
 | `--auth-url` | The auth server's URL, at most 60 characters. Required with `--type`, except for `local`. |
-| `--admin-url` | The admin console's URL. Default: `https://admin.` and the auth server's domain, so `https://admin.example.com` for `https://auth.example.com`. Required when the auth server's host is an IP address or a single word. |
+| `--admin-url` | The admin console's URL. Default: `https://admin.` and the auth server's domain, so `https://admin.example.com` for `https://auth.example.com`, and on Kubernetes the auth server's HTTPS port when it names one. Required when the auth server's host is an IP address or a single word. |
 | `--namespace` | Kubernetes: the namespace. Default: `goiabada`. |
 | `--create-namespace` | Kubernetes: `true` or `false`. `false` is for a namespace that [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists), which neither file then declares. Default: `true`. |
 | `--admin-email` | The first administrator's email. Default: `admin@example.com` for `local`, otherwise `admin@` and the auth server's domain. Required when the auth server's host is an IP address or a single word. |
@@ -154,12 +157,26 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--db-tls-client-key-file` | Kubernetes and native: the PEM file of the client certificate's private key, beside `--db-tls-client-cert-file`. Default: none. |
 | `--db-tls-server-name` | Kubernetes and native, with `--db-tls-mode` `verify-full`: the host name the database's certificate is checked against, when the address you dial isn't the name certified. Default: the host dialed. |
 | `--skip-db-test` | Skips the database connection test. Without it, a failed test warns and the files are still written. |
-| `--gateway-traffic-policy` | Kubernetes: `cluster` or `local`. Default: `cluster`. |
-| `--network-policy` | Kubernetes: admits only Envoy and the admin console to the servers, with NetworkPolicies. |
+| `--routing` | Kubernetes: `envoy-gateway`, `gateway`, `existing-gateway`, `ingress` or `none`. Default: `envoy-gateway`. See [Routing](/deploy/kubernetes/routing/). |
+| `--gateway-class` | Kubernetes, with `--routing=gateway`: the GatewayClass. Required. |
+| `--gateway-http-port` | Kubernetes, with `--routing=gateway`: the HTTP listener's port. Default: `80`. |
+| `--gateway-https-port` | Kubernetes, with `--routing=gateway`: the HTTPS listeners' port. Default: `443`. |
+| `--gateway-name` | Kubernetes, with `--routing=existing-gateway`: the Gateway the routes attach to. Required. |
+| `--gateway-namespace` | Kubernetes, with `--routing=existing-gateway`: that Gateway's namespace. Required. |
+| `--auth-listener` | Kubernetes, with `--routing=existing-gateway`: its HTTPS listener for the auth server's host. Required. |
+| `--admin-listener` | Kubernetes, with `--routing=existing-gateway`: its HTTPS listener for the admin console's host. Default: `--auth-listener`'s. |
+| `--ingress-class` | Kubernetes, with `--routing=ingress`: the IngressClass. Default: the cluster's default class. |
+| `--tls` | Kubernetes, with `--routing=gateway` or `ingress`: `cluster-issuer`, `issuer`, `secrets` or `external`. Default: `cluster-issuer`. |
+| `--tls-issuer` | Kubernetes, with `--tls=cluster-issuer` or `issuer`: the cert-manager ClusterIssuer or Issuer. Required. |
+| `--auth-tls-secret` | Kubernetes, with `--tls=secrets`: the TLS Secret holding the auth server's certificate. Default: `goiabada-tls-auth`. |
+| `--admin-tls-secret` | Kubernetes, with `--tls=secrets`: the TLS Secret holding the admin console's certificate. Default: `goiabada-tls-admin`. |
+| `--gateway-traffic-policy` | Kubernetes, with `--routing=envoy-gateway`: `cluster` or `local`. Default: `cluster`. |
+| `--network-policy` | Kubernetes: admits only your routing layer's namespace and the admin console to the servers, with NetworkPolicies. |
+| `--proxy-namespace` | Kubernetes, with `--network-policy`: the namespace your routing layer's proxies run in. Default: `envoy-gateway-system` with `--routing=envoy-gateway`, and required otherwise. |
 | `--metrics` | Kubernetes: `none`, `annotations` or `podmonitor`. Default: `none`. |
 | `--podmonitor-labels` | Kubernetes, with `--metrics=podmonitor`: the labels your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`. |
 | `--metrics-namespace` | Kubernetes, with metrics and `--network-policy`: the namespace your metrics scraper runs in. Default: `monitoring`. |
-| `--rate-limiter` | Production, Kubernetes and native: `true` or `false`. Default: `true`, except on Kubernetes under the `cluster` policy. |
+| `--rate-limiter` | Production, Kubernetes and native: `true` or `false`. Default: `true`, except on Kubernetes, unless with `--routing=envoy-gateway` and `--gateway-traffic-policy=local`. |
 | `--local-proxy` | Native: `true` when a reverse proxy on the same machine forwards to Goiabada. Default: `true`. |
 | `--output`, `-o` | Where to write the files: a directory, or the name of the main file. Default: the current directory. |
 | `--no-color` | Turns off colored output. |
