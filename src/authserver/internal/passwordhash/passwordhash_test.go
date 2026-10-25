@@ -172,4 +172,25 @@ func TestDummyHash(t *testing.T) {
 			t.Errorf("DummyHash does not have valid bcrypt prefix: %s", DummyHash[0:4])
 		}
 	})
+
+	t.Run("DummyHash costs what a hash Hash produces costs", func(t *testing.T) {
+		// The dummy comparison hides a missing account only while it takes as long as a real
+		// one, so its cost is read against a hash Hash actually produced, not bcrypt's default:
+		// raising Hash's cost without regenerating DummyHash fails here (#681 decision 4).
+		hashed, err := Hash("any_password_here")
+		if err != nil {
+			t.Fatalf("Hash() error = %v", err)
+		}
+		hashCost, err := bcrypt.Cost([]byte(hashed))
+		if err != nil {
+			t.Fatalf("bcrypt.Cost(Hash output) error = %v", err)
+		}
+		dummyCost, err := bcrypt.Cost([]byte(DummyHash))
+		if err != nil {
+			t.Fatalf("bcrypt.Cost(DummyHash) error = %v", err)
+		}
+		if dummyCost != hashCost {
+			t.Errorf("DummyHash cost = %d, want %d, the cost of a hash Hash produces", dummyCost, hashCost)
+		}
+	})
 }

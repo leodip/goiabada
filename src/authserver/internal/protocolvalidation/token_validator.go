@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
@@ -52,6 +53,9 @@ type TokenValidator struct {
 	tokenParser       TokenParser
 	permissionChecker PermissionChecker
 	dataCipher        *encryption.DataCipher
+	// verifyPassword is the password comparison the password grant makes, a field so a test can
+	// see which hash each refusal compared against (#681).
+	verifyPassword func(hashedPassword string, password string) bool
 }
 
 func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
@@ -61,6 +65,7 @@ func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
 		tokenParser:       tokenParser,
 		permissionChecker: permissionChecker,
 		dataCipher:        dataCipher,
+		verifyPassword:    passwordhash.Verify,
 	}
 }
 

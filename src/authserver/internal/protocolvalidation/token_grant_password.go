@@ -97,12 +97,19 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
+	// A missing account, and an account with no password yet (one an administrator created with
+	// the setup email keeps an empty hash until its user sets one, and bcrypt refuses an empty
+	// hash without doing any work), are compared against the dummy hash, so they take as long to
+	// refuse as a wrong password and the response time says neither whether an address has an
+	// account nor whether its user has set a password. The comparison's result is ignored: the
+	// dummy hash's plaintext signs no one in. The answer is the wrong password's (#681).
+	if user == nil || user.PasswordHash == "" {
+		val.verifyPassword(passwordhash.DummyHash, input.Password)
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Invalid resource owner credentials.", http.StatusBadRequest)
 	}
 
-	if !passwordhash.Verify(user.PasswordHash, input.Password) {
+	if !val.verifyPassword(user.PasswordHash, input.Password) {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Invalid resource owner credentials.", http.StatusBadRequest)
 	}
