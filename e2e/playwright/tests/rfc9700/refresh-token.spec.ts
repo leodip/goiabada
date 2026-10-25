@@ -134,7 +134,10 @@ test("an offline refresh token unused for longer than the client's idle timeout 
   expectTokenResponse(used);
 
   await new Promise((resolve) => setTimeout(resolve, 25_000));
-  expectTokenError(await token({ grant_type: "refresh_token", refresh_token: used.body.refresh_token as string }), "invalid_grant");
+  // Its exp is the idle timeout, so it is refused as expired.
+  const idle = await token({ grant_type: "refresh_token", refresh_token: used.body.refresh_token as string });
+  expectTokenError(idle, "invalid_grant");
+  expect(idle.body.error_description).toBe("The refresh token is invalid because it has expired.");
 });
 
 test("signing out at the auth server, or a new password, ends the user's refresh tokens (section 4.14.2 MAY)", async ({

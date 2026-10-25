@@ -2,7 +2,9 @@ package protocolvalidation
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -26,11 +29,18 @@ import (
 const invalidGenerationMessage = "The refresh token is invalid because it was superseded."
 
 // invalidRefreshTokenMessage is the refusal that says nothing about why: a validly signed token
-// with no row, an ROPC token issued before its grant's authentication instant was recorded, and a
-// token whose user is disabled (#128, #125, #137). None of these is something a client acts on
-// differently, naming the first would confirm which JTIs were ever issued, and naming the last
-// would tell whoever holds a stolen token what became of the account.
+// with no row, an ROPC token issued before its grant's authentication instant was recorded, a
+// token whose user is disabled, and a token the parser refuses for anything but its expiry, such as
+// a malformed one or one no stored key verifies (#128, #125, #137, #680). None of these is something
+// a client acts on differently, naming the first would confirm which JTIs were ever issued, naming
+// the last would tell whoever holds a stolen token what became of the account, and naming the
+// parser's check would tell a forger which one failed.
 const invalidRefreshTokenMessage = "The refresh token is invalid."
+
+// expiredRefreshTokenMessage refuses a token the parser found expired, which it says only once the
+// signature verified. It is the one distinction among the parser's refusals a client acts on, and
+// it names nothing a holder of the token cannot read from its exp (#680).
+const expiredRefreshTokenMessage = "The refresh token is invalid because it has expired."
 
 // RefreshTokenGrant is a validated refresh: the presented token as it was read, which may already be
 // revoked (the issuer contains its family then, #128), the client that owns it, and the narrower
@@ -76,9 +86,22 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 
 	refreshTokenInfo, err := val.tokenParser.DecodeAndValidateTokenString(ctx, input.RefreshToken, true)
 	if err != nil {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-			"The refresh token is invalid ("+err.Error()+").",
-			http.StatusBadRequest)
+		// A token the parser could not check, because the signing keys could not be read or
+		// decoded, says nothing about the token: answered as a server fault, so the client keeps
+		// its refresh token and may retry instead of reading it as dead (#680).
+		if !errors.Is(err, signingkeys.ErrTokenRefused) {
+			return nil, errs.Wrap(err, "unable to check the refresh token")
+		}
+		// The parser's error names the library and the check that failed, so it goes to the log
+		// only. The client is told only whether the token expired: the parser says expired only
+		// once the signature verified, and exp is readable by whoever holds the token.
+		slog.WarnContext(ctx, "refused a refresh token the token parser did not accept",
+			"error", err, "client_identifier", client.ClientIdentifier)
+		description := invalidRefreshTokenMessage
+		if errors.Is(err, signingkeys.ErrTokenExpired) {
+			description = expiredRefreshTokenMessage
+		}
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", description, http.StatusBadRequest)
 	}
 
 	jti := refreshTokenInfo.StringClaim("jti")
