@@ -145,7 +145,8 @@ func TestAPIAccountEmailPut_ConcurrentChangesNotifyThePreviousAddressOnce(t *tes
 	require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
 
 	// Five, the account-password limit's budget per user, which holds whatever the rate limiter
-	// switch says and counts a check still in flight against it (#542).
+	// switch says and counts a check still in flight against it (#542), and the email change's
+	// own budget per user an hour, which counts every request (#683).
 	const changes = 5
 	newEmails := make([]string, changes)
 	for i := range newEmails {
