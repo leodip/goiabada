@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -2500,7 +2502,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", false).Return(nil, errors.New("signature verification failed"))
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", false).
+			Return(nil, fmt.Errorf("token signature is invalid: %w", signingkeys.ErrTokenRefused))
 
 		handler.ServeHTTP(rr, req)
 
@@ -2508,6 +2511,69 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		location := rr.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "error_description=")
+
+		pageRenderer.AssertExpectations(t)
+		ceremonyStore.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+	})
+
+	// A hint the parser could not check, because the signing keys could not be read, says nothing
+	// about the hint: the server error page, as a failed client lookup gets, and no redirect telling
+	// the client a hint that may be good is invalid (#680).
+	t.Run("id_token_hint the parser could not check - server error page", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		ceremonyStore := handlersmocks.NewCeremonyStore(t)
+		userSessionManager := handlersmocks.NewUserSessionManager(t)
+		database := datamocks.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
+		authorizeValidator := handlersmocks.NewAuthorizeValidator(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		permissionChecker := handlersmocks.NewPermissionChecker(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
+
+		handler := buildAuthorizeGet(authorizeGetDeps{
+			pageRenderer:       pageRenderer,
+			ceremonyStore:      ceremonyStore,
+			userSessionManager: userSessionManager,
+			database:           database,
+			authorizeValidator: authorizeValidator,
+			auditLogger:        auditLogger,
+			permissionChecker:  permissionChecker,
+			tokenParser:        tokenParser,
+		})
+		stubAuthenticatedBrowser(database, userSessionManager)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=unchecked-jwt-token", nil)
+		require.NoError(t, err)
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}))
+
+		rr := httptest.NewRecorder()
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  record.AcrLevel1,
+		}, nil)
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		keyStoreDown := errors.New("the signing keys could not be read")
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "unchecked-jwt-token", false).Return(nil, keyStoreDown)
+		pageRenderer.On("InternalServerError", rr, mock.Anything, mock.MatchedBy(func(err error) bool {
+			return errors.Is(err, keyStoreDown)
+		})).Return().Once()
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Empty(t, rr.Header().Get("Location"), "a fault answers nobody by redirect")
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)

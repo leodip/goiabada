@@ -236,18 +236,37 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 	}
 
 	// Now try to use the invalid refresh token
-	formData = url.Values{
-		"grant_type":    {"refresh_token"},
-		"client_id":     {code.Client.ClientIdentifier},
-		"refresh_token": {invalidRefreshToken},
-		"client_secret": {clientSecret},
-	}
+	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, invalidRefreshToken)
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	// The grant's own sentence, which says nothing about which check failed (#680)
+	assertRefusedAsInvalidGrant(t, status, body, "a refresh token signed by a key the server never stored")
+	assert.Equal(t, "The refresh token is invalid.", body["error_description"])
+	assertNoParserText(t, invalidRefreshToken, body)
+}
 
-	// Assert that the token endpoint rejects the invalid token
-	assert.Equal(t, "invalid_grant", data["error"])
-	assert.Contains(t, data["error_description"].(string), "token signature is invalid")
+// assertNoParserText checks that a refused refresh token's description carries none of the
+// parser's own error for the same token, read from the parser directly so the check does not
+// depend on the JWT library's wording (#680).
+func assertNoParserText(t *testing.T, refreshToken string, body map[string]interface{}) {
+	t.Helper()
+
+	_, parserErr := signingkeys.NewTokenParser(database).DecodeAndValidateTokenString(
+		context.Background(), refreshToken, true)
+	require.Error(t, parserErr, "the parser must refuse the token")
+	assert.NotContains(t, body["error_description"], parserErr.Error())
+}
+
+// TestToken_Refresh_MalformedToken: a refresh token that is not a JWT at all gets the grant's
+// sentence that says nothing about why, never the parser's error (#680).
+func TestToken_Refresh_MalformedToken(t *testing.T) {
+	clientSecret := fake.Password(32)
+	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
+
+	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, "not-a-refresh-token")
+
+	assertRefusedAsInvalidGrant(t, status, body, "a malformed refresh token")
+	assert.Equal(t, "The refresh token is invalid.", body["error_description"])
+	assertNoParserText(t, "not-a-refresh-token", body)
 }
 
 func TestToken_Refresh_TokenExpired(t *testing.T) {
@@ -313,9 +332,13 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		"client_secret": {clientSecret},
 		"refresh_token": {refreshToken},
 	}
-	respData := postToTokenEndpoint(t, httpClient, destUrl, formData)
-	assert.Equal(t, "invalid_grant", respData["error"])
-	assert.Contains(t, respData["error_description"], "token is expired")
+	status, respData, err := concurrentTokenPost(httpClient, destUrl, formData)
+	require.NoError(t, err)
+
+	// Expiry is named, since the signature verified before the parser read exp (#680)
+	assertRefusedAsInvalidGrant(t, status, respData, "an expired refresh token")
+	assert.Equal(t, "The refresh token is invalid because it has expired.", respData["error_description"])
+	assertNoParserText(t, refreshToken, respData)
 }
 
 func TestToken_Refresh_WrongClient(t *testing.T) {

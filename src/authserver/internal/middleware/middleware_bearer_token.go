@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -9,7 +10,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -89,6 +92,9 @@ const formMediaType = "application/x-www-form-urlencoded"
 //     (isAccessTokenForAuthServer, #401) answers 401 invalid_token here and now. Every route group
 //     mounting this guard requires a token, so none is handed a refused one as though it were
 //     optional, and a refused token no longer reads as a missing one.
+//   - A token the parser could not check, because the signing keys could not be read or decoded,
+//     answers the surface's 500. The fault says nothing about the token, and 401 invalid_token
+//     would tell the client a token that may be good is bad (#680).
 //   - No credential, which includes another scheme such as Basic, passes through with nothing in the
 //     context; the scope guard behind it answers the realm-only challenge.
 //
@@ -134,6 +140,10 @@ func (m *BearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.
 				return
 			}
 			token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, true)
+			if err != nil && !errors.Is(err, signingkeys.ErrTokenRefused) {
+				m.refusals.internalError(w, r, errs.Wrap(err, "unable to check the bearer token"), "")
+				return
+			}
 			if err != nil {
 				slog.WarnContext(r.Context(), "rejecting bearer token: the token did not validate", "error", err)
 				m.refusals.invalidToken(w, r, invalidTokenDescription)

@@ -49,12 +49,17 @@ test("a refresh token gets new tokens; missing, garbled, altered or presented wi
   const current = refreshed.body.refresh_token as string;
 
   expectTokenError(await postToken(request, { grant_type: "refresh_token" }, basic), "invalid_request");
-  expectTokenError(await postToken(request, { grant_type: "refresh_token", refresh_token: "not-a-refresh-token" }, basic), "invalid_grant");
+  // Refused in the server's own sentence, which names no check and no library.
+  const garbled = await postToken(request, { grant_type: "refresh_token", refresh_token: "not-a-refresh-token" }, basic);
+  expectTokenError(garbled, "invalid_grant");
+  expect(garbled.body.error_description).toBe("The refresh token is invalid.");
   // Section 10.4 MUST: a refresh token cannot be modified into a valid one. One character of its
   // payload changed, so its signature no longer covers it.
   const at = current.indexOf(".") + 8;
   const altered = `${current.slice(0, at)}${current[at] === "A" ? "B" : "A"}${current.slice(at + 1)}`;
-  expectTokenError(await postToken(request, { grant_type: "refresh_token", refresh_token: altered }, basic), "invalid_grant");
+  const alteredAnswer = await postToken(request, { grant_type: "refresh_token", refresh_token: altered }, basic);
+  expectTokenError(alteredAnswer, "invalid_grant");
+  expect(alteredAnswer.body.error_description).toBe("The refresh token is invalid.");
   // Section 6 MUST: a confidential client authenticates; naming itself is not enough.
   expectInvalidClient(
     await postToken(request, { grant_type: "refresh_token", refresh_token: current, client_id: client.identifier }),

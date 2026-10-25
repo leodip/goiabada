@@ -2,8 +2,13 @@ package protocolvalidation
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
+	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"testing"
 	"time"
@@ -12,6 +17,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -250,8 +257,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
+		// A refusal is what the parser marks as one; an unmarked error is a fault (#680).
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_refresh_token", true).
-			Return(nil, errors.New("token is expired")).Once()
+			Return(nil, fmt.Errorf("token is malformed: %w", signingkeys.ErrTokenRefused)).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
@@ -261,7 +269,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		ok := errors.As(err, &customErr)
 		assert.True(t, ok)
 		assert.Equal(t, "invalid_grant", customErr.Code())
-		assert.Equal(t, "The refresh token is invalid (token is expired).", customErr.Description())
+		assert.Equal(t, "The refresh token is invalid.", customErr.Description())
 		assert.Equal(t, http.StatusBadRequest, customErr.HTTPStatus())
 	})
 
@@ -2071,9 +2079,11 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-	// withExpirationCheck = true is what makes the parser reject an expired token.
+	// withExpirationCheck = true is what makes the parser reject an expired token, which it marks
+	// as both refused and expired.
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_refresh_token", true).
-		Return(nil, errors.New("token has invalid claims: token is expired")).Once()
+		Return(nil, fmt.Errorf("token has invalid claims: token is expired: %w %w",
+			signingkeys.ErrTokenRefused, signingkeys.ErrTokenExpired)).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
@@ -2506,6 +2516,234 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			var detail *oauth.ErrorDetail
 			assert.NotErrorAs(t, err, &detail,
 				"expected a plain error carrying a 500, got a client-facing ErrorDetail: %v", err)
+		})
+	}
+}
+
+// The refresh grant answers a token the parser refuses in a sentence of its own, never with the
+// parser's error, and a token the parser could not check, because the server could not read or
+// decode its own signing keys, as a server fault (#680). These cases drive real token bytes through
+// the real parser over a mocked key store, since which sentence a token gets depends on which check
+// the parser failed. The strict mock is also the proof of which keys were read: a case that stubs
+// no key read asserts that none was.
+//
+// The expected sentences are written out here rather than taken from the constants the validator
+// uses. "No parser text" is checked against the parser's own error for the same token, obtained
+// from a second parser over an identically stubbed key store, so it does not depend on the JWT
+// library's wording.
+
+// refreshParserKeys are the keys a refresh test's key store holds: the current one, and one the
+// server never stored, which signs a forged token.
+type refreshParserKeys struct {
+	current *rsa.PrivateKey
+	foreign *rsa.PrivateKey
+}
+
+func newRefreshParserKeys(t *testing.T) refreshParserKeys {
+	t.Helper()
+	current, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	foreign, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	return refreshParserKeys{current: current, foreign: foreign}
+}
+
+func refreshParserKeyPair(t *testing.T, id int64, key *rsa.PrivateKey) record.KeyPair {
+	t.Helper()
+	der, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	require.NoError(t, err)
+	return record.KeyPair{Id: id, PublicKeyPEM: pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})}
+}
+
+func signRefreshToken(t *testing.T, key *rsa.PrivateKey, exp time.Time) string {
+	t.Helper()
+	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"jti": "the_jti",
+		"typ": "Refresh",
+		"sub": "the_subject",
+		"exp": exp.Unix(),
+	}).SignedString(key)
+	require.NoError(t, err)
+	return token
+}
+
+// refreshGrantOutcome is what one refresh validated with the real parser produced: the validator's
+// error, the records the request wrote, and the error the parser itself gives for the same token
+// over the same keys.
+type refreshGrantOutcome struct {
+	err       error
+	records   []logtest.CapturedRecord
+	parserErr error
+}
+
+// refreshGrantWithParser is a refresh request for client1 validated with the real token parser over
+// a strict key store, which stubKeys prepares.
+func refreshGrantWithParser(t *testing.T, refreshToken string,
+	stubKeys func(*datamocks.Database)) refreshGrantOutcome {
+	t.Helper()
+
+	parserDB := datamocks.NewDatabase(t)
+	stubKeys(parserDB)
+	_, parserErr := signingkeys.NewTokenParser(parserDB).DecodeAndValidateTokenString(context.Background(), refreshToken, true)
+
+	mockDB := datamocks.NewDatabase(t)
+	stubKeys(mockDB)
+	client := &record.Client{
+		Id:                       1,
+		ClientIdentifier:         "client1",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+		IsPublic:                 true,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
+
+	validator := NewTokenValidator(mockDB, signingkeys.NewTokenParser(mockDB),
+		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
+
+	capture := logtest.CaptureSlog(t)
+	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
+		GrantType:    "refresh_token",
+		ClientId:     "client1",
+		RefreshToken: refreshToken,
+	})
+	assert.Nil(t, result)
+
+	// No refresh token row is read for a token the parser did not accept.
+	mockDB.AssertNotCalled(t, "GetRefreshTokenByJti", mock.Anything, mock.Anything, mock.Anything)
+	return refreshGrantOutcome{err: err, records: capture.Records(), parserErr: parserErr}
+}
+
+func warnRecords(records []logtest.CapturedRecord) []logtest.CapturedRecord {
+	var warns []logtest.CapturedRecord
+	for _, r := range records {
+		if r.Level == slog.LevelWarn {
+			warns = append(warns, r)
+		}
+	}
+	return warns
+}
+
+func TestValidateTokenRequest_RefreshToken_ARefusedTokenGetsTheGrantsOwnSentence(t *testing.T) {
+	keys := newRefreshParserKeys(t)
+	current := refreshParserKeyPair(t, 1, keys.current)
+
+	testCases := []struct {
+		name        string
+		token       string
+		stubKeys    func(*datamocks.Database)
+		description string
+	}{
+		{
+			// Not a JWT at all: refused without reading a key.
+			name:        "a malformed token",
+			token:       "not-a-refresh-token",
+			stubKeys:    func(*datamocks.Database) {},
+			description: "The refresh token is invalid.",
+		},
+		{
+			// Signed by a key the server never stored: every stored key is tried.
+			name:  "a token signed by a key the server never stored",
+			token: signRefreshToken(t, keys.foreign, time.Now().Add(time.Hour)),
+			stubKeys: func(db *datamocks.Database) {
+				db.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&current, nil).Once()
+				db.On("GetAllSigningKeys", mock.Anything, mock.Anything).
+					Return([]record.KeyPair{current}, nil).Once()
+			},
+			description: "The refresh token is invalid.",
+		},
+		{
+			// Signed by the current key, so its signature verified before its expiry was read.
+			name:  "an expired token signed by the current key",
+			token: signRefreshToken(t, keys.current, time.Now().Add(-time.Hour)),
+			stubKeys: func(db *datamocks.Database) {
+				db.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&current, nil).Once()
+			},
+			description: "The refresh token is invalid because it has expired.",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			outcome := refreshGrantWithParser(t, tc.token, tc.stubKeys)
+			parserErr := outcome.parserErr
+			require.Error(t, parserErr, "the parser must refuse the fixture's token")
+
+			var detail *oauth.ErrorDetail
+			require.ErrorAs(t, outcome.err, &detail)
+			assert.Equal(t, "invalid_grant", detail.Code())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+			assert.Equal(t, tc.description, detail.Description())
+			assert.NotContains(t, detail.Description(), parserErr.Error())
+
+			// One Warn record, carrying the parser's error and the client that presented the token.
+			warns := warnRecords(outcome.records)
+			require.Len(t, warns, 1)
+			assert.Equal(t, "refused a refresh token the token parser did not accept", warns[0].Message)
+			assert.Equal(t, "client1", warns[0].Attrs["client_identifier"])
+			logged, isError := warns[0].Attrs["error"].(error)
+			require.True(t, isError, "the error attribute must be the parser's error")
+			assert.Equal(t, parserErr.Error(), logged.Error())
+		})
+	}
+}
+
+func TestValidateTokenRequest_RefreshToken_AKeyStoreFaultIsAServerFault(t *testing.T) {
+	keys := newRefreshParserKeys(t)
+	current := refreshParserKeyPair(t, 1, keys.current)
+	undecodable := record.KeyPair{Id: 2, PublicKeyPEM: []byte("not a pem key")}
+	lookupErr := errors.New("database is down")
+
+	testCases := []struct {
+		name     string
+		token    string
+		stubKeys func(*datamocks.Database)
+		cause    error
+	}{
+		{
+			name:  "the current key cannot be read",
+			token: signRefreshToken(t, keys.current, time.Now().Add(time.Hour)),
+			stubKeys: func(db *datamocks.Database) {
+				db.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(nil, lookupErr).Once()
+			},
+			cause: lookupErr,
+		},
+		{
+			name:  "the stored keys cannot be read for the fallback",
+			token: signRefreshToken(t, keys.foreign, time.Now().Add(time.Hour)),
+			stubKeys: func(db *datamocks.Database) {
+				db.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&current, nil).Once()
+				db.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(nil, lookupErr).Once()
+			},
+			cause: lookupErr,
+		},
+		{
+			name:  "a stored key the token may be signed by cannot be decoded",
+			token: signRefreshToken(t, keys.foreign, time.Now().Add(time.Hour)),
+			stubKeys: func(db *datamocks.Database) {
+				db.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&current, nil).Once()
+				db.On("GetAllSigningKeys", mock.Anything, mock.Anything).
+					Return([]record.KeyPair{current, undecodable}, nil).Once()
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			outcome := refreshGrantWithParser(t, tc.token, tc.stubKeys)
+			err := outcome.err
+			require.Error(t, err)
+
+			// A plain error, which the token endpoint answers as a 500 server_error, so the client
+			// keeps its refresh token and may retry.
+			var detail *oauth.ErrorDetail
+			assert.NotErrorAs(t, err, &detail,
+				"a key-store fault must not be answered as a refused token: %v", err)
+			if tc.cause != nil {
+				require.ErrorIs(t, err, tc.cause)
+			}
+
+			// The fault keeps the token endpoint's Error record; the refusal's Warn is not written.
+			assert.Empty(t, warnRecords(outcome.records))
 		})
 	}
 }

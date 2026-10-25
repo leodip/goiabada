@@ -3,6 +3,8 @@ package middleware
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/requestid"
@@ -26,8 +29,9 @@ import (
 // this server: the status, the exact WWW-Authenticate value and the exact body, per surface. The
 // guard-level tests beside it pin their own branches and leave the wire to this table (#435).
 
-// chainParser stands in for the signed-token parser: it knows four tokens by name and refuses
-// everything else as a token that does not verify.
+// chainParser stands in for the signed-token parser: it knows four tokens by name, could not check
+// "fault" because the signing keys could not be read, and refuses everything else as a token that
+// does not verify, carrying the parser's refused mark.
 type chainParser struct{}
 
 func (chainParser) DecodeAndValidateTokenString(_ context.Context, token string, _ bool) (*oauth.JwtToken, error) {
@@ -44,8 +48,10 @@ func (chainParser) DecodeAndValidateTokenString(_ context.Context, token string,
 	case "refresh":
 		claims["typ"] = "Refresh"
 		claims["scope"] = "openid"
+	case "fault":
+		return nil, errors.New("the signing keys could not be read")
 	default:
-		return nil, errors.New("the token does not verify")
+		return nil, fmt.Errorf("the token does not verify: %w", signingkeys.ErrTokenRefused)
 	}
 	return &oauth.JwtToken{TokenBase64: token, Claims: claims}, nil
 }
@@ -253,6 +259,43 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 				assertChainAnswer(t, want, rr)
 			})
 		}
+	}
+}
+
+// TestBearerGuardChain_AParserFaultOnEachSurface: a token the parser could not check, because the
+// signing keys could not be read, says nothing about the token, so it is the surface's 500 with no
+// challenge, logged once with its cause, and not 401 invalid_token, which would tell the client a
+// good token is bad (#680). A refused token keeps its 401 in the table above.
+func TestBearerGuardChain_AParserFaultOnEachSurface(t *testing.T) {
+	want := map[string]string{
+		"api":      `{"error_code":"INTERNAL_SERVER_ERROR","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: req-chain-1"}`,
+		"userinfo": `{"error":"server_error","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: req-chain-1"}`,
+	}
+	for _, surface := range chainSurfaces() {
+		t.Run(surface.name, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			guards := surface.build()
+			chain := guards.JwtAuthorizationHeaderToContext()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Error("a token the parser could not check must not reach the handler")
+			}))
+
+			req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
+			req = req.WithContext(requestid.NewContext(req.Context(), "req-chain-1"))
+			req.Header.Set("Authorization", "Bearer fault")
+			rr := httptest.NewRecorder()
+			chain.ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+			assert.Empty(t, rr.Header().Get("WWW-Authenticate"), "a server fault is not a challenge")
+			assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+			assert.JSONEq(t, want[surface.name], rr.Body.String())
+
+			records := logs.Records()
+			require.Len(t, records, 1, "one record per 500, and no Warn for a refusal")
+			assert.Equal(t, slog.LevelError, records[0].Level)
+			assert.Equal(t, "internal server error", records[0].Message)
+			assert.Contains(t, logs.Text(), "the signing keys could not be read")
+		})
 	}
 }
 

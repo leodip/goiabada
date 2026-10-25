@@ -42,6 +42,8 @@ A hint that fails a check is refused with `invalid_request`:
 
 That error reaches your app like any other error in the request: at once when the request has `prompt=none`, or when the browser has a valid session and the request doesn't have `prompt=login`, and otherwise after the user signs in. See [The app gets no error back](/troubleshooting/the-app-gets-no-error-back/).
 
+When the auth server can't check the hint at all, for example because it couldn't read its signing keys, it shows its error page and sends nothing back to your app. That says nothing about the hint, so send the request again later.
+
 ## What the hint changes
 
 | The browser has | With `prompt=none` | Without it |
