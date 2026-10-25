@@ -81,6 +81,10 @@ var answerCases = []goldenCase{
 		c.GatewayTrafficPolicy = trafficPolicyLocal
 		c.RateLimiter = true
 	}},
+	// Kubernetes into a namespace that already exists, which neither file declares (#686 section 2).
+	{name: "kubernetes-existing-namespace-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.NamespaceExists = true
+	}},
 	// Kubernetes with the NetworkPolicies admitting only Envoy and the admin console (#396 decision 5).
 	{name: "kubernetes-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NetworkPolicy = true

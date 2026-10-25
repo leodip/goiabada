@@ -75,6 +75,11 @@ var wizardSteps = []wizardStep{
 		run:     (*wizard).askNamespace,
 	},
 	{
+		title:   "Namespace creation",
+		applies: func(c *Config) bool { return c.Deployment.asksNamespace },
+		run:     (*wizard).askCreateNamespace,
+	},
+	{
 		title:   "Gateway traffic policy",
 		applies: func(c *Config) bool { return c.Deployment.servedByEnvoyGateway },
 		run:     (*wizard).askTrafficPolicy,
@@ -438,6 +443,34 @@ func (w *wizard) askNamespace() error {
 	w.out.info("Kubernetes namespace: %s", namespace)
 	w.config.K8sNamespace = namespace
 	return nil
+}
+
+// askCreateNamespace asks whether the files declare the namespace, so applying them creates it, yes
+// by default. No is for one that already exists, which a platform team provides with its own labels,
+// quotas and access: applying a Namespace there is refused, or resets what its owner set (#686
+// section 2).
+func (w *wizard) askCreateNamespace() error {
+	ns := w.config.K8sNamespace
+	if !w.interactive {
+		w.config.NamespaceExists = !w.flags.CreateNamespace.or(true)
+		answer := "created by the files"
+		if w.config.NamespaceExists {
+			answer = "already exists, declared in neither file"
+		}
+		w.out.info("Namespace %s: %s", ns, answer)
+		return nil
+	}
+	w.out.printf("Both files can declare the namespace %s, so applying either creates it, labelled to\n", ns)
+	w.out.println("warn about any pod that breaks the restricted Pod Security Standard.")
+	w.out.println("  Yes: for a cluster you run. Applying the files needs the right to create and patch")
+	w.out.println("       the namespace.")
+	w.out.println("  No:  for a namespace that already exists, such as one a platform team provides with")
+	w.out.println("       its own labels, quotas and access. Neither file declares it, so applying them")
+	w.out.println("       needs rights inside the namespace alone.")
+	w.out.println()
+	create, err := w.yesNo("Create the namespace?", true)
+	w.config.NamespaceExists = !create
+	return err
 }
 
 // askTrafficPolicy asks which externalTrafficPolicy Envoy Gateway's load balancer Service uses,

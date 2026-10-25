@@ -40,6 +40,11 @@ type Config struct {
 	AESEncryptionKey    string
 	OAuthClientSecret   string
 	K8sNamespace        string
+	// NamespaceExists says the Kubernetes namespace is someone else's to make, a platform team's as
+	// a rule, so neither file declares it: applying a Namespace needs the right to patch it, which a
+	// team granted rights inside the namespace lacks, and would reset the labels its owner set. Only
+	// Kubernetes asks (#686 section 2).
+	NamespaceExists bool
 	// AdminPasswordGenerated and DBPasswordGenerated say the wizard generated the password rather
 	// than the operator setting it, which is all the wizard reports of either (#396 decision 17).
 	AdminPasswordGenerated bool

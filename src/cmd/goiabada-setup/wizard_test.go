@@ -100,7 +100,10 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 		)
 	}
 	if d.asksNamespace {
-		steps = append(steps, scriptedStep{prompt: "Namespace [goiabada]: ", answer: ""})
+		steps = append(steps,
+			scriptedStep{prompt: "Namespace [goiabada]: ", answer: ""},
+			scriptedStep{prompt: createNamespacePrompt, answer: ""},
+		)
 	}
 	if d.servedByEnvoyGateway {
 		steps = append(steps,
@@ -160,8 +163,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
@@ -391,7 +394,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{11, 12},
+			numbers:  []int{12, 13},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret", "prefer", ""},
 			checked:  true,
 		},
@@ -1358,6 +1361,65 @@ const (
 )
 
 // kubernetesFlags is a non-interactive Kubernetes run, its answers to the two questions left out.
+// createNamespacePrompt is the question whether the files create the namespace, yes by default.
+const createNamespacePrompt = "Create the namespace? [Y/n]: "
+
+// The wizard asks whether the files create the namespace, yes unless it already exists, and no
+// writes neither file's Namespace, so applying them needs rights inside the namespace alone (#686
+// section 2).
+func TestWizard_KubernetesAsksWhetherToCreateTheNamespace(t *testing.T) {
+	cases := map[string]struct {
+		flags  *CLIFlags
+		steps  []scriptedStep
+		exists bool
+	}{
+		"prompted, the default": {&CLIFlags{}, withKubernetesAnswer(t, createNamespacePrompt, ""), false},
+		"prompted, no":          {&CLIFlags{}, withKubernetesAnswer(t, createNamespacePrompt, "n"), true},
+		"by flag, left out":     {kubernetesFlags(), nil, false},
+		"by flag, --create-namespace=false": {func() *CLIFlags {
+			f := kubernetesFlags()
+			if err := f.CreateNamespace.Set("false"); err != nil {
+				t.Fatal(err)
+			}
+			return f
+		}(), nil, true},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, in, out, _ := testWizard(t, tc.flags, tc.steps)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			in.assertConsumed()
+			if w.config.NamespaceExists != tc.exists {
+				t.Errorf("NamespaceExists is %v, want %v", w.config.NamespaceExists, tc.exists)
+			}
+			for _, path := range []string{w.paths.description, w.paths.secrets} {
+				written, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				namespaces := 0
+				for _, doc := range yamlDocuments(t, string(written)) {
+					if doc["kind"] == "Namespace" {
+						namespaces++
+					}
+				}
+				if want := map[bool]int{true: 0, false: 1}[tc.exists]; namespaces != want {
+					t.Errorf("%s declares %d Namespaces, want %d", filepath.Base(path), namespaces, want)
+				}
+			}
+			said := strings.Join(strings.Fields(out.String()), " ")
+			if tc.exists && !strings.Contains(said, "The namespace goiabada must already exist: neither file creates it.") {
+				t.Errorf("the completion message does not say the namespace must exist:\n%s", out)
+			}
+			if tc.steps != nil && !strings.Contains(said, "needs rights inside the namespace alone") {
+				t.Errorf("the question does not say what no asks of whoever applies the files:\n%s", out)
+			}
+		})
+	}
+}
+
 func kubernetesFlags() *CLIFlags {
 	return &CLIFlags{DeploymentType: "kubernetes", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 		DBHost: "pg.internal", SkipDBTest: true}
@@ -1494,14 +1556,17 @@ func TestWizard_KubernetesFlagsAreIgnoredElsewhere(t *testing.T) {
 	} {
 		t.Run(flags.DeploymentType, func(t *testing.T) {
 			flags.GatewayTrafficPolicy, flags.NetworkPolicy = trafficPolicyLocal, true
+			if err := flags.CreateNamespace.Set("false"); err != nil {
+				t.Fatal(err)
+			}
 			w, _, out, _ := testWizard(t, &flags, nil)
 			if err := w.setup(); err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
-			if w.config.GatewayTrafficPolicy != "" || w.config.NetworkPolicy {
-				t.Errorf("%s holds traffic policy %q and NetworkPolicy %v", flags.DeploymentType, w.config.GatewayTrafficPolicy, w.config.NetworkPolicy)
+			if w.config.GatewayTrafficPolicy != "" || w.config.NetworkPolicy || w.config.NamespaceExists {
+				t.Errorf("%s holds traffic policy %q, NetworkPolicy %v and NamespaceExists %v", flags.DeploymentType, w.config.GatewayTrafficPolicy, w.config.NetworkPolicy, w.config.NamespaceExists)
 			}
-			for _, said := range []string{"traffic policy", "NetworkPolic"} {
+			for _, said := range []string{"traffic policy", "NetworkPolic", "already exists"} {
 				if strings.Contains(out.String(), said) {
 					t.Errorf("%s reports %q:\n%s", flags.DeploymentType, said, out)
 				}

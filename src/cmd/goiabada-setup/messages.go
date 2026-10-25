@@ -23,7 +23,11 @@ func printSummary(out *console, config *Config) {
 	out.printf("  Auth Server URL:  %s\n", config.AuthServerURL)
 	out.printf("  Admin Console:    %s\n", config.AdminConsoleURL)
 	if config.K8sNamespace != "" {
-		out.printf("  K8s Namespace:    %s\n", config.K8sNamespace)
+		existing := ""
+		if config.NamespaceExists {
+			existing = " (already exists)"
+		}
+		out.printf("  K8s Namespace:    %s%s\n", config.K8sNamespace, existing)
 	}
 	if config.Deployment.servedByEnvoyGateway {
 		out.printf("  Traffic policy:   %s\n", config.GatewayTrafficPolicy)
@@ -162,6 +166,11 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	out.println("  4. Deploy Goiabada, the Secrets first, so no pod starts with an older copy of them:")
 	out.printf("     %s%s%s\n", out.cyan, kubernetesApplyCommand(paths), out.reset)
 	out.println()
+	if config.NamespaceExists {
+		out.printf("     The namespace %s must already exist: neither file creates it. The manifest's header\n", config.K8sNamespace)
+		out.println("     has the Pod Security labels its owner can set.")
+		out.println()
+	}
 	out.printf("     %sFor a deployment that already runs, apply only %s.%s %s holds\n", out.bold, filepath.Base(paths.description), out.reset, filepath.Base(paths.secrets))
 	out.println("     newly generated secrets, which its database isn't under: a pod reads its Secrets")
 	out.println("     only when it starts, so nothing changes until the next restart, and then the auth")

@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"maps"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
+
+	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // kubernetesConfig is a Kubernetes answer set in a namespace of its own, with URLs carrying a
@@ -647,6 +651,51 @@ func TestKubernetesManifest_LabelsTheNamespaceToWarnAndAuditAtRestricted(t *test
 	}
 	if enforce, ok := labels["pod-security.kubernetes.io/enforce"]; ok {
 		t.Errorf("the Namespace enforces %v, and it may hold workloads that are not Goiabada's", enforce)
+	}
+}
+
+// Into a namespace that already exists, neither file declares it, so one kustomization holds both:
+// with both declaring it, kustomize refuses the second. The manifest's header gives its owner the
+// command setting the labels the Namespace would otherwise carry (#686 section 2).
+func TestKubernetesManifest_AnExistingNamespaceIsDeclaredInNeitherFile(t *testing.T) {
+	created := kubernetesConfig()
+	wanted := at[map[string]any](t, kubernetesDocuments(t, created)["Namespace"][created.K8sNamespace], "metadata", "labels")
+	existing := kubernetesConfig()
+	existing.NamespaceExists = true
+	if namespaces := kubernetesDocuments(t, existing)["Namespace"]; len(namespaces) > 0 {
+		t.Errorf("the files declare %v", slices.Collect(maps.Keys(namespaces)))
+	}
+
+	description, secrets := generatedConfiguration(existing)
+	command := regexp.MustCompile(`(?m)^#\s+kubectl label namespace (\S+)((?: \S+=\S+)+)$`).FindStringSubmatch(description.content)
+	if command == nil {
+		t.Fatalf("the manifest's header gives no kubectl label command:\n%s", description.content)
+	}
+	if command[1] != existing.K8sNamespace {
+		t.Errorf("the command labels namespace %s, want %s", command[1], existing.K8sNamespace)
+	}
+	labelled := map[string]any{}
+	for _, pair := range strings.Fields(command[2]) {
+		key, value, _ := strings.Cut(pair, "=")
+		labelled[key] = value
+	}
+	delete(wanted, "kubernetes.io/metadata.name")
+	if !reflect.DeepEqual(labelled, wanted) {
+		t.Errorf("the command sets %v, and a created Namespace carries %v", labelled, wanted)
+	}
+
+	fs := filesys.MakeFsInMemory()
+	for name, content := range map[string]string{
+		"kustomization.yaml":    "resources:\n- goiabada-secrets.yaml\n- goiabada-k8s.yaml\n",
+		"goiabada-secrets.yaml": secrets.content,
+		"goiabada-k8s.yaml":     description.content,
+	} {
+		if err := fs.WriteFile("/goiabada/"+name, []byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := krusty.MakeKustomizer(krusty.MakeDefaultOptions()).Run(fs, "/goiabada"); err != nil {
+		t.Errorf("kustomize refuses a kustomization of both files: %v", err)
 	}
 }
 
