@@ -93,6 +93,8 @@ const (
 	emailVerificationWindow     = 900
 	emailVerificationSendBudget = 5 // requests per 60 minutes per token subject
 	emailVerificationSendWindow = 3600
+	accountEmailChangeBudget    = 5 // requests per 60 minutes per token subject
+	accountEmailChangeWindow    = 3600
 	accountPasswordBudget       = 5 // failures per 15 minutes per token subject, shared by two routes
 	accountPasswordWindow       = 900
 	otpBudget                   = 5 // failures per 15 minutes per user id
@@ -335,6 +337,16 @@ func exhaust(t *testing.T, s *Server, budget int, request func(attempt int) *htt
 	return serve(s, request(budget))
 }
 
+// routesTestSendWithoutSMTP is a verification send under settings with SMTP off, which the
+// handler answers with SMTP_NOT_ENABLED and sends nothing on, so a case spending it is about the
+// limiter alone.
+func routesTestSendWithoutSMTP() *http.Request {
+	r := apiRequest(http.MethodPost, "/api/v1/account/email/verification/send", "")
+	settings := routesTestSettings()
+	settings.SMTPEnabled = false
+	return r.WithContext(reqctx.WithSettings(r.Context(), settings))
+}
+
 // registrationOf is a registration of a distinct address per attempt, which spends only the
 // registration's per-IP tier.
 func registrationOf(attempt int) *http.Request {
@@ -397,16 +409,12 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 
 		// Every request counts. SMTP is off on these, so the handler answers each with
 		// SMTP_NOT_ENABLED and sends nothing, which keeps the case about the limiter; the
-		// hour's Retry-After is what no other tier answers with, so this is the send's own
-		// limiter and not one of its lookalikes.
-		sendRequest := func(int) *http.Request {
-			r := apiRequest(http.MethodPost, "/api/v1/account/email/verification/send", "")
-			settings := routesTestSettings()
-			settings.SMTPEnabled = false
-			return r.WithContext(reqctx.WithSettings(r.Context(), settings))
-		}
-		assertRefused(t, exhaust(t, server, emailVerificationSendBudget, sendRequest),
-			emailVerificationSendWindow, shapeAPI)
+		// hour's Retry-After is what no other tier answers with but the email change's, which
+		// the separate-budget cases below tell apart, so this is the send's own limiter and
+		// not one of its lookalikes.
+		assertRefused(t, exhaust(t, server, emailVerificationSendBudget, func(int) *http.Request {
+			return routesTestSendWithoutSMTP()
+		}), emailVerificationSendWindow, shapeAPI)
 
 		assert.True(t, reachesHandler(server, apiRequest(http.MethodPost, "/api/v1/account/email/verification",
 			`{"verificationCode":"ABCD1234"}`)),
@@ -579,14 +587,36 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
 		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
 			accountPasswordWindow, shapeAPI)
+		// The sixth change has spent the email change's own budget too, and that tier is
+		// mounted first, so it is the one that refuses: a request it refuses never reaches the
+		// password check.
 		assertRefused(t, serve(server, apiRequest(http.MethodPut, "/api/v1/account/email", emailBody)),
-			accountPasswordWindow, shapeAPI)
+			accountEmailChangeWindow, shapeAPI)
+	})
+
+	t.Run("PUT /api/v1/account/email counts every change", func(t *testing.T) {
+		// Past the password the change says whether an address is taken, so every request
+		// counts, not only a wrong password. A blank password is refused before it is checked
+		// and spends nothing on the shared bucket, which keeps the case about this tier: the
+		// password route still reaches its handler once the email change's budget is gone.
+		server := newRoutesTestServer(t)
+		changeOf := func(attempt int) *http.Request {
+			return apiRequest(http.MethodPut, "/api/v1/account/email",
+				fmt.Sprintf(`{"email":"probe%d@example.com","currentPassword":""}`, attempt))
+		}
+		assertRefused(t, exhaust(t, server, accountEmailChangeBudget, changeOf),
+			accountEmailChangeWindow, shapeAPI)
+
+		passwordBody := `{"currentPassword":"` + routesTestWrongPassword + `","newPassword":"a new password"}`
+		assert.True(t, reachesHandler(server, apiRequest(http.MethodPut, "/api/v1/account/password", passwordBody)),
+			"the shared password bucket keeps its own budget when the email change's is spent")
 	})
 
 	// The cases above pin every registration whose window or reject class differs from its
-	// neighbours'. Three pairs agree on both and so are still interchangeable from out
+	// neighbours'. Four pairs agree on both and so are still interchangeable from out
 	// here: registration and activation, either of those and forgot-password's IP tier,
-	// and email verification and the shared account-password bucket. Each of those
+	// email verification and the shared account-password bucket, and the email change and
+	// the verification send. Each of those
 	// substitutions survived, and what refuses them is that a limiter holds its own
 	// counter: spending one leaves its lookalike with its own budget intact (#219).
 
@@ -681,6 +711,33 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		assert.True(t, reachesHandler(server, apiRequest(http.MethodPost, "/api/v1/account/email/verification",
 			`{"verificationCode":"ABCD1234"}`)),
 			"email verification keeps its own budget when the password check's is spent")
+	})
+
+	t.Run("the email change and the verification send hold separate budgets", func(t *testing.T) {
+		// Both are 5 requests per 60 minutes keyed on the token subject, in the API class, so
+		// wiring the email change to LimitEmailVerificationSend left every case above green.
+		// SMTP is off on the send, for the send's own case's reason.
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, accountEmailChangeBudget, func(attempt int) *http.Request {
+			return apiRequest(http.MethodPut, "/api/v1/account/email",
+				fmt.Sprintf(`{"email":"probe%d@example.com","currentPassword":""}`, attempt))
+		}), accountEmailChangeWindow, shapeAPI)
+
+		assert.True(t, reachesHandler(server, routesTestSendWithoutSMTP()),
+			"the verification send keeps its own budget when the email change's is spent")
+	})
+
+	t.Run("the verification send budget is not the email change budget", func(t *testing.T) {
+		// The mirror, spending the send's counter rather than the email change's, so each of
+		// the two routes is caught wired to the other's limiter by spending its own.
+		server := newRoutesTestServer(t)
+		assertRefused(t, exhaust(t, server, emailVerificationSendBudget, func(int) *http.Request {
+			return routesTestSendWithoutSMTP()
+		}), emailVerificationSendWindow, shapeAPI)
+
+		assert.True(t, reachesHandler(server, apiRequest(http.MethodPut, "/api/v1/account/email",
+			`{"email":"probe@example.com","currentPassword":""}`)),
+			"the email change keeps its own budget when the send's is spent")
 	})
 
 	t.Run("both reset-password registrations share one bucket", func(t *testing.T) {

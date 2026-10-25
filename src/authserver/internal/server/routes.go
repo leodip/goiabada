@@ -396,8 +396,10 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.Get("/profile", apihandlers.HandleAccountProfileGet(s.database))
 		r.Put("/profile", apihandlers.HandleAccountProfilePut(s.database, profileValidator, auditLogger))
 		// The email change verifies the account password too, so it spends the same bucket as
-		// the password and OTP changes below (#404).
-		r.With(rateLimiter.LimitAccountPassword).Put("/email",
+		// the password and OTP changes below (#404). Past the password it says whether the address
+		// is taken, so every change counts on the account first, and a request that tier refuses
+		// never reaches the password check.
+		r.With(rateLimiter.LimitAccountEmailChange, rateLimiter.LimitAccountPassword).Put("/email",
 			apihandlers.HandleAccountEmailPut(httpHelper, s.database, emailValidator, emailSender, auditLogger, rateLimiter, s.jobs))
 		// The send counts every request on the account, beside its own five minute resend cooldown:
 		// the account chooses the address it mails, so each send is a mail to any address (#404).

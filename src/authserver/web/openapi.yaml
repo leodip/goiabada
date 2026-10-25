@@ -3228,7 +3228,9 @@ paths:
         VALIDATION_ERROR, a wrong one a 400 with error_code AUTHENTICATION_FAILED that counts
         against the failure limit shared with the password and OTP changes. Submitting the
         address the account already has changes nothing, keeps it verified, and answers 200
-        with the user as stored.
+        with the user as stored. The operation is also limited to 5 requests per hour per
+        account, answered 429, whatever the address and whether or not the password was right,
+        and whether or not the rate limiter (GOIABADA_AUTHSERVER_RATELIMITER_ENABLED) is on.
 
         A change clears any pending verification code, and any password reset link already
         sent stops working, since it was mailed to the previous address. Verify the new

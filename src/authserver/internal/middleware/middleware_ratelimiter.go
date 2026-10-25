@@ -409,6 +409,8 @@ type RateLimiter struct {
 	emailVerification *failureTier
 	// emailVerificationSend bounds the verification mail an account can have sent.
 	emailVerificationSend *requestTier
+	// accountEmailChange bounds the email changes an account can ask for.
+	accountEmailChange *requestTier
 	// accountPassword bounds guessing at the account's own password, at the two account API
 	// routes that verify it. One tier rather than two because it is one secret.
 	accountPassword *failureTier
@@ -519,6 +521,15 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// allows 12 an hour; this is 5, which is room for a user whose first code went to spam
 		// or expired before a slow inbox delivered it (#404).
 		emailVerificationSend: request("email_verification_send", countedByTokenUser, "", 5, 60*time.Minute),
+		// per-subject: email changes, every request counted, the taken, the free and the refused
+		// alike. Past the password the change answers whether another account holds the address,
+		// which a user changing theirs has to be told (#404), so what this bounds is one account
+		// asking about addresses: a right password spends nothing on account_password, and with
+		// self-registration on an account is one form away. 5 an hour is the send's figure, room
+		// for a typo and a change of mind, and caps one account at 120 addresses a day on each
+		// replica: the count is held in the process, as every request tier's is, and a restart
+		// starts it again.
+		accountEmailChange: request("account_email_change", countedByTokenUser, "", 5, 60*time.Minute),
 		// per-subject account password failures, one bucket for the three routes that check
 		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and
 		// PUT /api/v1/account/email (#404). All three verify the same secret, so separate
@@ -910,6 +921,20 @@ func (m *RateLimiter) LimitEmailVerificationSend(next http.Handler) http.Handler
 	return m.limitRequests(next, m.emailVerificationSend, rejectAPI)
 }
 
+// LimitAccountEmailChange rate limits the account's own email change, on the subject of the
+// access token presented. Every request counts, whatever the address and whether the password was
+// right: past the password the change says whether another account holds the address, so a
+// failures-only bound, which LimitAccountPassword is, leaves an account holder free to ask about
+// as many addresses as they like. Mounted before LimitAccountPassword, so a request this refuses
+// never reaches the password check.
+//
+// The subject for LimitEmailVerificationSend's reason: the account chooses the address, so a
+// per-address key would bound nothing. A request with no readable token passes through to the
+// handler, which answers it 500 before touching the address.
+func (m *RateLimiter) LimitAccountEmailChange(next http.Handler) http.Handler {
+	return m.limitRequests(next, m.accountEmailChange, rejectAPI)
+}
+
 // LimitAccountPassword rate limits the account's own password check, on the subject of the
 // access token presented. One middleware over three routes, PUT /api/v1/account/password,
 // PUT /api/v1/account/otp and PUT /api/v1/account/email (#404), which is what makes the bucket
@@ -945,8 +970,9 @@ func tokenSubjectRateLimitKey(r *http.Request) (string, bool) {
 
 // limitRequests writes the body of a limiter every request spends, keyed on what its one tier
 // counts by and refusing in the shape class names. LimitActivate, LimitResetPwd and LimitDCR are
-// this over a tier counted by the client block, and LimitEmailVerificationSend over one counted by
-// the token's user (#439). LimitRegister was too, until it gained a per-address tier (#207).
+// this over a tier counted by the client block, and LimitEmailVerificationSend and
+// LimitAccountEmailChange over one counted by the token's user (#439). LimitRegister was too,
+// until it gained a per-address tier (#207).
 //
 // A request with no subject of the tier's kind passes through to the handler, which answers it
 // itself, for limitFailuresPerSubject's reason; a client block is never absent.

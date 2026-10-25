@@ -134,9 +134,10 @@ func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 	requireNoPasswordInBind(t, httpHelper)
 }
 
-// Too many wrong passwords is the user's to wait out, RFC 6585 section 4, so the change is drawn
-// again with the console's rate-limit sentence rather than the 500 page; the password, again, is
-// not (#562 decision 7, #559 decision 10).
+// Too many wrong passwords, or a sixth email change in an hour with the right one (#683), is the
+// user's to wait out, RFC 6585 section 4, so the change is drawn again with the console's
+// rate-limit sentence rather than the 500 page; the password, again, is not (#562 decision 7,
+// #559 decision 10).
 func TestHandleEmailPost_TooManyAttemptsReRendersWithTheSentence(t *testing.T) {
 	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusTooManyRequests, Code: "TOO_MANY_REQUESTS",
