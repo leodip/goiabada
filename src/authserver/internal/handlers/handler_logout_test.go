@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -249,6 +250,72 @@ func TestHandleLogoutGet(t *testing.T) {
 		assert.Empty(t, location.Query().Get("sid"),
 			"sid is not a parameter RP-initiated logout defines, decision 5")
 		assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
+		pageRenderer.AssertExpectations(t)
+		database.AssertExpectations(t)
+		httpSession.AssertExpectations(t)
+	})
+
+	// A self-registered client loses the hintless redirect, but not this one: a confirmed hint proves
+	// the End-User signed in to the client its signed aud names, which is what registration alone
+	// cannot show.
+	t.Run("A confirmed hint redirects to a self-registered client", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		httpSession := sessionstoremocks.NewStore(t)
+		database := datamocks.NewDatabase(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{
+			"id_token_hint":            {hintedToken},
+			"post_logout_redirect_uri": {hintedRegisteredURI},
+		}, hintedSessionId)
+		rr := httptest.NewRecorder()
+
+		client := stubConfirmedHint(database, tokenParser, hintedClaims())
+		client.CreatedViaDCR = true
+		stubRegisteredURI(database, client, hintedRegisteredURI)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+
+		mockSession := expectCookieWipedBeforeSave(t, httpSession)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location, err := url.Parse(rr.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, hintedRegisteredURI, location.Scheme+"://"+location.Host+location.Path)
+		assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
+		pageRenderer.AssertExpectations(t)
+		database.AssertExpectations(t)
+		httpSession.AssertExpectations(t)
+	})
+
+	// The GET half of the self-registered refusal, whose POST half is a row of TestHandleLogoutPost's
+	// declined table: a hintless GET asks, and the redirect can only follow the confirming POST.
+	t.Run("A hintless GET naming a self-registered client asks rather than redirecting", func(t *testing.T) {
+		pageRenderer := handlersmocks.NewPageRenderer(t)
+		httpSession := sessionstoremocks.NewStore(t)
+		database := datamocks.NewDatabase(t)
+		tokenParser := handlersmocks.NewTokenParser(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+
+		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher)
+
+		req := hintedRequest(t, http.MethodGet, url.Values{
+			"client_id":                {"dcr_client"},
+			"post_logout_redirect_uri": {"https://evil.example/landing"},
+		}, "test-session")
+		rr := httptest.NewRecorder()
+
+		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
+			mock.Anything).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Empty(t, rr.Header().Get("Location"))
 		pageRenderer.AssertExpectations(t)
 		database.AssertExpectations(t)
 		httpSession.AssertExpectations(t)
@@ -1062,8 +1129,11 @@ func TestHandleLogoutPost(t *testing.T) {
 		}), "test-session")
 		rr := httptest.NewRecorder()
 
+		// Registered by an administrator, which is what lets client_id vouch for the target. A
+		// self-registered client is refused the same request, in the table below.
 		client := &record.Client{
 			ClientIdentifier: "test_client",
+			CreatedViaDCR:    false,
 			RedirectURIs:     []record.RedirectURI{{URI: "https://example.com/out?state=registered&lang=en"}},
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
@@ -1100,25 +1170,27 @@ func TestHandleLogoutPost(t *testing.T) {
 	// the response and never about whether the logout happens (#109).
 	//
 	// The table is four groups that fail for different reasons, and only the first is ordinary.
-	// Rows 1 to 3 are plain refusals: the request did not earn a redirect. Rows 4 to 11 are near
+	// Rows 1 to 4 are plain refusals: the request did not earn a redirect, row 2 because a
+	// self-registered client's URIs confirm nothing (#682). Rows 5 to 13 are near
 	// misses, where the requested URI differs from a registered one in a way exact string comparison
 	// catches and a looser one does not; they exist because no plain refusal can tell those apart,
-	// so every loose comparison listed below passed this table before its row was added. Rows 12 to
-	// 14 are the opposite case, a requested URI that matches a registered one byte for byte and is
+	// so every loose comparison listed below passed this table before its row was added. Rows 14 to
+	// 16 are the opposite case, a requested URI that matches a registered one byte for byte and is
 	// refused anyway because the value cannot name the host it appears to; no comparison can catch
-	// those, and they are the rows the absolute-URI gate owns (#122). Rows 15 to 17 are faults, a
+	// those, and they are the rows the absolute-URI gate owns (#122). Rows 17 to 19 are faults, a
 	// database that will not answer and a registered URI that will not parse, and those are the
 	// shapes where a plausible future edit turns "lose the redirect" into "return a 500", which
 	// would put a user who is still signed in on a terminal page. Every row asserts the whole
 	// teardown and the absence of an InternalServerError, not just the absent Location.
 	//
 	// The near misses come in two families, and each row differs from its registration in exactly
-	// one respect so that it names the comparison it kills. Rows 4 to 6 kill comparisons that are
-	// loose about the string: prefix in either direction, substring, and case folding. Rows 7 to 11
+	// one respect so that it names the comparison it kills. Rows 5 to 7 kill comparisons that are
+	// loose about the string: prefix in either direction, substring, and case folding. Rows 8 to 13
 	// kill comparisons that parse the URI and then compare or normalize selected components, which
 	// is the family that survives a table built only from the first: each of query omission, scheme
-	// omission, trailing-slash normalization, percent-decoding the path, and default-port
-	// normalization accepts a URI no operator registered.
+	// omission, trailing-slash normalization, percent-decoding the path, default-port
+	// normalization, and the authorization endpoint's loopback port exception accepts a URI no
+	// operator registered.
 	t.Run("A target that cannot be authorized is declined, and the logout still happens", func(t *testing.T) {
 		const unparseableURI = "https://example.com/out\x7f"
 
@@ -1154,11 +1226,50 @@ func TestHandleLogoutPost(t *testing.T) {
 			clientId    string
 			redirectURI string
 			stubDB      func(database *datamocks.Database)
+			// checkLogs, when set, reads the records the request wrote.
+			checkLogs func(t *testing.T, logs *logtest.SlogCapture)
 		}{
 			{
 				name:     "no client_id, so nothing can confirm the target",
 				clientId: "",
 				stubDB:   func(database *datamocks.Database) {},
+			},
+			{
+				// The client's URI is registered and the request is otherwise in order, but whoever
+				// registered the client chose that URI, so the registration confirms nothing about
+				// the target. Without a hint this would make the sign-out page a redirector to any
+				// host an anonymous caller registers, RFC 9700 section 4.11.2 (#682).
+				name:     "client_id names a self-registered client",
+				clientId: "dcr_client",
+				stubDB: func(database *datamocks.Database) {
+					client := &record.Client{
+						ClientIdentifier: "dcr_client",
+						CreatedViaDCR:    true,
+						RedirectURIs:     []record.RedirectURI{{URI: "https://example.com/out"}},
+					}
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "dcr_client").Return(client, nil)
+					database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil).Maybe()
+				},
+				// The refusal is the operator's only trace of it, so it is a Warn, as the branch's
+				// other refusals are, naming the client and never the target or the state, which
+				// are the caller's text (#122, #682).
+				checkLogs: func(t *testing.T, logs *logtest.SlogCapture) {
+					var refusals []logtest.CapturedRecord
+					for _, record := range logs.Records() {
+						if record.Message == "client_id names a self-registered client and there is no id_token_hint, not redirecting" {
+							refusals = append(refusals, record)
+						}
+						assert.NotContains(t, record.Message, "example.com", "no record names the requested target")
+						for key, value := range record.Attrs {
+							text := fmt.Sprint(value)
+							assert.NotContains(t, text, "example.com", "attribute %q names the requested target", key)
+							assert.NotEqual(t, "abc", text, "attribute %q carries the state", key)
+						}
+					}
+					require.Len(t, refusals, 1, "one record says why the redirect was declined")
+					assert.Equal(t, slog.LevelWarn, refusals[0].Level)
+					assert.Equal(t, "dcr_client", refusals[0].Attrs["client_identifier"])
+				},
 			},
 			{
 				name:     "client_id names no client",
@@ -1252,7 +1363,20 @@ func TestHandleLogoutPost(t *testing.T) {
 				stubDB:      registers("https://example.com/out"),
 			},
 			{
-				// Rows 12 to 14 are a family of their own, and the one thing that separates them
+				// The authorization endpoint ignores a loopback redirect URI's port, RFC 8252
+				// section 7.3, so a native client registers http://127.0.0.1/callback and signs in
+				// from whatever port it listens on. Sign-out has no such exception: RP-Initiated
+				// Logout 1.0 section 3 asks for an exact match, so a matcher reused from sign-in
+				// would accept this pair and exact comparison refuses it. The DCR guide tells such a
+				// client to leave the target out, or to register the port it will listen on and send
+				// the URI exactly as registered, which this row pins.
+				name:        "the requested URI adds a port to a registered loopback one",
+				clientId:    "test_client",
+				redirectURI: "http://127.0.0.1:53682/callback",
+				stubDB:      registers("http://127.0.0.1/callback"),
+			},
+			{
+				// Rows 14 to 16 are a family of their own, and the one thing that separates them
 				// from every row above is that the requested URI IS registered, byte for byte. No
 				// comparison, loose or exact, can refuse them; only a rule about the shape of the
 				// value can. This endpoint matches the client's OAuth redirect_uris rows, so it
@@ -1371,8 +1495,13 @@ func TestHandleLogoutPost(t *testing.T) {
 						return data["redirectDeclined"] == true
 					})).Return(nil)
 
+				logs := logtest.CaptureSlog(t)
+
 				handler.ServeHTTP(rr, req)
 
+				if tc.checkLogs != nil {
+					tc.checkLogs(t, logs)
+				}
 				assert.Empty(t, rr.Header().Get("Location"), "a declined target must never become a redirect")
 				assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
 				pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)

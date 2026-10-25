@@ -1,14 +1,16 @@
 // RFC 9700 at dynamic client registration (RFC 7591). Section 2.6: no http redirect URI but on
 // loopback, for any client. Section 4.15.1: a client does not choose its own client_id, which could
 // pass for a user's subject in a client credentials token. Section 4.11.2: a client anyone could
-// register is not where a declined authorization sends the user. A system test because registration
-// is a global switch, put back afterwards; the clients it registers are deleted.
+// register is not where a declined authorization sends the user, nor where a sign-out without a hint
+// does (#682). A system test because registration is a global switch, put back afterwards; the
+// clients it registers are deleted.
 import { randomUUID } from "node:crypto";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { clientIdFromList, deleteClient } from "../../lib/admin-console";
-import { submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
+import { signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
+import { codeToken } from "../../lib/oauth";
 import { authorizeEndpoint, codeRequest, emptyBrowser, readAnswer } from "../../lib/rfc6749";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 
@@ -96,5 +98,82 @@ test("declining a client that registered itself sends the user nowhere: the page
     await expect(tab.getByText("It registered itself with this server, so nobody here has checked who it is or where it wants to send you.")).toBeVisible();
     expect(new URL(tab.url()).origin).toBe(env.authUrl);
     await context.close();
+  });
+});
+
+// The same attack at /auth/logout: anyone registers a client pointing at their own host, and a link
+// naming it and that URI, with no id_token_hint, would make the auth server's own Sign out button
+// deliver the browser there. A self-registered client's URIs confirm nothing about where the user
+// should go, so without a hint the sign-out ends on the auth server's page, session or none. A hint
+// the auth server confirms proves the user signed in to the client, and still sends them back.
+test("a sign-out without a hint never sends the user to a client that registered itself; one with a confirmed hint does (section 4.11.2)", async ({
+  page,
+  browser,
+  request,
+  users,
+}) => {
+  const user = await users.create();
+  await withRegistration(page, async (registered) => {
+    const answer = await register(request, { redirect_uris: [testRedirectUri], token_endpoint_auth_method: "client_secret_basic" });
+    expect(answer.status, answer.text).toBe(201);
+    const clientId = answer.body.client_id as string;
+    const secret = answer.body.client_secret as string;
+    registered.push(clientId);
+
+    // Opens the logout endpoint with query in a tab of context, confirms when asked, and returns the tab.
+    const signOut = async (context: BrowserContext, query: Record<string, string>) => {
+      const tab = await context.newPage();
+      await tab.goto(`${env.authUrl}/auth/logout?${new URLSearchParams(query)}`);
+      const signOutButton = tab.getByRole("button", { name: "Sign out", exact: true });
+      if (await signOutButton.isVisible()) {
+        await signOutButton.click();
+        await tab.waitForLoadState();
+      }
+      return tab;
+    };
+    const hintless = { client_id: clientId, post_logout_redirect_uri: testRedirectUri, state: "s" };
+    const expectSignedOutHere = async (tab: Page) => {
+      expect(new URL(tab.url()).origin).toBe(env.authUrl);
+      await expect(tab.getByRole("heading", { name: "Signed out" })).toBeVisible();
+      await expect(tab.getByText("We couldn't take you back to the application you signed out from.")).toBeVisible();
+    };
+
+    await test.step("from a browser with no session, the page asks and then stays on the auth server", async () => {
+      const context = await emptyBrowser(browser);
+      const tab = await context.newPage();
+      await tab.goto(`${env.authUrl}/auth/logout?${new URLSearchParams(hintless)}`);
+      // The hintless GET asks first, so nothing is sent anywhere before the confirming POST.
+      expect(new URL(tab.url()).origin).toBe(env.authUrl);
+      await tab.getByRole("button", { name: "Sign out", exact: true }).click();
+      await tab.waitForLoadState();
+      await expectSignedOutHere(tab);
+      await context.close();
+    });
+
+    await test.step("a user signed in through the client is signed out and stays on the auth server", async () => {
+      const signIn = await signInThroughClient(browser, { clientId, email: user.email, password: user.password, scope: "openid" });
+      await expectSignedOutHere(await signOut(signIn.context, hintless));
+
+      // The session ended: the next sign-in in the same browser asks for the password again.
+      const next = await signIn.context.newPage();
+      await next.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(clientId).params)}`);
+      await expect(next).toHaveURL(/\/auth\/pwd/);
+      await signIn.context.close();
+    });
+
+    await test.step("with the ID token the client was issued as the hint, the browser goes back to the client", async () => {
+      const signIn = await signInThroughClient(browser, { clientId, email: user.email, password: user.password, scope: "openid" });
+      const token = await codeToken(request, clientId, secret, signIn.code, signIn.codeVerifier, testRedirectUri);
+      expect(token.status, JSON.stringify(token.body)).toBe(200);
+      const tab = await signOut(signIn.context, {
+        id_token_hint: token.body.id_token as string,
+        post_logout_redirect_uri: testRedirectUri,
+        state: "s",
+      });
+      const landed = new URL(tab.url());
+      expect(landed.href.startsWith(testRedirectUri), landed.href).toBe(true);
+      expect(landed.searchParams.get("state")).toBe("s");
+      await signIn.context.close();
+    });
   });
 });
