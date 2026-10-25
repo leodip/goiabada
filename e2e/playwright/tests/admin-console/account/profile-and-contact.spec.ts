@@ -72,7 +72,10 @@ test("the user picks a time zone and a language by searching their lists, and th
   await expect(page.locator('select[name="locale"]')).toHaveValue("en-GB");
 });
 
-test("the user changes their email with their password, which must be right and confirmed", async ({ page, browser, users }) => {
+// The console's own sentence for the auth server's 429, as password-and-otp.spec.ts reads it.
+const tooManyAttempts = "Too many requests have come from this browser, or for this account, in a short time. Please wait a few minutes and try again.";
+
+test("the user changes their email with their password, which must be right and confirmed, five times an hour", async ({ page, browser, users }) => {
   const user = await users.create();
   const other = await users.create();
   const newEmail = `${uniqueIdentifier("u")}@example.com`;
@@ -96,7 +99,26 @@ test("the user changes their email with their password, which must be right and 
   await submit(newEmail, newEmail, user.password);
   await expect(own.page.getByText("Email changed.", { exact: true })).toBeVisible();
 
-  // A new address starts unverified; verifying it with the mailed code is in email.spec.ts.
+  // Every change counts against the account, five an hour, whatever the address and whether the
+  // password was right, since past the password the answer says whether an address is taken (#683).
+  // Counted by the user whatever the rate limiter switch says: the four above that reached the auth
+  // server (the mismatch is the console's own) and this idle re-save of the address it now has, which
+  // changes nothing and is answered as a change, are five.
+  const currentPassword = own.page.locator("#currentPassword");
+  await submit(newEmail, newEmail, user.password);
+  await expect(currentPassword).toHaveValue("");
+  await expect(own.page.getByText("Email changed.", { exact: true })).toBeVisible();
+  // The sixth is refused with the right password and a free address, on the form, not the error page.
+  const freeEmail = `${uniqueIdentifier("u")}@example.com`;
+  await submit(freeEmail, freeEmail, user.password);
+  await expect(own.page.locator("#email-error")).toContainText(tooManyAttempts);
+  await expect(own.page.locator("#email")).toHaveValue(freeEmail);
+  await expect(currentPassword).toHaveValue("");
+  await expect(own.page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0);
+  await expect(own.page.getByRole("button", { name: "Change email" })).toBeVisible();
+
+  // A new address starts unverified, and the one refused above was not stored; verifying it with the
+  // mailed code is in email.spec.ts.
   await own.page.goto(`${env.adminUrl}/account/email-verification`);
   await expect(own.page.locator("main").getByText(newEmail, { exact: true })).toBeVisible();
   await expect(own.page.getByText("Not verified", { exact: true })).toBeVisible();

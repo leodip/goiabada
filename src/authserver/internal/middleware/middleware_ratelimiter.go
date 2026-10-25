@@ -526,7 +526,9 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// which a user changing theirs has to be told (#404), so what this bounds is one account
 		// asking about addresses: a right password spends nothing on account_password, and with
 		// self-registration on an account is one form away. 5 an hour is the send's figure, room
-		// for a typo and a change of mind, and caps one account at 120 addresses a day.
+		// for a typo and a change of mind, and caps one account at 120 addresses a day on each
+		// replica: the count is held in the process, as every request tier's is, and a restart
+		// starts it again.
 		accountEmailChange: request("account_email_change", countedByTokenUser, "", 5, 60*time.Minute),
 		// per-subject account password failures, one bucket for the three routes that check
 		// that password: PUT /api/v1/account/password, PUT /api/v1/account/otp and

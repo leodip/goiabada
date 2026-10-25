@@ -52,8 +52,9 @@ func IsSessionEnded(err error) bool {
 //
 // The auth server allows five wrong passwords per user per 15 minutes on the account API's
 // password, email and two-factor authentication changes, whatever its rate limiter switch says,
-// limits the email verification code the same way, and answers the next request 429
-// TOO_MANY_REQUESTS. Five mistyped passwords is ordinary use, so a page whose call the limiter can
+// limits the email verification code the same way, refuses the email change after five changes
+// per user an hour whatever the password, since past the password it says whether an address is
+// taken (#683), and answers the next request 429 TOO_MANY_REQUESTS. Five mistyped passwords is ordinary use, so a page whose call the limiter can
 // refuse answers it the way it answers a 400, with RateLimitedMessage, rather than with the 500
 // page, which blamed the server for the limit doing its job (#559 decision 10). Exported for the
 // two-factor authentication page, which routes its refusals on code rather than through
