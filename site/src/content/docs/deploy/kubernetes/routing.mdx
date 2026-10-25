@@ -1,0 +1,148 @@
+---
+title: Routing
+description: Deploy Goiabada behind the Gateway, Ingress controller or routing your cluster already has, with certificates from your issuer or your own TLS.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you deploy Goiabada behind the routing your cluster already has, rather than the Envoy Gateway the [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) recipe installs.
+
+The setup wizard asks how traffic reaches Goiabada, and writes what that answer needs. It asks what your cluster has, never which product runs it.
+
+## Set it up
+
+<Steps>
+
+1. **Prepare the database,** as [Database](/deploy/database/) describes.
+
+2. **Run the [setup wizard](/deploy/setup-wizard/),** choose **Kubernetes cluster**, and at **Routing** choose the mode that matches your cluster, from [The routing modes](#the-routing-modes) below. Answer what it asks next: the GatewayClass, the Gateway and its listeners, or the IngressClass, and [where the certificates come from](#where-the-certificates-come-from).
+
+3. **Follow the steps the wizard prints.** They check what the manifest names exists, deploy both files, the Secrets first, and point DNS at the address that serves the two hosts:
+
+   ```bash
+   kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml
+   ```
+
+4. **Check plain HTTP is redirected** wherever the manifest writes no redirect itself, which is every mode but a Gateway of your own that ends TLS. The answer should be a redirect, such as a `301`, `302` or `308`, whose `location` starts with `https://`, never a `200`:
+
+   ```bash
+   curl -sI http://auth.example.com/ | grep -i -E '^(HTTP|location)'
+   ```
+
+5. **Sign in** at your admin console's URL, as [First sign-in](/get-started/first-sign-in/) describes.
+
+</Steps>
+
+## The routing modes
+
+| Mode | `--routing` | The manifest writes | The wizard asks |
+|---|---|---|---|
+| Envoy Gateway | `envoy-gateway` | A Gateway of class `eg`, two HTTPRoutes and a redirect, with Let's Encrypt certificates: the [tested recipe](/deploy/kubernetes/gateway-and-certificates/), and the default | The traffic policy |
+| A Gateway of your cluster's class | `gateway` | The same Gateway and routes, of the class you name, and the redirect when the Gateway ends TLS | The class, the certificates, the listeners' ports |
+| A Gateway someone else runs | `existing-gateway` | The two HTTPRoutes alone, attached to that Gateway's HTTPS listeners | The Gateway, its namespace, and its listener for each host |
+| Ingress | `ingress` | One Ingress per host | The IngressClass, the certificates |
+| None | `none` | The Services alone, `goiabada-authserver` on 9090 and `goiabada-adminconsole` on 9091 | Nothing |
+
+Each mode was checked on a K3s cluster by signing in to the admin console through it: a Gateway of Envoy Gateway's class and of Traefik's, a shared Envoy Gateway in another namespace, Traefik's Ingress controller, and a route written by hand in front of the Services alone.
+
+### A Gateway of your cluster's class
+
+Use it when the cluster has a GatewayClass you may create Gateways of, such as Envoy Gateway's, Cilium's, Istio's or Traefik's. The Gateway is named `goiabada`, with an HTTP listener and, when it ends TLS, an HTTPS listener per host and the redirect route answering plain HTTP with a `301`. With [TLS ended in front](#where-the-certificates-come-from), it has the HTTP listener alone. Read its address for DNS once it's programmed:
+
+```bash
+kubectl get gateway goiabada -n goiabada -o jsonpath='{.status.addresses[0].value}'
+```
+
+Most implementations take the well-known ports 80 and 443 for the listeners, the wizard's defaults. Some take only their own proxy's ports: Traefik's Gateway accepts a listener only on one of its entry points, 8000 and 8443 by default, and refuses 80 as `PortUnavailable`; K3s publishes them on 80 and 443. Answer the ports your GatewayClass's documentation names, `--gateway-http-port=8000 --gateway-https-port=8443` for Traefik.
+
+### A Gateway someone else runs
+
+Use it when a platform team runs a shared Gateway and you attach routes to it. The manifest writes no Gateway, no redirect and no certificate: the Gateway's owner serves HTTPS for both hosts and redirects plain HTTP.
+
+The wizard always names the listener each route attaches to. A route naming none attaches to every listener its host matches, a plain HTTP one included, and would serve Goiabada over HTTP. Ask the Gateway's owner which listener serves HTTPS for each host; a shared Gateway often has one wildcard listener for both, which `--admin-listener` defaults to.
+
+The Gateway must admit routes from Goiabada's namespace on those listeners, in their `allowedRoutes`. Until it does, each route's `Accepted` condition is `False` with the reason `NotAllowedByListeners`, and nothing is served:
+
+```bash
+kubectl describe httproute -n goiabada
+```
+
+A reason of `NoMatchingParent` means the listener named isn't on the Gateway.
+
+### Ingress
+
+Use it when the cluster runs an Ingress controller, such as Traefik, HAProxy, F5 NGINX or a cloud provider's. Each Ingress is named after its Service, `goiabada-authserver` and `goiabada-adminconsole`. Leave the IngressClass blank to use the cluster's default class. Read the address for DNS once the controller has published it:
+
+```bash
+kubectl get ingress goiabada-authserver -n goiabada \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}'
+```
+
+No Ingress field asks for a redirect from HTTP to HTTPS: it's the controller's own setting, and some serve an Ingress with TLS on plain HTTP as well. **Never** leave it that way: the sign-in form would accept passwords over plain HTTP. Traefik does this until its `web` entry point redirects to `websecure`. On K3s, whose Traefik is set by a HelmChartConfig, this turns the redirect on:
+
+```yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+```
+
+The redirection is cluster-wide: agree it with whoever runs the controller.
+
+### None
+
+Use it when you route the Services yourself, with a mesh's gateway, a load balancer that reaches pods, or anything else the wizard doesn't write. Serve each URL over HTTPS to its Service, redirect plain HTTP, and read [Who can reach Goiabada](#who-can-reach-goiabada) before you answer the NetworkPolicy question.
+
+## Where the certificates come from
+
+A Gateway of your cluster's class and Ingresses ask where their certificates come from:
+
+- **A cert-manager ClusterIssuer** (`--tls=cluster-issuer --tls-issuer=NAME`), the default, or **an Issuer** in Goiabada's namespace (`--tls=issuer`). The Gateway or each Ingress carries `cert-manager.io/cluster-issuer` or `cert-manager.io/issuer`, and cert-manager issues a certificate per host into `goiabada-tls-auth` and `goiabada-tls-admin`. On a Gateway, cert-manager reads the annotation only with its Gateway API support on, as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) sets it. Both were checked with an internal CA issuer.
+- **TLS Secrets you supply** (`--tls=secrets`), named per host, `goiabada-tls-auth` and `goiabada-tls-admin` unless you answer others, or one name for both, such as a wildcard certificate's. You create them in Goiabada's namespace and renew them before they expire. When the wizard's files create the namespace, create the Secrets just after applying them: until they exist, a Gateway's HTTPS listeners report `InvalidCertificateRef` and serve nothing, and Traefik serves its own default certificate for an Ingress, as checked on K3s. With one Secret for both hosts, Envoy Gateway marks the two listeners `OverlappingTLSConfig` and serves them over HTTP/1.1 alone, which works.
+- **TLS ended in front** (`--tls=external`), at a load balancer or a CDN that forwards plain HTTP to the routing layer. The Gateway has its HTTP listener alone, or the Ingresses no TLS, and nothing redirects. The load balancer in front redirects plain HTTP itself.
+
+<Aside type="danger" title="With TLS ended in front">
+Let nothing but the load balancer reach the routing layer: it serves both hosts over plain HTTP. And turn the routing layer's own redirect to HTTPS off: every request reaches it as plain HTTP, so it would send each one back to HTTPS, round and round. Traefik's entry-point redirect did exactly that behind a load balancer ending TLS.
+</Aside>
+
+## Who can reach Goiabada
+
+With NetworkPolicies on, the wizard asks the namespace your routing layer's proxies run in, and the policies admit only that namespace to both servers, and the admin console to the auth server. A policy naming the wrong namespace refuses the routing layer's own connections: the route answers `502` or times out.
+
+The namespace is where the proxies' pods run, which isn't always the Gateway's or the controller's own:
+
+- **Envoy Gateway** runs every Gateway's proxies in `envoy-gateway-system` unless it was told otherwise, a shared Gateway in another namespace included.
+- **Traefik** on K3s runs in `kube-system`, for its Gateway and its Ingresses alike.
+
+Find yours with `kubectl get pods -A -o wide` and the addresses the routes come from. A routing layer whose proxies aren't pods in one namespace can't be admitted this way, such as a cloud load balancer that sends to pod addresses directly: answer **No**, and see [Security](/deploy/kubernetes/security/#who-can-reach-goiabada).
+
+## The client's address
+
+Outside the Envoy Gateway recipe, the wizard can't know which address your routing layer shows Goiabada for each client. The manifest trusts one proxy hop, right behind a routing layer that appends the address it received each connection from to `X-Forwarded-For`, as Envoy and Traefik do, and the [rate limiter](/deploy/setup-wizard/#the-rate-limiter-on-kubernetes) is off by default.
+
+Check what Goiabada sees once it runs: request any page, then read that request's `ip=` in the auth server's log:
+
+```bash
+kubectl logs -n goiabada deployment/goiabada-authserver | grep 'http request' | tail -3
+```
+
+Your own address means the per-address limits count each client alone. One address for every client, a node's or a load balancer's, means they'd count everyone together: keep the rate limiter off, or see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes). With TLS ended at a load balancer in front, that load balancer is a second hop when it appends an entry of its own: behind an Nginx ending TLS in front of Envoy on K3s, Goiabada saw a node's address for every client. List every hop then, as [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop) describes.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Security" description="Who can reach the pods, and what they may do." href="/deploy/kubernetes/security/" />
+  <LinkCard title="Internal TLS" description="Encrypt the admin console's and the gateway's connections to the auth server." href="/deploy/kubernetes/internal-tls/" />
+  <LinkCard title="Client IP and proxy trust" description="Make Goiabada see each client's own address." href="/deploy/client-ip-and-proxy-trust/" />
+</CardGrid>

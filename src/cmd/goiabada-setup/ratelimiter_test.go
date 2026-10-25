@@ -105,7 +105,7 @@ func TestEveryAskingOutput_TheRateLimiterCommentSaysWhatAppliesEitherWay(t *test
 				if strings.Contains(strings.ToLower(comment), "nothing limits") {
 					t.Errorf("the comment above %s says something goes unlimited with it off: %q", rateLimiterVariable, comment)
 				}
-				cluster := config.Deployment.servedByEnvoyGateway && config.GatewayTrafficPolicy == trafficPolicyCluster
+				cluster := config.servedByEnvoyGateway() && config.GatewayTrafficPolicy == trafficPolicyCluster
 				onAdds := "10 wrong passwords block an email's password sign-ins for 15 minutes for every client through a node"
 				if got := strings.Contains(comment, onAdds); got != cluster {
 					t.Errorf("under Cluster: %v, but the comment above %s saying %q is %v: %q", cluster, rateLimiterVariable, onAdds, got, comment)

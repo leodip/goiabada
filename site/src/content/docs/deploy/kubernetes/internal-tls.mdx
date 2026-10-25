@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you encrypt the admin console's and the gateway's connections to the auth server.
 
-Start with [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/). Keep these patches beside the wizard's `goiabada-k8s.yaml`.
+Start with [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) or [Routing](/deploy/kubernetes/routing/). Keep these patches beside the wizard's `goiabada-k8s.yaml`. The first section applies under every routing mode; the second only where the manifest writes HTTPRoutes, to a Gateway of its own or someone else's.
 
 ## Admin console to auth server
 
@@ -191,7 +191,7 @@ This example uses cert-manager's [CA issuer](https://cert-manager.io/docs/config
 
 ## Gateway to auth server
 
-Complete the previous section first. A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/reference/api-types/policy/backendtlspolicy/) makes the gateway verify the auth server's certificate on the Service's `https` port. These steps are tested with **Envoy Gateway v1.9.1**.
+Complete the previous section first. This section is for a Gateway: with Ingresses, or routing of your own, the hop from your routing layer stays HTTP unless your controller's own backend TLS settings encrypt it, which these steps don't cover. A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/reference/api-types/policy/backendtlspolicy/) makes the gateway verify the auth server's certificate on the Service's `https` port. These steps are tested with **Envoy Gateway v1.9.1**.
 
 <Steps>
 

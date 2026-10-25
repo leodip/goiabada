@@ -105,8 +105,9 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 			scriptedStep{prompt: createNamespacePrompt, answer: ""},
 		)
 	}
-	if d.servedByEnvoyGateway {
+	if d.asksRouting {
 		steps = append(steps,
+			scriptedStep{prompt: routingPrompt, answer: ""},
 			scriptedStep{prompt: trafficPolicyPrompt, answer: ""},
 			scriptedStep{prompt: networkPolicyPrompt, answer: ""},
 		)
@@ -163,8 +164,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
@@ -394,7 +395,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{12, 13},
+			numbers:  []int{13, 14},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret", "prefer", ""},
 			checked:  true,
 		},
@@ -1356,8 +1357,10 @@ func TestWizard_LocalProxyIsIgnoredOutsideNative(t *testing.T) {
 // trafficPolicyPrompt and networkPolicyPrompt are the two Kubernetes questions, the first Cluster
 // by default and the second no (#396 decisions 4 and 5).
 const (
-	trafficPolicyPrompt = "Select traffic policy [1-2] [1]: "
-	networkPolicyPrompt = "Restrict who can reach Goiabada with NetworkPolicies? [y/N]: "
+	routingPrompt        = "Select routing [1-5] [1]: "
+	trafficPolicyPrompt  = "Select traffic policy [1-2] [1]: "
+	networkPolicyPrompt  = "Restrict who can reach Goiabada with NetworkPolicies? [y/N]: "
+	proxyNamespacePrompt = "Namespace your routing layer's proxies run in [envoy-gateway-system]: "
 )
 
 // kubernetesFlags is a non-interactive Kubernetes run, its answers to the two questions left out.
@@ -1598,6 +1601,11 @@ func withAnswers(t *testing.T, kind deploymentType, answers map[string]string) [
 		if !found {
 			t.Fatalf("the %s script never asks %q", deployments[kind].name, prompt)
 		}
+	}
+	// NetworkPolicies answered yes ask the namespace they admit, envoy-gateway-system by default
+	// under the Envoy Gateway recipe the script routes through.
+	if at := slices.IndexFunc(steps, func(s scriptedStep) bool { return s.prompt == networkPolicyPrompt }); at >= 0 && strings.HasPrefix(steps[at].answer, "y") {
+		steps = slices.Insert(steps, at+1, scriptedStep{prompt: proxyNamespacePrompt, answer: ""})
 	}
 	return steps
 }

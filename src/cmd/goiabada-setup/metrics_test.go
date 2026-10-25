@@ -137,7 +137,7 @@ func TestKubernetesManifest_TurnsRequestLoggingOnInBothServers(t *testing.T) {
 // no annotation and no PodMonitor (#400 decision 7).
 func TestKubernetesManifest_SaysNothingOfMetricsWhenOff(t *testing.T) {
 	config := metricsConfig(metricsNone)
-	config.NetworkPolicy = true
+	config.NetworkPolicy, config.ProxyNamespace = true, envoyProxyNamespace
 	content := descriptionOf(config)
 	for _, unwanted := range []string{"METRICS", "9190", "9191", "prometheus", "PodMonitor", "metrics"} {
 		if strings.Contains(content, unwanted) {
@@ -280,13 +280,13 @@ func TestKubernetesManifest_LabelsThePodMonitorAsGiven(t *testing.T) {
 // NetworkPolicies off, metrics write none (#400 decision 8).
 func TestKubernetesManifest_AdmitsTheScraperToTheMetricsPortAlone(t *testing.T) {
 	without := metricsConfig(metricsNone)
-	without.NetworkPolicy = true
+	without.NetworkPolicy, without.ProxyNamespace = true, envoyProxyNamespace
 	before := kubernetesDocuments(t, without)
 
 	for _, exposure := range []metricsExposure{metricsAnnotations, metricsPodMonitor} {
 		t.Run(string(exposure), func(t *testing.T) {
 			config := metricsConfig(exposure)
-			config.NetworkPolicy = true
+			config.NetworkPolicy, config.ProxyNamespace = true, envoyProxyNamespace
 			config.MetricsNamespace = "observability"
 			docs := kubernetesDocuments(t, config)
 			content := descriptionOf(config)

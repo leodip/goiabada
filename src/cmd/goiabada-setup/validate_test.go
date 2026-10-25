@@ -26,7 +26,8 @@ func TestHostOf(t *testing.T) {
 
 // The default admin console URL and email are the auth host's parent with admin in front, and
 // there are none for a host without a parent. The last two labels defaulted
-// https://auth.example.co.uk to https://admin.co.uk (#430).
+// https://auth.example.co.uk to https://admin.co.uk (#430). Its path never goes with it, and an https
+// URL's port only for Kubernetes, whose Gateway serves both hosts on one HTTPS port (#686 section 3).
 func TestDefaultAdminURLAndEmail(t *testing.T) {
 	cases := []struct{ auth, admin, email string }{
 		{"https://auth.example.com", "https://admin.example.com", "admin@example.com"},
@@ -40,7 +41,7 @@ func TestDefaultAdminURLAndEmail(t *testing.T) {
 		{"https://localhost", "", ""},
 	}
 	for _, tc := range cases {
-		admin, derived := defaultAdminURL(tc.auth)
+		admin, derived := defaultAdminURL(tc.auth, false)
 		if admin != tc.admin || derived != (tc.admin != "") {
 			t.Errorf("defaultAdminURL(%q) = %q, %v; want %q, %v", tc.auth, admin, derived, tc.admin, tc.admin != "")
 		}
@@ -117,7 +118,7 @@ func TestValidateListenerHostname(t *testing.T) {
 func TestValidateURL(t *testing.T) {
 	for _, url := range []string{
 		"https://auth.example.com", "https://auth.example.com/", "https://auth.example.com:8443/base/path",
-		"http://localhost:9090", "https://10.0.0.5", "https://Auth.Example.com",
+		"http://localhost:9090", "https://10.0.0.5", "https://Auth.Example.com", "https://auth.example.com:65535",
 	} {
 		if err := validateURL(url); err != nil {
 			t.Errorf("validateURL(%q) = %v, want accepted", url, err)
@@ -127,6 +128,9 @@ func TestValidateURL(t *testing.T) {
 		"https://auth.example.com:x@evil.com/":   "cannot carry a user name or password",
 		"https://auth.example.com:x:y@evil.com/": "cannot carry a user name or password",
 		"https://auth.example.com:abc":           "cannot be parsed",
+		"https://auth.example.com:02000":         "URL port 02000 is not a port from 1 to 65535",
+		"https://auth.example.com:65536":         "URL port 65536 is not a port from 1 to 65535",
+		"https://auth.example.com:0/":            "URL port 0 is not a port from 1 to 65535",
 		"https://auth.example.com/%zz":           "cannot be parsed",
 		"auth.example.com":                       "must start with http:// or https://",
 		"https://auth_example.com":               "invalid character '_'",
@@ -136,6 +140,21 @@ func TestValidateURL(t *testing.T) {
 		err := validateURL(url)
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("validateURL(%q) = %v, want an error containing %q", url, err, want)
+		}
+	}
+}
+
+// For Kubernetes the default admin console URL keeps an https auth server URL's port, its HTTPS
+// port, and nothing else's: 443 is no port to keep, and an http URL's port is its HTTP one.
+func TestDefaultAdminURL_KeepsTheHTTPSPortForKubernetes(t *testing.T) {
+	for auth, want := range map[string]string{
+		"https://auth.example.com:8443/x": "https://admin.example.com:8443",
+		"https://auth.example.com:443/x":  "https://admin.example.com",
+		"https://auth.example.com":        "https://admin.example.com",
+		"http://auth.example.com:8080":    "https://admin.example.com",
+	} {
+		if admin, _ := defaultAdminURL(auth, true); admin != want {
+			t.Errorf("defaultAdminURL(%q, true) = %q, want %q", auth, admin, want)
 		}
 	}
 }

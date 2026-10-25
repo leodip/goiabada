@@ -71,7 +71,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	writeSharedURLs(&sb, config)
 	fmt.Fprintf(&sb, "  GOIABADA_APPNAME: %s\n", yamlQuote(seededAppName))
 	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: %s\n", yamlQuote(config.AdminEmail))
-	writeKubernetesTrust(&sb, "AUTHSERVER", config.GatewayTrafficPolicy)
+	writeKubernetesTrust(&sb, "AUTHSERVER", config)
 	for _, line := range config.rateLimiterComment() {
 		fmt.Fprintf(&sb, "  # %s\n", line)
 	}
@@ -102,7 +102,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 
 	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
 	writeSharedURLs(&sb, config)
-	writeKubernetesTrust(&sb, "ADMINCONSOLE", config.GatewayTrafficPolicy)
+	writeKubernetesTrust(&sb, "ADMINCONSOLE", config)
 	writeObservability(&sb, "ADMINCONSOLE", config.exposedMetricsPort(adminConsoleMetricsPort))
 	sb.WriteString("\n")
 
@@ -286,8 +286,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		if config.admitsMetricsScraper() {
 			admitTo = "the first rule's from:"
 		}
-		writeNetworkPolicy(&sb, ns, "goiabada-authserver", 9090, slices.Concat([]string{
-			"Admits the auth server's port from Envoy's proxies and from the admin console's pods,",
+		writeNetworkPolicy(&sb, ns, "goiabada-authserver", 9090, config.ProxyNamespace, slices.Concat([]string{
+			"Admits the auth server's port from " + config.proxies() + " and from the admin console's pods,",
 			"and from nothing else. Enforced only by a CNI that implements NetworkPolicy (Calico and",
 			"Cilium do; some clusters' default CNI does not, and accepts the policy and ignores it).",
 			"The kubelet's probes come from the pod's own node, which no NetworkPolicy blocks.",
@@ -299,13 +299,11 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 			"  - namespaceSelector:",
 			"      matchLabels:",
 			"        kubernetes.io/metadata.name: <its namespace>",
-			"If Envoy Gateway runs its proxies in a namespace other than envoy-gateway-system, its",
-			"default, name that one below instead.",
 		}, config.metricsScraperComment(authServerMetricsPort)), "goiabada-adminconsole",
 			config.scraperRule(authServerMetricsPort))
 		sb.WriteString("\n")
-		writeNetworkPolicy(&sb, ns, "goiabada-adminconsole", 9091, slices.Concat([]string{
-			"Admits the admin console's port from Envoy's proxies alone: nothing in the cluster calls",
+		writeNetworkPolicy(&sb, ns, "goiabada-adminconsole", 9091, config.ProxyNamespace, slices.Concat([]string{
+			"Admits the admin console's port from " + config.proxies() + " alone: nothing in the cluster calls",
 			"it. Ingress only, with no egress rules, as the auth server's is, and enforced only by a",
 			"CNI that implements NetworkPolicy.",
 		}, config.metricsScraperComment(adminConsoleMetricsPort)), "",
@@ -318,65 +316,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		sb.WriteString("\n")
 	}
 
-	// Routing is Gateway API rather than Ingress: the one controller the Ingresses were written
-	// for, ingress-nginx, is retired and gets no more security fixes, and SIG Network points its
-	// users at Gateway API (kubernetes.io blog, 2025-11-11). Nothing below names an
-	// implementation except gatewayClassName, which the completion message has the operator
-	// create for Envoy Gateway (#430).
-	authHost := hostOf(config.AuthServerURL)
-	adminHost := hostOf(config.AdminConsoleURL)
-
-	// The Gateway: plain HTTP for the redirect and for cert-manager's HTTP-01 challenges, and one
-	// HTTPS listener per host. cert-manager reads the annotation and issues each listener's
-	// certificateRefs for its hostname (cert-manager docs, usage/gateway.md).
-	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
-	sb.WriteString("kind: Gateway\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("  annotations:\n")
-	sb.WriteString("    cert-manager.io/cluster-issuer: \"letsencrypt-prod\"\n")
-	sb.WriteString("spec:\n")
-	sb.WriteString("  gatewayClassName: eg\n")
-	sb.WriteString("  listeners:\n")
-	sb.WriteString("  - name: http\n")
-	sb.WriteString("    protocol: HTTP\n")
-	sb.WriteString("    port: 80\n")
-	writeHTTPSListener(&sb, "auth-https", authHost, "goiabada-tls-auth")
-	writeHTTPSListener(&sb, "admin-https", adminHost, "goiabada-tls-admin")
-	sb.WriteString("\n")
-
-	writeHTTPRoute(&sb, ns, "goiabada-authserver", "auth-https", authHost, 9090)
-	sb.WriteString("\n")
-	writeHTTPRoute(&sb, ns, "goiabada-adminconsole", "admin-https", adminHost, 9091)
-	sb.WriteString("\n")
-
-	// Plain HTTP on either host is sent to HTTPS, which ingress-nginx did by default for a host
-	// with TLS. No port is written: with a scheme and no port "the redirect port MUST be the
-	// well-known port associated with the redirect scheme", 443 for https
-	// (HTTPRequestRedirectFilter.Port, Gateway API v1.6.1 apis/v1/httproute_types.go). An explicit
-	// 443 changes nothing on Envoy Gateway v1.9.1, which renders either as Envoy's scheme redirect
-	// alone: that drops a Host's :80 and keeps any other port it names (#430).
-	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
-	sb.WriteString("kind: HTTPRoute\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-https-redirect\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("spec:\n")
-	sb.WriteString("  parentRefs:\n")
-	sb.WriteString("  - name: goiabada\n")
-	sb.WriteString("    sectionName: http\n")
-	sb.WriteString("  hostnames:\n")
-	fmt.Fprintf(&sb, "  - %s\n", yamlQuote(authHost))
-	fmt.Fprintf(&sb, "  - %s\n", yamlQuote(adminHost))
-	sb.WriteString("  rules:\n")
-	sb.WriteString("  - filters:\n")
-	sb.WriteString("    - type: RequestRedirect\n")
-	sb.WriteString("      requestRedirect:\n")
-	sb.WriteString("        scheme: https\n")
-	sb.WriteString("        statusCode: 301\n")
+	writeRouting(&sb, config)
 
 	return sb.String()
 }
@@ -776,50 +716,13 @@ func writePreStopPause(sb *strings.Builder) {
 	fmt.Fprintf(sb, "              seconds: %d\n", preStopPauseSeconds)
 }
 
-// writeHTTPSListener writes one HTTPS listener of the Gateway, terminating TLS for host with the
-// certificate cert-manager keeps in the Secret certificate.
-func writeHTTPSListener(sb *strings.Builder, name, host, certificate string) {
-	fmt.Fprintf(sb, "  - name: %s\n", name)
-	sb.WriteString("    protocol: HTTPS\n")
-	sb.WriteString("    port: 443\n")
-	fmt.Fprintf(sb, "    hostname: %s\n", yamlQuote(host))
-	sb.WriteString("    tls:\n")
-	sb.WriteString("      mode: Terminate\n")
-	sb.WriteString("      certificateRefs:\n")
-	fmt.Fprintf(sb, "      - name: %s\n", certificate)
-}
-
-// writeHTTPRoute writes the HTTPRoute sending host, on the Gateway's listener, to service's port.
-func writeHTTPRoute(sb *strings.Builder, ns, service, listener, host string, port int) {
-	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
-	sb.WriteString("kind: HTTPRoute\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", service)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("spec:\n")
-	sb.WriteString("  parentRefs:\n")
-	sb.WriteString("  - name: goiabada\n")
-	fmt.Fprintf(sb, "    sectionName: %s\n", listener)
-	sb.WriteString("  hostnames:\n")
-	fmt.Fprintf(sb, "  - %s\n", yamlQuote(host))
-	sb.WriteString("  rules:\n")
-	sb.WriteString("  - backendRefs:\n")
-	fmt.Fprintf(sb, "    - name: %s\n", service)
-	fmt.Fprintf(sb, "      port: %d\n", port)
-}
-
-// envoyProxyNamespace is where Envoy Gateway runs its proxies unless told otherwise: its controller's
-// namespace (KubernetesDeployMode, Envoy Gateway v1.9.1 api/v1alpha1/envoygateway_types.go).
-const envoyProxyNamespace = "envoy-gateway-system"
-
 // writeNetworkPolicy writes the ingress-only NetworkPolicy of the Deployment name, under the lines
-// saying what it admits and why: its pods admit port from the Envoy proxies' namespace and, when
-// caller is set, from the pods of that Deployment, and from nothing else. It states no egress rule,
+// saying what it admits and why: its pods admit port from proxyNamespace, where the routing layer's
+// proxies run, and, when caller is set, from the pods of that Deployment, and from nothing else. It states no egress rule,
 // since the SMTP server and the database are nothing a NetworkPolicy can select (#396 decision 5). A
 // scraper rule, when given, is a second rule admitting the metrics scraper's namespace to the metrics
 // port alone, leaving the first as it is (#400 decision 8).
-func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, comment []string, caller string, scraper *ingressRule) {
+func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, proxyNamespace string, comment []string, caller string, scraper *ingressRule) {
 	sb.WriteString("---\n")
 	for _, line := range comment {
 		fmt.Fprintf(sb, "# %s\n", line)
@@ -839,7 +742,7 @@ func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, comment 
 	sb.WriteString("  - from:\n")
 	sb.WriteString("    - namespaceSelector:\n")
 	sb.WriteString("        matchLabels:\n")
-	fmt.Fprintf(sb, "          kubernetes.io/metadata.name: %s\n", envoyProxyNamespace)
+	fmt.Fprintf(sb, "          kubernetes.io/metadata.name: %s\n", yamlQuote(proxyNamespace))
 	if caller != "" {
 		sb.WriteString("    - podSelector:\n")
 		sb.WriteString("        matchLabels:\n")
@@ -864,23 +767,44 @@ func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, comment 
 // so the rightmost X-Forwarded-For entry is Envoy's own observation; a private-range or pod-CIDR
 // list would instead adopt a forged entry wherever nodes or pods share those addresses, and no list
 // stops a pod calling the Service around Envoy (#396 decision 3). server is the variables' infix,
-// AUTHSERVER or ADMINCONSOLE, and policy the gateway's traffic policy, which decides the address
-// Envoy receives each connection from (#396 decision 4).
-func writeKubernetesTrust(sb *strings.Builder, server string, policy trafficPolicy) {
-	sb.WriteString("  # Envoy, the one gateway in front, appends the address it received each connection from\n")
-	sb.WriteString("  # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.\n")
-	if policy == trafficPolicyLocal {
-		sb.WriteString("  # Under the gateway's Local traffic policy, with Envoy on every node, Envoy receives each\n")
-		sb.WriteString("  # connection from the address the load balancer leaves on it: the client's address when\n")
-		sb.WriteString("  # the load balancer passes connections through, and its own when it proxies them.\n")
+// AUTHSERVER or ADMINCONSOLE. Under the Envoy Gateway recipe, the traffic policy decides the address
+// Envoy receives each connection from (#396 decision 4); behind any other routing layer the wizard
+// cannot know it, and with TLS ended in front of that layer, the load balancer ending it is a second
+// hop when it appends an entry of its own, which in front of an Envoy Gateway it did (#686 section 3).
+func writeKubernetesTrust(sb *strings.Builder, server string, config *Config) {
+	if config.servedByEnvoyGateway() {
+		sb.WriteString("  # Envoy, the one gateway in front, appends the address it received each connection from\n")
+		sb.WriteString("  # to X-Forwarded-For, so trusting one hop, the rightmost entry, needs no list.\n")
+		if config.GatewayTrafficPolicy == trafficPolicyLocal {
+			sb.WriteString("  # Under the gateway's Local traffic policy, with Envoy on every node, Envoy receives each\n")
+			sb.WriteString("  # connection from the address the load balancer leaves on it: the client's address when\n")
+			sb.WriteString("  # the load balancer passes connections through, and its own when it proxies them.\n")
+		} else {
+			sb.WriteString("  # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,\n")
+			sb.WriteString("  # so the servers see a node's address for every client rather than the client's own.\n")
+		}
+		sb.WriteString("  # Set the list only when a CDN or a second load balancer sits in front of Envoy, naming\n")
+		sb.WriteString("  # every hop, the Envoy pods included. A pod that calls the Service directly, around Envoy,\n")
+		sb.WriteString("  # chooses the address it is counted and audited under: a NetworkPolicy admitting only\n")
+		sb.WriteString("  # Envoy stops that, and no list does.\n")
 	} else {
-		sb.WriteString("  # Under the gateway's Cluster traffic policy, Envoy receives each connection from a node,\n")
-		sb.WriteString("  # so the servers see a node's address for every client rather than the client's own.\n")
+		sb.WriteString("  # One hop trusted, the rightmost X-Forwarded-For entry, with no list: right behind a\n")
+		sb.WriteString("  # routing layer that appends the address it received each connection from to the header,\n")
+		sb.WriteString("  # as Envoy and Traefik do.\n")
+		sb.WriteString("  # The servers then see the address each connection reached it from: the client's, or a\n")
+		sb.WriteString("  # node's or a load balancer's for every client. Check the ip= of your own request in the\n")
+		sb.WriteString("  # auth server's log once it runs.\n")
+		if config.asksTLS() && config.TLS == tlsExternal {
+			sb.WriteString("  # The load balancer or CDN ending TLS in front is a second hop when it appends an entry\n")
+			sb.WriteString("  # of its own: set the list then, naming every hop, the routing layer's pods included.\n")
+		} else {
+			sb.WriteString("  # Set the list only when a CDN or a second load balancer sits in front of the routing\n")
+			sb.WriteString("  # layer, naming every hop, the routing layer's pods included.\n")
+		}
+		sb.WriteString("  # A pod that calls the Service directly, around the routing layer, chooses the address\n")
+		sb.WriteString("  # it is counted and audited under: a NetworkPolicy admitting only the routing layer\n")
+		sb.WriteString("  # stops that, and no list does.\n")
 	}
-	sb.WriteString("  # Set the list only when a CDN or a second load balancer sits in front of Envoy, naming\n")
-	sb.WriteString("  # every hop, the Envoy pods included. A pod that calls the Service directly, around Envoy,\n")
-	sb.WriteString("  # chooses the address it is counted and audited under: a NetworkPolicy admitting only\n")
-	sb.WriteString("  # Envoy stops that, and no list does.\n")
 	fmt.Fprintf(sb, "  GOIABADA_%s_TRUST_PROXY_HEADERS: \"true\"\n", server)
 	fmt.Fprintf(sb, "  GOIABADA_%s_TRUSTED_PROXIES: \"\"\n", server)
 }

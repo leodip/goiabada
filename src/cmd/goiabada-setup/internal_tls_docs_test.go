@@ -235,9 +235,9 @@ func objectNamed(objects []object, kind, name string) (object, bool) {
 	return objects[i], true
 }
 
-// internalTLSFindings builds the page's kustomization over the manifest and says what in the
-// result differs from what the page sets out to do.
-func internalTLSFindings(manifest string, guide internalTLSGuide, gateway bool) ([]string, error) {
+// internalTLSFindings builds the page's kustomization over the manifest, generated for the routing
+// mode mode, and says what in the result differs from what the page sets out to do.
+func internalTLSFindings(manifest string, guide internalTLSGuide, gateway bool, mode routing) ([]string, error) {
 	built, err := buildInternalTLS(manifest, guide, gateway)
 	if err != nil {
 		return nil, err
@@ -259,7 +259,7 @@ func internalTLSFindings(manifest string, guide internalTLSGuide, gateway bool) 
 	findings = append(findings, mergeFindings(base, result, guide)...)
 	findings = append(findings, wiringFindings(result)...)
 	findings = append(findings, networkPolicyFindings(result)...)
-	findings = append(findings, routeFindings(result, gateway)...)
+	findings = append(findings, routeFindings(result, gateway, mode)...)
 	findings = append(findings, httpsFindings(result, gateway)...)
 	if gateway {
 		findings = append(findings, backendTLSFindings(result)...)
@@ -581,9 +581,10 @@ func admitsPort(rule map[string]any, number int) bool {
 	})
 }
 
-// routeFindings: every route to the auth server's Service sends to the HTTP port until the second
-// section, and to the HTTPS port after it.
-func routeFindings(result []object, gateway bool) []string {
+// routeFindings: every route to the auth server's Service, an HTTPRoute or an Ingress, sends to the
+// HTTP port until the second section, and to the HTTPS port after it, which only the Gateway modes
+// reach. A mode that routes the Service has a route to it, and the Services alone have none.
+func routeFindings(result []object, gateway bool, mode routing) []string {
 	want := authServerHTTPPort
 	if gateway {
 		want = internalTLSHTTPSPort
@@ -591,26 +592,44 @@ func routeFindings(result []object, gateway bool) []string {
 	var findings []string
 	routed := false
 	for _, o := range result {
-		if o.kind != "HTTPRoute" {
-			continue
-		}
-		for _, r := range listAt(o.doc, "spec", "rules") {
-			rule, _ := r.(map[string]any)
-			refs, _ := rule["backendRefs"].([]any)
-			for _, b := range refs {
-				ref, _ := b.(map[string]any)
-				if ref["name"] != "goiabada-authserver" {
-					continue
+		var ports []any
+		switch o.kind {
+		case "HTTPRoute":
+			for _, r := range listAt(o.doc, "spec", "rules") {
+				rule, _ := r.(map[string]any)
+				refs, _ := rule["backendRefs"].([]any)
+				for _, b := range refs {
+					if ref, _ := b.(map[string]any); ref["name"] == "goiabada-authserver" {
+						ports = append(ports, ref["port"])
+					}
 				}
-				routed = true
-				if ref["port"] != want {
-					findings = append(findings, fmt.Sprintf("%s sends the auth server's traffic to port %v, want %d", o, ref["port"], want))
+			}
+		case "Ingress":
+			for _, r := range listAt(o.doc, "spec", "rules") {
+				rule, _ := r.(map[string]any)
+				http, _ := rule["http"].(map[string]any)
+				paths, _ := http["paths"].([]any)
+				for _, p := range paths {
+					path, _ := p.(map[string]any)
+					backend, _ := path["backend"].(map[string]any)
+					service, _ := backend["service"].(map[string]any)
+					if service["name"] != "goiabada-authserver" {
+						continue
+					}
+					port, _ := service["port"].(map[string]any)
+					ports = append(ports, port["number"])
 				}
 			}
 		}
+		for _, port := range ports {
+			routed = true
+			if port != want {
+				findings = append(findings, fmt.Sprintf("%s sends the auth server's traffic to port %v, want %d", o, port, want))
+			}
+		}
 	}
-	if !routed {
-		findings = append(findings, "no HTTPRoute sends to the auth server's Service")
+	if routed != (mode != routingNone) {
+		findings = append(findings, fmt.Sprintf("a route sends to the auth server's Service: %v, under --routing=%s", routed, mode))
 	}
 	return findings
 }
@@ -735,21 +754,28 @@ func readInternalTLSPage(t *testing.T) internalTLSGuide {
 
 func TestInternalTLSDocs_TheKustomizationPatchesEveryGeneratedManifest(t *testing.T) {
 	guide := readInternalTLSPage(t)
-	withNetworkPolicy := 0
+	withNetworkPolicy, modes := 0, map[routing]bool{}
 	for _, c := range goldenCases() {
 		if c.deployment != deploymentKubernetes {
 			continue
 		}
-		manifest := descriptionOf(c.config())
+		config := c.config()
+		manifest := descriptionOf(config)
 		if strings.Contains(manifest, "\nkind: NetworkPolicy\n") {
 			withNetworkPolicy++
 		}
+		modes[config.Routing] = true
 		for _, gateway := range []bool{false, true} {
 			stage := internalTLSConsole
 			if gateway {
 				stage = internalTLSGateway
 			}
-			findings, err := internalTLSFindings(manifest, guide, gateway)
+			// The page's second section is for the Gateway modes alone: without an HTTPRoute
+			// there is no gateway hop for it to encrypt.
+			if gateway && !config.routesThroughGateway() {
+				continue
+			}
+			findings, err := internalTLSFindings(manifest, guide, gateway, config.Routing)
 			if err != nil {
 				t.Errorf("%s, through %q: %v", c.name, stage, err)
 			}
@@ -760,6 +786,11 @@ func TestInternalTLSDocs_TheKustomizationPatchesEveryGeneratedManifest(t *testin
 	}
 	if withNetworkPolicy == 0 {
 		t.Error("no Kubernetes golden has a NetworkPolicy, so the page's NetworkPolicy patch went unbuilt")
+	}
+	for _, mode := range routings {
+		if !modes[mode] {
+			t.Errorf("no Kubernetes golden routes with --routing=%s, so the page went unbuilt over it", mode)
+		}
 	}
 }
 
@@ -846,7 +877,7 @@ func TestInternalTLSFindings_FindWhatAManifestChangeLeftUnpatched(t *testing.T) 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			manifest := changedManifest(t, tt.golden, func(objects []object) { tt.change(t, objects) })
-			findings, err := internalTLSFindings(manifest, guide, true)
+			findings, err := internalTLSFindings(manifest, guide, true, routingEnvoyGateway)
 			if err != nil {
 				t.Fatalf("the kustomization does not build, so this change needs no finding: %v", err)
 			}
@@ -944,7 +975,7 @@ func TestInternalTLSFindings_FindWhatAPageChangeBroke(t *testing.T) {
 			if i < 0 {
 				t.Fatalf("no golden case is named %s", tt.golden)
 			}
-			findings, err := internalTLSFindings(descriptionOf(goldenCases()[i].config()), tt.change(t), true)
+			findings, err := internalTLSFindings(descriptionOf(goldenCases()[i].config()), tt.change(t), true, routingEnvoyGateway)
 			if err != nil {
 				t.Fatalf("the kustomization does not build, so this change needs no finding: %v", err)
 			}
@@ -961,7 +992,7 @@ func TestInternalTLSFindings_AcceptAFileMountedOnItsOwn(t *testing.T) {
 		"        - name: internal-tls\n          mountPath: /etc/goiabada/internal-tls\n",
 		"        - name: internal-tls\n          mountPath: /etc/goiabada/internal-tls/tls.crt\n          subPath: tls.crt\n"+
 			"        - name: internal-tls\n          mountPath: /etc/goiabada/internal-tls/tls.key\n          subPath: tls.key\n")
-	findings, err := internalTLSFindings(descriptionOf(goldenConfig(deploymentKubernetes, "postgres")), guide, true)
+	findings, err := internalTLSFindings(descriptionOf(goldenConfig(deploymentKubernetes, "postgres")), guide, true, routingEnvoyGateway)
 	if err != nil || len(findings) > 0 {
 		t.Errorf("err %v, findings %q", err, findings)
 	}
@@ -973,7 +1004,7 @@ func TestInternalTLSFindings_ARenamedConfigMapStopsTheBuild(t *testing.T) {
 	manifest := changedManifest(t, "kubernetes-postgres", func(objects []object) {
 		objectToChange(t, objects, "ConfigMap", "goiabada-adminconsole-config")["metadata"].(map[string]any)["name"] = "goiabada-adminconsole-settings"
 	})
-	if _, err := internalTLSFindings(manifest, guide, false); err == nil {
+	if _, err := internalTLSFindings(manifest, guide, false, routingEnvoyGateway); err == nil {
 		t.Error("the kustomization built with its ConfigMap patch's target renamed")
 	}
 }

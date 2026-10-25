@@ -147,6 +147,7 @@ export default defineConfig({
 							items: [
 								{ label: 'Overview', slug: 'deploy/kubernetes/overview' },
 								{ label: 'Gateway and certificates', slug: 'deploy/kubernetes/gateway-and-certificates' },
+								{ label: 'Routing', slug: 'deploy/kubernetes/routing' },
 								{ label: 'High availability', slug: 'deploy/kubernetes/high-availability' },
 								{ label: 'Security', slug: 'deploy/kubernetes/security' },
 								{ label: 'Internal TLS', slug: 'deploy/kubernetes/internal-tls' },

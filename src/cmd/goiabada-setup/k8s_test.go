@@ -151,35 +151,46 @@ func TestKubernetesManifest_RoutesEachHostThroughTheGateway(t *testing.T) {
 }
 
 // Plain HTTP on either host is answered with a permanent redirect to HTTPS, which ingress-nginx did
-// by default for a host with TLS (#430).
+// by default for a host with TLS (#430), on the port the URLs name: none for 443, with which Gateway
+// API has the redirect use https's well-known port, and the port itself otherwise, which Envoy
+// Gateway would otherwise replace with the one plain HTTP came in on (#686 section 3).
 func TestKubernetesManifest_RedirectsPlainHTTPToHTTPS(t *testing.T) {
-	route := kubernetesDocuments(t, kubernetesConfig())["HTTPRoute"]["goiabada-https-redirect"]
-	if route == nil {
-		t.Fatal("no HTTPRoute named goiabada-https-redirect")
-	}
-	parent := only[map[string]any](t, at[[]any](t, route, "spec", "parentRefs"), "the redirect's parentRefs")
-	if at[string](t, parent, "name") != "goiabada" || at[string](t, parent, "sectionName") != "http" {
-		t.Errorf("the redirect attaches to %v, want the goiabada Gateway's http listener", parent)
-	}
-	hostnames := at[[]any](t, route, "spec", "hostnames")
-	if len(hostnames) != 2 || hostnames[0] != "auth.example.com" || hostnames[1] != "admin.example.com" {
-		t.Errorf("the redirect is for %v, want both hosts", hostnames)
-	}
-	rule := only[map[string]any](t, at[[]any](t, route, "spec", "rules"), "the redirect's rules")
-	if _, ok := rule["backendRefs"]; ok {
-		t.Errorf("the redirect rule also forwards: %v", rule)
-	}
-	filter := only[map[string]any](t, at[[]any](t, rule, "filters"), "the redirect's filters")
-	if got := at[string](t, filter, "type"); got != "RequestRedirect" {
-		t.Errorf("the filter is %q, want RequestRedirect", got)
-	}
-	redirect := at[map[string]any](t, filter, "requestRedirect")
-	if at[string](t, redirect, "scheme") != "https" || at[int](t, redirect, "statusCode") != 301 {
-		t.Errorf("the redirect is %v, want 301 to https", redirect)
-	}
-	// With no port, Gateway API has the redirect use https's well-known port, 443.
-	if port, ok := redirect["port"]; ok {
-		t.Errorf("the redirect names port %v, and https's own is the one wanted", port)
+	for _, tc := range []struct {
+		suffix string
+		port   any
+	}{{"", nil}, {":443", nil}, {":8444", 8444}} {
+		t.Run("URLs on "+tc.suffix, func(t *testing.T) {
+			config := goldenConfig(deploymentKubernetes, "postgres")
+			config.AuthServerURL = "https://auth.example.com" + tc.suffix
+			config.AdminConsoleURL = "https://admin.example.com" + tc.suffix + "/console"
+			route := kubernetesDocuments(t, config)["HTTPRoute"]["goiabada-https-redirect"]
+			if route == nil {
+				t.Fatal("no HTTPRoute named goiabada-https-redirect")
+			}
+			parent := only[map[string]any](t, at[[]any](t, route, "spec", "parentRefs"), "the redirect's parentRefs")
+			if at[string](t, parent, "name") != "goiabada" || at[string](t, parent, "sectionName") != "http" {
+				t.Errorf("the redirect attaches to %v, want the goiabada Gateway's http listener", parent)
+			}
+			hostnames := at[[]any](t, route, "spec", "hostnames")
+			if len(hostnames) != 2 || hostnames[0] != "auth.example.com" || hostnames[1] != "admin.example.com" {
+				t.Errorf("the redirect is for %v, want both hosts", hostnames)
+			}
+			rule := only[map[string]any](t, at[[]any](t, route, "spec", "rules"), "the redirect's rules")
+			if _, ok := rule["backendRefs"]; ok {
+				t.Errorf("the redirect rule also forwards: %v", rule)
+			}
+			filter := only[map[string]any](t, at[[]any](t, rule, "filters"), "the redirect's filters")
+			if got := at[string](t, filter, "type"); got != "RequestRedirect" {
+				t.Errorf("the filter is %q, want RequestRedirect", got)
+			}
+			redirect := at[map[string]any](t, filter, "requestRedirect")
+			if at[string](t, redirect, "scheme") != "https" || at[int](t, redirect, "statusCode") != 301 {
+				t.Errorf("the redirect is %v, want 301 to https", redirect)
+			}
+			if port := redirect["port"]; port != tc.port {
+				t.Errorf("the redirect names port %v, want %v", port, tc.port)
+			}
+		})
 	}
 }
 
@@ -424,7 +435,7 @@ func TestKubernetesManifest_AdmitsOnlyEnvoyWhenAsked(t *testing.T) {
 	})
 	t.Run("yes", func(t *testing.T) {
 		config := kubernetesConfig()
-		config.NetworkPolicy = true
+		config.NetworkPolicy, config.ProxyNamespace = true, envoyProxyNamespace
 		docs := kubernetesDocuments(t, config)
 		content := descriptionOf(config)
 		if len(docs["NetworkPolicy"]) != len(workloads) {

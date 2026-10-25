@@ -85,9 +85,50 @@ var answerCases = []goldenCase{
 	{name: "kubernetes-existing-namespace-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NamespaceExists = true
 	}},
+	// Each routing mode beside the Envoy Gateway recipe, with each source of certificates, in the shapes
+	// checked on k3s: a Gateway of Traefik's class on its proxy's ports, a shared Gateway in another
+	// namespace, Ingresses, and the Services alone (#686 section 3).
+	{name: "kubernetes-gateway-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.GatewayClass, c.GatewayHTTPPort, c.GatewayHTTPSPort = routingGateway, "traefik", 8000, 8443
+		c.TLS, c.TLSIssuer = tlsClusterIssuer, "internal-ca"
+		c.NetworkPolicy, c.ProxyNamespace = true, "kube-system"
+	}},
+	{name: "kubernetes-gateway-issuer-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.GatewayClass = routingGateway, "eg"
+		c.TLS, c.TLSIssuer = tlsIssuer, "team-ca"
+	}},
+	{name: "kubernetes-gateway-secrets-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.GatewayClass = routingGateway, "eg"
+		c.TLS, c.TLSIssuer, c.TLSSecretAuth, c.TLSSecretAdmin = tlsSecrets, "", "platform-tls", "platform-tls"
+	}},
+	{name: "kubernetes-gateway-external-tls-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.GatewayClass, c.GatewayHTTPSPort = routingGateway, "eg", 0
+		c.TLS, c.TLSIssuer = tlsExternal, ""
+	}},
+	{name: "kubernetes-existing-gateway-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.GatewayName, c.GatewayNamespace, c.AuthListener, c.AdminListener = routingExistingGateway, "shared", "infra", "https", "https"
+		c.NetworkPolicy, c.ProxyNamespace = true, envoyProxyNamespace
+	}},
+	{name: "kubernetes-ingress-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.IngressClass = routingIngress, "traefik"
+		c.TLS, c.TLSIssuer = tlsClusterIssuer, "internal-ca"
+		c.NetworkPolicy, c.ProxyNamespace = true, "kube-system"
+	}},
+	{name: "kubernetes-ingress-secrets-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing = routingIngress
+		c.TLS, c.TLSIssuer, c.TLSSecretAuth, c.TLSSecretAdmin = tlsSecrets, "", "auth-tls", "admin-tls"
+	}},
+	{name: "kubernetes-ingress-external-tls-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.IngressClass = routingIngress, "traefik"
+		c.TLS, c.TLSIssuer = tlsExternal, ""
+	}},
+	{name: "kubernetes-no-routing-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing = routingNone
+		c.NetworkPolicy, c.ProxyNamespace = true, "ingress"
+	}},
 	// Kubernetes with the NetworkPolicies admitting only Envoy and the admin console (#396 decision 5).
 	{name: "kubernetes-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
-		c.NetworkPolicy = true
+		c.NetworkPolicy, c.ProxyNamespace = true, envoyProxyNamespace
 	}},
 	// The rate limiter answered against its default: off for production Compose and native
 	// binaries, on for Kubernetes under the Cluster traffic policy (#396 decision 9).
@@ -117,7 +158,7 @@ var answerCases = []goldenCase{
 	// default, to the metrics port alone (#400 decision 8).
 	{name: "kubernetes-metrics-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.Metrics = metricsPodMonitor
-		c.NetworkPolicy = true
+		c.NetworkPolicy, c.ProxyNamespace = true, envoyProxyNamespace
 		c.MetricsNamespace = "monitoring"
 	}},
 	// A verifying TLS mode with a CA file: native binaries name the file's absolute path, and
@@ -254,13 +295,18 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 	// Only native binaries ask whether a reverse proxy on the same machine forwards to them, and
 	// the default answer is yes.
 	config.LocalProxy = kind == deploymentNative
-	// Only Kubernetes asks which traffic policy the gateway uses, Cluster by default, and whether to
-	// restrict who reaches the servers, no by default.
+	// Only Kubernetes asks how traffic reaches the servers, through the Envoy Gateway recipe by
+	// default, which traffic policy that gateway uses, Cluster by default, and whether to restrict
+	// who reaches the servers, no by default.
+	config.Routing = ""
 	config.GatewayTrafficPolicy = ""
 	if kind == deploymentKubernetes {
+		config.Routing = routingEnvoyGateway
+		config.useEnvoyGatewayRecipe()
 		config.GatewayTrafficPolicy = trafficPolicyCluster
 	}
 	config.NetworkPolicy = false
+	config.ProxyNamespace = ""
 	// Production Compose, native binaries and Kubernetes ask whether to turn the rate limiter on,
 	// yes by default but for Kubernetes under the Cluster traffic policy; local testing never asks.
 	config.RateLimiter = kind == deploymentProduction || kind == deploymentNative

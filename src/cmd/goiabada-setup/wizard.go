@@ -80,13 +80,28 @@ var wizardSteps = []wizardStep{
 		run:     (*wizard).askCreateNamespace,
 	},
 	{
+		title:   "Routing",
+		applies: func(c *Config) bool { return c.Deployment.asksRouting },
+		run:     (*wizard).askRouting,
+	},
+	{
+		title:   "TLS certificates",
+		applies: func(c *Config) bool { return c.Deployment.asksRouting && c.asksTLS() },
+		run:     (*wizard).askTLS,
+	},
+	{
+		title:   "Gateway listeners",
+		applies: func(c *Config) bool { return c.Deployment.asksRouting && c.Routing == routingGateway },
+		run:     (*wizard).askGatewayListeners,
+	},
+	{
 		title:   "Gateway traffic policy",
-		applies: func(c *Config) bool { return c.Deployment.servedByEnvoyGateway },
+		applies: func(c *Config) bool { return c.servedByEnvoyGateway() },
 		run:     (*wizard).askTrafficPolicy,
 	},
 	{
 		title:   "Network policy",
-		applies: func(c *Config) bool { return c.Deployment.servedByEnvoyGateway },
+		applies: func(c *Config) bool { return c.Deployment.asksRouting },
 		run:     (*wizard).askNetworkPolicy,
 	},
 	{
@@ -286,7 +301,12 @@ func (w *wizard) askURLs() error {
 	if !w.interactive {
 		return w.urlsFromFlags()
 	}
-	authServerURL, err := w.askURL("Auth server URL (e.g., https://auth.example.com)", "https://auth.example.com", w.checkAuthURL)
+	// The URLs given, when they are asked again, are offered.
+	offered := "https://auth.example.com"
+	if w.config.AuthServerURL != "" {
+		offered = w.config.AuthServerURL
+	}
+	authServerURL, err := w.askURL("Auth server URL (e.g., https://auth.example.com)", offered, w.checkAuthURL)
 	if err != nil {
 		return err
 	}
@@ -375,7 +395,7 @@ func (w *wizard) askURL(prompt, defaultValue string, check func(string) error) (
 // askAdminURL asks for the admin console URL, offering the auth server's sibling when its host
 // has a parent and nothing when it has none, and asks again while checkDistinctHosts refuses it.
 func (w *wizard) askAdminURL(prompt, authServerURL string) (string, error) {
-	defaultURL, _ := defaultAdminURL(authServerURL)
+	defaultURL, _ := defaultAdminURL(authServerURL, w.config.Deployment.routesByHost)
 	for {
 		adminConsoleURL, err := w.askURL(prompt, defaultURL, w.checkURL)
 		if err != nil {
@@ -403,7 +423,7 @@ func (w *wizard) urlsFromFlags() error {
 	}
 	if adminConsoleURL == "" {
 		var derived bool
-		if adminConsoleURL, derived = defaultAdminURL(authServerURL); !derived {
+		if adminConsoleURL, derived = defaultAdminURL(authServerURL, w.config.Deployment.routesByHost); !derived {
 			return errs.Errorf("--admin-url is required when the auth URL's host, %s, is an IP address or a single label, which no admin console URL can be derived from", hostOf(authServerURL))
 		}
 	}
@@ -473,6 +493,291 @@ func (w *wizard) askCreateNamespace() error {
 	return err
 }
 
+// askRouting asks how traffic from outside the cluster reaches the servers, the tested Envoy Gateway
+// recipe by default, and what the mode chosen attaches to: a Gateway's class, another's Gateway and
+// listeners, or an IngressClass. The questions are about what the cluster has, never which vendor
+// runs it (#686 section 3).
+func (w *wizard) askRouting() error {
+	if !w.interactive {
+		return w.routingFromFlags()
+	}
+	c := w.config
+	w.out.println("How does traffic from outside the cluster reach Goiabada?")
+	w.out.println("  1. Envoy Gateway, as the steps after this wizard install it: a Gateway of class eg,")
+	w.out.println("     with certificates from Let's Encrypt through cert-manager. The tested recipe.")
+	w.out.println("  2. A Gateway of Goiabada's own, of a GatewayClass your cluster already has.")
+	w.out.println("  3. A Gateway someone else runs, such as a platform team's shared one, which Goiabada's")
+	w.out.println("     routes attach to.")
+	w.out.println("  4. An Ingress per host, for an Ingress controller your cluster runs.")
+	w.out.println("  5. None: the manifest has the Services alone, and you route them yourself.")
+	w.out.println()
+	choice, err := w.choice("Select routing [1-5]", []string{"1", "2", "3", "4", "5"})
+	if err != nil {
+		return err
+	}
+	c.Routing = routings[choice[0]-'1']
+	switch c.Routing {
+	case routingEnvoyGateway:
+		c.useEnvoyGatewayRecipe()
+		err = w.redirectPortsAgree()
+	case routingGateway:
+		w.out.println()
+		c.GatewayClass, err = w.validated("GatewayClass of the Gateway", "", "name", validateObjectName)
+	case routingExistingGateway:
+		w.out.println()
+		w.out.printf("The Gateway's owner must admit routes from the namespace %s on the listeners they\n", c.K8sNamespace)
+		w.out.println("attach to (their allowedRoutes). Name the HTTPS listener for each host, the same one")
+		w.out.println("for both when it's a wildcard listener: a route naming none would also attach to a")
+		w.out.println("plain HTTP listener and serve Goiabada over HTTP.")
+		if c.GatewayName, err = w.validated("Gateway name", "", "name", validateObjectName); err != nil {
+			return err
+		}
+		if c.GatewayNamespace, err = w.namespace("Gateway namespace", ""); err != nil {
+			return err
+		}
+		if c.AuthListener, err = w.validated("HTTPS listener for "+hostOf(c.AuthServerURL), "", "name", validateObjectName); err != nil {
+			return err
+		}
+		c.AdminListener, err = w.validated("HTTPS listener for "+hostOf(c.AdminConsoleURL), c.AuthListener, "name", validateObjectName)
+	case routingIngress:
+		w.out.println()
+		c.IngressClass, err = w.validated("IngressClass, blank for the cluster's default class", "", "name", optional(validateObjectName))
+	}
+	return err
+}
+
+// routingFromFlags is askRouting answered by --routing, envoy-gateway when left out, and the flags
+// of the mode it names, each required where the mode has nothing to offer for it.
+func (w *wizard) routingFromFlags() error {
+	c, f := w.config, w.flags
+	c.Routing = f.Routing
+	if c.Routing == "" {
+		c.Routing = routingEnvoyGateway
+	}
+	switch c.Routing {
+	case routingEnvoyGateway:
+		c.useEnvoyGatewayRecipe()
+		if err := c.checkRedirectPort(); err != nil {
+			return err
+		}
+		w.out.info("Routing: %s, a Gateway of class %s", c.Routing, envoyGatewayClass)
+	case routingGateway:
+		if err := requiredName("--gateway-class", f.GatewayClass, "--routing=gateway"); err != nil {
+			return err
+		}
+		c.GatewayClass = f.GatewayClass
+		w.out.info("Routing: %s, a Gateway of class %s", c.Routing, c.GatewayClass)
+	case routingExistingGateway:
+		for _, flag := range []struct{ name, value string }{
+			{"--gateway-name", f.GatewayName},
+			{"--gateway-namespace", f.GatewayNamespace},
+			{"--auth-listener", f.AuthListener},
+		} {
+			if err := requiredName(flag.name, flag.value, "--routing=existing-gateway"); err != nil {
+				return err
+			}
+		}
+		if err := validateNamespace(f.GatewayNamespace); err != nil {
+			return errs.Wrap(err, "invalid --gateway-namespace")
+		}
+		c.GatewayName, c.GatewayNamespace, c.AuthListener = f.GatewayName, f.GatewayNamespace, f.AuthListener
+		c.AdminListener = f.AdminListener
+		if c.AdminListener == "" {
+			c.AdminListener = c.AuthListener
+		} else if err := validateObjectName(c.AdminListener); err != nil {
+			return errs.Wrap(err, "invalid --admin-listener")
+		}
+		w.out.info("Routing: %s, the Gateway %s in %s, %s", c.Routing, c.GatewayName, c.GatewayNamespace, c.listenersAnswer())
+	case routingIngress:
+		if f.IngressClass != "" {
+			if err := validateObjectName(f.IngressClass); err != nil {
+				return errs.Wrap(err, "invalid --ingress-class")
+			}
+		}
+		c.IngressClass = f.IngressClass
+		w.out.info("Routing: %s, of class %s", c.Routing, c.ingressClassAnswer())
+	case routingNone:
+		w.out.info("Routing: none, the Services alone")
+	}
+	return nil
+}
+
+// redirectPortsAgree is checkRedirectPort. Asked interactively, it has the URLs entered again,
+// every check askURLs makes applying to them, offering the auth server URL given and an admin
+// console URL on its HTTPS port, which agrees, rather than end the wizard (#686 section 3).
+func (w *wizard) redirectPortsAgree() error {
+	for {
+		err := w.config.checkRedirectPort()
+		if err == nil || !w.interactive {
+			return err
+		}
+		w.out.println()
+		w.out.printf("These URLs cannot be routed: %s.\n", err)
+		w.out.println("Please re-enter the URLs:")
+		if err := w.askURLs(); err != nil {
+			return err
+		}
+	}
+}
+
+// requiredName refuses a name flag the mode needs and was left out, or one no Kubernetes object can
+// be named.
+func requiredName(flag, value, mode string) error {
+	if value == "" {
+		return errs.Errorf("%s is required with %s", flag, mode)
+	}
+	if err := validateObjectName(value); err != nil {
+		return errs.Wrapf(err, "invalid %s", flag)
+	}
+	return nil
+}
+
+// optional is validate for a non-empty answer, and accepts an empty one.
+func optional(validate func(string) error) func(string) error {
+	return func(value string) error {
+		if value == "" {
+			return nil
+		}
+		return validate(value)
+	}
+}
+
+// askTLS asks where the certificates of the Gateway or Ingresses the manifest creates come from: a
+// cert-manager ClusterIssuer by default, an Issuer, TLS Secrets the platform supplies, or TLS ended
+// in front of them, which leaves them plain HTTP (#686 section 3).
+func (w *wizard) askTLS() error {
+	c := w.config
+	if !w.interactive {
+		return w.tlsFromFlags()
+	}
+	ns := c.K8sNamespace
+	w.out.printf("Where do the certificates for %s and %s come from?\n", hostOf(c.AuthServerURL), hostOf(c.AdminConsoleURL))
+	w.out.println("  1. A cert-manager ClusterIssuer your cluster has.")
+	w.out.printf("  2. A cert-manager Issuer in the namespace %s.\n", ns)
+	w.out.printf("  3. TLS Secrets you supply in the namespace %s, one per host or one for both.\n", ns)
+	w.out.println("  4. TLS ends in front of the cluster, at a load balancer or a CDN that forwards plain")
+	w.out.println("     HTTP: the routing layer serves HTTP alone, and redirects nothing.")
+	w.out.println()
+	choice, err := w.choice("Select certificates [1-4]", []string{"1", "2", "3", "4"})
+	if err != nil {
+		return err
+	}
+	c.TLS = tlsSources[choice[0]-'1']
+	c.TLSSecretAuth, c.TLSSecretAdmin = authCertificateSecret, adminCertificateSecret
+	switch c.TLS {
+	case tlsClusterIssuer:
+		c.TLSIssuer, err = w.validated("ClusterIssuer name", "", "name", validateObjectName)
+	case tlsIssuer:
+		c.TLSIssuer, err = w.validated("Issuer name", "", "name", validateObjectName)
+	case tlsSecrets:
+		if c.TLSSecretAuth, err = w.validated("TLS Secret for "+hostOf(c.AuthServerURL), authCertificateSecret, "name", validateObjectName); err != nil {
+			return err
+		}
+		c.TLSSecretAdmin, err = w.validated("TLS Secret for "+hostOf(c.AdminConsoleURL), adminCertificateSecret, "name", validateObjectName)
+	}
+	return err
+}
+
+// tlsFromFlags is askTLS answered by --tls, cluster-issuer when left out, with --tls-issuer required
+// for an issuer, and --auth-tls-secret and --admin-tls-secret read for Secrets alone.
+func (w *wizard) tlsFromFlags() error {
+	c, f := w.config, w.flags
+	c.TLS = f.TLS
+	if c.TLS == "" {
+		c.TLS = tlsClusterIssuer
+	}
+	c.TLSSecretAuth, c.TLSSecretAdmin = authCertificateSecret, adminCertificateSecret
+	switch c.TLS {
+	case tlsClusterIssuer, tlsIssuer:
+		if err := requiredName("--tls-issuer", f.TLSIssuer, "--tls="+string(c.TLS)); err != nil {
+			return err
+		}
+		c.TLSIssuer = f.TLSIssuer
+	case tlsSecrets:
+		for _, secret := range []struct {
+			flag  string
+			value string
+			into  *string
+		}{{"--auth-tls-secret", f.TLSSecretAuth, &c.TLSSecretAuth}, {"--admin-tls-secret", f.TLSSecretAdmin, &c.TLSSecretAdmin}} {
+			if secret.value == "" {
+				continue
+			}
+			if err := validateObjectName(secret.value); err != nil {
+				return errs.Wrapf(err, "invalid %s", secret.flag)
+			}
+			*secret.into = secret.value
+		}
+	}
+	w.out.info("TLS certificates: %s", c.tlsAnswer())
+	return nil
+}
+
+// askGatewayListeners asks the ports of the listeners of a Gateway of the cluster's own class, 80
+// and 443 by default, the HTTPS one only when the Gateway ends TLS: some implementations accept only
+// their own proxy's ports (#686 section 3).
+func (w *wizard) askGatewayListeners() error {
+	c := w.config
+	if !w.interactive {
+		return w.gatewayListenersFromFlags()
+	}
+	w.out.println("Most Gateway implementations take the well-known ports 80 and 443 for the listeners.")
+	w.out.println("Some take only their own proxy's ports: Traefik's Gateway takes 8000 and 8443, and")
+	w.out.println("refuses 80. The GatewayClass's documentation says which.")
+	w.out.println()
+	for {
+		httpPort, err := w.port("HTTP listener port", "80")
+		if err != nil {
+			return err
+		}
+		c.GatewayHTTPPort, _ = strconv.Atoi(httpPort)
+		if !c.endsTLS() {
+			return nil
+		}
+		httpsPort, err := w.port("HTTPS listener port", "443")
+		if err != nil {
+			return err
+		}
+		c.GatewayHTTPSPort, _ = strconv.Atoi(httpsPort)
+		if c.GatewayHTTPPort != c.GatewayHTTPSPort {
+			return w.redirectPortsAgree()
+		}
+		w.out.println("The two listeners need ports of their own. Please try again.")
+	}
+}
+
+// gatewayListenersFromFlags is askGatewayListeners answered by --gateway-http-port and
+// --gateway-https-port, 80 and 443 when left out.
+func (w *wizard) gatewayListenersFromFlags() error {
+	c, f := w.config, w.flags
+	c.GatewayHTTPPort, c.GatewayHTTPSPort = 80, 443
+	for _, port := range []struct {
+		flag  string
+		value int
+		into  *int
+	}{{"--gateway-http-port", f.GatewayHTTPPort, &c.GatewayHTTPPort}, {"--gateway-https-port", f.GatewayHTTPSPort, &c.GatewayHTTPSPort}} {
+		if port.value == 0 {
+			continue
+		}
+		if err := validatePort(strconv.Itoa(port.value)); err != nil {
+			return errs.Wrapf(err, "invalid %s", port.flag)
+		}
+		*port.into = port.value
+	}
+	if !c.endsTLS() {
+		c.GatewayHTTPSPort = 0
+		w.out.info("Gateway listener: HTTP on %d", c.GatewayHTTPPort)
+		return nil
+	}
+	if c.GatewayHTTPPort == c.GatewayHTTPSPort {
+		return errs.Errorf("--gateway-http-port and --gateway-https-port are both %d, and each listener needs a port of its own", c.GatewayHTTPPort)
+	}
+	if err := c.checkRedirectPort(); err != nil {
+		return err
+	}
+	w.out.info("Gateway listeners: HTTP on %d, HTTPS on %d", c.GatewayHTTPPort, c.GatewayHTTPSPort)
+	return nil
+}
+
 // askTrafficPolicy asks which externalTrafficPolicy Envoy Gateway's load balancer Service uses,
 // Cluster by default, which decides the EnvoyProxy the completion message prints and the address the
 // servers see (#396 decision 4).
@@ -504,29 +809,66 @@ func (w *wizard) askTrafficPolicy() error {
 	return err
 }
 
-// askNetworkPolicy asks whether NetworkPolicies admit only Envoy's namespace to both servers, and
-// the admin console to the auth server, no by default (#396 decision 5).
+// askNetworkPolicy asks whether NetworkPolicies admit only the routing layer's namespace to both
+// servers, and the admin console to the auth server, no by default (#396 decision 5), and with them,
+// that namespace: envoy-gateway-system by default for the Envoy Gateway recipe, and asked with
+// nothing offered for any other mode, since a Gateway's proxies need not run in its namespace (#686
+// section 3).
 func (w *wizard) askNetworkPolicy() error {
+	c := w.config
 	if !w.interactive {
-		w.config.NetworkPolicy = w.flags.NetworkPolicy
-		answer := "no"
-		if w.config.NetworkPolicy {
-			answer = "yes, admitting only Envoy and the admin console"
-		}
-		w.out.info("NetworkPolicies: %s", answer)
-		return nil
+		return w.networkPolicyFromFlags()
 	}
-	w.out.println("NetworkPolicies can admit only Envoy's namespace (envoy-gateway-system) to both servers,")
-	w.out.println("and the admin console to the auth server.")
+	w.out.println("NetworkPolicies can admit only the namespace your routing layer's proxies run in to both")
+	w.out.println("servers, and the admin console to the auth server.")
 	w.out.println("  Yes: on a CNI that enforces NetworkPolicy, every other pod is refused, including a")
 	w.out.println("       workload in another namespace that calls the auth server's Service, for /certs")
 	w.out.println("       or /userinfo, until you admit its namespace as the policy's comment shows.")
 	w.out.println("  No:  any pod in the cluster can reach both servers, and can choose the address it is")
 	w.out.println("       rate limited and audited under by sending its own X-Forwarded-For.")
+	w.out.println("A routing layer whose proxies are not pods in one namespace, such as a cloud load balancer")
+	w.out.println("sending to pod addresses, cannot be admitted this way.")
 	w.out.println()
 	restrict, err := w.yesNo("Restrict who can reach Goiabada with NetworkPolicies?", false)
-	w.config.NetworkPolicy = restrict
+	if err != nil || !restrict {
+		return err
+	}
+	c.NetworkPolicy = true
+	w.out.println()
+	defaultNamespace := ""
+	switch {
+	case c.servedByEnvoyGateway():
+		w.out.printf("Envoy Gateway runs its proxies in %s unless it was told otherwise.\n", envoyProxyNamespace)
+		defaultNamespace = envoyProxyNamespace
+	case c.Routing == routingExistingGateway:
+		w.out.printf("A Gateway's proxies may run outside its own namespace, %s: ask its owner.\n", c.GatewayNamespace)
+	}
+	c.ProxyNamespace, err = w.namespace("Namespace your routing layer's proxies run in", defaultNamespace)
 	return err
+}
+
+// networkPolicyFromFlags is askNetworkPolicy answered by --network-policy and --proxy-namespace,
+// which only the Envoy Gateway recipe offers a default for.
+func (w *wizard) networkPolicyFromFlags() error {
+	c, f := w.config, w.flags
+	c.NetworkPolicy = f.NetworkPolicy
+	if !c.NetworkPolicy {
+		w.out.info("NetworkPolicies: no")
+		return nil
+	}
+	namespace := f.ProxyNamespace
+	if namespace == "" {
+		if !c.servedByEnvoyGateway() {
+			return errs.Errorf("--proxy-namespace is required with --network-policy and --routing=%s", c.Routing)
+		}
+		namespace = envoyProxyNamespace
+	}
+	if err := validateNamespace(namespace); err != nil {
+		return errs.Wrap(err, "invalid --proxy-namespace")
+	}
+	c.ProxyNamespace = namespace
+	w.out.info("NetworkPolicies: yes, admitting only the namespace %s and the admin console", namespace)
+	return nil
 }
 
 // askLocalProxy asks whether a reverse proxy on the same machine forwards to the native binaries,
@@ -555,8 +897,8 @@ func (w *wizard) askLocalProxy() error {
 }
 
 // askRateLimiter asks whether to turn the auth server's rate limiter on, yes by default but for
-// Kubernetes under the Cluster traffic policy, after which the question comes, since it decides
-// that default (#396 decision 9).
+// Kubernetes, unless under Envoy Gateway's Local traffic policy, after which the question comes,
+// since it decides that default (#396 decision 9, #686 section 3).
 func (w *wizard) askRateLimiter() error {
 	defaultOn := w.config.rateLimiterDefault()
 	if !w.interactive {
@@ -566,7 +908,11 @@ func (w *wizard) askRateLimiter() error {
 			answer = "on"
 		}
 		if !w.flags.RateLimiter.set && !defaultOn {
-			answer += " (the default under the Cluster traffic policy; --rate-limiter turns it on)"
+			if w.config.servedByEnvoyGateway() {
+				answer += " (the default under the Cluster traffic policy; --rate-limiter turns it on)"
+			} else {
+				answer += " (the default for --routing=" + string(w.config.Routing) + "; --rate-limiter turns it on)"
+			}
 		}
 		w.out.info("Rate limiter: %s", answer)
 		return nil
@@ -577,7 +923,7 @@ func (w *wizard) askRateLimiter() error {
 	w.out.println("adds limits per client address on sign-ins, password resets, self-registrations and")
 	w.out.println("client registrations, and on wrong passwords per email from one network (10 per 15")
 	w.out.println("minutes).")
-	if w.config.Deployment.servedByEnvoyGateway {
+	if w.config.servedByEnvoyGateway() {
 		if defaultOn {
 			w.out.println("Under the Local traffic policy Goiabada sees each client's address, so the per-IP")
 			w.out.println("limits count each client alone, when the load balancer passes connections through.")
@@ -591,6 +937,12 @@ func (w *wizard) askRateLimiter() error {
 			w.out.println("On, every client through a node counts as one network, so 10 wrong passwords block an")
 			w.out.println("email's password sign-ins for 15 minutes for every client through a node.")
 		}
+	} else if w.config.Deployment.asksRouting {
+		w.out.println("Goiabada sees the address each connection reached your routing layer from, which can be")
+		w.out.println("a node's or a load balancer's, one for every client: the per-address limits then count")
+		w.out.println("every client together, which throttles sign-ins on a busy site. That is why it is off")
+		w.out.println("by default here. Once Goiabada runs, read the ip= of your own request in the auth")
+		w.out.println("server's log: your own address means the limits count each client alone.")
 	}
 	w.out.printf("The limits are listed at %s\n", rateLimitsDocsURL)
 	w.out.println()

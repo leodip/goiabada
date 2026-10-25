@@ -47,10 +47,27 @@ type CLIFlags struct {
 	Overwrite           bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
-	// GatewayTrafficPolicy is --gateway-traffic-policy and NetworkPolicy --network-policy, read by
-	// Kubernetes alone. The policy is empty when the flag was left out.
+	// Routing is --routing, empty when left out, and the flags below it its modes' answers, each read
+	// by the modes that ask it alone; a port left out is 0. Kubernetes alone reads them (#686 section 3).
+	Routing          routing
+	GatewayClass     string
+	GatewayHTTPPort  int
+	GatewayHTTPSPort int
+	GatewayName      string
+	GatewayNamespace string
+	AuthListener     string
+	AdminListener    string
+	IngressClass     string
+	TLS              tlsSource
+	TLSIssuer        string
+	TLSSecretAuth    string
+	TLSSecretAdmin   string
+	// GatewayTrafficPolicy is --gateway-traffic-policy, read by the envoy-gateway mode alone, empty
+	// when left out; NetworkPolicy is --network-policy and ProxyNamespace --proxy-namespace, read by
+	// Kubernetes alone.
 	GatewayTrafficPolicy trafficPolicy
 	NetworkPolicy        bool
+	ProxyNamespace       string
 	// CreateNamespace is --create-namespace, read by Kubernetes alone.
 	CreateNamespace optionalBool
 	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
@@ -117,6 +134,64 @@ func (p *trafficPolicy) Set(value string) error {
 	return errs.New("use cluster or local")
 }
 
+// String is the mode as --routing spells it, empty when the flag was left out.
+func (r *routing) String() string {
+	if r == nil {
+		return ""
+	}
+	return string(*r)
+}
+
+// Set reads one of the modes, and refuses anything else, which the flag package reports naming the
+// flag.
+func (r *routing) Set(value string) error {
+	for _, mode := range routings {
+		if value == string(mode) {
+			*r = mode
+			return nil
+		}
+	}
+	return errs.Errorf("use %s", orList(routingNames()))
+}
+
+// routingNames is every mode as --routing spells it, in the wizard's order.
+func routingNames() []string {
+	names := make([]string, len(routings))
+	for i, mode := range routings {
+		names[i] = string(mode)
+	}
+	return names
+}
+
+// String is the source as --tls spells it, empty when the flag was left out.
+func (t *tlsSource) String() string {
+	if t == nil {
+		return ""
+	}
+	return string(*t)
+}
+
+// Set reads one of the sources, and refuses anything else, which the flag package reports naming
+// the flag.
+func (t *tlsSource) Set(value string) error {
+	for _, source := range tlsSources {
+		if value == string(source) {
+			*t = source
+			return nil
+		}
+	}
+	return errs.Errorf("use %s", orList(tlsSourceNames()))
+}
+
+// tlsSourceNames is every source as --tls spells it, in the wizard's order.
+func tlsSourceNames() []string {
+	names := make([]string, len(tlsSources))
+	for i, source := range tlsSources {
+		names[i] = string(source)
+	}
+	return names
+}
+
 // parseFlags reads the command line. It returns flag.ErrHelp for -h and --help and the parse error
 // for anything else it cannot read, each already reported to stderr with the usage, and leaves the
 // exit to main: the flag package's own ExitOnError would have been a second exit (#430).
@@ -162,12 +237,26 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.BoolVar(&flags.Overwrite, "overwrite", false, "Overwrite output files that already exist, and the secrets in them")
 	fs.Var(&flags.CreateNamespace, "create-namespace", "Kubernetes: declare the namespace in both files, so applying them creates it; false for one that already exists (default: true)")
-	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
-	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only Envoy and the admin console to the servers with NetworkPolicies")
+	fs.Var(&flags.Routing, "routing", "Kubernetes: how traffic reaches the servers: "+orList(routingNames())+" (default: envoy-gateway)")
+	fs.StringVar(&flags.GatewayClass, "gateway-class", "", "Kubernetes, --routing=gateway: the GatewayClass of the Gateway the manifest creates")
+	fs.IntVar(&flags.GatewayHTTPPort, "gateway-http-port", 0, "Kubernetes, --routing=gateway: the Gateway's HTTP listener port (default: 80)")
+	fs.IntVar(&flags.GatewayHTTPSPort, "gateway-https-port", 0, "Kubernetes, --routing=gateway: the Gateway's HTTPS listener port (default: 443)")
+	fs.StringVar(&flags.GatewayName, "gateway-name", "", "Kubernetes, --routing=existing-gateway: the Gateway the routes attach to")
+	fs.StringVar(&flags.GatewayNamespace, "gateway-namespace", "", "Kubernetes, --routing=existing-gateway: the namespace of that Gateway")
+	fs.StringVar(&flags.AuthListener, "auth-listener", "", "Kubernetes, --routing=existing-gateway: the Gateway's HTTPS listener for the auth server's host")
+	fs.StringVar(&flags.AdminListener, "admin-listener", "", "Kubernetes, --routing=existing-gateway: the Gateway's HTTPS listener for the admin console's host (default: --auth-listener)")
+	fs.StringVar(&flags.IngressClass, "ingress-class", "", "Kubernetes, --routing=ingress: the Ingresses' class (default: the cluster's default class)")
+	fs.Var(&flags.TLS, "tls", "Kubernetes, --routing=gateway or ingress: where the certificates come from: "+orList(tlsSourceNames())+" (default: cluster-issuer)")
+	fs.StringVar(&flags.TLSIssuer, "tls-issuer", "", "Kubernetes, --tls=cluster-issuer or issuer: the cert-manager ClusterIssuer or Issuer")
+	fs.StringVar(&flags.TLSSecretAuth, "auth-tls-secret", "", "Kubernetes, --tls=secrets: the TLS Secret holding the auth server's certificate (default: "+authCertificateSecret+")")
+	fs.StringVar(&flags.TLSSecretAdmin, "admin-tls-secret", "", "Kubernetes, --tls=secrets: the TLS Secret holding the admin console's certificate (default: "+adminCertificateSecret+")")
+	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes, --routing=envoy-gateway: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
+	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only the routing layer and the admin console to the servers with NetworkPolicies")
+	fs.StringVar(&flags.ProxyNamespace, "proxy-namespace", "", "Kubernetes, with --network-policy: the namespace the routing layer's proxies run in (default: envoy-gateway-system for --routing=envoy-gateway, required otherwise)")
 	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
 	fs.Var(&flags.PodMonitorLabels, "podmonitor-labels", "Kubernetes: the labels the PodMonitor carries, key=value separated by commas")
 	fs.StringVar(&flags.MetricsNamespace, "metrics-namespace", "", "Kubernetes: the namespace the NetworkPolicies admit to the metrics ports (default: monitoring)")
-	fs.Var(&flags.RateLimiter, "rate-limiter", "Production, Kubernetes and native: turn on the auth server's rate limiter (default: true, but false for Kubernetes under the cluster traffic policy)")
+	fs.Var(&flags.RateLimiter, "rate-limiter", "Production, Kubernetes and native: turn on the auth server's rate limiter (default: true, but false for Kubernetes unless --routing=envoy-gateway with the local traffic policy)")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
@@ -226,20 +315,56 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("  --skip-db-test         Skip database connection test\n\n")
 		p("Rate Limiter Options (for production/kubernetes/native):\n")
 		p("  --rate-limiter=BOOL    Turn on the auth server's built-in rate limiter (default: true, but\n")
-		p("                         false for kubernetes under the cluster traffic policy, where its\n")
-		p("                         per-IP limits count every client arriving through one node together)\n\n")
+		p("                         false for kubernetes unless under Envoy Gateway's local traffic\n")
+		p("                         policy, since its per-IP limits count together every client that\n")
+		p("                         reaches Goiabada from one address, such as a node's)\n\n")
 		p("Kubernetes Options:\n")
 		p("  --create-namespace=BOOL\n")
 		p("                         Declare the namespace in both files, so applying them creates it\n")
 		p("                         (default: true). false, for a namespace that already exists,\n")
 		p("                         declares it in neither, and applying them needs rights inside it alone\n")
+		p("  --routing=MODE         How traffic from outside the cluster reaches the servers\n")
+		p("                         (default: envoy-gateway): envoy-gateway, a Gateway of class eg for\n")
+		p("                         the Envoy Gateway the wizard's steps install; gateway, a Gateway of\n")
+		p("                         a class your cluster has; existing-gateway, routes attached to a\n")
+		p("                         Gateway someone else runs; ingress, an Ingress per host; none, the\n")
+		p("                         Services alone, which you route\n")
+		p("  --gateway-class=NAME   With gateway, the GatewayClass (required)\n")
+		p("  --gateway-http-port=PORT\n")
+		p("                         With gateway, the HTTP listener's port (default: 80)\n")
+		p("  --gateway-https-port=PORT\n")
+		p("                         With gateway, the HTTPS listeners' port (default: 443). Some\n")
+		p("                         implementations take only their proxy's own ports: Traefik's Gateway\n")
+		p("                         takes 8000 and 8443\n")
+		p("  --gateway-name=NAME    With existing-gateway, the Gateway the routes attach to (required)\n")
+		p("  --gateway-namespace=NAME\n")
+		p("                         With existing-gateway, that Gateway's namespace (required)\n")
+		p("  --auth-listener=NAME   With existing-gateway, its HTTPS listener for the auth server's host\n")
+		p("                         (required)\n")
+		p("  --admin-listener=NAME  With existing-gateway, its HTTPS listener for the admin console's\n")
+		p("                         host (default: --auth-listener's)\n")
+		p("  --ingress-class=NAME   With ingress, the IngressClass (default: the cluster's default)\n")
+		p("  --tls=SOURCE           With gateway or ingress, where the certificates come from\n")
+		p("                         (default: cluster-issuer): cluster-issuer or issuer, the cert-manager\n")
+		p("                         ClusterIssuer or Issuer --tls-issuer names; secrets, TLS Secrets\n")
+		p("                         you supply; external, TLS ended in front, at a load balancer or CDN\n")
+		p("  --tls-issuer=NAME      With cluster-issuer or issuer, the issuer (required)\n")
+		p("  --auth-tls-secret=NAME With secrets, the auth server's TLS Secret (default: %s)\n", authCertificateSecret)
+		p("  --admin-tls-secret=NAME\n")
+		p("                         With secrets, the admin console's TLS Secret (default:\n")
+		p("                         %s)\n", adminCertificateSecret)
 		p("  --gateway-traffic-policy=POLICY\n")
-		p("                         The externalTrafficPolicy of Envoy Gateway's load balancer Service\n")
-		p("                         (default: cluster). cluster works behind every load balancer, and\n")
-		p("                         Goiabada sees a node's address for every client; local runs Envoy on\n")
-		p("                         every node as a DaemonSet, and Goiabada sees the client's address\n")
-		p("  --network-policy       Admit only Envoy's namespace, and the admin console to the auth\n")
-		p("                         server, with NetworkPolicies (default: off, any pod can reach them)\n")
+		p("                         With envoy-gateway, the externalTrafficPolicy of Envoy Gateway's\n")
+		p("                         load balancer Service (default: cluster). cluster works behind every\n")
+		p("                         load balancer, and Goiabada sees a node's address for every client;\n")
+		p("                         local runs Envoy on every node as a DaemonSet, and Goiabada sees the\n")
+		p("                         client's address\n")
+		p("  --network-policy       Admit only the routing layer's namespace, and the admin console to\n")
+		p("                         the auth server, with NetworkPolicies (default: off, any pod can\n")
+		p("                         reach them)\n")
+		p("  --proxy-namespace=NAME With --network-policy, the namespace the routing layer's proxies run\n")
+		p("                         in (default: envoy-gateway-system with envoy-gateway, required\n")
+		p("                         otherwise)\n")
 		p("  --metrics=EXPOSURE     Expose Prometheus metrics on ports %d and %d (default: none).\n", authServerMetricsPort, adminConsoleMetricsPort)
 		p("                         annotations writes the prometheus.io pod annotations, which the\n")
 		p("                         prometheus-community prometheus chart reads; podmonitor writes a\n")
@@ -297,6 +422,16 @@ func (f *CLIFlags) checkWritable() error {
 		{"--db-tls-client-cert-file", f.DBTLSClientCertFile},
 		{"--db-tls-client-key-file", f.DBTLSClientKeyFile},
 		{"--db-tls-server-name", f.DBTLSServerName},
+		{"--gateway-class", f.GatewayClass},
+		{"--gateway-name", f.GatewayName},
+		{"--gateway-namespace", f.GatewayNamespace},
+		{"--auth-listener", f.AuthListener},
+		{"--admin-listener", f.AdminListener},
+		{"--ingress-class", f.IngressClass},
+		{"--tls-issuer", f.TLSIssuer},
+		{"--auth-tls-secret", f.TLSSecretAuth},
+		{"--admin-tls-secret", f.TLSSecretAdmin},
+		{"--proxy-namespace", f.ProxyNamespace},
 	} {
 		if err := checkWritable(entry.value); err != nil {
 			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)
