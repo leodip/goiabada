@@ -1171,13 +1171,13 @@ func TestHandleLogoutPost(t *testing.T) {
 	//
 	// The table is four groups that fail for different reasons, and only the first is ordinary.
 	// Rows 1 to 4 are plain refusals: the request did not earn a redirect, row 2 because a
-	// self-registered client's URIs confirm nothing (#682). Rows 5 to 12 are near
+	// self-registered client's URIs confirm nothing (#682). Rows 5 to 13 are near
 	// misses, where the requested URI differs from a registered one in a way exact string comparison
 	// catches and a looser one does not; they exist because no plain refusal can tell those apart,
-	// so every loose comparison listed below passed this table before its row was added. Rows 13 to
-	// 15 are the opposite case, a requested URI that matches a registered one byte for byte and is
+	// so every loose comparison listed below passed this table before its row was added. Rows 14 to
+	// 16 are the opposite case, a requested URI that matches a registered one byte for byte and is
 	// refused anyway because the value cannot name the host it appears to; no comparison can catch
-	// those, and they are the rows the absolute-URI gate owns (#122). Rows 16 to 18 are faults, a
+	// those, and they are the rows the absolute-URI gate owns (#122). Rows 17 to 19 are faults, a
 	// database that will not answer and a registered URI that will not parse, and those are the
 	// shapes where a plausible future edit turns "lose the redirect" into "return a 500", which
 	// would put a user who is still signed in on a terminal page. Every row asserts the whole
@@ -1185,11 +1185,12 @@ func TestHandleLogoutPost(t *testing.T) {
 	//
 	// The near misses come in two families, and each row differs from its registration in exactly
 	// one respect so that it names the comparison it kills. Rows 5 to 7 kill comparisons that are
-	// loose about the string: prefix in either direction, substring, and case folding. Rows 8 to 12
+	// loose about the string: prefix in either direction, substring, and case folding. Rows 8 to 13
 	// kill comparisons that parse the URI and then compare or normalize selected components, which
 	// is the family that survives a table built only from the first: each of query omission, scheme
-	// omission, trailing-slash normalization, percent-decoding the path, and default-port
-	// normalization accepts a URI no operator registered.
+	// omission, trailing-slash normalization, percent-decoding the path, default-port
+	// normalization, and the authorization endpoint's loopback port exception accepts a URI no
+	// operator registered.
 	t.Run("A target that cannot be authorized is declined, and the logout still happens", func(t *testing.T) {
 		const unparseableURI = "https://example.com/out\x7f"
 
@@ -1362,7 +1363,19 @@ func TestHandleLogoutPost(t *testing.T) {
 				stubDB:      registers("https://example.com/out"),
 			},
 			{
-				// Rows 13 to 15 are a family of their own, and the one thing that separates them
+				// The authorization endpoint ignores a loopback redirect URI's port, RFC 8252
+				// section 7.3, so a native client registers http://127.0.0.1/callback and signs in
+				// from whatever port it listens on. Sign-out has no such exception: RP-Initiated
+				// Logout 1.0 section 3 asks for an exact match, so a matcher reused from sign-in
+				// would accept this pair and exact comparison refuses it. The DCR guide tells such a
+				// client to send the URI as registered, port included, which this row pins.
+				name:        "the requested URI adds a port to a registered loopback one",
+				clientId:    "test_client",
+				redirectURI: "http://127.0.0.1:53682/callback",
+				stubDB:      registers("http://127.0.0.1/callback"),
+			},
+			{
+				// Rows 14 to 16 are a family of their own, and the one thing that separates them
 				// from every row above is that the requested URI IS registered, byte for byte. No
 				// comparison, loose or exact, can refuse them; only a rule about the shape of the
 				// value can. This endpoint matches the client's OAuth redirect_uris rows, so it
