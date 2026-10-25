@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -1169,21 +1170,22 @@ func TestHandleLogoutPost(t *testing.T) {
 	// the response and never about whether the logout happens (#109).
 	//
 	// The table is four groups that fail for different reasons, and only the first is ordinary.
-	// Rows 1 to 3 are plain refusals: the request did not earn a redirect. Rows 4 to 11 are near
+	// Rows 1 to 4 are plain refusals: the request did not earn a redirect, row 2 because a
+	// self-registered client's URIs confirm nothing (#682). Rows 5 to 12 are near
 	// misses, where the requested URI differs from a registered one in a way exact string comparison
 	// catches and a looser one does not; they exist because no plain refusal can tell those apart,
-	// so every loose comparison listed below passed this table before its row was added. Rows 12 to
-	// 14 are the opposite case, a requested URI that matches a registered one byte for byte and is
+	// so every loose comparison listed below passed this table before its row was added. Rows 13 to
+	// 15 are the opposite case, a requested URI that matches a registered one byte for byte and is
 	// refused anyway because the value cannot name the host it appears to; no comparison can catch
-	// those, and they are the rows the absolute-URI gate owns (#122). Rows 15 to 17 are faults, a
+	// those, and they are the rows the absolute-URI gate owns (#122). Rows 16 to 18 are faults, a
 	// database that will not answer and a registered URI that will not parse, and those are the
 	// shapes where a plausible future edit turns "lose the redirect" into "return a 500", which
 	// would put a user who is still signed in on a terminal page. Every row asserts the whole
 	// teardown and the absence of an InternalServerError, not just the absent Location.
 	//
 	// The near misses come in two families, and each row differs from its registration in exactly
-	// one respect so that it names the comparison it kills. Rows 4 to 6 kill comparisons that are
-	// loose about the string: prefix in either direction, substring, and case folding. Rows 7 to 11
+	// one respect so that it names the comparison it kills. Rows 5 to 7 kill comparisons that are
+	// loose about the string: prefix in either direction, substring, and case folding. Rows 8 to 12
 	// kill comparisons that parse the URI and then compare or normalize selected components, which
 	// is the family that survives a table built only from the first: each of query omission, scheme
 	// omission, trailing-slash normalization, percent-decoding the path, and default-port
@@ -1223,6 +1225,8 @@ func TestHandleLogoutPost(t *testing.T) {
 			clientId    string
 			redirectURI string
 			stubDB      func(database *datamocks.Database)
+			// checkLogs, when set, reads the records the request wrote.
+			checkLogs func(t *testing.T, logs *logtest.SlogCapture)
 		}{
 			{
 				name:     "no client_id, so nothing can confirm the target",
@@ -1233,7 +1237,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// The client's URI is registered and the request is otherwise in order, but whoever
 				// registered the client chose that URI, so the registration confirms nothing about
 				// the target. Without a hint this would make the sign-out page a redirector to any
-				// host an anonymous caller registers, RFC 9700 section 4.11.2.
+				// host an anonymous caller registers, RFC 9700 section 4.11.2 (#682).
 				name:     "client_id names a self-registered client",
 				clientId: "dcr_client",
 				stubDB: func(database *datamocks.Database) {
@@ -1244,6 +1248,26 @@ func TestHandleLogoutPost(t *testing.T) {
 					}
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "dcr_client").Return(client, nil)
 					database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil).Maybe()
+				},
+				// The refusal is the operator's only trace of it, so it is a Warn, as the branch's
+				// other refusals are, naming the client and never the target or the state, which
+				// are the caller's text (#122, #682).
+				checkLogs: func(t *testing.T, logs *logtest.SlogCapture) {
+					var refusals []logtest.CapturedRecord
+					for _, record := range logs.Records() {
+						if record.Message == "client_id names a self-registered client and there is no id_token_hint, not redirecting" {
+							refusals = append(refusals, record)
+						}
+						assert.NotContains(t, record.Message, "example.com", "no record names the requested target")
+						for key, value := range record.Attrs {
+							text := fmt.Sprint(value)
+							assert.NotContains(t, text, "example.com", "attribute %q names the requested target", key)
+							assert.NotEqual(t, "abc", text, "attribute %q carries the state", key)
+						}
+					}
+					require.Len(t, refusals, 1, "one record says why the redirect was declined")
+					assert.Equal(t, slog.LevelWarn, refusals[0].Level)
+					assert.Equal(t, "dcr_client", refusals[0].Attrs["client_identifier"])
 				},
 			},
 			{
@@ -1338,7 +1362,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				stubDB:      registers("https://example.com/out"),
 			},
 			{
-				// Rows 12 to 14 are a family of their own, and the one thing that separates them
+				// Rows 13 to 15 are a family of their own, and the one thing that separates them
 				// from every row above is that the requested URI IS registered, byte for byte. No
 				// comparison, loose or exact, can refuse them; only a rule about the shape of the
 				// value can. This endpoint matches the client's OAuth redirect_uris rows, so it
@@ -1457,8 +1481,13 @@ func TestHandleLogoutPost(t *testing.T) {
 						return data["redirectDeclined"] == true
 					})).Return(nil)
 
+				logs := logtest.CaptureSlog(t)
+
 				handler.ServeHTTP(rr, req)
 
+				if tc.checkLogs != nil {
+					tc.checkLogs(t, logs)
+				}
 				assert.Empty(t, rr.Header().Get("Location"), "a declined target must never become a redirect")
 				assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
 				pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)

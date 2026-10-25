@@ -899,7 +899,7 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 		// sign-out page a redirector to a host the caller picked. RFC 9700 section 4.11.2 is the
 		// same reason ClientErrorResponder.RedirectWillBeEmitted never redirects an error to such a
 		// client. A confirmed hint still earns the redirect, since it proves the End-User signed in
-		// to the client its aud names, and that path does not come through here.
+		// to the client its aud names, and that path does not come through here (#682).
 		slog.WarnContext(ctx, "client_id names a self-registered client and there is no id_token_hint, not redirecting",
 			"client_identifier", clientId)
 		return nil
