@@ -16,7 +16,9 @@ That is the whole point of writing it down here rather than in prose. The depend
 between these three modules is not visible at a call site and is not a compile error until the day
 it becomes a cycle, so it is the kind of rule that decays silently. This repository already learned
 that lesson once about prose: `AssertAgentDocs` exists because the state machine documented in
-`CLAUDE.md` had moved underneath the description while every test stayed green (#252).
+`CLAUDE.md` had moved underneath the description while every test stayed green (#252). That
+description now lives in the [authentication guide](docs/development/authentication.md), with
+the same roster check.
 
 The refactor that these rules were written for is the 16-issue Core Refactor epic, whose checklist
 is [#332](https://github.com/leodip/goiabada/issues/332), and it is finished: #360 moved the last

@@ -381,7 +381,7 @@ func refuseActivationAddressTaken(pageRenderer PageRenderer, database accountAct
 //
 // The account, its default permission and the consumption of the pending registration are written
 // in one transaction, and created_user and activated_account recorded after it commits, so a
-// failure anywhere leaves the pending registration and no account (AGENTS.md pattern 9). The
+// failure anywhere leaves the pending registration and no account (docs/development/data.md, Multi-row writes and list saves). The
 // account used to commit on its own first, so a failed consumption answered the 500 page over a
 // verified, enabled account.
 //

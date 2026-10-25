@@ -21,7 +21,7 @@ import (
 // Dropping the global lock order (#297, removed in stage 4) leaves pairs of transactions on the
 // same account that can take the same rows in opposite orders and deadlock. Decision 7 answers
 // that not by re-imposing an order but by rerunning the engine's victim, inside RunInTransaction.
-// A paragraph in CLAUDE.md claiming this holds on four engines is not evidence; these tests are.
+// A paragraph in docs/development/data.md claiming this holds on four engines is not evidence; these tests are.
 //
 // Each test drives two REAL production transactions, both opened through RunInTransaction, into a
 // genuine engine cycle, and asserts that both finish. The proof that the retry is what carried

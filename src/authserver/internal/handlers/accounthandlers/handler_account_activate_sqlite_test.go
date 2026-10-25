@@ -196,7 +196,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 	})
 
 	// The account used to commit in its own transaction before the consumption, so a failure
-	// after it answered the 500 page over a verified, enabled account (AGENTS.md pattern 9).
+	// after it answered the 500 page over a verified, enabled account (docs/development/data.md, Multi-row writes and list saves).
 	t.Run("a consumption that fails after the account insert commits no account", func(t *testing.T) {
 		db := newActivationSQLiteDB(t)
 		ctx := context.Background()

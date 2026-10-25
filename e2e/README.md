@@ -1,6 +1,6 @@
 # End-to-end environment
 
-A real Goiabada deployment, built from a release tag on a VPS, for browser tests to run against.
+A real Goiabada deployment on the maintainer's VPS, built from a release tag, for browser tests.
 It builds the environment, deploys the test app beside it, checks that both are reachable, and runs
 two Playwright suites against them:
 
@@ -25,6 +25,26 @@ release after v1.7.0: they no longer work around how v1.7.0 signed people in fro
 or started its first PostgreSQL (#551). Against v1.7.0 the suite fails, and the environment may fail
 to start. Before a release, build the environment from the checkout instead (`--source`), which is
 what that release will ship.
+
+## Contribute tests
+
+The suites run against the maintainer's VPS and require SSH access to it. External contributors
+do not have that access, so you cannot run these suites against the project's environment.
+The public test URLs alone are insufficient: the runner also controls the rate limiter and opens
+an SSH tunnel to Mailpit.
+
+New and improved e2e tests are welcome. Follow the [browser test conventions](#browser-tests) below,
+and check the TypeScript locally, from `e2e/playwright/`:
+
+```sh
+npm ci
+npm run typecheck
+```
+
+In your pull request, say that the browser suites were not run because they require the
+maintainer's VPS; a maintainer can run them. The Go unit, data and integration tiers described in
+the [contributing guide](../site/src/content/docs/about/contributing.mdx#run-the-tests) run in the
+dev container and do not require this VPS.
 
 ## Run it
 

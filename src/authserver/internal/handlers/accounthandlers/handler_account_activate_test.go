@@ -877,7 +877,7 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 		accountvalidation.AccountWords{Email: activateTestEmail, AppName: "Goiabada"}).Return(nil).Once()
 
 	// The account and the consumption are written on the one transaction, and both success
-	// entries are recorded after it commits (AGENTS.md pattern 9).
+	// entries are recorded after it commits (docs/development/data.md, Multi-row writes and list saves).
 	var steps []string
 	datamocks.ExpectRunInTransaction(database, activationTx, func(step string) { steps = append(steps, step) })
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).
@@ -1168,7 +1168,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 
 // The account, its permission and the consumption of the pending registration commit together or
 // not at all, and created_user and activated_account are recorded only after they commit
-// (AGENTS.md pattern 9). Each failure answers the 500 page, records no entry, and leaves the
+// (docs/development/data.md, Multi-row writes and list saves). Each failure answers the 500 page, records no entry, and leaves the
 // pending registration to the rollback rather than deleting it outside the transaction. The
 // account used to commit in its own transaction before the consumption, so a failed consumption
 // answered the 500 page over a verified, enabled account. handler_account_activate_sqlite_test.go

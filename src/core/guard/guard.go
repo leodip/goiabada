@@ -27,7 +27,7 @@ import (
 // Demonstrated on 8883642d: replacing `if len(dead) == 0 { return }` with `if true { return }` in
 // dead_interface_lint.go, so the guard can never report a dead interface, left the entire core
 // module tier green. The equivalent blinding of credential_read_lint.go survived its own rule test
-// likewise, and that guard is the sole enforcement of CLAUDE.md pattern 5, which exists to stop a
+// likewise, and that guard is the sole enforcement of the credential form-field rule in docs/development/conventions.md, which exists to stop a
 // bearer token or a password reaching a proxy log.
 //
 // Reporter and Run close that. Each guard's reporting half takes a Reporter rather than a

@@ -14,37 +14,21 @@ import (
 	"testing"
 )
 
-// AssertAgentDocs holds CLAUDE.md and AGENTS.md to two rules: the two files are
-// byte-identical, and the roster of states in CLAUDE.md's "Auth States (State
-// Machine)" section is exactly the set of AuthState* string constants declared
-// in src/authserver/internal/ceremony/auth_context.go. An AuthState* name that
-// file declares with var is a finding of its own: a state is a constant, and a
-// variable could be reassigned underneath every gate that compares against it
-// (#436).
+// AssertAgentDocs keeps the instruction entry points small and consistent: AGENTS.md is the
+// canonical guide, CLAUDE.md is its checked copy, and root links reach existing reference files. The
+// 10 KiB budget leaves room below Codex's default 32 KiB project-instruction cap; the old 111 KiB
+// file was cut off before its test commands. The line budget also discourages dense root prose.
 //
-// Both rules exist because the two files are prose about code, and prose about
-// code is the one thing in this repository nothing else checks. The ceremony's
-// state list sat in CLAUDE.md describing a machine that had moved underneath it:
-// it named ten states in a numbered order the handlers do not follow, omitted
-// level1_existing_session entirely, and opened by saying the context lives in a
-// session cookie, which stopped being true when #266 moved the store
-// server-side. Every one of those was true when written (#252).
+// The authentication guide's state roster is exactly the AuthState* string constants declared in
+// auth_context.go. States declared with var are findings, since reassignment could move a gate
+// underneath its callers (#436). The roster once omitted level1_existing_session and described a
+// machine that had changed while tests stayed green (#252). Check membership, not transitions:
+// reconstructing the state graph here would be a second implementation of the ceremony.
 //
-// The files are co-maintained copies for two different tools, which is the
-// second rule's whole reason: an edit that lands in one and not the other leaves
-// two agents reading different descriptions of the same handlers, and a plain
-// diff is the only thing that ever notices. The drift this guard was written
-// against was four lines about test fixtures present in CLAUDE.md and missing
-// from AGENTS.md.
+// A copy loads when Claude starts in a module without external-import approval; a symlink would
+// require extra Git setup on Windows. Authors edit AGENTS.md and copy it, not two separate guides.
 //
-// The roster rule checks membership, not transitions. Reconstructing the state
-// graph from the handlers would be a second implementation of the thing being
-// documented, and it would go red on every comment edit; the roster is the part
-// that goes stale silently, when a state is added or deleted.
-//
-// Scope is the source root's parent, because SourceRoot returns the directory
-// holding the four go.mod files and the two agent files live one level above it.
-// Each module's unit tier calls this, so the guard fires whichever tier is run.
+// Scope is the source root's parent. The core and both server unit tiers call this guard.
 func AssertAgentDocs(t *testing.T) {
 	t.Helper()
 
@@ -61,9 +45,16 @@ func assertAgentDocs(r Reporter, repoRoot string) {
 	}
 }
 
-// agentDocsHeading is the section of CLAUDE.md the roster rule reads. The
-// section runs to the next heading at the same level or above.
-const agentDocsHeading = "### Auth States (State Machine)"
+const (
+	agentDocsAuthGuide = "docs/development/authentication.md"
+	agentDocsHeading   = "### Auth States (State Machine)"
+	agentDocsMaxBytes  = 10 * 1024
+	agentDocsMaxLines  = 200
+)
+
+// Root references are ordinary Markdown links, so they can be checked without loading the linked
+// guides into every agent session. Anchors are stripped for the file-existence check.
+var agentDocsLink = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 
 // agentDocsStateCell matches a first table cell that is exactly one backticked
 // state value. It is deliberately narrower than "a backticked token anywhere in
@@ -74,8 +65,8 @@ const agentDocsHeading = "### Auth States (State Machine)"
 // readable as a roster; route cells like `/auth/pwd` do not match.
 var agentDocsStateCell = regexp.MustCompile("^`([a-z0-9_]+)`$")
 
-// checkAgentDocs returns one finding per rule violation, ordered rule 1 then
-// rule 2 and sorted within rule 2 so the message is stable. It returns strings
+// checkAgentDocs returns findings for the entry points, references and roster, with roster
+// differences sorted so the message is stable. It returns strings
 // rather than errors because every caller is an assertion: a stack captured here
 // would point at this file rather than at the prose that is wrong.
 func checkAgentDocs(root string) []string {
@@ -91,7 +82,14 @@ func checkAgentDocs(root string) []string {
 	}
 
 	if claudeErr == nil && agentsErr == nil && string(claude) != string(agents) {
-		findings = append(findings, firstDifference(string(claude), string(agents)))
+		findings = append(findings, "CLAUDE.md must match AGENTS.md; run cp AGENTS.md CLAUDE.md from the repository root")
+	}
+	if agentsErr == nil {
+		findings = append(findings, checkAgentEntry(root, agents)...)
+	}
+	authGuide, authGuideErr := os.ReadFile(filepath.Join(root, filepath.FromSlash(agentDocsAuthGuide)))
+	if authGuideErr != nil {
+		findings = append(findings, fmt.Sprintf("reading %s: %v", agentDocsAuthGuide, authGuideErr))
 	}
 
 	declared, variables, declErr := declaredAuthStates(filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"))
@@ -110,13 +108,13 @@ func checkAgentDocs(root string) []string {
 		findings = append(findings, "src/authserver/internal/ceremony/auth_context.go declares no AuthState* string constants")
 	}
 
-	if claudeErr != nil || declErr != nil || len(declared) == 0 {
+	if authGuideErr != nil || declErr != nil || len(declared) == 0 {
 		return findings
 	}
 
-	section, ok := agentDocsSection(string(claude))
+	section, ok := agentDocsSection(string(authGuide))
 	if !ok {
-		findings = append(findings, fmt.Sprintf("CLAUDE.md has no %q section", agentDocsHeading))
+		findings = append(findings, fmt.Sprintf("%s has no %q section", agentDocsAuthGuide, agentDocsHeading))
 		return findings
 	}
 
@@ -138,41 +136,51 @@ func checkAgentDocs(root string) []string {
 
 	for _, state := range missing {
 		findings = append(findings, fmt.Sprintf(
-			"state %q is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the %q section of CLAUDE.md",
-			state, agentDocsHeading))
+			"state %q is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the %q section of %s",
+			state, agentDocsHeading, agentDocsAuthGuide))
 	}
 	for _, state := range unknown {
 		findings = append(findings, fmt.Sprintf(
-			"the %q section of CLAUDE.md has a row for state %q, which src/authserver/internal/ceremony/auth_context.go does not declare",
-			agentDocsHeading, state))
+			"the %q section of %s has a row for state %q, which src/authserver/internal/ceremony/auth_context.go does not declare",
+			agentDocsHeading, agentDocsAuthGuide, state))
 	}
 
 	return findings
 }
 
-// firstDifference names the line the two files start disagreeing at, because a
-// whole-file diff in a test failure is unreadable and a bare "they differ" sends
-// the reader to run the diff themselves.
-func firstDifference(claude, agents string) string {
-	claudeLines := strings.Split(claude, "\n")
-	agentsLines := strings.Split(agents, "\n")
-
-	for i := 0; i < len(claudeLines) || i < len(agentsLines); i++ {
-		c, a := "<end of file>", "<end of file>"
-		if i < len(claudeLines) {
-			c = claudeLines[i]
+// checkAgentEntry checks the material every session must receive, without following imports or
+// recursively reading reference guides. A missing root or guide is reported by checkAgentDocs.
+func checkAgentEntry(root string, agents []byte) []string {
+	var findings []string
+	if strings.TrimSpace(string(agents)) == "" {
+		findings = append(findings, "AGENTS.md must not be empty")
+	}
+	if len(agents) > agentDocsMaxBytes {
+		findings = append(findings, fmt.Sprintf("AGENTS.md is %d bytes; limit is %d bytes; move detail to a development guide", len(agents), agentDocsMaxBytes))
+	}
+	lines := strings.Count(strings.TrimSuffix(string(agents), "\n"), "\n") + 1
+	if lines > agentDocsMaxLines {
+		findings = append(findings, fmt.Sprintf("AGENTS.md is %d lines; limit is %d lines; move detail to a development guide", lines, agentDocsMaxLines))
+	}
+	linkedAuthGuide := false
+	seen := map[string]bool{}
+	for _, match := range agentDocsLink.FindAllStringSubmatch(string(agents), -1) {
+		target, _, _ := strings.Cut(match[1], "#")
+		if target == "" || strings.Contains(target, "://") || seen[target] {
+			continue
 		}
-		if i < len(agentsLines) {
-			a = agentsLines[i]
+		seen[target] = true
+		if target == agentDocsAuthGuide {
+			linkedAuthGuide = true
 		}
-		if c != a {
-			return fmt.Sprintf("CLAUDE.md and AGENTS.md differ at line %d; they are co-maintained copies and must be identical\n\tCLAUDE.md: %s\n\tAGENTS.md: %s",
-				i+1, c, a)
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(target))); err != nil {
+			findings = append(findings, fmt.Sprintf("AGENTS.md reference %q: %v", target, err))
 		}
 	}
-	// Unreachable while the caller compares the contents first, and cheaper to
-	// state than to leave as a nil return somebody has to reason about.
-	return "CLAUDE.md and AGENTS.md differ, but no differing line was found"
+	if !linkedAuthGuide {
+		findings = append(findings, "AGENTS.md must link to "+agentDocsAuthGuide)
+	}
+	return findings
 }
 
 // declaredAuthStates returns the unquoted value of every AuthState* string
@@ -245,7 +253,7 @@ func agentDocsSection(doc string) ([]string, bool) {
 		return nil, false
 	}
 	for i := start; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], "### ") || strings.HasPrefix(lines[i], "## ") {
+		if strings.HasPrefix(lines[i], "### ") || strings.HasPrefix(lines[i], "## ") || strings.HasPrefix(lines[i], "# ") {
 			return lines[start:i], true
 		}
 	}

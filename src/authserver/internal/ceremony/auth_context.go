@@ -11,7 +11,7 @@ import (
 )
 
 // AuthState is one state of the authorization ceremony's machine: the value AuthContext.AuthState
-// holds between hops, and what each route's gate compares against. The roster in CLAUDE.md's
+// holds between hops, and what each route's gate compares against. The roster in docs/development/authentication.md's
 // "Auth States (State Machine)" section is held to these constants by AssertAgentDocs in
 // core/guard, which reads them from this file's const block, so each is written as a typed
 // string literal rather than a conversion (#436).

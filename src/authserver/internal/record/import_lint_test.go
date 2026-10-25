@@ -31,7 +31,7 @@ const recordDir = "authserver/internal/record"
 // core/builtin carries the permission identifiers Client and Resource name, and core/errs is
 // this tree's one error constructor, which the four enumerations #385 moved in here -- AcrLevel,
 // KeyState, PasswordPolicy and ThreeStateSetting -- raise their refusals through, and which
-// CLAUDE.md pattern 7 requires of every error this tree constructs. Both are declarations and
+// docs/development/conventions.md's error-handling rule requires of every error this tree constructs. Both are declarations and
 // values rather than behaviour, which is the test for anything that would be added here: a path
 // that makes this package able to *do* something belongs on the other side of the call, not in
 // this list.

@@ -18,13 +18,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeClaudeLines is the fixture CLAUDE.md, one line per element so every case that asserts a line
+// fakeAuthDocLines is the fixture authentication guide, one line per element so each asserted line
 // number can be read against it. Line numbers below are 1-based, so line N is index N-1.
 //
 // Three shapes in it are load-bearing and every case leans on at least one: the continuation row at
 // line 13 has an empty first cell, the route table at lines 17 and 18 repeats two state values in a
 // later column, and the `bogus_state` at line 23 sits below the next `###` heading.
-var fakeClaudeLines = []string{
+var fakeAuthDocLines = []string{
 	"# Fake repository notes", // 1
 	"",                        // 2
 	"## Authentication Flow (Authorization Code)", // 3
@@ -131,14 +131,14 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		claude []string
-		agents []string // nil means AGENTS.md is a copy of claude
+		doc    []string
+		claude string // empty means the checked copy of AGENTS.md
 		states string
 		want   []string
 	}{
 		{
-			name:   "identical files and a full roster pass",
-			claude: fakeClaudeLines,
+			name:   "identical entry points and a full roster pass",
+			doc:    fakeAuthDocLines,
 			states: fakeStatesConst,
 			want:   nil,
 		},
@@ -146,7 +146,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			// The real file's shape: a defined type and typed constants. The value is still a string
 			// literal, so the roster reads it.
 			name:   "the same, with a defined AuthState type and typed constants",
-			claude: fakeClaudeLines,
+			doc:    fakeAuthDocLines,
 			states: fakeStatesTyped,
 			want:   nil,
 		},
@@ -154,7 +154,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			// Every state a var: each is its own finding, and none counts as declared, so the
 			// no-constants finding follows and the roster is not compared.
 			name:   "states declared with var fail, one finding each, and leave no constants",
-			claude: fakeClaudeLines,
+			doc:    fakeAuthDocLines,
 			states: fakeStatesVar,
 			want: []string{
 				varFinding("AuthStateInitial"),
@@ -167,80 +167,92 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			// One stray var beside a correct const block. Its value is not read into the roster,
 			// so the var finding is the only one: no roster row is demanded for "stray".
 			name:   "one var beside the const block fails with exactly the var finding",
-			claude: fakeClaudeLines,
+			doc:    fakeAuthDocLines,
 			states: fakeStatesStray,
 			want:   []string{varFinding("AuthStateStray")},
 		},
 		{
-			name:   "a one-line difference in AGENTS.md fails naming the first differing line",
-			claude: fakeClaudeLines,
-			agents: replaceLine(fakeClaudeLines, 6, "The values below are the constants, probably."),
+			name:   "a prose reference does not replace the checked copy",
+			doc:    fakeAuthDocLines,
+			claude: "Read AGENTS.md before working.",
 			states: fakeStatesConst,
-			want: []string{
-				"CLAUDE.md and AGENTS.md differ at line 6; they are co-maintained copies and must be identical\n" +
-					"\tCLAUDE.md: The values below are the constants in `src/authserver/internal/ceremony/auth_context.go`.\n" +
-					"\tAGENTS.md: The values below are the constants, probably.",
-			},
+			want:   []string{"CLAUDE.md must match AGENTS.md; run cp AGENTS.md CLAUDE.md from the repository root"},
 		},
 		{
-			name:   "a shorter AGENTS.md fails at the line where it ends",
-			claude: fakeClaudeLines,
-			agents: fakeClaudeLines[:5],
+			name:   "an empty Claude entry fails",
+			doc:    fakeAuthDocLines,
+			claude: " \n",
 			states: fakeStatesConst,
-			want: []string{
-				"CLAUDE.md and AGENTS.md differ at line 6; they are co-maintained copies and must be identical\n" +
-					"\tCLAUDE.md: The values below are the constants in `src/authserver/internal/ceremony/auth_context.go`.\n" +
-					"\tAGENTS.md: <end of file>",
-			},
+			want:   []string{"CLAUDE.md must match AGENTS.md; run cp AGENTS.md CLAUDE.md from the repository root"},
+		},
+		{
+			name:   "an import wrapper cannot replace the portable checked copy",
+			doc:    fakeAuthDocLines,
+			claude: "@AGENTS.md\n",
+			states: fakeStatesConst,
+			want:   []string{"CLAUDE.md must match AGENTS.md; run cp AGENTS.md CLAUDE.md from the repository root"},
+		},
+		{
+			name:   "an import of another file fails",
+			doc:    fakeAuthDocLines,
+			claude: "@some-other-file.md",
+			states: fakeStatesConst,
+			want:   []string{"CLAUDE.md must match AGENTS.md; run cp AGENTS.md CLAUDE.md from the repository root"},
 		},
 		{
 			name:   "a declared state with no row fails naming the value",
-			claude: fakeClaudeLines,
+			doc:    fakeAuthDocLines,
 			states: fakeStatesExtra,
 			want: []string{
-				`state "requires_consent" is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
+				`state "requires_consent" is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the "### Auth States (State Machine)" section of docs/development/authentication.md`,
 			},
+		},
+		{
+			name:   "a top-level heading ends the roster section",
+			doc:    replaceAuthDocHeading(fakeAuthDocLines),
+			states: fakeStatesConst,
+			want:   nil,
 		},
 		{
 			// The reason the roster reads the first cell rather than the whole section: level2_otp
 			// is still on line 17, in the route table's Accepts column, so a rule that accepted any
 			// occurrence would see nothing wrong here.
 			name:   "a state left only in a later column, its own row deleted, fails naming the value",
-			claude: deleteLine(fakeClaudeLines, 11),
+			doc:    deleteLine(fakeAuthDocLines, 11),
 			states: fakeStatesConst,
 			want: []string{
-				`state "level2_otp" is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
+				`state "level2_otp" is declared in src/authserver/internal/ceremony/auth_context.go but has no row in the "### Auth States (State Machine)" section of docs/development/authentication.md`,
 			},
 		},
 		{
 			name:   "a first-cell token with no declaration fails naming the token",
-			claude: insertLine(fakeClaudeLines, 14, "| `level2_otp_completed` | nobody | dead |"),
+			doc:    insertLine(fakeAuthDocLines, 14, "| `level2_otp_completed` | nobody | dead |"),
 			states: fakeStatesConst,
 			want: []string{
-				`the "### Auth States (State Machine)" section of CLAUDE.md has a row for state "level2_otp_completed", which src/authserver/internal/ceremony/auth_context.go does not declare`,
+				`the "### Auth States (State Machine)" section of docs/development/authentication.md has a row for state "level2_otp_completed", which src/authserver/internal/ceremony/auth_context.go does not declare`,
 			},
 		},
 		{
 			name:   "a declaration block with no AuthState names fails rather than passing vacuously",
-			claude: fakeClaudeLines,
+			doc:    fakeAuthDocLines,
 			states: fakeStatesNone,
 			want:   []string{"src/authserver/internal/ceremony/auth_context.go declares no AuthState* string constants"},
 		},
 		{
 			name:   "a missing heading fails",
-			claude: strings.Split(strings.TrimSuffix(missingHeading, "\n"), "\n"),
+			doc:    strings.Split(strings.TrimSuffix(missingHeading, "\n"), "\n"),
 			states: fakeStatesConst,
-			want:   []string{`CLAUDE.md has no "### Auth States (State Machine)" section`},
+			want:   []string{`docs/development/authentication.md has no "### Auth States (State Machine)" section`},
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			agents := tc.agents
-			if agents == nil {
-				agents = tc.claude
+			root := writeFakeTree(t, tc.doc, fakeStatesConst)
+			writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), tc.states)
+			if tc.claude != "" {
+				writeFile(t, filepath.Join(root, "CLAUDE.md"), tc.claude)
 			}
-			root := writeFakeTree(t, tc.claude, agents, tc.states)
 
 			assert.Equal(t, tc.want, checkAgentDocs(root))
 		})
@@ -251,9 +263,8 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 // system's own "no such file" text and the path separator it uses, neither of which belongs in a
 // table asserting exact strings.
 func TestAgentDocs_AMissingAgentsFileFails(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
-	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), fakeStatesConst)
+	root := writeFakeTree(t, fakeAuthDocLines, fakeStatesConst)
+	require.NoError(t, os.Remove(filepath.Join(root, "AGENTS.md")))
 
 	findings := checkAgentDocs(root)
 
@@ -261,12 +272,21 @@ func TestAgentDocs_AMissingAgentsFileFails(t *testing.T) {
 	assert.True(t, strings.HasPrefix(findings[0], "reading AGENTS.md: "), findings[0])
 }
 
-func writeFakeTree(t *testing.T, claude, agents []string, states string) string {
+const fakeAgentEntry = "# Fake instructions\n\n[Authentication](docs/development/authentication.md)\n"
+
+func replaceAuthDocHeading(lines []string) []string {
+	out := append([]string(nil), lines...)
+	out[19] = "# Another guide section"
+	return out
+}
+
+func writeFakeTree(t *testing.T, doc []string, states string) string {
 	t.Helper()
 
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(claude, "\n"))
-	writeFile(t, filepath.Join(root, "AGENTS.md"), strings.Join(agents, "\n"))
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), fakeAgentEntry)
+	writeFile(t, filepath.Join(root, "AGENTS.md"), fakeAgentEntry)
+	writeFile(t, filepath.Join(root, filepath.FromSlash(agentDocsAuthGuide)), strings.Join(doc, "\n"))
 	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), states)
 	return root
 }
@@ -278,14 +298,7 @@ func writeFile(t *testing.T, path, content string) {
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 }
 
-// replaceLine, deleteLine and insertLine take 1-based line numbers so a case reads against the
-// numbered fixture above. Each copies, because the fixture is shared by every case.
-func replaceLine(lines []string, n int, with string) []string {
-	out := append([]string(nil), lines...)
-	out[n-1] = with
-	return out
-}
-
+// deleteLine and insertLine use 1-based line numbers from the fixture. Each copies the shared slice.
 func deleteLine(lines []string, n int) []string {
 	out := append([]string(nil), lines[:n-1]...)
 	return append(out, lines[n:]...)
@@ -297,31 +310,25 @@ func insertLine(lines []string, n int, line string) []string {
 	return append(out, lines[n-1:]...)
 }
 
-// Seam 2: the reporting half. Every case above asserts on what checkAgentDocs returned, and the two
-// real callers read a repository whose two documents agree, so the loop that turns a finding into a
-// failure was reached by both server tiers and observed failing by neither.
-
-// TestAgentDocs_TheGuardFailsOnADivergedPairOfDocuments drives the reporting half over the defect
-// this guard exists for: AGENTS.md and CLAUDE.md are meant to be the same document, and the way
-// they stop being one is an edit to one of them.
-func TestAgentDocs_TheGuardFailsOnADivergedPairOfDocuments(t *testing.T) {
-	agents := replaceLine(fakeClaudeLines, 6,
-		"The values below are the constants in some other file entirely.")
-	root := writeFakeTree(t, fakeClaudeLines, agents, fakeStatesConst)
+// Seam 2: exercise the reporting half as well as the finder. The real repository is clean, so a
+// reporting loop that silently stopped emitting findings would otherwise pass the real tiers.
+func TestAgentDocs_TheGuardFailsOnADivergedCopy(t *testing.T) {
+	root := writeFakeTree(t, fakeAuthDocLines, fakeStatesConst)
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), "Read AGENTS.md")
 
 	report := Run(func(r Reporter) { assertAgentDocs(r, root) })
 
-	require.True(t, report.Failed(), "two documents that disagree passed the guard")
-	assert.False(t, report.Stopped, "a divergence is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "line 6")
+	require.True(t, report.Failed(), "divergent entry points passed")
+	assert.False(t, report.Stopped, "a divergent copy is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "CLAUDE.md must match AGENTS.md")
 }
 
 // TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster is the second rule, and the reason the
 // roster is read from the assigned-by table's first column rather than from anywhere the value
 // appears: a state deleted from that table is still spelled twice in the route table below it.
 func TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster(t *testing.T) {
-	shortened := deleteLine(fakeClaudeLines, 11)
-	root := writeFakeTree(t, shortened, shortened, fakeStatesConst)
+	shortened := deleteLine(fakeAuthDocLines, 11)
+	root := writeFakeTree(t, shortened, fakeStatesConst)
 
 	report := Run(func(r Reporter) { assertAgentDocs(r, root) })
 
@@ -332,7 +339,7 @@ func TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster(t *testing.T) {
 // TestAgentDocs_TheGuardFailsOnAStateDeclaredWithVar drives the var rule through the reporting half:
 // a var finding is an Errorf like every other, so the rest of the check still reports.
 func TestAgentDocs_TheGuardFailsOnAStateDeclaredWithVar(t *testing.T) {
-	root := writeFakeTree(t, fakeClaudeLines, fakeClaudeLines, fakeStatesVar)
+	root := writeFakeTree(t, fakeAuthDocLines, fakeStatesVar)
 
 	report := Run(func(r Reporter) { assertAgentDocs(r, root) })
 
@@ -341,27 +348,73 @@ func TestAgentDocs_TheGuardFailsOnAStateDeclaredWithVar(t *testing.T) {
 	assert.Contains(t, report.Text(), varFinding("AuthStateLevel2OTP"))
 }
 
-// TestAgentDocs_TheGuardPassesDocumentsThatAgree is the other direction, and it is what keeps the
+// TestAgentDocs_TheGuardPassesCanonicalInstructions is the other direction, and it is what keeps the
 // two cases above from passing for the wrong reason.
-func TestAgentDocs_TheGuardPassesDocumentsThatAgree(t *testing.T) {
-	root := writeFakeTree(t, fakeClaudeLines, fakeClaudeLines, fakeStatesConst)
+func TestAgentDocs_TheGuardPassesCanonicalInstructions(t *testing.T) {
+	root := writeFakeTree(t, fakeAuthDocLines, fakeStatesConst)
 
 	report := Run(func(r Reporter) { assertAgentDocs(r, root) })
 
-	assert.False(t, report.Failed(), "two documents that agree failed the guard: %s", report.Text())
+	assert.False(t, report.Failed(), "valid instructions failed the guard: %s", report.Text())
 }
 
-// TestAgentDocs_TheGuardReportsAnUnreadableDocument covers the shape this guard answers instead of
-// an empty walk. It reads two named files rather than walking a tree, so there is nothing to count
-// and no vacuous pass to refuse: a document that is not there reports itself as a finding, which is
-// what keeps a rename from quietly reducing the guard to zero rules.
+// Named inputs must report their absence instead of silently reducing the check's coverage.
 func TestAgentDocs_TheGuardReportsAnUnreadableDocument(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
-	writeFile(t, filepath.Join(root, "src", "authserver", "internal", "ceremony", "auth_context.go"), fakeStatesConst)
+	root := writeFakeTree(t, fakeAuthDocLines, fakeStatesConst)
+	require.NoError(t, os.Remove(filepath.Join(root, "AGENTS.md")))
 
 	report := Run(func(r Reporter) { assertAgentDocs(r, root) })
 
 	require.True(t, report.Failed(), "a missing AGENTS.md passed the guard")
 	assert.Contains(t, report.Text(), "reading AGENTS.md")
+}
+
+// These boundaries prevent instructions growing past the part an agent receives. Multibyte text
+// matters because the Codex limit is bytes, not characters; exact limits must still pass.
+func TestAgentDocs_EntryBudgetsAndReferences(t *testing.T) {
+	byteLimit := fakeAgentEntry + strings.Repeat(" ", agentDocsMaxBytes-len(fakeAgentEntry))
+	lineLimit := fakeAgentEntry + strings.Repeat("line\n", agentDocsMaxLines-3)
+	cases := []struct {
+		name, entry, want string
+	}{
+		{"exact byte budget", byteLimit, ""},
+		{"one byte over", byteLimit + "x", "AGENTS.md is 10241 bytes; limit is 10240 bytes"},
+		{"multibyte over budget", fakeAgentEntry + strings.Repeat("é", agentDocsMaxBytes/2), "bytes; limit is 10240 bytes"},
+		{"exact line budget", lineLimit, ""},
+		{"one line over", lineLimit + "line\n", "AGENTS.md is 201 lines; limit is 200 lines"},
+		{"empty entry", " \n", "AGENTS.md must not be empty"},
+		{"missing reference", fakeAgentEntry + "[Missing](docs/missing.md)\n", `AGENTS.md reference "docs/missing.md"`},
+		{"anchor in reference", strings.ReplaceAll(fakeAgentEntry, ".md)", ".md#auth-states-state-machine)"), ""},
+		{"external and local anchors", fakeAgentEntry + "[RFC](https://rfc-editor.org/) [Here](#section)\n", ""},
+		{"undiscoverable authentication guide", "# Instructions\n", "AGENTS.md must link to " + agentDocsAuthGuide},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := writeFakeTree(t, fakeAuthDocLines, fakeStatesConst)
+			writeFile(t, filepath.Join(root, "AGENTS.md"), tc.entry)
+			writeFile(t, filepath.Join(root, "CLAUDE.md"), tc.entry)
+			findings := checkAgentDocs(root)
+			report := Run(func(r Reporter) { assertAgentDocs(r, root) })
+			if tc.want == "" {
+				assert.Empty(t, findings)
+				assert.False(t, report.Failed(), report.Text())
+			} else {
+				assert.Contains(t, strings.Join(findings, "\n"), tc.want)
+				require.True(t, report.Failed(), "the reporting half missed the defect")
+				assert.Contains(t, report.Text(), tc.want)
+			}
+		})
+	}
+}
+
+func TestAgentDocs_MissingInputsReportInsteadOfPassingVacuously(t *testing.T) {
+	for _, path := range []string{"CLAUDE.md", agentDocsAuthGuide, "src/authserver/internal/ceremony/auth_context.go"} {
+		t.Run(path, func(t *testing.T) {
+			root := writeFakeTree(t, fakeAuthDocLines, fakeStatesConst)
+			require.NoError(t, os.Remove(filepath.Join(root, filepath.FromSlash(path))))
+			report := Run(func(r Reporter) { assertAgentDocs(r, root) })
+			require.True(t, report.Failed(), "an unreadable input passed")
+			assert.Contains(t, report.Text(), "reading "+path)
+		})
+	}
 }

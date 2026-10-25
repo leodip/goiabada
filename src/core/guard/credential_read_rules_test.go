@@ -278,7 +278,7 @@ func f(r *request) {
 
 // Seam 3: the reporting half. Everything above asserts on what findCredentialQueryReads returned,
 // which leaves the lines that turn those reads into a failure untested. This is the guard where
-// that matters most: it is the sole enforcement of CLAUDE.md pattern 5, which exists to stop a
+// that matters most: it is the sole enforcement of the credential form-field rule in docs/development/conventions.md, which exists to stop a
 // bearer token or a password reaching a proxy log, and blinding its report loop (ranging over
 // reads[:0]) survived its own rule test.
 

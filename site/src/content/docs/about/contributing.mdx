@@ -27,7 +27,8 @@ Everything you need, Go, the linters, the Tailwind CLI and the four databases, r
 
 </Steps>
 
-Every command below runs inside the container, from the directory it names.
+Run the Go commands below inside the container, from the directory each names. Run the docs and
+Playwright typechecks on your own machine.
 
 ## Run Goiabada from source
 
@@ -95,6 +96,16 @@ Three more options narrow a run:
 
 `./run-tests.sh --help` lists every option.
 
+### Browser e2e tests
+
+The Playwright suites in `e2e/` run against the maintainer's VPS and require SSH access, which
+external contributors do not have. You're welcome to write or improve these tests. Follow the
+[e2e README](https://github.com/leodip/goiabada/blob/main/e2e/README.md#contribute-tests), run
+`npm ci` and `npm run typecheck` from `e2e/playwright` on your machine, and say in your pull request
+that the browser suites need a maintainer to run them.
+
+The Go unit, data and integration tiers above run in the dev container and do not need that VPS.
+
 ## Commit what you generate
 
 Some committed files are written by a tool. When your change touches what one is written from, run its command and commit what it changes:
@@ -131,7 +142,7 @@ The build fails on a broken link, including a link to the site from the Go code 
 
 ## The project
 
-Goiabada is three Go modules and the setup wizard:
+Goiabada has four Go modules:
 
 ```
 src/
@@ -142,7 +153,13 @@ src/
 └── build/               The release Dockerfiles and build scripts
 ```
 
-`ARCHITECTURE.md` at the repository root says which module owns what, and the unit tiers hold the code to it. `AGENTS.md` describes the code in depth: the sign-in state machine, the patterns every handler follows and every guard the tests run. It's written for AI coding assistants, and reads just as well for people. `CLAUDE.md` is the same file.
+`ARCHITECTURE.md` at the repository root says which module owns what, and the unit tiers hold the
+code to it. `AGENTS.md` gives AI coding assistants the commands and conventions for working here;
+`CLAUDE.md` is a checked copy. Edit `AGENTS.md` and run `cp AGENTS.md CLAUDE.md` from the
+repository root to update both. The guides in
+[`docs/development/`](https://github.com/leodip/goiabada/tree/main/docs/development) explain the
+sign-in state machine, transactional writes, application conventions, UI, tests and guards. Read
+the guide for the part you're changing.
 
 ## Many checks are tests
 
