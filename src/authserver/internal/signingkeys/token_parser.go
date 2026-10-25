@@ -13,6 +13,15 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+var (
+	// ErrTokenRefused marks a token the parser refused: malformed, signed with a method other than
+	// RS256, verified by none of the stored keys, or failing a claim check.
+	ErrTokenRefused = errors.New("the token is refused")
+	// ErrTokenExpired marks a refused token whose exp has passed. An error carrying it carries
+	// ErrTokenRefused too.
+	ErrTokenExpired = errors.New("the token has expired")
+)
+
 // tokenParserDatabase is what token parsing needs: the keys a signature may have been made with.
 type tokenParserDatabase interface {
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
@@ -46,11 +55,34 @@ func (tp *TokenParser) getPublicKey(ctx context.Context) (*rsa.PublicKey, error)
 	return pubKey, nil
 }
 
+// refusal marks a failure of the token itself with ErrTokenRefused, and with ErrTokenExpired when the
+// library found it expired. Its text is the library's, which stays in the chain for the log.
+type refusal struct {
+	err error
+}
+
+func (r *refusal) Error() string { return r.err.Error() }
+
+func (r *refusal) Unwrap() error { return r.err }
+
+func (r *refusal) Is(target error) bool {
+	return target == ErrTokenRefused ||
+		(target == ErrTokenExpired && errors.Is(r.err, jwt.ErrTokenExpired))
+}
+
+func refused(err error) error {
+	return errs.WithStack(&refusal{err: err})
+}
+
 // DecodeAndValidateTokenString verifies an RS256 token against the current signing key, then, when
 // the signature is what failed, against every other stored key, so a token signed before a rotation
 // still verifies. withExpirationCheck requires an unexpired exp claim; without it no claim is
 // validated, which is how an id_token_hint is read. An empty token returns an empty result and reads
 // no key.
+//
+// A failure of the token itself carries ErrTokenRefused, and an expired token ErrTokenExpired too.
+// A token that is malformed or not RS256 is refused before any key is read. A key that could not be
+// read or decoded leaves the token unchecked, and that error carries neither mark (#680).
 //
 // The key always comes from the database. It used to be a parameter every caller passed as nil, so
 // the one branch that used it was never reached in production (#424).
@@ -61,94 +93,99 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 		TokenBase64: token,
 	}
 
-	if len(token) > 0 {
-		claims := jwt.MapClaims{}
-
-		opts := []jwt.ParserOption{jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()})}
-		if withExpirationCheck {
-			opts = append(opts, jwt.WithExpirationRequired())
-		} else {
-			opts = append(opts, jwt.WithoutClaimsValidation())
-		}
-
-		// Tried with the current key first, then with each fallback key
-		tryParse := func(pk *rsa.PublicKey) error {
-			_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-				return pk, nil
-			}, opts...)
-			return err
-		}
-
-		pubKey, err := tp.getPublicKey(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		if err = tryParse(pubKey); err != nil {
-			slog.DebugContext(ctx, "unable to parse the token with the current key", "error", err)
-
-			// Check if this is a claims validation error (not a signature error)
-			// If the token has valid signature but invalid claims (e.g., expired),
-			// we should return that error immediately without trying fallback keys
-			// Use errors.Is() for robust error type checking instead of string matching
-			isClaimsError := errors.Is(err, jwt.ErrTokenExpired) ||
-				errors.Is(err, jwt.ErrTokenNotValidYet) ||
-				errors.Is(err, jwt.ErrTokenInvalidAudience) ||
-				errors.Is(err, jwt.ErrTokenInvalidIssuer) ||
-				errors.Is(err, jwt.ErrTokenInvalidSubject) ||
-				errors.Is(err, jwt.ErrTokenUsedBeforeIssued) ||
-				errors.Is(err, jwt.ErrTokenRequiredClaimMissing) ||
-				errors.Is(err, jwt.ErrTokenInvalidId)
-
-			if isClaimsError {
-				slog.DebugContext(ctx, "the error is claims-related, so no fallback key is tried")
-				return nil, err
-			}
-
-			// Only try fallback keys for signature-related errors
-			// This handles tokens signed with rotated/old keys
-
-			// Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key.
-			// A failed lookup returns both errors: the parse error says why the token was
-			// refused, the lookup error that no other key could be tried, which returning the
-			// first alone hid (#424).
-			allKeys, derr := tp.database.GetAllSigningKeys(ctx, nil)
-			if derr != nil {
-				return nil, errs.Join(err, errs.Wrap(derr, "unable to read the signing keys to try"))
-			}
-			slog.DebugContext(ctx, "trying the fallback keys", "count", len(allKeys))
-
-			var lastErr = err
-			for i, kp := range allKeys {
-				// Skip if this is same as current key
-				parsedPk, perr := jwt.ParseRSAPublicKeyFromPEM(kp.PublicKeyPEM)
-				if perr != nil {
-					lastErr = perr
-					continue
-				}
-				if parsedPk.Equal(pubKey) {
-					slog.DebugContext(ctx, "skipping a fallback key that is the current one",
-						"index", i, "key_id", kp.Id)
-					continue
-				}
-				slog.DebugContext(ctx, "trying a fallback key", "index", i, "key_id", kp.Id,
-					"state", kp.State, "key_identifier", kp.KeyIdentifier)
-				if perr2 := tryParse(parsedPk); perr2 == nil {
-					// success with a fallback key
-					slog.DebugContext(ctx, "parsed the token with a fallback key", "index", i, "key_id", kp.Id)
-					result.Claims = claims
-					return result, nil
-				} else {
-					slog.DebugContext(ctx, "unable to parse the token with a fallback key",
-						"index", i, "key_id", kp.Id, "error", perr2)
-					lastErr = perr2
-				}
-			}
-			slog.DebugContext(ctx, "every key is exhausted, returning the last error", "error", lastErr)
-			return nil, lastErr
-		}
-		result.Claims = claims
+	if len(token) == 0 {
+		return result, nil
 	}
 
-	return result, nil
+	claims := jwt.MapClaims{}
+
+	opts := []jwt.ParserOption{jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()})}
+	if withExpirationCheck {
+		opts = append(opts, jwt.WithExpirationRequired())
+	} else {
+		opts = append(opts, jwt.WithoutClaimsValidation())
+	}
+
+	// The library calls the key function only once the token is well formed and RS256, so the
+	// current key is read for no token that cannot be valid.
+	var pubKey *rsa.PublicKey
+	var keyErr error
+	_, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
+		pubKey, keyErr = tp.getPublicKey(ctx)
+		if keyErr != nil {
+			return nil, keyErr
+		}
+		return pubKey, nil
+	}, opts...)
+	if keyErr != nil {
+		return nil, keyErr
+	}
+	if err == nil {
+		result.Claims = claims
+		return result, nil
+	}
+	slog.DebugContext(ctx, "unable to parse the token with the current key", "error", err)
+
+	// Only a signature the current key did not verify sends the parser to the other keys; any
+	// other failure, such as an expired token whose signature verified, is the token's own.
+	if pubKey == nil || !errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+		return nil, refused(err)
+	}
+
+	// Tried with each fallback key
+	tryParse := func(pk *rsa.PublicKey) error {
+		_, perr := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
+			return pk, nil
+		}, opts...)
+		return perr
+	}
+
+	// Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key.
+	// A failed lookup returns both errors: the parse error says why the current key did not
+	// verify the token, the lookup error that no other key could be tried, which returning the
+	// first alone hid (#424).
+	allKeys, derr := tp.database.GetAllSigningKeys(ctx, nil)
+	if derr != nil {
+		return nil, errs.Join(err, errs.Wrap(derr, "unable to read the signing keys to try"))
+	}
+	slog.DebugContext(ctx, "trying the fallback keys", "count", len(allKeys))
+
+	var lastErr = err
+	var decodeErr error
+	for i, kp := range allKeys {
+		parsedPk, perr := jwt.ParseRSAPublicKeyFromPEM(kp.PublicKeyPEM)
+		if perr != nil {
+			decodeErr = perr
+			continue
+		}
+		// Skip if this is same as current key
+		if parsedPk.Equal(pubKey) {
+			slog.DebugContext(ctx, "skipping a fallback key that is the current one",
+				"index", i, "key_id", kp.Id)
+			continue
+		}
+		slog.DebugContext(ctx, "trying a fallback key", "index", i, "key_id", kp.Id,
+			"state", kp.State, "key_identifier", kp.KeyIdentifier)
+		perr2 := tryParse(parsedPk)
+		if perr2 == nil {
+			// success with a fallback key
+			slog.DebugContext(ctx, "parsed the token with a fallback key", "index", i, "key_id", kp.Id)
+			result.Claims = claims
+			return result, nil
+		}
+		slog.DebugContext(ctx, "unable to parse the token with a fallback key",
+			"index", i, "key_id", kp.Id, "error", perr2)
+		if !errors.Is(perr2, jwt.ErrTokenSignatureInvalid) {
+			// This key verified the signature, so the failure is the token's own
+			return nil, refused(perr2)
+		}
+		lastErr = perr2
+	}
+
+	// A key that could not be decoded may be the one the token was signed with
+	if decodeErr != nil {
+		return nil, errs.Join(lastErr, errs.Wrap(decodeErr, "unable to decode a signing key to try"))
+	}
+	slog.DebugContext(ctx, "every key is exhausted, returning the last error", "error", lastErr)
+	return nil, refused(lastErr)
 }
