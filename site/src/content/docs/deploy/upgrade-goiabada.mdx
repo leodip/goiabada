@@ -69,11 +69,11 @@ Running the setup wizard again generates new secrets. Before you use its output 
 
 ## Pin a deployment to an image digest
 
-The image lines a release of the setup wizard writes name a release by its version tag, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`. A tag is mutable in the registry: a re-push under the same name, by mistake or through a compromised credential, changes what every node pulls next. A digest names the image content itself, and the release's attestations are made against it, so pinning a deployment to a digest makes the registry unable to change what runs.
+The image lines a release of the setup wizard writes name a release by its version tag, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`, with the registry in front, `docker.io/`, in `goiabada-k8s.yaml`. A tag is mutable in the registry: a re-push under the same name, by mistake or through a compromised credential, changes what every node pulls next. A digest names the image content itself, and the release's attestations are made against it, so pinning a deployment to a digest makes the registry unable to change what runs.
 
 The setup wizard writes the version tag alone. Pinning is up to you, once you've read the rule at the end of this section.
 
-To pin, give each image line the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>` in `docker-compose.yml`, the same form for both images in `goiabada-k8s.yaml`.
+To pin, give each image line the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>` in `docker-compose.yml`, the same form after `docker.io/` for both images in `goiabada-k8s.yaml`.
 
 Where the digest comes from:
 

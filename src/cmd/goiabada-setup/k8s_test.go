@@ -574,6 +574,10 @@ func deploymentNamed(t *testing.T, docs map[string]map[string]map[string]any, na
 // root besides, on its own securityContext with no pod-level one beside it; each pod mounts no
 // service account token and is handed no service links, since neither binary calls the Kubernetes
 // API or reads the variables Kubernetes would inject (#396 decision 2, the service-link assumption).
+// No user, group or filesystem group ID is fixed, so the image's USER is their one source.
+// OpenShift's restricted-v2 SCC refuses a user ID or fsGroup outside the namespace's ranges and
+// assigns its own; it accepts any group ID, and leaving that out too keeps the gid 0 OpenShift
+// runs an assigned user with (#686).
 func TestKubernetesManifest_HardensEveryContainerToTheRestrictedStandard(t *testing.T) {
 	docs := kubernetesDocuments(t, kubernetesConfig())
 	for _, w := range workloads {
@@ -599,8 +603,6 @@ func TestKubernetesManifest_HardensEveryContainerToTheRestrictedStandard(t *test
 				want any
 			}{
 				{[]string{"runAsNonRoot"}, true},
-				{[]string{"runAsUser"}, 10001},
-				{[]string{"runAsGroup"}, 10001},
 				{[]string{"allowPrivilegeEscalation"}, false},
 				{[]string{"readOnlyRootFilesystem"}, true},
 				{[]string{"seccompProfile", "type"}, "RuntimeDefault"},
@@ -608,6 +610,12 @@ func TestKubernetesManifest_HardensEveryContainerToTheRestrictedStandard(t *test
 				if got := at[any](t, context, field.path...); got != field.want {
 					t.Errorf("securityContext.%s is %v, want %v", strings.Join(field.path, "."), got, field.want)
 				}
+			}
+			if got, ok := context["runAsUser"]; ok {
+				t.Errorf("securityContext.runAsUser is %v, which restricted-v2 refuses outside the namespace's range", got)
+			}
+			if got, ok := context["runAsGroup"]; ok {
+				t.Errorf("securityContext.runAsGroup is %v, and the image's USER is the group's one source", got)
 			}
 			if got := only[string](t, at[[]any](t, context, "capabilities", "drop"), "the dropped capabilities"); got != "ALL" {
 				t.Errorf("the container drops %q, want ALL", got)
@@ -736,6 +744,8 @@ func withImageTag(t *testing.T, tag string) {
 
 // A version tag names one build, so a node pulls it once; a source build's latest moves, so a node
 // pulls it at every start, or it would run whichever latest it happened to cache (#396 decision 10).
+// The image is named with its registry, which a CRI-O node needs when its configuration resolves no
+// short name (#686).
 func TestKubernetesManifest_PullPolicyFollowsTheTag(t *testing.T) {
 	for _, testCase := range []struct{ tag, policy string }{
 		{"latest", "Always"},
@@ -748,7 +758,7 @@ func TestKubernetesManifest_PullPolicyFollowsTheTag(t *testing.T) {
 			for _, w := range workloads {
 				podSpec := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "spec")
 				container := only[map[string]any](t, at[[]any](t, podSpec, "containers"), w.deployment+"'s containers")
-				if got, want := at[string](t, container, "image"), "leodip/goiabada:"+w.container+"-"+testCase.tag; got != want {
+				if got, want := at[string](t, container, "image"), "docker.io/leodip/goiabada:"+w.container+"-"+testCase.tag; got != want {
 					t.Errorf("%s runs %q, want %q", w.deployment, got, want)
 				}
 				if got := at[string](t, container, "imagePullPolicy"); got != testCase.policy {

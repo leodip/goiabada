@@ -608,7 +608,9 @@ func writeTopologySpread(sb *strings.Builder, name string) {
 // tag, with the pull policy that tag needs and the container's securityContext.
 func writeContainerHead(sb *strings.Builder, name string) {
 	fmt.Fprintf(sb, "      - name: %s\n", name)
-	fmt.Fprintf(sb, "        image: leodip/goiabada:%s-%s\n", name, imageTag)
+	sb.WriteString("        # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through\n")
+	sb.WriteString("        # registries its configuration lists, and may refuse to pull leodip/goiabada.\n")
+	fmt.Fprintf(sb, "        image: docker.io/leodip/goiabada:%s-%s\n", name, imageTag)
 	if imageTag == "latest" {
 		sb.WriteString("        # latest is a moving tag: each start pulls whatever release it names then, so pods can\n")
 		sb.WriteString("        # run different releases. Replace it with a release version to pin the image.\n")
@@ -622,10 +624,11 @@ func writeContainerHead(sb *strings.Builder, name string) {
 	sb.WriteString("        # Kubernetes, and the auth server's one other write, Go spilling an upload over the size\n")
 	sb.WriteString("        # limit to /tmp, is refused as FILE_TOO_LARGE rather than by the image check, a 400 either\n")
 	sb.WriteString("        # way. No writable mount is needed.\n")
+	sb.WriteString("        # No user or group ID is set: the container runs as the image's user, uid and gid 10001.\n")
+	sb.WriteString("        # OpenShift's restricted-v2 SCC, which refuses a user ID outside the namespace's range,\n")
+	sb.WriteString("        # assigns one from that range instead.\n")
 	sb.WriteString("        securityContext:\n")
 	sb.WriteString("          runAsNonRoot: true\n")
-	sb.WriteString("          runAsUser: 10001\n")
-	sb.WriteString("          runAsGroup: 10001\n")
 	sb.WriteString("          allowPrivilegeEscalation: false\n")
 	sb.WriteString("          readOnlyRootFilesystem: true\n")
 	sb.WriteString("          capabilities:\n")

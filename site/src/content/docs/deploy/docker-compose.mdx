@@ -115,7 +115,7 @@ Each image holds the server's binary on a minimal Alpine: BusyBox, the CA certif
 
 Without `ssl_client`, the image's `wget` reaches `http://` addresses only: `wget https://…` fails with `can't execute 'ssl_client'`.
 
-To add a tool to an image of your own built on Goiabada's, install it in another stage and copy it in, with any libraries it links.
+To add a tool to an image of your own built on Goiabada's, install it in another stage and copy it in, with any libraries it links. If your Dockerfile switches user, end it with `USER 10001:10001`, by number. The generated Kubernetes manifest sets no user ID, so on a cluster that doesn't assign one, its `runAsNonRoot` refuses an image that runs as root, or names its user rather than numbering it. OpenShift assigns one, and runs such an image as that user instead.
 
 ## Recover a locked-out administrator
 
