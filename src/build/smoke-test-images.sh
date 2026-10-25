@@ -81,12 +81,24 @@ fail() {
     failed=1
 }
 
+# The containers this run has started. Leaving, by the last line, a failure,
+# Ctrl-C or SIGTERM, removes them all, so a run cut short leaves none running.
+CONTAINERS=()
+# shellcheck disable=SC2329 # the EXIT trap below invokes it
+remove_containers() {
+    [ "${#CONTAINERS[@]}" -eq 0 ] || docker rm -f "${CONTAINERS[@]}" >/dev/null 2>&1 || true
+}
+trap remove_containers EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 # Runs an image with one TZ and no other configuration, printing its combined
 # output and setting STATUS to its exit code. The container is named so that a
 # run the timeout cuts short is still removed.
 run_image() {
     local image="$1" tz="$2" name
     name="goiabada-smoke-$$-$RANDOM"
+    CONTAINERS+=("$name")
     STATUS=0
     OUTPUT=$(timeout "$RUN_TIMEOUT" docker run --rm --name "$name" -e TZ="$tz" "$image" 2>&1) || STATUS=$?
     docker rm -f "$name" >/dev/null 2>&1 || true
@@ -128,17 +140,19 @@ random_hex() {
     od -An -vtx1 -N "$1" /dev/urandom | tr -d ' \n'
 }
 
-# Waits up to RUN_TIMEOUT for the running container name to answer healthy on
-# /health at port, setting HEALTHY, and stops waiting once the container has exited.
+# Waits up to RUN_TIMEOUT seconds for the running container name to answer healthy
+# on /health at port, setting HEALTHY, and stops waiting once the container has
+# exited. Each probe has its own limits, since a server that accepts the connection
+# and never answers would hold BusyBox's wget far longer than RUN_TIMEOUT.
 wait_healthy() {
-    local name="$1" port="$2"
+    local name="$1" port="$2" deadline=$((SECONDS + RUN_TIMEOUT))
     HEALTHY=false
-    for _ in $(seq "$RUN_TIMEOUT"); do
-        if [ "$(docker exec "$name" wget -q -O - "http://localhost:$port/health" 2>/dev/null)" = healthy ]; then
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        if [ "$(timeout 5 docker exec "$name" wget -q -T 2 -O - "http://localhost:$port/health" 2>/dev/null)" = healthy ]; then
             HEALTHY=true
             return
         fi
-        [ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = true ] || return 0
+        [ "$(timeout 5 docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = true ] || return 0
         sleep 1
     done
 }
@@ -227,6 +241,7 @@ else
     restricted=(--user "$ARBITRARY_USER" --read-only --cap-drop ALL --security-opt no-new-privileges)
     urls=(-e GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090 -e GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091)
     client_secret=$(random_hex 32)
+    CONTAINERS+=("$authserver_name" "$adminconsole_name")
     docker run -d --name "$authserver_name" --network none "${restricted[@]}" "${urls[@]}" \
         -e GOIABADA_DB_TYPE=sqlite \
         -e GOIABADA_AES_ENCRYPTION_KEY="$(random_hex 32)" \
