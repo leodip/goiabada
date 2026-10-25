@@ -54,20 +54,24 @@ type passwordSubmissionBrowser interface {
 type PasswordSubmission struct {
 	database    passwordSubmissionDatabase
 	auditLogger auditLogger
+	// verifyPassword is the password comparison the form makes, a field so a test can see which
+	// hash each refusal compared against (#681).
+	verifyPassword func(hashedPassword string, password string) bool
 }
 
 // NewPasswordSubmission builds the operation over the database it reads and the audit log.
 func NewPasswordSubmission(database passwordSubmissionDatabase, auditLogger auditLogger) *PasswordSubmission {
-	return &PasswordSubmission{database: database, auditLogger: auditLogger}
+	return &PasswordSubmission{database: database, auditLogger: auditLogger, verifyPassword: passwordhash.Verify}
 }
 
 // PasswordAnswer is how PasswordSubmission answered a submission.
 type PasswordAnswer int
 
 const (
-	// PasswordRefused is an address naming no account, or a password that is not the account's. The
-	// form is shown again with one message for both, in the request's locale, so neither the wording
-	// nor the language says whether the account exists.
+	// PasswordRefused is an address naming no account, a password that is not the account's, or any
+	// password for an account that has none yet. The form is shown again with one message for all
+	// three, in the request's locale, so neither the wording nor the language says whether the
+	// account exists.
 	PasswordRefused PasswordAnswer = iota + 1
 	// PasswordAccountDisabled is the right password for a disabled account. The form is shown again
 	// with the disabled message, in the user's locale. Nothing was written to the browser session.
@@ -100,8 +104,9 @@ type PasswordSubmissionResult struct {
 //  2. No account: compares the password against a dummy hash, so the answer takes as long as for a
 //     wrong password, charges the guess to the rate limiter, audits EventAuthFailedPwd with the
 //     address's digest, and answers PasswordRefused.
-//  3. A wrong password: charges the guess, audits EventAuthFailedPwd with the digest and the
-//     account, and answers PasswordRefused.
+//  3. A wrong password, or an account with no password yet, whose password is compared against
+//     the dummy hash for the same reason and refused whatever that comparison says: charges the
+//     guess, audits EventAuthFailedPwd with the digest and the account, and answers PasswordRefused.
 //  4. A disabled account: audits EventUserDisabled and answers PasswordAccountDisabled. Not charged
 //     to the rate limiter: the password was right, so there is no guess to bound (#219).
 //  5. Accepted: audits EventAuthSuccessPwd, records the verified password on the ceremony
@@ -130,7 +135,7 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 	emailDigest := hashutil.HashString(email)
 
 	if user == nil {
-		passwordhash.Verify(passwordhash.DummyHash, password)
+		o.verifyPassword(passwordhash.DummyHash, password)
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedPwd, map[string]interface{}{
 			"email_digest": emailDigest,
@@ -138,7 +143,18 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 		return PasswordSubmissionResult{Answer: PasswordRefused}, nil
 	}
 
-	if !passwordhash.Verify(user.PasswordHash, password) {
+	// An account with no password yet (one an administrator created with the setup email keeps an
+	// empty hash until its user sets one, and bcrypt refuses an empty hash without doing any work)
+	// is compared against the dummy hash, so it takes as long to refuse as a wrong password and the
+	// response time does not say whether its user has set a password. The comparison's result is
+	// ignored: the dummy hash's plaintext signs no one in (#681).
+	passwordMatches := false
+	if user.PasswordHash == "" {
+		o.verifyPassword(passwordhash.DummyHash, password)
+	} else {
+		passwordMatches = o.verifyPassword(user.PasswordHash, password)
+	}
+	if !passwordMatches {
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedPwd, map[string]interface{}{
 			"email_digest": emailDigest,
