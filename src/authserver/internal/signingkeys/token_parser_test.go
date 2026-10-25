@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -76,6 +78,7 @@ func TestDecodeAndValidateTokenString(t *testing.T) {
 			tp := NewTokenParser(currentKeyDatabase(t, privateKey))
 			token := jwt.NewWithClaims(jwt.SigningMethodRS256, tt.tokenClaims)
 			tokenString, _ := token.SignedString(privateKey)
+			logs := logtest.CaptureSlog(t)
 
 			result, err := tp.DecodeAndValidateTokenString(context.Background(), tokenString, true)
 
@@ -85,6 +88,11 @@ func TestDecodeAndValidateTokenString(t *testing.T) {
 				assert.Nil(t, result)
 				require.ErrorIs(t, err, ErrTokenRefused)
 				assert.Equal(t, tt.expired, errors.Is(err, ErrTokenExpired), "expired mark")
+				assert.Contains(t, logs.Records(), logtest.CapturedRecord{
+					Level:   slog.LevelDebug,
+					Message: "the error is claims-related, so no fallback key is tried",
+					Attrs:   map[string]any{},
+				})
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, result)

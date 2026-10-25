@@ -99,7 +99,7 @@ Pragma: no-cache
 | 401 | `invalid_token` | "Session has expired" | The session the token was issued in reached its idle timeout or maximum lifetime |
 | 500 | `server_error` | "An unexpected server error has occurred. …" | The auth server couldn't check the token, for example because it couldn't read its signing keys. The token may still be good: keep it and retry later. |
 
-The last two make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Ending sessions](/concepts/ending-sessions/#what-it-doesnt-reach).
+The two session errors make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Ending sessions](/concepts/ending-sessions/#what-it-doesnt-reach).
 
 ## Calling it from a browser
 

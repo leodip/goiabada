@@ -128,7 +128,11 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 
 	// Only a signature the current key did not verify sends the parser to the other keys; any
 	// other failure, such as an expired token whose signature verified, is the token's own.
-	if pubKey == nil || !errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+	if pubKey == nil {
+		return nil, refused(err)
+	}
+	if !errors.Is(err, jwt.ErrTokenSignatureInvalid) {
+		slog.DebugContext(ctx, "the error is claims-related, so no fallback key is tried")
 		return nil, refused(err)
 	}
 
