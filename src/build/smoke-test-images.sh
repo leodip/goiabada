@@ -42,6 +42,16 @@
 #   - It must have /etc/ssl/certs/ca-certificates.crt, the CA bundle the servers'
 #     TLS reads, which deleting apk-tools with --purge removes unless it is added.
 #
+# Last, the two images are started together and configured, as OpenShift runs them
+# under its restricted-v2 SCC (#686): an arbitrary uid with group 0, a read-only
+# root, every capability dropped and no network, the admin console in the auth
+# server's network namespace. The keys are generated for the run, and the database
+# is SQLite in memory. Each must answer healthy on /health within RUN_TIMEOUT: the
+# auth server only after migrating, seeding and listening, the admin console only
+# after the auth server has issued its token. So anything that start reads or runs
+# that only uid 10001 may, or any write it makes to the image's file system, fails
+# the run. It needs both images, and is skipped when either is missing.
+#
 # Usage: ./smoke-test-images.sh --version <version> <image>...
 set -euo pipefail
 
@@ -60,6 +70,7 @@ done
 RUN_TIMEOUT=60
 UNKNOWN_TZ="Not/AZone"
 RUN_AS="10001:10001"
+ARBITRARY_USER="1000680000:0"
 AUTHSERVER_WRITABLE_DIRS=(/data /bootstrap)
 FINAL_STAGE_PACKAGES=(alpine-baselayout alpine-baselayout-data alpine-keys alpine-release busybox busybox-binsh ca-certificates-bundle musl)
 CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
@@ -110,6 +121,26 @@ read_contents() {
         if apk=$(command -v apk); then echo "apk $apk"; else echo "apk absent"; fi
         if [ -f "$1" ]; then echo "$1 present"; else echo "$1 absent"; fi
     ' sh "$CA_BUNDLE"
+}
+
+# Prints count random bytes as hex, the form the servers' keys take.
+random_hex() {
+    od -An -vtx1 -N "$1" /dev/urandom | tr -d ' \n'
+}
+
+# Waits up to RUN_TIMEOUT for the running container name to answer healthy on
+# /health at port, setting HEALTHY, and stops waiting once the container has exited.
+wait_healthy() {
+    local name="$1" port="$2"
+    HEALTHY=false
+    for _ in $(seq "$RUN_TIMEOUT"); do
+        if [ "$(docker exec "$name" wget -q -O - "http://localhost:$port/health" 2>/dev/null)" = healthy ]; then
+            HEALTHY=true
+            return
+        fi
+        [ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" = true ] || return 0
+        sleep 1
+    done
 }
 
 # Fails unless the read_user output in USER_OUTPUT carries the line exactly.
@@ -180,6 +211,47 @@ for image in "${IMAGES[@]}"; do
     if [ "$STATUS" -ne 2 ]; then
         fail "$image with TZ=$UNKNOWN_TZ exited $STATUS, not 2"
     fi
+
+    case "$binary" in
+        */goiabada-authserver) authserver_image="$image" ;;
+        */goiabada-adminconsole) adminconsole_image="$image" ;;
+    esac
 done
+
+if [ -z "${authserver_image:-}" ] || [ -z "${adminconsole_image:-}" ]; then
+    echo "=== skipping the start as $ARBITRARY_USER: it needs both images"
+else
+    echo "=== $authserver_image and $adminconsole_image, configured, as $ARBITRARY_USER"
+    authserver_name="goiabada-smoke-$$-$RANDOM"
+    adminconsole_name="goiabada-smoke-$$-$RANDOM"
+    restricted=(--user "$ARBITRARY_USER" --read-only --cap-drop ALL --security-opt no-new-privileges)
+    urls=(-e GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090 -e GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091)
+    client_secret=$(random_hex 32)
+    docker run -d --name "$authserver_name" --network none "${restricted[@]}" "${urls[@]}" \
+        -e GOIABADA_DB_TYPE=sqlite \
+        -e GOIABADA_AES_ENCRYPTION_KEY="$(random_hex 32)" \
+        -e GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="$(random_hex 64)" \
+        -e GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY="$(random_hex 32)" \
+        -e GOIABADA_ADMIN_EMAIL=admin@example.com \
+        -e GOIABADA_ADMIN_PASSWORD="$(random_hex 16)" \
+        -e GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="$client_secret" \
+        "$authserver_image" >/dev/null || fail "$authserver_image: unable to start it as $ARBITRARY_USER"
+    wait_healthy "$authserver_name" 9090
+    docker logs "$authserver_name" 2>&1 || true
+    if [ "$HEALTHY" = true ]; then
+        docker run -d --name "$adminconsole_name" --network "container:$authserver_name" "${restricted[@]}" "${urls[@]}" \
+            -e GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="$(random_hex 64)" \
+            -e GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY="$(random_hex 32)" \
+            -e GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="$client_secret" \
+            "$adminconsole_image" >/dev/null || fail "$adminconsole_image: unable to start it as $ARBITRARY_USER"
+        wait_healthy "$adminconsole_name" 9091
+        docker logs "$adminconsole_name" 2>&1 || true
+        [ "$HEALTHY" = true ] ||
+            fail "$adminconsole_image as $ARBITRARY_USER on a read-only root did not answer healthy within ${RUN_TIMEOUT}s"
+    else
+        fail "$authserver_image as $ARBITRARY_USER on a read-only root did not answer healthy within ${RUN_TIMEOUT}s"
+    fi
+    docker rm -f "$adminconsole_name" "$authserver_name" >/dev/null 2>&1 || true
+fi
 
 exit "$failed"

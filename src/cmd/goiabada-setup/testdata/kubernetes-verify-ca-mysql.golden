@@ -148,7 +148,9 @@ spec:
             app: goiabada-authserver
       containers:
       - name: authserver
-        image: leodip/goiabada:authserver-latest
+        # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through
+        # registries its configuration lists, and may refuse to pull leodip/goiabada.
+        image: docker.io/leodip/goiabada:authserver-latest
         # latest is a moving tag: each start pulls whatever release it names then, so pods can
         # run different releases. Replace it with a release version to pin the image.
         imagePullPolicy: Always
@@ -157,10 +159,11 @@ spec:
         # Kubernetes, and the auth server's one other write, Go spilling an upload over the size
         # limit to /tmp, is refused as FILE_TOO_LARGE rather than by the image check, a 400 either
         # way. No writable mount is needed.
+        # No user or group ID is set: the container runs as the image's user, uid and gid 10001.
+        # OpenShift's restricted-v2 SCC, which refuses a user ID outside the namespace's range,
+        # assigns one from that range instead.
         securityContext:
           runAsNonRoot: true
-          runAsUser: 10001
-          runAsGroup: 10001
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           capabilities:
@@ -339,7 +342,9 @@ spec:
             app: goiabada-adminconsole
       containers:
       - name: adminconsole
-        image: leodip/goiabada:adminconsole-latest
+        # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through
+        # registries its configuration lists, and may refuse to pull leodip/goiabada.
+        image: docker.io/leodip/goiabada:adminconsole-latest
         # latest is a moving tag: each start pulls whatever release it names then, so pods can
         # run different releases. Replace it with a release version to pin the image.
         imagePullPolicy: Always
@@ -348,10 +353,11 @@ spec:
         # Kubernetes, and the auth server's one other write, Go spilling an upload over the size
         # limit to /tmp, is refused as FILE_TOO_LARGE rather than by the image check, a 400 either
         # way. No writable mount is needed.
+        # No user or group ID is set: the container runs as the image's user, uid and gid 10001.
+        # OpenShift's restricted-v2 SCC, which refuses a user ID outside the namespace's range,
+        # assigns one from that range instead.
         securityContext:
           runAsNonRoot: true
-          runAsUser: 10001
-          runAsGroup: 10001
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           capabilities:

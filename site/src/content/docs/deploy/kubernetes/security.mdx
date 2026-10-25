@@ -32,8 +32,6 @@ Every generated container runs with this `securityContext`, which is everything 
 ```yaml
 securityContext:
   runAsNonRoot: true
-  runAsUser: 10001
-  runAsGroup: 10001
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
@@ -42,7 +40,11 @@ securityContext:
     type: RuntimeDefault
 ```
 
-uid 10001 is [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as). No writable volume is mounted, because neither server writes to its file system here. The legacy bootstrap file isn't used under Kubernetes, and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`, fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check: a 400 either way. A certificate or customization you mount from a Secret or ConfigMap is readable by default, mode `0644`; with a stricter `defaultMode`, keep it readable by uid or gid 10001.
+It sets no user or group ID, so each container runs as [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as), uid and gid 10001. On OpenShift, the default `restricted-v2` security context constraint (SCC), its admission policy for pods, admits the pods and assigns them IDs from the ranges OpenShift allocates to the namespace instead: a user ID for each container, and an `fsGroup` for the pod.
+
+No writable volume is mounted, because neither server writes to its file system here. The legacy bootstrap file isn't used under Kubernetes, and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`, fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check: a 400 either way.
+
+A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
 
 Both pod specs also set:
 
