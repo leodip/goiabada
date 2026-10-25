@@ -1,0 +1,280 @@
+---
+title: Internal TLS
+description: Encrypt the admin console's and gateway's connections to the auth server.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you encrypt the admin console's and the gateway's connections to the auth server.
+
+Start with [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/). Keep these patches beside the wizard's `goiabada-k8s.yaml`.
+
+## Admin console to auth server
+
+This example uses cert-manager's [CA issuer](https://cert-manager.io/docs/configuration/ca/), with your authority's certificate in `ca.pem` and signing key in `ca-key.pem`. With an existing issuer, skip the signing Secret and Issuer below and set the Certificate's `issuerRef` to yours.
+
+<Aside type="danger">
+**Never** commit the signing key or its Secret. Give the admin console only the authority's public certificate.
+</Aside>
+
+<Steps>
+
+1. **Issue the auth server's certificate.** Import the authority into the namespace:
+
+   ```bash
+   kubectl create secret tls goiabada-internal-ca -n goiabada \
+     --cert=ca.pem --key=ca-key.pem
+   ```
+
+   Save this as `internal-certificate.yaml`. Replace `goiabada` and `cluster.local` throughout these files if your namespace or cluster DNS domain differs.
+
+   ```yaml
+   apiVersion: cert-manager.io/v1
+   kind: Issuer
+   metadata:
+     name: goiabada-internal-ca
+     namespace: goiabada
+   spec:
+     ca:
+       secretName: goiabada-internal-ca
+   ---
+   apiVersion: cert-manager.io/v1
+   kind: Certificate
+   metadata:
+     name: goiabada-authserver-internal
+     namespace: goiabada
+   spec:
+     secretName: goiabada-authserver-internal
+     dnsNames:
+     - goiabada-authserver
+     - goiabada-authserver.goiabada.svc.cluster.local
+     issuerRef:
+       name: goiabada-internal-ca
+       kind: Issuer
+   ```
+
+   ```bash
+   kubectl apply -f internal-certificate.yaml
+   kubectl wait -n goiabada --for=condition=Ready \
+     certificate/goiabada-authserver-internal --timeout=2m
+   ```
+
+2. **Share the public certificate.** Use the key `ca.crt`, which the gateway requires too:
+
+   ```bash
+   kubectl create configmap goiabada-internal-ca -n goiabada \
+     --from-file=ca.crt=ca.pem --dry-run=client -o yaml > internal-ca.yaml
+   kubectl apply -f internal-ca.yaml
+   ```
+
+3. **Mount the files and turn on HTTPS.** Save these patches as `internal-tls-patches.yaml`:
+
+   ```yaml
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: goiabada-authserver-config
+     namespace: goiabada
+   data:
+     GOIABADA_AUTHSERVER_CERTFILE: "/etc/goiabada/internal-tls/tls.crt"
+     GOIABADA_AUTHSERVER_KEYFILE: "/etc/goiabada/internal-tls/tls.key"
+     GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS: "9443"
+   ---
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: goiabada-adminconsole-config
+     namespace: goiabada
+   data:
+     GOIABADA_AUTHSERVER_INTERNALBASEURL: "https://goiabada-authserver:9443"
+     GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE: "/etc/goiabada/internal-ca/ca.crt"
+   ---
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: goiabada-authserver
+     namespace: goiabada
+   spec:
+     template:
+       spec:
+         containers:
+         - name: authserver
+           ports:
+           - name: https
+             containerPort: 9443
+           volumeMounts:
+           - name: internal-tls
+             mountPath: /etc/goiabada/internal-tls
+             readOnly: true
+         volumes:
+         - name: internal-tls
+           secret:
+             secretName: goiabada-authserver-internal
+   ---
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: goiabada-adminconsole
+     namespace: goiabada
+   spec:
+     template:
+       spec:
+         containers:
+         - name: adminconsole
+           volumeMounts:
+           - name: internal-ca
+             mountPath: /etc/goiabada/internal-ca
+             readOnly: true
+         volumes:
+         - name: internal-ca
+           configMap:
+             name: goiabada-internal-ca
+   ---
+   apiVersion: v1
+   kind: Service
+   metadata:
+     name: goiabada-authserver
+     namespace: goiabada
+   spec:
+     ports:
+     - name: http
+       port: 9090
+       targetPort: 9090
+     - name: https
+       port: 9443
+       targetPort: 9443
+   ```
+
+   Both Service ports need names. Keep HTTP on 9090 for the probes and, until the next section, the gateway.
+
+4. **Apply the patches.** Save this as `kustomization.yaml`. Omit the final patch if you generated no NetworkPolicies.
+
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   resources:
+   - goiabada-k8s.yaml
+   patches:
+   - path: internal-tls-patches.yaml
+   - target:
+       kind: NetworkPolicy
+       name: goiabada-authserver
+     patch: |-
+       - op: add
+         path: /spec/ingress/0/ports/-
+         value:
+           protocol: TCP
+           port: 9443
+   ```
+
+   Apply it and restart both Deployments to read the ConfigMaps:
+
+   ```bash
+   kubectl apply -k .
+   kubectl rollout restart -n goiabada \
+     deployment/goiabada-authserver deployment/goiabada-adminconsole
+   kubectl rollout status -n goiabada deployment/goiabada-authserver --timeout=5m
+   kubectl rollout status -n goiabada deployment/goiabada-adminconsole --timeout=5m
+   ```
+
+   Keep using `kubectl apply -k .`: applying the wizard's manifest alone undoes these settings.
+
+5. **Sign in to the admin console and open Clients.** This checks its HTTPS connection to the auth server.
+
+   An unreadable CA file, or one without a certificate, stops the console. A TLS failure keeps its new pod unready. Check its logs or [Can't reach the auth server](/troubleshooting/cant-reach-the-auth-server/):
+
+   ```bash
+   kubectl logs -n goiabada deployment/goiabada-adminconsole
+   ```
+
+</Steps>
+
+## Gateway to auth server
+
+Complete the previous section first. A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/reference/api-types/policy/backendtlspolicy/) makes the gateway verify the auth server's certificate on the Service's `https` port. These steps are tested with **Envoy Gateway v1.9.1**.
+
+<Steps>
+
+1. **Create the policy.** Save this as `backend-tls.yaml`. Use the Service's namespace and a `hostname` that matches a DNS name in the certificate:
+
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: BackendTLSPolicy
+   metadata:
+     name: goiabada-authserver
+     namespace: goiabada
+   spec:
+     targetRefs:
+     - group: ""
+       kind: Service
+       name: goiabada-authserver
+       sectionName: https
+     validation:
+       caCertificateRefs:
+       - group: ""
+         kind: ConfigMap
+         name: goiabada-internal-ca
+       hostname: goiabada-authserver.goiabada.svc.cluster.local
+   ```
+
+   Add `backend-tls.yaml` to `resources` in `kustomization.yaml`. Apply it before changing the route:
+
+   ```bash
+   kubectl apply -k .
+   kubectl get backendtlspolicy goiabada-authserver -n goiabada -o yaml
+   ```
+
+   Under `status.ancestors`, wait for `Accepted` and `ResolvedRefs` to be `"True"`, with their `observedGeneration` matching `metadata.generation`.
+
+2. **Switch the auth server's route to 9443.** Add this entry to `patches` in `kustomization.yaml`:
+
+   ```yaml
+   - target:
+       group: gateway.networking.k8s.io
+       version: v1
+       kind: HTTPRoute
+       name: goiabada-authserver
+     patch: |-
+       - op: replace
+         path: /spec/rules/0/backendRefs/0/port
+         value: 9443
+   ```
+
+   ```bash
+   kubectl apply -k .
+   ```
+
+3. **Check the connection.** Use your public auth server URL:
+
+   ```bash
+   curl --fail --show-error https://auth.example.com/health
+   ```
+
+   Allow a few seconds for the gateway to update, then expect `healthy`. Sign in and open Clients again. For a 503, check the policy's status, certificate DNS names, `ca.crt` and NetworkPolicy's 9443 rule.
+
+</Steps>
+
+The gateway's hop to the admin console on 9091 is still HTTP. Use an [encrypting network plugin or a service mesh](/deploy/kubernetes/security/#encrypt-the-hop-to-the-auth-server) to cover it too.
+
+## Certificate changes
+
+The auth server reads its certificate and key only at start. The console reads its CA file only at start; the gateway watches the ConfigMap.
+
+<Steps>
+
+1. **After each certificate renewal, restart the auth server:**
+
+   ```bash
+   kubectl rollout restart -n goiabada deployment/goiabada-authserver
+   ```
+
+2. **When changing authorities, trust both during the switch.** Put both CA certificates in `ca.pem`, regenerate and apply `internal-ca.yaml`, and restart the console before replacing the server's certificate. Remove the old CA and restart the console once the switch is complete.
+
+</Steps>
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Security" description="Who reaches the pods, and which hops need encryption." href="/deploy/kubernetes/security/" />
+  <LinkCard title="Can't reach the auth server" description="Diagnose an internal URL or certificate failure." href="/troubleshooting/cant-reach-the-auth-server/" />
+</CardGrid>

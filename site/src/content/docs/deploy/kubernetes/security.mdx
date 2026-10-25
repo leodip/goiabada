@@ -105,26 +105,8 @@ When the pod network isn't one you trust, such as a cluster shared with workload
 
 - **A network plugin that encrypts pod traffic,** such as Calico's or Cilium's WireGuard mode. It encrypts every hop between nodes, the gateway's included, and the manifest stays as it is.
 - **A service mesh with mutual TLS** between the pods, such as Istio or Linkerd. It covers both hops too. Check that its sidecars leave `X-Forwarded-For` as Envoy wrote it, or Goiabada reads the wrong client address: see [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop).
-- **TLS at the auth server itself,** for the admin console's hop:
-
-  <Steps>
-
-  1. Make a certificate for the name the admin console calls, `goiabada-authserver`, from a certificate authority of your own (cert-manager's CA issuer can issue and renew it). Put it in a Secret, and mount it into the auth server's container.
-
-  2. Turn on the auth server's HTTPS listener, on port 9443, by setting `GOIABADA_AUTHSERVER_CERTFILE` and `GOIABADA_AUTHSERVER_KEYFILE` in its ConfigMap to the mounted files. Add port 9443 to its container and its Service, and, with the NetworkPolicies on, to the auth server's policy. Its plain HTTP listener stays on for the gateway and the probes.
-
-  3. Mount your certificate authority's certificate into the admin console's container, and set, in the admin console's ConfigMap:
-
-     ```yaml
-     GOIABADA_AUTHSERVER_INTERNALBASEURL: "https://goiabada-authserver:9443"
-     GOIABADA_ADMINCONSOLE_INTERNAL_CA_FILE: "/certs/ca.pem"
-     ```
-
-  4. Restart both Deployments. The auth server reads its certificate when it starts, so restart it after each renewal too.
-
-  </Steps>
-
-- **A [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/api-types/backendtlspolicy/)** for the gateway's hop, once the auth server serves HTTPS as above: it has the gateway connect to a Service port over TLS and check the certificate against your authority. Point the auth server's HTTPRoute at port 9443, and name every host name the gateway uses in the certificate.
+- **TLS at the auth server,** for the [admin console's hop](/deploy/kubernetes/internal-tls/#admin-console-to-auth-server).
+- **A `BackendTLSPolicy`,** for the [gateway's hop to the auth server](/deploy/kubernetes/internal-tls/#gateway-to-auth-server), once the auth server serves HTTPS.
 
 If the admin console then can't reach the auth server, see [Can't reach the auth server](/troubleshooting/cant-reach-the-auth-server/).
 
