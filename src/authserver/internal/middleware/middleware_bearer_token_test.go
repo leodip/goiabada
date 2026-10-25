@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
@@ -24,6 +27,10 @@ import (
 // token is validated, and what reaches the context. The whole chain on both surfaces, with the exact
 // challenge and body of every refusal, is bearer_guard_chain_test.go's; the refusals here pin only
 // the status and the API code, which is deliberate.
+
+// errRefusedToken is what the parser answers a token it refuses, carrying its refused mark. An error
+// without the mark is a fault, which bearer_guard_chain_test.go answers on both surfaces.
+var errRefusedToken = fmt.Errorf("token signature is invalid: %w", signingkeys.ErrTokenRefused)
 
 // parseGuardResult is what one request through the parse guard produced.
 type parseGuardResult struct {
@@ -121,7 +128,7 @@ func TestJwtAuthorizationHeaderToContext_TheSchemeIsCaseInsensitive(t *testing.T
 func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	parser := new(middlewaremocks.TokenParser)
-	parser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", true).Return(nil, assert.AnError)
+	parser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", true).Return(nil, errRefusedToken)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "Bearer invalidtoken")
@@ -134,6 +141,26 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 	assert.Equal(t, slog.LevelWarn, records[0].Level)
 	assert.Contains(t, records[0].Message, "did not validate")
 	assert.NotContains(t, logs.Text(), "invalidtoken", "the record carries no token material")
+}
+
+// An expired token is a refused one, carrying both marks, and gets the one sentence every refused
+// token gets: the parse guard does not name the reason.
+func TestJwtAuthorizationHeaderToContext_ExpiredBearerToken(t *testing.T) {
+	logs := logtest.CaptureSlog(t)
+	parser := new(middlewaremocks.TokenParser)
+	parser.On("DecodeAndValidateTokenString", mock.Anything, "expiredtoken", true).
+		Return(nil, fmt.Errorf("token is expired: %w", errors.Join(signingkeys.ErrTokenRefused, signingkeys.ErrTokenExpired)))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer expiredtoken")
+
+	requireRefused(t, serveParseGuard(parser, req), http.StatusUnauthorized, "INVALID_TOKEN")
+	parser.AssertExpectations(t)
+
+	records := logs.Records()
+	require.Len(t, records, 1, "one record per refusal")
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Contains(t, records[0].Message, "did not validate")
 }
 
 func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
@@ -187,7 +214,7 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 
 func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
-	parser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", true).Return(nil, assert.AnError)
+	parser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", true).Return(nil, errRefusedToken)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=invalidposttoken"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

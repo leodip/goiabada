@@ -3,6 +3,7 @@ package authflow
 import (
 	"context"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -20,6 +21,7 @@ import (
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -73,6 +75,13 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			wantPrompt:      "login",
 			wantCalls:       []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes", "ValidatePrompt", "DecodeAndValidateTokenString"},
 		},
+		{
+			// The parser could not check the hint, so nothing is known of it: a fault (#680).
+			name:      "a hint the parser could not check is a fault, not refused",
+			hint:      "unchecked-hint",
+			wantFault: true,
+			wantCalls: []string{"ValidateUnsupportedRequestParameters", "ValidateRequest", "ValidateScopes", "ValidatePrompt", "DecodeAndValidateTokenString"},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -97,7 +106,11 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 			authorizeValidator.On("ValidatePrompt", "login").
 				Run(recordCall("ValidatePrompt")).Return("login", nil).Maybe()
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "not-a-token", false).
-				Run(recordCall("DecodeAndValidateTokenString")).Return(nil, errors.New("malformed")).Maybe()
+				Run(recordCall("DecodeAndValidateTokenString")).
+				Return(nil, fmt.Errorf("token is malformed: %w", signingkeys.ErrTokenRefused)).Maybe()
+			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "unchecked-hint", false).
+				Run(recordCall("DecodeAndValidateTokenString")).
+				Return(nil, errors.New("the signing keys could not be read")).Maybe()
 
 			// ValidateScopes is handed the scope as sent, never the request's normalized copy, whose
 			// spaces would hide a malformed one (#244): the copy below differs, so a call with it
@@ -178,6 +191,49 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 			}
 			assert.Empty(t, sub)
 			var detail *oauth.ErrorDetail
+			require.ErrorAs(t, err, &detail)
+			assert.Equal(t, "invalid_request", detail.Code())
+			assert.Equal(t, "The id_token_hint is invalid.", detail.Description())
+			assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
+		})
+	}
+}
+
+// TestValidateIdTokenHint_TheParsersAnswer: a hint the parser refuses, expired included, is the
+// invalid_request every bad hint gets, and a hint it could not check, because the signing keys could
+// not be read, is returned as the fault itself, which the handler answers on its server error page,
+// rather than telling the client a hint that may be good is invalid (#680).
+func TestValidateIdTokenHint_TheParsersAnswer(t *testing.T) {
+	settings := &record.Settings{Issuer: "https://test-issuer.com"}
+	keyStoreDown := errors.New("the signing keys could not be read")
+
+	tests := []struct {
+		name      string
+		parserErr error
+		wantFault bool
+	}{
+		{name: "refused", parserErr: fmt.Errorf("token signature is invalid: %w", signingkeys.ErrTokenRefused)},
+		{name: "refused as expired",
+			parserErr: fmt.Errorf("token is expired: %w", errors.Join(signingkeys.ErrTokenRefused, signingkeys.ErrTokenExpired))},
+		{name: "could not be checked", parserErr: keyStoreDown, wantFault: true},
+		{name: "could not be checked, joined to the library's error",
+			parserErr: errors.Join(jwt.ErrTokenSignatureInvalid, keyStoreDown), wantFault: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tokenParser := handlersmocks.NewTokenParser(t)
+			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).Return(nil, tc.parserErr)
+
+			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
+
+			assert.Empty(t, sub)
+			var detail *oauth.ErrorDetail
+			if tc.wantFault {
+				require.ErrorIs(t, err, keyStoreDown)
+				assert.NotErrorAs(t, err, &detail, "a fault is not a refusal of the hint")
+				return
+			}
 			require.ErrorAs(t, err, &detail)
 			assert.Equal(t, "invalid_request", detail.Code())
 			assert.Equal(t, "The id_token_hint is invalid.", detail.Description())

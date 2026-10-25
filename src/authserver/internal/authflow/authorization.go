@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -677,8 +678,8 @@ func validateAuthorizeRequest(ctx context.Context, validator authorizeRequestVal
 	return validation, nil
 }
 
-// validateIdTokenHint answers the sub of the id_token_hint, "" when there is none, or the
-// invalid_request that refuses it. OIDC Core 1.0 section 3.1.2.2 requires the server to verify it
+// validateIdTokenHint answers the sub of the id_token_hint, "" when there is none, the
+// invalid_request that refuses it, or the fault when the parser could not check it. OIDC Core 1.0 section 3.1.2.2 requires the server to verify it
 // issued the hint, and says it SHOULD accept an expired one, so the expiry is not checked.
 func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser idTokenHintParser,
 	settings *record.Settings) (string, error) {
@@ -692,6 +693,12 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser id
 	}
 
 	jwtToken, err := tokenParser.DecodeAndValidateTokenString(ctx, idTokenHint, false)
+	// A hint the parser could not check, because the signing keys could not be read or decoded,
+	// says nothing about the hint: a fault, answered on the server error page rather than telling
+	// the client a hint that may be good is invalid (#680).
+	if err != nil && !errors.Is(err, signingkeys.ErrTokenRefused) {
+		return "", errs.Wrap(err, "unable to check the id_token_hint")
+	}
 	// OIDC Core 1.0 section 3.1.2.1 defines the hint as an ID Token, and the signature does not say
 	// which kind of token this is: access and refresh tokens are signed with the same key and carry
 	// iss and sub too. A refused kind is answered as a hint that does not parse, so the answer says
