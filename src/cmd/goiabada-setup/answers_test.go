@@ -67,6 +67,9 @@ func TestAnswers_RegenerateEveryGoldenConfigurationByteForByte(t *testing.T) {
 			continue
 		}
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.release {
+				withRelease(t)
+			}
 			dir := t.TempDir()
 			paths := writeDeployment(t, config, dir)
 			description, answers := readFile(t, paths.description), readFile(t, paths.answers)

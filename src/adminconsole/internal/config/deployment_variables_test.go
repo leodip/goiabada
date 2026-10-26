@@ -293,7 +293,7 @@ func receivedVariables(content []byte, image string) (map[string][]string, error
 		containers, _ := mapAt(doc, "spec", "template", "spec")["containers"].([]any)
 		for _, c := range containers {
 			container, _ := c.(map[string]any)
-			// The Kubernetes manifest names the registry, docker.io/, which Compose files leave out (#686).
+			// The wizard names the registry, docker.io/, which the hand-written files leave out (#686).
 			if value, _ := container["image"].(string); !strings.HasPrefix(strings.TrimPrefix(value, "docker.io/"), image) {
 				continue
 			}

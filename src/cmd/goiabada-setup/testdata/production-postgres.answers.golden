@@ -13,4 +13,6 @@ db: "postgres"
 auth-url: "https://auth.example.com"
 admin-url: "https://admin.example.com"
 rate-limiter: true
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
 admin-email: "admin@example.com"

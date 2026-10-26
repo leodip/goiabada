@@ -64,6 +64,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off on Kubernetes](#the-rate-limiter-on-kubernetes). | On, but off on Kubernetes unless Envoy Gateway's policy is Local |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
+| Container images | Every deployment but native binaries: the repository both servers' images are pulled from, such as a mirror in a registry of your own. A release of the wizard asks whether to pin a mirror's images by digest, and on Kubernetes the wizard asks for an image pull secret. See [Images from your own registry](#images-from-your-own-registry). | `docker.io/leodip/goiabada`, pinned, and no pull secret |
 | Admin credentials | Every deployment: the admin's email and password. | `admin@example.com` for local testing, otherwise `admin@` and the auth server's domain. A generated password. |
 | Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user, password, and [the connection's TLS](#the-database-connections-tls): its mode, and the CA file, client certificate and host name each mode asks for. Then an optional connection test, which connects as the auth server will. If it fails, you can enter them all again. | The database's usual port and user, the name `goiabada`, the TLS mode `prefer`, the system's roots, no client certificate, and the database host as the name checked |
 | Database password | Local testing and production, with any database but SQLite. The wizard runs that database for you, and writes the TLS mode `prefer`. | A generated password |
@@ -86,6 +87,44 @@ The wizard warns you whenever the mode it writes checks no certificate.
 The auth server's limits counted by a user or an email apply whether the rate limiter is on or off: wrong one-time codes, wrong passwords per account, and password-reset and registration mails per address among them. The rate limiter adds the limits counted by an IP address.
 
 Under Envoy Gateway's Cluster policy, Goiabada sees a node's address for every client. The per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Behind any other routing, the wizard can't know which address Goiabada sees, so it's off by default too: read the `ip=` of your own request in the auth server's log once it runs, and turn it on when that's your own address. Turned on, it also limits wrong passwords per email from one network, and every client through a node counts as one network: 10 wrong passwords block an email's password sign-ins for 15 minutes for every client through that node. See the [rate limits](/reference/environment-variables/#rate-limits).
+
+## Images from your own registry
+
+Both servers' images are on Docker Hub, `docker.io/leodip/goiabada`, and on GitHub's registry, `ghcr.io/leodip/goiabada`, under the same tags and digests. A release of the wizard writes each image line with the release's tag and the digest it pushed, such as `docker.io/leodip/goiabada:authserver-<version>@sha256:<digest>`, and a runtime pulls it by the digest alone: see [Pin a deployment to an image digest](/deploy/upgrade-goiabada/#pin-a-deployment-to-an-image-digest).
+
+Where the cluster or the host can reach neither, or may pull only from a registry of your own, copy both images to a mirror there, and answer its repository, such as `--image-repository=registry.example.com/mirror/goiabada`. The mirror needs the release's tags, `authserver-<version>` and `adminconsole-<version>`, and its digests, for the pinned image lines to pull. These keep them, as checked with a private registry and K3s:
+
+- **A pull-through cache,** which fetches each image from Docker Hub as it's asked for.
+- **A copy of every platform,** with `skopeo copy --all`, `crane copy` or `docker buildx imagetools create`:
+
+  ```bash
+  for image in authserver adminconsole; do
+    skopeo copy --all "docker://docker.io/leodip/goiabada:$image-<version>" \
+      "docker://registry.example.com/mirror/goiabada:$image-<version>"
+  done
+  ```
+
+`docker pull`, `docker tag` and `docker push` copy one platform, under another digest, which a pinned image line can't be pulled by: the pull fails with `not found`. Copy the images again with one of the above, or answer **No** when the wizard asks whether to pin the images, `--image-digest=false`, so the image lines name the tag alone.
+
+With MySQL, PostgreSQL or SQL Server, a Compose file also runs the database's own image, such as `postgres:18`, which `--image-repository` doesn't change. Copy it to your registry too, and name your copy under the database's service, `mysql-server`, `postgres-server` or `mssql-server`, in `docker-compose.override.yml`. It overrides the image `docker-compose.yml` names, and `--keep-secrets` leaves it as it is:
+
+```yaml
+services:
+  postgres-server:
+    image: registry.example.com/mirror/postgres:18
+```
+
+A registry that asks for credentials needs them where the images are pulled:
+
+- **Docker Compose:** sign the host in, `docker login registry.example.com`, before `docker compose pull`.
+- **Kubernetes:** nodes that hold the registry's credentials already, as managed clusters' nodes do for their cloud's registry, need nothing more. Otherwise, create a Secret of type `kubernetes.io/dockerconfigjson` in the namespace, and answer its name, such as `--image-pull-secret=registry-credentials`: both pod specs name it under `imagePullSecrets`. `--docker-server` is the repository's first part, the registry's host, with its port when it has one:
+
+  ```bash
+  kubectl create secret docker-registry registry-credentials -n goiabada \
+    --docker-server=registry.example.com --docker-username=<user> --docker-password=<password>
+  ```
+
+  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them.
 
 ## Where the secrets go
 
@@ -203,6 +242,9 @@ With prompts, `--keep-secrets` asks every question but the passwords, and writes
 | `--metrics` | Kubernetes: `none`, `annotations` or `podmonitor`. Default: `none`. |
 | `--podmonitor-labels` | Kubernetes, with `--metrics=podmonitor`: the labels your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`. |
 | `--metrics-namespace` | Kubernetes, with metrics and `--network-policy`: the namespace your metrics scraper runs in. Default: `monitoring`. |
+| `--image-repository` | Kubernetes, `local` and `production`: the repository both servers' images are pulled from, such as `registry.example.com/mirror/goiabada`. Default: `docker.io/leodip/goiabada`. |
+| `--image-digest` | Kubernetes, `local` and `production`: `true` or `false`. `true` pins each image line to the digest its release pushed, beside the tag. `false` writes the tag alone, for a mirror holding [other digests](#images-from-your-own-registry). A wizard built from source writes the tag alone either way. Default: `true`. |
+| `--image-pull-secret` | Kubernetes: the Secret holding your registry's credentials, which you create in the namespace. Default: none. |
 | `--rate-limiter` | Production, Kubernetes and native: `true` or `false`. Default: `true`, except on Kubernetes, unless with `--routing=envoy-gateway` and `--gateway-traffic-policy=local`. |
 | `--local-proxy` | Native: `true` when a reverse proxy on the same machine forwards to Goiabada. Default: `true`. |
 | `--output`, `-o` | Where to write the files: a directory, or the name of the main file. Default: the current directory. |

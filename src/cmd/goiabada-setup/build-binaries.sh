@@ -7,17 +7,34 @@
 set -euo pipefail
 
 VERSION="${GOIABADA_VERSION:-dev}"
+# The digests of the two images the release pushed, which the wizard pins its image lines to beside
+# the tag (#686 section 5). A build given none, as every build but a release's is, writes the tag
+# alone.
+AUTHSERVER_DIGEST=""
+ADMINCONSOLE_DIGEST=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --version) VERSION="${2:?--version needs a value}"; shift 2 ;;
+        --authserver-digest) AUTHSERVER_DIGEST="${2:?--authserver-digest needs a value}"; shift 2 ;;
+        --adminconsole-digest) ADMINCONSOLE_DIGEST="${2:?--adminconsole-digest needs a value}"; shift 2 ;;
         # Turns a future typo into a failure rather than a silently ignored
         # argument.
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
 
+# One digest alone would pin one image line, and a digest that is none would write lines no runtime
+# can pull.
+if [ -n "$AUTHSERVER_DIGEST$ADMINCONSOLE_DIGEST" ]; then
+    for digest in "$AUTHSERVER_DIGEST" "$ADMINCONSOLE_DIGEST"; do
+        [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+            { echo "--authserver-digest and --adminconsole-digest take both images' digests, sha256:<64 hex digits>" >&2; exit 2; }
+    done
+fi
+
 echo "Version: $VERSION"
+echo "Image digests: ${AUTHSERVER_DIGEST:-none} ${ADMINCONSOLE_DIGEST:-none}"
 echo "Current directory: $(pwd)"
 
 BUILD_DIR=./build
@@ -33,7 +50,7 @@ build_platform() {
     # imageTag gets the same value as version: the wizard writes deployment
     # manifests for users, and the images it points them at must be the ones
     # that shipped in this release. Both derive from one tag, so they cannot
-    # disagree.
+    # disagree. The digests are the ones the same release pushed under it.
     #
     # -w drops the DWARF debug data, as the servers' release builds do (#331).
     # It is -w and not -s -w, which this script passed until then: -s drops
@@ -57,7 +74,7 @@ build_platform() {
     # build_platform calls below stop matching the guard's release targets
     # (#463).
     GOOS=$os GOARCH=$arch go build -v -tags=production \
-        -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
+        -ldflags "-w -X main.version=${VERSION} -X main.imageTag=${VERSION} -X main.authserverDigest=${AUTHSERVER_DIGEST} -X main.adminconsoleDigest=${ADMINCONSOLE_DIGEST}" \
         -o "${BUILD_DIR}/goiabada-setup-${os}-${arch}${extension}" \
         .
 }

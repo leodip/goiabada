@@ -112,6 +112,14 @@ type Config struct {
 	Metrics          metricsExposure
 	PodMonitorLabels []podMonitorLabel
 	MetricsNamespace string
+	// ImageRepository is the repository both servers' images are pulled from, Docker Hub's unless a
+	// mirror holds them. ImageDigest asks for each image line to name the digest its release pushed,
+	// which a build carrying none cannot write (pinsDigests). ImagePullSecret is the Secret holding the
+	// registry's credentials, empty for none, which Kubernetes alone asks: Compose pulls with the
+	// host's docker login (#686 section 5).
+	ImageRepository string
+	ImageDigest     bool
+	ImagePullSecret string
 }
 
 // trafficPolicy is an externalTrafficPolicy, spelled as Kubernetes spells it.

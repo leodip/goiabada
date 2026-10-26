@@ -274,6 +274,13 @@ func generateAnswers(config *Config, paths outputPaths) string {
 			text("metrics-namespace", config.MetricsNamespace)
 		}
 	}
+	if d.asksImages {
+		text("image-repository", config.ImageRepository)
+		boolean("image-digest", config.ImageDigest)
+		if d.kind == deploymentKubernetes {
+			text("image-pull-secret", config.ImagePullSecret)
+		}
+	}
 	text("admin-email", config.AdminEmail)
 	if config.Engine.hasServer && d.externalDatabase {
 		text("db-host", config.DBHost)

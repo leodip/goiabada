@@ -154,7 +154,9 @@ vps_runs_release() {
   images="$(ssh_vps "cd $(printf %q "$E2E_REMOTE_DIR") && docker compose ps --format '{{.Image}} {{.State}}'")" ||
     { echo "cannot read the Compose project"; return 1; }
   for server in authserver adminconsole; do
-    grep -qx "leodip/goiabada:$server-$version running" <<<"$images" ||
+    # As the Compose file names it: in full, and pinned, by a release's wizard after 1.8.0 (#686
+    # section 5).
+    grep -Eqx "(docker\.io/)?leodip/goiabada:$server-$version(@sha256:[0-9a-f]{64})? running" <<<"$images" ||
       { echo "no running leodip/goiabada:$server-$version in: $(tr '\n' ';' <<<"$images")"; return 1; }
   done
   echo "authserver-$version, adminconsole-$version"

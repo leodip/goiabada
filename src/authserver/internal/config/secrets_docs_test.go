@@ -730,7 +730,7 @@ func secretReferences(content []byte) (map[secretRef]secretReader, int, error) {
 		for _, c := range containers {
 			container, _ := c.(map[string]any)
 			image, _ := container["image"].(string)
-			// The Kubernetes manifest names the registry, docker.io/, which Compose files leave out (#686).
+			// The wizard names the registry, docker.io/, which the hand-written files leave out (#686).
 			image = strings.TrimPrefix(image, "docker.io/")
 			var reader string
 			switch {

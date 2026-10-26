@@ -31,9 +31,15 @@ import (
 // binary, and "latest" is the right image tag for someone running the wizard
 // from a checkout: it resolves to the current release rather than to whichever
 // version happened to be hardcoded when the file was last edited.
+//
+// authserverDigest and adminconsoleDigest are the digests of the two images the release pushed, its
+// multi-platform image indexes, which the image lines pin beside the tag (#686 section 5). A source
+// build has none, nor has an image it built pushed anywhere, and writes the tag alone.
 var (
-	version  = "dev"
-	imageTag = "latest"
+	version            = "dev"
+	imageTag           = "latest"
+	authserverDigest   = ""
+	adminconsoleDigest = ""
 )
 
 // main is the wizard's one exit. Everything under it returns an error instead, so a failure deep

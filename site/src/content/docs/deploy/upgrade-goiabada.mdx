@@ -17,11 +17,11 @@ You don't migrate the database yourself. The auth server brings the schema up to
 
 2. **Back up the database,** and the AES key if you haven't: see [Back up the AES key](/deploy/secrets/#back-up-the-aes-key).
 
-3. **Install the new release, and restart.**
+3. **Install the new release, and restart.** With [images from your own registry](/deploy/setup-wizard/#images-from-your-own-registry), copy the release's two images there first.
 
    <Tabs syncKey="platform">
      <TabItem label="Docker Compose">
-       Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `docker-compose.yml`. It writes the release's version into both image lines, and anything else the release changed in what it generates, and leaves `docker-compose.override.yml`, with your secrets, as it is. Review the diff, then start the new release:
+       Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `docker-compose.yml`. It writes the release's version and digests into both image lines, and anything else the release changed in what it generates, and leaves `docker-compose.override.yml`, with your secrets, as it is. Review the diff, then start the new release:
 
        ```bash
        ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets
@@ -32,7 +32,7 @@ You don't migrate the database yourself. The auth server brings the schema up to
 
        Docker Compose recreates the containers whose image or configuration changed, the two servers among them. The database's data stays in its volume.
 
-       Without an answers file, set both image lines in `docker-compose.yml` to the new release yourself, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`, then run the last two commands.
+       Without an answers file, set both image lines in `docker-compose.yml` to the new release yourself, the two references its notes list under **Pinned image references**, then run the last two commands.
 
        A setup wizard built from source writes the moving `latest` tag instead of a version, so `docker compose pull` fetches whatever release `latest` names that day. Replace it with a [release version](https://github.com/leodip/goiabada/releases), so that you choose when to upgrade.
 
@@ -50,9 +50,9 @@ You don't migrate the database yourself. The auth server brings the schema up to
        Keep the old binaries until the new release works: a [rollback](#roll-back-to-an-earlier-release) installs them again.
      </TabItem>
      <TabItem label="Kubernetes">
-       A release of the setup wizard writes its own version into both image lines, with `imagePullPolicy: IfNotPresent`, since a version tag names one build. A wizard built from source writes `latest` with `imagePullPolicy: Always`, under a comment, and warns you when it finishes: `latest` moves, so pods started at different times can run different releases. Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
+       A release of the setup wizard writes its own version and the digests it pushed into both image lines, with `imagePullPolicy: IfNotPresent`, since a version tag names one build. A wizard built from source writes `latest` with `imagePullPolicy: Always`, under a comment, and warns you when it finishes: `latest` moves, so pods started at different times can run different releases. Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
 
-       Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `goiabada-k8s.yaml`. It writes the release's version into both image lines, and anything else the release changed in the manifest, and leaves `goiabada-secrets.yaml` as it is. Review the diff, and what applying would change in the cluster, then apply the manifest alone: the Secrets need no applying again.
+       Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `goiabada-k8s.yaml`. It writes the release's version and digests into both image lines, and anything else the release changed in the manifest, and leaves `goiabada-secrets.yaml` as it is. Review the diff, and what applying would change in the cluster, then apply the manifest alone: the Secrets need no applying again.
 
        ```bash
        ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets
@@ -64,7 +64,7 @@ You don't migrate the database yourself. The auth server brings the schema up to
 
        With a kustomization over the manifest, such as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide's, apply that instead, with `kubectl apply -k`.
 
-       Without an answers file, set both image lines in `goiabada-k8s.yaml` to the new release yourself, then apply it.
+       Without an answers file, set both image lines in `goiabada-k8s.yaml` to the new release yourself, the two references its notes list under **Pinned image references** after `docker.io/`, then apply it.
 
        A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together: the digest alone decides what a pod runs, so a tag changed on its own leaves every pod on the old release while `kubectl rollout status` reports success.
      </TabItem>
@@ -80,11 +80,11 @@ Running the setup wizard again without `--keep-secrets` generates new secrets. B
 
 ## Pin a deployment to an image digest
 
-The image lines a release of the setup wizard writes name a release by its version tag, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`, with the registry in front, `docker.io/`, in `goiabada-k8s.yaml`. A tag is mutable in the registry: a re-push under the same name, by mistake or through a compromised credential, changes what every node pulls next. A digest names the image content itself, and the release's attestations are made against it, so pinning a deployment to a digest makes the registry unable to change what runs.
+A tag is mutable in the registry: a re-push under the same name, by mistake or through a compromised credential, changes what every node pulls next. A digest names the image content itself, and the release's attestations are made against it, so pinning a deployment to a digest makes the registry unable to change what runs.
 
-The setup wizard writes the version tag alone. Pinning is up to you, once you've read the rule at the end of this section.
+A release of the setup wizard pins both image lines: each names the release's version tag and the digest the release pushed, `docker.io/leodip/goiabada:authserver-<version>@sha256:<digest>`. Read the rule at the end of this section before you change one by hand.
 
-To pin, give each image line the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>` in `docker-compose.yml`, the same form after `docker.io/` for both images in `goiabada-k8s.yaml`.
+An image line naming the tag alone, written by a wizard built from source or with [`--image-digest=false`](/deploy/setup-wizard/#images-from-your-own-registry), is pinned by giving it the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>`, after the registry it names.
 
 Where the digest comes from:
 

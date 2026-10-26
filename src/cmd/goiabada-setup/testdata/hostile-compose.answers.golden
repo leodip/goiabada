@@ -13,4 +13,6 @@ db: "mssql"
 auth-url: "https://auth.example.com/p\"a$HOME #x: y"
 admin-url: "https://admin.example.com/`id`\\q'r ${PATH}"
 rate-limiter: true
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
 admin-email: "a\"b$c`d\\e #f'g@example.com"

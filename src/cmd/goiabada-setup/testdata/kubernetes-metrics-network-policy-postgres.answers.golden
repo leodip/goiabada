@@ -22,6 +22,9 @@ rate-limiter: false
 metrics: "podmonitor"
 podmonitor-labels: ""
 metrics-namespace: "monitoring"
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
+image-pull-secret: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

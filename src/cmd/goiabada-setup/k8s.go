@@ -123,8 +123,9 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		"The surge pod opens its own database connections: the docs' connection arithmetic counts it.")
 	writeTerminationGracePeriod(&sb, "Set lower, it cuts the cleanup worker short first.")
 	writeTopologySpread(&sb, "goiabada-authserver")
+	writeImagePullSecrets(&sb, config)
 	sb.WriteString("      containers:\n")
-	writeContainerHead(&sb, "authserver")
+	writeContainerHead(&sb, config, "authserver")
 	writeContainerPorts(&sb, 9090, config.exposedMetricsPort(authServerMetricsPort))
 	sb.WriteString("        envFrom:\n")
 	sb.WriteString("        - configMapRef:\n")
@@ -223,8 +224,9 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		"The auth server's value: this server stops within its 15s drain, and a grace period",
 		"is a ceiling, not a wait.")
 	writeTopologySpread(&sb, "goiabada-adminconsole")
+	writeImagePullSecrets(&sb, config)
 	sb.WriteString("      containers:\n")
-	writeContainerHead(&sb, "adminconsole")
+	writeContainerHead(&sb, config, "adminconsole")
 	writeContainerPorts(&sb, 9091, config.exposedMetricsPort(adminConsoleMetricsPort))
 	sb.WriteString("        envFrom:\n")
 	sb.WriteString("        - configMapRef:\n")
@@ -595,13 +597,31 @@ func writeTopologySpread(sb *strings.Builder, name string) {
 	fmt.Fprintf(sb, "            app: %s\n", name)
 }
 
+// writeImagePullSecrets names the Secret holding the image registry's credentials in a pod spec,
+// when there is one.
+func writeImagePullSecrets(sb *strings.Builder, config *Config) {
+	if config.ImagePullSecret == "" {
+		return
+	}
+	sb.WriteString("      # The registry's credentials, a kubernetes.io/dockerconfigjson Secret you create: until\n")
+	sb.WriteString("      # it exists, the pod cannot pull its image, and waits in ImagePullBackOff.\n")
+	sb.WriteString("      imagePullSecrets:\n")
+	fmt.Fprintf(sb, "      - name: %s\n", yamlQuote(config.ImagePullSecret))
+}
+
 // writeContainerHead opens the container name, running the image of the same name at the wizard's
 // tag, with the pull policy that tag needs and the container's securityContext.
-func writeContainerHead(sb *strings.Builder, name string) {
+func writeContainerHead(sb *strings.Builder, config *Config, name string) {
 	fmt.Fprintf(sb, "      - name: %s\n", name)
-	sb.WriteString("        # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through\n")
-	sb.WriteString("        # registries its configuration lists, and may refuse to pull leodip/goiabada.\n")
-	fmt.Fprintf(sb, "        image: docker.io/leodip/goiabada:%s-%s\n", name, imageTag)
+	if config.ImageRepository == defaultImageRepository {
+		sb.WriteString("        # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through\n")
+		sb.WriteString("        # registries its configuration lists, and may refuse to pull leodip/goiabada.\n")
+	}
+	if config.pinsDigests() {
+		sb.WriteString("        # Pulled by the digest alone, the one this release pushed, so no registry can change what\n")
+		sb.WriteString("        # runs: the tag is there to be read. An upgrade changes the two together.\n")
+	}
+	fmt.Fprintf(sb, "        image: %s\n", yamlQuote(config.image(name)))
 	if imageTag == "latest" {
 		sb.WriteString("        # latest is a moving tag: each start pulls whatever release it names then, so pods can\n")
 		sb.WriteString("        # run different releases. Replace it with a release version to pin the image.\n")

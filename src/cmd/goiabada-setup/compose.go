@@ -97,7 +97,7 @@ func generateAuthServerService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-authserver:\n")
-	fmt.Fprintf(&sb, "    image: leodip/goiabada:authserver-%s\n", imageTag)
+	writeComposeImage(&sb, config, authServerImage)
 	sb.WriteString("    restart: unless-stopped\n")
 	writeStopGracePeriod(&sb,
 		"Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after",
@@ -197,7 +197,7 @@ func generateAdminConsoleService(config *Config) string {
 	authInternalURL := "http://goiabada-authserver:9090"
 
 	sb.WriteString("  goiabada-adminconsole:\n")
-	fmt.Fprintf(&sb, "    image: leodip/goiabada:adminconsole-%s\n", imageTag)
+	writeComposeImage(&sb, config, adminConsoleImage)
 	sb.WriteString("    restart: unless-stopped\n")
 	writeStopGracePeriod(&sb,
 		"The auth server's value: this service stops within its 15s drain, and a grace",
@@ -374,4 +374,13 @@ type composeEnvVar struct {
 // database services use, its value quoted as writeComposeVariable quotes a whole entry.
 func writeComposeMapping(sb *strings.Builder, name, value string) {
 	fmt.Fprintf(sb, "      %s: %s\n", name, composeQuote(value))
+}
+
+// writeComposeImage writes the service's image line, under a comment when it is pinned by digest.
+func writeComposeImage(sb *strings.Builder, config *Config, component string) {
+	if config.pinsDigests() {
+		sb.WriteString("    # Pulled by the digest alone, the one this release pushed, so no registry can change what\n")
+		sb.WriteString("    # runs: the tag is there to be read. An upgrade changes the two together.\n")
+	}
+	fmt.Fprintf(sb, "    image: %s\n", yamlQuote(config.image(component)))
 }

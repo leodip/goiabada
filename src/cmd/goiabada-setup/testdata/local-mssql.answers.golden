@@ -10,4 +10,6 @@
 version: 1
 type: "local"
 db: "mssql"
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
 admin-email: "admin@example.com"

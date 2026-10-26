@@ -119,6 +119,11 @@ var wizardSteps = []wizardStep{
 		applies: func(c *Config) bool { return c.Deployment.asksMetrics },
 		run:     (*wizard).askMetrics,
 	},
+	{
+		title:   "Container images",
+		applies: func(c *Config) bool { return c.Deployment.asksImages },
+		run:     (*wizard).askImages,
+	},
 	{title: "Admin credentials", run: (*wizard).askAdmin},
 	{
 		title:   "Database connection",

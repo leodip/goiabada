@@ -117,8 +117,10 @@ if ! "./$wizard" --no-color --type production --db "$E2E_DB" \
 fi
 rm -f "$stage/admin-password"
 
+# The image line names the registry, and a release's wizard pins the digest beside the tag (#686
+# section 5); the wizards before it wrote leodip/goiabada:<tag> alone.
 for server in authserver adminconsole; do
-  grep -q "image: leodip/goiabada:$server-$version\$" docker-compose.yml ||
+  grep -Eq "^    image: \"?(docker\.io/)?leodip/goiabada:$server-$version(@sha256:[0-9a-f]{64})?\"?\$" docker-compose.yml ||
     fail "docker-compose.yml does not name leodip/goiabada:$server-$version"
 done
 

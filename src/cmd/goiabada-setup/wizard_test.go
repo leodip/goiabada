@@ -126,6 +126,12 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 	if d.kind == deploymentKubernetes {
 		steps = append(steps, scriptedStep{prompt: metricsPrompt, answer: ""})
 	}
+	if d.asksImages {
+		steps = append(steps, scriptedStep{prompt: imageRepositoryPrompt, answer: ""})
+	}
+	if d.kind == deploymentKubernetes {
+		steps = append(steps, scriptedStep{prompt: imagePullSecretPrompt, answer: ""})
+	}
 	defaultEmail := "admin@example.com"
 	if d.asksURLs {
 		defaultEmail = "admin@example.org"
@@ -160,12 +166,12 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		engine     string
 		titles     []string
 	}{
-		{deploymentLocal, "sqlite", []string{"Deployment type", "Database type", "Admin credentials", "Generating credentials", "Generating configuration"}},
-		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
-		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentLocal, "sqlite", []string{"Deployment type", "Database type", "Container images", "Admin credentials", "Generating credentials", "Generating configuration"}},
+		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Container images", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
+		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Container images", "Admin credentials", "Generating credentials", "Generating configuration"}},
+		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Container images", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Container images", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Container images", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
@@ -383,11 +389,11 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 	}{
 		{
 			flags:   CLIFlags{DeploymentType: "local", DBType: "sqlite"},
-			numbers: []int{4, 5},
+			numbers: []int{5, 6},
 		},
 		{
 			flags:    CLIFlags{DeploymentType: "production", DBType: "mysql", AuthServerURL: "https://auth.example.org", DBPassword: "db-secret"},
-			numbers:  []int{7, 8},
+			numbers:  []int{8, 9},
 			database: connectionCall{engine: "mysql", port: "3306", password: "db-secret", tlsMode: "prefer"},
 		},
 		{
@@ -395,7 +401,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{13, 14},
+			numbers:  []int{14, 15},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret", "prefer", ""},
 			checked:  true,
 		},
