@@ -22,6 +22,8 @@ metrics: "none"
 image-repository: "docker.io/leodip/goiabada"
 image-digest: true
 image-pull-secret: ""
+labels: ""
+annotations: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "1433"

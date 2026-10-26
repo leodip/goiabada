@@ -110,7 +110,7 @@ type Config struct {
 	// the scraper's namespace, which the NetworkPolicies admit to the metrics ports, set only when
 	// both are on. Only Kubernetes asks (#400 decisions 7 and 8).
 	Metrics          metricsExposure
-	PodMonitorLabels []podMonitorLabel
+	PodMonitorLabels []keyValue
 	MetricsNamespace string
 	// ImageRepository is the repository both servers' images are pulled from, Docker Hub's unless a
 	// mirror holds them. ImageDigest asks for each image line to name the digest its release pushed,
@@ -120,6 +120,11 @@ type Config struct {
 	ImageRepository string
 	ImageDigest     bool
 	ImagePullSecret string
+	// Labels and Annotations are the operator's, which every object and both pod templates carry
+	// beside the standard labels, for the admission policies an organisation sets. Only Kubernetes
+	// asks (#686 section 6).
+	Labels      []keyValue
+	Annotations []keyValue
 }
 
 // trafficPolicy is an externalTrafficPolicy, spelled as Kubernetes spells it.

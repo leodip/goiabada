@@ -84,13 +84,16 @@ type CLIFlags struct {
 	// Metrics is --metrics, empty when left out, PodMonitorLabels --podmonitor-labels and
 	// MetricsNamespace --metrics-namespace, read by Kubernetes alone.
 	Metrics          metricsExposure
-	PodMonitorLabels podMonitorLabels
+	PodMonitorLabels podMonitorLabelSet
 	MetricsNamespace string
 	// ImageRepository is --image-repository and ImageDigest --image-digest, read by Kubernetes and
 	// Compose; ImagePullSecret is --image-pull-secret, read by Kubernetes alone (#686 section 5).
 	ImageRepository string
 	ImageDigest     optionalBool
 	ImagePullSecret string
+	// Labels is --labels and Annotations --annotations, read by Kubernetes alone (#686 section 6).
+	Labels      labelSet
+	Annotations annotationSet
 }
 
 // optionalBool is a boolean flag that knows whether it was given, so one left out takes the
@@ -276,6 +279,8 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.StringVar(&flags.ImageRepository, "image-repository", "", "Kubernetes, local and production: the repository both servers' images are pulled from (default: "+defaultImageRepository+")")
 	fs.Var(&flags.ImageDigest, "image-digest", "Kubernetes, local and production: pin each image line to the digest its release pushed, which a source build has none of (default: true)")
 	fs.StringVar(&flags.ImagePullSecret, "image-pull-secret", "", "Kubernetes: the Secret holding the image registry's credentials (default: none)")
+	fs.Var(&flags.Labels, "labels", "Kubernetes: labels every object and pod template carries, key=value separated by commas (default: none)")
+	fs.Var(&flags.Annotations, "annotations", "Kubernetes: annotations every object and pod template carries, key=value separated by commas (default: none)")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
@@ -412,7 +417,13 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("                         release=kube-prometheus-stack; default: none)\n")
 		p("  --metrics-namespace=NAME\n")
 		p("                         With metrics and --network-policy, the namespace the scraper runs\n")
-		p("                         in, admitted to the metrics ports alone (default: monitoring)\n\n")
+		p("                         in, admitted to the metrics ports alone (default: monitoring)\n")
+		p("  --labels=LABELS        Labels every object and both pod templates carry beside the\n")
+		p("                         app.kubernetes.io ones, key=value separated by commas, such as an\n")
+		p("                         admission policy requires (e.g., team=identity; default: none)\n")
+		p("  --annotations=ANNOTATIONS\n")
+		p("                         Annotations every object and both pod templates carry, key=value\n")
+		p("                         separated by commas; a value holds no comma (default: none)\n\n")
 		p("Native Binaries Options:\n")
 		p("  --local-proxy=BOOL     A reverse proxy on this machine forwards to Goiabada (default: true):\n")
 		p("                         both servers listen on 127.0.0.1 and trust its forwarded headers.\n")

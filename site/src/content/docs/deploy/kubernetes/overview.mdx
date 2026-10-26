@@ -60,6 +60,7 @@ The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can com
 - **Two NetworkPolicies,** if you ask for them, admitting only your routing layer's namespace and the admin console. See [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
 - **A Gateway and three HTTPRoutes,** by default: one route per host name, and one redirecting HTTP to HTTPS. Other [routing modes](/deploy/kubernetes/routing/#the-routing-modes) write the two routes alone, an Ingress per host, or nothing.
 - **A PodMonitor,** if you ask for one, or scrape annotations. See [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes).
+- **The standard labels** on every object, and any labels and annotations you add. See [Labels and annotations](#labels-and-annotations).
 
 `goiabada-secrets.yaml`, beside it, holds the Secrets the Deployments read: `goiabada-encryption-key`, with the AES key alone, `goiabada-secrets`, with every other secret, and, if you gave the wizard a database client certificate, `goiabada-db-client-tls`, with the certificate and its key. **Never** commit the file. See [Secrets](/deploy/kubernetes/secrets/).
 
@@ -76,6 +77,47 @@ Both files declare the Namespace, so applying either creates it. When someone el
 <Aside type="danger" title="Switching a running deployment">
 Answering no for a namespace the files created takes the Namespace out of the manifest. A GitOps tool that prunes what leaves its source then deletes the namespace and everything in it, the AES key's Secret included. Before you switch, have the tool leave the Namespace alone, and let it apply that: Flux's [`kustomize.toolkit.fluxcd.io/prune: disabled`](https://fluxcd.io/flux/components/kustomize/kustomizations/#prune) annotation, or Argo CD's [`Prune=false`](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#no-prune-resources).
 </Aside>
+
+## Labels and annotations
+
+Every object in both files, and both pod templates, carries the [recommended labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/), so cost tools, dashboards and policies can find Goiabada by them:
+
+| Label | Value |
+|---|---|
+| `app.kubernetes.io/name` | `goiabada` |
+| `app.kubernetes.io/instance` | The namespace, which holds one installation |
+| `app.kubernetes.io/component` | `authserver` or `adminconsole`, on what belongs to one server. The objects both share, such as the Namespace, the Gateway and `goiabada-secrets`, have none. |
+| `app.kubernetes.io/part-of` | `goiabada` |
+| `app.kubernetes.io/version` | The image tag, such as `1.8.0` |
+| `app.kubernetes.io/managed-by` | `goiabada-setup` |
+
+The selectors of the Deployments, Services, PodDisruptionBudgets, NetworkPolicies and PodMonitor match the `app` label alone, such as `app: goiabada-authserver`. A Deployment's selector can't change once it exists, so a manifest from an earlier release of the wizard is replaced by this one in place. Its first apply rolls both servers once, since their pod templates gain labels.
+
+When your cluster's admission policies require labels or annotations of their own, such as a team or a cost centre, answer them when the wizard asks, or pass `--labels` and `--annotations`, each `key=value` separated by commas:
+
+```bash
+./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets \
+  --labels=team=identity,cost-center=1234 --annotations=example.com/owner=identity-team
+```
+
+Every object and both pod templates carry them, so a policy on Pods, such as one Kyverno extends to Deployments, is met as well as one on any other kind. Checked on K3s with a Kyverno policy requiring a label on every kind the files create, the Namespace and the Secrets included, and with Gatekeeper's `K8sRequiredLabels`: both refused the files without the label and admitted them with it. The wizard refuses a key it sets itself, such as `app` or an `app.kubernetes.io` label, and a label the PodMonitor's own labels name.
+
+A policy checks a Secret when it's created, so the Secrets you create yourself, the TLS Secrets you supply and the image pull secret, need the labels from the start. The steps the wizard prints add them, the standard labels and yours: the Secret is written locally, labeled and annotated there, and only then created:
+
+```bash
+kubectl create secret docker-registry registry-credentials -n goiabada --docker-server=registry.example.com \
+  --docker-username=<user> --docker-password=<password> --dry-run=client -o yaml |
+  kubectl label --local -f - app.kubernetes.io/name=goiabada app.kubernetes.io/instance=goiabada \
+    app.kubernetes.io/part-of=goiabada app.kubernetes.io/version=<version> \
+    app.kubernetes.io/managed-by=goiabada-setup team=identity cost-center=1234 -o yaml |
+  kubectl create -f -
+```
+
+`--keep-secrets` leaves the secrets file as it is, so labels you add later reach the Secrets on a run without it, or when you add them yourself:
+
+```bash
+kubectl label secret goiabada-secrets goiabada-encryption-key -n goiabada team=identity
+```
 
 ## Recover a locked-out administrator
 

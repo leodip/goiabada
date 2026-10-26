@@ -20,8 +20,13 @@ metadata:
   # first that everything else running here meets it, cert-manager's HTTP-01 solver pods
   # included, which run here while a certificate is issued.
   labels:
-    pod-security.kubernetes.io/warn: restricted
-    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: "restricted"
+    pod-security.kubernetes.io/audit: "restricted"
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 
 ---
 # What the auth server reads.
@@ -31,6 +36,13 @@ kind: ConfigMap
 metadata:
   name: goiabada-authserver-config
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 data:
   GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
@@ -83,6 +95,13 @@ kind: ConfigMap
 metadata:
   name: goiabada-adminconsole-config
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 data:
   GOIABADA_AUTHSERVER_BASEURL: "https://auth.example.com"
   # Plain HTTP: the admin console's secret and tokens cross this hop unencrypted, so it assumes a network you trust.
@@ -107,6 +126,13 @@ kind: Deployment
 metadata:
   name: goiabada-authserver
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   replicas: 1
   # A rollout starts one new pod and waits for it to be ready before it stops an old one, so
@@ -117,6 +143,8 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
+  # The selector matches app alone, and the Services, PodDisruptionBudgets and NetworkPolicies
+  # select by it too: a Deployment's selector cannot change once it exists.
   selector:
     matchLabels:
       app: goiabada-authserver
@@ -124,10 +152,16 @@ spec:
     metadata:
       labels:
         app: goiabada-authserver
+        app.kubernetes.io/name: "goiabada"
+        app.kubernetes.io/instance: "goiabada"
+        app.kubernetes.io/component: "authserver"
+        app.kubernetes.io/part-of: "goiabada"
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: "goiabada-setup"
       annotations:
         # The checksum of the ConfigMaps the pod reads, which it reads only when it starts: a
         # manifest whose ConfigMaps changed changes it, so applying the manifest rolls the pods.
-        goiabada.dev/config-checksum: "75596cd3be6b4fe7a20c2fb33d4dfdcf7202f35465818e4fcc23d28b88a00fcf"
+        goiabada.dev/config-checksum: "7e94274a7504538ff9ddf0b7332fb436b8f064cef6fbd7fc5807cc8583f1acc7"
     spec:
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
@@ -292,6 +326,13 @@ kind: PodDisruptionBudget
 metadata:
   name: goiabada-authserver
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   maxUnavailable: 1
   selector:
@@ -304,6 +345,13 @@ kind: Deployment
 metadata:
   name: goiabada-adminconsole
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   replicas: 1
   # A rollout starts one new pod and waits for it to be ready before it stops an old one, so
@@ -314,6 +362,8 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
       maxSurge: 1
+  # The selector matches app alone, and the Services, PodDisruptionBudgets and NetworkPolicies
+  # select by it too: a Deployment's selector cannot change once it exists.
   selector:
     matchLabels:
       app: goiabada-adminconsole
@@ -321,10 +371,16 @@ spec:
     metadata:
       labels:
         app: goiabada-adminconsole
+        app.kubernetes.io/name: "goiabada"
+        app.kubernetes.io/instance: "goiabada"
+        app.kubernetes.io/component: "adminconsole"
+        app.kubernetes.io/part-of: "goiabada"
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: "goiabada-setup"
       annotations:
         # The checksum of the ConfigMaps the pod reads, which it reads only when it starts: a
         # manifest whose ConfigMaps changed changes it, so applying the manifest rolls the pods.
-        goiabada.dev/config-checksum: "a7b884cc79d557538386a6c4eb48c44beb47ea30ef73ea4533b32af425500472"
+        goiabada.dev/config-checksum: "f3fbb8e461e1db60456760553c3538639d719708f773a3906c4d1e60a0b9bd4e"
     spec:
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
@@ -461,6 +517,13 @@ kind: PodDisruptionBudget
 metadata:
   name: goiabada-adminconsole
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   maxUnavailable: 1
   selector:
@@ -473,6 +536,13 @@ kind: Service
 metadata:
   name: goiabada-authserver
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   selector:
     app: goiabada-authserver
@@ -486,6 +556,13 @@ kind: Service
 metadata:
   name: goiabada-adminconsole
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   selector:
     app: goiabada-adminconsole
@@ -499,6 +576,12 @@ kind: Gateway
 metadata:
   name: goiabada
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
@@ -530,6 +613,13 @@ kind: HTTPRoute
 metadata:
   name: goiabada-authserver
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   parentRefs:
   - name: "goiabada"
@@ -547,6 +637,13 @@ kind: HTTPRoute
 metadata:
   name: goiabada-adminconsole
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   parentRefs:
   - name: "goiabada"
@@ -564,6 +661,12 @@ kind: HTTPRoute
 metadata:
   name: goiabada-https-redirect
   namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
   parentRefs:
   - name: goiabada

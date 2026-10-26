@@ -124,6 +124,11 @@ var wizardSteps = []wizardStep{
 		applies: func(c *Config) bool { return c.Deployment.asksImages },
 		run:     (*wizard).askImages,
 	},
+	{
+		title:   "Labels and annotations",
+		applies: func(c *Config) bool { return c.Deployment.kind == deploymentKubernetes },
+		run:     (*wizard).askLabels,
+	},
 	{title: "Admin credentials", run: (*wizard).askAdmin},
 	{
 		title:   "Database connection",

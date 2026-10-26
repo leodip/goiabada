@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 func printBanner(out *console) {
@@ -75,6 +77,12 @@ func printSummary(out *console, config *Config) {
 		if config.ImagePullSecret != "" {
 			out.printf("  Pull secret:      %s\n", config.ImagePullSecret)
 		}
+	}
+	if len(config.Labels) > 0 {
+		out.printf("  Labels:           %s\n", joinPairs(config.Labels))
+	}
+	if len(config.Annotations) > 0 {
+		out.printf("  Annotations:      %s\n", joinPairs(config.Annotations))
 	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
 	if config.KeepSecrets {
@@ -499,16 +507,45 @@ func printRoutingPrerequisites(out *console, config *Config) {
 }
 
 // printCreateTLSSecret prints the command creating the auth server's TLS Secret, for the operator to
-// repeat for the admin console's.
+// repeat for the admin console's: the auth server's alone, unless one Secret serves both hosts.
 func printCreateTLSSecret(out *console, config *Config) {
-	out.printf("     %skubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key%s\n", out.cyan, config.TLSSecretAuth, config.K8sNamespace, out.reset)
+	component := authServerComponent
+	if config.TLSSecretAuth == config.TLSSecretAdmin {
+		component = ""
+	}
+	printCreateSecret(out, config, "     ", component,
+		fmt.Sprintf("kubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key", config.TLSSecretAuth, config.K8sNamespace))
 }
 
-// printCreatePullSecret prints, at indent, the command that creates the image pull secret, keyed by
-// the registry the repository names.
+// printCreatePullSecret prints, at indent, the command that creates the image pull secret, which
+// both servers' pods name, keyed by the registry the repository names.
 func printCreatePullSecret(out *console, config *Config, indent string) {
-	out.printf("%s%skubectl create secret docker-registry %s -n %s --docker-server=%s --docker-username=<user> --docker-password=<password>%s\n",
-		indent, out.cyan, config.ImagePullSecret, config.K8sNamespace, config.imageRegistry(), out.reset)
+	printCreateSecret(out, config, indent, "", fmt.Sprintf("kubectl create secret docker-registry %s -n %s --docker-server=%s --docker-username=<user> --docker-password=<password>",
+		config.ImagePullSecret, config.K8sNamespace, config.imageRegistry()))
+}
+
+// printCreateSecret prints, at indent, create, a kubectl create secret command, as one carrying the
+// labels every other object does, the standard ones of component and the operator's, and the
+// operator's annotations. An admission policy checks a Secret as it is created, and kubectl create
+// secret sets neither, so the Secret is written locally, labeled and annotated there, and only then
+// created: kubectl apply would copy it, credentials included, into its last-applied-configuration
+// annotation (#686 section 6).
+func printCreateSecret(out *console, config *Config, indent, component, create string) {
+	out.printf("%s%s%s --dry-run=client -o yaml |%s\n", indent, out.cyan, create, out.reset)
+	for _, step := range []struct {
+		command string
+		pairs   []keyValue
+	}{{"label", slices.Concat(config.standardLabels(component), config.Labels)}, {"annotate", config.Annotations}} {
+		if len(step.pairs) == 0 {
+			continue
+		}
+		words := []string{"kubectl", step.command, "--local", "-f", "-"}
+		for _, pair := range step.pairs {
+			words = append(words, shellQuote(pair.key+"="+pair.value))
+		}
+		out.printf("%s  %s%s -o yaml |%s\n", indent, out.cyan, strings.Join(words, " "), out.reset)
+	}
+	out.printf("%s  %skubectl create -f -%s\n", indent, out.cyan, out.reset)
 }
 
 // printDeployStep prints the deploy, step number of the steps: both files, the Secrets first, and
