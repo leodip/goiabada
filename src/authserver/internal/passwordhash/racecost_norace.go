@@ -3,7 +3,7 @@
 package passwordhash
 
 import (
-	"testing"
+	"flag"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -29,8 +29,11 @@ const DummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 // raceBuildHashCost is the cost Hash uses when the gate below reports a run under go test.
 const raceBuildHashCost = bcrypt.DefaultCost
 
-// raceBuildTestRun reports whether this build is running under go test. In this build
-// either answer selects the values above, which are today's, so neither costs anything.
+// raceBuildTestRun reports whether this build is running under go test. The test runner
+// registers the flags it owns on the default flag set before any test runs, so finding one
+// tells it without importing the test framework itself, which the refused-package table
+// keeps out of a shipped binary (#331, #462). In this build either answer selects the
+// values above, which are today's, so neither costs anything.
 func raceBuildTestRun() bool {
-	return testing.Testing()
+	return flag.Lookup("test.v") != nil
 }
