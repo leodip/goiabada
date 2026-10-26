@@ -122,6 +122,42 @@ data:
   GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS: "true"
 
 ---
+# The account the pods run as, rather than the namespace's default, which a cluster policy may
+# refuse. It is bound to no role: neither server calls the Kubernetes API, so no token of it is
+# mounted either.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: goiabada-authserver
+  namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
+automountServiceAccountToken: false
+
+---
+# The account the pods run as, rather than the namespace's default, which a cluster policy may
+# refuse. It is bound to no role: neither server calls the Kubernetes API, so no token of it is
+# mounted either.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: goiabada-adminconsole
+  namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
+automountServiceAccountToken: false
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -164,6 +200,8 @@ spec:
         # manifest whose ConfigMaps changed changes it, so applying the manifest rolls the pods.
         goiabada.dev/config-checksum: "e84d27950cb25015ed294831836247390857a0959abba1fc4adf768b7adfc14a"
     spec:
+      # The server's own account, not the namespace's default, which a cluster policy may refuse.
+      serviceAccountName: goiabada-authserver
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
       # Kubernetes would otherwise give the container variables for every Service in the
@@ -383,6 +421,8 @@ spec:
         # manifest whose ConfigMaps changed changes it, so applying the manifest rolls the pods.
         goiabada.dev/config-checksum: "7619a04ca98b403d7e0b2191685b46c23804478af949bc3fad1d9cacd42b466f"
     spec:
+      # The server's own account, not the namespace's default, which a cluster policy may refuse.
+      serviceAccountName: goiabada-adminconsole
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
       # Kubernetes would otherwise give the container variables for every Service in the

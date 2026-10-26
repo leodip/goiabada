@@ -127,6 +127,12 @@ A registry that asks for credentials needs them where the images are pulled:
 
   Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them.
 
+  The pods run as [accounts of their own](/deploy/kubernetes/security/#pod-security), so pull secrets that a namespace's `default` ServiceAccount names don't reach them. In a namespace that already exists, check for them, and answer the one the registry needs:
+
+  ```bash
+  kubectl get serviceaccount default -n goiabada -o jsonpath='{.imagePullSecrets}'
+  ```
+
 ## Where the secrets go
 
 The wizard keeps every secret in one file, and the rest of the configuration in another, so you can commit the second one.

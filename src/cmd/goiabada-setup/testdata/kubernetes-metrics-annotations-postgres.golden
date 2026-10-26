@@ -127,6 +127,42 @@ data:
   GOIABADA_ADMINCONSOLE_METRICS_ENABLED: "true"
 
 ---
+# The account the pods run as, rather than the namespace's default, which a cluster policy may
+# refuse. It is bound to no role: neither server calls the Kubernetes API, so no token of it is
+# mounted either.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: goiabada-authserver
+  namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "authserver"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
+automountServiceAccountToken: false
+
+---
+# The account the pods run as, rather than the namespace's default, which a cluster policy may
+# refuse. It is bound to no role: neither server calls the Kubernetes API, so no token of it is
+# mounted either.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: goiabada-adminconsole
+  namespace: "goiabada"
+  labels:
+    app.kubernetes.io/name: "goiabada"
+    app.kubernetes.io/instance: "goiabada"
+    app.kubernetes.io/component: "adminconsole"
+    app.kubernetes.io/part-of: "goiabada"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: "goiabada-setup"
+automountServiceAccountToken: false
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -175,6 +211,8 @@ spec:
         prometheus.io/port: "9190"
         prometheus.io/path: "/metrics"
     spec:
+      # The server's own account, not the namespace's default, which a cluster policy may refuse.
+      serviceAccountName: goiabada-authserver
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
       # Kubernetes would otherwise give the container variables for every Service in the
@@ -402,6 +440,8 @@ spec:
         prometheus.io/port: "9191"
         prometheus.io/path: "/metrics"
     spec:
+      # The server's own account, not the namespace's default, which a cluster policy may refuse.
+      serviceAccountName: goiabada-adminconsole
       # Neither server calls the Kubernetes API, so the pod mounts no service account token.
       automountServiceAccountToken: false
       # Kubernetes would otherwise give the container variables for every Service in the

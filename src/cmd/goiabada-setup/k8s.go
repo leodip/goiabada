@@ -118,6 +118,9 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		authServerConfig += sb.String()[databaseCAStart:]
 	}
 
+	writeServiceAccount(&sb, config, "goiabada-authserver")
+	writeServiceAccount(&sb, config, "goiabada-adminconsole")
+
 	// Auth Server Deployment
 	writeDeploymentHead(&sb, config, "goiabada-authserver", configChecksum(authServerConfig), config.annotatedMetricsPort(authServerMetricsPort),
 		"The surge pod opens its own database connections: the docs' connection arithmetic counts it.")
@@ -576,12 +579,28 @@ func writeDeploymentHead(sb *strings.Builder, config *Config, name, checksum str
 	}
 	writeOperatorPairs(sb, "        ", config.Annotations)
 	sb.WriteString("    spec:\n")
+	sb.WriteString("      # The server's own account, not the namespace's default, which a cluster policy may refuse.\n")
+	fmt.Fprintf(sb, "      serviceAccountName: %s\n", name)
 	sb.WriteString("      # Neither server calls the Kubernetes API, so the pod mounts no service account token.\n")
 	sb.WriteString("      automountServiceAccountToken: false\n")
 	sb.WriteString("      # Kubernetes would otherwise give the container variables for every Service in the\n")
 	sb.WriteString("      # namespace, GOIABADA_AUTHSERVER_PORT and GOIABADA_ADMINCONSOLE_SERVICE_HOST among them,\n")
 	sb.WriteString("      # none of which either server reads.\n")
 	sb.WriteString("      enableServiceLinks: false\n")
+}
+
+// writeServiceAccount writes the account the Deployment name's pods run as, named after it (#686
+// section 7).
+func writeServiceAccount(sb *strings.Builder, config *Config, name string) {
+	sb.WriteString("---\n")
+	sb.WriteString("# The account the pods run as, rather than the namespace's default, which a cluster policy may\n")
+	sb.WriteString("# refuse. It is bound to no role: neither server calls the Kubernetes API, so no token of it is\n")
+	sb.WriteString("# mounted either.\n")
+	sb.WriteString("apiVersion: v1\n")
+	sb.WriteString("kind: ServiceAccount\n")
+	config.writeMetadata(sb, objectMetadata{name: name, component: componentOf(name)})
+	sb.WriteString("automountServiceAccountToken: false\n")
+	sb.WriteString("\n")
 }
 
 // writeTopologySpread writes a pod spec's preference for one pod of the Deployment name per node.
