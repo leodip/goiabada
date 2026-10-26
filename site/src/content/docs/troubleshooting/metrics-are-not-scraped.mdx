@@ -23,7 +23,8 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
 - **The listener only listens on `127.0.0.1`,** because `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` or `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` says so, and the scraper runs elsewhere.
 - **The scraper doesn't read what the manifest gives it.** kube-prometheus-stack ignores the `prometheus.io/scrape` pod annotations and scrapes only what a PodMonitor or ServiceMonitor names. The prometheus-community `prometheus` chart reads the annotations.
 - **No Prometheus selects the PodMonitor.** A Prometheus the Prometheus Operator runs scrapes only the PodMonitors its `podMonitorSelector` matches, in the namespaces its `podMonitorNamespaceSelector` matches. kube-prometheus-stack, by default, only those labeled `release: <its release name>`.
-- **A NetworkPolicy refuses the scraper.** With the generated NetworkPolicies, only the namespace you named for the scraper, `monitoring` unless you named another, reaches the metrics ports.
+- **A NetworkPolicy refuses the scraper.** With the generated NetworkPolicies, only the namespace you named for the scraper, `monitoring` unless you named another, reaches the metrics ports. A scraper in a service mesh that delivers on a port of its own, such as Istio's ambient mode or Linkerd, arrives on that port instead, which they don't admit: see [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
+- **Istio's sidecars moved the annotations to their own port,** 15020, which the generated NetworkPolicies refuse: see [Pod annotations](/deploy/monitoring/#pod-annotations).
 
 ## Fix it
 

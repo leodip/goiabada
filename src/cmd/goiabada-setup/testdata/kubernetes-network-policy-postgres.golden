@@ -247,7 +247,8 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         ports:
-        - containerPort: 9090
+        - name: http
+          containerPort: 9090
         envFrom:
         - configMapRef:
             name: goiabada-authserver-config
@@ -469,7 +470,8 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         ports:
-        - containerPort: 9091
+        - name: http
+          containerPort: 9091
         envFrom:
         - configMapRef:
             name: goiabada-adminconsole-config
@@ -587,8 +589,10 @@ spec:
   selector:
     app: goiabada-authserver
   ports:
-  - port: 9090
+  - name: http
+    port: 9090
     targetPort: 9090
+    appProtocol: http
 
 ---
 apiVersion: v1
@@ -607,8 +611,10 @@ spec:
   selector:
     app: goiabada-adminconsole
   ports:
-  - port: 9091
+  - name: http
+    port: 9091
     targetPort: 9091
+    appProtocol: http
 
 ---
 # Admits the auth server's port from Envoy's proxies and from the admin console's pods,

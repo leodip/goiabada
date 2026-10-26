@@ -72,11 +72,12 @@ type CLIFlags struct {
 	TLSSecretAuth    string
 	TLSSecretAdmin   string
 	// GatewayTrafficPolicy is --gateway-traffic-policy, read by the envoy-gateway mode alone, empty
-	// when left out; NetworkPolicy is --network-policy and ProxyNamespace --proxy-namespace, read by
-	// Kubernetes alone.
+	// when left out; NetworkPolicy is --network-policy, ProxyNamespace --proxy-namespace and
+	// MeshPorts --mesh-ports, read by Kubernetes alone.
 	GatewayTrafficPolicy trafficPolicy
 	NetworkPolicy        bool
 	ProxyNamespace       string
+	MeshPorts            portList
 	// CreateNamespace is --create-namespace, read by Kubernetes alone.
 	CreateNamespace optionalBool
 	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
@@ -272,6 +273,7 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes, --routing=envoy-gateway: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only the routing layer and the admin console to the servers with NetworkPolicies")
 	fs.StringVar(&flags.ProxyNamespace, "proxy-namespace", "", "Kubernetes, with --network-policy: the namespace the routing layer's proxies run in (default: envoy-gateway-system for --routing=envoy-gateway, required otherwise)")
+	fs.Var(&flags.MeshPorts, "mesh-ports", "Kubernetes, with --network-policy: the ports a service mesh's proxies deliver on between meshed pods, separated by commas (default: none)")
 	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
 	fs.Var(&flags.PodMonitorLabels, "podmonitor-labels", "Kubernetes: the labels the PodMonitor carries, key=value separated by commas")
 	fs.StringVar(&flags.MetricsNamespace, "metrics-namespace", "", "Kubernetes: the namespace the NetworkPolicies admit to the metrics ports (default: monitoring)")
@@ -407,6 +409,10 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("  --proxy-namespace=NAME With --network-policy, the namespace the routing layer's proxies run\n")
 		p("                         in (default: envoy-gateway-system with envoy-gateway, required\n")
 		p("                         otherwise)\n")
+		p("  --mesh-ports=PORTS     With --network-policy, the ports a service mesh's proxies deliver\n")
+		p("                         on between meshed pods, admitted from the same sources, separated\n")
+		p("                         by commas: 15008 under Istio's ambient mode, 4143 under Linkerd\n")
+		p("                         (default: none)\n")
 		p("  --metrics=EXPOSURE     Expose Prometheus metrics on ports %d and %d (default: none).\n", authServerMetricsPort, adminConsoleMetricsPort)
 		p("                         annotations writes the prometheus.io pod annotations, which the\n")
 		p("                         prometheus-community prometheus chart reads; podmonitor writes a\n")

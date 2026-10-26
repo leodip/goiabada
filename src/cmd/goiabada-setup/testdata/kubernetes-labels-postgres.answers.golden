@@ -18,6 +18,7 @@ routing: "envoy-gateway"
 gateway-traffic-policy: "cluster"
 network-policy: true
 proxy-namespace: "envoy-gateway-system"
+mesh-ports: ""
 rate-limiter: false
 metrics: "podmonitor"
 podmonitor-labels: "release=kube-prometheus-stack"

@@ -259,6 +259,7 @@ func generateAnswers(config *Config, paths outputPaths) string {
 		boolean("network-policy", config.NetworkPolicy)
 		if config.NetworkPolicy {
 			text("proxy-namespace", config.ProxyNamespace)
+			text("mesh-ports", joinPorts(config.MeshPorts))
 		}
 	}
 	if d.asksRateLimiter {

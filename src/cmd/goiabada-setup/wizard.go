@@ -846,7 +846,7 @@ func (w *wizard) askTrafficPolicy() error {
 // servers, and the admin console to the auth server, no by default (#396 decision 5), and with them,
 // that namespace: envoy-gateway-system by default for the Envoy Gateway recipe, and asked with
 // nothing offered for any other mode, since a Gateway's proxies need not run in its namespace (#686
-// section 3).
+// section 3); and the service mesh's ports (#686 section 8).
 func (w *wizard) askNetworkPolicy() error {
 	c := w.config
 	if !w.interactive {
@@ -876,12 +876,14 @@ func (w *wizard) askNetworkPolicy() error {
 	case c.Routing == routingExistingGateway:
 		w.out.printf("A Gateway's proxies may run outside its own namespace, %s: ask its owner.\n", c.GatewayNamespace)
 	}
-	c.ProxyNamespace, err = w.namespace("Namespace your routing layer's proxies run in", defaultNamespace)
-	return err
+	if c.ProxyNamespace, err = w.namespace("Namespace your routing layer's proxies run in", defaultNamespace); err != nil {
+		return err
+	}
+	return w.askMeshPorts()
 }
 
-// networkPolicyFromFlags is askNetworkPolicy answered by --network-policy and --proxy-namespace,
-// which only the Envoy Gateway recipe offers a default for.
+// networkPolicyFromFlags is askNetworkPolicy answered by --network-policy, --proxy-namespace, which
+// only the Envoy Gateway recipe offers a default for, and --mesh-ports.
 func (w *wizard) networkPolicyFromFlags() error {
 	c, f := w.config, w.flags
 	c.NetworkPolicy = f.NetworkPolicy
@@ -901,6 +903,10 @@ func (w *wizard) networkPolicyFromFlags() error {
 	}
 	c.ProxyNamespace = namespace
 	w.out.info("NetworkPolicies: yes, admitting only the namespace %s and the admin console", namespace)
+	c.MeshPorts = f.MeshPorts
+	if len(c.MeshPorts) > 0 {
+		w.out.info("Service mesh ports: %s, admitted from the same sources", joinPorts(c.MeshPorts))
+	}
 	return nil
 }
 

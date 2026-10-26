@@ -60,7 +60,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | TLS certificates | Kubernetes, with a Gateway of your cluster's class or Ingresses: a cert-manager ClusterIssuer or Issuer, TLS Secrets you supply, or TLS ended in front, at a load balancer or a CDN. See [Where the certificates come from](/deploy/kubernetes/routing/#where-the-certificates-come-from). | 1, a ClusterIssuer |
 | Gateway listeners | Kubernetes, with a Gateway of your cluster's class: the HTTP and HTTPS listeners' ports. Some implementations take only their proxy's own ports, such as Traefik's 8000 and 8443. | 80 and 443 |
 | Gateway traffic policy | Kubernetes, with Envoy Gateway. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
-| Network policy | Kubernetes. Yes admits only your routing layer's namespace to both servers, and the admin console to the auth server, and asks that namespace. It needs a network plugin that enforces NetworkPolicies. | No, and `envoy-gateway-system` with Envoy Gateway |
+| Network policy | Kubernetes. Yes admits only your routing layer's namespace to both servers, and the admin console to the auth server, and asks that namespace and the ports your service mesh delivers on, if you run one. It needs a network plugin that enforces NetworkPolicies. | No, `envoy-gateway-system` with Envoy Gateway, and no mesh ports |
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off on Kubernetes](#the-rate-limiter-on-kubernetes). | On, but off on Kubernetes unless Envoy Gateway's policy is Local |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
@@ -246,6 +246,7 @@ With prompts, `--keep-secrets` asks every question but the passwords, and writes
 | `--gateway-traffic-policy` | Kubernetes, with `--routing=envoy-gateway`: `cluster` or `local`. Default: `cluster`. |
 | `--network-policy` | Kubernetes: admits only your routing layer's namespace and the admin console to the servers, with NetworkPolicies. |
 | `--proxy-namespace` | Kubernetes, with `--network-policy`: the namespace your routing layer's proxies run in. Default: `envoy-gateway-system` with `--routing=envoy-gateway`, and required otherwise. |
+| `--mesh-ports` | Kubernetes, with `--network-policy`: the ports your service mesh's proxies deliver on between meshed pods, separated by commas, admitted from the same sources: `15008` for Istio's ambient mode, `4143` for Linkerd. Default: none. |
 | `--metrics` | Kubernetes: `none`, `annotations` or `podmonitor`. Default: `none`. |
 | `--podmonitor-labels` | Kubernetes, with `--metrics=podmonitor`: the labels your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`. |
 | `--metrics-namespace` | Kubernetes, with metrics and `--network-policy`: the namespace your metrics scraper runs in. Default: `monitoring`. |

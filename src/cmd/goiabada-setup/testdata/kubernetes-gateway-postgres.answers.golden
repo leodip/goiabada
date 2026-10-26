@@ -22,6 +22,7 @@ gateway-http-port: 8000
 gateway-https-port: 8443
 network-policy: true
 proxy-namespace: "kube-system"
+mesh-ports: ""
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"

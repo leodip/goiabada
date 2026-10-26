@@ -17,6 +17,7 @@ create-namespace: true
 routing: "none"
 network-policy: true
 proxy-namespace: "ingress"
+mesh-ports: ""
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"

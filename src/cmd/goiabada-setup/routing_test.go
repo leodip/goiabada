@@ -277,7 +277,8 @@ func TestWizard_NetworkPoliciesAdmitTheNamespaceAnswered(t *testing.T) {
 	underNone[at].answer = "y"
 	underNone = slices.Insert(underNone, at+1,
 		scriptedStep{prompt: "Namespace your routing layer's proxies run in: ", answer: ""},
-		scriptedStep{prompt: "Namespace your routing layer's proxies run in: ", answer: "ingress"})
+		scriptedStep{prompt: "Namespace your routing layer's proxies run in: ", answer: "ingress"},
+		scriptedStep{prompt: meshPortsPrompt, answer: ""})
 	cases := map[string]struct {
 		flags *CLIFlags
 		steps []scriptedStep

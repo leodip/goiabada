@@ -166,6 +166,10 @@ var answerCases = []goldenCase{
 	{name: "kubernetes-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NetworkPolicy, c.ProxyNamespace = true, envoyProxyNamespace
 	}},
+	// The NetworkPolicies admitting a service mesh's ports beside each server's (#686 section 8).
+	{name: "kubernetes-mesh-ports-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.NetworkPolicy, c.ProxyNamespace, c.MeshPorts = true, envoyProxyNamespace, []int{15008, 4143}
+	}},
 	// A release build's image lines, pinned to the digests its release pushed, from Docker Hub and
 	// from a mirror, with an image pull secret on Kubernetes, and a mirror's unpinned (#686 section 5).
 	{name: "kubernetes-release-postgres", deployment: deploymentKubernetes, engine: "postgres", release: true},

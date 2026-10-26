@@ -1613,9 +1613,9 @@ func withAnswers(t *testing.T, kind deploymentType, answers map[string]string) [
 		}
 	}
 	// NetworkPolicies answered yes ask the namespace they admit, envoy-gateway-system by default
-	// under the Envoy Gateway recipe the script routes through.
+	// under the Envoy Gateway recipe the script routes through, and the service mesh's ports, none.
 	if at := slices.IndexFunc(steps, func(s scriptedStep) bool { return s.prompt == networkPolicyPrompt }); at >= 0 && strings.HasPrefix(steps[at].answer, "y") {
-		steps = slices.Insert(steps, at+1, scriptedStep{prompt: proxyNamespacePrompt, answer: ""})
+		steps = slices.Insert(steps, at+1, scriptedStep{prompt: proxyNamespacePrompt, answer: ""}, scriptedStep{prompt: meshPortsPrompt, answer: ""})
 	}
 	return steps
 }

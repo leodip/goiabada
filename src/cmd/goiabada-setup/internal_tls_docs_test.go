@@ -852,10 +852,10 @@ func TestInternalTLSFindings_FindWhatAManifestChangeLeftUnpatched(t *testing.T) 
 		{"a renamed HTTPRoute", "kubernetes-postgres", func(t *testing.T, objects []object) {
 			objectToChange(t, objects, "HTTPRoute", "goiabada-authserver")["metadata"].(map[string]any)["name"] = "goiabada-auth"
 		}, "to port 9090, want 9443"},
-		{"another Service port", "kubernetes-postgres", func(t *testing.T, objects []object) {
+		{"an unnamed Service port", "kubernetes-postgres", func(t *testing.T, objects []object) {
 			service := objectToChange(t, objects, "Service", "goiabada-authserver")
-			listAt(service, "spec", "ports")[0].(map[string]any)["port"] = 8080
-		}, "port 8080 has no name of its own"},
+			delete(listAt(service, "spec", "ports")[0].(map[string]any), "name")
+		}, "port 9090 has no name of its own"},
 		{"relabelled pods with the metrics rule first", "kubernetes-metrics-network-policy-postgres", func(t *testing.T, objects []object) {
 			for _, o := range objects {
 				relabel(o.doc)

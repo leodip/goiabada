@@ -20,6 +20,7 @@ tls: "cluster-issuer"
 tls-issuer: "internal-ca"
 network-policy: true
 proxy-namespace: "kube-system"
+mesh-ports: ""
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"

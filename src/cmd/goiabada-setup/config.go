@@ -99,9 +99,12 @@ type Config struct {
 	TLSSecretAdmin string
 	// NetworkPolicy says the manifest admits the servers' ports from ProxyNamespace, where the
 	// routing layer's proxies run, and the auth server's from the admin console, and from nothing
-	// else. Only Kubernetes asks (#396 decision 5, #686 section 3).
+	// else. Only Kubernetes asks (#396 decision 5, #686 section 3). MeshPorts are the ports a service
+	// mesh's proxies deliver on between meshed pods, admitted from the same sources, none unless
+	// asked for (#686 section 8).
 	NetworkPolicy  bool
 	ProxyNamespace string
+	MeshPorts      []int
 	// RateLimiter turns on the auth server's built-in rate limiter. Production Compose, native
 	// binaries and Kubernetes ask; local testing leaves it off (#396 decision 9).
 	RateLimiter bool

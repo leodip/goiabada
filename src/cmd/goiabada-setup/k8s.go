@@ -264,7 +264,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	writeDisruptionBudget(&sb, config, "goiabada-adminconsole")
 	sb.WriteString("\n")
 
-	// Services
+	// Services, each port named http with appProtocol http: the protocol a service mesh then reads
+	// instead of detecting it (#686 section 8).
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: Service\n")
@@ -273,8 +274,10 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    app: goiabada-authserver\n")
 	sb.WriteString("  ports:\n")
-	sb.WriteString("  - port: 9090\n")
+	sb.WriteString("  - name: http\n")
+	sb.WriteString("    port: 9090\n")
 	sb.WriteString("    targetPort: 9090\n")
+	sb.WriteString("    appProtocol: http\n")
 	sb.WriteString("\n")
 
 	sb.WriteString("---\n")
@@ -285,8 +288,10 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    app: goiabada-adminconsole\n")
 	sb.WriteString("  ports:\n")
-	sb.WriteString("  - port: 9091\n")
+	sb.WriteString("  - name: http\n")
+	sb.WriteString("    port: 9091\n")
 	sb.WriteString("    targetPort: 9091\n")
+	sb.WriteString("    appProtocol: http\n")
 	sb.WriteString("\n")
 
 	if config.NetworkPolicy {
@@ -308,14 +313,14 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 			"  - namespaceSelector:",
 			"      matchLabels:",
 			"        kubernetes.io/metadata.name: <its namespace>",
-		}, config.metricsScraperComment(authServerMetricsPort)), "goiabada-adminconsole",
+		}, config.meshPortsComment(), config.metricsScraperComment(authServerMetricsPort)), "goiabada-adminconsole",
 			config.scraperRule(authServerMetricsPort))
 		sb.WriteString("\n")
 		writeNetworkPolicy(&sb, config, "goiabada-adminconsole", 9091, config.ProxyNamespace, slices.Concat([]string{
 			"Admits the admin console's port from " + config.proxies() + " alone: nothing in the cluster calls",
 			"it. Ingress only, with no egress rules, as the auth server's is, and enforced only by a",
 			"CNI that implements NetworkPolicy.",
-		}, config.metricsScraperComment(adminConsoleMetricsPort)), "",
+		}, config.meshPortsComment(), config.metricsScraperComment(adminConsoleMetricsPort)), "",
 			config.scraperRule(adminConsoleMetricsPort))
 		sb.WriteString("\n")
 	}
@@ -778,11 +783,12 @@ func writePreStopPause(sb *strings.Builder) {
 }
 
 // writeNetworkPolicy writes the ingress-only NetworkPolicy of the Deployment name, under the lines
-// saying what it admits and why: its pods admit port from proxyNamespace, where the routing layer's
-// proxies run, and, when caller is set, from the pods of that Deployment, and from nothing else. It states no egress rule,
-// since the SMTP server and the database are nothing a NetworkPolicy can select (#396 decision 5). A
-// scraper rule, when given, is a second rule admitting the metrics scraper's namespace to the metrics
-// port alone, leaving the first as it is (#400 decision 8).
+// saying what it admits and why: its pods admit port, and the service mesh's ports, from
+// proxyNamespace, where the routing layer's proxies run, and, when caller is set, from the pods of
+// that Deployment, and from nothing else. It states no egress rule, since the SMTP server and the
+// database are nothing a NetworkPolicy can select (#396 decision 5). A scraper rule, when given, is
+// a second rule admitting the metrics scraper's namespace to the metrics port alone, leaving the
+// first as it is (#400 decision 8).
 func writeNetworkPolicy(sb *strings.Builder, config *Config, name string, port int, proxyNamespace string, comment []string, caller string, scraper *ingressRule) {
 	sb.WriteString("---\n")
 	for _, line := range comment {
@@ -808,8 +814,10 @@ func writeNetworkPolicy(sb *strings.Builder, config *Config, name string, port i
 		fmt.Fprintf(sb, "          app: %s\n", caller)
 	}
 	sb.WriteString("    ports:\n")
-	sb.WriteString("    - protocol: TCP\n")
-	fmt.Fprintf(sb, "      port: %d\n", port)
+	for _, admitted := range slices.Concat([]int{port}, config.MeshPorts) {
+		sb.WriteString("    - protocol: TCP\n")
+		fmt.Fprintf(sb, "      port: %d\n", admitted)
+	}
 	if scraper != nil {
 		sb.WriteString("  - from:\n")
 		sb.WriteString("    - namespaceSelector:\n")
@@ -883,11 +891,13 @@ func writeObservability(sb *strings.Builder, server string, metricsPort int) {
 	fmt.Fprintf(sb, "  GOIABADA_%s_METRICS_ENABLED: \"true\"\n", server)
 }
 
-// writeContainerPorts writes a container's ports: the server's, and, with metricsPort other than 0,
-// its metrics listener's under the name metrics, which the PodMonitor scrapes by.
+// writeContainerPorts writes a container's ports: the server's, named http, as its Service's is, and,
+// with metricsPort other than 0, its metrics listener's under the name metrics, which the PodMonitor
+// scrapes by.
 func writeContainerPorts(sb *strings.Builder, port, metricsPort int) {
 	sb.WriteString("        ports:\n")
-	fmt.Fprintf(sb, "        - containerPort: %d\n", port)
+	sb.WriteString("        - name: http\n")
+	fmt.Fprintf(sb, "          containerPort: %d\n", port)
 	if metricsPort != 0 {
 		sb.WriteString("        - name: metrics\n")
 		fmt.Fprintf(sb, "          containerPort: %d\n", metricsPort)

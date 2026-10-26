@@ -48,6 +48,9 @@ func printSummary(out *console, config *Config) {
 		}
 		if config.NetworkPolicy {
 			out.printf("  NetworkPolicies:  admit only the namespace %s and the admin console\n", config.ProxyNamespace)
+			if len(config.MeshPorts) > 0 {
+				out.printf("  Mesh ports:       %s\n", joinPorts(config.MeshPorts))
+			}
 		} else {
 			out.println("  NetworkPolicies:  none")
 		}
@@ -661,6 +664,10 @@ func printMetricsNotes(out *console, config *Config) {
 	if config.admitsMetricsScraper() {
 		out.printf("  • The NetworkPolicies admit the namespace %s to the metrics ports alone. A scraper\n", config.MetricsNamespace)
 		out.println("    running elsewhere cannot connect until its namespace is admitted, as the policies' comments show.")
+		if len(config.MeshPorts) > 0 {
+			out.println("    A scraper in the service mesh arrives on the mesh's port, which the second rule does not")
+			out.println("    admit: keep it out of the mesh, or add that port to the rule.")
+		}
 		out.println()
 	}
 }

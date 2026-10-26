@@ -33,6 +33,7 @@ The usual causes:
 - **The internal URL is wrong for where the admin console runs.** Inside Docker Compose, `localhost` is the admin console's own container, not the auth server's. Use the auth server's service name, such as `http://goiabada-authserver:9090`.
 - **The internal URL is empty, and the public URL isn't reachable from inside,** such as a public hostname that only resolves outside your network, or a firewall that stops the admin console's host from reaching it.
 - **The internal URL is `https`, and its certificate isn't trusted** or doesn't name the host in the URL.
+- **On Kubernetes, the NetworkPolicies refuse a service mesh's port.** A mesh whose proxies deliver on a port of their own, such as Istio's ambient mode or Linkerd, needs that port admitted beside the auth server's: the error is a `connection reset by peer`, or `authserver returned status 504` from the mesh's proxy. See [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
 - **Something answers, but with an error,** `authserver returned status` and the status: a proxy in between answering `404` or `502`, or the auth server answering `500` because its database is down. The auth server's `/health` doesn't check the database, so it can answer `healthy` meanwhile: read the auth server's log.
 
 ## Fix it

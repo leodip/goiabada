@@ -79,6 +79,8 @@ annotations:
 
 They're a convention, not part of Kubernetes or Prometheus. The prometheus-community `prometheus` chart's default configuration reads them, and kube-prometheus-stack ignores them. For the NetworkPolicy, the namespace is the one the chart's Prometheus runs in.
 
+Istio's sidecars rewrite them by default, pointing the scraper at port 15020, where the sidecar serves its own metrics merged with the server's. The generated NetworkPolicies don't admit 15020, so the targets go down. Keep the annotations as written by adding Istio's opt-out to the pod templates, `--annotations=prometheus.istio.io/merge-metrics=false`, and the scraper reads 9190 and 9191 directly.
+
 ### A PodMonitor
 
 The Prometheus Operator, which kube-prometheus-stack installs, scrapes only what a PodMonitor or a ServiceMonitor names. The wizard writes one PodMonitor for both servers:
