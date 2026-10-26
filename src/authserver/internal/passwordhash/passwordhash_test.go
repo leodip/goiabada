@@ -175,8 +175,10 @@ func TestDummyHash(t *testing.T) {
 
 	t.Run("DummyHash costs what a hash Hash produces costs", func(t *testing.T) {
 		// The dummy comparison hides a missing account only while it takes as long as a real
-		// one, so its cost is read against a hash Hash actually produced, not bcrypt's default:
-		// raising Hash's cost without regenerating DummyHash fails here (#681 decision 4).
+		// one, so its cost is read against a hash Hash actually produced, not bcrypt's
+		// default: raising Hash's cost without regenerating the dummy fails here (#681
+		// decision 4). The two are a pair a build selects together, so this holds in a
+		// race test build too, where both sides take bcrypt.MinCost (#691).
 		hashed, err := Hash("any_password_here")
 		if err != nil {
 			t.Fatalf("Hash() error = %v", err)
@@ -191,6 +193,30 @@ func TestDummyHash(t *testing.T) {
 		}
 		if dummyCost != hashCost {
 			t.Errorf("DummyHash cost = %d, want %d, the cost of a hash Hash produces", dummyCost, hashCost)
+		}
+	})
+
+	t.Run("The cost is the one this build owes", func(t *testing.T) {
+		// A race build owes bcrypt.MinCost under go test, the price of a race tier that is
+		// not mostly bcrypt; every other build and run owes the default cost. Pinning the
+		// level per build keeps a later change from lowering the cost anywhere else (#691).
+		hashed, err := Hash("any_password_here")
+		if err != nil {
+			t.Fatalf("Hash() error = %v", err)
+		}
+		hashCost, err := bcrypt.Cost([]byte(hashed))
+		if err != nil {
+			t.Fatalf("bcrypt.Cost(Hash output) error = %v", err)
+		}
+		dummyCost, err := bcrypt.Cost([]byte(DummyHash))
+		if err != nil {
+			t.Fatalf("bcrypt.Cost(DummyHash) error = %v", err)
+		}
+		if hashCost != testHashCost {
+			t.Errorf("Hash cost = %d, want %d", hashCost, testHashCost)
+		}
+		if dummyCost != testHashCost {
+			t.Errorf("DummyHash cost = %d, want %d", dummyCost, testHashCost)
 		}
 	})
 }

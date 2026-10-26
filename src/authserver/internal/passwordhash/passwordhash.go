@@ -9,17 +9,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// DummyHash is a pre-computed bcrypt hash that a refusal compares the typed password against, so
-// it costs one comparison as a wrong password does and the response time says nothing about the
-// account. Its two callers, the sign-in form (authflow.PasswordSubmission) and the password grant
-// (protocolvalidation.TokenValidator), each compare against it in two cases: an address naming no
-// account, so the time does not say which emails have accounts; and an account with no password
-// yet, whose empty stored hash bcrypt would refuse without doing any work, so the time does not
-// say whether its user has set one. Both refuse whatever the comparison says, so its plaintext
-// signs no one in (#681).
-// The hash was generated using bcrypt.DefaultCost (10) for the string "dummy_password_for_timing_safe_comparison".
-const DummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
-
 // MaxPasswordBytes is the longest password bcrypt operates on, in bytes: golang.org/x/crypto's
 // GenerateFromPassword refuses anything longer with bcrypt.ErrPasswordTooLong rather than truncate
 // it. Bytes and not characters, so a password of accented or other non-ASCII characters reaches it
@@ -27,10 +16,17 @@ const DummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 // refusal names the input rather than surfacing as a hashing failure (#409).
 const MaxPasswordBytes = 72
 
-// Hash returns the bcrypt hash of password at bcrypt.DefaultCost. A password longer than
-// MaxPasswordBytes is refused with an error wrapping bcrypt.ErrPasswordTooLong, never truncated.
+// Hash returns the bcrypt hash of password. The cost is bcrypt.DefaultCost everywhere except a
+// race build running under go test, where it is bcrypt.MinCost: the detector multiplies what a
+// comparison costs until bcrypt dominates the race tier, and the rounds' count is invisible to it
+// (#691). A password longer than MaxPasswordBytes is refused with an error wrapping
+// bcrypt.ErrPasswordTooLong, never truncated.
 func Hash(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	cost := bcrypt.DefaultCost
+	if raceBuildTestRun() {
+		cost = raceBuildHashCost
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
 		return "", errs.Wrap(err, "unable to hash")
 	}

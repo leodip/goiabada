@@ -520,21 +520,24 @@ jobs:
         working-directory: src/authserver
         run: ./run-tests.sh --type setup --no-build
 
-  # The three module tiers again, under the race detector. The plain unit jobs
-  # above stay: the detector slows a run several times over and changes its
-  # timing, so it complements the plain run rather than replacing it. One job
-  # rather than three so the sidebar gains one line, with the tier on the step
-  # axis where a red run names it in one click, like everything else here.
+  # The three module tiers again, under the race detector, as three parallel jobs so
+  # the quick tiers stop queueing behind the auth server: as one job the tier ran
+  # 12 to 18 minutes, and a red run was a 15-minute wait for the next signal (#691).
+  # The plain unit jobs above stay: the detector slows a run several times over and
+  # changes its timing, so it complements the plain run rather than replacing it.
+  # Each job repeats the cache restore and container start, about 20 to 45s of
+  # runner time a public repository is not charged for, with the tier on the job
+  # axis where a red run still names it in one click.
   #
   # `go test -race` needs cgo, and cgo needs a C compiler. The golang image
   # ships gcc, and CGO_ENABLED defaults to 1 wherever a compiler is found, so
   # nothing is installed for it; run-tests.sh sets CGO_ENABLED=1 for the leg
   # regardless, so the same flag works in the dev container, which pins it to
-  # 0 for ordinary builds. Mailpit is here for the same reason as in Unit /
-  # authserver. The data and integration tiers do not run under the detector (#276,
-  # section 9 of the closing log).
-  unit-race:
-    name: Unit / race
+  # 0 for ordinary builds. Mailpit rides with the internal tier for the same
+  # reason as in Unit / authserver. The data and integration tiers do not run
+  # under the detector (#276, section 9 of the closing log).
+  unit-race-internal:
+    name: Unit / race (internal)
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
@@ -554,9 +557,39 @@ jobs:
       - name: Authserver internal tests
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --race --no-build
+
+  unit-race-core:
+    name: Unit / race (core)
+    needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Core module tests
         working-directory: src/authserver
         run: ./run-tests.sh --type core --race --no-build
+
+  unit-race-adminconsole:
+    name: Unit / race (adminconsole)
+    needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    container:
+      image: golang:${{ needs.versions.outputs.go }}-bookworm
+      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-test-container
+        with:
+          tailwind: ${{ needs.versions.outputs.tailwind }}
+          node: ${{ needs.versions.outputs.node }}
       - name: Admin console module tests
         working-directory: src/authserver
         run: ./run-tests.sh --type adminconsole --race --no-build
