@@ -33,11 +33,13 @@ func writtenConfiguration(config *Config, paths outputPaths) (description, secre
 	return description, generatedFile{name: filepath.Base(paths.secrets), content: d.generateSecrets(config, paths)}
 }
 
-// outputPaths are where a configuration's description and its secrets file are written, the same
-// path for a type whose one file is both.
+// outputPaths are where a configuration's description, its secrets file and its answers file are
+// written: the secrets file at the description's path for a type whose one file is both, and no
+// answers file for it, which is empty.
 type outputPaths struct {
 	description string
 	secrets     string
+	answers     string
 }
 
 // separate says whether the secrets are in a file of their own.
@@ -58,16 +60,16 @@ func (d *deployment) defaultPaths() outputPaths {
 	if d.secretsFile == "" {
 		return outputPaths{description: d.outputFile, secrets: d.outputFile}
 	}
-	return outputPaths{description: d.outputFile, secrets: d.secretsFile}
+	return outputPaths{description: d.outputFile, secrets: d.secretsFile, answers: answersFile}
 }
 
 // resolveOutputPaths places the deployment's files: under their default names in the current
 // directory, or in the directory output names, or, when output names a file, the description under
-// that name and the secrets file beside it under the name derived from it.
+// that name and the secrets and answers files beside it under the names derived from it.
 func resolveOutputPaths(d *deployment, output string) outputPaths {
 	dir, _ := os.Getwd()
 	defaults := d.defaultPaths()
-	description, secrets := defaults.description, defaults.secrets
+	description, secrets, answers := defaults.description, defaults.secrets, defaults.answers
 	if output != "" {
 		if isDirectory(output) {
 			dir = output
@@ -75,9 +77,16 @@ func resolveOutputPaths(d *deployment, output string) outputPaths {
 			dir = filepath.Dir(output)
 			description = filepath.Base(output)
 			secrets = d.secretsFileBeside(description)
+			if answers != "" {
+				answers = answersFileBeside(description)
+			}
 		}
 	}
-	return outputPaths{description: filepath.Join(dir, description), secrets: filepath.Join(dir, secrets)}
+	paths := outputPaths{description: filepath.Join(dir, description), secrets: filepath.Join(dir, secrets)}
+	if answers != "" {
+		paths.answers = filepath.Join(dir, answers)
+	}
+	return paths
 }
 
 // gitWorkingTree finds the git working tree dir is inside, by walking up from it for a .git entry,

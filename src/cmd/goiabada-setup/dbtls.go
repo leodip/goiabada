@@ -110,6 +110,16 @@ func readCAFile(path string) (absolute, certificates string, err error) {
 		}
 		return "", "", errs.Errorf("the CA file %s cannot be read: %s", strconv.Quote(absolute), reason)
 	}
+	certificates = pemCertificates(content)
+	if certificates == "" {
+		return "", "", errs.Errorf("the CA file %s holds no PEM certificate", strconv.Quote(absolute))
+	}
+	return absolute, certificates, nil
+}
+
+// pemCertificates is every certificate content holds, as PEM, and nothing else, empty for none:
+// what a CA file and an answers file's db-tls-ca are both read to.
+func pemCertificates(content []byte) string {
 	var sb strings.Builder
 	for block, rest := pem.Decode(content); block != nil; block, rest = pem.Decode(rest) {
 		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
@@ -120,10 +130,7 @@ func readCAFile(path string) (absolute, certificates string, err error) {
 		}
 		sb.Write(pem.EncodeToMemory(block))
 	}
-	if sb.Len() == 0 {
-		return "", "", errs.Errorf("the CA file %s holds no PEM certificate", strconv.Quote(absolute))
-	}
-	return absolute, sb.String(), nil
+	return sb.String()
 }
 
 // tlsRoots is the pool of the certificates a CA file held, nil for none, which is the system's

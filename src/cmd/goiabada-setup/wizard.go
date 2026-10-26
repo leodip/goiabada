@@ -39,7 +39,7 @@ func newWizard(flags *CLIFlags, in prompter, out *console) *wizard {
 		flags:          flags,
 		interactive:    flags.DeploymentType == "",
 		stdin:          os.Stdin,
-		config:         &Config{},
+		config:         &Config{KeepSecrets: flags.KeepSecrets},
 		testConnection: testDatabaseConnection,
 	}
 }
@@ -127,10 +127,15 @@ var wizardSteps = []wizardStep{
 	},
 	{
 		title:   "Database password",
-		applies: func(c *Config) bool { return c.Engine.hasServer && !c.Deployment.externalDatabase },
+		applies: func(c *Config) bool { return c.Engine.hasServer && !c.Deployment.externalDatabase && !c.KeepSecrets },
 		run:     (*wizard).askDatabasePassword,
 	},
-	{title: "Generating credentials", announced: true, run: (*wizard).generateCredentials},
+	{
+		title:     "Generating credentials",
+		announced: true,
+		applies:   func(c *Config) bool { return !c.KeepSecrets },
+		run:       (*wizard).generateCredentials,
+	},
 	{run: (*wizard).confirm},
 	{title: "Generating configuration", announced: true, run: (*wizard).writeConfiguration},
 }
@@ -148,6 +153,9 @@ func (w *wizard) setup() error {
 			return err
 		}
 		if err := w.flags.checkPasswordSources(); err != nil {
+			return err
+		}
+		if err := w.flags.checkKeptSecrets(); err != nil {
 			return err
 		}
 	}
@@ -201,6 +209,16 @@ func (w *wizard) chooseDeployment() error {
 		}
 		w.out.info("Deployment type: %s", target.displayName)
 	}
+	if target.secretsFile == "" {
+		// Native binaries keep every setting and every secret in one file, so no run can write it
+		// again and leave the secrets as they are, and it has no answers file to read.
+		switch {
+		case w.flags.KeepSecrets:
+			return errs.Errorf("--keep-secrets is for %s: %s holds the native binaries' secrets with every other setting, so no file is left to write", orList(answerDeploymentNames()), target.outputFile)
+		case w.flags.Answers != "":
+			return errs.Errorf("an answers file is for %s: the native binaries' %s holds every setting with the secrets", orList(answerDeploymentNames()), target.outputFile)
+		}
+	}
 	w.config.Deployment = target
 	// The files are placed here, before any step reports a secret, so each can say where it will be.
 	w.paths = resolveOutputPaths(target, w.flags.Output)
@@ -222,6 +240,11 @@ func (w *wizard) chooseDeployment() error {
 // next restart, which on Kubernetes passes its health checks first (#542). So it warns in bold, and
 // an interactive run asks, defaulting to no; a run without prompts needs --overwrite.
 func (w *wizard) confirmOverwrite() error {
+	if w.config.KeepSecrets {
+		// The secrets file is never written, and the description and the answers file hold no secret:
+		// writing them over what a run wrote before is what --keep-secrets is for.
+		return nil
+	}
 	var existing []string
 	for _, path := range w.paths.files() {
 		if _, err := os.Lstat(path); err == nil { //nolint:gosec,nolintlint // G703: the paths are the ones this run writes, under the --output the operator chose, on their own machine; nolintlint because gosec v2.29.0 finds this G703 on some runs only (securego/gosec#1712, #494)
@@ -1036,6 +1059,10 @@ func (w *wizard) askAdmin() error {
 		if err != nil {
 			return err
 		}
+		w.config.AdminEmail = adminEmail
+		if w.config.KeepSecrets {
+			return nil
+		}
 		// A generated default, where the prompt offered changeme, the password the docs and the
 		// samples printed, to every operator who pressed Enter.
 		generated := generatePassword()
@@ -1058,6 +1085,11 @@ func (w *wizard) askAdmin() error {
 	}
 	if err := validateEmail(adminEmail); err != nil {
 		return errs.Wrap(err, "invalid admin email")
+	}
+	if w.config.KeepSecrets {
+		w.out.info("Admin email: %s", adminEmail)
+		w.config.AdminEmail = adminEmail
+		return nil
 	}
 	// Only a password the operator chose is judged, and only by the first administrator's rule.
 	adminPassword, err := w.givenPassword(w.flags.AdminPassword, "--admin-password-file", w.flags.AdminPasswordFile)
@@ -1102,7 +1134,9 @@ func (w *wizard) askDatabaseConnection() error {
 		if err := w.databaseTLSFromFlags(); err != nil {
 			return err
 		}
-		if !w.flags.SkipDBTest && !w.testConnection(w.out, c) {
+		// Under --keep-secrets the password is the secrets file's, which no step reads, so nothing
+		// can be tested.
+		if !w.flags.SkipDBTest && !c.KeepSecrets && !w.testConnection(w.out, c) {
 			w.out.warning("Database connection test failed. Configuration will still be generated.")
 		}
 		return nil
@@ -1126,6 +1160,9 @@ func (w *wizard) askDatabaseConnection() error {
 	for {
 		if err := w.databaseConnectionFromPrompts(defaultHost); err != nil {
 			return err
+		}
+		if c.KeepSecrets {
+			return nil
 		}
 
 		w.out.println()
@@ -1186,8 +1223,10 @@ func (w *wizard) databaseConnectionFromPrompts(defaultHost string) error {
 	if c.DBUsername, err = w.nonEmpty("Database username", c.Engine.defaultUser); err != nil {
 		return err
 	}
-	if err = w.databasePasswordFromPrompt(); err != nil {
-		return err
+	if !c.KeepSecrets {
+		if err = w.databasePasswordFromPrompt(); err != nil {
+			return err
+		}
 	}
 	return w.databaseTLSFromPrompts()
 }
@@ -1270,6 +1309,13 @@ func (w *wizard) databaseTLSFromPrompts() error {
 // refusals say (#546).
 func (w *wizard) clientCertificateFromPrompts() error {
 	c := w.config
+	if c.KeepSecrets {
+		// The pair is in the secrets file, which this run leaves as it is: only whether the auth
+		// server presents one is asked.
+		kept, err := w.yesNo(fmt.Sprintf("Does the auth server present a client certificate to the database? Its %s Secret stays as it is", dbClientTLSSecret), false)
+		c.DBTLSClientCertKept = kept
+		return err
+	}
 	for {
 		// No default: a blank answer means none, the second time round as the first, rather than the
 		// certificate a blank key returned from (#546).
@@ -1341,6 +1387,13 @@ func (w *wizard) databaseTLSFromFlags() error {
 			described = "left out, so " + mode
 		}
 		return errs.Errorf("--db-tls-ca-file is set while --db-tls-mode is %s, which checks no certificate: only verify-ca and verify-full read a CA file", described)
+	case w.flags.DBTLSCA != "":
+		// An answers file's certificates, which a mode that checks none would leave unread.
+		if !checksCertificate(mode) {
+			return errs.Errorf("db-tls-ca is answered while --db-tls-mode is %s, which checks no certificate: only verify-ca and verify-full read the CA's certificates", mode)
+		}
+		c.DBTLSCA = w.flags.DBTLSCA
+		w.out.info("Database CA: the certificates in %s", w.flags.Answers)
 	case w.flags.DBTLSCAFile == "":
 		// Only a mode that checks the certificate has roots to name; disable, prefer and require
 		// check none, and the warning below says so (#546).
@@ -1385,7 +1438,7 @@ func (w *wizard) clientCertificateFromFlags() error {
 		return nil
 	}
 	if w.flags.DBTLSClientCertFile == "" && w.flags.DBTLSClientKeyFile == "" {
-		return nil
+		return w.keptClientCertificate()
 	}
 	if w.flags.DBTLSClientCertFile == "" || w.flags.DBTLSClientKeyFile == "" {
 		half, other := "--db-tls-client-cert-file", "--db-tls-client-key-file"
@@ -1423,6 +1476,28 @@ func (w *wizard) clientCertificateFromFlags() error {
 	return nil
 }
 
+// keptClientCertificate is an answers file's db-tls-client-cert, which says the auth server
+// presents a pair without naming its files: under --keep-secrets the secrets file holds it already,
+// and any other run needs the files, to write the pair into the one it writes.
+func (w *wizard) keptClientCertificate() error {
+	c := w.config
+	if !w.flags.DBTLSClientCertKept {
+		return nil
+	}
+	if !c.KeepSecrets {
+		return errs.Errorf("%s answers that the auth server presents a client certificate: name it with --db-tls-client-cert-file and --db-tls-client-key-file, or pass --keep-secrets to leave the Secret holding it as it is", w.flags.Answers)
+	}
+	if !c.Engine.takesClientCertificate {
+		return errs.Errorf("db-tls-client-cert is answered while --db is %s, whose driver takes no client certificate", c.Engine.name)
+	}
+	if !carriesClientCertificate(c.DBTLSMode) {
+		return errs.Errorf("db-tls-client-cert is answered while --db-tls-mode is %s: only require, verify-ca and verify-full carry a client certificate", c.DBTLSMode)
+	}
+	c.DBTLSClientCertKept = true
+	w.out.info("Database client certificate: the one in the %s Secret, left as it is", dbClientTLSSecret)
+	return nil
+}
+
 // warnUncheckedTLS is #502 decision 3's warning at the moment a mode that checks no certificate is
 // chosen, for a database the operator runs, which the auth server may reach across any network.
 func (w *wizard) warnUncheckedTLS() {
@@ -1457,8 +1532,10 @@ func (w *wizard) databaseConnectionFromFlags() error {
 	if c.DBUsername == "" {
 		c.DBUsername = c.Engine.defaultUser
 	}
-	if err := w.databasePasswordFromFlags(); err != nil {
-		return err
+	if !c.KeepSecrets {
+		if err := w.databasePasswordFromFlags(); err != nil {
+			return err
+		}
 	}
 	w.out.info("Database host: %s:%s", c.DBHost, c.DBPort)
 	w.out.info("Database name: %s", c.DBName)
@@ -1594,14 +1671,20 @@ func (w *wizard) confirm() error {
 func (w *wizard) writeConfiguration() error {
 	description, secrets := writtenConfiguration(w.config, w.paths)
 	files := []struct{ path, content string }{{w.paths.description, description.content}}
-	if w.paths.separate() {
+	if w.paths.separate() && !w.config.KeepSecrets {
 		files = append(files, struct{ path, content string }{w.paths.secrets, secrets.content})
+	}
+	if w.paths.answers != "" {
+		files = append(files, struct{ path, content string }{w.paths.answers, generateAnswers(w.config, w.paths)})
 	}
 	for _, file := range files {
 		if err := writePrivateFile(file.path, file.content); err != nil {
 			return errs.Wrapf(err, "unable to write %s", filepath.Base(file.path))
 		}
 		w.out.success("Created: %s", file.path)
+	}
+	if w.paths.separate() && w.config.KeepSecrets {
+		w.out.info("Not written: %s, which --keep-secrets leaves as it is", w.paths.secrets)
 	}
 	return nil
 }

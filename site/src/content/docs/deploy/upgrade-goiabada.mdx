@@ -21,12 +21,18 @@ You don't migrate the database yourself. The auth server brings the schema up to
 
    <Tabs syncKey="platform">
      <TabItem label="Docker Compose">
-       Set both image lines in `docker-compose.yml` to the new release, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`, then:
+       Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `docker-compose.yml`. It writes the release's version into both image lines, and anything else the release changed in what it generates, and leaves `docker-compose.override.yml`, with your secrets, as it is. Review the diff, then start the new release:
 
        ```bash
+       ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets
+       git diff -- docker-compose.yml goiabada-setup.yaml
        docker compose pull
        docker compose up -d
        ```
+
+       Docker Compose recreates the containers whose image or configuration changed, the two servers among them. The database's data stays in its volume.
+
+       Without an answers file, set both image lines in `docker-compose.yml` to the new release yourself, `leodip/goiabada:authserver-<version>` and `leodip/goiabada:adminconsole-<version>`, then run the last two commands.
 
        A setup wizard built from source writes the moving `latest` tag instead of a version, so `docker compose pull` fetches whatever release `latest` names that day. Replace it with a [release version](https://github.com/leodip/goiabada/releases), so that you choose when to upgrade.
 
@@ -46,14 +52,19 @@ You don't migrate the database yourself. The auth server brings the schema up to
      <TabItem label="Kubernetes">
        A release of the setup wizard writes its own version into both image lines, with `imagePullPolicy: IfNotPresent`, since a version tag names one build. A wizard built from source writes `latest` with `imagePullPolicy: Always`, under a comment, and warns you when it finishes: `latest` moves, so pods started at different times can run different releases. Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
 
-       Set both image lines in `goiabada-k8s.yaml` to the new release, then apply it. It alone carries the image tags, so the Secrets need no applying again:
+       Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `goiabada-k8s.yaml`. It writes the release's version into both image lines, and anything else the release changed in the manifest, and leaves `goiabada-secrets.yaml` as it is. Review the diff, and what applying would change in the cluster, then apply the manifest alone: the Secrets need no applying again.
 
        ```bash
+       ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets
+       git diff -- goiabada-k8s.yaml goiabada-setup.yaml
+       kubectl diff -f goiabada-k8s.yaml
        kubectl apply -f goiabada-k8s.yaml
        kubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n goiabada
        ```
 
-       If you regenerate the manifest with the setup wizard instead, apply only the new `goiabada-k8s.yaml`: the `goiabada-secrets.yaml` written beside it holds new secrets, which the database isn't under.
+       With a kustomization over the manifest, such as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide's, apply that instead, with `kubectl apply -k`.
+
+       Without an answers file, set both image lines in `goiabada-k8s.yaml` to the new release yourself, then apply it.
 
        A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together: the digest alone decides what a pod runs, so a tag changed on its own leaves every pod on the old release while `kubectl rollout status` reports success.
      </TabItem>
@@ -64,7 +75,7 @@ You don't migrate the database yourself. The auth server brings the schema up to
 </Steps>
 
 <Aside type="caution">
-Running the setup wizard again generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) explains: a new AES key can't decrypt the database.
+Running the setup wizard again without `--keep-secrets` generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) explains: a new AES key can't decrypt the database.
 </Aside>
 
 ## Pin a deployment to an image digest

@@ -31,7 +31,8 @@ GOIABADA_DB_PASSWORD="db: \"pw\" #1 \$(id) \`x\` \\n
 # How the auth server protects its connection to the database: disable, prefer, require,
 # verify-ca or verify-full.
 # verify-ca: require, and the certificate must chain to an authority you trust; its host name is not checked.
-# The certificate is checked against the authorities in GOIABADA_DB_TLS_CA_FILE alone.
+# The certificate is checked against the system's roots; GOIABADA_DB_TLS_CA_FILE names a
+# PEM file of the authorities to trust instead.
 GOIABADA_DB_TLS_MODE="verify-ca"
 GOIABADA_DB_TLS_CA_FILE="/etc/ssl/\"db\" \$HOME \`id\` #x: ca's.pem"
 

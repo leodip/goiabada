@@ -59,6 +59,13 @@ func run(args []string) int {
 	if !flags.NoColor && term.IsTerminal(int(os.Stdout.Fd())) {
 		out.palette = ansiColors
 	}
+	if flags.Answers != "" {
+		// The command line is read again over the answers, so each flag on it replaces the answer
+		// of its name.
+		if flags, err = loadAnswers(args, flags.Answers); err != nil {
+			return exitCode(out, err)
+		}
+	}
 	return exitCode(out, newWizard(flags, newPrompter(os.Stdin, os.Stdout), out).setup())
 }
 

@@ -177,7 +177,7 @@ This example uses cert-manager's [CA issuer](https://cert-manager.io/docs/config
    kubectl rollout status -n goiabada deployment/goiabada-adminconsole --timeout=5m
    ```
 
-   Keep using `kubectl apply -k .`: applying the wizard's manifest alone undoes these settings.
+   Keep using `kubectl apply -k .`: applying the wizard's manifest alone undoes these settings. A manifest the wizard [writes again](/deploy/setup-wizard/#run-it-again-on-a-deployment) stays this kustomization's base.
 
 5. **Sign in to the admin console and open Clients.** This checks its HTTPS connection to the auth server.
 

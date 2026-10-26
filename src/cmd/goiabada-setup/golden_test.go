@@ -39,13 +39,22 @@ func (c goldenCase) secretsPath() string {
 	return filepath.Join("testdata", c.name+".secrets.golden")
 }
 
-// goldenFiles are the case's goldens, each with the generated file it holds: the description, and
-// the secrets file when it is a file of its own.
+// answersPath is the golden of the case's answers file, for a deployment type that writes one.
+func (c goldenCase) answersPath() string {
+	return filepath.Join("testdata", c.name+".answers.golden")
+}
+
+// goldenFiles are the case's goldens, each with the generated file it holds: the description, the
+// secrets file when it is a file of its own, and the answers file beside them (#686 section 4).
 func (c goldenCase) goldenFiles() map[string]generatedFile {
-	description, secrets := generatedConfiguration(c.config())
+	config := c.config()
+	description, secrets := generatedConfiguration(config)
 	files := map[string]generatedFile{c.path(): description}
 	if secrets != description {
 		files[c.secretsPath()] = secrets
+	}
+	if paths := config.Deployment.defaultPaths(); paths.answers != "" {
+		files[c.answersPath()] = generatedFile{name: answersFile, content: generateAnswers(config, paths)}
 	}
 	return files
 }
