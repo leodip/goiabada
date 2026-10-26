@@ -36,7 +36,6 @@ func writeRouting(sb *strings.Builder, config *Config) {
 	// Routing is Gateway API rather than Ingress by default: the one controller the Ingresses were
 	// written for, ingress-nginx, is retired and gets no more security fixes, and SIG Network points
 	// its users at Gateway API (kubernetes.io blog, 2025-11-11).
-	ns := config.K8sNamespace
 	authHost := hostOf(config.AuthServerURL)
 	adminHost := hostOf(config.AdminConsoleURL)
 	parent := gatewayParent{name: "goiabada", authListener: authHTTPSListener, adminListener: adminHTTPSListener}
@@ -51,12 +50,12 @@ func writeRouting(sb *strings.Builder, config *Config) {
 		writeGateway(sb, config, authHost, adminHost)
 		sb.WriteString("\n")
 	}
-	writeHTTPRoute(sb, ns, "goiabada-authserver", parent, parent.authListener, authHost, 9090)
+	writeHTTPRoute(sb, config, "goiabada-authserver", parent, parent.authListener, authHost, 9090)
 	sb.WriteString("\n")
-	writeHTTPRoute(sb, ns, "goiabada-adminconsole", parent, parent.adminListener, adminHost, 9091)
+	writeHTTPRoute(sb, config, "goiabada-adminconsole", parent, parent.adminListener, adminHost, 9091)
 	if config.writesRedirect() {
 		sb.WriteString("\n")
-		writeHTTPSRedirect(sb, ns, authHost, adminHost, httpsPortOf(config.AuthServerURL))
+		writeHTTPSRedirect(sb, config, authHost, adminHost, httpsPortOf(config.AuthServerURL))
 	}
 }
 
@@ -85,13 +84,7 @@ func writeGateway(sb *strings.Builder, config *Config, authHost, adminHost strin
 	}
 	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
 	sb.WriteString("kind: Gateway\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada\n")
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(config.K8sNamespace))
-	if config.issuesWithCertManager() {
-		sb.WriteString("  annotations:\n")
-		fmt.Fprintf(sb, "    %s: %s\n", config.certManagerAnnotation(), yamlQuote(config.TLSIssuer))
-	}
+	config.writeMetadata(sb, objectMetadata{name: "goiabada", annotations: config.issuerAnnotations()})
 	sb.WriteString("spec:\n")
 	fmt.Fprintf(sb, "  gatewayClassName: %s\n", yamlQuote(config.GatewayClass))
 	sb.WriteString("  listeners:\n")
@@ -119,13 +112,11 @@ func writeHTTPSListener(sb *strings.Builder, name, host string, port int, certif
 
 // writeHTTPRoute writes the HTTPRoute sending host, on the parent Gateway's listener, to service's
 // port.
-func writeHTTPRoute(sb *strings.Builder, ns, service string, parent gatewayParent, listener, host string, port int) {
+func writeHTTPRoute(sb *strings.Builder, config *Config, service string, parent gatewayParent, listener, host string, port int) {
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
 	sb.WriteString("kind: HTTPRoute\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", service)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: service, component: componentOf(service)})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  parentRefs:\n")
 	fmt.Fprintf(sb, "  - name: %s\n", yamlQuote(parent.name))
@@ -150,13 +141,11 @@ func writeHTTPRoute(sb *strings.Builder, ns, service string, parent gatewayParen
 // changes nothing on Envoy Gateway v1.9.1, which renders either as Envoy's scheme redirect alone:
 // that drops a Host's :80 and keeps any other port it names, so a URL on another port needs it
 // written (#430, #686 section 3).
-func writeHTTPSRedirect(sb *strings.Builder, ns, authHost, adminHost, port string) {
+func writeHTTPSRedirect(sb *strings.Builder, config *Config, authHost, adminHost, port string) {
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
 	sb.WriteString("kind: HTTPRoute\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-https-redirect\n")
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: "goiabada-https-redirect"})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  parentRefs:\n")
 	sb.WriteString("  - name: goiabada\n")
@@ -207,13 +196,7 @@ func writeIngresses(sb *strings.Builder, config *Config) {
 func writeIngress(sb *strings.Builder, config *Config, service, host string, port int, certificate string) {
 	sb.WriteString("apiVersion: networking.k8s.io/v1\n")
 	sb.WriteString("kind: Ingress\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", service)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(config.K8sNamespace))
-	if config.issuesWithCertManager() {
-		sb.WriteString("  annotations:\n")
-		fmt.Fprintf(sb, "    %s: %s\n", config.certManagerAnnotation(), yamlQuote(config.TLSIssuer))
-	}
+	config.writeMetadata(sb, objectMetadata{name: service, component: componentOf(service), annotations: config.issuerAnnotations()})
 	sb.WriteString("spec:\n")
 	if config.IngressClass != "" {
 		fmt.Fprintf(sb, "  ingressClassName: %s\n", yamlQuote(config.IngressClass))
@@ -244,4 +227,13 @@ func (c *Config) proxies() string {
 		return "Envoy's proxies"
 	}
 	return "the routing layer"
+}
+
+// issuerAnnotations are the annotations naming the cert-manager issuer of a Gateway or an Ingress the
+// manifest creates, none when cert-manager issues no certificate.
+func (c *Config) issuerAnnotations() []keyValue {
+	if !c.issuesWithCertManager() {
+		return nil
+	}
+	return []keyValue{{c.certManagerAnnotation(), c.TLSIssuer}}
 }

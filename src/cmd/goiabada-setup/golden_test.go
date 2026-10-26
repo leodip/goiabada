@@ -176,6 +176,14 @@ var answerCases = []goldenCase{
 	{name: "production-mirror-unpinned-postgres", deployment: deploymentProduction, engine: "postgres", release: true, answers: func(c *Config) {
 		c.ImageRepository, c.ImageDigest = "registry.example.com/mirror/goiabada", false
 	}},
+	// The operator's labels and annotations on every object and pod template, beside the standard
+	// labels, the PodMonitor's and the NetworkPolicies included (#686 section 6).
+	{name: "kubernetes-labels-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Labels = []keyValue{{"team", "identity"}, {"example.com/cost-center", "1234"}}
+		c.Annotations = []keyValue{{"example.com/owner", "identity-team@example.com"}}
+		c.Metrics, c.PodMonitorLabels = metricsPodMonitor, []keyValue{{"release", "kube-prometheus-stack"}}
+		c.NetworkPolicy, c.ProxyNamespace, c.MetricsNamespace = true, envoyProxyNamespace, "monitoring"
+	}},
 	// The rate limiter answered against its default: off for production Compose and native
 	// binaries, on for Kubernetes under the Cluster traffic policy (#396 decision 9).
 	{name: "production-no-rate-limiter-postgres", deployment: deploymentProduction, engine: "postgres", answers: func(c *Config) {
@@ -198,7 +206,7 @@ var answerCases = []goldenCase{
 	}},
 	{name: "kubernetes-metrics-podmonitor-labels-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.Metrics = metricsPodMonitor
-		c.PodMonitorLabels = []podMonitorLabel{{"release", "kube-prometheus-stack"}}
+		c.PodMonitorLabels = []keyValue{{"release", "kube-prometheus-stack"}}
 	}},
 	// Metrics with the NetworkPolicies on, which admit the scraper's namespace, monitoring by
 	// default, to the metrics port alone (#400 decision 8).
@@ -288,6 +296,8 @@ func hostileConfig(config *Config) {
 	config.AdminEmail = "a\"b$c`d\\e #f'g@example.com"
 	config.AuthServerURL = "https://auth.example.com/p\"a$HOME #x: y"
 	config.AdminConsoleURL = "https://admin.example.com/`id`\\q'r ${PATH}"
+	// An annotation's value is free text but a comma, which separates the pairs.
+	config.Annotations = []keyValue{{"example.com/note", "a\"b $HOME `id` #x: y \\ z' ~ yes"}}
 	if config.Engine.hasServer {
 		config.DBPassword = "db: \"pw\" #1 $(id) `x` \\n \r\n{a: [b]} 0123"
 	}

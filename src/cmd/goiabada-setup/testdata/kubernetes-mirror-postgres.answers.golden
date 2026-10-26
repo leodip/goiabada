@@ -22,6 +22,8 @@ metrics: "none"
 image-repository: "registry.example.com/mirror/goiabada"
 image-digest: true
 image-pull-secret: "registry-credentials"
+labels: ""
+annotations: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

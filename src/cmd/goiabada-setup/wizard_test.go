@@ -130,7 +130,11 @@ func interactiveScript(d *deployment, e *engine) []scriptedStep {
 		steps = append(steps, scriptedStep{prompt: imageRepositoryPrompt, answer: ""})
 	}
 	if d.kind == deploymentKubernetes {
-		steps = append(steps, scriptedStep{prompt: imagePullSecretPrompt, answer: ""})
+		steps = append(steps,
+			scriptedStep{prompt: imagePullSecretPrompt, answer: ""},
+			scriptedStep{prompt: labelsPrompt, answer: ""},
+			scriptedStep{prompt: annotationsPrompt, answer: ""},
+		)
 	}
 	defaultEmail := "admin@example.com"
 	if d.asksURLs {
@@ -170,8 +174,8 @@ func TestWizard_EveryDeploymentTypeRunsToItsFile(t *testing.T) {
 		{deploymentLocal, "mysql", []string{"Deployment type", "Database type", "Container images", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Container images", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentProduction, "postgres", []string{"Deployment type", "Database type", "Domain names", "Rate limiter", "Container images", "Admin credentials", "Database password", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Container images", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
-		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Container images", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "postgres", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Container images", "Labels and annotations", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
+		{deploymentKubernetes, "mssql", []string{"Deployment type", "Database type", "Domain names", "Kubernetes namespace", "Namespace creation", "Routing", "Gateway traffic policy", "Network policy", "Rate limiter", "Metrics", "Container images", "Labels and annotations", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "sqlite", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Generating credentials", "Generating configuration"}},
 		{deploymentNative, "mysql", []string{"Deployment type", "Database type", "Domain names", "Reverse proxy", "Rate limiter", "Admin credentials", "Database connection", "Generating credentials", "Generating configuration"}},
 	}
@@ -401,7 +405,7 @@ func TestWizard_NonInteractiveRunsFromTheFlags(t *testing.T) {
 				DeploymentType: "k8s", DBType: "postgres", AuthServerURL: "https://auth.example.org",
 				Namespace: "identity", DBHost: "pg.internal", DBPort: "6543", DBName: "gb", DBUsername: "gbuser", DBPassword: "db-secret",
 			},
-			numbers:  []int{14, 15},
+			numbers:  []int{15, 16},
 			database: connectionCall{"postgres", "pg.internal", "6543", "gb", "gbuser", "db-secret", "prefer", ""},
 			checked:  true,
 		},

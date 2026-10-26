@@ -231,7 +231,7 @@ func TestKubernetesManifest_ExposesMetricsAsAnswered(t *testing.T) {
 				if got := at[string](t, monitor, "metadata", "namespace"); got != config.K8sNamespace {
 					t.Errorf("the PodMonitor is in namespace %q, want %q", got, config.K8sNamespace)
 				}
-				if labels, ok := at[map[string]any](t, monitor, "metadata")["labels"]; ok {
+				if labels := withoutStandardLabels(at[map[string]any](t, monitor, "metadata", "labels")); len(labels) > 0 {
 					t.Errorf("the PodMonitor carries labels %v, and none was given", labels)
 				}
 				selector := at[map[string]any](t, monitor, "spec", "selector")
@@ -263,14 +263,14 @@ func TestKubernetesManifest_ExposesMetricsAsAnswered(t *testing.T) {
 // given, and they move nothing else (#400 decision 7).
 func TestKubernetesManifest_LabelsThePodMonitorAsGiven(t *testing.T) {
 	config := metricsConfig(metricsPodMonitor)
-	config.PodMonitorLabels = []podMonitorLabel{{"release", "kube-prometheus-stack"}, {"example.com/team", "identity"}}
+	config.PodMonitorLabels = []keyValue{{"release", "kube-prometheus-stack"}, {"example.com/team", "identity"}}
 	monitors := kubernetesDocuments(t, config)["PodMonitor"]
 	if len(monitors) != 1 {
 		t.Fatalf("the manifest has PodMonitors %v, want one", slices.Sorted(maps.Keys(monitors)))
 	}
 	for _, monitor := range monitors {
 		want := map[string]any{"release": "kube-prometheus-stack", "example.com/team": "identity"}
-		if got := at[map[string]any](t, monitor, "metadata", "labels"); !reflect.DeepEqual(got, want) {
+		if got := withoutStandardLabels(at[map[string]any](t, monitor, "metadata", "labels")); !reflect.DeepEqual(got, want) {
 			t.Errorf("the PodMonitor is labeled %v, want %v", got, want)
 		}
 	}
@@ -380,7 +380,7 @@ func TestWizard_KubernetesAsksWhetherToExposeMetrics(t *testing.T) {
 		"by flag, podmonitor":   {byFlag(metricsPodMonitor), nil, metricsPodMonitor},
 		"by flag, labels ignored": {func() *CLIFlags {
 			f := byFlag(metricsAnnotations)
-			f.PodMonitorLabels = []podMonitorLabel{{"release", "x"}}
+			f.PodMonitorLabels = []keyValue{{"release", "x"}}
 			return f
 		}(), nil, metricsAnnotations},
 		"by flag, namespace ignored": {func() *CLIFlags { f := byFlag(metricsPodMonitor); f.MetricsNamespace = "observability"; return f }(), nil, metricsPodMonitor},
@@ -433,7 +433,7 @@ func TestWizard_ThePodMonitorAsksForItsLabels(t *testing.T) {
 	invalidThenValid := metricsScript(t, "3", "release", false, "")
 	at := slices.IndexFunc(invalidThenValid, func(s scriptedStep) bool { return s.prompt == podMonitorLabelsPrompt })
 	invalidThenValid = slices.Insert(invalidThenValid, at+1, scriptedStep{prompt: podMonitorLabelsPrompt, answer: "release=kube-prometheus-stack"})
-	byFlag := func(labels []podMonitorLabel) *CLIFlags {
+	byFlag := func(labels []keyValue) *CLIFlags {
 		f := kubernetesFlags()
 		f.Metrics = metricsPodMonitor
 		f.PodMonitorLabels = labels
@@ -442,14 +442,14 @@ func TestWizard_ThePodMonitorAsksForItsLabels(t *testing.T) {
 	cases := map[string]struct {
 		flags *CLIFlags
 		steps []scriptedStep
-		want  []podMonitorLabel
+		want  []keyValue
 	}{
 		"prompted, blank":            {&CLIFlags{}, metricsScript(t, "3", "", false, ""), nil},
-		"prompted, one":              {&CLIFlags{}, metricsScript(t, "3", "release=kube-prometheus-stack", false, ""), []podMonitorLabel{{"release", "kube-prometheus-stack"}}},
-		"prompted, two with a space": {&CLIFlags{}, metricsScript(t, "3", "release=prom, team=identity", false, ""), []podMonitorLabel{{"release", "prom"}, {"team", "identity"}}},
-		"prompted, invalid first":    {&CLIFlags{}, invalidThenValid, []podMonitorLabel{{"release", "kube-prometheus-stack"}}},
+		"prompted, one":              {&CLIFlags{}, metricsScript(t, "3", "release=kube-prometheus-stack", false, ""), []keyValue{{"release", "kube-prometheus-stack"}}},
+		"prompted, two with a space": {&CLIFlags{}, metricsScript(t, "3", "release=prom, team=identity", false, ""), []keyValue{{"release", "prom"}, {"team", "identity"}}},
+		"prompted, invalid first":    {&CLIFlags{}, invalidThenValid, []keyValue{{"release", "kube-prometheus-stack"}}},
 		"by flag, left out":          {byFlag(nil), nil, nil},
-		"by flag, one":               {byFlag([]podMonitorLabel{{"release", "kube-prometheus-stack"}}), nil, []podMonitorLabel{{"release", "kube-prometheus-stack"}}},
+		"by flag, one":               {byFlag([]keyValue{{"release", "kube-prometheus-stack"}}), nil, []keyValue{{"release", "kube-prometheus-stack"}}},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -481,7 +481,7 @@ func TestWizard_ThePodMonitorAsksForItsLabels(t *testing.T) {
 // anything else is refused saying what is wrong (Kubernetes docs, "Labels and Selectors", syntax and
 // character set).
 func TestParsePodMonitorLabels(t *testing.T) {
-	for input, want := range map[string][]podMonitorLabel{
+	for input, want := range map[string][]keyValue{
 		"":                                 nil,
 		"  ":                               nil,
 		"release=kube-prometheus-stack":    {{"release", "kube-prometheus-stack"}},
@@ -518,7 +518,7 @@ func TestParsePodMonitorLabels(t *testing.T) {
 		"release=prom#x",
 	} {
 		if got, err := parsePodMonitorLabels(input); err == nil {
-			t.Errorf("parsePodMonitorLabels(%q) = %v, want it refused", input, got)
+			t.Errorf("parseLabels(%q) = %v, want it refused", input, got)
 		}
 	}
 }
@@ -612,7 +612,7 @@ func TestParseFlags_TheMetricsFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []podMonitorLabel{{"release", "prom"}, {"team", "identity"}}; !slices.Equal(flags.PodMonitorLabels, want) {
+	if want := []keyValue{{"release", "prom"}, {"team", "identity"}}; !slices.Equal(flags.PodMonitorLabels, want) {
 		t.Errorf("--podmonitor-labels reads %v, want %v", flags.PodMonitorLabels, want)
 	}
 	if flags.MetricsNamespace != "observability" {
@@ -645,7 +645,7 @@ func TestWizard_MetricsFlagsAreIgnoredOutsideKubernetes(t *testing.T) {
 	} {
 		t.Run(flags.DeploymentType, func(t *testing.T) {
 			flags.Metrics, flags.NetworkPolicy, flags.MetricsNamespace = metricsPodMonitor, true, "observability"
-			flags.PodMonitorLabels = []podMonitorLabel{{"release", "prom"}}
+			flags.PodMonitorLabels = []keyValue{{"release", "prom"}}
 			w, _, out, _ := testWizard(t, &flags, nil)
 			if err := w.setup(); err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
@@ -683,9 +683,10 @@ func TestSummary_ReportsTheMetricsAnswer(t *testing.T) {
 		"annotations": {func(c *Config) { c.Metrics = metricsAnnotations }, []string{"Metrics: pod annotations"}, []string{"scraper"}},
 		"podmonitor": {func(c *Config) {
 			c.Metrics = metricsPodMonitor
-			c.PodMonitorLabels = []podMonitorLabel{{"release", "prom"}}
+			c.PodMonitorLabels = []keyValue{{"release", "prom"}}
 		}, []string{"Metrics: a PodMonitor labeled release=prom"}, []string{"scraper"}},
-		"podmonitor, no labels": {func(c *Config) { c.Metrics = metricsPodMonitor }, []string{"Metrics: a PodMonitor, unlabeled"}, nil},
+		// The PodMonitor carries the standard labels, so the summary says nothing of its labels.
+		"podmonitor, no labels": {func(c *Config) { c.Metrics = metricsPodMonitor }, []string{"Metrics: a PodMonitor"}, []string{"unlabeled", "PodMonitor labeled", "scraper"}},
 		"with NetworkPolicies": {func(c *Config) {
 			c.Metrics, c.NetworkPolicy, c.MetricsNamespace = metricsAnnotations, true, "observability"
 		}, []string{"Metrics: pod annotations", "Metrics scraper: namespace observability"}, nil},

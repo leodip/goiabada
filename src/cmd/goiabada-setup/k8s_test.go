@@ -691,7 +691,7 @@ func TestKubernetesManifest_AnExistingNamespaceIsDeclaredInNeitherFile(t *testin
 		labelled[key] = value
 	}
 	delete(wanted, "kubernetes.io/metadata.name")
-	if !reflect.DeepEqual(labelled, wanted) {
+	if wanted = withoutStandardLabels(wanted); !reflect.DeepEqual(labelled, wanted) {
 		t.Errorf("the command sets %v, and a created Namespace carries %v", labelled, wanted)
 	}
 
