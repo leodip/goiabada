@@ -20,6 +20,9 @@ network-policy: true
 proxy-namespace: "envoy-gateway-system"
 rate-limiter: false
 metrics: "none"
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
+image-pull-secret: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

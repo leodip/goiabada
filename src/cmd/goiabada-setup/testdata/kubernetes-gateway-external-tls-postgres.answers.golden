@@ -21,6 +21,9 @@ gateway-http-port: 80
 network-policy: false
 rate-limiter: false
 metrics: "none"
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
+image-pull-secret: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

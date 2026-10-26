@@ -52,6 +52,9 @@ type deployment struct {
 	// asksMetrics says the type asks whether to expose the servers' Prometheus metrics, and to which
 	// kind of scraper (#400 decision 7).
 	asksMetrics bool
+	// asksImages says the type runs the servers' images, and asks where they are pulled from (#686
+	// section 5). Native binaries run none.
+	asksImages bool
 	// routesByHost says the manifest routes and certifies each URL by its host, which must then be
 	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
 	routesByHost bool
@@ -78,6 +81,7 @@ var deployments = []*deployment{
 		name:              "local",
 		menuLabel:         "Local testing (HTTP only) - for development/testing",
 		displayName:       "Local testing (Docker)",
+		asksImages:        true,
 		outputFile:        "docker-compose.yml",
 		secretsFile:       "docker-compose.override.yml",
 		secretsSuffix:     ".override",
@@ -94,6 +98,7 @@ var deployments = []*deployment{
 		asksURLs:          true,
 		behindProxy:       true,
 		asksRateLimiter:   true,
+		asksImages:        true,
 		outputFile:        "docker-compose.yml",
 		secretsFile:       "docker-compose.override.yml",
 		secretsSuffix:     ".override",
@@ -115,6 +120,7 @@ var deployments = []*deployment{
 		asksRouting:       true,
 		asksRateLimiter:   true,
 		asksMetrics:       true,
+		asksImages:        true,
 		outputFile:        "goiabada-k8s.yaml",
 		secretsFile:       "goiabada-secrets.yaml",
 		secretsSuffix:     "-secrets",

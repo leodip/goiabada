@@ -22,6 +22,8 @@ func testConfig() *Config {
 		AESEncryptionKey:    "aes-encryption-key",
 		OAuthClientSecret:   "oauth-client-secret",
 		K8sNamespace:        "goiabada",
+		ImageRepository:     defaultImageRepository,
+		ImageDigest:         true,
 	}
 }
 

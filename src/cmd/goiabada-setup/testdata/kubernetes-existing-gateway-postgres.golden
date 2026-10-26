@@ -160,7 +160,7 @@ spec:
       - name: authserver
         # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through
         # registries its configuration lists, and may refuse to pull leodip/goiabada.
-        image: docker.io/leodip/goiabada:authserver-latest
+        image: "docker.io/leodip/goiabada:authserver-latest"
         # latest is a moving tag: each start pulls whatever release it names then, so pods can
         # run different releases. Replace it with a release version to pin the image.
         imagePullPolicy: Always
@@ -358,7 +358,7 @@ spec:
       - name: adminconsole
         # Named in full: CRI-O, the runtime OpenShift uses, resolves a short name only through
         # registries its configuration lists, and may refuse to pull leodip/goiabada.
-        image: docker.io/leodip/goiabada:adminconsole-latest
+        image: "docker.io/leodip/goiabada:adminconsole-latest"
         # latest is a moving tag: each start pulls whatever release it names then, so pods can
         # run different releases. Replace it with a release version to pin the image.
         imagePullPolicy: Always

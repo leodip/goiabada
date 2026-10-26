@@ -298,7 +298,7 @@ func preStopPause(container map[string]any) (time.Duration, error) {
 
 func imageIs(node map[string]any, image string) bool {
 	value, _ := node["image"].(string)
-	// The Kubernetes manifest names the registry, docker.io/, which Compose files leave out (#686).
+	// The wizard names the registry, docker.io/, which the hand-written files leave out (#686).
 	return strings.HasPrefix(strings.TrimPrefix(value, "docker.io/"), image)
 }
 

@@ -20,6 +20,9 @@ network-policy: false
 rate-limiter: false
 metrics: "podmonitor"
 podmonitor-labels: "release=kube-prometheus-stack"
+image-repository: "docker.io/leodip/goiabada"
+image-digest: true
+image-pull-secret: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

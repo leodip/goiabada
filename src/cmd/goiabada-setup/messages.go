@@ -70,6 +70,12 @@ func printSummary(out *console, config *Config) {
 			out.println("  Rate limiter:     off")
 		}
 	}
+	if config.Deployment.asksImages {
+		out.printf("  Images:           %s\n", config.imageAnswer())
+		if config.ImagePullSecret != "" {
+			out.printf("  Pull secret:      %s\n", config.ImagePullSecret)
+		}
+	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
 	if config.KeepSecrets {
 		out.println("  Secrets:          left as they are, none generated")
@@ -164,12 +170,24 @@ func printRegeneratedMessage(out *console, config *Config, paths outputPaths) {
 		out.printf("       %s%s%s\n", out.cyan, composeUpCommand(paths), out.reset)
 		return
 	}
-	out.println("  2. Apply the manifest alone: the Secrets need no applying again.")
+	step := 2
+	if config.ImagePullSecret != "" {
+		// No secrets file holds it, so a run that adds it to the pods adds a Secret nothing has
+		// created yet, which the new pods cannot pull without (#686 section 5).
+		out.printf("  %d. Check the image pull secret %s exists in %s, with your credentials for\n", step, config.ImagePullSecret, config.K8sNamespace)
+		out.printf("     %s: until it does, the new pods wait in ImagePullBackOff, and the old ones keep\n", config.imageRegistry())
+		out.println("     serving. If it is missing, create it. For instance:")
+		out.printf("       %skubectl get secret %s -n %s%s\n", out.cyan, config.ImagePullSecret, config.K8sNamespace, out.reset)
+		printCreatePullSecret(out, config, "       ")
+		out.println()
+		step++
+	}
+	out.printf("  %d. Apply the manifest alone: the Secrets need no applying again.\n", step)
 	out.printf("       %skubectl apply -f %s%s\n", out.cyan, shellQuote(description), out.reset)
 	out.println("     With a kustomization over it, such as the Internal TLS guide's, apply that instead:")
 	out.printf("       %skubectl apply -k .%s\n", out.cyan, out.reset)
 	out.println()
-	out.println("  3. Wait for both servers to roll out:")
+	out.printf("  %d. Wait for both servers to roll out:\n", step+1)
 	out.printf("       %skubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 }
 
@@ -486,11 +504,19 @@ func printCreateTLSSecret(out *console, config *Config) {
 	out.printf("     %skubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key%s\n", out.cyan, config.TLSSecretAuth, config.K8sNamespace, out.reset)
 }
 
+// printCreatePullSecret prints, at indent, the command that creates the image pull secret, keyed by
+// the registry the repository names.
+func printCreatePullSecret(out *console, config *Config, indent string) {
+	out.printf("%s%skubectl create secret docker-registry %s -n %s --docker-server=%s --docker-username=<user> --docker-password=<password>%s\n",
+		indent, out.cyan, config.ImagePullSecret, config.K8sNamespace, config.imageRegistry(), out.reset)
+}
+
 // printDeployStep prints the deploy, step number of the steps: both files, the Secrets first, and
 // only the manifest over a deployment that already runs, whose Secrets a new run's would replace
 // (#542). TLS Secrets the operator supplies follow it when the files create the namespace, which a
 // namespaced Secret needs first: until they exist, a Gateway's HTTPS listeners are refused as
 // InvalidCertificateRef, and an Ingress controller serves a certificate of its own (#686 section 3).
+// So does the image pull secret, until which the pods wait in ImagePullBackOff (#686 section 5).
 func printDeployStep(out *console, config *Config, paths outputPaths, number int) {
 	out.printf("  %d. Deploy Goiabada, the Secrets first, so no pod starts with an older copy of them:\n", number)
 	out.printf("     %s%s%s\n", out.cyan, kubernetesApplyCommand(paths), out.reset)
@@ -500,6 +526,17 @@ func printDeployStep(out *console, config *Config, paths outputPaths, number int
 		out.println("     now that the namespace exists: until then the hosts are served without their")
 		out.println("     certificates. For instance:")
 		printCreateTLSSecret(out, config)
+		out.println()
+	}
+	if config.ImagePullSecret != "" {
+		if config.NamespaceExists {
+			out.printf("     The image pull secret %s must exist in %s, with your credentials for %s:\n", config.ImagePullSecret, config.K8sNamespace, config.imageRegistry())
+			out.println("     until it does, the pods wait in ImagePullBackOff. For instance:")
+		} else {
+			out.printf("     Then create the image pull secret %s, now that the namespace exists, with your\n", config.ImagePullSecret)
+			out.printf("     credentials for %s: until it exists, the pods wait in ImagePullBackOff. For instance:\n", config.imageRegistry())
+		}
+		printCreatePullSecret(out, config, "     ")
 		out.println()
 	}
 	if config.NamespaceExists {

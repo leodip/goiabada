@@ -115,8 +115,10 @@ jobs:
   binaries:
     name: Binaries
     # Depends on both, though Checks implies Verify transitively. Naming both
-    # makes the intent explicit and survives someone editing Checks.
-    needs: [verify, checks, versions]
+    # makes the intent explicit and survives someone editing Checks. Images
+    # too: the setup wizard pins its image lines to the digests that job
+    # pushed (#686 section 5).
+    needs: [verify, checks, versions, images]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -131,7 +133,12 @@ jobs:
 
       - name: Cross-compile the setup tool
         working-directory: src/cmd/goiabada-setup
-        run: ./build-binaries.sh --version "${{ needs.verify.outputs.version }}"
+        env:
+          AUTHSERVER_DIGEST: ${{ needs.images.outputs.authserver }}
+          ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
+        run: |
+          ./build-binaries.sh --version "${{ needs.verify.outputs.version }}" \
+            --authserver-digest "$AUTHSERVER_DIGEST" --adminconsole-digest "$ADMINCONSOLE_DIGEST"
 
       # One staging directory feeding the checksums, the attestation and the
       # release upload, so all three describe an identical set.

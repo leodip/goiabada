@@ -86,6 +86,11 @@ type CLIFlags struct {
 	Metrics          metricsExposure
 	PodMonitorLabels podMonitorLabels
 	MetricsNamespace string
+	// ImageRepository is --image-repository and ImageDigest --image-digest, read by Kubernetes and
+	// Compose; ImagePullSecret is --image-pull-secret, read by Kubernetes alone (#686 section 5).
+	ImageRepository string
+	ImageDigest     optionalBool
+	ImagePullSecret string
 }
 
 // optionalBool is a boolean flag that knows whether it was given, so one left out takes the
@@ -268,6 +273,9 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.Var(&flags.PodMonitorLabels, "podmonitor-labels", "Kubernetes: the labels the PodMonitor carries, key=value separated by commas")
 	fs.StringVar(&flags.MetricsNamespace, "metrics-namespace", "", "Kubernetes: the namespace the NetworkPolicies admit to the metrics ports (default: monitoring)")
 	fs.Var(&flags.RateLimiter, "rate-limiter", "Production, Kubernetes and native: turn on the auth server's rate limiter (default: true, but false for Kubernetes unless --routing=envoy-gateway with the local traffic policy)")
+	fs.StringVar(&flags.ImageRepository, "image-repository", "", "Kubernetes, local and production: the repository both servers' images are pulled from (default: "+defaultImageRepository+")")
+	fs.Var(&flags.ImageDigest, "image-digest", "Kubernetes, local and production: pin each image line to the digest its release pushed, which a source build has none of (default: true)")
+	fs.StringVar(&flags.ImagePullSecret, "image-pull-secret", "", "Kubernetes: the Secret holding the image registry's credentials (default: none)")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
@@ -335,6 +343,18 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("                         false for kubernetes unless under Envoy Gateway's local traffic\n")
 		p("                         policy, since its per-IP limits count together every client that\n")
 		p("                         reaches Goiabada from one address, such as a node's)\n\n")
+		p("Image Options (for kubernetes/local/production):\n")
+		p("  --image-repository=REPOSITORY\n")
+		p("                         The repository both servers' images are pulled from (default:\n")
+		p("                         %s), such as a mirror's,\n", defaultImageRepository)
+		p("                         registry.example.com/mirror/goiabada, holding the release's tags\n")
+		p("  --image-digest=BOOL    Pin each image line to the digest its release pushed beside the tag\n")
+		p("                         (default: true). false, for a mirror holding other digests, such as\n")
+		p("                         one filled by docker push, writes the tag alone. A source build has\n")
+		p("                         no digest, and writes the tag alone either way\n")
+		p("  --image-pull-secret=NAME\n")
+		p("                         Kubernetes: the Secret in the namespace holding the registry's\n")
+		p("                         credentials, which you create (default: none)\n\n")
 		p("Kubernetes Options:\n")
 		p("  --create-namespace=BOOL\n")
 		p("                         Declare the namespace in both files, so applying them creates it\n")
@@ -452,6 +472,8 @@ func (f *CLIFlags) checkWritable() error {
 		{"--auth-tls-secret", f.TLSSecretAuth},
 		{"--admin-tls-secret", f.TLSSecretAdmin},
 		{"--proxy-namespace", f.ProxyNamespace},
+		{"--image-repository", f.ImageRepository},
+		{"--image-pull-secret", f.ImagePullSecret},
 	} {
 		if err := checkWritable(entry.value); err != nil {
 			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)

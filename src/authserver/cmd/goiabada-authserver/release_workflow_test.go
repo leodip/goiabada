@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,16 +26,34 @@ const pinnedReferencesHeading = "Pinned image references"
 // workflowStep is one step of a workflow job, as far as the digest contract reads it: the name it
 // runs under, the env it runs with, and its script.
 type workflowStep struct {
-	Name string            `yaml:"name"`
-	Env  map[string]string `yaml:"env"`
-	Run  string            `yaml:"run"`
+	Name             string            `yaml:"name"`
+	WorkingDirectory string            `yaml:"working-directory"`
+	Env              map[string]string `yaml:"env"`
+	Run              string            `yaml:"run"`
 }
 
-// workflowJob is one job of a workflow, as far as the digest contract reads it: its outputs and
-// its steps.
+// workflowJob is one job of a workflow, as far as the digest contract reads it: the jobs it waits
+// for, its outputs and its steps.
 type workflowJob struct {
+	Needs   jobNeeds          `yaml:"needs"`
 	Outputs map[string]string `yaml:"outputs"`
 	Steps   []workflowStep    `yaml:"steps"`
+}
+
+// jobNeeds is a job's needs, which a workflow spells as one job's name or as a list of them.
+type jobNeeds []string
+
+func (n *jobNeeds) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		*n = jobNeeds{value.Value}
+		return nil
+	}
+	var names []string
+	if err := value.Decode(&names); err != nil {
+		return err
+	}
+	*n = names
+	return nil
 }
 
 // readWorkflow reads a workflow's jobs out of its YAML, or reports why it cannot be read, so a
@@ -99,6 +118,44 @@ func checkDraftNamesTheDigests(jobs map[string]workflowJob) []string {
 	return findings
 }
 
+// wizardBuildDirectory is where the release builds the setup wizard, with its own build-binaries.sh.
+const wizardBuildDirectory = "src/cmd/goiabada-setup"
+
+// checkWizardPinsTheDigests holds the release workflow to the contract the wizard's pinned image
+// lines rest on (#686 section 5): the binaries job waits for the images job, and builds the wizard
+// with the two digests that job pushed, wired from its outputs, so the image lines a release's
+// wizard writes name the image content that release attested. It returns what does not hold.
+func checkWizardPinsTheDigests(jobs map[string]workflowJob) []string {
+	binaries, ok := jobs["binaries"]
+	if !ok {
+		return []string{"release workflow: there is no binaries job"}
+	}
+	var findings []string
+	if !slices.Contains(binaries.Needs, "images") {
+		findings = append(findings, "release workflow: the binaries job does not wait for the images job")
+	}
+	var build *workflowStep
+	for i := range binaries.Steps {
+		if binaries.Steps[i].WorkingDirectory == wizardBuildDirectory && strings.Contains(binaries.Steps[i].Run, "./build-binaries.sh") {
+			build = &binaries.Steps[i]
+		}
+	}
+	if build == nil {
+		return append(findings, "release workflow: no binaries step runs the wizard's build-binaries.sh in "+wizardBuildDirectory)
+	}
+	for _, image := range digestImages {
+		if got, want := build.Env[image.env+"_DIGEST"], "${{ needs.images.outputs."+image.output+" }}"; got != want {
+			findings = append(findings, fmt.Sprintf(
+				"release workflow: the wizard's build takes the %s digest from %q, not from the images job's output",
+				image.output, got))
+		}
+		if flag := "--" + image.output + "-digest \"$" + image.env + "_DIGEST\""; !strings.Contains(build.Run, flag) {
+			findings = append(findings, fmt.Sprintf("release workflow: the wizard's build is not given %s", flag))
+		}
+	}
+	return findings
+}
+
 // draftCreateStep is the draft job's step that creates the release, or nil when it has none.
 func draftCreateStep(draft workflowJob) *workflowStep {
 	for i := range draft.Steps {
@@ -110,8 +167,8 @@ func draftCreateStep(draft workflowJob) *workflowStep {
 }
 
 // releaseNotesFixture is a workflow shaped like the release's digest path: an images job exposing
-// the digests its digests step read, and a draft created with notes naming them above the
-// generated ones.
+// the digests its digests step read, a draft created with notes naming them above the generated
+// ones, and the wizard built with them.
 const releaseNotesFixture = `name: Release
 on:
   push:
@@ -146,6 +203,18 @@ jobs:
           echo "- Auth server: leodip/goiabada:authserver-$VERSION@$AUTHSERVER_DIGEST" > pinned.md
           echo "- Admin console: leodip/goiabada:adminconsole-$VERSION@$ADMINCONSOLE_DIGEST" >> pinned.md
           gh release create "v$VERSION" --draft --generate-notes --notes-file pinned.md dist/*
+  binaries:
+    needs: [verify, images]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cross-compile the setup tool
+        working-directory: src/cmd/goiabada-setup
+        env:
+          AUTHSERVER_DIGEST: ${{ needs.images.outputs.authserver }}
+          ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}
+        run: |
+          ./build-binaries.sh --version "${{ needs.verify.outputs.version }}" \
+            --authserver-digest "$AUTHSERVER_DIGEST" --adminconsole-digest "$ADMINCONSOLE_DIGEST"
 `
 
 func TestReleaseWorkflow_TheDraftNamesTheDigests(t *testing.T) {
@@ -195,6 +264,56 @@ func TestReleaseWorkflow_TheDraftNamesTheDigests(t *testing.T) {
 			"release workflow: the notes the draft writes name no authserver reference, tag and digest together",
 		}, checkDraftNamesTheDigests(jobs))
 	})
+}
+
+func TestReleaseWorkflow_TheWizardIsBuiltWithTheDigests(t *testing.T) {
+	t.Run("a wizard built with both digests wired from the images job passes", func(t *testing.T) {
+		jobs, err := readWorkflow(releaseNotesFixture)
+		require.NoError(t, err)
+		assert.Empty(t, checkWizardPinsTheDigests(jobs))
+	})
+
+	t.Run("a binaries job not waiting for the images job fails", func(t *testing.T) {
+		text := strings.Replace(releaseNotesFixture, "  binaries:\n    needs: [verify, images]\n", "  binaries:\n    needs: [verify]\n", 1)
+		jobs, err := readWorkflow(text)
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"release workflow: the binaries job does not wait for the images job",
+		}, checkWizardPinsTheDigests(jobs))
+	})
+
+	t.Run("a wizard build taking a digest from somewhere else fails", func(t *testing.T) {
+		text := strings.Replace(releaseNotesFixture,
+			"          ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.adminconsole }}\n        run: |\n          ./build-binaries.sh",
+			"          ADMINCONSOLE_DIGEST: ${{ needs.images.outputs.authserver }}\n        run: |\n          ./build-binaries.sh", 1)
+		jobs, err := readWorkflow(text)
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			"release workflow: the wizard's build takes the adminconsole digest from " +
+				"\"${{ needs.images.outputs.authserver }}\", not from the images job's output",
+		}, checkWizardPinsTheDigests(jobs))
+	})
+
+	t.Run("a wizard build given no digest fails", func(t *testing.T) {
+		text := strings.Replace(releaseNotesFixture, ` \
+            --authserver-digest "$AUTHSERVER_DIGEST" --adminconsole-digest "$ADMINCONSOLE_DIGEST"`, "", 1)
+		jobs, err := readWorkflow(text)
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			`release workflow: the wizard's build is not given --authserver-digest "$AUTHSERVER_DIGEST"`,
+			`release workflow: the wizard's build is not given --adminconsole-digest "$ADMINCONSOLE_DIGEST"`,
+		}, checkWizardPinsTheDigests(jobs))
+	})
+}
+
+// TestReleaseWorkflow_TheRealWizardIsBuiltWithTheDigestsTheImagesJobPushed holds this repository's
+// own release workflow to the wizard's digest contract.
+func TestReleaseWorkflow_TheRealWizardIsBuiltWithTheDigestsTheImagesJobPushed(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(guard.SourceRoot(t)), releaseWorkflow))
+	require.NoError(t, err)
+	jobs, err := readWorkflow(string(body))
+	require.NoErrorf(t, err, "%s cannot be read as YAML", releaseWorkflow)
+	assert.Empty(t, checkWizardPinsTheDigests(jobs))
 }
 
 // TestReleaseWorkflow_TheRealDraftNamesTheDigestsTheImagesJobPushed holds this repository's own

@@ -7,7 +7,7 @@
 services:
 
   goiabada-authserver:
-    image: leodip/goiabada:authserver-latest
+    image: "docker.io/leodip/goiabada:authserver-latest"
     restart: unless-stopped
     # Up to 50s to stop cleanly (15s to drain requests, 15s for work handed off after
     # responses, 20s for the cleanup worker) plus 10s of headroom; Compose's default is 10s.
@@ -64,7 +64,7 @@ services:
       - "GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091"
 
   goiabada-adminconsole:
-    image: leodip/goiabada:adminconsole-latest
+    image: "docker.io/leodip/goiabada:adminconsole-latest"
     restart: unless-stopped
     # The auth server's value: this service stops within its 15s drain, and a grace
     # period is a ceiling, not a wait. Compose's default is 10s.
