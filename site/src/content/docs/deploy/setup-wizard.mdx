@@ -101,9 +101,9 @@ The wizard keeps every secret in one file, and the rest of the configuration in 
 
 Every file the wizard writes can be read by its owner only. When it writes into a Git working tree, it warns you and prints the line to add to `.gitignore`. It never edits `.gitignore` itself.
 
-Running the wizard again where its files already are writes new secrets over them, so it warns first and asks before going on; without prompts, it stops unless you pass `--overwrite`. A database seeded with the old secrets can't be used with the new ones, and without another copy of the old AES key, the data it encrypts can never be read again. So back the files up first, then either start over with an empty database, or copy your existing secrets over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes. Never apply the new secrets file to a deployment that already runs.
+Running the wizard again where its files already are writes new secrets over them, so it warns first and asks before going on; without prompts, it stops unless you pass `--overwrite`. A database seeded with the old secrets can't be used with the new ones, and without another copy of the old AES key, the data it encrypts can never be read again. So back the files up first, then either start over with an empty database, or copy your existing secrets over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes. Never apply the new secrets file to a deployment that already runs. To write a deployment's files again without new secrets, use `--keep-secrets`, as [Run it again on a deployment](#run-it-again-on-a-deployment) shows.
 
-With `--output`, the files go into the directory it names. When it names a file instead, the secrets file is named after it: `compose.yaml` gets `compose.override.yaml`, and `my-k8s.yaml` gets `my-k8s-secrets.yaml`.
+With `--output`, the files go into the directory it names. When it names a file instead, the files beside it are named after it: `compose.yaml` gets `compose.override.yaml` and `compose-setup.yaml`, and `my-k8s.yaml` gets `my-k8s-secrets.yaml` and `my-k8s-setup.yaml`.
 
 ## Passwords
 
@@ -121,7 +121,7 @@ Pass `--type` and the wizard asks nothing: it takes every answer from the flags 
   --db-host=postgres.default.svc --db-password-file=/run/secrets/db-password
 ```
 
-Without `--type`, the wizard asks every question and reads only `--output` and `--no-color`, and asks rather than reading `--overwrite`.
+Without `--type` or `--answers`, the wizard asks every question and reads only `--output`, `--no-color` and `--keep-secrets`, and asks rather than reading `--overwrite`.
 
 Prefer a generated password, or a password file, to `--admin-password` and `--db-password`. A password on the command line lands in your shell history and, while the wizard runs, in the process list. A password file can be `-` to read standard input, and one trailing line break is dropped.
 
@@ -131,6 +131,33 @@ printf '%s' "$DB_PASSWORD" | ./goiabada-setup-linux-amd64 --type=native --db=pos
 ```
 
 The wizard exits with 0 when it's done or when you abort it, 1 when it can't finish, and 2 when it can't read a flag. It writes nothing until every answer is valid.
+
+## Run it again on a deployment
+
+For Kubernetes and Docker Compose, the wizard also writes `goiabada-setup.yaml`, the answers file: every answer the files were generated from, defaults included, and no secret. Commit it with the manifest or the Compose file.
+
+`--answers` reads that file instead of asking, and `--keep-secrets` writes every file but the secrets file, which it leaves as it is, and generates no secret. Together, they write a deployment's files again, from a new release of the wizard or with a changed answer. Run them from the directory holding the files:
+
+```bash
+./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets
+```
+
+The same release and the same answers write the same files, byte for byte. A flag given beside `--answers` replaces the answer of the same name, and the answers file written records it:
+
+```bash
+./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --metrics=annotations
+```
+
+Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, each pod template carries a checksum of the ConfigMaps its server reads, so a changed answer rolls the pods it reaches when you apply the manifest. Changes you made to the secrets file stay, since nothing writes it. A change to the manifest itself doesn't: keep it in a kustomization over the manifest, as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide does.
+
+Each answer is under the name of the flag that gives it, except two:
+
+- `db-tls-ca` holds the certificates of `--db-tls-ca-file` themselves, so the answers file writes the manifest on any machine. To change them, give `--db-tls-ca-file` again, or `--db-tls-ca-file=` to return to the system's roots.
+- `db-tls-client-cert: true` says the auth server presents a [database client certificate](/deploy/database/#a-client-certificate), whose pair is in the secrets file. `--keep-secrets` refuses the pair's files, which it would never write: to add or replace a pair, create its Secret [from your terminal](/deploy/kubernetes/secrets/#from-your-terminal) and answer `db-tls-client-cert: true`. Empty files, `--db-tls-client-cert-file= --db-tls-client-key-file=`, stop presenting one. A run without `--keep-secrets` needs the files, to write the pair into the secrets file.
+
+The wizard refuses an answers file it might misread: one whose `version` isn't `1`, one with a key it doesn't know or given twice, and one holding a password, which only the secrets file holds. Native binaries have neither: `goiabada.env` holds every setting with the secrets.
+
+With prompts, `--keep-secrets` asks every question but the passwords, and writes the answers file from your answers.
 
 ## Flags
 
@@ -181,6 +208,8 @@ The wizard exits with 0 when it's done or when you abort it, 1 when it can't fin
 | `--output`, `-o` | Where to write the files: a directory, or the name of the main file. Default: the current directory. |
 | `--no-color` | Turns off colored output. |
 | `--overwrite` | Without prompts: writes over output files that already exist, and the secrets in them. Without it, the wizard stops. |
+| `--answers` | Kubernetes, `local` and `production`: reads the answers from an [answers file](#run-it-again-on-a-deployment) instead of asking. A flag given beside it replaces the answer of its name. |
+| `--keep-secrets` | Kubernetes, `local` and `production`: writes every file but the secrets file, which it leaves as it is, and generates no secret. |
 | `--version`, `-v` | Prints the wizard's version. |
 
 ## Next steps

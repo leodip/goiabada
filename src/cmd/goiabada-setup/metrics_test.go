@@ -192,7 +192,13 @@ func TestKubernetesManifest_ExposesMetricsAsAnswered(t *testing.T) {
 						t.Errorf("the container declares ports %v, want the server's and metrics", ports)
 					}
 
-					annotations := mapOrEmpty(at[map[string]any](t, deployment, "spec", "template", "metadata")["annotations"])
+					// The scrape annotations alone: every pod template also carries the config checksum.
+					annotations := map[string]any{}
+					for key, value := range mapOrEmpty(at[map[string]any](t, deployment, "spec", "template", "metadata")["annotations"]) {
+						if strings.HasPrefix(key, "prometheus.io/") {
+							annotations[key] = value
+						}
+					}
 					if exposure == metricsAnnotations {
 						want := map[string]any{
 							"prometheus.io/scrape": "true",
@@ -734,7 +740,7 @@ func TestKubernetesInstructions_SayWhatTheMetricsAnswerNeeds(t *testing.T) {
 			config := kubernetesConfig()
 			tc.configure(config)
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+			printKubernetesInstructions(&console{w: &buf}, config, deployments[deploymentKubernetes].defaultPaths())
 			said := strings.Join(strings.Fields(buf.String()), " ")
 			for _, want := range tc.want {
 				if !strings.Contains(said, want) {
@@ -745,7 +751,7 @@ func TestKubernetesInstructions_SayWhatTheMetricsAnswerNeeds(t *testing.T) {
 	}
 	t.Run("none", func(t *testing.T) {
 		var buf bytes.Buffer
-		printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+		printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), deployments[deploymentKubernetes].defaultPaths())
 		said := strings.Join(strings.Fields(buf.String()), " ")
 		for _, want := range []string{"Prometheus metrics are off", "--metrics=annotations", "--metrics=podmonitor", monitoringDocs} {
 			if !strings.Contains(said, want) {

@@ -178,7 +178,7 @@ Add the receiver to a metrics pipeline, and give the Collector's service account
 
 ### A manifest generated without metrics
 
-Run the wizard again with the answer you want and compare. Or set `GOIABADA_AUTHSERVER_METRICS_ENABLED` and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `"true"` in the two servers' ConfigMaps, and add the `metrics` port to each container yourself, here the auth server's, with 9191 for the admin console:
+Write the manifest again over your [answers file](/deploy/setup-wizard/#run-it-again-on-a-deployment), with the answer you want, and apply it: `--answers=goiabada-setup.yaml --keep-secrets --metrics=annotations`. Or set `GOIABADA_AUTHSERVER_METRICS_ENABLED` and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `"true"` in the two servers' ConfigMaps, and add the `metrics` port to each container yourself, here the auth server's, with 9191 for the admin console:
 
 ```yaml
 ports:

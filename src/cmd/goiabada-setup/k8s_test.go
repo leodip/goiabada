@@ -232,7 +232,7 @@ func TestKubernetesInstructions_SetUpWhatTheManifestNames(t *testing.T) {
 			config.GatewayTrafficPolicy = policy
 			gateway := kubernetesDocuments(t, config)["Gateway"]["goiabada"]
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+			printKubernetesInstructions(&console{w: &buf}, config, deployments[deploymentKubernetes].defaultPaths())
 			message := buf.String()
 
 			for _, gone := range []string{"ingress-nginx", "Ingress", "ingress:", "LoadBalancer"} {
@@ -325,7 +325,7 @@ func TestKubernetesInstructions_FollowTheTrafficPolicy(t *testing.T) {
 			config := kubernetesConfig()
 			config.GatewayTrafficPolicy = testCase.policy
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+			printKubernetesInstructions(&console{w: &buf}, config, deployments[deploymentKubernetes].defaultPaths())
 			message := buf.String()
 			if !strings.Contains(message, "cluster-wide") || !strings.Contains(message, "whoever runs") {
 				t.Errorf("the message does not say the EnvoyProxy and GatewayClass are cluster-wide, so the choice is whoever runs Envoy Gateway's:\n%s", message)
@@ -844,7 +844,7 @@ func TestKubernetesInstructions_WarnWhenTheManifestFollowsAMovingTag(t *testing.
 		t.Run(testCase.tag, func(t *testing.T) {
 			withImageTag(t, testCase.tag)
 			var buf bytes.Buffer
-			printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+			printKubernetesInstructions(&console{w: &buf}, kubernetesConfig(), deployments[deploymentKubernetes].defaultPaths())
 			message := buf.String()
 			if got := strings.Contains(message, warning); got != testCase.warn {
 				t.Errorf("the message warns %q: %v, want %v\n%s", warning, got, testCase.warn, message)
@@ -936,7 +936,7 @@ func TestKubernetesManifest_GivesEachProcessAConfigMapOfItsOwn(t *testing.T) {
 func TestKubernetesInstructions_ListTheStepsInTheOrderTaken(t *testing.T) {
 	config := kubernetesConfig()
 	var buf bytes.Buffer
-	printKubernetesInstructions(&console{w: &buf}, config, outputPaths{"goiabada-k8s.yaml", "goiabada-secrets.yaml"})
+	printKubernetesInstructions(&console{w: &buf}, config, deployments[deploymentKubernetes].defaultPaths())
 	message := buf.String()
 
 	steps := []string{
@@ -968,5 +968,47 @@ func TestKubernetesInstructions_ListTheStepsInTheOrderTaken(t *testing.T) {
 		if strings.Contains(message, placeholder) {
 			t.Errorf("the message still says %q", placeholder)
 		}
+	}
+}
+
+// A pod reads its ConfigMaps' variables only when it starts, so each pod template carries the
+// checksum of the ConfigMaps its server reads: one changed, the database CA's included, changes its
+// template, which rolls its pods on an apply, and leaves the other server's as it was (#686
+// section 4).
+func TestKubernetesManifest_AChangedConfigMapRollsItsPodsAlone(t *testing.T) {
+	checksums := func(config *Config) map[string]string {
+		docs := kubernetesDocuments(t, config)
+		got := map[string]string{}
+		for _, name := range []string{"goiabada-authserver", "goiabada-adminconsole"} {
+			annotations := at[map[string]any](t, docs["Deployment"][name], "spec", "template", "metadata", "annotations")
+			got[name], _ = annotations[configChecksumAnnotation].(string)
+		}
+		return got
+	}
+	before := checksums(kubernetesConfig())
+	for name, sum := range before {
+		if len(sum) != 64 {
+			t.Errorf("%s's pod template has the checksum %q, want a SHA-256", name, sum)
+		}
+	}
+	if again := checksums(kubernetesConfig()); !maps.Equal(again, before) {
+		t.Errorf("the same configuration has the checksums %v, then %v", before, again)
+	}
+
+	limited := kubernetesConfig()
+	limited.RateLimiter = !limited.RateLimiter
+	after := checksums(limited)
+	if after["goiabada-authserver"] == before["goiabada-authserver"] {
+		t.Error("the auth server's ConfigMap changed, and its pod template did not")
+	}
+	if after["goiabada-adminconsole"] != before["goiabada-adminconsole"] {
+		t.Error("the auth server's ConfigMap changed, and the admin console's pod template did too")
+	}
+
+	oneCA, twoCAs := kubernetesConfig(), kubernetesConfig()
+	oneCA.DBTLSMode, oneCA.DBTLSCA = "verify-full", goldenCA()
+	twoCAs.DBTLSMode, twoCAs.DBTLSCA = "verify-full", goldenCA()+goldenCA()
+	if checksums(oneCA)["goiabada-authserver"] == checksums(twoCAs)["goiabada-authserver"] {
+		t.Error("the database CA's ConfigMap changed, and the auth server's pod template did not")
 	}
 }

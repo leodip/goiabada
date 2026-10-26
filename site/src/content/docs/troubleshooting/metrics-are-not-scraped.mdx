@@ -56,7 +56,7 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
    kubectl get pods -A | grep -i -e prometheus -e alloy -e collector
    ```
 
-   If it isn't the one the policies admit, change the `kubernetes.io/metadata.name` in the second rule of both `goiabada-authserver` and `goiabada-adminconsole` NetworkPolicies to it, or run the setup wizard again with the right namespace.
+   If it isn't the one the policies admit, change the `kubernetes.io/metadata.name` in the second rule of both `goiabada-authserver` and `goiabada-adminconsole` NetworkPolicies to it, or [write the manifest again](/deploy/setup-wizard/#run-it-again-on-a-deployment) with `--metrics-namespace` set to it.
 
 </Steps>
 

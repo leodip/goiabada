@@ -71,7 +71,11 @@ func printSummary(out *console, config *Config) {
 		}
 	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
-	out.printf("  Admin Password:   %s\n", passwordOrigin(config.AdminPasswordGenerated))
+	if config.KeepSecrets {
+		out.println("  Secrets:          left as they are, none generated")
+	} else {
+		out.printf("  Admin Password:   %s\n", passwordOrigin(config.AdminPasswordGenerated))
+	}
 	if config.DBHost != "" {
 		out.printf("  DB Host:          %s:%s\n", config.DBHost, config.DBPort)
 		out.printf("  DB Name:          %s\n", config.DBName)
@@ -93,6 +97,8 @@ func printSummary(out *console, config *Config) {
 	if config.DBTLSClientCertFile != "" {
 		out.printf("  DB client cert:   %s\n", config.DBTLSClientCertFile)
 		out.printf("  DB client key:    %s\n", config.DBTLSClientKeyFile)
+	} else if config.DBTLSClientCertKept {
+		out.printf("  DB client cert:   the one in the %s Secret\n", dbClientTLSSecret)
 	}
 	if config.DBTLSServerName != "" {
 		out.printf("  DB TLS host name: %s\n", config.DBTLSServerName)
@@ -102,6 +108,10 @@ func printSummary(out *console, config *Config) {
 }
 
 func printCompletionMessage(out *console, config *Config, paths outputPaths) {
+	if config.KeepSecrets {
+		printRegeneratedMessage(out, config, paths)
+		return
+	}
 	out.println()
 	out.printf("%s%s================================================================================\n", out.bold, out.green)
 	out.printf("                            SETUP COMPLETE!\n")
@@ -118,6 +128,49 @@ func printCompletionMessage(out *console, config *Config, paths outputPaths) {
 	printWhereTheAdminPasswordIs(out, config, paths)
 	out.println()
 	printSecretsAdvice(out, paths)
+}
+
+// printRegeneratedMessage is the completion message of a run under --keep-secrets, which wrote the
+// description and the answers file over a deployment's own: review them, and apply the description
+// alone, since the secrets file is as it was (#686 section 4).
+func printRegeneratedMessage(out *console, config *Config, paths outputPaths) {
+	description, answers := filepath.Base(paths.description), filepath.Base(paths.answers)
+	out.println()
+	out.printf("%s%s================================================================================\n", out.bold, out.green)
+	out.printf("                          CONFIGURATION REGENERATED\n")
+	out.printf("================================================================================%s\n", out.reset)
+	out.println()
+	out.printf("%s and %s are written.\n", description, answers)
+	out.printf("%s is not: the deployment keeps the secrets it has.\n", filepath.Base(paths.secrets))
+	out.println()
+	kubernetes := config.Deployment.kind == deploymentKubernetes
+	if kubernetes && imageTag == "latest" {
+		out.warning("The manifest follows the moving image tag \"latest\", so pods can run different releases")
+		out.println("   and each start pulls whatever release it names then. Replace latest with a release")
+		out.println("   version in both image lines to pin them.")
+		out.println()
+	}
+	out.println("From the directory holding the files:")
+	out.println()
+	out.println("  1. Review what changed before you apply it:")
+	if _, inTree := gitWorkingTree(filepath.Dir(paths.description)); inTree {
+		out.printf("       %sgit diff -- %s %s%s\n", out.cyan, shellQuote(description), shellQuote(answers), out.reset)
+	} else {
+		out.println("     compare both files with the copies the deployment runs from.")
+	}
+	out.println()
+	if !kubernetes {
+		out.println("  2. Apply it. docker compose recreates the containers whose configuration changed:")
+		out.printf("       %s%s%s\n", out.cyan, composeUpCommand(paths), out.reset)
+		return
+	}
+	out.println("  2. Apply the manifest alone: the Secrets need no applying again.")
+	out.printf("       %skubectl apply -f %s%s\n", out.cyan, shellQuote(description), out.reset)
+	out.println("     With a kustomization over it, such as the Internal TLS guide's, apply that instead:")
+	out.printf("       %skubectl apply -k .%s\n", out.cyan, out.reset)
+	out.println()
+	out.println("  3. Wait for both servers to roll out:")
+	out.printf("       %skubectl rollout status deployment/goiabada-authserver deployment/goiabada-adminconsole -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 }
 
 // gatewayDocsURL is the page the Kubernetes completion message follows step by step for the Envoy
@@ -457,7 +510,8 @@ func printDeployStep(out *console, config *Config, paths outputPaths, number int
 	out.printf("     %sFor a deployment that already runs, apply only %s.%s %s holds\n", out.bold, filepath.Base(paths.description), out.reset, filepath.Base(paths.secrets))
 	out.println("     newly generated secrets, which its database isn't under: a pod reads its Secrets")
 	out.println("     only when it starts, so nothing changes until the next restart, and then the auth")
-	out.println("     server and the admin console refuse to start.")
+	out.println("     server and the admin console refuse to start. To write the manifest again without")
+	out.printf("     them, run the wizard with the flags in %s's header.\n", filepath.Base(paths.answers))
 	out.println()
 }
 
@@ -671,7 +725,10 @@ func systemdEnvironmentFileHint(paths outputPaths) string {
 func printSecretsAdvice(out *console, paths outputPaths) {
 	secrets := filepath.Base(paths.secrets)
 	out.printf("Keep %s%s%s out of version control: it holds every secret, the AES key among them.\n", out.bold, secrets, out.reset)
-	if paths.separate() {
+	switch {
+	case paths.answers != "":
+		out.printf("%s and %s hold none, and can be committed.\n", filepath.Base(paths.description), filepath.Base(paths.answers))
+	case paths.separate():
 		out.printf("%s holds none, and can be committed.\n", filepath.Base(paths.description))
 	}
 	out.println()

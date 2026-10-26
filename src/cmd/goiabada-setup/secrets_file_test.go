@@ -416,21 +416,23 @@ func flagsFor(kind deploymentType, output string) *CLIFlags {
 // names in the directory --output names; when --output names a file, the description takes that
 // name and the secrets file is named from it: Kubernetes' with -secrets before its extension, and
 // Compose's as Compose names an override, .override before its extension, so a compose.yaml's
-// override is the compose.override.yaml Compose merges by itself (#396 decision 14).
+// override is the compose.override.yaml Compose merges by itself (#396 decision 14). Beside them is
+// the answers file, goiabada-setup.yaml, or the description's name with -setup before its extension;
+// native binaries have none (#686 section 4).
 func TestWizard_WritesTheSecretsFileBesideTheDescription(t *testing.T) {
 	cases := []struct {
-		name                 string
-		kind                 deploymentType
-		output               string
-		description, secrets string
+		name                          string
+		kind                          deploymentType
+		output                        string
+		description, secrets, answers string
 	}{
-		{"kubernetes into a directory", deploymentKubernetes, "", "goiabada-k8s.yaml", "goiabada-secrets.yaml"},
-		{"kubernetes named", deploymentKubernetes, "prod.yaml", "prod.yaml", "prod-secrets.yaml"},
-		{"production into a directory", deploymentProduction, "", "docker-compose.yml", "docker-compose.override.yml"},
-		{"production named", deploymentProduction, "compose.yaml", "compose.yaml", "compose.override.yaml"},
-		{"local into a directory", deploymentLocal, "", "docker-compose.yml", "docker-compose.override.yml"},
-		{"native into a directory", deploymentNative, "", "goiabada.env", "goiabada.env"},
-		{"native named", deploymentNative, "prod.env", "prod.env", "prod.env"},
+		{"kubernetes into a directory", deploymentKubernetes, "", "goiabada-k8s.yaml", "goiabada-secrets.yaml", "goiabada-setup.yaml"},
+		{"kubernetes named", deploymentKubernetes, "prod.yaml", "prod.yaml", "prod-secrets.yaml", "prod-setup.yaml"},
+		{"production into a directory", deploymentProduction, "", "docker-compose.yml", "docker-compose.override.yml", "goiabada-setup.yaml"},
+		{"production named", deploymentProduction, "compose.yaml", "compose.yaml", "compose.override.yaml", "compose-setup.yaml"},
+		{"local into a directory", deploymentLocal, "", "docker-compose.yml", "docker-compose.override.yml", "goiabada-setup.yaml"},
+		{"native into a directory", deploymentNative, "", "goiabada.env", "goiabada.env", ""},
+		{"native named", deploymentNative, "prod.env", "prod.env", "prod.env", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -447,7 +449,11 @@ func TestWizard_WritesTheSecretsFileBesideTheDescription(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := slices.Compact(slices.Sorted(slices.Values([]string{tc.description, tc.secrets})))
+			files := []string{tc.description, tc.secrets}
+			if tc.answers != "" {
+				files = append(files, tc.answers)
+			}
+			want := slices.Compact(slices.Sorted(slices.Values(files)))
 			if got := entryNames(entries); !slices.Equal(got, want) {
 				t.Fatalf("the directory holds %v, want %v", got, want)
 			}

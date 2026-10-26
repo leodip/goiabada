@@ -138,7 +138,12 @@ The auth server reads the file only when it starts, so change it like this. The 
    kubectl edit configmap goiabada-db-ca -n goiabada
    ```
 
-   Or run the wizard again, and apply only the new `goiabada-k8s.yaml`.
+   Or write the manifest again with the new file, and apply it:
+
+   ```bash
+   ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --db-tls-ca-file=new-ca.pem
+   kubectl apply -f goiabada-k8s.yaml
+   ```
 
 2. Restart the auth server:
 

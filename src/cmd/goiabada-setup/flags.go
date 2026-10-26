@@ -45,6 +45,15 @@ type CLIFlags struct {
 	SkipDBTest          bool
 	NoColor             bool
 	Overwrite           bool
+	// Answers is --answers, the answers file read in place of prompts, and KeepSecrets
+	// --keep-secrets, which writes every file but the secrets file and generates no secret
+	// (#686 section 4). DBTLSCA and DBTLSClientCertKept are no flag's: an answers file's db-tls-ca,
+	// the certificates themselves, and db-tls-client-cert, which says a client certificate is
+	// presented without naming its files.
+	Answers             string
+	KeepSecrets         bool
+	DBTLSCA             string
+	DBTLSClientCertKept bool
 	// LocalProxy is --local-proxy, read by native binaries alone.
 	LocalProxy optionalBool
 	// Routing is --routing, empty when left out, and the flags below it its modes' answers, each read
@@ -236,6 +245,8 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.BoolVar(&flags.SkipDBTest, "skip-db-test", false, "Skip database connection test")
 	fs.BoolVar(&flags.NoColor, "no-color", false, "Disable colored output")
 	fs.BoolVar(&flags.Overwrite, "overwrite", false, "Overwrite output files that already exist, and the secrets in them")
+	fs.StringVar(&flags.Answers, "answers", "", "Read the answers from an answers file a run wrote, asking for none")
+	fs.BoolVar(&flags.KeepSecrets, "keep-secrets", false, "Write every file but the secrets file, which is left as it is, and generate no secret")
 	fs.Var(&flags.CreateNamespace, "create-namespace", "Kubernetes: declare the namespace in both files, so applying them creates it; false for one that already exists (default: true)")
 	fs.Var(&flags.Routing, "routing", "Kubernetes: how traffic reaches the servers: "+orList(routingNames())+" (default: envoy-gateway)")
 	fs.StringVar(&flags.GatewayClass, "gateway-class", "", "Kubernetes, --routing=gateway: the GatewayClass of the Gateway the manifest creates")
@@ -266,12 +277,18 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("Generate configuration files for Goiabada authentication server.\n\n")
 		p("Usage: %s [options]\n\n", name)
 		p("When run without options, starts an interactive wizard.\n")
-		p("Use --type to enable non-interactive mode with CLI flags.\n\n")
+		p("Use --type, or --answers, to enable non-interactive mode with CLI flags.\n\n")
 		p("General Options:\n")
 		p("  -v, --version          Show version and exit\n")
 		p("  -o, --output PATH      Output file path (default: current directory)\n")
 		p("  --no-color             Disable colored output\n")
-		p("  --overwrite            Overwrite output files that already exist, and the secrets in them\n\n")
+		p("  --overwrite            Overwrite output files that already exist, and the secrets in them\n")
+		p("  --answers FILE         Read the answers from FILE, an answers file a run wrote, asking for\n")
+		p("                         none; a flag given beside it replaces the answer of its name.\n")
+		p("                         For kubernetes, local and production\n")
+		p("  --keep-secrets         Write every file but the secrets file, which is left as it is, and\n")
+		p("                         generate no secret: regenerates a deployment's configuration from\n")
+		p("                         its answers. For kubernetes, local and production\n\n")
 		p("Deployment Options:\n")
 		p("  --type TYPE            Deployment type: %s\n", orList(deploymentNames()))
 		p("  --db TYPE              Database: %s\n", orList(engineNames()))
@@ -384,6 +401,9 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("Examples:\n")
 		p("  Interactive mode (recommended for first-time setup):\n")
 		p("    %s\n\n", name)
+		p("  Regenerate a deployment's configuration, keeping its secrets, from the directory\n")
+		p("  holding its answers file:\n")
+		p("    %s --answers=%s --keep-secrets\n\n", name, answersFile)
 		p("  Local development with MySQL:\n")
 		p("    %s --type=local --db=mysql\n\n", name)
 		p("  Kubernetes with PostgreSQL:\n")
@@ -435,6 +455,38 @@ func (f *CLIFlags) checkWritable() error {
 	} {
 		if err := checkWritable(entry.value); err != nil {
 			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)
+		}
+	}
+	return nil
+}
+
+// clientCertificateSecretDocsURL is the page that creates the client certificate's Secret by hand.
+const clientCertificateSecretDocsURL = "https://goiabada.dev/deploy/kubernetes/secrets/#from-your-terminal" //nolint:gosec // G101: a docs URL, no credential
+
+// checkKeptSecrets refuses a secret given beside --keep-secrets, which writes none: a password
+// would be dropped without a word, and a client certificate pair would be mounted from a Secret the
+// secrets file doesn't hold, or leave the old pair in use. Empty client certificate files, which
+// present none, are not refused.
+func (f *CLIFlags) checkKeptSecrets() error {
+	if !f.KeepSecrets {
+		return nil
+	}
+	for _, given := range []struct{ flag, value string }{
+		{"--admin-password", f.AdminPassword},
+		{"--admin-password-file", f.AdminPasswordFile},
+		{"--db-password", f.DBPassword},
+		{"--db-password-file", f.DBPasswordFile},
+	} {
+		if given.value != "" {
+			return errs.Errorf("%s is given with --keep-secrets, which writes no secret: leave it out", given.flag)
+		}
+	}
+	for _, given := range []struct{ flag, value string }{
+		{"--db-tls-client-cert-file", f.DBTLSClientCertFile},
+		{"--db-tls-client-key-file", f.DBTLSClientKeyFile},
+	} {
+		if given.value != "" {
+			return errs.Errorf("%s is given with --keep-secrets, which writes no secret: create or replace the %s Secret from the pair, as %s shows, and answer db-tls-client-cert: true in the answers file", given.flag, dbClientTLSSecret, clientCertificateSecretDocsURL)
 		}
 	}
 	return nil

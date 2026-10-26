@@ -35,6 +35,12 @@ type Config struct {
 	DBTLSClientCert     string
 	DBTLSClientKey      string
 	DBTLSServerName     string
+	// DBTLSClientCertKept says the auth server presents a client certificate pair the secrets file
+	// already holds, which a run under --keep-secrets leaves as it is, without reading the pair.
+	DBTLSClientCertKept bool
+	// KeepSecrets says the run writes every file but the secrets file, and generates no secret
+	// (#686 section 4).
+	KeepSecrets         bool
 	AuthServerURL       string
 	AdminConsoleURL     string
 	AdminEmail          string
@@ -193,6 +199,12 @@ func (c *Config) routesThroughGateway() bool {
 	return c.ownsGateway() || c.Routing == routingExistingGateway
 }
 
+// presentsClientCertificate says the auth server presents a client certificate pair to the
+// database: one this run read, or one the secrets file it leaves as it is holds.
+func (c *Config) presentsClientCertificate() bool {
+	return c.DBTLSClientCert != "" || c.DBTLSClientCertKept
+}
+
 // asksTLS says the mode creates what ends TLS and asks where its certificates come from.
 func (c *Config) asksTLS() bool {
 	return c.Routing == routingGateway || c.Routing == routingIngress
@@ -344,7 +356,7 @@ func (c *Config) dbTLSComment() []string {
 	switch {
 	case !checksCertificate(c.DBTLSMode):
 		lines = append(lines, "Only verify-full makes sure it reached your database and nothing in between.")
-	case c.DBTLSCAFile == "":
+	case c.DBTLSCA == "":
 		lines = append(lines, "The certificate is checked against the system's roots; GOIABADA_DB_TLS_CA_FILE names a",
 			"PEM file of the authorities to trust instead.")
 	default:
