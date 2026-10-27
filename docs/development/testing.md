@@ -76,8 +76,10 @@ here, folded into #387 (PR #422).
 `./run-tests.sh --type modules --race` runs the three module tiers under `go test -race`, and CI's
 three `Unit / race` jobs do the same beside the plain unit jobs, one job per tier so the quick ones
 stop queueing behind the auth server leg (#691). A race build running under `go test` also hashes
-and dummy-compares at bcrypt's minimum cost, so the tier is not mostly bcrypt; production builds and
-every other tier keep the default cost. The detector needs cgo, so the dev
+passwords, and compares refusals against its dummy hash, at bcrypt's minimum cost, so bcrypt does not
+dominate the tier. Production builds, every other tier and a race binary run outside `go test` keep
+the default cost for both; `passwordhash`'s `TestCostOutsideGoTest` runs a probe binary outside the
+test harness, in the test's own build, to hold that. The detector needs cgo, so the dev
 container ships gcc and pins `CGO_ENABLED=0` for everything except that leg, which sets it to 1 for
 itself. Code whose correctness is a locking argument (`authserver/internal/ratelimit`, whose
 failures-only limiter holds the in-flight count since #439, the concurrent transactions of #301) is

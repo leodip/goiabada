@@ -104,7 +104,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	// account nor whether its user has set a password. The comparison's result is ignored: the
 	// dummy hash's plaintext signs no one in. The answer is the wrong password's (#681).
 	if user == nil || user.PasswordHash == "" {
-		val.verifyPassword(passwordhash.DummyHash, input.Password)
+		val.verifyPassword(passwordhash.DummyHash(), input.Password)
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"Invalid resource owner credentials.", http.StatusBadRequest)
 	}

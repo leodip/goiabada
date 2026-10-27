@@ -1,9 +1,13 @@
 package passwordhash
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"golang.org/x/crypto/bcrypt"
@@ -149,7 +153,7 @@ func TestDummyHash(t *testing.T) {
 
 	t.Run("DummyHash is a valid bcrypt hash", func(t *testing.T) {
 		// This should not panic and should return false (since we're not using the original password)
-		result := Verify(DummyHash, "any_password_here")
+		result := Verify(DummyHash(), "any_password_here")
 		if result {
 			t.Error("DummyHash should not verify against arbitrary passwords")
 		}
@@ -157,7 +161,7 @@ func TestDummyHash(t *testing.T) {
 
 	t.Run("DummyHash works with empty password", func(t *testing.T) {
 		// Ensure it handles empty passwords gracefully (important for timing protection)
-		result := Verify(DummyHash, "")
+		result := Verify(DummyHash(), "")
 		if result {
 			t.Error("DummyHash should not verify against empty password")
 		}
@@ -165,11 +169,11 @@ func TestDummyHash(t *testing.T) {
 
 	t.Run("DummyHash has correct bcrypt format", func(t *testing.T) {
 		// Bcrypt hashes start with $2a$, $2b$, or $2y$ followed by cost factor
-		if len(DummyHash) < 60 {
-			t.Errorf("DummyHash length %d is too short for bcrypt (expected >= 60)", len(DummyHash))
+		if len(DummyHash()) < 60 {
+			t.Errorf("DummyHash length %d is too short for bcrypt (expected >= 60)", len(DummyHash()))
 		}
-		if DummyHash[0:4] != "$2a$" && DummyHash[0:4] != "$2b$" && DummyHash[0:4] != "$2y$" {
-			t.Errorf("DummyHash does not have valid bcrypt prefix: %s", DummyHash[0:4])
+		if DummyHash()[0:4] != "$2a$" && DummyHash()[0:4] != "$2b$" && DummyHash()[0:4] != "$2y$" {
+			t.Errorf("DummyHash does not have valid bcrypt prefix: %s", DummyHash()[0:4])
 		}
 	})
 
@@ -187,7 +191,7 @@ func TestDummyHash(t *testing.T) {
 		if err != nil {
 			t.Fatalf("bcrypt.Cost(Hash output) error = %v", err)
 		}
-		dummyCost, err := bcrypt.Cost([]byte(DummyHash))
+		dummyCost, err := bcrypt.Cost([]byte(DummyHash()))
 		if err != nil {
 			t.Fatalf("bcrypt.Cost(DummyHash) error = %v", err)
 		}
@@ -208,7 +212,7 @@ func TestDummyHash(t *testing.T) {
 		if err != nil {
 			t.Fatalf("bcrypt.Cost(Hash output) error = %v", err)
 		}
-		dummyCost, err := bcrypt.Cost([]byte(DummyHash))
+		dummyCost, err := bcrypt.Cost([]byte(DummyHash()))
 		if err != nil {
 			t.Fatalf("bcrypt.Cost(DummyHash) error = %v", err)
 		}
@@ -219,4 +223,26 @@ func TestDummyHash(t *testing.T) {
 			t.Errorf("DummyHash cost = %d, want %d", dummyCost, testHashCost)
 		}
 	})
+}
+
+func TestCostOutsideGoTest(t *testing.T) {
+	// Every other test runs under go test, where a race build takes bcrypt.MinCost, so none of
+	// them sees what an ordinary binary does. The probe is one, built in this test's own build:
+	// in the race build it is the binary someone builds with -race to debug a deployment, which
+	// must still store default-cost hashes and compare refusals against the default-cost dummy,
+	// so neither the hashes it writes nor its refusal timing differ from a release build's (#691).
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	args := append([]string{"run", "-buildvcs=false"}, probeBuildFlags...)
+	args = append(args, "./testdata/costprobe")
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go %s: %v\nstderr: %s", strings.Join(args, " "), err, stderr.String())
+	}
+	if got, want := strings.TrimSpace(string(out)), "10 10"; got != want {
+		t.Errorf("probe's Hash and DummyHash costs = %q, want %q: outside go test every build keeps bcrypt.DefaultCost", got, want)
+	}
 }
