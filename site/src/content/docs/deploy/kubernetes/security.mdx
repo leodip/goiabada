@@ -44,7 +44,7 @@ It sets no user or group ID, so each container runs as [the user the images run 
 
 No writable volume is mounted, because neither server writes to its file system here. The legacy bootstrap file isn't used under Kubernetes, and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`, fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check: a 400 either way.
 
-A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
+A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, in a kustomization over the manifest, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
 
 Both pod specs also set:
 
@@ -133,32 +133,14 @@ If a pod can't verify the database's certificate, it stops at start and crash-lo
 
 ### Change the authorities
 
-The auth server reads the file only when it starts, so change it like this. The commands use the wizard's default namespace, `goiabada`; replace it with the namespace you chose:
+Write the manifest again with the new file, and apply it, or the kustomization over it with `kubectl apply -k .`. The answers file then holds the new authorities, so the next run keeps them, where an edit of the ConfigMap would be lost. The auth server reads the file only when it starts, and its pod template carries a checksum of the ConfigMap, so applying rolls its pods onto the new authorities:
 
-<Steps>
+```bash
+./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --db-tls-ca-file=new-ca.pem
+kubectl apply -f goiabada-k8s.yaml
+```
 
-1. Edit the `goiabada-db-ca` ConfigMap:
-
-   ```bash
-   kubectl edit configmap goiabada-db-ca -n goiabada
-   ```
-
-   Or write the manifest again with the new file, and apply it:
-
-   ```bash
-   ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --db-tls-ca-file=new-ca.pem
-   kubectl apply -f goiabada-k8s.yaml
-   ```
-
-2. Restart the auth server:
-
-   ```bash
-   kubectl rollout restart -n goiabada deployment/goiabada-authserver
-   ```
-
-</Steps>
-
-Moving the database to a certificate from another authority? Put both authorities in the file and restart before the database switches. Remove the old one once it has.
+Moving the database to a certificate from another authority? Put both authorities in the file, and apply it before the database switches. Once it has, do the same with the new authority alone.
 
 ## Next steps
 

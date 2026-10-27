@@ -422,24 +422,39 @@ func TestKubernetesManifest_RoutesAsTheAnswersSay(t *testing.T) {
 
 // TLS Secrets the operator supplies are created where their namespace already exists: in the first
 // step when it existed before, and after the deploy that creates it otherwise, which a namespaced
-// Secret created first would be refused for (#686 section 3).
+// Secret created first would be refused for (#686 section 3). Each Secret has its command, so one
+// that serves both hosts has one.
 func TestCompletionMessage_CreatesTheTLSSecretsOnceTheirNamespaceExists(t *testing.T) {
 	for _, mode := range []routing{routingGateway, routingIngress} {
 		for _, exists := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s, namespace exists: %v", mode, exists), func(t *testing.T) {
-				config := goldenConfig(deploymentKubernetes, "postgres")
-				config.Routing, config.GatewayClass, config.TLS, config.NamespaceExists = mode, "eg", tlsSecrets, exists
-				var buf bytes.Buffer
-				printKubernetesInstructions(&console{w: &buf}, config, resolveOutputPaths(config.Deployment, ""))
-				said := buf.String()
-				create, apply := strings.Index(said, "kubectl create secret tls"), strings.Index(said, "kubectl apply -f")
-				if create < 0 || apply < 0 || strings.Count(said, "kubectl create secret tls") != 1 {
-					t.Fatalf("the message has no single Secret creation and apply:\n%s", said)
-				}
-				if (create < apply) != exists {
-					t.Errorf("the Secrets are created before the apply: %v, want %v\n%s", create < apply, exists, said)
-				}
-			})
+			for _, secrets := range [][2]string{{"auth-tls", "admin-tls"}, {"platform-tls", "platform-tls"}} {
+				t.Run(fmt.Sprintf("%s, namespace exists: %v, Secrets %v", mode, exists, secrets), func(t *testing.T) {
+					config := goldenConfig(deploymentKubernetes, "postgres")
+					config.Routing, config.GatewayClass, config.TLS, config.NamespaceExists = mode, "eg", tlsSecrets, exists
+					config.TLSSecretAuth, config.TLSSecretAdmin = secrets[0], secrets[1]
+					var buf bytes.Buffer
+					printKubernetesInstructions(&console{w: &buf}, config, resolveOutputPaths(config.Deployment, ""))
+					said := buf.String()
+					apply := strings.Index(said, "kubectl apply -f")
+					if apply < 0 {
+						t.Fatalf("the message has no apply:\n%s", said)
+					}
+					names := slices.Compact(slices.Clone(secrets[:]))
+					for _, secret := range names {
+						command := "kubectl create secret tls " + secret + " "
+						create := strings.Index(said, command)
+						if create < 0 || strings.Count(said, command) != 1 {
+							t.Fatalf("the message has no single creation of %s:\n%s", secret, said)
+						}
+						if (create < apply) != exists {
+							t.Errorf("%s is created before the apply: %v, want %v\n%s", secret, create < apply, exists, said)
+						}
+					}
+					if want := len(names); strings.Count(said, "kubectl create secret tls") != want {
+						t.Errorf("the message creates %d TLS Secrets, want %d:\n%s", strings.Count(said, "kubectl create secret tls"), want, said)
+					}
+				})
+			}
 		}
 	}
 }
@@ -488,6 +503,57 @@ func TestCompletionMessage_FollowsTheRouting(t *testing.T) {
 				if got := strings.Contains(said, line); got != want {
 					t.Errorf("the message says %q: %v, want %v\n%s", line, got, want, buf.String())
 				}
+			}
+		})
+	}
+}
+
+// A run under --keep-secrets may move the certificates to TLS Secrets or an issuer nothing has
+// created yet, so its message has the operator check them before applying the manifest, and says
+// nothing of them where the manifest takes none (#686).
+func TestRegeneratedMessage_ChecksTheCertificatesBeforeTheApply(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		routing       routing
+		tls           tlsSource
+		issuer        string
+		auth, admin   string
+		check, create []string
+	}{
+		{name: "two TLS Secrets", routing: routingIngress, tls: tlsSecrets, auth: "auth-tls", admin: "admin-tls",
+			check:  []string{"kubectl get secret auth-tls admin-tls -n identity"},
+			create: []string{"kubectl create secret tls auth-tls -n identity --cert=auth.crt", "kubectl create secret tls admin-tls -n identity --cert=admin.crt"}},
+		{name: "one TLS Secret", routing: routingGateway, tls: tlsSecrets, auth: "platform-tls", admin: "platform-tls",
+			check:  []string{"kubectl get secret platform-tls -n identity"},
+			create: []string{"kubectl create secret tls platform-tls -n identity --cert=auth.crt"}},
+		{name: "a ClusterIssuer", routing: routingGateway, tls: tlsClusterIssuer, issuer: "internal-ca",
+			check: []string{"kubectl get clusterissuer internal-ca"}},
+		{name: "an Issuer", routing: routingIngress, tls: tlsIssuer, issuer: "team-ca",
+			check: []string{"kubectl get issuer team-ca -n identity"}},
+		{name: "TLS ended in front", routing: routingIngress, tls: tlsExternal},
+		{name: "the Envoy Gateway recipe", routing: routingEnvoyGateway},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := kubernetesConfig()
+			config.KeepSecrets, config.Routing, config.GatewayClass = true, tc.routing, "eg"
+			config.TLS, config.TLSIssuer, config.TLSSecretAuth, config.TLSSecretAdmin = tc.tls, tc.issuer, tc.auth, tc.admin
+			var buf strings.Builder
+			printRegeneratedMessage(&console{w: &buf}, config, config.Deployment.defaultPaths())
+			out := buf.String()
+			apply := strings.Index(out, "kubectl apply -f goiabada-k8s.yaml")
+			if apply < 0 {
+				t.Fatalf("the message has no apply:\n%s", out)
+			}
+			for _, want := range slices.Concat(tc.check, tc.create) {
+				if at := strings.Index(out, want); at < 0 || at > apply {
+					t.Errorf("the message has no %q before the apply:\n%s", want, out)
+				}
+			}
+			if got := strings.Count(out, "kubectl create secret tls"); got != len(tc.create) {
+				t.Errorf("the message creates %d TLS Secrets, want %d:\n%s", got, len(tc.create), out)
+			}
+			if len(tc.check) == 0 && (strings.Contains(out, "kubectl get secret") || strings.Contains(out, "issuer")) {
+				t.Errorf("the message checks certificates the manifest takes from nowhere it names:\n%s", out)
 			}
 		})
 	}

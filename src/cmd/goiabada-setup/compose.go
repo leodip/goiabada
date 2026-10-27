@@ -38,7 +38,10 @@ func generateDockerCompose(config *Config, paths outputPaths) string {
 	writeGeneratedFrom(&sb, paths)
 	fmt.Fprintf(&sb, "# Run: %s\n", composeUpCommand(paths))
 	sb.WriteString("# This file holds no secret: docker compose merges every one in from\n")
-	fmt.Fprintf(&sb, "# %s, beside it.\n\n", filepath.Base(paths.secrets))
+	fmt.Fprintf(&sb, "# %s, beside it.\n", filepath.Base(paths.secrets))
+	sb.WriteString("# A run writes this file anew: change an answer in the answers file or by its flag, and keep\n")
+	fmt.Fprintf(&sb, "# any other change in %s, which a run with --keep-secrets\n", filepath.Base(paths.secrets))
+	sb.WriteString("# leaves as it is.\n\n")
 	sb.WriteString("services:\n\n")
 
 	if config.Engine.hasServer {

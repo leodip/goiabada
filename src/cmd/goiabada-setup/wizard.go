@@ -1580,7 +1580,7 @@ func (w *wizard) askDatabasePassword() error {
 	w.config.DBTLSMode = composeDBTLSMode
 	w.out.warning("GOIABADA_DB_TLS_MODE is %s, which checks no certificate. The database runs on", composeDBTLSMode)
 	w.out.println("   this Compose file's own network, so the connection never leaves this host. If you move")
-	w.out.println("   the database off it, set GOIABADA_DB_TLS_MODE to verify-full.")
+	w.out.println("   the database off it, set GOIABADA_DB_TLS_MODE to verify-full in the override file.")
 	return nil
 }
 

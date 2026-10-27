@@ -39,7 +39,7 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
 
    With Docker Compose, from a container on the Compose network, `curl -s http://goiabada-authserver:9190/metrics`.
 
-   If nothing answers, turn the listener on: set `GOIABADA_AUTHSERVER_METRICS_ENABLED` to `true` on the auth server and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `true` on the admin console, and restart them. On Kubernetes, also give each container its `metrics` port, as [A manifest generated without metrics](/deploy/monitoring/#a-manifest-generated-without-metrics) shows, or run the setup wizard again with metrics on and compare.
+   If nothing answers, turn the listener on. On Kubernetes, [write the manifest again](/deploy/monitoring/#a-manifest-generated-without-metrics) with metrics on, and apply it. With Docker Compose or native binaries, set `GOIABADA_AUTHSERVER_METRICS_ENABLED` and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `true`, in the override or `goiabada.env`, and restart both servers.
 
 2. If the listener answers but the scraper can't reach it, check the listen host. Leave `GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS` and `GOIABADA_ADMINCONSOLE_LISTEN_HOST_METRICS` unset, which listens on every address, unless the scraper runs on the same host.
 
@@ -49,7 +49,7 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
    kubectl get prometheus -A -o jsonpath='{..podMonitorSelector}'
    ```
 
-   Add them under the PodMonitor's `metadata.labels`, or answer the setup wizard's labels question with them. For the prometheus-community chart, use the pod annotations. For Grafana Alloy or the OpenTelemetry Collector, keep the targets on the `metrics` container port and let the scraper's service account list and watch pods in the `goiabada` namespace.
+   [Write the manifest again](/deploy/setup-wizard/#run-it-again-on-a-deployment) with them, `--podmonitor-labels`, and apply it. For the prometheus-community chart, use the pod annotations. For Grafana Alloy or the OpenTelemetry Collector, keep the targets on the `metrics` container port and let the scraper's service account list and watch pods in the `goiabada` namespace.
 
 4. With the NetworkPolicies on, check the namespace your scraper's pods actually run in:
 
@@ -57,7 +57,7 @@ Each server serves its metrics on a listener of its own, `GET /metrics` on port 
    kubectl get pods -A | grep -i -e prometheus -e alloy -e collector
    ```
 
-   If it isn't the one the policies admit, change the `kubernetes.io/metadata.name` in the second rule of both `goiabada-authserver` and `goiabada-adminconsole` NetworkPolicies to it, or [write the manifest again](/deploy/setup-wizard/#run-it-again-on-a-deployment) with `--metrics-namespace` set to it.
+   If it isn't the one the policies admit, [write the manifest again](/deploy/setup-wizard/#run-it-again-on-a-deployment) with `--metrics-namespace` set to it, and apply it.
 
 </Steps>
 

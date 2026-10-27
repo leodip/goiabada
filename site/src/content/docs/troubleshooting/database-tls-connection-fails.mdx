@@ -26,7 +26,7 @@ The auth server stops with `unable to create the database connection`. Its `erro
 
 On MySQL and SQL Server in `verify-ca`, an `x509:` error comes after `unable to verify the database server's certificate chain`.
 
-The auth server reads the CA file only at start, so restart it after you change the file. On Kubernetes, the file is in [the `goiabada-db-ca` ConfigMap](/deploy/kubernetes/security/#check-the-databases-certificate).
+The auth server reads the CA file only at start, so restart it after you change the file. On Kubernetes, change it as [Change the authorities](/deploy/kubernetes/security/#change-the-authorities) shows, which rolls the pods.
 
 A CA file the auth server can't use stops it before it connects, with a `malformed configuration:` line naming `GOIABADA_DB_TLS_CA_FILE`. That happens when the file can't be read, holds no certificate, or is set with `disable`, `prefer` or `require`, which read none.
 

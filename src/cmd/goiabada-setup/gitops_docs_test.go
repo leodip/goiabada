@@ -232,38 +232,11 @@ func gitOpsFindings(guide gitOpsGuide, manifest, built, variables string) ([]str
 	return findings, nil
 }
 
-// readBy says whether the environment variables page lists variable as read by server, or by both.
-func readBy(variables, variable, server string) bool {
-	for _, line := range strings.Split(variables, "\n") {
-		if strings.HasPrefix(line, "| `"+variable+"`") {
-			return server != "" && (strings.Contains(line, "Read by: "+server) || strings.Contains(line, "Read by: both"))
-		}
-	}
-	return false
-}
-
-func readVariablesPage(t *testing.T) string {
+// buildOverEveryGolden builds guide's kustomizations over every Kubernetes golden, and fails on
+// each finding, and on each of the patches counts gives, by kustomization, whose removal leaves
+// the build as it was.
+func buildOverEveryGolden(t *testing.T, guide gitOpsGuide, variables string, counts map[string]int) {
 	t.Helper()
-	page, err := os.ReadFile(variablesPage)
-	if err != nil {
-		t.Fatalf("unable to read the environment variables page: %v", err)
-	}
-	return string(page)
-}
-
-// Every Kubernetes golden builds under the page's environment, component included, with every
-// value the patches set in the container it names, and every variable one read by that server. Every patch of either changes what it builds:
-// one that matched nothing would leave the build as it was without it.
-func TestGitOpsDocs_EveryPatchChangesEveryGeneratedManifest(t *testing.T) {
-	guide := readGitOpsPage(t)
-	variables := readVariablesPage(t)
-	counts, err := patchCounts(guide)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if counts[gitOpsComponent] == 0 {
-		t.Fatalf("%s has no patches, so the page shares nothing between environments", gitOpsComponent)
-	}
 	built := 0
 	for _, c := range goldenCases() {
 		if c.deployment != deploymentKubernetes {
@@ -299,6 +272,41 @@ func TestGitOpsDocs_EveryPatchChangesEveryGeneratedManifest(t *testing.T) {
 	if built == 0 {
 		t.Error("no Kubernetes golden was built")
 	}
+}
+
+// readBy says whether the environment variables page lists variable as read by server, or by both.
+func readBy(variables, variable, server string) bool {
+	for _, line := range strings.Split(variables, "\n") {
+		if strings.HasPrefix(line, "| `"+variable+"`") {
+			return server != "" && (strings.Contains(line, "Read by: "+server) || strings.Contains(line, "Read by: both"))
+		}
+	}
+	return false
+}
+
+func readVariablesPage(t *testing.T) string {
+	t.Helper()
+	page, err := os.ReadFile(variablesPage)
+	if err != nil {
+		t.Fatalf("unable to read the environment variables page: %v", err)
+	}
+	return string(page)
+}
+
+// Every Kubernetes golden builds under the page's environment, component included, with every
+// value the patches set in the container it names, and every variable one read by that server. Every patch of either changes what it builds:
+// one that matched nothing would leave the build as it was without it.
+func TestGitOpsDocs_EveryPatchChangesEveryGeneratedManifest(t *testing.T) {
+	guide := readGitOpsPage(t)
+	variables := readVariablesPage(t)
+	counts, err := patchCounts(guide)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[gitOpsComponent] == 0 {
+		t.Fatalf("%s has no patches, so the page shares nothing between environments", gitOpsComponent)
+	}
+	buildOverEveryGolden(t, guide, variables, counts)
 }
 
 // The Argo CD Application and the Flux Kustomization apply the environment's directory the page

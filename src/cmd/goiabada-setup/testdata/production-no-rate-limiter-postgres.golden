@@ -3,6 +3,9 @@
 # Run: docker compose up -d
 # This file holds no secret: docker compose merges every one in from
 # docker-compose.override.yml, beside it.
+# A run writes this file anew: change an answer in the answers file or by its flag, and keep
+# any other change in docker-compose.override.yml, which a run with --keep-secrets
+# leaves as it is.
 
 services:
 

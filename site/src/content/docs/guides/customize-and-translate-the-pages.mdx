@@ -85,12 +85,11 @@ To change the layout of a page, or an email's body, you give a server its own co
    chmod -R a+rX authserver-web adminconsole-web
    ```
 
-4. Mount each directory read-only and point its server at it. In the generated `docker-compose.yml`, which already lists the four variables empty:
+4. Mount each directory read-only and point its server at it, in `docker-compose.override.yml`, which a run of the setup wizard with `--keep-secrets` leaves as it is. Compose adds these volumes to the ones `docker-compose.yml` gives each service, and these values win over the empty ones it lists:
 
    ```yaml
    goiabada-authserver:
      volumes:
-       - sqlite-data:/data   # keep the volumes the service already has
        - ./authserver-web/template:/app/web/template:ro
        - ./authserver-web/static:/app/web/static:ro
      environment:

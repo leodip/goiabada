@@ -174,6 +174,16 @@ var answerCases = []goldenCase{
 	{name: "kubernetes-mesh-ports-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NetworkPolicy, c.ProxyNamespace, c.MeshPorts = true, envoyProxyNamespace, []int{15008, 4143}
 	}},
+	// The answers a managed cluster typically takes together: a Gateway someone else runs, in a
+	// namespace that already exists, with the NetworkPolicies admitting its proxies and a mesh's
+	// port, and the platform's labels (#686).
+	{name: "kubernetes-managed-cluster-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.Routing, c.GatewayName, c.GatewayNamespace, c.AuthListener, c.AdminListener = routingExistingGateway, "shared", "infra", "https-auth", "https-admin"
+		c.NamespaceExists = true
+		c.NetworkPolicy, c.ProxyNamespace, c.MeshPorts = true, "infra", []int{15008}
+		c.Labels = []keyValue{{"team", "identity"}}
+		c.AuthServerReplicas = 3
+	}},
 	// A release build's image lines, pinned to the digests its release pushed, from Docker Hub and
 	// from a mirror, with an image pull secret on Kubernetes, and a mirror's unpinned (#686 section 5).
 	{name: "kubernetes-release-postgres", deployment: deploymentKubernetes, engine: "postgres", release: true},

@@ -126,7 +126,7 @@ A registry that asks for credentials needs them where the images are pulled:
     --docker-server=registry.example.com --docker-username=<user> --docker-password=<password>
   ```
 
-  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them.
+  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them. Under an admission policy that requires labels, create it with them, as the wizard's last message and [Labels and annotations](/deploy/kubernetes/overview/#labels-and-annotations) show.
 
   The pods run as [accounts of their own](/deploy/kubernetes/security/#pod-security), so pull secrets that a namespace's `default` ServiceAccount names don't reach them. In a namespace that already exists, check for them, and answer the one the registry needs:
 
@@ -195,7 +195,10 @@ The same release and the same answers write the same files, byte for byte. A fla
 ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --metrics=annotations
 ```
 
-Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, each pod template carries a checksum of the ConfigMaps its server reads, so a changed answer rolls the pods it reaches when you apply the manifest. Changes you made to the secrets file stay, since nothing writes it. A change to the manifest itself doesn't: keep it in a kustomization over the manifest, as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide does.
+Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, each pod template carries a checksum of the ConfigMaps its server reads, so a changed answer rolls the pods it reaches when you apply the manifest. Changes you made to the secrets file stay, since nothing writes it. A change to the manifest or the Compose file doesn't:
+
+- **On Kubernetes,** keep it in a kustomization over the manifest, as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide does. Set a server setting the wizard doesn't ask as an `env` entry of its container, as [GitOps](/deploy/kubernetes/gitops/#regenerate-or-patch) shows.
+- **On Docker Compose,** set it in the override, the secrets file, under the server's `environment`: it wins over the Compose file's value of the same name.
 
 Each answer is under the name of the flag that gives it, except two:
 

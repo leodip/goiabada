@@ -19,7 +19,35 @@ The setup wizard asks how many auth server pods to run, two unless you answer ot
    (replicas + surge) × GOIABADA_DB_MAX_OPEN_CONNS + headroom < max_connections
    ```
 
-   [Connections](#connections) explains each term, and the wizard's completion message gives the sum for the count you answered. With the defaults, two replicas make 3 × 20 = 60 connections, and three make 4 × 20 = 80. A stock PostgreSQL allows 100, 3 of them reserved for superusers, which leaves 17 for the headroom at three replicas; a stock MySQL allows 151. Until the sum holds, lower `GOIABADA_DB_MAX_OPEN_CONNS` in the auth server's ConfigMap, or raise the database's `max_connections`.
+   [Connections](#connections) explains each term, and the wizard's completion message gives the sum for the count you answered. With the defaults, two replicas make 3 × 20 = 60 connections, and three make 4 × 20 = 80. A stock PostgreSQL allows 100, 3 of them reserved for superusers, which leaves 17 for the headroom at three replicas; a stock MySQL allows 151. Until the sum holds, raise the database's `max_connections`, or lower `GOIABADA_DB_MAX_OPEN_CONNS`.
+
+   Lower it in a kustomization over the manifest, since the wizard writes the manifest again on every run. Save this as `kustomization.yaml`, beside `goiabada-k8s.yaml`, with the limit your sum needs:
+
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   resources:
+   - goiabada-k8s.yaml
+   patches:
+   - target:
+       kind: Deployment
+       name: goiabada-authserver
+     patch: |-
+       apiVersion: apps/v1
+       kind: Deployment
+       metadata:
+         name: goiabada-authserver
+       spec:
+         template:
+           spec:
+             containers:
+             - name: authserver
+               env:
+               - name: GOIABADA_DB_MAX_OPEN_CONNS
+                 value: "10"
+   ```
+
+   The container's `env` overrides the ConfigMap, and changes the pod template, so applying it rolls the pods.
 
 2. **Set the auth server's count.** Answer the wizard's replicas question, or write the manifest again over your [answers file](/deploy/setup-wizard/#run-it-again-on-a-deployment) with the count you want, and apply it:
 
@@ -28,9 +56,9 @@ The setup wizard asks how many auth server pods to run, two unless you answer ot
    kubectl apply -f goiabada-k8s.yaml
    ```
 
-   With a kustomization over the manifest, such as step 3's or the [Internal TLS](/deploy/kubernetes/internal-tls/) guide's, apply that instead, with `kubectl apply -k .`: applying the manifest alone drops its patches. `kubectl scale` changes the count too, until the next apply sets it back.
+   With a kustomization over the manifest, such as step 1's, step 3's or the [Internal TLS](/deploy/kubernetes/internal-tls/) guide's, apply that instead, with `kubectl apply -k .`: applying the manifest alone drops its patches. `kubectl scale` changes the count too, until the next apply sets it back.
 
-3. **Scale the admin console, if you want more than one pod,** after reading [The admin console across replicas](#the-admin-console-across-replicas). The wizard writes one admin console pod every time, so keep your count in a kustomization over the manifest:
+3. **Scale the admin console, if you want more than one pod,** after reading [The admin console across replicas](#the-admin-console-across-replicas). The wizard writes one admin console pod every time, so keep your count in a kustomization over the manifest, adding its `replicas` to step 1's if you saved it:
 
    ```yaml
    apiVersion: kustomize.config.k8s.io/v1beta1

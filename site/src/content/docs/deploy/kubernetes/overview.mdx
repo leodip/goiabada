@@ -51,7 +51,7 @@ The admin console calls the auth server's API at `GOIABADA_AUTHSERVER_INTERNALBA
 The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can commit it:
 
 - **A Namespace,** labelled to warn about any pod that breaks the restricted Pod Security Standard, unless you answer that it [already exists](#a-namespace-that-already-exists). See [Security](/deploy/kubernetes/security/#pod-security).
-- **Two ConfigMaps,** `goiabada-authserver-config` and `goiabada-adminconsole-config`, each holding only what its server reads. The three URLs are in both, written from the same answers, so change them in both.
+- **Two ConfigMaps,** `goiabada-authserver-config` and `goiabada-adminconsole-config`, each holding only what its server reads. The three URLs are in both: the auth server's and the admin console's, your answers, which [running the wizard again](/deploy/setup-wizard/#run-it-again-on-a-deployment) changes in both, and the auth server's internal one, which [Internal TLS](/deploy/kubernetes/internal-tls/) turns to HTTPS.
 - **A third ConfigMap, `goiabada-db-ca`,** if you gave the wizard a CA file for the database's certificate. It's mounted into the auth server's pods. See [Check the database's certificate](/deploy/kubernetes/security/#check-the-databases-certificate).
 - **Two ServiceAccounts,** `goiabada-authserver` and `goiabada-adminconsole`, one per server, bound to no role and mounting no token. See [Pod security](/deploy/kubernetes/security/#pod-security).
 - **Two Deployments,** one per server, the auth server's at two replicas unless you answer otherwise and the admin console's at one, with a rolling update that never runs fewer pods than replicas and a spread over nodes. See [High availability](/deploy/kubernetes/high-availability/).

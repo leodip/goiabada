@@ -102,7 +102,7 @@ func (c *Config) metricsScraperComment(metricsPort int) []string {
 	}
 	return []string{
 		fmt.Sprintf("The second rule admits the metrics scraper's namespace, %s, to the metrics port, %d,", c.MetricsNamespace, metricsPort),
-		"and to nothing else. To admit a scraper in another namespace, add its namespaceSelector to",
-		"that rule's from.",
+		"and to nothing else. For a scraper in another namespace, answer that namespace instead,",
+		"with --metrics-namespace.",
 	}
 }

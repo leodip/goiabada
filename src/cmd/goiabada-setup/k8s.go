@@ -40,6 +40,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	ns := config.K8sNamespace
 
 	writeGeneratedFrom(&sb, paths)
+	sb.WriteString("# A run writes this file anew: change an answer in the answers file or by its flag, and keep\n")
+	sb.WriteString("# any other change in a kustomization over this file.\n")
 	sb.WriteString("# Apply with the Secrets file beside it, that file first, so no pod starts with an older\n")
 	if config.NamespaceExists {
 		fmt.Fprintf(&sb, "# copy of the Secrets. Neither file creates the namespace, %s, which must already exist:\n", ns)
@@ -187,7 +189,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		"empty one before it listens; with several replicas, the first pod migrates and the",
 		"others wait for its lock. If an upgrade's migrations take longer, raise",
 		"failureThreshold until it times periodSeconds covers them, or the container is",
-		"restarted mid-migration.")
+		"restarted mid-migration. Raise it in a kustomization over this file, which the",
+		"wizard writes again on every run: see the Probes and shutdown page.")
 	writePreStopPause(&sb)
 	writeResources(&sb,
 		"A sign-in costs one bcrypt check at cost 10, about 35ms of CPU on a modern core, which no",
@@ -482,9 +485,9 @@ const (
 func writeDatabaseCA(sb *strings.Builder, config *Config) {
 	sb.WriteString("---\n")
 	sb.WriteString("# The authorities the auth server checks the database's certificate against, in place of the\n")
-	fmt.Fprintf(sb, "# system's roots, mounted into its pods at %s. To change them, edit this\n", dbCAFileInPod)
-	sb.WriteString("# ConfigMap, or run the wizard again, and restart the auth server:\n")
-	fmt.Fprintf(sb, "#   kubectl rollout restart -n %s deployment/goiabada-authserver\n", config.K8sNamespace)
+	fmt.Fprintf(sb, "# system's roots, mounted into its pods at %s. To change them, run the\n", dbCAFileInPod)
+	sb.WriteString("# wizard again with --db-tls-ca-file and apply its manifest, which rolls the auth server's\n")
+	sb.WriteString("# pods.\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: ConfigMap\n")
 	config.writeMetadata(sb, objectMetadata{name: dbCAConfigMap, component: authServerComponent})
@@ -510,7 +513,7 @@ func writeSecretHead(sb *strings.Builder, config *Config, name, component string
 func writeConfigMapHead(sb *strings.Builder, config *Config, name, whose string) {
 	sb.WriteString("---\n")
 	fmt.Fprintf(sb, "# %s\n", whose)
-	sb.WriteString("# The three URLs are in both ConfigMaps, written from the same answers; change them in both.\n")
+	sb.WriteString("# The three URLs are in both ConfigMaps, written from the same answers.\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: ConfigMap\n")
 	config.writeMetadata(sb, objectMetadata{name: name, component: componentOf(strings.TrimSuffix(name, "-config"))})
@@ -655,7 +658,7 @@ func writeContainerHead(sb *strings.Builder, config *Config, name string) {
 	fmt.Fprintf(sb, "        image: %s\n", yamlQuote(config.image(name)))
 	if imageTag == "latest" {
 		sb.WriteString("        # latest is a moving tag: each start pulls whatever release it names then, so pods can\n")
-		sb.WriteString("        # run different releases. Replace it with a release version to pin the image.\n")
+		sb.WriteString("        # run different releases. A release's wizard writes its version and digest instead.\n")
 		sb.WriteString("        imagePullPolicy: Always\n")
 	} else {
 		sb.WriteString("        # A version tag names one build, so a node pulls it once.\n")

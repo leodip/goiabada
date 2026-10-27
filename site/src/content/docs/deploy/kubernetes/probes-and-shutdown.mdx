@@ -15,21 +15,34 @@ The manifest the setup wizard generates sets every probe, the stop pause and the
 
 1. **Find out how long the migration takes.** The release notes announce a long one, and running the new release against a copy of your database shows it: the `database migrated` record carries its `duration`.
 
-2. **Raise the auth server's startup budget** until `failureThreshold × periodSeconds` covers it. In `goiabada-k8s.yaml`, on the auth server's container, the default allows 60 × 5 = 300 seconds:
+2. **Raise the auth server's startup budget** until `failureThreshold × periodSeconds` covers it. The manifest's allows 60 × 5 = 300 seconds. The upgrade writes the manifest again, so raise it in a kustomization over the manifest. Save this as `kustomization.yaml`, beside `goiabada-k8s.yaml`, or add its patch to the kustomization you have:
 
    ```yaml
-   startupProbe:
-     httpGet:
-       path: /health
-       port: 9090
-     periodSeconds: 5
-     timeoutSeconds: 1
-     failureThreshold: 120   # 10 minutes
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   resources:
+   - goiabada-k8s.yaml
+   patches:
+   - target:
+       kind: Deployment
+       name: goiabada-authserver
+     patch: |-
+       apiVersion: apps/v1
+       kind: Deployment
+       metadata:
+         name: goiabada-authserver
+       spec:
+         template:
+           spec:
+             containers:
+             - name: authserver
+               startupProbe:
+                 failureThreshold: 120   # 10 minutes
    ```
 
    Leave liveness and readiness as they are.
 
-3. **Apply the manifest,** then upgrade as [Upgrade Goiabada](/deploy/upgrade-goiabada/) describes.
+3. **Upgrade** as [Upgrade Goiabada](/deploy/upgrade-goiabada/) describes, applying the kustomization, `kubectl apply -k .`, where it applies the manifest.
 
 </Steps>
 

@@ -283,7 +283,7 @@ func TestAnswers_APodMonitorLabelAppStillRegenerates(t *testing.T) {
 // A Secret the operator creates carries the labels every other object does, the standard ones and
 // theirs, and their annotations, from its creation, which an admission policy checks: the printed
 // command writes it locally, labels and annotates it there, quoting a pair the shell would split,
-// and only then creates it. The auth server's TLS Secret is its component's; the pull secret, which
+// and only then creates it. Each server's TLS Secret is its component's; the pull secret, which
 // both pods name, is no component's.
 func TestKubernetesInstructions_CreateSecretsWithTheLabels(t *testing.T) {
 	config := kubernetesConfig()
@@ -292,6 +292,7 @@ func TestKubernetesInstructions_CreateSecretsWithTheLabels(t *testing.T) {
 	const standard = "app.kubernetes.io/name=goiabada app.kubernetes.io/instance=identity "
 	const shared = "app.kubernetes.io/part-of=goiabada app.kubernetes.io/version=latest app.kubernetes.io/managed-by=goiabada-setup"
 	tls := "kubectl create secret tls goiabada-tls-auth -n identity --cert=auth.crt --key=auth.key --dry-run=client -o yaml |\n"
+	admin := "kubectl create secret tls goiabada-tls-admin -n identity --cert=admin.crt --key=admin.key --dry-run=client -o yaml |\n"
 	pull := "kubectl create secret docker-registry registry-credentials -n identity --docker-server=registry.example.com --docker-username=<user> --docker-password=<password> --dry-run=client -o yaml |\n"
 	for _, tc := range []struct {
 		name        string
@@ -301,10 +302,13 @@ func TestKubernetesInstructions_CreateSecretsWithTheLabels(t *testing.T) {
 	}{
 		{name: "no labels of the operator's", want: []string{
 			tls + "       kubectl label --local -f - " + standard + "app.kubernetes.io/component=authserver " + shared + " -o yaml |\n       kubectl create -f -\n",
+			admin + "       kubectl label --local -f - " + standard + "app.kubernetes.io/component=adminconsole " + shared + " -o yaml |\n       kubectl create -f -\n",
 			pull + "       kubectl label --local -f - " + standard + shared + " -o yaml |\n       kubectl create -f -\n",
 		}},
 		{name: "the operator's labels and annotations", labels: []keyValue{{"team", "identity"}}, annotations: operatorAnnotations, want: []string{
 			tls + "       kubectl label --local -f - " + standard + "app.kubernetes.io/component=authserver " + shared + " team=identity -o yaml |\n" +
+				"       kubectl annotate --local -f - 'example.com/owner=identity team: on call' -o yaml |\n       kubectl create -f -\n",
+			admin + "       kubectl label --local -f - " + standard + "app.kubernetes.io/component=adminconsole " + shared + " team=identity -o yaml |\n" +
 				"       kubectl annotate --local -f - 'example.com/owner=identity team: on call' -o yaml |\n       kubectl create -f -\n",
 			pull + "       kubectl label --local -f - " + standard + shared + " team=identity -o yaml |\n" +
 				"       kubectl annotate --local -f - 'example.com/owner=identity team: on call' -o yaml |\n       kubectl create -f -\n",
