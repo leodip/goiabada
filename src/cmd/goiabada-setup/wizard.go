@@ -105,6 +105,11 @@ var wizardSteps = []wizardStep{
 		run:     (*wizard).askNetworkPolicy,
 	},
 	{
+		title:   "Replicas",
+		applies: func(c *Config) bool { return c.Deployment.kind == deploymentKubernetes },
+		run:     (*wizard).askReplicas,
+	},
+	{
 		title:   "Reverse proxy",
 		applies: func(c *Config) bool { return c.Deployment.asksLocalProxy },
 		run:     (*wizard).askLocalProxy,

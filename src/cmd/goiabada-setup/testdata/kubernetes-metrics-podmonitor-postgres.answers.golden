@@ -17,6 +17,7 @@ create-namespace: true
 routing: "envoy-gateway"
 gateway-traffic-policy: "cluster"
 network-policy: false
+authserver-replicas: 2
 rate-limiter: false
 metrics: "podmonitor"
 podmonitor-labels: ""

@@ -262,6 +262,9 @@ func generateAnswers(config *Config, paths outputPaths) string {
 			text("mesh-ports", joinPorts(config.MeshPorts))
 		}
 	}
+	if d.kind == deploymentKubernetes {
+		number("authserver-replicas", config.AuthServerReplicas)
+	}
 	if d.asksRateLimiter {
 		boolean("rate-limiter", config.RateLimiter)
 	}

@@ -54,7 +54,7 @@ The wizard writes two files. `goiabada-k8s.yaml` holds no secret, so you can com
 - **Two ConfigMaps,** `goiabada-authserver-config` and `goiabada-adminconsole-config`, each holding only what its server reads. The three URLs are in both, written from the same answers, so change them in both.
 - **A third ConfigMap, `goiabada-db-ca`,** if you gave the wizard a CA file for the database's certificate. It's mounted into the auth server's pods. See [Check the database's certificate](/deploy/kubernetes/security/#check-the-databases-certificate).
 - **Two ServiceAccounts,** `goiabada-authserver` and `goiabada-adminconsole`, one per server, bound to no role and mounting no token. See [Pod security](/deploy/kubernetes/security/#pod-security).
-- **Two Deployments,** one per server, at one replica each, with a rolling update that never runs fewer pods than replicas and a spread over nodes. See [High availability](/deploy/kubernetes/high-availability/).
+- **Two Deployments,** one per server, the auth server's at two replicas unless you answer otherwise and the admin console's at one, with a rolling update that never runs fewer pods than replicas and a spread over nodes. See [High availability](/deploy/kubernetes/high-availability/).
 - **Probes, a stop pause and a grace period** on every container. See [Probes and shutdown](/deploy/kubernetes/probes-and-shutdown/).
 - **Two PodDisruptionBudgets,** one per Deployment.
 - **Two ClusterIP Services,** `goiabada-authserver` on 9090 and `goiabada-adminconsole` on 9091.

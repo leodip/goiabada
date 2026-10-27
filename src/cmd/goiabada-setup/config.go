@@ -105,6 +105,9 @@ type Config struct {
 	NetworkPolicy  bool
 	ProxyNamespace string
 	MeshPorts      []int
+	// AuthServerReplicas is the auth server Deployment's replica count, two unless asked for
+	// otherwise; the admin console runs one. Only Kubernetes asks (#686 section 9).
+	AuthServerReplicas int
 	// RateLimiter turns on the auth server's built-in rate limiter. Production Compose, native
 	// binaries and Kubernetes ask; local testing leaves it off (#396 decision 9).
 	RateLimiter bool

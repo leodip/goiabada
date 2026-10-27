@@ -21,6 +21,7 @@ tls-issuer: "internal-ca"
 network-policy: true
 proxy-namespace: "kube-system"
 mesh-ports: ""
+authserver-replicas: 2
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"

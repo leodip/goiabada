@@ -22,6 +22,7 @@ admin-listener: "https"
 network-policy: true
 proxy-namespace: "envoy-gateway-system"
 mesh-ports: ""
+authserver-replicas: 2
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"

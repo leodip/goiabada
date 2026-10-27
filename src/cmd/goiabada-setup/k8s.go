@@ -544,13 +544,20 @@ func configChecksum(configMaps string) string {
 }
 
 func writeDeploymentHead(sb *strings.Builder, config *Config, name, checksum string, scrapePort int, surge string) {
+	replicas := 1
+	if name == "goiabada-authserver" {
+		replicas = config.AuthServerReplicas
+	}
 	component := componentOf(name)
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: apps/v1\n")
 	sb.WriteString("kind: Deployment\n")
 	config.writeMetadata(sb, objectMetadata{name: name, component: component})
 	sb.WriteString("spec:\n")
-	sb.WriteString("  replicas: 1\n")
+	for _, line := range config.replicasComment(name) {
+		fmt.Fprintf(sb, "  # %s\n", line)
+	}
+	fmt.Fprintf(sb, "  replicas: %d\n", replicas)
 	sb.WriteString("  # A rollout starts one new pod and waits for it to be ready before it stops an old one, so\n")
 	sb.WriteString("  # it never runs fewer pods than replicas.\n")
 	fmt.Fprintf(sb, "  # %s\n", surge)

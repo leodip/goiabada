@@ -166,6 +166,10 @@ var answerCases = []goldenCase{
 	{name: "kubernetes-network-policy-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NetworkPolicy, c.ProxyNamespace = true, envoyProxyNamespace
 	}},
+	// One auth server pod, which a node drain stops, rather than the default two (#686 section 9).
+	{name: "kubernetes-one-replica-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
+		c.AuthServerReplicas = 1
+	}},
 	// The NetworkPolicies admitting a service mesh's ports beside each server's (#686 section 8).
 	{name: "kubernetes-mesh-ports-postgres", deployment: deploymentKubernetes, engine: "postgres", answers: func(c *Config) {
 		c.NetworkPolicy, c.ProxyNamespace, c.MeshPorts = true, envoyProxyNamespace, []int{15008, 4143}
@@ -367,6 +371,11 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 	}
 	config.NetworkPolicy = false
 	config.ProxyNamespace = ""
+	// Only Kubernetes asks how many auth server pods run, two by default.
+	config.AuthServerReplicas = 0
+	if kind == deploymentKubernetes {
+		config.AuthServerReplicas = defaultAuthServerReplicas
+	}
 	// Production Compose, native binaries and Kubernetes ask whether to turn the rate limiter on,
 	// yes by default but for Kubernetes under the Cluster traffic policy; local testing never asks.
 	config.RateLimiter = kind == deploymentProduction || kind == deploymentNative

@@ -170,7 +170,9 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
-  replicas: 1
+  # Each pod opens up to GOIABADA_DB_MAX_OPEN_CONNS database connections, 20 unless set.
+  # From two, a node drain keeps sign-ins up, evicting one pod at a time.
+  replicas: 2
   # A rollout starts one new pod and waits for it to be ready before it stops an old one, so
   # it never runs fewer pods than replicas.
   # The surge pod opens its own database connections: the docs' connection arithmetic counts it.
@@ -392,6 +394,8 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: "goiabada-setup"
 spec:
+  # One pod. With more, two can spend one administrator's refresh token at once, which signs
+  # them out, unless the gateway keeps each browser on one pod: see the High availability page.
   replicas: 1
   # A rollout starts one new pod and waits for it to be ready before it stops an old one, so
   # it never runs fewer pods than replicas.

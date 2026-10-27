@@ -19,6 +19,7 @@ gateway-traffic-policy: "cluster"
 network-policy: true
 proxy-namespace: "envoy-gateway-system"
 mesh-ports: "15008, 4143"
+authserver-replicas: 2
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"

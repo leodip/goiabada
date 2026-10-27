@@ -55,6 +55,9 @@ func printSummary(out *console, config *Config) {
 			out.println("  NetworkPolicies:  none")
 		}
 	}
+	if config.Deployment.kind == deploymentKubernetes {
+		out.printf("  Replicas:         auth server %d, admin console 1\n", config.AuthServerReplicas)
+	}
 	if config.Deployment.asksMetrics {
 		out.printf("  Metrics:          %s\n", config.metricsAnswer())
 		if config.admitsMetricsScraper() {
@@ -193,6 +196,10 @@ func printRegeneratedMessage(out *console, config *Config, paths outputPaths) {
 		out.println()
 		step++
 	}
+	out.printf("  %d. ", step)
+	printConnectionSum(out, config, "     ")
+	out.println()
+	step++
 	out.printf("  %d. Apply the manifest alone: the Secrets need no applying again.\n", step)
 	out.printf("       %skubectl apply -f %s%s\n", out.cyan, shellQuote(description), out.reset)
 	out.println("     With a kustomization over it, such as the Internal TLS guide's, apply that instead:")
@@ -601,10 +608,23 @@ func printImportantNotes(out *console, config *Config) {
 	out.println("    admin user and OAuth clients configured with the URLs above.")
 	out.println("    If redeploying with different URLs, use a fresh database.")
 	out.println()
+	out.printf("  • ")
+	printConnectionSum(out, config, "    ")
+	out.println()
 	out.println("  • If using a managed database service (Supabase, PlanetScale, etc.),")
 	out.println("    use the connection pooler endpoint for better compatibility (IPv4).")
 	out.println()
 	printMetricsNotes(out, config)
+}
+
+// printConnectionSum says how many database connections the auth server's running pods and its
+// surge pod may open, which the database's max_connections must exceed with room for the pods a
+// rollout is still stopping, its lines after the first indented by indent (#686 section 9).
+func printConnectionSum(out *console, config *Config, indent string) {
+	out.printf("The auth server's %d pods, and the one more a rollout starts, each open up to %d database\n", config.AuthServerReplicas, authServerPoolSize)
+	out.printf("%sconnections: (%d + 1) × %d = %d. The database's max_connections must exceed that, beside\n", indent, config.AuthServerReplicas, authServerPoolSize, config.connectionBudget())
+	out.printf("%sthe pods a rollout is still stopping and every other connection it takes:\n", indent)
+	out.printf("%s%s\n", indent, highAvailabilityDocsURL)
 }
 
 // printNetworkPolicyTip says, with the NetworkPolicies on, how a blocked connection looks and how

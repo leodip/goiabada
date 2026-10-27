@@ -78,6 +78,8 @@ type CLIFlags struct {
 	NetworkPolicy        bool
 	ProxyNamespace       string
 	MeshPorts            portList
+	// AuthServerReplicas is --authserver-replicas, read by Kubernetes alone, 0 when left out.
+	AuthServerReplicas int
 	// CreateNamespace is --create-namespace, read by Kubernetes alone.
 	CreateNamespace optionalBool
 	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
@@ -274,6 +276,7 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only the routing layer and the admin console to the servers with NetworkPolicies")
 	fs.StringVar(&flags.ProxyNamespace, "proxy-namespace", "", "Kubernetes, with --network-policy: the namespace the routing layer's proxies run in (default: envoy-gateway-system for --routing=envoy-gateway, required otherwise)")
 	fs.Var(&flags.MeshPorts, "mesh-ports", "Kubernetes, with --network-policy: the ports a service mesh's proxies deliver on between meshed pods, separated by commas (default: none)")
+	fs.IntVar(&flags.AuthServerReplicas, "authserver-replicas", 0, "Kubernetes: the auth server's replica count (default: 2)")
 	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
 	fs.Var(&flags.PodMonitorLabels, "podmonitor-labels", "Kubernetes: the labels the PodMonitor carries, key=value separated by commas")
 	fs.StringVar(&flags.MetricsNamespace, "metrics-namespace", "", "Kubernetes: the namespace the NetworkPolicies admit to the metrics ports (default: monitoring)")
@@ -413,6 +416,9 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("                         on between meshed pods, admitted from the same sources, separated\n")
 		p("                         by commas: 15008 under Istio's ambient mode, 4143 under Linkerd\n")
 		p("                         (default: none)\n")
+		p("  --authserver-replicas=N\n")
+		p("                         The auth server's replica count (default: 2). Each pod opens up to\n")
+		p("                         %d database connections, and a rollout runs one more pod\n", authServerPoolSize)
 		p("  --metrics=EXPOSURE     Expose Prometheus metrics on ports %d and %d (default: none).\n", authServerMetricsPort, adminConsoleMetricsPort)
 		p("                         annotations writes the prometheus.io pod annotations, which the\n")
 		p("                         prometheus-community prometheus chart reads; podmonitor writes a\n")

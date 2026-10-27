@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you run more than one pod of each Goiabada server, so a node going away doesn't take sign-ins with it.
 
-The manifest the setup wizard generates runs one replica of each server. At one replica, a node drain or a node failure stops that server until its replacement is ready.
+The setup wizard asks how many auth server pods to run, two unless you answer otherwise, and the manifest runs one admin console pod. From two, a node drain keeps sign-ins up, since the [disruption budget](#disruptions-and-spread) evicts one pod at a time. At one, a node drain or a node failure stops that server until its replacement is ready.
 
 ## Scale out
 
@@ -19,26 +19,38 @@ The manifest the setup wizard generates runs one replica of each server. At one 
    (replicas + surge) × GOIABADA_DB_MAX_OPEN_CONNS + headroom < max_connections
    ```
 
-   [Connections](#connections) explains each term. With the defaults, three replicas make 4 × 20 = 80 connections. A stock PostgreSQL allows 100, 3 of them reserved for superusers, which leaves 17 for the headroom; a stock MySQL allows 151. Until the sum holds, lower `GOIABADA_DB_MAX_OPEN_CONNS` in the auth server's ConfigMap, or raise the database's `max_connections`.
+   [Connections](#connections) explains each term, and the wizard's completion message gives the sum for the count you answered. With the defaults, two replicas make 3 × 20 = 60 connections, and three make 4 × 20 = 80. A stock PostgreSQL allows 100, 3 of them reserved for superusers, which leaves 17 for the headroom at three replicas; a stock MySQL allows 151. Until the sum holds, lower `GOIABADA_DB_MAX_OPEN_CONNS` in the auth server's ConfigMap, or raise the database's `max_connections`.
 
-2. **Scale the Deployments:**
+2. **Set the auth server's count.** Answer the wizard's replicas question, or write the manifest again over your [answers file](/deploy/setup-wizard/#run-it-again-on-a-deployment) with the count you want, and apply it:
 
    ```bash
-   kubectl scale deployment goiabada-authserver -n goiabada --replicas=3
-   kubectl scale deployment goiabada-adminconsole -n goiabada --replicas=2
+   ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --authserver-replicas=3
+   kubectl apply -f goiabada-k8s.yaml
    ```
 
-   To keep the count across a reapply of the manifest, change `replicas` in `goiabada-k8s.yaml` too.
+   With a kustomization over the manifest, such as step 3's or the [Internal TLS](/deploy/kubernetes/internal-tls/) guide's, apply that instead, with `kubectl apply -k .`: applying the manifest alone drops its patches. `kubectl scale` changes the count too, until the next apply sets it back.
 
-3. **Decide on the rate limiter,** whose per-pod limits multiply with the replicas: see [Rate limiting across replicas](#rate-limiting-across-replicas).
+3. **Scale the admin console, if you want more than one pod,** after reading [The admin console across replicas](#the-admin-console-across-replicas). The wizard writes one admin console pod every time, so keep your count in a kustomization over the manifest:
 
-4. **Keep each browser on one admin console pod,** with more than one console replica: see [The admin console across replicas](#the-admin-console-across-replicas).
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   resources:
+   - goiabada-k8s.yaml
+   replicas:
+   - name: goiabada-adminconsole
+     count: 2
+   ```
+
+   Apply it with `kubectl apply -k .`.
+
+4. **Decide on the rate limiter,** whose per-pod limits multiply with the replicas: see [Rate limiting across replicas](#rate-limiting-across-replicas).
 
 </Steps>
 
 ## Connections
 
-- **Surge** is the extra pod a rolling update runs beside the old ones. The generated Deployments set `maxSurge: 1` and `maxUnavailable: 0`: a rollout starts one new pod, waits for it to be ready, and only then stops an old one, so three replicas briefly run four, and never fewer than three. A stopping pod holds its connections until it exits, up to a minute, and the next new pod can start meanwhile, so count one more pod's connections in the headroom.
+- **Surge** is the extra pod a rolling update runs beside the old ones. The generated Deployments set `maxSurge: 1` and `maxUnavailable: 0`: a rollout starts one new pod, waits for it to be ready, and only then stops an old one, so three replicas briefly run four, and never fewer than three. A stopping pod holds its connections until it exits, up to a minute, and the rollout starts the next new pod as soon as one is ready, so several old pods can be stopping at once. Leave room for them in the headroom: at most `replicas × GOIABADA_DB_MAX_OPEN_CONNS` more, should every old pod still be stopping.
 - **Headroom** is every other connection the database must accept: the `migrate` subcommand, the maintenance connection a starting pod opens to create the database when `GOIABADA_DB_CREATE` is on, your own sessions, and any other application on the same server. The admin console opens none.
 - **With a HorizontalPodAutoscaler, replicas is its `maxReplicas`,** not today's count, since it may scale out to it under load, at the worst moment.
 
