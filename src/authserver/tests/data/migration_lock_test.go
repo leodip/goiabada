@@ -459,8 +459,9 @@ func messageOrder(capture *logtest.SlogCapture, wanted ...string) []string {
 }
 
 // TestMigrationLock_ThePreCreateGivesTheResourceBack covers the one place outside the runner
-// that takes the migration lock: SQL Server's schema_migrations pre-create, which is a catalog
-// check followed by a CREATE and is safe only while the lock is held (#293).
+// that takes the migration lock: SQL Server's and PostgreSQL's schema_migrations pre-creates,
+// each a catalog check followed by a CREATE, safe only while the lock is held (#293, #686
+// section 10).
 //
 // It holds the same resource on the same instance, so it owes the same two things Migrator.run
 // owes and for the same reasons: the lock has to come back, and a session that failed to give it
@@ -471,13 +472,13 @@ func messageOrder(capture *logtest.SlogCapture, wanted ...string) []string {
 // since there is nothing to create and the lock may be held by another process's migration, which
 // the start then waits for in the runner, where it says so (#390 decision 7).
 //
-// SQL Server only. It is the only engine whose pre-create reaches for the lock at all: the other
-// three create the table with a plain IF NOT EXISTS, which their engines make atomic.
+// SQL Server and PostgreSQL only, the engines whose pre-create reaches for the lock: MySQL and
+// SQLite create the table with a plain IF NOT EXISTS, which their engines make atomic.
 //
-// Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
+// Run via: ./run-tests.sh --type data --db <postgres|mssql> --run TestMigrationLock
 func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
-	if dbType() != data.MSSQL {
-		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
+	if !preCreateTakesTheLock() {
+		t.Skipf("%s pre-creates schema_migrations with one atomic statement, under no lock", dbType())
 	}
 
 	h := newIsolatedDB(t)
@@ -492,6 +493,51 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
 
 	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
+}
+
+// concurrentStarts is how many starts TestMigrationLock_StartsTogetherOnAnEmptyDatabaseAllSucceed
+// runs at once: more than a Deployment's usual replicas plus its surge pod, so a pre-create that
+// races shows within one run rather than once in many.
+const concurrentStarts = 8
+
+// TestMigrationLock_StartsTogetherOnAnEmptyDatabaseAllSucceed is a fresh install's first start:
+// several replicas of the auth server, the setup wizard's default being two, opening one empty
+// database at the same moment. Every start must come up, one migrating and the others finding it
+// done, rather than any failing the pre-create of schema_migrations and being restarted.
+//
+// PostgreSQL's CREATE TABLE IF NOT EXISTS is not atomic: two sessions can both find the table
+// absent, and the loser fails on pg_type's unique index (SQLSTATE 23505). Under Argo CD, the two
+// pods of a fresh install hit it, and one restarted (#686 section 10).
+//
+// The drop leaves the isolated database as a first start finds it, with no version table.
+//
+// Run via: ./run-tests.sh --type data --db <mysql|postgres|mssql> --run TestMigrationLock
+func TestMigrationLock_StartsTogetherOnAnEmptyDatabaseAllSucceed(t *testing.T) {
+	if !hasSessionMigrationLock() {
+		t.Skipf("%s has no session-scoped migration lock: its exclusion is a process-wide mutex", dbType())
+	}
+
+	h := newIsolatedDB(t)
+	_, err := h.SQL.Exec("DROP TABLE schema_migrations")
+	require.NoError(t, err, "clear the table the fixture's own construction created")
+
+	capture := logtest.CaptureSlog(t)
+	starts := make([]<-chan startResult, concurrentStarts)
+	for i := range starts {
+		starts[i] = startInBackground(t, h.Name)
+	}
+	for i, done := range starts {
+		select {
+		case res := <-done:
+			require.NoErrorf(t, res.err, "start %d of %d on an empty %s database", i+1, concurrentStarts, dbType())
+		case <-time.After(migrationLockFinishBudget):
+			t.Fatalf("start %d of %d did not finish within %s on %s", i+1, concurrentStarts, migrationLockFinishBudget, dbType())
+		}
+	}
+
+	assert.Len(t, recordsNamed(capture, "database migrated"), 1, "one start migrates")
+	assert.Len(t, recordsNamed(capture, "no need to migrate the database"), concurrentStarts-1,
+		"every other start finds the schema at head")
 }
 
 // releaseApplockStatement is the fragment identifying the one statement the fault below refuses.
@@ -525,8 +571,8 @@ var errPrecreateUnlockFault = errors.New("injected sp_releaseapplock failure")
 // CREATE reaches the end and the deferred unlock supplies the error; a failing CREATE is already
 // returning one, and the unlock's has to join it rather than replace it.
 //
-// SQL Server only, for the same reason as the test above: it is the one engine whose pre-create
-// takes a lock at all.
+// SQL Server only: the fault goes into the go-mssqldb driver. PostgreSQL's pre-create releases
+// the lock through the same deferred unlock, written the same way.
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
 func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *testing.T) {

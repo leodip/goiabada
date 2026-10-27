@@ -233,9 +233,10 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // The migrator runs the pre-flight under its lock, on the version it read there, and then steps to
 // head, and the startup
 // records are written here, by the process starting, rather than by the runner or by each engine:
-// the runner, and SQL Server's schema_migrations pre-create before it, report a wait for the
-// migration lock, and the runner the migration around its files, through startupProgress, and the
-// record saying nothing needed migrating is this function's own (#438, #390 decision 7).
+// the runner, and SQL Server's and PostgreSQL's schema_migrations pre-creates before it, report a
+// wait for the migration lock, and the runner the migration around its files, through
+// startupProgress, and the record saying nothing needed migrating is this function's own (#438,
+// #390 decision 7).
 //
 // ctx is the start's, and its end is a shutdown signal (#390 decision 9): it cancels a wait, for
 // the engine, its creation or the migration lock, at once; a migration file already running runs
@@ -262,8 +263,8 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		}
 	}()
 
-	// One progress for the whole start: SQL Server's schema_migrations pre-create can wait for the
-	// migration lock before the runner does, and the start says it is waiting once.
+	// One progress for the whole start: SQL Server's and PostgreSQL's schema_migrations pre-creates
+	// can wait for the migration lock before the runner does, and the start says it is waiting once.
 	progress := &startupProgress{ctx: ctx}
 
 	m, err := database.NewMigrator(ctx, progress)
@@ -310,8 +311,8 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 // record and then "no need to migrate the database".
 //
 // The wait record is written once per start, however many times the start queues: SQL Server's
-// schema_migrations pre-create takes the migration lock before the runner does, and a start can
-// find it held at both.
+// and PostgreSQL's schema_migrations pre-creates take the migration lock before the runner does,
+// and a start can find it held at both.
 type startupProgress struct {
 	ctx    context.Context
 	waited bool
