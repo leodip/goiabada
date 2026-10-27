@@ -80,11 +80,11 @@ passwords, and compares refusals against its dummy hash, at bcrypt's minimum cos
 dominate the tier. Production builds, every other tier and a race binary run outside `go test` keep
 the default cost for both; `passwordhash`'s `TestCostOutsideGoTest` runs a probe binary outside the
 test harness, in the test's own build, to hold that. The detector needs cgo, so the dev
-container ships gcc and pins `CGO_ENABLED=0` for everything except that leg, which sets it to 1 for
-itself. Code whose correctness is a locking argument (`authserver/internal/ratelimit`, whose
-failures-only limiter holds the in-flight count since #439, the concurrent transactions of #301) is
-covered there and nowhere else; the setup tier also accepts `--race`; the data and integration tiers
-do not run under it.
+container ships gcc and pins `CGO_ENABLED=0` for everything except the race runs, each of which sets
+it to 1 for itself. Code whose correctness is a locking argument (`authserver/internal/ratelimit`,
+whose failures-only limiter holds the in-flight count since #439, the concurrent transactions
+of #301) is covered there and nowhere else; the setup tier also accepts `--race`; the data and
+integration tiers do not run under it.
 
 ## Browser e2e tests
 
