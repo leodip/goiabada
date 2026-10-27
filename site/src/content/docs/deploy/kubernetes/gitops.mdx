@@ -1,0 +1,209 @@
+---
+title: GitOps
+description: Keep each environment's Goiabada files in Git, patch what the setup wizard doesn't ask, and have Argo CD or Flux apply them.
+---
+
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you keep Goiabada's Kubernetes files in a Git repository that Argo CD or Flux applies.
+
+## Set up the repository
+
+<Steps>
+
+1. **Generate each environment's files in a directory of its own,** running the [setup wizard](/deploy/setup-wizard/) once per environment. Each one answers its own URLs, namespace and database, so each gets a manifest of its own rather than patches over another's:
+
+   ```text
+   goiabada-deploy/
+   ├── components/
+   │   └── common/
+   │       └── kustomization.yaml
+   ├── production/
+   │   ├── goiabada-setup.yaml
+   │   ├── goiabada-k8s.yaml
+   │   ├── goiabada-secrets.sealed.yaml
+   │   ├── goiabada-encryption-key.sealed.yaml
+   │   └── kustomization.yaml
+   └── staging/
+       └── ...
+   ```
+
+   Commit `goiabada-setup.yaml`, the answers file, and `goiabada-k8s.yaml`. **Never** commit `goiabada-secrets.yaml`: add it to `.gitignore`.
+
+2. **Put the Secrets in the repository sealed, or leave them out,** as [Secrets](/deploy/kubernetes/secrets/#create-the-secrets-another-way) describes: a sealed file per Secret with SealedSecrets, an `ExternalSecret` per Secret with the External Secrets Operator, or Secrets created from your terminal, which the repository then leaves out. Sealed files and `ExternalSecret`s let the GitOps tool rebuild an environment from the repository alone.
+
+3. **Write the patches every environment shares** in a Kustomize component. This one raises the auth server's CPU limit, as [Resource limits](/deploy/kubernetes/high-availability/#resource-limits) suggests for a higher sign-in peak. Save this as `components/common/kustomization.yaml`:
+
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1alpha1
+   kind: Component
+   patches:
+   - target:
+       kind: Deployment
+       name: goiabada-authserver
+     patch: |-
+       apiVersion: apps/v1
+       kind: Deployment
+       metadata:
+         name: goiabada-authserver
+       spec:
+         template:
+           spec:
+             containers:
+             - name: authserver
+               resources:
+                 limits:
+                   cpu: "1"
+   ```
+
+   The `target` selects the Deployment by kind and name alone, so the patch fits every environment's namespace. A patch without one matches only a Deployment in the namespace its own `metadata` names, and Kustomize refuses it when it names none.
+
+4. **Write each environment's kustomization.** This one also caps the auth server's database pool at 10 connections, for a smaller database. Save this as `production/kustomization.yaml`:
+
+   ```yaml
+   apiVersion: kustomize.config.k8s.io/v1beta1
+   kind: Kustomization
+   resources:
+   - goiabada-k8s.yaml
+   - goiabada-secrets.sealed.yaml
+   - goiabada-encryption-key.sealed.yaml
+   components:
+   - ../components/common
+   patches:
+   - target:
+       kind: Deployment
+       name: goiabada-authserver
+     patch: |-
+       apiVersion: apps/v1
+       kind: Deployment
+       metadata:
+         name: goiabada-authserver
+       spec:
+         template:
+           spec:
+             containers:
+             - name: authserver
+               env:
+               - name: GOIABADA_DB_MAX_OPEN_CONNS
+                 value: "10"
+   ```
+
+   Leave the sealed files out of `resources` if you create the Secrets another way. Check what it builds before you commit it:
+
+   ```bash
+   kubectl kustomize production
+   ```
+
+5. **Point your GitOps tool at each environment's directory,** with [Argo CD](#argo-cd) or [Flux](#flux) below.
+
+</Steps>
+
+## Regenerate or patch
+
+A setting the wizard asks, other than a password, belongs in the answers file, and everything else in a patch:
+
+| Change | How |
+|---|---|
+| URLs, namespace, the database's host, port, name, user and TLS, routing, the HTTPS certificates, NetworkPolicies, mesh ports, the auth server's replicas, metrics, images, labels and annotations, the rate limiter | Regenerate with the new answer |
+| Resources, node selectors, tolerations, affinity, the admin console's replicas, a server setting the wizard doesn't ask | A patch in the environment's kustomization, or in the component when every environment shares it |
+| A new Goiabada release | Regenerate every environment with the new release's wizard |
+| A password or key | Change it in the Secrets, as [Rotate secrets](/deploy/rotate-secrets/) describes, and in their source when [something else owns them](/deploy/kubernetes/secrets/#rotating-secrets-something-else-owns) |
+
+To regenerate, run the wizard over the environment's answers file, from its directory, with the answer that changes. It leaves the Secrets as they are:
+
+```bash
+cd production
+./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --authserver-replicas=3
+git diff
+```
+
+Review the diff, commit and push, and the GitOps tool applies it. The answers file records the new answer, so the next regeneration keeps it. [Run it again on a deployment](/deploy/setup-wizard/#run-it-again-on-a-deployment) has the rest.
+
+Set a server setting the wizard doesn't ask, such as `GOIABADA_DB_MAX_OPEN_CONNS`, as an `env` entry of the container, as the kustomization above does, rather than by patching the ConfigMap. A container's `env` overrides the ConfigMap's value of the same name, and changes the pod template, so applying it rolls the pods. A patched ConfigMap leaves the checksum the wizard wrote on the pod template as it was, so the pods keep the old value until something restarts them.
+
+A change made in the cluster by hand, such as a `kubectl scale`, doesn't last: Argo CD's self-heal reverts it at once, and Flux at its next reconciliation. Make the change in the repository.
+
+## Argo CD
+
+One `Application` per environment, in the namespace Argo CD runs in, here production's. Register the repository's credentials as [Argo CD's documentation](https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories/) describes:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: goiabada-production
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.example.com/platform/goiabada-deploy.git
+    targetRevision: main
+    path: production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: goiabada
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+```
+
+Argo CD builds the kustomization itself. `prune` deletes what leaves the manifest, such as the NetworkPolicies when you regenerate with them turned off, and `selfHeal` reverts changes made by hand. An `Application` pointed at a deployment you applied with `kubectl` takes its objects over, and rolls the pods once if its patches change them.
+
+## Flux
+
+A `GitRepository` for the repository, and one `Kustomization` per environment, in the namespace Flux runs in. The `secretRef` names a Secret holding the repository's credentials, as [Flux's documentation](https://fluxcd.io/flux/components/source/gitrepositories/#secret-reference) describes:
+
+```yaml
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: goiabada-deploy
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: https://git.example.com/platform/goiabada-deploy.git
+  ref:
+    branch: main
+  secretRef:
+    name: goiabada-deploy-auth
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: goiabada-production
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: goiabada-deploy
+  path: ./production
+  prune: true
+  wait: true
+  timeout: 5m
+```
+
+`prune` deletes what leaves the manifest, and `wait` holds the Kustomization not ready until every object it applied is, the pods included. To apply a commit without waiting for the intervals:
+
+```bash
+flux reconcile kustomization goiabada-production --with-source
+```
+
+## Deleting an environment
+
+When you answered yes to creating the namespace, the manifest declares it, and the GitOps tool owns it with everything else. Deleting a Flux `Kustomization` that prunes, or an Argo CD `Application` with cascading deletion, then deletes the namespace and everything in it, Secrets you created by hand included.
+
+Sealed files and `ExternalSecret`s come back with the rest when the environment is applied again. Secrets created from your terminal don't: create them again, with the same values, as [Secrets](/deploy/kubernetes/secrets/#from-your-terminal) explains. For a namespace that must outlive the GitOps tool's objects, answer no to creating it, and create it outside the repository.
+
+## The Internal TLS guide in a repository
+
+The [Internal TLS](/deploy/kubernetes/internal-tls/) guide's files go in the environment's directory, beside its kustomization, and its patches in that kustomization's `patches`. They name the namespace `goiabada`, so they belong to the environment deployed there rather than to the component.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Secrets" description="Seal the Secrets, or sync them from a secret manager." href="/deploy/kubernetes/secrets/" />
+  <LinkCard title="Setup wizard" description="Every answer, and running it again on a deployment." href="/deploy/setup-wizard/" />
+  <LinkCard title="Upgrade Goiabada" description="Move each environment to a new release." href="/deploy/upgrade-goiabada/" />
+</CardGrid>

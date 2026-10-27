@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 func printBanner(out *console) {
@@ -46,9 +48,15 @@ func printSummary(out *console, config *Config) {
 		}
 		if config.NetworkPolicy {
 			out.printf("  NetworkPolicies:  admit only the namespace %s and the admin console\n", config.ProxyNamespace)
+			if len(config.MeshPorts) > 0 {
+				out.printf("  Mesh ports:       %s\n", joinPorts(config.MeshPorts))
+			}
 		} else {
 			out.println("  NetworkPolicies:  none")
 		}
+	}
+	if config.Deployment.kind == deploymentKubernetes {
+		out.printf("  Replicas:         auth server %d, admin console 1\n", config.AuthServerReplicas)
 	}
 	if config.Deployment.asksMetrics {
 		out.printf("  Metrics:          %s\n", config.metricsAnswer())
@@ -75,6 +83,12 @@ func printSummary(out *console, config *Config) {
 		if config.ImagePullSecret != "" {
 			out.printf("  Pull secret:      %s\n", config.ImagePullSecret)
 		}
+	}
+	if len(config.Labels) > 0 {
+		out.printf("  Labels:           %s\n", joinPairs(config.Labels))
+	}
+	if len(config.Annotations) > 0 {
+		out.printf("  Annotations:      %s\n", joinPairs(config.Annotations))
 	}
 	out.printf("  Admin Email:      %s\n", config.AdminEmail)
 	if config.KeepSecrets {
@@ -152,8 +166,8 @@ func printRegeneratedMessage(out *console, config *Config, paths outputPaths) {
 	kubernetes := config.Deployment.kind == deploymentKubernetes
 	if kubernetes && imageTag == "latest" {
 		out.warning("The manifest follows the moving image tag \"latest\", so pods can run different releases")
-		out.println("   and each start pulls whatever release it names then. Replace latest with a release")
-		out.println("   version in both image lines to pin them.")
+		out.println("   and each start pulls whatever release it names then. A release's setup wizard pins both")
+		out.println("   image lines to its version and digests.")
 		out.println()
 	}
 	out.println("From the directory holding the files:")
@@ -182,6 +196,13 @@ func printRegeneratedMessage(out *console, config *Config, paths outputPaths) {
 		out.println()
 		step++
 	}
+	if printTLSCheck(out, config, step) {
+		step++
+	}
+	out.printf("  %d. ", step)
+	printConnectionSum(out, config, "     ")
+	out.println()
+	step++
 	out.printf("  %d. Apply the manifest alone: the Secrets need no applying again.\n", step)
 	out.printf("       %skubectl apply -f %s%s\n", out.cyan, shellQuote(description), out.reset)
 	out.println("     With a kustomization over it, such as the Internal TLS guide's, apply that instead:")
@@ -213,8 +234,8 @@ func printKubernetesInstructions(out *console, config *Config, paths outputPaths
 	// (#396 decision 10).
 	if imageTag == "latest" {
 		out.warning("The manifest follows the moving image tag \"latest\", so pods can run different releases")
-		out.println("   and each start pulls whatever release it names then. Replace latest with a release")
-		out.println("   version in both image lines to pin them.")
+		out.println("   and each start pulls whatever release it names then. A release's setup wizard pins both")
+		out.println("   image lines to its version and digests.")
 		out.println()
 	}
 	if config.servedByEnvoyGateway() {
@@ -301,10 +322,10 @@ func printEnvoyGatewayInstructions(out *console, config *Config, paths outputPat
 	out.println()
 	out.println("     Created any earlier, it has cert-manager look the names up before they exist, and a")
 	out.println("     resolver can then remember them as missing for as long as your zone says, often 30")
-	out.println("     minutes or more. Without it, cert-manager waits. Remove the Gateway's cert-manager")
-	out.println("     annotation instead to manage the certificates yourself.")
+	out.println("     minutes or more. Without it, cert-manager waits. To manage the certificates yourself,")
+	out.println("     remove the Gateway's cert-manager annotation in a kustomization over the manifest.")
 	out.println()
-	out.println("  7. Check it is up: both pods Running, then both certificates READY within a few minutes.")
+	out.println("  7. Check it is up: every pod Running, then both certificates READY within a few minutes.")
 	out.printf("     %skubectl get pods -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.printf("     %skubectl get certificates -n %s%s\n", out.cyan, config.K8sNamespace, out.reset)
 	out.println()
@@ -398,7 +419,7 @@ func printRoutingInstructions(out *console, config *Config, paths outputPaths) {
 	out.printf("     %s%-*s -> %s%s\n", out.cyan, width, adminHost, target, out.reset)
 	out.println()
 
-	out.println("  4. Check it is up: both pods Running, then the route in.")
+	out.println("  4. Check it is up: every pod Running, then the route in.")
 	out.printf("     %skubectl get pods -n %s%s\n", out.cyan, ns, out.reset)
 	switch {
 	case config.routesThroughGateway():
@@ -484,7 +505,7 @@ func printRoutingPrerequisites(out *console, config *Config) {
 	case config.TLS == tlsSecrets:
 		out.printf("     The TLS Secrets %s and %s in %s hold the certificates, which you create\n", config.TLSSecretAuth, config.TLSSecretAdmin, ns)
 		out.println("     and renew, for instance:")
-		printCreateTLSSecret(out, config)
+		printCreateTLSSecret(out, config, "     ")
 	default:
 		out.println("     TLS ends in front, at a load balancer or a CDN that forwards plain HTTP to the routing")
 		out.println("     layer and redirects plain HTTP to HTTPS itself. The routing layer must not redirect:")
@@ -498,17 +519,87 @@ func printRoutingPrerequisites(out *console, config *Config) {
 	out.println()
 }
 
-// printCreateTLSSecret prints the command creating the auth server's TLS Secret, for the operator to
-// repeat for the admin console's.
-func printCreateTLSSecret(out *console, config *Config) {
-	out.printf("     %skubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key%s\n", out.cyan, config.TLSSecretAuth, config.K8sNamespace, out.reset)
+// printCreateTLSSecret prints, at indent, the commands creating the TLS Secrets: one for each
+// server, labeled with its component, or a single one, of no component, when one Secret serves
+// both hosts.
+func printCreateTLSSecret(out *console, config *Config, indent string) {
+	if config.TLSSecretAuth == config.TLSSecretAdmin {
+		printCreateSecret(out, config, indent, "",
+			fmt.Sprintf("kubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key", config.TLSSecretAuth, config.K8sNamespace))
+		return
+	}
+	printCreateSecret(out, config, indent, authServerComponent,
+		fmt.Sprintf("kubectl create secret tls %s -n %s --cert=auth.crt --key=auth.key", config.TLSSecretAuth, config.K8sNamespace))
+	printCreateSecret(out, config, indent, adminConsoleComponent,
+		fmt.Sprintf("kubectl create secret tls %s -n %s --cert=admin.crt --key=admin.key", config.TLSSecretAdmin, config.K8sNamespace))
 }
 
-// printCreatePullSecret prints, at indent, the command that creates the image pull secret, keyed by
-// the registry the repository names.
+// printTLSCheck prints, as step number of the regeneration's steps, the check that what the
+// certificates come from is there, and says whether it printed one. A run that moves to TLS Secrets
+// or to an issuer names one nothing may have created yet: until a Secret exists, its host is served
+// without its certificate, and until an issuer is ready, cert-manager issues and renews nothing from
+// it (#686).
+func printTLSCheck(out *console, config *Config, step int) bool {
+	if !config.asksTLS() {
+		return false
+	}
+	switch config.TLS {
+	case tlsSecrets:
+		if config.TLSSecretAuth == config.TLSSecretAdmin {
+			out.printf("  %d. Check the TLS Secret %s exists in %s, with the certificate of both hosts:\n", step, config.TLSSecretAuth, config.K8sNamespace)
+			out.println("     until it does, the hosts are served without it. If it is missing, create it. For")
+		} else {
+			out.printf("  %d. Check the TLS Secrets %s and %s exist in %s, with the hosts' certificates:\n", step, config.TLSSecretAuth, config.TLSSecretAdmin, config.K8sNamespace)
+			out.println("     until they do, the hosts are served without them. If one is missing, create it. For")
+		}
+		out.println("     instance:")
+		names := slices.Compact([]string{config.TLSSecretAuth, config.TLSSecretAdmin})
+		out.printf("       %skubectl get secret %s -n %s%s\n", out.cyan, strings.Join(names, " "), config.K8sNamespace, out.reset)
+		printCreateTLSSecret(out, config, "       ")
+	case tlsClusterIssuer:
+		out.printf("  %d. Check the ClusterIssuer %s is READY True: until it is, cert-manager issues and\n", step, config.TLSIssuer)
+		out.println("     renews no certificate from it:")
+		out.printf("       %skubectl get clusterissuer %s%s\n", out.cyan, config.TLSIssuer, out.reset)
+	case tlsIssuer:
+		out.printf("  %d. Check the Issuer %s in %s is READY True: until it is, cert-manager issues and\n", step, config.TLSIssuer, config.K8sNamespace)
+		out.println("     renews no certificate from it:")
+		out.printf("       %skubectl get issuer %s -n %s%s\n", out.cyan, config.TLSIssuer, config.K8sNamespace, out.reset)
+	default:
+		return false
+	}
+	out.println()
+	return true
+}
+
+// printCreatePullSecret prints, at indent, the command that creates the image pull secret, which
+// both servers' pods name, keyed by the registry the repository names.
 func printCreatePullSecret(out *console, config *Config, indent string) {
-	out.printf("%s%skubectl create secret docker-registry %s -n %s --docker-server=%s --docker-username=<user> --docker-password=<password>%s\n",
-		indent, out.cyan, config.ImagePullSecret, config.K8sNamespace, config.imageRegistry(), out.reset)
+	printCreateSecret(out, config, indent, "", fmt.Sprintf("kubectl create secret docker-registry %s -n %s --docker-server=%s --docker-username=<user> --docker-password=<password>",
+		config.ImagePullSecret, config.K8sNamespace, config.imageRegistry()))
+}
+
+// printCreateSecret prints, at indent, create, a kubectl create secret command, as one carrying the
+// labels every other object does, the standard ones of component and the operator's, and the
+// operator's annotations. An admission policy checks a Secret as it is created, and kubectl create
+// secret sets neither, so the Secret is written locally, labeled and annotated there, and only then
+// created: kubectl apply would copy it, credentials included, into its last-applied-configuration
+// annotation (#686 section 6).
+func printCreateSecret(out *console, config *Config, indent, component, create string) {
+	out.printf("%s%s%s --dry-run=client -o yaml |%s\n", indent, out.cyan, create, out.reset)
+	for _, step := range []struct {
+		command string
+		pairs   []keyValue
+	}{{"label", slices.Concat(config.standardLabels(component), config.Labels)}, {"annotate", config.Annotations}} {
+		if len(step.pairs) == 0 {
+			continue
+		}
+		words := []string{"kubectl", step.command, "--local", "-f", "-"}
+		for _, pair := range step.pairs {
+			words = append(words, shellQuote(pair.key+"="+pair.value))
+		}
+		out.printf("%s  %s%s -o yaml |%s\n", indent, out.cyan, strings.Join(words, " "), out.reset)
+	}
+	out.printf("%s  %skubectl create -f -%s\n", indent, out.cyan, out.reset)
 }
 
 // printDeployStep prints the deploy, step number of the steps: both files, the Secrets first, and
@@ -525,7 +616,7 @@ func printDeployStep(out *console, config *Config, paths outputPaths, number int
 		out.printf("     Then create the TLS Secrets %s and %s,\n", config.TLSSecretAuth, config.TLSSecretAdmin)
 		out.println("     now that the namespace exists: until then the hosts are served without their")
 		out.println("     certificates. For instance:")
-		printCreateTLSSecret(out, config)
+		printCreateTLSSecret(out, config, "     ")
 		out.println()
 	}
 	if config.ImagePullSecret != "" {
@@ -561,10 +652,23 @@ func printImportantNotes(out *console, config *Config) {
 	out.println("    admin user and OAuth clients configured with the URLs above.")
 	out.println("    If redeploying with different URLs, use a fresh database.")
 	out.println()
+	out.printf("  • ")
+	printConnectionSum(out, config, "    ")
+	out.println()
 	out.println("  • If using a managed database service (Supabase, PlanetScale, etc.),")
 	out.println("    use the connection pooler endpoint for better compatibility (IPv4).")
 	out.println()
 	printMetricsNotes(out, config)
+}
+
+// printConnectionSum says how many database connections the auth server's running pods and its
+// surge pod may open, which the database's max_connections must exceed with room for the pods a
+// rollout is still stopping, its lines after the first indented by indent (#686 section 9).
+func printConnectionSum(out *console, config *Config, indent string) {
+	out.printf("The auth server's %d pods, and the one more a rollout starts, each open up to %d database\n", config.AuthServerReplicas, authServerPoolSize)
+	out.printf("%sconnections: (%d + 1) × %d = %d. The database's max_connections must exceed that, beside\n", indent, config.AuthServerReplicas, authServerPoolSize, config.connectionBudget())
+	out.printf("%sthe pods a rollout is still stopping and every other connection it takes:\n", indent)
+	out.printf("%s%s\n", indent, highAvailabilityDocsURL)
 }
 
 // printNetworkPolicyTip says, with the NetworkPolicies on, how a blocked connection looks and how
@@ -623,7 +727,12 @@ func printMetricsNotes(out *console, config *Config) {
 	out.println()
 	if config.admitsMetricsScraper() {
 		out.printf("  • The NetworkPolicies admit the namespace %s to the metrics ports alone. A scraper\n", config.MetricsNamespace)
-		out.println("    running elsewhere cannot connect until its namespace is admitted, as the policies' comments show.")
+		out.println("    running elsewhere cannot connect until you answer its namespace, with --metrics-namespace.")
+		if len(config.MeshPorts) > 0 {
+			out.println("    A scraper in the service mesh arrives on the mesh's port, which the second rule does not")
+			out.println("    admit: keep it out of the mesh, or add that port to the rule in a kustomization over the")
+			out.println("    manifest.")
+		}
 		out.println()
 	}
 }

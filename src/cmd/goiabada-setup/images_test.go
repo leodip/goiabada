@@ -278,7 +278,7 @@ func TestRegeneratedMessage_ChecksThePullSecretBeforeTheApply(t *testing.T) {
 	if check < 0 || create < 0 || apply < 0 || check > apply || create > apply {
 		t.Errorf("the message does not check and create the pull secret before the apply:\n%s", out)
 	}
-	if !strings.Contains(out, "  4. Wait for both servers to roll out:") {
+	if !strings.Contains(out, "  5. Wait for both servers to roll out:") {
 		t.Errorf("the steps after the pull secret are not renumbered:\n%s", out)
 	}
 }

@@ -152,6 +152,7 @@ export default defineConfig({
 								{ label: 'Security', slug: 'deploy/kubernetes/security' },
 								{ label: 'Internal TLS', slug: 'deploy/kubernetes/internal-tls' },
 								{ label: 'Secrets', slug: 'deploy/kubernetes/secrets' },
+								{ label: 'GitOps', slug: 'deploy/kubernetes/gitops' },
 								{ label: 'Probes and shutdown', slug: 'deploy/kubernetes/probes-and-shutdown' },
 							],
 						},

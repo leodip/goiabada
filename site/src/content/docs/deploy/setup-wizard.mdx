@@ -60,11 +60,13 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | TLS certificates | Kubernetes, with a Gateway of your cluster's class or Ingresses: a cert-manager ClusterIssuer or Issuer, TLS Secrets you supply, or TLS ended in front, at a load balancer or a CDN. See [Where the certificates come from](/deploy/kubernetes/routing/#where-the-certificates-come-from). | 1, a ClusterIssuer |
 | Gateway listeners | Kubernetes, with a Gateway of your cluster's class: the HTTP and HTTPS listeners' ports. Some implementations take only their proxy's own ports, such as Traefik's 8000 and 8443. | 80 and 443 |
 | Gateway traffic policy | Kubernetes, with Envoy Gateway. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
-| Network policy | Kubernetes. Yes admits only your routing layer's namespace to both servers, and the admin console to the auth server, and asks that namespace. It needs a network plugin that enforces NetworkPolicies. | No, and `envoy-gateway-system` with Envoy Gateway |
+| Network policy | Kubernetes. Yes admits only your routing layer's namespace to both servers, and the admin console to the auth server, and asks that namespace and the ports your service mesh delivers on, if you run one. It needs a network plugin that enforces NetworkPolicies. | No, `envoy-gateway-system` with Envoy Gateway, and no mesh ports |
+| Replicas | Kubernetes: how many auth server pods run. From two, a node drain keeps sign-ins up. Each pod opens up to 20 database connections, and a rollout runs one more. The admin console runs one pod; see [High availability](/deploy/kubernetes/high-availability/). | 2 |
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off on Kubernetes](#the-rate-limiter-on-kubernetes). | On, but off on Kubernetes unless Envoy Gateway's policy is Local |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
 | Container images | Every deployment but native binaries: the repository both servers' images are pulled from, such as a mirror in a registry of your own. A release of the wizard asks whether to pin a mirror's images by digest, and on Kubernetes the wizard asks for an image pull secret. See [Images from your own registry](#images-from-your-own-registry). | `docker.io/leodip/goiabada`, pinned, and no pull secret |
+| Labels and annotations | Kubernetes: labels and annotations every object and both pod templates carry, beside the `app.kubernetes.io` labels, such as an admission policy requires. See [Labels and annotations](/deploy/kubernetes/overview/#labels-and-annotations). | None |
 | Admin credentials | Every deployment: the admin's email and password. | `admin@example.com` for local testing, otherwise `admin@` and the auth server's domain. A generated password. |
 | Database connection | Kubernetes and native binaries, with any database but SQLite: host, port, name, user, password, and [the connection's TLS](#the-database-connections-tls): its mode, and the CA file, client certificate and host name each mode asks for. Then an optional connection test, which connects as the auth server will. If it fails, you can enter them all again. | The database's usual port and user, the name `goiabada`, the TLS mode `prefer`, the system's roots, no client certificate, and the database host as the name checked |
 | Database password | Local testing and production, with any database but SQLite. The wizard runs that database for you, and writes the TLS mode `prefer`. | A generated password |
@@ -124,7 +126,13 @@ A registry that asks for credentials needs them where the images are pulled:
     --docker-server=registry.example.com --docker-username=<user> --docker-password=<password>
   ```
 
-  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them.
+  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them. Under an admission policy that requires labels, create it with them, as the wizard's last message and [Labels and annotations](/deploy/kubernetes/overview/#labels-and-annotations) show.
+
+  The pods run as [accounts of their own](/deploy/kubernetes/security/#pod-security), so pull secrets that a namespace's `default` ServiceAccount names don't reach them. In a namespace that already exists, check for them, and answer the one the registry needs:
+
+  ```bash
+  kubectl get serviceaccount default -n goiabada -o jsonpath='{.imagePullSecrets}'
+  ```
 
 ## Where the secrets go
 
@@ -187,7 +195,10 @@ The same release and the same answers write the same files, byte for byte. A fla
 ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --metrics=annotations
 ```
 
-Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, each pod template carries a checksum of the ConfigMaps its server reads, so a changed answer rolls the pods it reaches when you apply the manifest. Changes you made to the secrets file stay, since nothing writes it. A change to the manifest itself doesn't: keep it in a kustomization over the manifest, as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide does.
+Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, each pod template carries a checksum of the ConfigMaps its server reads, so a changed answer rolls the pods it reaches when you apply the manifest. Changes you made to the secrets file stay, since nothing writes it. A change to the manifest or the Compose file doesn't:
+
+- **On Kubernetes,** keep it in a kustomization over the manifest, as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide does. Set a server setting the wizard doesn't ask as an `env` entry of its container, as [GitOps](/deploy/kubernetes/gitops/#regenerate-or-patch) shows.
+- **On Docker Compose,** set it in the override, the secrets file, under the server's `environment`: it wins over the Compose file's value of the same name.
 
 Each answer is under the name of the flag that gives it, except two:
 
@@ -239,12 +250,16 @@ With prompts, `--keep-secrets` asks every question but the passwords, and writes
 | `--gateway-traffic-policy` | Kubernetes, with `--routing=envoy-gateway`: `cluster` or `local`. Default: `cluster`. |
 | `--network-policy` | Kubernetes: admits only your routing layer's namespace and the admin console to the servers, with NetworkPolicies. |
 | `--proxy-namespace` | Kubernetes, with `--network-policy`: the namespace your routing layer's proxies run in. Default: `envoy-gateway-system` with `--routing=envoy-gateway`, and required otherwise. |
+| `--mesh-ports` | Kubernetes, with `--network-policy`: the ports your service mesh's proxies deliver on between meshed pods, separated by commas, admitted from the same sources: `15008` for Istio's ambient mode, `4143` for Linkerd. Default: none. |
+| `--authserver-replicas` | Kubernetes: how many auth server pods run. Default: `2`. |
 | `--metrics` | Kubernetes: `none`, `annotations` or `podmonitor`. Default: `none`. |
 | `--podmonitor-labels` | Kubernetes, with `--metrics=podmonitor`: the labels your Prometheus selects PodMonitors by, such as `release=kube-prometheus-stack`. |
 | `--metrics-namespace` | Kubernetes, with metrics and `--network-policy`: the namespace your metrics scraper runs in. Default: `monitoring`. |
 | `--image-repository` | Kubernetes, `local` and `production`: the repository both servers' images are pulled from, such as `registry.example.com/mirror/goiabada`. Default: `docker.io/leodip/goiabada`. |
 | `--image-digest` | Kubernetes, `local` and `production`: `true` or `false`. `true` pins each image line to the digest its release pushed, beside the tag. `false` writes the tag alone, for a mirror holding [other digests](#images-from-your-own-registry). A wizard built from source writes the tag alone either way. Default: `true`. |
 | `--image-pull-secret` | Kubernetes: the Secret holding your registry's credentials, which you create in the namespace. Default: none. |
+| `--labels` | Kubernetes: labels every object and both pod templates carry, `key=value` separated by commas, such as `team=identity,cost-center=1234`. Default: none. |
+| `--annotations` | Kubernetes: annotations every object and both pod templates carry, `key=value` separated by commas. A value can't hold a comma. Default: none. |
 | `--rate-limiter` | Production, Kubernetes and native: `true` or `false`. Default: `true`, except on Kubernetes, unless with `--routing=envoy-gateway` and `--gateway-traffic-policy=local`. |
 | `--local-proxy` | Native: `true` when a reverse proxy on the same machine forwards to Goiabada. Default: `true`. |
 | `--output`, `-o` | Where to write the files: a directory, or the name of the main file. Default: the current directory. |

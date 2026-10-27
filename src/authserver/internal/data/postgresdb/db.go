@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"errors"
 	"fmt"
@@ -375,9 +376,68 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 	"(version bigint not null primary key, dirty boolean not null)"
 
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
-// there yet.
-func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) error {
-	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
+// there yet, holding the migration lock while it does.
+//
+// CREATE TABLE IF NOT EXISTS is not atomic on PostgreSQL: two sessions can both find the table
+// absent and both create it, and the loser fails on pg_type's unique index (SQLSTATE 23505) and
+// does not start. Several replicas starting on one empty database is a fresh install's ordinary
+// first start, the setup wizard's default being two, and under a GitOps sync one of the two pods
+// failed that way (#686 section 10). So the create runs under the migration lock, as SQL Server's
+// does, on the resource the runner's own Engine names, so the two cannot drift apart.
+//
+// pg_advisory_lock is scoped to one session, so the lock is taken, used and released on a single
+// connection pinned out of the pool: issued against the pooled *sql.DB, the release could land on
+// another session and leave the lock held for the life of the process.
+//
+// A table already there is answered before the lock, because there is nothing to create and the
+// lock may be held by another process's migration for as long as that takes; the runner waits for
+// the same lock next. Only a table that is absent, a first start, takes the lock, and the DDL's IF
+// NOT EXISTS checks again under it. The lock is taken as the runner takes it, tried first, with
+// progress told before a wait, so the start says it is waiting from here as it would from the
+// runner (#390 decision 7).
+func (d *Database) ensureSchemaMigrationsTable(ctx context.Context, progress migrator.Progress) (err error) {
+	// Looked for in the current schema alone, where the unqualified CREATE puts it: a table of the
+	// same name further along the search path is not this one.
+	var existing sql.NullString
+	if checkErr := d.DB.QueryRowContext(ctx,
+		"SELECT to_regclass(quote_ident(current_schema()) || '.schema_migrations')::text").Scan(&existing); checkErr != nil {
+		return errs.Wrap(checkErr, "unable to check for the schema_migrations table")
+	}
+	if existing.Valid {
+		return nil
+	}
+
+	eng := migrator.Postgres(d.dbConfig.Name)
+
+	conn, err := d.DB.Conn(ctx)
+	if err != nil {
+		return errs.Wrap(err, "unable to pin a connection for the migration lock")
+	}
+	defer func() {
+		// ErrConnDone is what Close answers for a connection the deferred unlock below already
+		// disposed of, which is a deliberate outcome rather than a failure.
+		if cerr := conn.Close(); cerr != nil && !errors.Is(cerr, sql.ErrConnDone) {
+			err = errs.Join(err, cerr)
+		}
+	}()
+
+	// The lock waits indefinitely, as the runner's does, and a stop ends the wait.
+	if lockErr := eng.LockReporting(ctx, conn, progress); lockErr != nil {
+		return errs.Wrap(lockErr, "unable to take the migration lock")
+	}
+	defer func() {
+		// The two obligations Migrator.run carries, for the same reasons: a lock that did not
+		// come back blocks every later migrator on this database indefinitely, so it is reported;
+		// and the session still holding it must not go back to the pool, where the next borrower
+		// would carry it for the life of the process. driver.ErrBadConn is how database/sql is
+		// told to discard it (#268). The release runs whatever became of ctx.
+		if unlockErr := eng.Unlock(context.WithoutCancel(ctx), conn); unlockErr != nil {
+			err = errs.Join(err, errs.Wrap(unlockErr, "unable to release the migration lock"))
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
+
+	if _, err := conn.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	return nil
@@ -390,10 +450,10 @@ func (d *Database) ensureSchemaMigrationsTable(ctx context.Context) error {
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
 //
-// The Progress SQL Server's pre-create reports a lock wait to goes unused: the version table here is
-// created by one idempotent statement, which waits for no migration lock.
-func (d *Database) NewMigrator(ctx context.Context, _ migrator.Progress) (*migrator.Migrator, error) {
-	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
+// progress is told when the schema_migrations pre-create has to wait for the migration lock, and
+// may be nil.
+func (d *Database) NewMigrator(ctx context.Context, progress migrator.Progress) (*migrator.Migrator, error) {
+	if err := d.ensureSchemaMigrationsTable(ctx, progress); err != nil {
 		return nil, err
 	}
 

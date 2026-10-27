@@ -259,7 +259,11 @@ func generateAnswers(config *Config, paths outputPaths) string {
 		boolean("network-policy", config.NetworkPolicy)
 		if config.NetworkPolicy {
 			text("proxy-namespace", config.ProxyNamespace)
+			text("mesh-ports", joinPorts(config.MeshPorts))
 		}
+	}
+	if d.kind == deploymentKubernetes {
+		number("authserver-replicas", config.AuthServerReplicas)
 	}
 	if d.asksRateLimiter {
 		boolean("rate-limiter", config.RateLimiter)
@@ -267,8 +271,7 @@ func generateAnswers(config *Config, paths outputPaths) string {
 	if d.asksMetrics {
 		text("metrics", string(config.Metrics))
 		if config.Metrics == metricsPodMonitor {
-			labels := podMonitorLabels(config.PodMonitorLabels)
-			text("podmonitor-labels", labels.String())
+			text("podmonitor-labels", joinPairs(config.PodMonitorLabels))
 		}
 		if config.admitsMetricsScraper() {
 			text("metrics-namespace", config.MetricsNamespace)
@@ -280,6 +283,10 @@ func generateAnswers(config *Config, paths outputPaths) string {
 		if d.kind == deploymentKubernetes {
 			text("image-pull-secret", config.ImagePullSecret)
 		}
+	}
+	if d.kind == deploymentKubernetes {
+		text("labels", joinPairs(config.Labels))
+		text("annotations", joinPairs(config.Annotations))
 	}
 	text("admin-email", config.AdminEmail)
 	if config.Engine.hasServer && d.externalDatabase {

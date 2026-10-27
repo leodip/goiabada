@@ -40,6 +40,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	ns := config.K8sNamespace
 
 	writeGeneratedFrom(&sb, paths)
+	sb.WriteString("# A run writes this file anew: change an answer in the answers file or by its flag, and keep\n")
+	sb.WriteString("# any other change in a kustomization over this file.\n")
 	sb.WriteString("# Apply with the Secrets file beside it, that file first, so no pod starts with an older\n")
 	if config.NamespaceExists {
 		fmt.Fprintf(&sb, "# copy of the Secrets. Neither file creates the namespace, %s, which must already exist:\n", ns)
@@ -64,13 +66,13 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	sb.WriteString("\n")
 
 	if !config.NamespaceExists {
-		writeNamespace(&sb, ns)
+		writeNamespace(&sb, config)
 	}
 
 	// One ConfigMap per process, holding exactly what that process reads, so neither is handed the
 	// other's settings; each server's unit tier holds its container to that (#396 decision 13).
 	authServerConfigStart := sb.Len()
-	writeConfigMapHead(&sb, ns, "goiabada-authserver-config", "What the auth server reads.")
+	writeConfigMapHead(&sb, config, "goiabada-authserver-config", "What the auth server reads.")
 	writeSharedURLs(&sb, config)
 	fmt.Fprintf(&sb, "  GOIABADA_APPNAME: %s\n", yamlQuote(seededAppName))
 	fmt.Fprintf(&sb, "  GOIABADA_ADMIN_EMAIL: %s\n", yamlQuote(config.AdminEmail))
@@ -105,7 +107,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 
 	authServerConfig := sb.String()[authServerConfigStart:]
 	adminConsoleConfigStart := sb.Len()
-	writeConfigMapHead(&sb, ns, "goiabada-adminconsole-config", "What the admin console reads.")
+	writeConfigMapHead(&sb, config, "goiabada-adminconsole-config", "What the admin console reads.")
 	writeSharedURLs(&sb, config)
 	writeKubernetesTrust(&sb, "ADMINCONSOLE", config)
 	writeObservability(&sb, "ADMINCONSOLE", config.exposedMetricsPort(adminConsoleMetricsPort))
@@ -114,12 +116,15 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	adminConsoleConfig := sb.String()[adminConsoleConfigStart:]
 	if config.DBTLSCA != "" {
 		databaseCAStart := sb.Len()
-		writeDatabaseCA(&sb, ns, config.DBTLSCA)
+		writeDatabaseCA(&sb, config)
 		authServerConfig += sb.String()[databaseCAStart:]
 	}
 
+	writeServiceAccount(&sb, config, "goiabada-authserver")
+	writeServiceAccount(&sb, config, "goiabada-adminconsole")
+
 	// Auth Server Deployment
-	writeDeploymentHead(&sb, ns, "goiabada-authserver", configChecksum(authServerConfig), config.annotatedMetricsPort(authServerMetricsPort),
+	writeDeploymentHead(&sb, config, "goiabada-authserver", configChecksum(authServerConfig), config.annotatedMetricsPort(authServerMetricsPort),
 		"The surge pod opens its own database connections: the docs' connection arithmetic counts it.")
 	writeTerminationGracePeriod(&sb, "Set lower, it cuts the cleanup worker short first.")
 	writeTopologySpread(&sb, "goiabada-authserver")
@@ -184,7 +189,8 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		"empty one before it listens; with several replicas, the first pod migrates and the",
 		"others wait for its lock. If an upgrade's migrations take longer, raise",
 		"failureThreshold until it times periodSeconds covers them, or the container is",
-		"restarted mid-migration.")
+		"restarted mid-migration. Raise it in a kustomization over this file, which the",
+		"wizard writes again on every run: see the Probes and shutdown page.")
 	writePreStopPause(&sb)
 	writeResources(&sb,
 		"A sign-in costs one bcrypt check at cost 10, about 35ms of CPU on a modern core, which no",
@@ -214,11 +220,11 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		}
 	}
 	sb.WriteString("\n")
-	writeDisruptionBudget(&sb, ns, "goiabada-authserver")
+	writeDisruptionBudget(&sb, config, "goiabada-authserver")
 	sb.WriteString("\n")
 
 	// Admin Console Deployment
-	writeDeploymentHead(&sb, ns, "goiabada-adminconsole", configChecksum(adminConsoleConfig), config.annotatedMetricsPort(adminConsoleMetricsPort),
+	writeDeploymentHead(&sb, config, "goiabada-adminconsole", configChecksum(adminConsoleConfig), config.annotatedMetricsPort(adminConsoleMetricsPort),
 		"This server opens no database connections, so its surge pod costs the database nothing.")
 	writeTerminationGracePeriod(&sb,
 		"The auth server's value: this server stops within its 15s drain, and a grace period",
@@ -258,36 +264,37 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 	writeResources(&sb,
 		"The auth server's numbers. This server verifies no passwords and needs less.")
 	sb.WriteString("\n")
-	writeDisruptionBudget(&sb, ns, "goiabada-adminconsole")
+	writeDisruptionBudget(&sb, config, "goiabada-adminconsole")
 	sb.WriteString("\n")
 
-	// Services
+	// Services, each port named http with appProtocol http: the protocol a service mesh then reads
+	// instead of detecting it (#686 section 8).
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: Service\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-authserver\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(&sb, objectMetadata{name: "goiabada-authserver", component: componentOf("goiabada-authserver")})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    app: goiabada-authserver\n")
 	sb.WriteString("  ports:\n")
-	sb.WriteString("  - port: 9090\n")
+	sb.WriteString("  - name: http\n")
+	sb.WriteString("    port: 9090\n")
 	sb.WriteString("    targetPort: 9090\n")
+	sb.WriteString("    appProtocol: http\n")
 	sb.WriteString("\n")
 
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: Service\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-adminconsole\n")
-	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(&sb, objectMetadata{name: "goiabada-adminconsole", component: componentOf("goiabada-adminconsole")})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    app: goiabada-adminconsole\n")
 	sb.WriteString("  ports:\n")
-	sb.WriteString("  - port: 9091\n")
+	sb.WriteString("  - name: http\n")
+	sb.WriteString("    port: 9091\n")
 	sb.WriteString("    targetPort: 9091\n")
+	sb.WriteString("    appProtocol: http\n")
 	sb.WriteString("\n")
 
 	if config.NetworkPolicy {
@@ -296,7 +303,7 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 		if config.admitsMetricsScraper() {
 			admitTo = "the first rule's from:"
 		}
-		writeNetworkPolicy(&sb, ns, "goiabada-authserver", 9090, config.ProxyNamespace, slices.Concat([]string{
+		writeNetworkPolicy(&sb, config, "goiabada-authserver", 9090, config.ProxyNamespace, slices.Concat([]string{
 			"Admits the auth server's port from " + config.proxies() + " and from the admin console's pods,",
 			"and from nothing else. Enforced only by a CNI that implements NetworkPolicy (Calico and",
 			"Cilium do; some clusters' default CNI does not, and accepts the policy and ignores it).",
@@ -309,20 +316,20 @@ func generateKubernetesManifests(config *Config, paths outputPaths) string {
 			"  - namespaceSelector:",
 			"      matchLabels:",
 			"        kubernetes.io/metadata.name: <its namespace>",
-		}, config.metricsScraperComment(authServerMetricsPort)), "goiabada-adminconsole",
+		}, config.meshPortsComment(), config.metricsScraperComment(authServerMetricsPort)), "goiabada-adminconsole",
 			config.scraperRule(authServerMetricsPort))
 		sb.WriteString("\n")
-		writeNetworkPolicy(&sb, ns, "goiabada-adminconsole", 9091, config.ProxyNamespace, slices.Concat([]string{
+		writeNetworkPolicy(&sb, config, "goiabada-adminconsole", 9091, config.ProxyNamespace, slices.Concat([]string{
 			"Admits the admin console's port from " + config.proxies() + " alone: nothing in the cluster calls",
 			"it. Ingress only, with no egress rules, as the auth server's is, and enforced only by a",
 			"CNI that implements NetworkPolicy.",
-		}, config.metricsScraperComment(adminConsoleMetricsPort)), "",
+		}, config.meshPortsComment(), config.metricsScraperComment(adminConsoleMetricsPort)), "",
 			config.scraperRule(adminConsoleMetricsPort))
 		sb.WriteString("\n")
 	}
 
 	if config.Metrics == metricsPodMonitor {
-		writePodMonitor(&sb, ns, config.PodMonitorLabels)
+		writePodMonitor(&sb, config)
 		sb.WriteString("\n")
 	}
 
@@ -361,21 +368,26 @@ var podSecurityLabels = []string{"pod-security.kubernetes.io/warn", "pod-securit
 
 // writeNamespace writes the Namespace both files declare, the one definition of it, so the two can
 // never disagree on its labels and fight over them on every apply.
-func writeNamespace(sb *strings.Builder, ns string) {
+func writeNamespace(sb *strings.Builder, config *Config) {
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: Namespace\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", yamlQuote(ns))
-	sb.WriteString("  # Pod Security admission warns on apply, and writes to the audit log, for any pod in this\n")
-	sb.WriteString("  # namespace that breaks the restricted standard, and refuses none. If you own the namespace\n")
-	sb.WriteString("  # outright, add pod-security.kubernetes.io/enforce: restricted to refuse such pods; check\n")
-	sb.WriteString("  # first that everything else running here meets it, cert-manager's HTTP-01 solver pods\n")
-	sb.WriteString("  # included, which run here while a certificate is issued.\n")
-	sb.WriteString("  labels:\n")
+	var labels []keyValue
 	for _, label := range podSecurityLabels {
-		fmt.Fprintf(sb, "    %s: restricted\n", label)
+		labels = append(labels, keyValue{label, "restricted"})
 	}
+	config.writeMetadata(sb, objectMetadata{
+		name:          yamlQuote(config.K8sNamespace),
+		clusterScoped: true,
+		labelsComment: []string{
+			"Pod Security admission warns on apply, and writes to the audit log, for any pod in this",
+			"namespace that breaks the restricted standard, and refuses none. If you own the namespace",
+			"outright, add pod-security.kubernetes.io/enforce: restricted to refuse such pods; check",
+			"first that everything else running here meets it, cert-manager's HTTP-01 solver pods",
+			"included, which run here while a certificate is issued.",
+		},
+		labels: labels,
+	})
 	sb.WriteString("\n")
 }
 
@@ -403,13 +415,13 @@ func generateKubernetesSecrets(config *Config, paths outputPaths) string {
 	sb.WriteString("\n")
 
 	if !config.NamespaceExists {
-		writeNamespace(&sb, ns)
+		writeNamespace(&sb, config)
 	}
 
 	// base64 spells any bytes in characters YAML reads as they are, so the Secrets' values are the
 	// one set of interpolated values not written through yamlQuote.
 	sb.WriteString("---\n")
-	writeSecretHead(&sb, ns, goiabadaSecrets)
+	writeSecretHead(&sb, config, goiabadaSecrets, "")
 	fmt.Fprintf(&sb, "  db-password: %s\n", base64Encode(config.DBPassword))
 	fmt.Fprintf(&sb, "  admin-password: %s\n", base64Encode(config.AdminPassword))
 	fmt.Fprintf(&sb, "  auth-session-auth-key: %s\n", base64Encode(config.AuthSessionAuthKey))
@@ -426,7 +438,7 @@ func generateKubernetesSecrets(config *Config, paths outputPaths) string {
 		sb.WriteString("# volume serves both files the server reads. To change the pair, edit this Secret and\n")
 		sb.WriteString("# restart the auth server:\n")
 		fmt.Fprintf(&sb, "#   kubectl rollout restart -n %s deployment/goiabada-authserver\n", ns)
-		writeSecretHead(&sb, ns, dbClientTLSSecret)
+		writeSecretHead(&sb, config, dbClientTLSSecret, authServerComponent)
 		fmt.Fprintf(&sb, "  %s: %s\n", dbClientCertFileName, base64Encode(config.DBTLSClientCert))
 		fmt.Fprintf(&sb, "  %s: %s\n", dbClientKeyFileName, base64Encode(config.DBTLSClientKey))
 		sb.WriteString("\n")
@@ -439,7 +451,7 @@ func generateKubernetesSecrets(config *Config, paths outputPaths) string {
 	sb.WriteString("# It is a Secret of its own so that RBAC can restrict get on it by resourceNames, and a\n")
 	sb.WriteString("# secret manager can own it, apart from the other secrets. Read it back for the backup with:\n")
 	fmt.Fprintf(&sb, "#   %s\n", kubernetesSecretReadCommand(encryptionKeySecret, "aes-encryption-key", ns))
-	writeSecretHead(&sb, ns, encryptionKeySecret)
+	writeSecretHead(&sb, config, encryptionKeySecret, authServerComponent)
 	fmt.Fprintf(&sb, "  aes-encryption-key: %s\n", base64Encode(config.AESEncryptionKey))
 
 	return sb.String()
@@ -470,46 +482,41 @@ const (
 
 // writeDatabaseCA writes the ConfigMap holding the certificates of the CA file the operator named,
 // as PEM, which is ASCII lines alone, so each is written as it is inside a literal block.
-func writeDatabaseCA(sb *strings.Builder, ns, certificates string) {
+func writeDatabaseCA(sb *strings.Builder, config *Config) {
 	sb.WriteString("---\n")
 	sb.WriteString("# The authorities the auth server checks the database's certificate against, in place of the\n")
-	fmt.Fprintf(sb, "# system's roots, mounted into its pods at %s. To change them, edit this\n", dbCAFileInPod)
-	sb.WriteString("# ConfigMap, or run the wizard again, and restart the auth server:\n")
-	fmt.Fprintf(sb, "#   kubectl rollout restart -n %s deployment/goiabada-authserver\n", ns)
+	fmt.Fprintf(sb, "# system's roots, mounted into its pods at %s. To change them, run the\n", dbCAFileInPod)
+	sb.WriteString("# wizard again with --db-tls-ca-file and apply its manifest, which rolls the auth server's\n")
+	sb.WriteString("# pods.\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: ConfigMap\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", dbCAConfigMap)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: dbCAConfigMap, component: authServerComponent})
 	sb.WriteString("data:\n")
 	fmt.Fprintf(sb, "  %s: |\n", dbCAFileName)
-	for _, line := range strings.Split(strings.TrimSuffix(certificates, "\n"), "\n") {
+	for _, line := range strings.Split(strings.TrimSuffix(config.DBTLSCA, "\n"), "\n") {
 		fmt.Fprintf(sb, "    %s\n", line)
 	}
 	sb.WriteString("\n")
 }
 
-// writeSecretHead writes the Secret name's fields down to its data.
-func writeSecretHead(sb *strings.Builder, ns, name string) {
+// writeSecretHead writes the Secret name's fields down to its data, the Secret of component, empty
+// for one both servers read.
+func writeSecretHead(sb *strings.Builder, config *Config, name, component string) {
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: Secret\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", name)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: name, component: component})
 	sb.WriteString("type: Opaque\n")
 	sb.WriteString("data:\n")
 }
 
 // writeConfigMapHead opens the ConfigMap name, under a comment saying whose it is.
-func writeConfigMapHead(sb *strings.Builder, ns, name, whose string) {
+func writeConfigMapHead(sb *strings.Builder, config *Config, name, whose string) {
 	sb.WriteString("---\n")
 	fmt.Fprintf(sb, "# %s\n", whose)
-	sb.WriteString("# The three URLs are in both ConfigMaps, written from the same answers; change them in both.\n")
+	sb.WriteString("# The three URLs are in both ConfigMaps, written from the same answers.\n")
 	sb.WriteString("apiVersion: v1\n")
 	sb.WriteString("kind: ConfigMap\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", name)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: name, component: componentOf(strings.TrimSuffix(name, "-config"))})
 	sb.WriteString("data:\n")
 }
 
@@ -539,15 +546,21 @@ func configChecksum(configMaps string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func writeDeploymentHead(sb *strings.Builder, ns, name, checksum string, scrapePort int, surge string) {
+func writeDeploymentHead(sb *strings.Builder, config *Config, name, checksum string, scrapePort int, surge string) {
+	replicas := 1
+	if name == "goiabada-authserver" {
+		replicas = config.AuthServerReplicas
+	}
+	component := componentOf(name)
 	sb.WriteString("---\n")
 	sb.WriteString("apiVersion: apps/v1\n")
 	sb.WriteString("kind: Deployment\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", name)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: name, component: component})
 	sb.WriteString("spec:\n")
-	sb.WriteString("  replicas: 1\n")
+	for _, line := range config.replicasComment(name) {
+		fmt.Fprintf(sb, "  # %s\n", line)
+	}
+	fmt.Fprintf(sb, "  replicas: %d\n", replicas)
 	sb.WriteString("  # A rollout starts one new pod and waits for it to be ready before it stops an old one, so\n")
 	sb.WriteString("  # it never runs fewer pods than replicas.\n")
 	fmt.Fprintf(sb, "  # %s\n", surge)
@@ -556,6 +569,8 @@ func writeDeploymentHead(sb *strings.Builder, ns, name, checksum string, scrapeP
 	sb.WriteString("    rollingUpdate:\n")
 	sb.WriteString("      maxUnavailable: 0\n")
 	sb.WriteString("      maxSurge: 1\n")
+	sb.WriteString("  # The selector matches app alone, and the Services, PodDisruptionBudgets and NetworkPolicies\n")
+	sb.WriteString("  # select by it too: a Deployment's selector cannot change once it exists.\n")
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    matchLabels:\n")
 	fmt.Fprintf(sb, "      app: %s\n", name)
@@ -563,6 +578,8 @@ func writeDeploymentHead(sb *strings.Builder, ns, name, checksum string, scrapeP
 	sb.WriteString("    metadata:\n")
 	sb.WriteString("      labels:\n")
 	fmt.Fprintf(sb, "        app: %s\n", name)
+	writePairs(sb, "        ", config.standardLabels(component))
+	writeOperatorPairs(sb, "        ", config.Labels)
 	sb.WriteString("      annotations:\n")
 	sb.WriteString("        # The checksum of the ConfigMaps the pod reads, which it reads only when it starts: a\n")
 	sb.WriteString("        # manifest whose ConfigMaps changed changes it, so applying the manifest rolls the pods.\n")
@@ -575,13 +592,30 @@ func writeDeploymentHead(sb *strings.Builder, ns, name, checksum string, scrapeP
 		fmt.Fprintf(sb, "        prometheus.io/port: \"%d\"\n", scrapePort)
 		sb.WriteString("        prometheus.io/path: \"/metrics\"\n")
 	}
+	writeOperatorPairs(sb, "        ", config.Annotations)
 	sb.WriteString("    spec:\n")
+	sb.WriteString("      # The server's own account, not the namespace's default, which a cluster policy may refuse.\n")
+	fmt.Fprintf(sb, "      serviceAccountName: %s\n", name)
 	sb.WriteString("      # Neither server calls the Kubernetes API, so the pod mounts no service account token.\n")
 	sb.WriteString("      automountServiceAccountToken: false\n")
 	sb.WriteString("      # Kubernetes would otherwise give the container variables for every Service in the\n")
 	sb.WriteString("      # namespace, GOIABADA_AUTHSERVER_PORT and GOIABADA_ADMINCONSOLE_SERVICE_HOST among them,\n")
 	sb.WriteString("      # none of which either server reads.\n")
 	sb.WriteString("      enableServiceLinks: false\n")
+}
+
+// writeServiceAccount writes the account the Deployment name's pods run as, named after it (#686
+// section 7).
+func writeServiceAccount(sb *strings.Builder, config *Config, name string) {
+	sb.WriteString("---\n")
+	sb.WriteString("# The account the pods run as, rather than the namespace's default, which a cluster policy may\n")
+	sb.WriteString("# refuse. It is bound to no role: neither server calls the Kubernetes API, so no token of it is\n")
+	sb.WriteString("# mounted either.\n")
+	sb.WriteString("apiVersion: v1\n")
+	sb.WriteString("kind: ServiceAccount\n")
+	config.writeMetadata(sb, objectMetadata{name: name, component: componentOf(name)})
+	sb.WriteString("automountServiceAccountToken: false\n")
+	sb.WriteString("\n")
 }
 
 // writeTopologySpread writes a pod spec's preference for one pod of the Deployment name per node.
@@ -624,7 +658,7 @@ func writeContainerHead(sb *strings.Builder, config *Config, name string) {
 	fmt.Fprintf(sb, "        image: %s\n", yamlQuote(config.image(name)))
 	if imageTag == "latest" {
 		sb.WriteString("        # latest is a moving tag: each start pulls whatever release it names then, so pods can\n")
-		sb.WriteString("        # run different releases. Replace it with a release version to pin the image.\n")
+		sb.WriteString("        # run different releases. A release's wizard writes its version and digest instead.\n")
 		sb.WriteString("        imagePullPolicy: Always\n")
 	} else {
 		sb.WriteString("        # A version tag names one build, so a node pulls it once.\n")
@@ -664,16 +698,14 @@ func writeResources(sb *strings.Builder, meaning ...string) {
 }
 
 // writeDisruptionBudget writes the PodDisruptionBudget of the Deployment name.
-func writeDisruptionBudget(sb *strings.Builder, ns, name string) {
+func writeDisruptionBudget(sb *strings.Builder, config *Config, name string) {
 	sb.WriteString("---\n")
 	sb.WriteString("# A voluntary disruption, such as a node drain or a cluster upgrade, evicts one pod at a\n")
 	sb.WriteString("# time. At one replica that pod is still evicted, and the server is down until its\n")
 	sb.WriteString("# replacement is ready; at n replicas, n-1 keep serving.\n")
 	sb.WriteString("apiVersion: policy/v1\n")
 	sb.WriteString("kind: PodDisruptionBudget\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", name)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: name, component: componentOf(name)})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  maxUnavailable: 1\n")
 	sb.WriteString("  selector:\n")
@@ -761,21 +793,20 @@ func writePreStopPause(sb *strings.Builder) {
 }
 
 // writeNetworkPolicy writes the ingress-only NetworkPolicy of the Deployment name, under the lines
-// saying what it admits and why: its pods admit port from proxyNamespace, where the routing layer's
-// proxies run, and, when caller is set, from the pods of that Deployment, and from nothing else. It states no egress rule,
-// since the SMTP server and the database are nothing a NetworkPolicy can select (#396 decision 5). A
-// scraper rule, when given, is a second rule admitting the metrics scraper's namespace to the metrics
-// port alone, leaving the first as it is (#400 decision 8).
-func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, proxyNamespace string, comment []string, caller string, scraper *ingressRule) {
+// saying what it admits and why: its pods admit port, and the service mesh's ports, from
+// proxyNamespace, where the routing layer's proxies run, and, when caller is set, from the pods of
+// that Deployment, and from nothing else. It states no egress rule, since the SMTP server and the
+// database are nothing a NetworkPolicy can select (#396 decision 5). A scraper rule, when given, is
+// a second rule admitting the metrics scraper's namespace to the metrics port alone, leaving the
+// first as it is (#400 decision 8).
+func writeNetworkPolicy(sb *strings.Builder, config *Config, name string, port int, proxyNamespace string, comment []string, caller string, scraper *ingressRule) {
 	sb.WriteString("---\n")
 	for _, line := range comment {
 		fmt.Fprintf(sb, "# %s\n", line)
 	}
 	sb.WriteString("apiVersion: networking.k8s.io/v1\n")
 	sb.WriteString("kind: NetworkPolicy\n")
-	sb.WriteString("metadata:\n")
-	fmt.Fprintf(sb, "  name: %s\n", name)
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	config.writeMetadata(sb, objectMetadata{name: name, component: componentOf(name)})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  podSelector:\n")
 	sb.WriteString("    matchLabels:\n")
@@ -793,8 +824,10 @@ func writeNetworkPolicy(sb *strings.Builder, ns, name string, port int, proxyNam
 		fmt.Fprintf(sb, "          app: %s\n", caller)
 	}
 	sb.WriteString("    ports:\n")
-	sb.WriteString("    - protocol: TCP\n")
-	fmt.Fprintf(sb, "      port: %d\n", port)
+	for _, admitted := range slices.Concat([]int{port}, config.MeshPorts) {
+		sb.WriteString("    - protocol: TCP\n")
+		fmt.Fprintf(sb, "      port: %d\n", admitted)
+	}
 	if scraper != nil {
 		sb.WriteString("  - from:\n")
 		sb.WriteString("    - namespaceSelector:\n")
@@ -868,11 +901,13 @@ func writeObservability(sb *strings.Builder, server string, metricsPort int) {
 	fmt.Fprintf(sb, "  GOIABADA_%s_METRICS_ENABLED: \"true\"\n", server)
 }
 
-// writeContainerPorts writes a container's ports: the server's, and, with metricsPort other than 0,
-// its metrics listener's under the name metrics, which the PodMonitor scrapes by.
+// writeContainerPorts writes a container's ports: the server's, named http, as its Service's is, and,
+// with metricsPort other than 0, its metrics listener's under the name metrics, which the PodMonitor
+// scrapes by.
 func writeContainerPorts(sb *strings.Builder, port, metricsPort int) {
 	sb.WriteString("        ports:\n")
-	fmt.Fprintf(sb, "        - containerPort: %d\n", port)
+	sb.WriteString("        - name: http\n")
+	fmt.Fprintf(sb, "          containerPort: %d\n", port)
 	if metricsPort != 0 {
 		sb.WriteString("        - name: metrics\n")
 		fmt.Fprintf(sb, "          containerPort: %d\n", metricsPort)
@@ -896,7 +931,7 @@ type ingressRule struct {
 
 // writePodMonitor writes the one PodMonitor having the Prometheus Operator scrape both servers'
 // metrics ports, carrying the labels its Prometheus selects PodMonitors by (#400 decision 7).
-func writePodMonitor(sb *strings.Builder, ns string, labels []podMonitorLabel) {
+func writePodMonitor(sb *strings.Builder, config *Config) {
 	sb.WriteString("---\n")
 	sb.WriteString("# Has the Prometheus Operator scrape both servers' metrics ports. A Prometheus the Operator runs\n")
 	sb.WriteString("# selects only the PodMonitors its podMonitorSelector matches, in the namespaces its\n")
@@ -908,15 +943,7 @@ func writePodMonitor(sb *strings.Builder, ns string, labels []podMonitorLabel) {
 	sb.WriteString("# exits 1 after applying everything else in this file.\n")
 	sb.WriteString("apiVersion: monitoring.coreos.com/v1\n")
 	sb.WriteString("kind: PodMonitor\n")
-	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada\n")
-	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
-	if len(labels) > 0 {
-		sb.WriteString("  labels:\n")
-		for _, label := range labels {
-			fmt.Fprintf(sb, "    %s: %s\n", yamlQuote(label.key), yamlQuote(label.value))
-		}
-	}
+	config.writeMetadata(sb, objectMetadata{name: "goiabada", operatorLabels: config.PodMonitorLabels})
 	sb.WriteString("spec:\n")
 	sb.WriteString("  selector:\n")
 	sb.WriteString("    matchExpressions:\n")

@@ -67,7 +67,7 @@ On SQLite, `unable to connect to database` means the file couldn't be opened. Wh
 
 3. If it connects, the credentials or the database name are what's wrong. Connect with the same username and password from your own client to check them, and see [Database](/deploy/database/) for what each engine needs prepared, including what `GOIABADA_DB_CREATE` asks of the user.
 
-4. Fix the value, then restart the auth server: `kubectl rollout restart deployment/goiabada-authserver -n goiabada`, or `docker compose up -d`.
+4. Fix the value, then restart the auth server, with `docker compose up -d` on Docker Compose. On Kubernetes, the ConfigMap's values are the setup wizard's answers: [write the manifest again](/deploy/setup-wizard/#run-it-again-on-a-deployment) with the right one and apply it, which rolls the pods, since an edit of the ConfigMap is lost on the wizard's next run. For the password, put the right one in the Secret, then `kubectl rollout restart deployment/goiabada-authserver -n goiabada`.
 
 </Steps>
 

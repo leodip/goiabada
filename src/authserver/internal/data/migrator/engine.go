@@ -94,10 +94,10 @@ func (e Engine) Name() string { return e.name }
 
 // Lock takes this engine's cross-process migration lock on conn, and Unlock releases it. They
 // are the same statements on the same resource the runner itself uses, exported for the callers
-// outside this package that have to hold that exact resource: SQL Server's schema_migrations
-// pre-create, which is a check followed by a create and is safe only while the migration lock is
-// held (#293), takes it through LockReporting and releases it with Unlock, and the data tier's lock
-// tests hold it from a session of their own with this pair.
+// outside this package that have to hold that exact resource: SQL Server's and PostgreSQL's
+// schema_migrations pre-creates, a check followed by a create on both, safe only while the
+// migration lock is held (#293, #686 section 10), take it through LockReporting and release it
+// with Unlock, and the data tier's lock tests hold it from a session of their own with this pair.
 //
 // Both are no-ops on SQLite, which has no session-scoped lock statement at all; the runner
 // excludes itself there with sqliteMigrationMu, which run takes and this pair cannot, since a

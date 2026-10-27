@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -71,91 +70,11 @@ func (c *Config) metricsAnswer() string {
 		return "pod annotations"
 	case metricsPodMonitor:
 		if len(c.PodMonitorLabels) == 0 {
-			return "a PodMonitor, unlabeled"
+			return "a PodMonitor"
 		}
-		labels := podMonitorLabels(c.PodMonitorLabels)
-		return "a PodMonitor labeled " + labels.String()
+		return "a PodMonitor labeled " + joinPairs(c.PodMonitorLabels)
 	}
 	return "none"
-}
-
-// podMonitorLabel is one label the PodMonitor carries, for the Prometheus that selects it.
-type podMonitorLabel struct{ key, value string }
-
-// podMonitorLabels is --podmonitor-labels: key=value pairs separated by commas, in the order given.
-type podMonitorLabels []podMonitorLabel
-
-// String is the labels as the summary reports them, key=value separated by commas. A nil receiver
-// is no label, because the flag package may call String on one.
-func (l *podMonitorLabels) String() string {
-	if l == nil {
-		return ""
-	}
-	pairs := make([]string, 0, len(*l))
-	for _, label := range *l {
-		pairs = append(pairs, label.key+"="+label.value)
-	}
-	return strings.Join(pairs, ", ")
-}
-
-// Set reads the labels with parsePodMonitorLabels, whose refusal the flag package reports naming
-// the flag.
-func (l *podMonitorLabels) Set(value string) error {
-	labels, err := parsePodMonitorLabels(value)
-	*l = labels
-	return err
-}
-
-// The label syntax Kubernetes accepts ("Labels and Selectors", syntax and character set): a name,
-// and a value unless it is empty, of at most 63 characters, alphanumeric at both ends with dashes,
-// underscores and dots between; a key's optional prefix is a DNS subdomain of at most 253.
-var (
-	labelNamePattern = regexp.MustCompile(`^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$`)
-	dnsSubdomain     = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
-)
-
-// parsePodMonitorLabels reads a label set written key=value, pairs separated by commas and spaces
-// around either ignored, refusing a key or value Kubernetes would refuse and a key given twice.
-// Blank is no label.
-func parsePodMonitorLabels(value string) ([]podMonitorLabel, error) {
-	if strings.TrimSpace(value) == "" {
-		return nil, nil
-	}
-	var labels []podMonitorLabel
-	seen := map[string]bool{}
-	for _, pair := range strings.Split(value, ",") {
-		key, labelValue, found := strings.Cut(pair, "=")
-		key, labelValue = strings.TrimSpace(key), strings.TrimSpace(labelValue)
-		if !found {
-			return nil, errs.Errorf("%q is not key=value", strings.TrimSpace(pair))
-		}
-		if err := validateLabelKey(key); err != nil {
-			return nil, err
-		}
-		if labelValue != "" && (len(labelValue) > 63 || !labelNamePattern.MatchString(labelValue)) {
-			return nil, errs.Errorf("%q is not a label value: at most 63 letters, digits, '-', '_' and '.', starting and ending with a letter or digit", labelValue)
-		}
-		if seen[key] {
-			return nil, errs.Errorf("the label %s is given twice", key)
-		}
-		seen[key] = true
-		labels = append(labels, podMonitorLabel{key, labelValue})
-	}
-	return labels, nil
-}
-
-func validateLabelKey(key string) error {
-	name := key
-	if prefix, rest, found := strings.Cut(key, "/"); found {
-		if len(prefix) > 253 || !dnsSubdomain.MatchString(prefix) {
-			return errs.Errorf("%q is not a label key: its prefix, %q, is not a lowercase DNS subdomain", key, prefix)
-		}
-		name = rest
-	}
-	if len(name) > 63 || !labelNamePattern.MatchString(name) {
-		return errs.Errorf("%q is not a label key: its name is at most 63 letters, digits, '-', '_' and '.', starting and ending with a letter or digit", key)
-	}
-	return nil
 }
 
 // exposedMetricsPort is the server's metrics port with either yes answer, and 0 with metrics off.
@@ -183,7 +102,7 @@ func (c *Config) metricsScraperComment(metricsPort int) []string {
 	}
 	return []string{
 		fmt.Sprintf("The second rule admits the metrics scraper's namespace, %s, to the metrics port, %d,", c.MetricsNamespace, metricsPort),
-		"and to nothing else. To admit a scraper in another namespace, add its namespaceSelector to",
-		"that rule's from.",
+		"and to nothing else. For a scraper in another namespace, answer that namespace instead,",
+		"with --metrics-namespace.",
 	}
 }

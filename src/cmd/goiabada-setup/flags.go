@@ -72,11 +72,14 @@ type CLIFlags struct {
 	TLSSecretAuth    string
 	TLSSecretAdmin   string
 	// GatewayTrafficPolicy is --gateway-traffic-policy, read by the envoy-gateway mode alone, empty
-	// when left out; NetworkPolicy is --network-policy and ProxyNamespace --proxy-namespace, read by
-	// Kubernetes alone.
+	// when left out; NetworkPolicy is --network-policy, ProxyNamespace --proxy-namespace and
+	// MeshPorts --mesh-ports, read by Kubernetes alone.
 	GatewayTrafficPolicy trafficPolicy
 	NetworkPolicy        bool
 	ProxyNamespace       string
+	MeshPorts            portList
+	// AuthServerReplicas is --authserver-replicas, read by Kubernetes alone, 0 when left out.
+	AuthServerReplicas int
 	// CreateNamespace is --create-namespace, read by Kubernetes alone.
 	CreateNamespace optionalBool
 	// RateLimiter is --rate-limiter, read by production Compose, native binaries and Kubernetes.
@@ -84,13 +87,16 @@ type CLIFlags struct {
 	// Metrics is --metrics, empty when left out, PodMonitorLabels --podmonitor-labels and
 	// MetricsNamespace --metrics-namespace, read by Kubernetes alone.
 	Metrics          metricsExposure
-	PodMonitorLabels podMonitorLabels
+	PodMonitorLabels podMonitorLabelSet
 	MetricsNamespace string
 	// ImageRepository is --image-repository and ImageDigest --image-digest, read by Kubernetes and
 	// Compose; ImagePullSecret is --image-pull-secret, read by Kubernetes alone (#686 section 5).
 	ImageRepository string
 	ImageDigest     optionalBool
 	ImagePullSecret string
+	// Labels is --labels and Annotations --annotations, read by Kubernetes alone (#686 section 6).
+	Labels      labelSet
+	Annotations annotationSet
 }
 
 // optionalBool is a boolean flag that knows whether it was given, so one left out takes the
@@ -269,6 +275,8 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.Var(&flags.GatewayTrafficPolicy, "gateway-traffic-policy", "Kubernetes, --routing=envoy-gateway: the traffic policy of Envoy Gateway's load balancer Service: cluster or local (default: cluster)")
 	fs.BoolVar(&flags.NetworkPolicy, "network-policy", false, "Kubernetes: admit only the routing layer and the admin console to the servers with NetworkPolicies")
 	fs.StringVar(&flags.ProxyNamespace, "proxy-namespace", "", "Kubernetes, with --network-policy: the namespace the routing layer's proxies run in (default: envoy-gateway-system for --routing=envoy-gateway, required otherwise)")
+	fs.Var(&flags.MeshPorts, "mesh-ports", "Kubernetes, with --network-policy: the ports a service mesh's proxies deliver on between meshed pods, separated by commas (default: none)")
+	fs.IntVar(&flags.AuthServerReplicas, "authserver-replicas", 0, "Kubernetes: the auth server's replica count (default: 2)")
 	fs.Var(&flags.Metrics, "metrics", "Kubernetes: expose Prometheus metrics to a scraper finding them by: none, annotations or podmonitor (default: none)")
 	fs.Var(&flags.PodMonitorLabels, "podmonitor-labels", "Kubernetes: the labels the PodMonitor carries, key=value separated by commas")
 	fs.StringVar(&flags.MetricsNamespace, "metrics-namespace", "", "Kubernetes: the namespace the NetworkPolicies admit to the metrics ports (default: monitoring)")
@@ -276,6 +284,8 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 	fs.StringVar(&flags.ImageRepository, "image-repository", "", "Kubernetes, local and production: the repository both servers' images are pulled from (default: "+defaultImageRepository+")")
 	fs.Var(&flags.ImageDigest, "image-digest", "Kubernetes, local and production: pin each image line to the digest its release pushed, which a source build has none of (default: true)")
 	fs.StringVar(&flags.ImagePullSecret, "image-pull-secret", "", "Kubernetes: the Secret holding the image registry's credentials (default: none)")
+	fs.Var(&flags.Labels, "labels", "Kubernetes: labels every object and pod template carries, key=value separated by commas (default: none)")
+	fs.Var(&flags.Annotations, "annotations", "Kubernetes: annotations every object and pod template carries, key=value separated by commas (default: none)")
 	fs.Var(&flags.LocalProxy, "local-proxy", "A reverse proxy on this machine forwards to the native binaries (default: true)")
 
 	fs.Usage = func() {
@@ -402,6 +412,13 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("  --proxy-namespace=NAME With --network-policy, the namespace the routing layer's proxies run\n")
 		p("                         in (default: envoy-gateway-system with envoy-gateway, required\n")
 		p("                         otherwise)\n")
+		p("  --mesh-ports=PORTS     With --network-policy, the ports a service mesh's proxies deliver\n")
+		p("                         on between meshed pods, admitted from the same sources, separated\n")
+		p("                         by commas: 15008 under Istio's ambient mode, 4143 under Linkerd\n")
+		p("                         (default: none)\n")
+		p("  --authserver-replicas=N\n")
+		p("                         The auth server's replica count (default: 2). Each pod opens up to\n")
+		p("                         %d database connections, and a rollout runs one more pod\n", authServerPoolSize)
 		p("  --metrics=EXPOSURE     Expose Prometheus metrics on ports %d and %d (default: none).\n", authServerMetricsPort, adminConsoleMetricsPort)
 		p("                         annotations writes the prometheus.io pod annotations, which the\n")
 		p("                         prometheus-community prometheus chart reads; podmonitor writes a\n")
@@ -412,7 +429,13 @@ func newFlagSet(flags *CLIFlags, stderr io.Writer) *flag.FlagSet {
 		p("                         release=kube-prometheus-stack; default: none)\n")
 		p("  --metrics-namespace=NAME\n")
 		p("                         With metrics and --network-policy, the namespace the scraper runs\n")
-		p("                         in, admitted to the metrics ports alone (default: monitoring)\n\n")
+		p("                         in, admitted to the metrics ports alone (default: monitoring)\n")
+		p("  --labels=LABELS        Labels every object and both pod templates carry beside the\n")
+		p("                         app.kubernetes.io ones, key=value separated by commas, such as an\n")
+		p("                         admission policy requires (e.g., team=identity; default: none)\n")
+		p("  --annotations=ANNOTATIONS\n")
+		p("                         Annotations every object and both pod templates carry, key=value\n")
+		p("                         separated by commas; a value holds no comma (default: none)\n\n")
 		p("Native Binaries Options:\n")
 		p("  --local-proxy=BOOL     A reverse proxy on this machine forwards to Goiabada (default: true):\n")
 		p("                         both servers listen on 127.0.0.1 and trust its forwarded headers.\n")

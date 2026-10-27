@@ -11,24 +11,26 @@ import (
 
 // The Kubernetes pages tell an operator where the manifest keeps the database's CA and how to
 // change it, held here to the manifest the wizard writes, so a renamed ConfigMap, a moved mount or
-// another restart command fails until the pages say so (#502 decision 8).
+// another way to change it fails until the pages say so (#502 decision 8). The way is the wizard's
+// flag, since the answers file holds the certificates and the next run writes them back over an
+// edit of the ConfigMap (#686).
 const (
 	kubernetesSecurityPage = "../../../site/src/content/docs/deploy/kubernetes/security.mdx"
 	kubernetesOverviewPage = "../../../site/src/content/docs/deploy/kubernetes/overview.mdx"
 	databaseCAHeading      = "## Check the database's certificate"
 )
 
-// restartInManifest is the restart command the CA ConfigMap's comment gives.
-var restartInManifest = regexp.MustCompile(`(?m)^#\s+(kubectl rollout restart .+)$`)
+// changeInManifest is the flag the CA ConfigMap's comment changes the authorities with.
+var changeInManifest = regexp.MustCompile(`(?m)^#.* with (--[a-z-]+) and apply`)
 
 func TestKubernetesDocs_SayWhereTheDatabaseCALivesAndHowToChangeIt(t *testing.T) {
 	config := goldenConfig(deploymentKubernetes, "postgres")
 	config.DBTLSMode, config.DBTLSCAFile, config.DBTLSCA = "verify-full", "/home/operator/db-ca.pem", goldenCA()
 	manifest := generateKubernetesManifests(config, deployments[deploymentKubernetes].defaultPaths())
 
-	restart := restartInManifest.FindStringSubmatch(manifest)
-	if restart == nil {
-		t.Fatal("the CA ConfigMap's comment gives no restart command")
+	change := changeInManifest.FindStringSubmatch(manifest)
+	if change == nil {
+		t.Fatal("the CA ConfigMap's comment gives no flag to change the authorities with")
 	}
 	named := []string{
 		"name: " + dbCAConfigMap,
@@ -58,11 +60,15 @@ func TestKubernetesDocs_SayWhereTheDatabaseCALivesAndHowToChangeIt(t *testing.T)
 		"`GOIABADA_DB_TLS_CA_FILE`",
 		"`GOIABADA_DB_TLS_MODE`",
 		"`goiabada-authserver-config`",
-		restart[1],
+		change[1] + "=",
 	} {
 		if !strings.Contains(section, want) {
 			t.Errorf("%s, %s: does not name %s, which the manifest writes", kubernetesSecurityPage, databaseCAHeading, want)
 		}
+	}
+
+	if strings.Contains(section, "kubectl edit") {
+		t.Errorf("%s, %s: edits the ConfigMap in place, which the wizard's next run writes over", kubernetesSecurityPage, databaseCAHeading)
 	}
 
 	overview, err := os.ReadFile(kubernetesOverviewPage)

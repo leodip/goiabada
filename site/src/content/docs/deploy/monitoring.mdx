@@ -20,7 +20,7 @@ Each server has a metrics listener of its own, off until you turn it on:
 
 <Steps>
 
-1. Turn the listeners on. On Kubernetes, answer the setup wizard's metrics question, as [Scrape on Kubernetes](#scrape-on-kubernetes) describes. With Docker Compose or native binaries, add the two variables above to each server's environment: the Compose files and the env file the wizard writes leave them off.
+1. Turn the listeners on. On Kubernetes, answer the setup wizard's metrics question, as [Scrape on Kubernetes](#scrape-on-kubernetes) describes. With Docker Compose or native binaries, add the two variables above to each server's environment, in the override or `goiabada.env`: the Compose files and the env file the wizard writes leave them off.
 
 2. Restart both servers.
 
@@ -64,7 +64,7 @@ Pick the answer that matches what scrapes your cluster:
 
 Alloy and the Collector don't read the annotations; that answer is simply the one that turns the listeners on and names the port without writing a PodMonitor, which `kubectl apply` refuses on a cluster without the Operator.
 
-With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in (`--metrics-namespace`, `monitoring` by default). Each policy then gains a second ingress rule admitting that namespace to its server's metrics port alone. Give it the namespace your scraper's pods actually run in, which `kubectl get pods -A` shows: a policy naming any other admits nothing. To admit a scraper in another namespace too, add its `namespaceSelector` to that second rule's `from`. Without the NetworkPolicies, any pod in the cluster can read the metrics.
+With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in (`--metrics-namespace`, `monitoring` by default). Each policy then gains a second ingress rule admitting that namespace to its server's metrics port alone. Give it the namespace your scraper's pods actually run in, which `kubectl get pods -A` shows: a policy naming any other admits nothing. To admit a scraper in another namespace too, add its `namespaceSelector` to that second rule's `from` in a kustomization over the manifest. Without the NetworkPolicies, any pod in the cluster can read the metrics.
 
 ### Pod annotations
 
@@ -78,6 +78,8 @@ annotations:
 ```
 
 They're a convention, not part of Kubernetes or Prometheus. The prometheus-community `prometheus` chart's default configuration reads them, and kube-prometheus-stack ignores them. For the NetworkPolicy, the namespace is the one the chart's Prometheus runs in.
+
+Istio's sidecars rewrite them by default, pointing the scraper at port 15020, where the sidecar serves its own metrics merged with the server's. The generated NetworkPolicies don't admit 15020, so the targets go down. Keep the annotations as written by adding Istio's opt-out to the pod templates, `--annotations=prometheus.istio.io/merge-metrics=false`, and the scraper reads 9190 and 9191 directly.
 
 ### A PodMonitor
 
@@ -178,14 +180,7 @@ Add the receiver to a metrics pipeline, and give the Collector's service account
 
 ### A manifest generated without metrics
 
-Write the manifest again over your [answers file](/deploy/setup-wizard/#run-it-again-on-a-deployment), with the answer you want, and apply it: `--answers=goiabada-setup.yaml --keep-secrets --metrics=annotations`. Or set `GOIABADA_AUTHSERVER_METRICS_ENABLED` and `GOIABADA_ADMINCONSOLE_METRICS_ENABLED` to `"true"` in the two servers' ConfigMaps, and add the `metrics` port to each container yourself, here the auth server's, with 9191 for the admin console:
-
-```yaml
-ports:
-- containerPort: 9090
-- name: metrics
-  containerPort: 9190
-```
+Write the manifest again over your [answers file](/deploy/setup-wizard/#run-it-again-on-a-deployment), with the answer you want, and apply it: `--answers=goiabada-setup.yaml --keep-secrets --metrics=annotations`. The answers file then holds it, so the next run keeps the metrics on.
 
 ## Scrape outside Kubernetes
 

@@ -17,12 +17,15 @@ create-namespace: true
 routing: "envoy-gateway"
 gateway-traffic-policy: "cluster"
 network-policy: false
+authserver-replicas: 2
 rate-limiter: false
 metrics: "podmonitor"
 podmonitor-labels: "release=kube-prometheus-stack"
 image-repository: "docker.io/leodip/goiabada"
 image-digest: true
 image-pull-secret: ""
+labels: ""
+annotations: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

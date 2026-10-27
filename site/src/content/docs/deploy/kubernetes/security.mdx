@@ -44,11 +44,12 @@ It sets no user or group ID, so each container runs as [the user the images run 
 
 No writable volume is mounted, because neither server writes to its file system here. The legacy bootstrap file isn't used under Kubernetes, and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`, fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check: a 400 either way.
 
-A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
+A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, in a kustomization over the manifest, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
 
 Both pod specs also set:
 
-- **`automountServiceAccountToken: false`,** because neither server calls the Kubernetes API, so a compromised pod gets no API credential.
+- **`serviceAccountName`,** an account of the server's own, `goiabada-authserver` or `goiabada-adminconsole`, which the manifest declares, rather than the namespace's `default`. Policies such as Kyverno's that refuse pods running as `default` admit them, and a cloud workload identity or a policy can tell the two servers apart. No role is bound to either account. Checked on K3s under a Kyverno policy refusing the `default` account, and on MicroShift, whose `restricted-v2` SCC admits both pods. A pod takes the image pull secrets its own account names, so any that the namespace's `default` account names don't reach these: give the one your registry needs with [`--image-pull-secret`](/deploy/setup-wizard/#images-from-your-own-registry).
+- **`automountServiceAccountToken: false`,** on the pods and on both accounts, because neither server calls the Kubernetes API, so a compromised pod gets no API credential.
 - **`enableServiceLinks: false`,** because Kubernetes would otherwise give each container variables for every Service in the namespace, and two of the generated Services are named so that those begin with `GOIABADA_`, such as `GOIABADA_AUTHSERVER_PORT` and `GOIABADA_ADMINCONSOLE_SERVICE_HOST`, which neither server reads.
 
 The generated Namespace is labelled `pod-security.kubernetes.io/warn: restricted` and `pod-security.kubernetes.io/audit: restricted`. For any pod in it that breaks the standard, Goiabada's own included, `kubectl apply` prints a warning and the API server writes an audit entry; nothing is refused. It doesn't enforce, because the wizard accepts an existing namespace, whose other workloads' pods would then be refused the next time they're created. When you answer that the namespace [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists), neither file sets a label on it, and the manifest's header has the command its owner can run to add these two.
@@ -66,9 +67,13 @@ On yes, the manifest carries one ingress-only NetworkPolicy per Deployment:
 | `goiabada-authserver` | TCP 9190, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
 | `goiabada-adminconsole` | TCP 9191, with metrics exposed | The metrics scraper's namespace, `monitoring` unless you name another |
 
-The metrics ports are a second rule of each policy, so the scraper's namespace reaches the metrics port and nothing else, and the routing layer and the admin console don't reach it at all (see [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes)).
+The metrics ports are a second rule of each policy, so the scraper's namespace reaches the metrics port and nothing else, and the routing layer and the admin console don't reach it at all, unless they reach it through a service mesh, as below (see [Scrape on Kubernetes](/deploy/monitoring/#scrape-on-kubernetes)).
 
-The routing layer's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on every namespace. On yes, the wizard asks which namespace that is: `envoy-gateway-system`, where Envoy Gateway runs its proxies by default, under the [Envoy Gateway recipe](/deploy/kubernetes/gateway-and-certificates/), and whatever you answer under [any other routing](/deploy/kubernetes/routing/#who-can-reach-goiabada), with `--proxy-namespace` answering it without the prompt. The kubelet's probes come from the pod's own node, which a NetworkPolicy can't block, and cert-manager's HTTP-01 solver pods carry other labels, so neither is affected.
+The routing layer's namespace is selected by its `kubernetes.io/metadata.name` label, which Kubernetes sets on every namespace. On yes, the wizard asks which namespace that is: `envoy-gateway-system`, where Envoy Gateway runs its proxies by default, under the [Envoy Gateway recipe](/deploy/kubernetes/gateway-and-certificates/), and whatever you answer under [any other routing](/deploy/kubernetes/routing/#who-can-reach-goiabada), with `--proxy-namespace` answering it without the prompt. The kubelet's probes come from the pod's own node, which a NetworkPolicy can't block, except under Istio's ambient mode, as below, and cert-manager's HTTP-01 solver pods carry other labels, so neither is affected.
+
+Under a service mesh, a pod's proxy may receive meshed traffic on a port of its own instead of the server's: 15008 under Istio's ambient mode, 4143 under Linkerd. A policy admitting the server's port alone then refuses the admin console's calls to the auth server, and the routing layer's too once its proxies join the mesh. The wizard asks those ports after the namespace, with `--mesh-ports` answering without the prompt, and each policy's first rule admits them from the same sources. Between Istio's sidecars, each server's port is kept and none is needed, but a sidecar that ambient pods call needs 15008.
+
+A mesh port carries a meshed caller to every port of the pod, so the policies then separate ports only for traffic outside the mesh: the admin console and a meshed routing layer reach the metrics ports too, and the mesh's own authorization policies decide what they may call. A scraper that joins such a mesh arrives on the mesh port as well, which the scraper's rule doesn't admit, so its targets go down. Keep the scraper out of the mesh, or add the mesh port to the second rule of both policies. Under Istio's ambient mode, the kubelet's probes arrive from `169.254.7.127`, which some network plugins check against the policies: [Istio's page on NetworkPolicy](https://istio.io/latest/docs/ambient/usage/networkpolicy/) has the rule to add.
 
 Before you answer yes, check two things:
 
@@ -106,7 +111,7 @@ The admin console calls the auth server at `GOIABADA_AUTHSERVER_INTERNALBASEURL`
 When the pod network isn't one you trust, such as a cluster shared with workloads you don't control, or nodes that talk across a network others can read, encrypt the hops. Any of these works, and none needs a change to Goiabada:
 
 - **A network plugin that encrypts pod traffic,** such as Calico's or Cilium's WireGuard mode. It encrypts every hop between nodes, the gateway's included, and the manifest stays as it is.
-- **A service mesh with mutual TLS** between the pods, such as Istio or Linkerd. It covers both hops too. Check that its sidecars leave `X-Forwarded-For` as Envoy wrote it, or Goiabada reads the wrong client address: see [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop).
+- **A service mesh with mutual TLS** between the pods, such as Istio or Linkerd. It covers the gateway's hop too once the gateway's proxies join the mesh. With the NetworkPolicies on, name the ports it delivers on (see [Who can reach Goiabada](#who-can-reach-goiabada)). Check that its sidecars leave `X-Forwarded-For` as Envoy wrote it, or Goiabada reads the wrong client address: see [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop).
 - **TLS at the auth server,** for the [admin console's hop](/deploy/kubernetes/internal-tls/#admin-console-to-auth-server).
 - **A `BackendTLSPolicy`,** for the [gateway's hop to the auth server](/deploy/kubernetes/internal-tls/#gateway-to-auth-server), once the auth server serves HTTPS.
 
@@ -128,32 +133,14 @@ If a pod can't verify the database's certificate, it stops at start and crash-lo
 
 ### Change the authorities
 
-The auth server reads the file only when it starts, so change it like this. The commands use the wizard's default namespace, `goiabada`; replace it with the namespace you chose:
+Write the manifest again with the new file, and apply it, or the kustomization over it with `kubectl apply -k .`. The answers file then holds the new authorities, so the next run keeps them, where an edit of the ConfigMap would be lost. The auth server reads the file only when it starts, and its pod template carries a checksum of the ConfigMap, so applying rolls its pods onto the new authorities:
 
-<Steps>
+```bash
+./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --db-tls-ca-file=new-ca.pem
+kubectl apply -f goiabada-k8s.yaml
+```
 
-1. Edit the `goiabada-db-ca` ConfigMap:
-
-   ```bash
-   kubectl edit configmap goiabada-db-ca -n goiabada
-   ```
-
-   Or write the manifest again with the new file, and apply it:
-
-   ```bash
-   ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --db-tls-ca-file=new-ca.pem
-   kubectl apply -f goiabada-k8s.yaml
-   ```
-
-2. Restart the auth server:
-
-   ```bash
-   kubectl rollout restart -n goiabada deployment/goiabada-authserver
-   ```
-
-</Steps>
-
-Moving the database to a certificate from another authority? Put both authorities in the file and restart before the database switches. Remove the old one once it has.
+Moving the database to a certificate from another authority? Put both authorities in the file, and apply it before the database switches. Once it has, do the same with the new authority alone.
 
 ## Next steps
 

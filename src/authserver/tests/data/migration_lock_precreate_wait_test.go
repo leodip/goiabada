@@ -16,23 +16,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SQL Server's schema_migrations pre-create takes the migration lock when it finds no table, a
-// first start, and a start can queue there behind another process that has since created the
-// table and begun migrating: the runner holds the lock across its whole chain. So the queue at the
-// pre-create is the runner's queue in every way an operator sees, and these hold it to the same
-// rules: the start says it is waiting, once, and a stop ends the wait at once, at the start and in
-// `migrate to` alike (#390 decisions 7, 9 and 10).
+// SQL Server's and PostgreSQL's schema_migrations pre-creates take the migration lock when they
+// find no table, a first start, and a start can queue there behind another process that has since
+// created the table and begun migrating: the runner holds the lock across its whole chain. So the
+// queue at the pre-create is the runner's queue in every way an operator sees, and these hold it to
+// the same rules: the start says it is waiting, once, and a stop ends the wait at once, at the start
+// and in `migrate to` alike (#390 decisions 7, 9 and 10).
 //
-// SQL Server only: it is the one engine whose pre-create takes the lock at all.
+// SQL Server and PostgreSQL only: MySQL's and SQLite's pre-creates are one atomic statement and
+// take no lock.
+
+// preCreateTakesTheLock says the engine's schema_migrations pre-create takes the migration lock:
+// SQL Server's, which has no atomic CREATE TABLE IF NOT EXISTS, and PostgreSQL's, whose form of it
+// races (#686 section 10).
+func preCreateTakesTheLock() bool {
+	return dbType() == data.MSSQL || dbType() == data.Postgres
+}
 
 // TestMigrationLock_AFirstStartQueuedAtThePreCreateSaysSo: a start against a database with no
 // version table, whose migration lock another session holds. The holder creates the table while
 // the start waits, as another pod's pre-create would before it migrates, and then releases.
 //
-// Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
+// Run via: ./run-tests.sh --type data --db <postgres|mssql> --run TestMigrationLock
 func TestMigrationLock_AFirstStartQueuedAtThePreCreateSaysSo(t *testing.T) {
-	if dbType() != data.MSSQL {
-		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
+	if !preCreateTakesTheLock() {
+		t.Skipf("%s pre-creates schema_migrations with one atomic statement, under no lock", dbType())
 	}
 
 	h := newIsolatedDB(t)
@@ -69,10 +77,10 @@ func TestMigrationLock_AFirstStartQueuedAtThePreCreateSaysSo(t *testing.T) {
 // TestMigrationLock_AStopWhileQueuedAtThePreCreateEndsTheWait: the same queue, and a stop arriving
 // in it, ends the wait at once, answered as the cancellation it was, and leaves nothing behind.
 //
-// Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
+// Run via: ./run-tests.sh --type data --db <postgres|mssql> --run TestMigrationLock
 func TestMigrationLock_AStopWhileQueuedAtThePreCreateEndsTheWait(t *testing.T) {
-	if dbType() != data.MSSQL {
-		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
+	if !preCreateTakesTheLock() {
+		t.Skipf("%s pre-creates schema_migrations with one atomic statement, under no lock", dbType())
 	}
 
 	h := newIsolatedDB(t)
@@ -111,10 +119,10 @@ func TestMigrationLock_AStopWhileQueuedAtThePreCreateEndsTheWait(t *testing.T) {
 // The binary is built from this tree, since the subcommand's entry point is package main and no
 // other seam reaches the classification of its preparation step against a real lock.
 //
-// Run via: ./run-tests.sh --type data --db mssql --run TestMigrationLock
+// Run via: ./run-tests.sh --type data --db <postgres|mssql> --run TestMigrationLock
 func TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchanged(t *testing.T) {
-	if dbType() != data.MSSQL {
-		t.Skipf("%s pre-creates schema_migrations without a lock: only SQL Server has no atomic form of that check-then-create", dbType())
+	if !preCreateTakesTheLock() {
+		t.Skipf("%s pre-creates schema_migrations with one atomic statement, under no lock", dbType())
 	}
 
 	binary := buildAuthServer(t)
@@ -129,7 +137,7 @@ func TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchan
 	cfg := appConfig.Database
 	cmd := exec.CommandContext(ctx, binary, "migrate", "to", strconv.Itoa(head))
 	cmd.Env = append(os.Environ(),
-		"GOIABADA_DB_TYPE=mssql",
+		"GOIABADA_DB_TYPE="+string(dbType()),
 		"GOIABADA_DB_HOST="+cfg.Host,
 		"GOIABADA_DB_PORT="+strconv.Itoa(cfg.Port),
 		"GOIABADA_DB_USERNAME="+cfg.Username,
@@ -192,25 +200,38 @@ func dropTheVersionTable(t *testing.T, h *isolatedDB) {
 // createTheVersionTable creates schema_migrations at the shape the pre-create gives it.
 func createTheVersionTable(t *testing.T, h *isolatedDB) {
 	t.Helper()
-	_, err := h.SQL.Exec("CREATE TABLE schema_migrations (version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL)")
+	ddl := "CREATE TABLE schema_migrations (version BIGINT PRIMARY KEY NOT NULL, dirty BIT NOT NULL)"
+	if dbType() == data.Postgres {
+		ddl = "CREATE TABLE schema_migrations (version bigint not null primary key, dirty boolean not null)"
+	}
+	_, err := h.SQL.Exec(ddl)
 	require.NoError(t, err, "create the version table as the holder's pre-create would")
 }
 
 func versionTableExists(t *testing.T, h *isolatedDB) bool {
 	t.Helper()
-	var id *int64
-	require.NoError(t, h.SQL.QueryRow("SELECT OBJECT_ID(N'schema_migrations', N'U')").Scan(&id))
-	return id != nil
+	check := "SELECT OBJECT_ID(N'schema_migrations', N'U')"
+	if dbType() == data.Postgres {
+		check = "SELECT to_regclass('schema_migrations')::text"
+	}
+	var found any
+	require.NoError(t, h.SQL.QueryRow(check).Scan(&found))
+	return found != nil
 }
 
-// queuedForTheLock counts the application lock requests waiting in the isolated database, which,
-// with the test holding the migration lock, are requests for it.
+// queuedForTheLock counts the lock requests waiting in the isolated database, which, with the test
+// holding the migration lock, are requests for it: SQL Server's application locks, and
+// PostgreSQL's advisory locks not yet granted.
 func queuedForTheLock(t *testing.T, h *isolatedDB) int {
 	t.Helper()
+	query := `SELECT COUNT(*) FROM sys.dm_tran_locks
+		WHERE resource_type = 'APPLICATION' AND request_status = 'WAIT' AND resource_database_id = DB_ID(@p1)`
+	if dbType() == data.Postgres {
+		query = `SELECT COUNT(*) FROM pg_locks
+			WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = $1)`
+	}
 	var waiting int
-	require.NoError(t, h.SQL.QueryRow(`SELECT COUNT(*) FROM sys.dm_tran_locks
-		WHERE resource_type = 'APPLICATION' AND request_status = 'WAIT' AND resource_database_id = DB_ID(@p1)`,
-		h.Name).Scan(&waiting))
+	require.NoError(t, h.SQL.QueryRow(query, h.Name).Scan(&waiting))
 	return waiting
 }
 

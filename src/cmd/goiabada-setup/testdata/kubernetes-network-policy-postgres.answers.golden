@@ -18,11 +18,15 @@ routing: "envoy-gateway"
 gateway-traffic-policy: "cluster"
 network-policy: true
 proxy-namespace: "envoy-gateway-system"
+mesh-ports: ""
+authserver-replicas: 2
 rate-limiter: false
 metrics: "none"
 image-repository: "docker.io/leodip/goiabada"
 image-digest: true
 image-pull-secret: ""
+labels: ""
+annotations: ""
 admin-email: "admin@example.com"
 db-host: "goiabada-db"
 db-port: "5432"

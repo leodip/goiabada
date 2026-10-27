@@ -129,7 +129,7 @@ GOIABADA_AUTHSERVER_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
 GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES=10.0.0.0/8,192.168.1.5
 ```
 
-Under Docker Compose, the one that connects to Goiabada is the Compose network's gateway, so list the network's range. For Cloudflare in front of Nginx, [resolve Cloudflare in Nginx](#cloudflare--nginx) instead.
+Under Docker Compose, the one that connects to Goiabada is the Compose network's gateway, so list the network's range. The wizard writes these lists empty in the Compose file and the manifest on every run, so set them where a run keeps them: see [Run it again on a deployment](/deploy/setup-wizard/#run-it-again-on-a-deployment). For Cloudflare in front of Nginx, [resolve Cloudflare in Nginx](#cloudflare--nginx) instead.
 
 ## How the client's address is resolved
 

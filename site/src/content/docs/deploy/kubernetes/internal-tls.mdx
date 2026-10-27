@@ -137,15 +137,12 @@ This example uses cert-manager's [CA issuer](https://cert-manager.io/docs/config
      namespace: goiabada
    spec:
      ports:
-     - name: http
-       port: 9090
-       targetPort: 9090
      - name: https
        port: 9443
        targetPort: 9443
    ```
 
-   Both Service ports need names. Keep HTTP on 9090 for the probes and, until the next section, the gateway.
+   The patch adds the `https` port beside the manifest's `http` one, 9090, which the gateway calls until the next section.
 
 4. **Apply the patches.** Save this as `kustomization.yaml`. Omit the final patch if you generated no NetworkPolicies.
 

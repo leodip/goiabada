@@ -691,7 +691,7 @@ func TestKubernetesManifest_AnExistingNamespaceIsDeclaredInNeitherFile(t *testin
 		labelled[key] = value
 	}
 	delete(wanted, "kubernetes.io/metadata.name")
-	if !reflect.DeepEqual(labelled, wanted) {
+	if wanted = withoutStandardLabels(wanted); !reflect.DeepEqual(labelled, wanted) {
 		t.Errorf("the command sets %v, and a created Namespace carries %v", labelled, wanted)
 	}
 
@@ -1010,5 +1010,39 @@ func TestKubernetesManifest_AChangedConfigMapRollsItsPodsAlone(t *testing.T) {
 	twoCAs.DBTLSMode, twoCAs.DBTLSCA = "verify-full", goldenCA()+goldenCA()
 	if checksums(oneCA)["goiabada-authserver"] == checksums(twoCAs)["goiabada-authserver"] {
 		t.Error("the database CA's ConfigMap changed, and the auth server's pod template did not")
+	}
+}
+
+// Each server's pods run as an account of their own, which the manifest declares, rather than the
+// namespace's default, which a cluster policy may refuse; neither the account nor the pod mounts a
+// token, and no role is granted, since neither server calls the Kubernetes API (#686 section 7).
+func TestKubernetesManifest_EachServerRunsAsAnAccountOfItsOwn(t *testing.T) {
+	docs := kubernetesDocuments(t, kubernetesConfig())
+	accounts := docs["ServiceAccount"]
+	if len(accounts) != len(workloads) {
+		t.Errorf("the manifest declares ServiceAccounts %v, want one per server", slices.Sorted(maps.Keys(accounts)))
+	}
+	for _, w := range workloads {
+		podSpec := at[map[string]any](t, deploymentNamed(t, docs, w.deployment), "spec", "template", "spec")
+		name := at[string](t, podSpec, "serviceAccountName")
+		if name != w.deployment {
+			t.Errorf("%s runs as %q, want %q", w.deployment, name, w.deployment)
+		}
+		account, declared := accounts[name]
+		if !declared {
+			t.Errorf("%s runs as %q, which the manifest doesn't declare", w.deployment, name)
+			continue
+		}
+		if mounts := at[bool](t, account, "automountServiceAccountToken"); mounts {
+			t.Errorf("the ServiceAccount %s mounts its token", name)
+		}
+		if mounts := at[bool](t, podSpec, "automountServiceAccountToken"); mounts {
+			t.Errorf("%s mounts its account's token", w.deployment)
+		}
+	}
+	for _, kind := range []string{"Role", "RoleBinding", "ClusterRole", "ClusterRoleBinding"} {
+		if len(docs[kind]) > 0 {
+			t.Errorf("the manifest grants a %s", kind)
+		}
 	}
 }
