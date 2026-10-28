@@ -62,7 +62,7 @@ Pick the answer that matches what scrapes your cluster:
 | Grafana Alloy | Pod annotations | [The `metrics` container port](#grafana-alloy) |
 | The OpenTelemetry Collector | Pod annotations | [The `metrics` container port](#the-opentelemetry-collector) |
 
-Alloy and the Collector don't read the annotations; that answer is simply the one that turns the listeners on and names the port without writing a PodMonitor, which `kubectl apply` refuses on a cluster without the Operator.
+Alloy and the Collector don't read the annotations. That answer is the one that turns the listeners on and names the port without writing a PodMonitor, which `kubectl apply` refuses on a cluster without the Operator.
 
 With the NetworkPolicies on, the wizard also asks which namespace the scraper runs in (`--metrics-namespace`, `monitoring` by default). Each policy then gains a second ingress rule admitting that namespace to its server's metrics port alone. Give it the namespace your scraper's pods actually run in, which `kubectl get pods -A` shows: a policy naming any other admits nothing. To admit a scraper in another namespace too, add its `namespaceSelector` to that second rule's `from` in a kustomization over the manifest. Without the NetworkPolicies, any pod in the cluster can read the metrics.
 

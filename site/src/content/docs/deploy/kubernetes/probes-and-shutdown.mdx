@@ -15,7 +15,7 @@ The manifest the setup wizard generates sets every probe, the stop pause and the
 
 1. **Find out how long the migration takes.** The release notes announce a long one, and running the new release against a copy of your database shows it: the `database migrated` record carries its `duration`.
 
-2. **Raise the auth server's startup budget** until `failureThreshold × periodSeconds` covers it. The manifest's allows 60 × 5 = 300 seconds. The upgrade writes the manifest again, so raise it in a kustomization over the manifest. Save this as `kustomization.yaml`, beside `goiabada-k8s.yaml`, or add its patch to the kustomization you have:
+2. **Raise the auth server's startup budget** until `failureThreshold × periodSeconds` covers it. The manifest allows 60 × 5 = 300 seconds. The upgrade writes the manifest again, so raise it in a kustomization over the manifest. Save this as `kustomization.yaml`, beside `goiabada-k8s.yaml`, or add its patch to the kustomization you have:
 
    ```yaml
    apiVersion: kustomize.config.k8s.io/v1beta1

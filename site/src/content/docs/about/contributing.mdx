@@ -98,13 +98,11 @@ Three more options narrow a run:
 
 ### Browser e2e tests
 
-The Playwright suites in `e2e/` run against the maintainer's VPS and require SSH access, which
-external contributors do not have. You're welcome to write or improve these tests. Follow the
+The Playwright suites in `e2e/` run against the maintainer's VPS and need SSH access, which
+external contributors don't have. You're welcome to write or improve these tests. Follow the
 [e2e README](https://github.com/leodip/goiabada/blob/main/e2e/README.md#contribute-tests), run
 `npm ci` and `npm run typecheck` from `e2e/playwright` on your machine, and say in your pull request
 that the browser suites need a maintainer to run them.
-
-The Go unit, data and integration tiers above run in the dev container and do not need that VPS.
 
 ## Commit what you generate
 

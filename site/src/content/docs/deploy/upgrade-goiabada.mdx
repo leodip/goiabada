@@ -78,7 +78,7 @@ A tag is mutable in the registry: a re-push under the same name, by mistake or t
 
 A release of the setup wizard pins both image lines: each names the release's version tag and the digest the release pushed, `docker.io/leodip/goiabada:authserver-<version>@sha256:<digest>`. Read the rule at the end of this section before you change one by hand.
 
-An image line naming the tag alone, written by a wizard built from source or with [`--image-digest=false`](/deploy/setup-wizard/#images-from-your-own-registry), is pinned by giving it the tag and the digest together, `leodip/goiabada:authserver-<version>@sha256:<digest>`, after the registry it names.
+To pin an image line that names the tag alone, written by a wizard built from source or with [`--image-digest=false`](/deploy/setup-wizard/#images-from-your-own-registry), add the digest after the tag: `leodip/goiabada:authserver-<version>@sha256:<digest>`, keeping the registry your line names in front.
 
 Where the digest comes from:
 

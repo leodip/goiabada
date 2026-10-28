@@ -88,7 +88,9 @@ The wizard warns you whenever the mode it writes checks no certificate.
 
 The auth server's limits counted by a user or an email apply whether the rate limiter is on or off: wrong one-time codes, wrong passwords per account, and password-reset and registration mails per address among them. The rate limiter adds the limits counted by an IP address.
 
-Under Envoy Gateway's Cluster policy, Goiabada sees a node's address for every client. The per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Behind any other routing, the wizard can't know which address Goiabada sees, so it's off by default too: read the `ip=` of your own request in the auth server's log once it runs, and turn it on when that's your own address. Turned on, it also limits wrong passwords per email from one network, and every client through a node counts as one network: 10 wrong passwords block an email's password sign-ins for 15 minutes for every client through that node. See the [rate limits](/reference/environment-variables/#rate-limits).
+Under Envoy Gateway's Cluster policy, Goiabada sees a node's address for every client. The per-address limits would then count every user who arrives through one node together, and throttle sign-ins on a busy site. That's why it's off by default there. Turned on, it also counts every client through a node as one network: 10 wrong passwords block an email's password sign-ins for 15 minutes for every client through that node. See the [rate limits](/reference/environment-variables/#rate-limits).
+
+Behind any other routing, the wizard can't tell which address Goiabada sees, so it's off by default too. Once Goiabada runs, read the `ip=` of your own request in the auth server's log. If it's your own address, turn the rate limiter on.
 
 ## Images from your own registry
 
@@ -195,7 +197,7 @@ The same release and the same answers write the same files, byte for byte. A fla
 ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --metrics=annotations
 ```
 
-Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, each pod template carries a checksum of the ConfigMaps its server reads, so a changed answer rolls the pods it reaches when you apply the manifest. Changes you made to the secrets file stay, since nothing writes it. A change to the manifest or the Compose file doesn't:
+Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada](/deploy/upgrade-goiabada/#update-to-a-new-release) shows. On Kubernetes, applying the manifest restarts the pods whose configuration changed. Changes you made to the secrets file stay, since nothing writes it. A change you made to the manifest or the Compose file is lost:
 
 - **On Kubernetes,** keep it in a kustomization over the manifest, as the [Internal TLS](/deploy/kubernetes/internal-tls/) guide does. Set a server setting the wizard doesn't ask as an `env` entry of its container, as [GitOps](/deploy/kubernetes/gitops/#regenerate-or-patch) shows.
 - **On Docker Compose,** set it in the override, the secrets file, under the server's `environment`: it wins over the Compose file's value of the same name.
