@@ -167,6 +167,7 @@ func TestAnswers_RefusesAFileItCouldMisread(t *testing.T) {
 		{"a client key's file", "version: 1\ntype: kubernetes\ndb-tls-client-key-file: key.pem\n", "line 3: db-tls-client-key-file names a secret's file"},
 		{"a run option", "version: 1\ntype: kubernetes\noverwrite: true\n", "line 3: overwrite says how one run writes"},
 		{"certificates that are none", "version: 1\ntype: kubernetes\ndb-tls-ca: nothing\n", "line 3: db-tls-ca holds no PEM certificate"},
+		{"a client certificate neither true nor false", "version: 1\ntype: kubernetes\ndb-tls-client-cert: yes\n", "line 3: db-tls-client-cert is \"yes\", which is neither true nor false"},
 		{"no mapping", "- type\n", "holds no mapping of answers"},
 	}
 	for _, tc := range cases {
@@ -274,6 +275,46 @@ func TestKeepSecrets_AnInteractiveRunAsksNoSecret(t *testing.T) {
 				t.Errorf("the directory holds %v, no %s", names, answersFile)
 			}
 		})
+	}
+}
+
+// keptClientCertPrompt is what an interactive run under --keep-secrets asks in place of the pair's
+// files, which stay in the secrets file.
+const keptClientCertPrompt = "Does the auth server present a client certificate to the database? Its " + dbClientTLSSecret + " Secret stays as it is [y/N]: "
+
+// An interactive run under --keep-secrets with a mode that carries a client certificate asks only
+// whether one is presented, and a yes keeps the pair's mount in the manifest it writes again, the
+// secrets file left as it was: without it, the regenerated pods would stop presenting the pair the
+// database checks (#686 section 4).
+func TestKeepSecrets_AnInteractiveRunKeepsTheClientCertificate(t *testing.T) {
+	var steps []scriptedStep
+	for _, step := range withTLSAnswers(t, deploymentKubernetes, "5", "") {
+		switch {
+		case step.hidden, step.prompt == "Test database connection? [Y/n]: ":
+		case step.prompt == clientCertPrompt:
+			steps = append(steps, scriptedStep{prompt: keptClientCertPrompt, answer: "y"})
+		default:
+			steps = append(steps, step)
+		}
+	}
+	dir := t.TempDir()
+	secrets := resolveOutputPaths(deployments[deploymentKubernetes], dir).secrets
+	if err := os.WriteFile(secrets, []byte(keptSecrets), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	w, _, out, _ := testWizard(t, &CLIFlags{KeepSecrets: true, Output: dir}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("a run under --keep-secrets: %v\n%s", err, out)
+	}
+	if !w.config.presentsClientCertificate() {
+		t.Error("the run answered yes and presents no client certificate")
+	}
+	if manifest := readFile(t, w.paths.description); !strings.Contains(manifest, dbClientTLSSecret) {
+		t.Errorf("the manifest does not mount the %s Secret the database checks", dbClientTLSSecret)
+	}
+	if got := readFile(t, secrets); got != keptSecrets {
+		t.Errorf("--keep-secrets wrote the secrets file:\n%s", got)
 	}
 }
 
