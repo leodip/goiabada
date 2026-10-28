@@ -34,7 +34,7 @@ type RefreshTokenGrantInput struct {
 // RefreshOutcome is what a successful refresh did besides answering, for the token handler's audit.
 type RefreshOutcome struct {
 	// BumpedSession is the browser session the refresh kept alive: nil for a password grant's token,
-	// which has no session, and for a token bound to none.
+	// which has no session, for a token bound to none, and when the bump failed (#701).
 	BumpedSession *record.UserSession
 }
 
@@ -82,7 +82,8 @@ var (
 // between them: it either commits before the check, which refuses the rotation and rolls the claim
 // back, or after the insert, when it finds the child and revokes it too, or in the window between,
 // where the child is born into a family that is already recorded and the validator refuses it (#132,
-// #259). The session bump opens a transaction of its own and stays after the commit.
+// #259). The session bump opens a transaction of its own and stays after the commit, and a bump
+// that fails is logged rather than answered, since the presented token is spent by then (#701).
 //
 // The user's row comes first, so a credential change that revokes the user's grants and this
 // rotation serialize on it: the change takes that row before it moves a generation or sweeps a
@@ -256,10 +257,23 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		// session's own. The address is left as recorded too: a session holds the latest address
 		// its user's browser was seen from, and a refresh request often comes from the client's
 		// server instead (#243).
-		outcome.BumpedSession, err = t.sessions.BumpUserSession(ctx, refreshToken.SessionIdentifier,
+		//
+		// A bump that fails still hands out the tokens. The rotation has committed, so the presented
+		// token is spent: answering a fault would leave the client nothing to refresh with, and its
+		// retry with the spent token would read as a replay and revoke the family, the child minted
+		// here included (#701). Nothing the tokens carry depends on the bump, which records the
+		// session's last use and the client's association with it. A session that ended in the
+		// meantime fails the bump too, and the validator refuses the child at its next refresh.
+		bumped, bumpErr := t.sessions.BumpUserSession(ctx, refreshToken.SessionIdentifier,
 			refreshToken.Code.ClientId, "", "", "")
-		if err != nil {
-			return nil, nil, err
+		if bumpErr != nil {
+			slog.WarnContext(ctx, "unable to bump the user session after a refresh token rotation",
+				"grant_type", oidc.GrantTypeRefreshToken.String(),
+				"refresh_token_id", refreshToken.Id,
+				"client_id", refreshToken.Code.ClientId,
+				"error", bumpErr)
+		} else {
+			outcome.BumpedSession = bumped
 		}
 	}
 	return tokenResponse, outcome, nil

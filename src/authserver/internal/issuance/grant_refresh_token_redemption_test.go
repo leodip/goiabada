@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
@@ -914,23 +915,64 @@ func TestIssueRefreshTokenGrant_ATokenThatCannotBeReadBackIsAFault(t *testing.T)
 	}
 }
 
-// A bump that fails is answered as a fault, as it was when the handler made it: the tokens already
-// minted are not handed out.
-func TestIssueRefreshTokenGrant_AFailedBumpIsAFault(t *testing.T) {
-	mockDB := datamocks.NewDatabase(t)
-	failure := errs.New("connection refused")
-	sessions := &fakeSessions{err: failure}
-	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
+// A bump that fails after the rotation committed still hands out the tokens (#701). The presented
+// token is spent by then, so a fault would leave the client nothing to refresh with, and its retry
+// with the spent token would read as a replay and revoke the family, the child minted here
+// included. The refresh token handed out is the child the rotation inserted, nothing is contained,
+// the outcome names no bumped session, so the handler audits no bump, and the failure is logged.
+func TestIssueRefreshTokenGrant_AFailedBumpStillHandsOutTheTokens(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		failure error
+	}{
+		{"a database fault", errs.New("connection refused")},
+		{"the refusal a session that ended since the validator read it answers", errs.New("can't bump user session because user session is nil")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := datamocks.NewDatabase(t)
+			var order []string
+			note := func(what string) { order = append(order, what) }
+			sessions := &fakeSessions{err: tc.failure, note: note}
+			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
+			logs := logtest.CaptureSlog(t)
 
-	input := codeRefreshInput()
-	armRotation(mockDB, input, true, false, func(string) {})
-	armRefreshMint(t, mockDB, input, func(string) {})
+			input := codeRefreshInput()
+			stub := armRotation(mockDB, input, true, false, note)
+			inserted := armRefreshMint(t, mockDB, input, note)
 
-	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
+			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
-	require.ErrorIs(t, err, failure)
-	assert.Nil(t, response)
-	assert.Nil(t, outcome)
-	assert.Len(t, sessions.bumps, 1)
-	mockDB.AssertExpectations(t)
+			require.NoError(t, err)
+			require.NoError(t, stub.BodyErr)
+			assert.Equal(t, []string{"begin", "acquire", "claim", "family", "reread", "mint", "insert", "commit", "bump"}, order,
+				"the bump fails after the rotation committed")
+			require.NotNil(t, response)
+			assert.NotEmpty(t, response.AccessToken)
+			assert.NotEmpty(t, response.IdToken)
+			require.NotNil(t, inserted.row)
+			claims := jwt.MapClaims{}
+			_, _, parseErr := jwt.NewParser().ParseUnverified(response.RefreshToken, claims)
+			require.NoError(t, parseErr)
+			assert.Equal(t, inserted.row.RefreshTokenJti, claims["jti"],
+				"the refresh token handed out is the child the rotation inserted")
+			assert.NotEqual(t, input.RefreshToken.RefreshTokenJti, claims["jti"])
+			require.NotNil(t, outcome)
+			assert.Nil(t, outcome.BumpedSession, "no session was kept alive, so the handler audits no bump")
+			assert.Len(t, sessions.bumps, 1)
+			// The strict double: no containment, no family record, nothing past the rotation.
+			mockDB.AssertExpectations(t)
+
+			records := logs.Records()
+			require.Len(t, records, 1)
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Equal(t, "unable to bump the user session after a refresh token rotation", records[0].Message)
+			assert.Equal(t, "refresh_token", records[0].Attrs["grant_type"])
+			assert.Equal(t, int64(7), records[0].Attrs["refresh_token_id"])
+			assert.Equal(t, int64(1), records[0].Attrs["client_id"])
+			logged, isError := records[0].Attrs["error"].(error)
+			require.True(t, isError, "the failure rides as an error attribute")
+			require.ErrorIs(t, logged, tc.failure)
+			assert.NotContains(t, records[0].Attrs, "session_identifier", "a session identifier is a credential, never logged")
+		})
+	}
 }
