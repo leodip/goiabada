@@ -51,7 +51,7 @@ Most implementations take the well-known ports 80 and 443 for the listeners, the
 
 Use it when a platform team runs a shared Gateway and you attach routes to it. The manifest writes no Gateway, no redirect and no certificate: the Gateway's owner serves HTTPS for both hosts and redirects plain HTTP.
 
-The wizard always names the listener each route attaches to. A route naming none attaches to every listener its host matches, a plain HTTP one included, and would serve Goiabada over HTTP. Ask the Gateway's owner which listener serves HTTPS for each host; a shared Gateway often has one wildcard listener for both, which `--admin-listener` defaults to.
+Ask the Gateway's owner which listener serves HTTPS for each host, and name that one: a route attached to a plain HTTP listener serves Goiabada over HTTP. A shared Gateway often has one wildcard listener for both hosts. `--admin-listener` defaults to `--auth-listener`'s, so name it once.
 
 The Gateway must admit routes from Goiabada's namespace on those listeners, in their `allowedRoutes`. Until it does, each route's `Accepted` condition is `False` with the reason `NotAllowedByListeners`, and nothing is served:
 

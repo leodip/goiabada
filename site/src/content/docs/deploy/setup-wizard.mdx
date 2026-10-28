@@ -61,7 +61,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Gateway listeners | Kubernetes, with a Gateway of your cluster's class: the HTTP and HTTPS listeners' ports. Some implementations take only their proxy's own ports, such as Traefik's 8000 and 8443. | 80 and 443 |
 | Gateway traffic policy | Kubernetes, with Envoy Gateway. Cluster works behind every load balancer, but Goiabada then sees a node's address for every client. Local runs Envoy on every node and keeps each client's own address, behind a load balancer that passes connections through rather than proxying them. | Cluster |
 | Network policy | Kubernetes. Yes admits only your routing layer's namespace to both servers, and the admin console to the auth server, and asks that namespace and the ports your service mesh delivers on, if you run one. It needs a network plugin that enforces NetworkPolicies. | No, `envoy-gateway-system` with Envoy Gateway, and no mesh ports |
-| Replicas | Kubernetes: how many auth server pods run. From two, a node drain keeps sign-ins up. Each pod opens up to 20 database connections, and a rollout runs one more. The admin console runs one pod; see [High availability](/deploy/kubernetes/high-availability/). | 2 |
+| Replicas | Kubernetes: how many auth server pods run. From two, a node drain keeps sign-ins up. Each pod opens up to 20 database connections, and a rollout runs one more pod. The admin console runs one pod; see [High availability](/deploy/kubernetes/high-availability/). | 2 |
 | Reverse proxy | Native binaries. Yes has both servers listen on `127.0.0.1` and trust the proxy's forwarded headers. No has them listen on every interface and trust no forwarded header, and you set up their HTTPS yourself. | Yes |
 | Rate limiter | Every deployment but local testing, which leaves it off. See [why it's off on Kubernetes](#the-rate-limiter-on-kubernetes). | On, but off on Kubernetes unless Envoy Gateway's policy is Local |
 | Metrics | Kubernetes. None, pod annotations, or a PodMonitor for the Prometheus Operator. See [Monitoring](/deploy/monitoring/). | None |
@@ -108,7 +108,7 @@ Where the cluster or the host can reach neither, or may pull only from a registr
 
 `docker pull`, `docker tag` and `docker push` copy one platform, under another digest, which a pinned image line can't be pulled by: the pull fails with `not found`. Copy the images again with one of the above, or answer **No** when the wizard asks whether to pin the images, `--image-digest=false`, so the image lines name the tag alone.
 
-With MySQL, PostgreSQL or SQL Server, a Compose file also runs the database's own image, such as `postgres:18`, which `--image-repository` doesn't change. Copy it to your registry too, and name your copy under the database's service, `mysql-server`, `postgres-server` or `mssql-server`, in `docker-compose.override.yml`. It overrides the image `docker-compose.yml` names, and `--keep-secrets` leaves it as it is:
+With MySQL, PostgreSQL or SQL Server, a Compose file also runs the database's own image, such as `postgres:18`, which `--image-repository` doesn't change. Copy it to your registry too, and add an `image` line naming your copy to the database's service already in `docker-compose.override.yml`, `mysql-server`, `postgres-server` or `mssql-server`. It overrides the image `docker-compose.yml` names, and `--keep-secrets` leaves it as it is:
 
 ```yaml
 services:

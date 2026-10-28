@@ -14,7 +14,7 @@ Most people want **Cloudflare Tunnel**: no open port, no certificate to renew an
 | [Cloudflare Tunnel](/deploy/cloudflare-tunnel/)<br/>Least effort | Cloudflare's certificates | Nothing: `cloudflared` connects out | Production with reverse proxy | MySQL, PostgreSQL, SQL Server or SQLite, in the Compose file | One server, with your domain on Cloudflare |
 | [Cloudflare + Nginx](/deploy/cloudflare-nginx/)<br/>Some effort | Cloudflare's, and Let's Encrypt's on Nginx | Ports 80 and 443 | Production with reverse proxy | The same | A server already running Nginx, with your domain on Cloudflare |
 | [Reverse proxy](/deploy/reverse-proxy/)<br/>Some effort | Let's Encrypt's on Nginx | Ports 80 and 443 | Production with reverse proxy | The same | One server, without Cloudflare |
-| [Kubernetes](/deploy/kubernetes/overview/)<br/>Most effort | cert-manager's, on the Gateway | The Gateway's load balancer | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
+| [Kubernetes](/deploy/kubernetes/overview/)<br/>Most effort | cert-manager's or your own, on a Gateway or an Ingress | Your Gateway's or Ingress controller's load balancer | Kubernetes cluster | MySQL, PostgreSQL or SQL Server, run by you | Several replicas, on a cluster you already run |
 | [Native binaries](/deploy/native-binaries/)<br/>Some effort | Your reverse proxy's, or each server's own | Your proxy's ports, or each server's | Native binaries | MySQL, PostgreSQL or SQL Server run by you, or SQLite | A server without Docker |
 
 The first three run the [Docker Compose](/deploy/docker-compose/) files the setup wizard writes, and differ only in what sits in front of them.
@@ -28,7 +28,7 @@ The first three run the [Docker Compose](/deploy/docker-compose/) files the setu
 
 ## What changes between methods
 
-Every method runs the same two servers. The auth server answers sign-ins, tokens and the API on port 9090, and the admin console answers administrators on port 9091. Each serves plain HTTP by default, and something in front of it serves HTTPS: Cloudflare, Nginx, a Kubernetes Gateway, or the server itself with a certificate of its own.
+Every method runs the same two servers. The auth server answers sign-ins, tokens and the API on port 9090, and the admin console answers administrators on port 9091. Each serves plain HTTP by default, and something in front of it serves HTTPS: Cloudflare, Nginx, a Kubernetes Gateway or Ingress, or the server itself with a certificate of its own.
 
 Two things change from method to method, and each has a page:
 

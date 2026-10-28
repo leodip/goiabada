@@ -94,7 +94,7 @@ This page helps you keep Goiabada's Kubernetes files in a Git repository that Ar
    kubectl kustomize production
    ```
 
-5. **Point your GitOps tool at each environment's directory,** with [Argo CD](#argo-cd) or [Flux](#flux) below.
+5. **Point your GitOps tool at each environment's directory,** with [Argo CD](#argo-cd) or [Flux](#flux) below. These steps are tested with Argo CD v3.5.6 and Flux v2.10.0.
 
 </Steps>
 
@@ -194,7 +194,7 @@ flux reconcile kustomization goiabada-production --with-source
 
 When you answered yes to creating the namespace, the manifest declares it, and the GitOps tool owns it with everything else. Deleting a Flux `Kustomization` that prunes, or an Argo CD `Application` with cascading deletion, then deletes the namespace and everything in it, Secrets you created by hand included.
 
-Sealed files and `ExternalSecret`s come back with the rest when the environment is applied again. Secrets created from your terminal don't: create them again, with the same values, as [Secrets](/deploy/kubernetes/secrets/#from-your-terminal) explains. For a namespace that must outlive the GitOps tool's objects, answer no to creating it, and create it outside the repository.
+Sealed files and `ExternalSecret`s come back with the rest when the environment is applied again. Secrets created from your terminal don't: create them again, with the same values, as [Secrets](/deploy/kubernetes/secrets/#from-your-terminal) explains. For a namespace that must outlive the GitOps tool's objects, answer no to creating it, and create it outside the repository. To switch an environment that already runs, **never** just regenerate: follow [Switching a running deployment](/deploy/kubernetes/overview/#a-namespace-that-already-exists) first, or pruning deletes the namespace.
 
 ## The Internal TLS guide in a repository
 

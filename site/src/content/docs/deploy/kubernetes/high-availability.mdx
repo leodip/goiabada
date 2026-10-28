@@ -19,7 +19,7 @@ The setup wizard asks how many auth server pods to run, two unless you answer ot
    (replicas + surge) × GOIABADA_DB_MAX_OPEN_CONNS + headroom < max_connections
    ```
 
-   [Connections](#connections) explains each term, and the wizard's completion message gives the sum for the count you answered. With the defaults, two replicas make 3 × 20 = 60 connections, and three make 4 × 20 = 80. A stock PostgreSQL allows 100, 3 of them reserved for superusers, which leaves 17 for the headroom at three replicas; a stock MySQL allows 151. Until the sum holds, raise the database's `max_connections`, or lower `GOIABADA_DB_MAX_OPEN_CONNS`.
+   [Connections](#connections) explains each term, and the wizard's completion message gives the sum for the count you answered. With the defaults, two replicas make 3 × 20 = 60 connections, and three make 4 × 20 = 80. A stock PostgreSQL allows 100, 3 of them reserved for superusers: that leaves 37 for the headroom at two replicas, room for one stopping pod, and 17 at three, room for none. A stock MySQL allows 151. Until the sum holds, raise the database's `max_connections`, or lower `GOIABADA_DB_MAX_OPEN_CONNS`.
 
    Lower it in a kustomization over the manifest, since the wizard writes the manifest again on every run. Save this as `kustomization.yaml`, beside `goiabada-k8s.yaml`, with the limit your sum needs:
 

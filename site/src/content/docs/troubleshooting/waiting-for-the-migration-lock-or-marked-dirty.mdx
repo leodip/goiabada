@@ -21,7 +21,7 @@ The auth server's last record is `waiting for the migration lock`, a few lines a
 
 ### Why it happens
 
-Only one process migrates a database at a time, and it holds the migration lock while it does. Another process got there first: another auth server replica starting on the new release, or a `goiabada-authserver migrate` command. A waiting start waits for as long as the lock is held, and then finds the schema current and starts, with `no need to migrate the database`.
+Only one process migrates a database at a time, and it holds the migration lock while it does. Another process got there first: another auth server replica starting at the same time, on a first start or on a new release, or a `goiabada-authserver migrate` command. A waiting start waits for as long as the lock is held, and then finds the schema current and starts, with `no need to migrate the database`.
 
 So a start that writes `waiting for the migration lock` and nothing more is waiting, not hung. SQLite never writes it: its lock covers one process.
 

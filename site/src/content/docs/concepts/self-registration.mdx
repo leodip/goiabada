@@ -47,7 +47,7 @@ An address that already has an account is refused with "Apologies, but this emai
 This form appears only while email verification is off. It works with or without email set up.
 
 <Aside type="caution">
-Without email verification, anyone can find out whether an address has an account, by trying to register it. The answer can't be hidden, because the account the form creates is usable at once: signing in with the chosen password would fail for an address that was already taken. Leave email verification on, and set up email, if the list of addresses with an account shouldn't be discoverable.
+Without email verification, anyone can find out whether an address has an account, by trying to register it. The answer can't be hidden, because the account the form creates is usable at once: signing in with the chosen password would fail for an address that was already taken. Leave email verification on, and set up email, if the list of addresses with an account shouldn't be discoverable. Even then, someone with an account can test an address by changing their own email to it, up to 5 times an hour on each auth server pod: see [rate limits](/reference/environment-variables/#rate-limits).
 </Aside>
 
 ## With email verification

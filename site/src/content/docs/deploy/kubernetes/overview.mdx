@@ -108,7 +108,7 @@ kubectl create secret docker-registry registry-credentials -n goiabada --docker-
   kubectl create -f -
 ```
 
-`--keep-secrets` leaves the secrets file as it is, so labels you add later reach the Secrets on a run without it, or when you add them yourself:
+`--keep-secrets` leaves the secrets file as it is, so labels you add later don't reach the Secrets. Add them yourself:
 
 ```bash
 kubectl label secret goiabada-secrets goiabada-encryption-key -n goiabada team=identity
