@@ -55,7 +55,7 @@ The wizard asks only the questions that apply to your deployment, in this order,
 | Database type | Every deployment. MySQL, PostgreSQL, SQL Server or SQLite. Kubernetes doesn't offer SQLite. | 1, MySQL (`--db` has none) |
 | Domain names | The auth server's and the admin console's URLs, for every deployment but local testing, which uses `http://localhost:9090` and `http://localhost:9091`. On Kubernetes, each URL needs a host of its own. The auth server's is at most 60 characters, since the first start makes it the issuer. | `https://auth.example.com`, then the admin console's on the same domain, and on Kubernetes on the auth server's HTTPS port when it names one: `https://admin.example.com` |
 | Kubernetes namespace | Kubernetes | `goiabada` |
-| Namespace creation | Kubernetes. Yes declares the namespace in both files, so applying them creates it. No is for a namespace that [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists), such as one a platform team provides: neither file declares it, so applying them needs rights inside the namespace alone. | Yes |
+| Namespace creation | Kubernetes. Yes declares the namespace in both files. No is for a namespace that [already exists](/deploy/kubernetes/overview/#a-namespace-that-already-exists). | Yes |
 | Routing | Kubernetes: how traffic reaches the servers. Envoy Gateway, as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) installs it; a Gateway of a class your cluster has; a Gateway someone else runs; an Ingress per host; or none. The Gateway modes and Ingress then ask what they attach to: see [Routing](/deploy/kubernetes/routing/). | 1, Envoy Gateway |
 | TLS certificates | Kubernetes, with a Gateway of your cluster's class or Ingresses: a cert-manager ClusterIssuer or Issuer, TLS Secrets you supply, or TLS ended in front, at a load balancer or a CDN. See [Where the certificates come from](/deploy/kubernetes/routing/#where-the-certificates-come-from). | 1, a ClusterIssuer |
 | Gateway listeners | Kubernetes, with a Gateway of your cluster's class: the HTTP and HTTPS listeners' ports. Some implementations take only their proxy's own ports, such as Traefik's 8000 and 8443. | 80 and 443 |
@@ -92,9 +92,9 @@ Under Envoy Gateway's Cluster policy, Goiabada sees a node's address for every c
 
 ## Images from your own registry
 
-Both servers' images are on Docker Hub, `docker.io/leodip/goiabada`, and on GitHub's registry, `ghcr.io/leodip/goiabada`, under the same tags and digests. A release of the wizard writes each image line with the release's tag and the digest it pushed, such as `docker.io/leodip/goiabada:authserver-<version>@sha256:<digest>`, and a runtime pulls it by the digest alone: see [Pin a deployment to an image digest](/deploy/upgrade-goiabada/#pin-a-deployment-to-an-image-digest).
+Both servers' images are on Docker Hub, `docker.io/leodip/goiabada`, and on GitHub's registry, `ghcr.io/leodip/goiabada`, under the same tags and digests. A release of the wizard [pins each image line](/deploy/upgrade-goiabada/#pin-a-deployment-to-an-image-digest) to the digest the release pushed.
 
-Where the cluster or the host can reach neither, or may pull only from a registry of your own, copy both images to a mirror there, and answer its repository, such as `--image-repository=registry.example.com/mirror/goiabada`. The mirror needs the release's tags, `authserver-<version>` and `adminconsole-<version>`, and its digests, for the pinned image lines to pull. These keep them, as checked with a private registry and K3s:
+Where the cluster or the host can reach neither, or may pull only from a registry of your own, copy both images to a mirror there, and answer its repository, such as `--image-repository=registry.example.com/mirror/goiabada`. The mirror needs the release's tags, `authserver-<version>` and `adminconsole-<version>`, and its digests, for the pinned image lines to pull. These keep them:
 
 - **A pull-through cache,** which fetches each image from Docker Hub as it's asked for.
 - **A copy of every platform,** with `skopeo copy --all`, `crane copy` or `docker buildx imagetools create`:
@@ -126,7 +126,7 @@ A registry that asks for credentials needs them where the images are pulled:
     --docker-server=registry.example.com --docker-username=<user> --docker-password=<password>
   ```
 
-  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. When the wizard's files create the namespace, create the Secret just after applying them. Under an admission policy that requires labels, create it with them, as the wizard's last message and [Labels and annotations](/deploy/kubernetes/overview/#labels-and-annotations) show.
+  Until the Secret exists, the pods wait in `ImagePullBackOff`, and their events say `no basic auth credentials`. The wizard's last message has the command, with your labels.
 
   The pods run as [accounts of their own](/deploy/kubernetes/security/#pod-security), so pull secrets that a namespace's `default` ServiceAccount names don't reach them. In a namespace that already exists, check for them, and answer the one the registry needs:
 
@@ -148,7 +148,7 @@ The wizard keeps every secret in one file, and the rest of the configuration in 
 
 Every file the wizard writes can be read by its owner only. When it writes into a Git working tree, it warns you and prints the line to add to `.gitignore`. It never edits `.gitignore` itself.
 
-Running the wizard again where its files already are writes new secrets over them, so it warns first and asks before going on; without prompts, it stops unless you pass `--overwrite`. A database seeded with the old secrets can't be used with the new ones, and without another copy of the old AES key, the data it encrypts can never be read again. So back the files up first, then either start over with an empty database, or copy your existing secrets over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes. Never apply the new secrets file to a deployment that already runs. To write a deployment's files again without new secrets, use `--keep-secrets`, as [Run it again on a deployment](#run-it-again-on-a-deployment) shows.
+Running the wizard again where its files already are writes new secrets over them. **Never** apply the new secrets file to a deployment that already runs: to write its files again, keep its secrets with `--keep-secrets`, as [Run it again on a deployment](#run-it-again-on-a-deployment) shows. To reuse a database with new secrets, copy the old values over them first, as [Secrets](/deploy/secrets/#when-a-secret-changes) describes.
 
 With `--output`, the files go into the directory it names. When it names a file instead, the files beside it are named after it: `compose.yaml` gets `compose.override.yaml` and `compose-setup.yaml`, and `my-k8s.yaml` gets `my-k8s-secrets.yaml` and `my-k8s-setup.yaml`.
 
@@ -203,9 +203,7 @@ Review what changed, with `git diff`, before you apply it, as [Upgrade Goiabada]
 Each answer is under the name of the flag that gives it, except two:
 
 - `db-tls-ca` holds the certificates of `--db-tls-ca-file` themselves, so the answers file writes the manifest on any machine. To change them, give `--db-tls-ca-file` again, or `--db-tls-ca-file=` to return to the system's roots.
-- `db-tls-client-cert: true` says the auth server presents a [database client certificate](/deploy/database/#a-client-certificate), whose pair is in the secrets file. `--keep-secrets` refuses the pair's files, which it would never write: to add or replace a pair, create its Secret [from your terminal](/deploy/kubernetes/secrets/#from-your-terminal) and answer `db-tls-client-cert: true`. Empty files, `--db-tls-client-cert-file= --db-tls-client-key-file=`, stop presenting one. A run without `--keep-secrets` needs the files, to write the pair into the secrets file.
-
-The wizard refuses an answers file it might misread: one whose `version` isn't `1`, one with a key it doesn't know or given twice, and one holding a password, which only the secrets file holds. Native binaries have neither: `goiabada.env` holds every setting with the secrets.
+- `db-tls-client-cert: true` says the auth server presents a [database client certificate](/deploy/database/#a-client-certificate), whose pair is in the secrets file. To add or replace the pair, create its Secret [from your terminal](/deploy/kubernetes/secrets/#from-your-terminal) and answer `db-tls-client-cert: true`. Empty files, `--db-tls-client-cert-file= --db-tls-client-key-file=`, stop presenting one.
 
 With prompts, `--keep-secrets` asks every question but the passwords, and writes the answers file from your answers.
 

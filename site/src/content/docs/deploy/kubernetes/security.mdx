@@ -42,13 +42,13 @@ securityContext:
 
 It sets no user or group ID, so each container runs as [the user the images run as](/deploy/docker-compose/#the-user-the-images-run-as), uid and gid 10001. On OpenShift, the default `restricted-v2` security context constraint (SCC), its admission policy for pods, admits the pods and assigns them IDs from the ranges OpenShift allocates to the namespace instead: a user ID for each container, and an `fsGroup` for the pod.
 
-No writable volume is mounted, because neither server writes to its file system here. The legacy bootstrap file isn't used under Kubernetes, and the auth server's one other write, Go spilling a picture upload over its size limit to `/tmp`, fails on the read-only root and is refused as `FILE_TOO_LARGE` rather than by the image check: a 400 either way.
+No writable volume is mounted, because neither server writes to its file system here.
 
 A certificate or customization you mount from a Secret or ConfigMap is readable at the default mode, `0644`. With a stricter `defaultMode`, such as `0440`, the server reads the files through their group: add `fsGroup: 10001` to the pod's `securityContext`, in a kustomization over the manifest, and Kubernetes gives the mounted files that group. On OpenShift, leave `fsGroup` out: `restricted-v2` assigns one, and refuses 10001.
 
 Both pod specs also set:
 
-- **`serviceAccountName`,** an account of the server's own, `goiabada-authserver` or `goiabada-adminconsole`, which the manifest declares, rather than the namespace's `default`. Policies such as Kyverno's that refuse pods running as `default` admit them, and a cloud workload identity or a policy can tell the two servers apart. No role is bound to either account. Checked on K3s under a Kyverno policy refusing the `default` account, and on MicroShift, whose `restricted-v2` SCC admits both pods. A pod takes the image pull secrets its own account names, so any that the namespace's `default` account names don't reach these: give the one your registry needs with [`--image-pull-secret`](/deploy/setup-wizard/#images-from-your-own-registry).
+- **`serviceAccountName`,** an account of the server's own, `goiabada-authserver` or `goiabada-adminconsole`, which the manifest declares, rather than the namespace's `default`. Policies such as Kyverno's that refuse pods running as `default` admit them, and a cloud workload identity or a policy can tell the two servers apart. No role is bound to either account, and image pull secrets the `default` account names [don't reach these pods](/deploy/setup-wizard/#images-from-your-own-registry).
 - **`automountServiceAccountToken: false`,** on the pods and on both accounts, because neither server calls the Kubernetes API, so a compromised pod gets no API credential.
 - **`enableServiceLinks: false`,** because Kubernetes would otherwise give each container variables for every Service in the namespace, and two of the generated Services are named so that those begin with `GOIABADA_`, such as `GOIABADA_AUTHSERVER_PORT` and `GOIABADA_ADMINCONSOLE_SERVICE_HOST`, which neither server reads.
 
@@ -133,7 +133,7 @@ If a pod can't verify the database's certificate, it stops at start and crash-lo
 
 ### Change the authorities
 
-Write the manifest again with the new file, and apply it, or the kustomization over it with `kubectl apply -k .`. The answers file then holds the new authorities, so the next run keeps them, where an edit of the ConfigMap would be lost. The auth server reads the file only when it starts, and its pod template carries a checksum of the ConfigMap, so applying rolls its pods onto the new authorities:
+Write the manifest again with the new file, and apply it, or the kustomization over it with `kubectl apply -k .`. Applying rolls the auth server's pods onto the new authorities:
 
 ```bash
 ./goiabada-setup-linux-amd64 --answers=goiabada-setup.yaml --keep-secrets --db-tls-ca-file=new-ca.pem

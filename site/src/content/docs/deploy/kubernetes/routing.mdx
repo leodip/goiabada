@@ -7,8 +7,6 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you deploy Goiabada behind the routing your cluster already has, rather than the Envoy Gateway the [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) recipe installs.
 
-The setup wizard asks how traffic reaches Goiabada, and writes what that answer needs. It asks what your cluster has, never which product runs it.
-
 ## Set it up
 
 <Steps>
@@ -17,19 +15,13 @@ The setup wizard asks how traffic reaches Goiabada, and writes what that answer 
 
 2. **Run the [setup wizard](/deploy/setup-wizard/),** choose **Kubernetes cluster**, and at **Routing** choose the mode that matches your cluster, from [The routing modes](#the-routing-modes) below. Answer what it asks next: the GatewayClass, the Gateway and its listeners, or the IngressClass, and [where the certificates come from](#where-the-certificates-come-from).
 
-3. **Follow the steps the wizard prints.** They check what the manifest names exists, deploy both files, the Secrets first, and point DNS at the address that serves the two hosts:
+3. **Follow the steps the wizard prints.** They check that what the manifest names exists, deploy both files, the Secrets first, point DNS at the address that serves the two hosts, and check that plain HTTP is redirected:
 
    ```bash
    kubectl apply -f goiabada-secrets.yaml -f goiabada-k8s.yaml
    ```
 
-4. **Check plain HTTP is redirected** wherever the manifest writes no redirect itself, which is every mode but a Gateway of your own that ends TLS. The answer should be a redirect, such as a `301`, `302` or `308`, whose `location` starts with `https://`, never a `200`:
-
-   ```bash
-   curl -sI http://auth.example.com/ | grep -i -E '^(HTTP|location)'
-   ```
-
-5. **Sign in** at your admin console's URL, as [First sign-in](/get-started/first-sign-in/) describes.
+4. **Sign in** at your admin console's URL, as [First sign-in](/get-started/first-sign-in/) describes.
 
 </Steps>
 
@@ -129,7 +121,7 @@ Find yours with `kubectl get pods -A -o wide` and the addresses the routes come 
 
 ## The client's address
 
-Outside the Envoy Gateway recipe, the wizard can't know which address your routing layer shows Goiabada for each client. The manifest trusts one proxy hop, right behind a routing layer that appends the address it received each connection from to `X-Forwarded-For`, as Envoy and Traefik do, and the [rate limiter](/deploy/setup-wizard/#the-rate-limiter-on-kubernetes) is off by default.
+Outside the Envoy Gateway recipe, the wizard can't know which address your routing layer shows Goiabada for each client, so the [rate limiter](/deploy/setup-wizard/#the-rate-limiter-on-kubernetes) is off by default. The manifest [trusts one proxy hop](/deploy/client-ip-and-proxy-trust/#kubernetes).
 
 Check what Goiabada sees once it runs: request any page, then read that request's `ip=` in the auth server's log:
 
@@ -137,7 +129,7 @@ Check what Goiabada sees once it runs: request any page, then read that request'
 kubectl logs -n goiabada deployment/goiabada-authserver | grep 'http request' | tail -3
 ```
 
-Your own address means the per-address limits count each client alone. One address for every client, a node's or a load balancer's, means they'd count everyone together: keep the rate limiter off, or see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes). With TLS ended at a load balancer in front, that load balancer is a second hop when it appends an entry of its own: behind an Nginx ending TLS in front of Envoy on K3s, Goiabada saw a node's address for every client. List every hop then, as [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop) describes.
+Your own address means the per-address limits count each client alone. One address for every client, a node's or a load balancer's, means they'd count everyone together: keep the rate limiter off, or see [Client IP and proxy trust](/deploy/client-ip-and-proxy-trust/#kubernetes). A load balancer in front that ends TLS and appends to `X-Forwarded-For` is a second hop: list every hop, as [A second proxy hop](/deploy/client-ip-and-proxy-trust/#a-second-proxy-hop) describes.
 
 ## Next steps
 

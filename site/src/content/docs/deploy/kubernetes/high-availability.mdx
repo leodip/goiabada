@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you run more than one pod of each Goiabada server, so a node going away doesn't take sign-ins with it.
 
-The setup wizard asks how many auth server pods to run, two unless you answer otherwise, and the manifest runs one admin console pod. From two, a node drain keeps sign-ins up, since the [disruption budget](#disruptions-and-spread) evicts one pod at a time. At one, a node drain or a node failure stops that server until its replacement is ready.
+The setup wizard asks how many auth server pods to run, two unless you answer otherwise, and the manifest runs one admin console pod. At one pod, a node drain or a node failure stops that server until its replacement is ready.
 
 ## Scale out
 

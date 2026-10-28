@@ -50,8 +50,6 @@ You don't migrate the database yourself. The auth server brings the schema up to
        Keep the old binaries until the new release works: a [rollback](#roll-back-to-an-earlier-release) installs them again.
      </TabItem>
      <TabItem label="Kubernetes">
-       A release of the setup wizard writes its own version and the digests it pushed into both image lines, with `imagePullPolicy: IfNotPresent`, since a version tag names one build. A wizard built from source writes `latest` with `imagePullPolicy: Always`, under a comment, and warns you when it finishes: `latest` moves, so pods started at different times can run different releases. Replace it with a [release version](https://github.com/leodip/goiabada/releases) before production.
-
        Run the new release's [setup wizard](/deploy/setup-wizard/#run-it-again-on-a-deployment) over your answers file, from the directory holding `goiabada-k8s.yaml`. It writes the release's version and digests into both image lines, and anything else the release changed in the manifest, and leaves `goiabada-secrets.yaml` as it is. Review the diff, and what applying would change in the cluster, then apply the manifest alone: the Secrets need no applying again.
 
        ```bash
@@ -73,10 +71,6 @@ You don't migrate the database yourself. The auth server brings the schema up to
 4. **Check the start.** The auth server writes `database migrated` once it has run the release's migrations, or `no need to migrate the database` when it had none to run, and then starts its listeners. The `build information` record it writes as it starts names the release actually running in its `version` attribute: confirm it is the one you installed, which is where a stale pin shows.
 
 </Steps>
-
-<Aside type="caution">
-Running the setup wizard again without `--keep-secrets` generates new secrets. Before you use its output for a deployment that already has a database, copy your existing secret values over the new ones, as [Secrets](/deploy/secrets/#when-a-secret-changes) explains: a new AES key can't decrypt the database.
-</Aside>
 
 ## Pin a deployment to an image digest
 

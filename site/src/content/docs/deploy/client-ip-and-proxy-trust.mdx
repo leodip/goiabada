@@ -117,7 +117,7 @@ Leave the lists empty. The lists that come to mind for a cluster both go wrong: 
 
 A pod that calls the `goiabada-authserver` or `goiabada-adminconsole` Service directly, around Envoy, can send any `X-Forwarded-For` it likes. No list stops that, since Envoy's pods are pods too. A NetworkPolicy admitting only Envoy does: see [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
 
-Behind [any other routing](/deploy/kubernetes/routing/), the manifest trusts one hop too, which is right behind a routing layer that appends the address it received each connection from, as Envoy and Traefik do. Which address that is the wizard can't know, so the comment says to check: [The client's address](/deploy/kubernetes/routing/#the-clients-address) has how.
+Behind [any other routing](/deploy/kubernetes/routing/), the manifest trusts one hop too. That's right behind a routing layer that appends the address it received each connection from, as Envoy and Traefik do. [The client's address](/deploy/kubernetes/routing/#the-clients-address) has how to check which address Goiabada sees.
 
 ### A second proxy hop
 
