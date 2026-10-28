@@ -2,6 +2,44 @@
 
 Every page under `src/content/docs` follows this guide, and every docs change does too.
 
+## What belongs
+
+The reader is an operator deploying Goiabada, a developer adding sign-in to an app, or an
+administrator using the admin console. It isn't the maintainer or a reviewer of the code. Before
+polishing a sentence, decide whether it belongs at all: keep it, cut it, move it to the release
+notes, or leave it to a code comment.
+
+A page holds what the reader needs before or while they act, and can't get from Goiabada at that
+moment:
+
+- how to do a task;
+- a rule or default that shapes a decision up front, in one line where that field's rules are
+  listed;
+- something they'll see but can't diagnose from the message alone, on a troubleshooting page;
+- security properties and real risks.
+
+It leaves out:
+
+- what Goiabada already tells them at that moment: a form or API refusal (the catalogs in
+  `src/core/i18n/catalogs/`), a startup refusal, or a log record and its `remedy`;
+- what only someone upgrading needs, such as data left from an older release, a changed default or
+  a removed setting. That goes in the release notes, as **Versions** says;
+- how the code does it: the order of checks, which function does what, locks, transactions, what a
+  test pins;
+- history: issue numbers, "used to", "now", "no longer", a fix described as a fix;
+- an edge case that only a contrived setup or a rare fault reaches;
+- what another page already says. A rule keeps one home, the page where a reader making that
+  decision looks, and the others link to it.
+
+The test: would someone get stuck, or open an issue, without this text? If not, cut it. Prefer
+cutting to rewording. Never cut the only statement of a default, a limit, a step, a real security
+warning, or an error whose message doesn't say what to do.
+
+What stays is true against the code: names, defaults, limits, status codes, labels, and every
+"always" and "never". It doesn't contradict a code comment or `AGENTS.md` about the same behavior,
+though they may say more. Their dense, chained sentences are wrong here: write one idea per
+sentence.
+
 ## Voice
 
 - Friendly and direct. Address the reader as "you", keep sentences short, and cut filler.

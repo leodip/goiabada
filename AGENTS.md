@@ -98,6 +98,10 @@ the behavior changes.
 - Tests use independent expected results and preserve transaction identity. Use
   `datamocks.ExpectRunInTransaction`, `internal/fake` and `internal/otp/otptest` where applicable;
   restore the shared settings row in integration tests. The test guide names the helpers.
+- Docs pages hold only what an operator, app developer or administrator needs to act. Before
+  writing one, apply `site/STYLE.md`'s **What belongs**: leave out what Goiabada's own messages
+  say, code internals, history, rare-fault edge cases and upgrade-only facts (release notes). Keep
+  each rule on one page, and check every claim against the code.
 
 ## Regenerate committed files
 
