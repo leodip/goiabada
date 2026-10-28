@@ -135,7 +135,7 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 	emailDigest := hashutil.HashString(email)
 
 	if user == nil {
-		o.verifyPassword(passwordhash.DummyHash, password)
+		o.verifyPassword(passwordhash.DummyHash(), password)
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedPwd, map[string]interface{}{
 			"email_digest": emailDigest,
@@ -150,7 +150,7 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 	// ignored: the dummy hash's plaintext signs no one in (#681).
 	passwordMatches := false
 	if user.PasswordHash == "" {
-		o.verifyPassword(passwordhash.DummyHash, password)
+		o.verifyPassword(passwordhash.DummyHash(), password)
 	} else {
 		passwordMatches = o.verifyPassword(user.PasswordHash, password)
 	}

@@ -396,7 +396,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
 	assert.Equal(t, 400, customErr.HTTPStatus())
 	require.Len(t, recorder.calls, 1)
-	assert.Equal(t, "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", recorder.calls[0].hashedPassword)
+	assert.Equal(t, testDummyHash, recorder.calls[0].hashedPassword)
 	assert.Equal(t, "password", recorder.calls[0].password)
 }
 
@@ -457,7 +457,7 @@ func TestValidateTokenRequest_ROPC_UserWithoutPassword(t *testing.T) {
 	assert.Equal(t, "Invalid resource owner credentials.", customErr.Description())
 	assert.Equal(t, 400, customErr.HTTPStatus())
 	require.Len(t, recorder.calls, 1)
-	assert.Equal(t, "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", recorder.calls[0].hashedPassword)
+	assert.Equal(t, testDummyHash, recorder.calls[0].hashedPassword)
 	assert.Equal(t, "guessedpassword", recorder.calls[0].password)
 }
 

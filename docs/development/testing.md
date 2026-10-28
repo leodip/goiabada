@@ -74,12 +74,17 @@ here, folded into #387 (PR #422).
 ## Race detector
 
 `./run-tests.sh --type modules --race` runs the three module tiers under `go test -race`, and CI's
-`Unit / race` job does the same beside the plain unit jobs. The detector needs cgo, so the dev
-container ships gcc and pins `CGO_ENABLED=0` for everything except that leg, which sets it to 1 for
-itself. Code whose correctness is a locking argument (`authserver/internal/ratelimit`, whose
-failures-only limiter holds the in-flight count since #439, the concurrent transactions of #301) is
-covered there and nowhere else; the setup tier also accepts `--race`; the data and integration tiers
-do not run under it.
+three `Unit / race` jobs do the same beside the plain unit jobs, one job per tier so the quick ones
+stop queueing behind the auth server leg (#691). A race build running under `go test` also hashes
+passwords, and compares refusals against its dummy hash, at bcrypt's minimum cost, so bcrypt does not
+dominate the tier. Production builds, every other tier and a race binary run outside `go test` keep
+the default cost for both; `passwordhash`'s `TestCostOutsideGoTest` runs a probe binary outside the
+test harness, in the test's own build, to hold that. The detector needs cgo, so the dev
+container ships gcc and pins `CGO_ENABLED=0` for everything except the race runs, each of which sets
+it to 1 for itself. Code whose correctness is a locking argument (`authserver/internal/ratelimit`,
+whose failures-only limiter holds the in-flight count since #439, the concurrent transactions
+of #301) is covered there and nowhere else; the setup tier also accepts `--race`; the data and
+integration tiers do not run under it.
 
 ## Browser e2e tests
 

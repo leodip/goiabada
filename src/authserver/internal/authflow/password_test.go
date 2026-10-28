@@ -84,9 +84,6 @@ func (f *fakeAuditLogger) Log(_ context.Context, auditEvent string, details map[
 	f.entries = append(f.entries, auditEntry{event: auditEvent, details: details})
 }
 
-// The dummy hash, written out so the test does not read it from the code it checks.
-const testDummyHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
-
 func TestPasswordSubmission_Refusals(t *testing.T) {
 	tests := []struct {
 		name string

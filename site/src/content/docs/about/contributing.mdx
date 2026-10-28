@@ -88,7 +88,7 @@ Three more options narrow a run:
 
 - **`--db`** picks the database for `data` and `integration`: `mysql`, `postgres`, `mssql`, `sqlite`, or `all`, the default. SQLite is the quickest.
 - **`--run`** takes a `go test -run` pattern. A pattern that matches no test fails the run, so a typo doesn't pass as green.
-- **`--race`** runs the unit tiers and the setup wizard's tests under Go's race detector.
+- **`--race`** runs the unit tiers and the setup wizard's tests under Go's race detector. Under the race detector, test runs hash passwords at bcrypt's lowest cost, so the run isn't spent on bcrypt. Every other test tier, and every build that runs outside the tests, race detector or not, keeps the default cost.
 
 ```sh
 ./run-tests.sh --type integration --db sqlite --run 'TestToken_'

@@ -61,7 +61,7 @@
 #   # One core test (the fast loop for a unit test)
 #   ./run-tests.sh --type core --no-build --run TestReleaseBuilds
 #
-#   # The three module tiers under the race detector, as CI's Unit / race job runs them
+#   # The three module tiers under the race detector, as CI's Unit / race jobs run them
 #   ./run-tests.sh --type modules --race
 #
 #   # golangci-lint and unparam alone, where sloglint holds the logging convention (#320)
