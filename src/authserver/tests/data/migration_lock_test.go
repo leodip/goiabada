@@ -472,6 +472,10 @@ func messageOrder(capture *logtest.SlogCapture, wanted ...string) []string {
 // since there is nothing to create and the lock may be held by another process's migration, which
 // the start then waits for in the runner, where it says so (#390 decision 7).
 //
+// Both DDL outcomes run, because they leave the function through different returns: a CREATE the
+// server refuses returns its error with the lock still held, and only the deferred unlock gives it
+// back on that path.
+//
 // SQL Server and PostgreSQL only, the engines whose pre-create reaches for the lock: MySQL and
 // SQLite create the table with a plain IF NOT EXISTS, which their engines make atomic.
 //
@@ -481,18 +485,43 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 		t.Skipf("%s pre-creates schema_migrations with one atomic statement, under no lock", dbType())
 	}
 
-	h := newIsolatedDB(t)
-	eng := migrationLockEngine(t, h.Name)
+	for _, failDDL := range []bool{false, true} {
+		name := "the create succeeds"
+		if failDDL {
+			name = "the create fails"
+		}
+		t.Run(name, func(t *testing.T) {
+			h := newIsolatedDB(t)
+			eng := migrationLockEngine(t, h.Name)
 
-	_, err := h.SQL.Exec("DROP TABLE schema_migrations")
-	require.NoError(t, err, "clear the table the fixture's own construction created")
+			_, err := h.SQL.Exec("DROP TABLE schema_migrations")
+			require.NoError(t, err, "clear the table the fixture's own construction created")
+			if failDDL {
+				// An object of the same name that is not a table: the pre-create's existence check
+				// sees none and issues the CREATE, which the server refuses for the name. On
+				// PostgreSQL a type, since to_regclass finds relations alone and the table's own
+				// row type collides with it; on SQL Server a view, which is not of type U.
+				collision := "CREATE VIEW schema_migrations AS SELECT CAST(0 AS BIGINT) AS version, CAST(0 AS BIT) AS dirty"
+				if dbType() == data.Postgres {
+					collision = "CREATE TYPE schema_migrations AS ENUM ('collision')"
+				}
+				_, err = h.SQL.Exec(collision)
+				require.NoError(t, err, "seed the collision the CREATE will hit")
+			}
 
-	// The pre-create runs inside NewMigrator, so this is what puts the lock ceremony under test
-	// rather than the runner's own.
-	_, err = h.DB.NewMigrator(context.Background(), nil)
-	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
+			// The pre-create runs inside NewMigrator, so this is what puts the lock ceremony under
+			// test rather than the runner's own.
+			_, err = h.DB.NewMigrator(context.Background(), nil)
+			if failDDL {
+				require.Errorf(t, err, "the CREATE must fail on the seeded collision on %s", dbType())
+				assert.Contains(t, err.Error(), "unable to create the schema_migrations table")
+			} else {
+				require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
+			}
 
-	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
+			requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
+		})
+	}
 }
 
 // concurrentStarts is how many starts TestMigrationLock_StartsTogetherOnAnEmptyDatabaseAllSucceed
