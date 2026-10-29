@@ -23,6 +23,7 @@ type clientAuthenticationEndpoint int
 const (
 	atTokenEndpoint clientAuthenticationEndpoint = iota + 1
 	atRevocationEndpoint
+	atIntrospectionEndpoint
 )
 
 // logClientAuthenticationRefusal writes the Warn record of a client that could not be authenticated
@@ -53,6 +54,11 @@ func (endpoint clientAuthenticationEndpoint) logClientAuthenticationRefusal(r *h
 			"grant_type", requestedGrantType(r).String())
 	case atRevocationEndpoint:
 		slog.WarnContext(r.Context(), "client authentication refused at the revocation endpoint",
+			"reason", errDetail.Description(),
+			"client_identifier", logging.FieldForLog(clientIdentifier),
+			"client_auth_method", clientAuthMethod(r))
+	case atIntrospectionEndpoint:
+		slog.WarnContext(r.Context(), "client authentication refused at the introspection endpoint",
 			"reason", errDetail.Description(),
 			"client_identifier", logging.FieldForLog(clientIdentifier),
 			"client_auth_method", clientAuthMethod(r))

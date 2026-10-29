@@ -192,7 +192,7 @@ The **Permissions** tab grants permissions to the client itself, for the client 
 
 ## Introspection resources
 
-An API checking a token with the auth server calls as a confidential client, since a resource holds no credentials of its own. A client's introspection resources are the resources whose tokens that client may introspect. The list starts empty, so a client introspects nothing until you add the resources it stands for. One client can stand for several resources, and several clients for one resource.
+An API checking a token with the auth server's [introspection endpoint](/reference/endpoints/introspect/) calls as a confidential client, since a resource holds no credentials of its own. A client's introspection resources are the resources whose tokens that client may introspect. The list starts empty, so a client introspects nothing until you add the resources it stands for. One client can stand for several resources, and several clients for one resource.
 
 Set the list on the client's **Introspection** tab: choose a resource, click **Add resource**, and click **Save**. Through the Admin API, read it with [`GET /api/v1/admin/clients/{id}/introspection-resources`](/reference/api/admin/operations/getclientintrospectionresources/), and replace it whole with [`PUT`](/reference/api/admin/operations/updateclientintrospectionresources/) on the same path, sending the list as you read it in `expectedResourceIds`. Each save leaves an `updated_client_introspection_resources` entry in the [audit log](/concepts/audit-log/).
 

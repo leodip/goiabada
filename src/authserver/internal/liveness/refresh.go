@@ -133,8 +133,8 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 }
 
 // RefreshToken checks a refresh token FindRefreshToken read, against the state its grant stands for
-// at now: the checks the refresh grant makes on a token's state, which introspection is to make
-// too, so the two cannot disagree about a token (#676 decision 7). What belongs to a request stays
+// at now: the checks the refresh grant makes on a token's state, which introspection makes too, so
+// the two cannot disagree about a token (#676 decision 7). What belongs to a request stays
 // with its caller: authenticating the client, matching it to the token, PKCE for a public client,
 // and the scope a refresh may ask for. Whose token it is, ClientId, the caller matches to a client
 // authentication has found to exist and be enabled, so the check reads no client of its own.

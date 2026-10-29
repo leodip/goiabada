@@ -176,6 +176,7 @@ export default defineConfig({
 								{ label: 'Authorize', slug: 'reference/endpoints/authorize' },
 								{ label: 'Token', slug: 'reference/endpoints/token' },
 								{ label: 'Revoke', slug: 'reference/endpoints/revoke' },
+								{ label: 'Introspect', slug: 'reference/endpoints/introspect' },
 								{ label: 'Logout', slug: 'reference/endpoints/logout' },
 								{ label: 'UserInfo', slug: 'reference/endpoints/userinfo' },
 								{ label: 'Dynamic client registration', slug: 'reference/endpoints/dynamic-client-registration' },

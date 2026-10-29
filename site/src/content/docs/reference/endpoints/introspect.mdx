@@ -1,0 +1,122 @@
+---
+title: Introspect
+description: Ask the auth server whether a token is still active, from your API or your app's backend, with /auth/introspect.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps your API ask the auth server whether an access token is still active, with the introspection endpoint, `/auth/introspect`.
+
+It's the [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) token introspection endpoint, the `introspection_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). A signature check tells your API a token was issued and hasn't expired. Introspection also tells it whether the token was cut off since: its session ended, its grant was revoked, its user or its client was disabled.
+
+## Introspect a token
+
+<Steps>
+
+1. Give your API a confidential [client](/concepts/clients/) of its own. In the admin console, open **Admin**, **Clients** and click **New client**, enter a **Client identifier**, such as `product-api-introspector`, and click **Create client**. On **Authentication**, click **Show** and copy the **Client secret** to your API's configuration.
+
+2. On the client's **Introspection** tab, choose your API's resource, such as `product-api`, click **Add resource**, and click **Save**. See [Introspection resources](/concepts/clients/#introspection-resources).
+
+3. From your API, send the access token it received, with the client's credentials:
+
+   ```http
+   POST /auth/introspect HTTP/1.1
+   Host: auth.example.com
+   Content-Type: application/x-www-form-urlencoded
+   Authorization: Basic cHJvZHVjdC1hcGktaW50cm9zcGVjdG9yOm15LXNlY3JldA==
+
+   token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiIsInR5cCI6ImF0K2p3dCJ9...
+   ```
+
+4. Read whether it's active:
+
+   ```json
+   {
+     "active": true,
+     "scope": "openid product-api:read",
+     "client_id": "my-web-app",
+     "sub": "8a1f7c2e-5b3d-4e6f-9a0b-1c2d3e4f5a6b",
+     "aud": ["product-api", "authserver"],
+     "iss": "https://auth.example.com",
+     "exp": 1760000300,
+     "iat": 1760000000,
+     "nbf": 1760000000,
+     "jti": "9a6f1c1e-2d0b-4f3e-8a55-0c1b7a3e2f44",
+     "token_type": "Bearer"
+   }
+   ```
+
+   Anything else is answered with `active` alone, and your API refuses the request:
+
+   ```json
+   {
+     "active": false
+   }
+   ```
+
+</Steps>
+
+Still check `scope` for the permission the operation needs, as [Protect an API](/guides/protect-an-api/) describes.
+
+## When a token is active
+
+An access token is active while it's live and its `aud` names a resource on the calling client's introspection resources. Live means the auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and APIs would accept it now: it hasn't expired, its user and its client exist and are enabled, and nothing has ended it since, such as its session ending, its user's credentials changing, or its grant being revoked. See [Ending sessions](/concepts/ending-sessions/).
+
+A refresh token is active only to the client it was issued to, while it would still refresh. So your app's backend can find out whether its refresh token is still good without using it. Introspecting it spends nothing, and the refresh token keeps working.
+
+Every other token gets `{"active": false}`: one that's expired, revoked, forged or malformed, an ID token, an access token for a resource the client doesn't list, and another client's refresh token. The answer never says which, as [RFC 7662 section 2.2](https://www.rfc-editor.org/rfc/rfc7662.html#section-2.2) requires.
+
+## What an active answer carries
+
+The members are read from the token, and they're the same for every client that may see it. A user's profile claims aren't among them: call [`/userinfo`](/reference/endpoints/userinfo/) for those.
+
+| Member | Access token | Refresh token |
+|---|---|---|
+| `active` | `true` | `true` |
+| `scope` | The token's scope | The token's scope |
+| `client_id` | The client the token was issued to | Your client |
+| `sub` | The user, or for a client credentials token, the client | The user |
+| `aud` | The token's `aud`, a string or an array | Not sent |
+| `iss` | The issuer | The issuer |
+| `exp`, `iat` | When the token expires and was issued, in seconds since the epoch | The same |
+| `nbf` | When the token became usable | Not sent |
+| `jti` | The token's identifier | The token's identifier |
+| `token_type` | `Bearer` | Not sent |
+
+## The request
+
+`/auth/introspect` takes a POST, with the parameters in an `application/x-www-form-urlencoded` body. Each parameter goes in once. A GET is refused with `405 Method Not Allowed`, so a token never ends up in a URL.
+
+| Parameter | Required | What it does |
+|---|---|---|
+| `token` | Yes | The access token or refresh token to ask about |
+| `token_type_hint` | No | Ignored. The auth server reads the token's type from the token |
+
+## Client authentication
+
+The calling client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here: `401 Unauthorized` with `invalid_client`.
+
+A [public client](/concepts/clients/#public-and-confidential-clients) can't introspect, since it has no secret to authenticate with. It's refused with `401 Unauthorized` and `invalid_client`.
+
+The auth server's log has a `client authentication refused at the introspection endpoint` warning for each refusal. See [Logs](/deploy/logs/#records-worth-knowing).
+
+## The answer
+
+| Status | When |
+|---|---|
+| `200 OK` | The token is active, or `{"active": false}` |
+| `400 Bad Request`, `invalid_request` | `token` is missing, or a parameter is repeated |
+| `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated, or it's a public client |
+| `500 Internal Server Error`, `server_error` | The auth server couldn't check the token. That says nothing about the token: try again, or refuse the request |
+
+Every answer carries `Cache-Control: no-store`. If your API caches answers itself, keep each one no longer than you can accept a revoked token being honored, and never past the token's `exp`.
+
+An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors). Browsers can't call the endpoint: it answers no CORS, since only a confidential client may.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Protect an API" description="Check the access token on every request." href="/guides/protect-an-api/" />
+  <LinkCard title="Clients" description="Set a client's introspection resources." href="/concepts/clients/#introspection-resources" />
+  <LinkCard title="Revoke" description="End a grant from your app." href="/reference/endpoints/revoke/" />
+</CardGrid>

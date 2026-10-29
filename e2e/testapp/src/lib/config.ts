@@ -47,4 +47,11 @@ export const apiResource = env("API_RESOURCE", "product-api");
 export const apiScope = env("API_SCOPE", "product-api:read");
 export const apiUrl = `${appUrl}/api/products`;
 
+// The API's own confidential client, listed for the API's resource on its Introspection tab, with
+// which the API asks the auth server whether each token is still active.
+export const apiClient = {
+  clientId: env("API_CLIENT_ID", "testapp-api"),
+  clientSecret: env("API_CLIENT_SECRET"),
+};
+
 export const defaultScope = `openid email profile ${apiScope}`;

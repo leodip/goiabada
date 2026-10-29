@@ -51,6 +51,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 		{"POST /auth/authorize is exempt", "/auth/authorize", "", true, http.StatusOK},
 		{"POST /auth/token is exempt", "/auth/token", "", true, http.StatusOK},
 		{"POST /auth/revoke is exempt", "/auth/revoke", "", true, http.StatusOK},
+		{"POST /auth/introspect is exempt", "/auth/introspect", "", true, http.StatusOK},
 		{"POST /userinfo is exempt", "/userinfo", "", true, http.StatusOK},
 		{"POST /connect/register is exempt", "/connect/register", "", true, http.StatusOK},
 		{"POST under the /api/ prefix is exempt", "/api/v1/admin/users", "", true, http.StatusOK},
@@ -71,6 +72,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 		// matched exactly.
 		{"POST /auth/token-introspect is refused", "/auth/token-introspect", "", true, http.StatusForbidden},
 		{"POST /auth/revoke-all is refused", "/auth/revoke-all", "", true, http.StatusForbidden},
+		{"POST /auth/introspect-all is refused", "/auth/introspect-all", "", true, http.StatusForbidden},
 		{"POST /userinfo-export is refused", "/userinfo-export", "", true, http.StatusForbidden},
 
 		// Claim 3, the one behaviour change. /auth/callback is the admin console's OAuth callback.
@@ -177,6 +179,8 @@ func newCsrfTestServer(t *testing.T) *Server {
 		"/auth/token-introspect",
 		"/auth/revoke",
 		"/auth/revoke-all",
+		"/auth/introspect",
+		"/auth/introspect-all",
 		"/auth/logout",
 		"/auth/pwd",
 		"/auth/consent",

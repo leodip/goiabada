@@ -62,6 +62,7 @@ The protocol endpoints are called from other sites by design, so the auth server
 | `/auth/authorize` | OpenID Connect requires it to take a POST as well as a GET, and a POST only starts a sign-in, as a link would. Every step after it is checked. |
 | `/auth/token` | A confidential client presents its secret. A public client presents a one-time code, bound to its redirect URI and to a PKCE verifier only it holds. |
 | `/auth/revoke` | A client presents its secret, or a public client its `client_id`, with a token it already holds. It reads no cookie, and it ends only that token's grant. |
+| `/auth/introspect` | A confidential client presents its secret, which a cross-site page doesn't have. It reads no cookie and changes nothing. |
 | `/userinfo` | It takes an access token, never a cookie. |
 | `/connect/register` | It creates a client and acts on no signed-in user. It's off by default. |
 | `/auth/logout` | Only a POST carrying an `id_token_hint`, which [RP-initiated logout](/reference/endpoints/logout/) requires. A POST without one is checked. |

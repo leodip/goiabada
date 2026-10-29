@@ -239,3 +239,55 @@ func TestAuthenticate(t *testing.T) {
 		})
 	}
 }
+
+// TestAuthenticateConfidential is the call of an endpoint whose callers MUST authenticate, the
+// introspection endpoint (RFC 7662 section 4, #676 decision 9): Authenticate's refusals, and a public
+// client refused as a client that cannot authenticate, whether or not it sends a secret, so its
+// answer does not depend on what it sent.
+func TestAuthenticateConfidential(t *testing.T) {
+	publicRefused := refusal{"invalid_client",
+		"This client is configured as public, and a public client cannot introspect tokens. Introspect as a confidential client.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+	rows := []struct {
+		name       string
+		identifier string
+		stored     func(t *testing.T) *record.Client
+		secret     string
+		want       *refusal
+	}{
+		{"no client identifier", "", nil, theSecret, &missingClientId},
+		{"an unknown client", "the_client", func(*testing.T) *record.Client { return nil }, theSecret, &unknownClient},
+		{"a disabled client with its right secret", "the_client", func(t *testing.T) *record.Client {
+			client := confidentialClient(t)
+			client.Enabled = false
+			return client
+		}, theSecret, &disabledClient},
+		{"a confidential client with no secret", "the_client", confidentialClient, "", &secretRequired},
+		{"a confidential client with a wrong secret", "the_client", confidentialClient, "not_the_secret", &wrongSecret},
+		{"a confidential client with its secret", "the_client", confidentialClient, theSecret, nil},
+		{"a public client with a secret", "the_client", func(*testing.T) *record.Client { return publicClient() }, "any_secret", &publicRefused},
+		{"a public client by its identifier alone", "the_client", func(*testing.T) *record.Client { return publicClient() }, "", &publicRefused},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			var stored *record.Client
+			if row.stored != nil {
+				stored = row.stored(t)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, row.identifier).
+					Return(stored, nil).Once()
+			}
+
+			client, err := clientauth.NewAuthenticator(database, testDataCipher).
+				AuthenticateConfidential(context.Background(), row.identifier, row.secret)
+
+			if row.want == nil {
+				require.NoError(t, err)
+				assert.Same(t, stored, client)
+				return
+			}
+			assert.Nil(t, client)
+			refusedWith(t, err, *row.want)
+		})
+	}
+}

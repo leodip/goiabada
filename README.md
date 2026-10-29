@@ -40,6 +40,7 @@ Goiabada is an open-source authentication server built on **OAuth 2.0** and **Op
 
 - **OAuth 2.0** (RFC 6749): authorization code with PKCE (RFC 7636), client credentials, and refresh tokens.
 - **Token revocation** (RFC 7009): an app ends a grant, typically at sign-out, by sending its refresh token or an access token.
+- **Token introspection** (RFC 7662): an API asks whether a token is still active, for the resources an administrator allowed it.
 - **OpenID Connect**: Core 1.0 with ID tokens and userinfo, Discovery 1.0, and RP-Initiated Logout 1.0.
 - **Metadata and keys**: authorization server metadata (RFC 8414) and a JWKS endpoint (RFC 7517).
 - **Access tokens**: JWT access tokens (RFC 9068), which an API checks on its own with the auth server's public keys.

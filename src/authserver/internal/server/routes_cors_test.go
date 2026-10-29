@@ -26,6 +26,8 @@ func TestRegisterRoutes_APreflightIsAnsweredBeforeRouting(t *testing.T) {
 	}{
 		{path: "/auth/token", wantAllow: true},
 		{path: "/auth/revoke", wantAllow: true},
+		// No CORS: a public client, the only kind a browser holds, never introspects (#676 decision 13).
+		{path: "/auth/introspect"},
 		{path: "/certs", wantAllow: true},
 		{path: "/auth/authorize"},
 		{path: "/no-such-path"},

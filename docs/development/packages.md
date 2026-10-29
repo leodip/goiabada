@@ -265,6 +265,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
   refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
   Bearer challenges share, as the lowest package that writes a challenge (#676)
+- `internal/introspectionmetrics/` - `goiabada_introspection_requests_total`, the introspection
+  endpoint's answers by outcome, a closed set (#676)
 - `internal/liveness/` - Whether a token the auth server issued is still live. An access token:
   its header is `at+jwt` and its `iss` the configured issuer (RFC 9068 section 4); its client exists
   and is enabled; its user exists and is enabled; its `sid` session exists, belongs to the user, is within its
@@ -273,7 +275,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   token: `FindRefreshToken` reads its row and what it names, and `RefreshToken` judges the state the
   refresh grant checks, leaving ownership, PKCE and scope to the grant's validator. Each returns a
   verdict and leaves the answer and the log record to the caller: the bearer guard
-  `RequireValidSession` and the refresh grant now, introspection too, so they cannot disagree.
+  `RequireValidSession`, the refresh grant, revocation and introspection, so they cannot disagree.
   `Subject` is the one reading of a token's subject, which `reqctx` answers through (#676)
 - `internal/revocation/` - The six revocation operations, their results, reason constants and audit
   helpers, the sixth, `RevokeGrantTx`, ending one grant at its client's request at `/auth/revoke`

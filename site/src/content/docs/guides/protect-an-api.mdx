@@ -3,7 +3,7 @@ title: Protect an API
 description: Decide who may call your API, and check the access token on every request, for users and for services.
 ---
 
-import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This guide protects your API with Goiabada, so it answers only callers holding the right permission, whether an app calls it for a user or a service calls it on its own.
 
@@ -108,11 +108,31 @@ Fetch the key set from `/certs` once and cache it, then pick the key whose `kid`
 
 ## What your API can't see
 
-Your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
+Checking the signature, your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
 
-<Aside type="caution">
-If an operation must stop the moment a user is disabled or their session is ended, check the signature and also call [`/userinfo`](/reference/endpoints/userinfo/) with the token: the auth server refuses it from then on. That works for any token carrying `openid`. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
-</Aside>
+## Ask the auth server about a token
+
+When an operation must stop the moment a token is cut off, have your API introspect the token as well as check it. The auth server answers `{"active": false}` from the moment the user's session ends, the user or the client is disabled, the user's credentials change or the grant is revoked.
+
+<Steps>
+
+1. Give your API a confidential client of its own: open **Admin**, **Clients**, click **New client**, enter a **Client identifier**, such as `product-api-introspector`, and click **Create client**. On **Authentication**, click **Show** and copy the **Client secret** to your API's configuration.
+
+2. On the client's **Introspection** tab, choose `product-api`, click **Add resource**, and click **Save**. The client can now introspect the tokens whose `aud` names `product-api`, and no others.
+
+3. On each request, send the token to the introspection endpoint with the client's credentials:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/introspect \
+     -u product-api-introspector:CLIENT_SECRET \
+     -d token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+   ```
+
+4. Answer the request only when the answer's `active` is `true`, and still check its `scope` for the permission the operation needs.
+
+</Steps>
+
+Each check is a call to the auth server, so keep it for the operations that need it. See [Introspect](/reference/endpoints/introspect/) for the answer's members and errors.
 
 ## When something goes wrong
 
@@ -126,4 +146,5 @@ If an operation must stop the moment a user is disabled or their session is ende
   <LinkCard title="Resources and permissions" description="Who holds a permission, and the authserver resource." href="/concepts/resources-and-permissions/" />
   <LinkCard title="Tokens" description="Every claim an access token carries, and how long it lasts." href="/concepts/tokens/" />
   <LinkCard title="Token" description="The token endpoint's grants, answers and errors." href="/reference/endpoints/token/" />
+  <LinkCard title="Introspect" description="Ask the auth server whether a token is still active." href="/reference/endpoints/introspect/" />
 </CardGrid>

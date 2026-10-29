@@ -32,7 +32,8 @@ import (
 // protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
 // (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, protocol, api, token, revoke := branches.pages, branches.protocol, branches.api, branches.token, branches.revoke
+	pages, protocol, api, token, revoke, introspect := branches.pages, branches.protocol, branches.api, branches.token,
+		branches.revoke, branches.introspect
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database))
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -173,6 +174,10 @@ func (s *Server) initRoutes(branches appBranches) {
 	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
 	// before anything else, as at the token endpoint's grants that have none (decision 10).
 	revoke.Post("/auth/revoke", handlers.HandleRevokePost(httpHelper, s.database, tokenParser, s.dataCipher, auditLogger, s.revocationMetrics))
+	// Token introspection (RFC 7662, #676), outside the /auth group for the same reason, on a branch
+	// of its own that counts the faults it answers. POST alone: a GET falls to the /auth group's 405,
+	// so no token reaches a URL (decision 13). No rate limit, as for revocation (decision 10).
+	introspect.Post("/auth/introspect", handlers.HandleIntrospectPost(httpHelper, s.database, tokenParser, s.dataCipher, s.introspectionMetrics))
 
 	pages.Route("/account", func(r *routing.Router) {
 		// While registration is unavailable both routes are a 404 ahead of the limiter, so a refused

@@ -4,7 +4,8 @@
 // failure the one way. Reading the credentials off a request, and logging a refusal, are the
 // handlers' (#676 decision 9).
 //
-// Authenticate is the whole of it. The token validator calls its two halves apart instead,
+// Authenticate is the whole of it, and AuthenticateConfidential for an endpoint a public client may
+// not call. The token validator calls its two halves apart instead,
 // FindClient before it looks at the grant and VerifySecret at the point in each grant's own order
 // where that grant authenticates the client, so its answers and their order stay what they were
 // (#437).
@@ -46,6 +47,9 @@ const clientSecretNotRequiredErrorMsg = "This client is configured as public, wh
 // answered a shorter text until #437, so the same failure read two ways depending on the grant.
 const wrongClientSecretErrorMsg = "Client authentication failed. Please review your client_secret."
 
+// AuthenticateConfidential's refusal of a public client.
+const publicClientCannotIntrospectErrorMsg = "This client is configured as public, and a public client cannot introspect tokens. Introspect as a confidential client."
+
 // FindClient's refusals.
 const (
 	clientIdMissingErrorMsg    = "Missing required client_id parameter."
@@ -77,6 +81,24 @@ func (a *Authenticator) Authenticate(ctx context.Context, clientIdentifier, pres
 	client, err := a.FindClient(ctx, clientIdentifier)
 	if err != nil {
 		return nil, err
+	}
+	if err := a.VerifySecret(client, presentedSecret); err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+// AuthenticateConfidential is Authenticate for an endpoint whose callers MUST authenticate, the
+// introspection endpoint (RFC 7662 section 4, #676 decision 9). A public client holds nothing to
+// authenticate with, so it is refused as a client that failed to authenticate, invalid_client, before
+// its secret is looked at: whether it sent one or not, it gets the one answer.
+func (a *Authenticator) AuthenticateConfidential(ctx context.Context, clientIdentifier, presentedSecret string) (*record.Client, error) {
+	client, err := a.FindClient(ctx, clientIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	if client.IsPublic {
+		return nil, invalidClientError(publicClientCannotIntrospectErrorMsg)
 	}
 	if err := a.VerifySecret(client, presentedSecret); err != nil {
 		return nil, err

@@ -132,6 +132,25 @@ A client ends one of its grants by sending a token of it.
   `goiabada_revocation_requests_total` counts each answer by outcome (#676)
 - Implementation: `handler_revoke.go`, `revocation/revocation.go`, `revocationmetrics`
 
+### Token introspection (RFC 7662)
+An API, calling as a confidential client, asks whether a token is active.
+- Endpoint: `POST /auth/introspect`, form-encoded, CSRF-exempt, no CORS, GET answered 405 by the
+  `/auth` group; on a branch of its own whose faults answer 500 and count as `error`
+- Order: the client authenticates first through `clientauth.AuthenticateConfidential`, which
+  refuses a public client 401 `invalid_client` whatever it sent (section 4); the token parser
+  refuses a malformed or foreign token before reading a key; `token_type_hint` is never read
+- An access token is active when `liveness.AccessToken` finds it live and its `aud` names a
+  resource on the caller's introspection resources (`clients_introspection_resources`, compared
+  exactly); a refresh token only to its own client, compared before `liveness.RefreshToken` runs,
+  so another client's token reads nothing of its grant. Introspection has no side effect: a rotated
+  refresh token is answered inactive and triggers no replay containment
+- Every other token is exactly `{"active": false}`. An active access token carries the token's own
+  `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`; a refresh
+  token `scope`, its client's `client_id`, `sub`, `iss`, `exp`, `iat` and `jti`. Every answer carries
+  `Cache-Control: no-store`; a fault answers 500, never inactive. No audit event;
+  `goiabada_introspection_requests_total` counts each answer by outcome (#676)
+- Implementation: `handler_introspect.go`, `clientauth`, `liveness`, `introspectionmetrics`
+
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
 - Endpoint: `GET /auth/authorize` with `response_type=token|id_token|id_token token`
@@ -558,6 +577,7 @@ names (section 2.2.2).
 - `/auth/authorize` - OAuth2 authorization endpoint
 - `/auth/token` - Token endpoint
 - `/auth/revoke` - Token revocation endpoint (RFC 7009)
+- `/auth/introspect` - Token introspection endpoint (RFC 7662)
 - `/auth/logout` - Sign-out and post-logout redirect endpoint
 - `/userinfo` - OIDC userinfo
 - `/certs` - JWKS endpoint

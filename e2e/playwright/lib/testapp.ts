@@ -12,7 +12,14 @@ export const testapp = {
   web2: { clientId: "testapp-web2", url: `${env.webtest2Url}/web2` },
   spa: { clientId: "testapp-spa", url: `${env.webtest1Url}/spa`, origin: env.webtest1Url },
   service: { clientId: "testapp-service", url: `${env.webtest1Url}/service` },
-  api: { resource: "product-api", permissions: ["read", "write"], scope: "product-api:read", url: `${env.webtest1Url}/api/products` },
+  api: {
+    resource: "product-api",
+    permissions: ["read", "write"],
+    scope: "product-api:read",
+    url: `${env.webtest1Url}/api/products`,
+    // The API's own client, which introspects every token it is sent.
+    clientId: "testapp-api",
+  },
 };
 
 export type WebApp = typeof testapp.web;
