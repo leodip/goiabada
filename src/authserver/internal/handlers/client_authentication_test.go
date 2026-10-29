@@ -29,6 +29,22 @@ func TestParseBasicAuth(t *testing.T) {
 		assert.Empty(t, clientSecret)
 	})
 
+	t.Run("The scheme name is case-insensitive", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
+		for _, scheme := range []string{"basic", "BASIC", "bAsIc"} {
+			clientId, clientSecret, ok := parseBasicAuth(scheme + " " + encoded)
+			assert.True(t, ok, scheme)
+			assert.Equal(t, "client", clientId, scheme)
+			assert.Equal(t, "secret", clientSecret, scheme)
+		}
+	})
+
+	t.Run("A longer scheme name is not Basic", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
+		_, _, ok := parseBasicAuth("Basicx " + encoded)
+		assert.False(t, ok)
+	})
+
 	t.Run("Invalid base64 returns false", func(t *testing.T) {
 		clientId, clientSecret, ok := parseBasicAuth("Basic not-valid-base64!")
 		assert.False(t, ok)
@@ -118,16 +134,6 @@ func TestParseBasicAuth(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "клиент", clientId)
 		assert.Equal(t, "密码", clientSecret)
-	})
-
-	t.Run("Lowercase basic prefix is rejected", func(t *testing.T) {
-		// RFC 7617 says the scheme is case-insensitive, but we're strict here
-		// This documents the current behavior
-		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
-		clientId, clientSecret, ok := parseBasicAuth("basic " + encoded)
-		assert.False(t, ok)
-		assert.Empty(t, clientId)
-		assert.Empty(t, clientSecret)
 	})
 
 	t.Run("Extra whitespace after Basic is handled", func(t *testing.T) {

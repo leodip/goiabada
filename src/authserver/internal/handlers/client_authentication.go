@@ -69,7 +69,7 @@ func (endpoint clientAuthenticationEndpoint) logClientAuthenticationRefusal(r *h
 // token_endpoint_auth_methods_supported names them, for a log record: client_secret_basic for the
 // Authorization header, client_secret_post for a secret in the body, and none for neither.
 func clientAuthMethod(r *http.Request) string {
-	if strings.HasPrefix(r.Header.Get("Authorization"), "Basic ") {
+	if _, basic := basicCredentials(r.Header.Get("Authorization")); basic {
 		return "client_secret_basic"
 	}
 	if r.PostForm.Get("client_secret") != "" {
@@ -109,21 +109,26 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, e
 	return postClientId, postClientSecret, nil
 }
 
+// basicCredentials returns what follows the Basic scheme and one space in an Authorization header
+// value, and whether the header names that scheme. The scheme name is case-insensitive (RFC 9110
+// section 11.1), so "basic" and "BASIC" name it too.
+func basicCredentials(authHeader string) (string, bool) {
+	const scheme = "Basic "
+	if len(authHeader) < len(scheme) || !strings.EqualFold(authHeader[:len(scheme)], scheme) {
+		return "", false
+	}
+	return authHeader[len(scheme):], true
+}
+
 // parseBasicAuth parses an HTTP Basic Authentication header value.
 // It returns the client_id, client_secret, and whether Basic auth was present.
 func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool) {
-	if authHeader == "" {
-		return "", "", false
-	}
-
-	// Must start with "Basic "
-	const prefix = "Basic "
-	if !strings.HasPrefix(authHeader, prefix) {
+	encoded, basic := basicCredentials(authHeader)
+	if !basic {
 		return "", "", false
 	}
 
 	// Decode base64
-	encoded := authHeader[len(prefix):]
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return "", "", false

@@ -38,16 +38,18 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 		name       string
 		identifier string
 		client     *record.Client
-		basic      bool
+		scheme     string
 		secret     string
 		reason     string
 		method     string
 	}{
-		{"an unknown client, through the Authorization header", "no-such-client", nil, true, "a-secret",
+		{"an unknown client, through the Authorization header", "no-such-client", nil, "Basic", "a-secret",
 			"Client does not exist.", "client_secret_basic"},
-		{"a wrong secret, in the body", "my-service", confidential, false, "a-wrong-secret",
+		{"an unknown client, through the header with a lowercase scheme", "no-such-client", nil, "basic", "a-secret",
+			"Client does not exist.", "client_secret_basic"},
+		{"a wrong secret, in the body", "my-service", confidential, "", "a-wrong-secret",
 			"Client authentication failed. Please review your client_secret.", "client_secret_post"},
-		{"a confidential client with no secret", "my-service", confidential, false, "",
+		{"a confidential client with no secret", "my-service", confidential, "", "",
 			"This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.",
 			"none"},
 	}
@@ -69,7 +71,7 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 				auditLogger, noCredentialFailures{}, testTokenMetrics())
 
 			form := url.Values{"grant_type": {"client_credentials"}}
-			if !tc.basic {
+			if tc.scheme == "" {
 				form.Set("client_id", tc.identifier)
 				if tc.secret != "" {
 					form.Set("client_secret", tc.secret)
@@ -77,8 +79,8 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 			}
 			req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			if tc.basic {
-				req.Header.Set("Authorization", "Basic "+
+			if tc.scheme != "" {
+				req.Header.Set("Authorization", tc.scheme+" "+
 					base64.StdEncoding.EncodeToString([]byte(tc.identifier+":"+tc.secret)))
 			}
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1}))
