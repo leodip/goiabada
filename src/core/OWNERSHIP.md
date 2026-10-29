@@ -128,7 +128,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
 | `core/api` | `GetAuditLogsResponse` | both-apps | — |
-| `core/api` | `GetClientIntrospectionResourcesResponse` | contract | Admin API response DTO of `GET /api/v1/admin/clients/{id}/introspection-resources` (#676 decision 14), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
+| `core/api` | `GetClientIntrospectionResourcesResponse` | both-apps | — |
 | `core/api` | `GetClientPermissionsResponse` | both-apps | — |
 | `core/api` | `GetClientResponse` | both-apps | — |
 | `core/api` | `GetClientSecretResponse` | both-apps | — |
@@ -194,7 +194,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateAccountPhoneRequest` | both-apps | — |
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
-| `core/api` | `UpdateClientIntrospectionResourcesRequest` | contract | Admin API request DTO of `PUT /api/v1/admin/clients/{id}/introspection-resources` (#676 decision 14), which is what `core/api` is for. The auth server reads it and no admin console file writes it yet; #385 exempts this package by name. |
+| `core/api` | `UpdateClientIntrospectionResourcesRequest` | both-apps | — |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |
 | `core/api` | `UpdateClientPermissionsRequest` | both-apps | — |
 | `core/api` | `UpdateClientRedirectURIsRequest` | both-apps | — |

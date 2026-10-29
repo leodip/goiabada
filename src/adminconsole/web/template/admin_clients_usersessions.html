@@ -5,7 +5,7 @@
 {{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "user-sessions" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
+{{ template "client_header" (args "user-sessions" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* A device label is attacker-chosen text: it is derived from Sec-CH-UA and Sec-CH-UA-Platform,
      which UA-CH requires a server to accept with arbitrary values (#281). It reaches the dialog in

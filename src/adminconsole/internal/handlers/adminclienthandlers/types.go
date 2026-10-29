@@ -57,6 +57,21 @@ type PermissionsPostInput struct {
 	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
 }
 
+// listedResource is a resource on a client's introspection list, as its Introspection tab lists
+// it: the resource's id, which the save sends, and its identifier, which the row shows.
+type listedResource struct {
+	Id         int64
+	Identifier string
+}
+
+// IntrospectionPostInput is the Introspection tab's save: the list wanted, and the list as the page
+// loaded it, passed through unchanged so the auth server can refuse a save from an outdated page
+// (#428). The client is the route's.
+type IntrospectionPostInput struct {
+	ResourceIds         []int64 `json:"resourceIds"`
+	ExpectedResourceIds []int64 `json:"expectedResourceIds"`
+}
+
 type RedirectURIsPostInput struct {
 	ClientId     int64    `json:"clientId"`
 	RedirectURIs []string `json:"redirectURIs"`

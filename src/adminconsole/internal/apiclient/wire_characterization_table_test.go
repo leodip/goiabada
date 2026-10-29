@@ -35,6 +35,7 @@ var (
 		ExpectedWebOrigins: []string{"https://old.example.com"}}
 	charUpdateClientToken = &api.UpdateClientTokensRequest{TokenExpirationInSeconds: 300}
 	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
+	charUpdateClientIntro = &api.UpdateClientIntrospectionResourcesRequest{ResourceIds: []int64{4}, ExpectedResourceIds: []int64{2}}
 	charAllowed           = true
 	charUpdateClientAdmin = &api.UpdateClientAdministrativeScopesRequest{Allowed: &charAllowed}
 
@@ -326,6 +327,30 @@ func wireCharacterization() []wireCase {
 			},
 			verb: "GET", path: "/api/v1/admin/audit-logs/event-types", contentType: charJSON,
 			successStatus: 200, reply: `{"auditEventTypes":["AuditUserLogin"]}`, want: "AuditUserLogin",
+		},
+
+		// --- client_introspection_resources.go --------------------------------------------
+		{
+			name: "GetClientIntrospectionResources",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				client, resources, err := c.GetClientIntrospectionResources(ctx, charAccessToken, 3)
+				if err != nil {
+					return nil, err
+				}
+				return []any{client.Id, resources[0].Id}, nil
+			},
+			verb: "GET", path: "/api/v1/admin/clients/3/introspection-resources",
+			successStatus: 200, reply: `{"client":{"id":3},"resources":[{"id":4}]}`,
+			want: []any{int64(3), int64(4)},
+		},
+		{
+			name: "UpdateClientIntrospectionResources",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				return nil, c.UpdateClientIntrospectionResources(ctx, charAccessToken, 3, charUpdateClientIntro)
+			},
+			verb: "PUT", path: "/api/v1/admin/clients/3/introspection-resources", contentType: charJSON,
+			bodyOf:        charUpdateClientIntro,
+			successStatus: 200, reply: `{}`,
 		},
 
 		// --- client_permissions.go --------------------------------------------------------

@@ -49,6 +49,9 @@ type ClientSettings struct {
 	DefaultAcrLevel             string
 	IsSystemLevelClient         bool
 	CreatedViaDCR               bool
+	// IsPublic is not edited here; the tab bar reads it, from the client as stored, to leave out
+	// the Introspection tab of a public client.
+	IsPublic bool
 }
 
 // clientSettingsFrom draws the Settings tab from the client as the auth server answers it.
@@ -70,6 +73,7 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		DefaultAcrLevel:             c.DefaultAcrLevel,
 		IsSystemLevelClient:         c.IsSystemLevelClient,
 		CreatedViaDCR:               c.CreatedViaDCR,
+		IsPublic:                    c.IsPublic,
 	}
 }
 
@@ -229,6 +233,7 @@ func HandleSettingsPost(
 			DefaultAcrLevel:             r.FormValue("defaultAcrLevel"),
 			IsSystemLevelClient:         isSystemLevelClient,
 			CreatedViaDCR:               clientResp.CreatedViaDCR,
+			IsPublic:                    clientResp.IsPublic,
 		}
 
 		// A refusal draws the tab again with the inputs as typed, and the title and the dialogs'

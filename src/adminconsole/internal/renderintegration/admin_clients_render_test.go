@@ -50,6 +50,7 @@ func TestRender_AdminClientRedirectURIs(t *testing.T) {
 				CanManageRedirectURIs bool
 				RedirectURIs          []string
 				IsSystemLevelClient   bool
+				IsPublic              bool
 			}{
 				ClientId:              7,
 				ClientIdentifier:      "an-implicit-app",
@@ -86,6 +87,7 @@ func TestRender_AdminClientRedirectURIs_SendsTheLoadedList(t *testing.T) {
 			CanManageRedirectURIs bool
 			RedirectURIs          []string
 			IsSystemLevelClient   bool
+			IsPublic              bool
 		}{
 			ClientId:              7,
 			ClientIdentifier:      "an-app",
@@ -122,6 +124,7 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 			WebOrigins          []string
 			EffectiveWebOrigins []effectiveWebOrigin
 			IsSystemLevelClient bool
+			IsPublic            bool
 		}{
 			ClientId:         7,
 			ClientIdentifier: "a-javascript-app",
@@ -166,6 +169,7 @@ func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 			WebOrigins          []string
 			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
 			IsSystemLevelClient bool
+			IsPublic            bool
 		}{
 			ClientId:         7,
 			ClientIdentifier: "a-javascript-app",
@@ -193,6 +197,7 @@ func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 				Scope string
 			}
 			IsSystemLevelClient bool
+			IsPublic            bool
 		}{
 			ClientId:                 7,
 			ClientIdentifier:         "a-service",
@@ -214,7 +219,7 @@ func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 }
 
 // The Remove buttons of the lists edited in the page, a client's redirect URIs, web origins and
-// permissions, a user's permissions and groups, and a group's permissions, are named for what they do and to which row: the
+// permissions and introspection resources, a user's permissions and groups, and a group's permissions, are named for what they do and to which row: the
 // visible "Remove" and the row's value beside it for a screen reader, in the administrator's
 // language, as the page draws the stored rows, and as the scripts build the row of an entry added
 // in the page, from the form's data-remove-label.
@@ -235,6 +240,7 @@ func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 			CanManageRedirectURIs bool
 			RedirectURIs          []string
 			IsSystemLevelClient   bool
+			IsPublic              bool
 		}{ClientId: 7, ClientIdentifier: "an-app", CanManageRedirectURIs: true, RedirectURIs: []string{"https://example.com/cb"}}},
 			"https://example.com/cb", "pages/client-uri-list.js"},
 		{"/admin_clients_web_origins.html", map[string]interface{}{"client": struct {
@@ -243,6 +249,7 @@ func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 			WebOrigins          []string
 			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
 			IsSystemLevelClient bool
+			IsPublic            bool
 		}{ClientId: 7, ClientIdentifier: "a-javascript-app", WebOrigins: []string{"https://a.example.com"}}},
 			"https://a.example.com", "pages/client-uri-list.js"},
 		{"/admin_clients_permissions.html", map[string]interface{}{"client": struct {
@@ -251,9 +258,25 @@ func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 			ClientCredentialsEnabled bool
 			Permissions              []permission
 			IsSystemLevelClient      bool
+			IsPublic                 bool
 		}{ClientId: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true, Permissions: []permission{{3, "some-resource:read"}}},
 			"resources": []api.ResourceResponse{}},
 			"some-resource:read", "pages/permission-list.js"},
+		{"/admin_clients_introspection.html", map[string]interface{}{"client": struct {
+			ClientId            int64
+			ClientIdentifier    string
+			IsPublic            bool
+			IsSystemLevelClient bool
+			Resources           []struct {
+				Id         int64
+				Identifier string
+			}
+		}{ClientId: 7, ClientIdentifier: "orders-backend", Resources: []struct {
+			Id         int64
+			Identifier string
+		}{{3, "orders-api"}}},
+			"resources": []render.Choice{}},
+			"orders-api", "pages/introspection-resources.js"},
 		{"/admin_users_permissions.html", map[string]interface{}{
 			"user":      &api.UserResponse{Id: 5, Email: "someone@example.com"},
 			"granted":   []permission{{3, "some-resource:read"}},

@@ -5,7 +5,7 @@
 {{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "authentication" .client.ClientId .storedClient.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
+{{ template "client_header" (args "authentication" .client.ClientId .storedClient.ClientIdentifier .client.IsSystemLevelClient .storedClient.IsPublic $.ctx) }}
 
 {{/* A save asks first, in one dialog, about a change of type and about a new secret, against the
      client as stored, and always on the admin console's own client. The secret is drawn hidden; a

@@ -321,6 +321,7 @@
 "adminconsole.client_tabs.web_origins" = "Web origins"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
+"adminconsole.client_tabs.introspection" = "Introspection"
 
 "adminconsole.group_tabs.settings" = "Settings"
 "adminconsole.group_tabs.attributes" = "Attributes"
@@ -852,6 +853,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "The client already has that permission."
 "adminconsole.admin_clients.permissions.added" = "Permission granted. Save to keep the change."
 "adminconsole.admin_clients.permissions.removed" = "Permission removed. Save to keep the change."
+"adminconsole.admin_clients.introspection.lead" = "The resources whose tokens this client may introspect. An API checking tokens with the auth server calls as a confidential client, and learns that a token is active only when it is for a resource listed here."
+"adminconsole.admin_clients.introspection.field.resource" = "Resource"
+"adminconsole.admin_clients.introspection.select_resource" = "Choose a resource"
+"adminconsole.admin_clients.introspection.add_button" = "Add resource"
+"adminconsole.admin_clients.introspection.col_listed" = "Introspection resources"
+"adminconsole.admin_clients.introspection.remove_label" = "Remove"
+"adminconsole.admin_clients.introspection.none_yet" = "No introspection resources yet."
+"adminconsole.admin_clients.introspection.public_client" = "A public client can't authenticate, so it can't introspect tokens. Make the client confidential, on the Authentication tab, to list introspection resources."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Introspection resources saved."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Choose a resource to add."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "The client already lists that resource."
+"adminconsole.admin_clients.introspection.added" = "Resource added. Save to keep the change."
+"adminconsole.admin_clients.introspection.removed" = "Resource removed. Save to keep the change."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 

@@ -178,6 +178,8 @@ func (s *Server) initRoutes(root *routing.Router) {
 		r.Post("/clients/{clientId}/user-sessions/delete", adminclienthandlers.HandleUserSessionsPost(httpHelper, apiClient))
 		r.Get("/clients/{clientId}/permissions", adminclienthandlers.HandlePermissionsGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/clients/{clientId}/permissions", adminclienthandlers.HandlePermissionsPost(httpHelper, s.sessionStore, apiClient))
+		r.Get("/clients/{clientId}/introspection", adminclienthandlers.HandleIntrospectionGet(httpHelper, s.sessionStore, apiClient))
+		r.Post("/clients/{clientId}/introspection", adminclienthandlers.HandleIntrospectionPost(httpHelper, s.sessionStore, apiClient))
 		r.Get("/clients/generate-new-secret", adminclienthandlers.HandleGenerateNewSecretGet(httpHelper))
 		r.Get("/clients/{clientId}/delete", adminclienthandlers.HandleDeleteGet(httpHelper, apiClient))
 		r.Post("/clients/{clientId}/delete", adminclienthandlers.HandleDeletePost(httpHelper, apiClient, baseURL))

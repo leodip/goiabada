@@ -59,7 +59,7 @@ A client you create in the admin console starts:
 - with the default ACR level `urn:goiabada:level2_optional`;
 - not allowed to request the administrative scopes.
 
-The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Web origins**, **Sessions** and **Permissions**.
+The client's page has these tabs: **Settings**, **Logo**, **Tokens**, **Authentication**, **OAuth2 flows**, **Redirect URIs**, **Web origins**, **Sessions**, **Permissions** and, for a confidential client, **Introspection**.
 
 ## Public and confidential clients
 
@@ -194,9 +194,9 @@ The **Permissions** tab grants permissions to the client itself, for the client 
 
 An API checking a token with the auth server calls as a confidential client, since a resource holds no credentials of its own. A client's introspection resources are the resources whose tokens that client may introspect. The list starts empty, so a client introspects nothing until you add the resources it stands for. One client can stand for several resources, and several clients for one resource.
 
-Set the list through the Admin API: read it with [`GET /api/v1/admin/clients/{id}/introspection-resources`](/reference/api/admin/operations/getclientintrospectionresources/), and replace it whole with [`PUT`](/reference/api/admin/operations/updateclientintrospectionresources/) on the same path, sending the list as you read it in `expectedResourceIds`. Each save leaves an `updated_client_introspection_resources` entry in the [audit log](/concepts/audit-log/).
+Set the list on the client's **Introspection** tab: choose a resource, click **Add resource**, and click **Save**. Through the Admin API, read it with [`GET /api/v1/admin/clients/{id}/introspection-resources`](/reference/api/admin/operations/getclientintrospectionresources/), and replace it whole with [`PUT`](/reference/api/admin/operations/updateclientintrospectionresources/) on the same path, sending the list as you read it in `expectedResourceIds`. Each save leaves an `updated_client_introspection_resources` entry in the [audit log](/concepts/audit-log/).
 
-- **A public client has none.** It can't authenticate, so it can't introspect, and a non-empty list for one is refused.
+- **A public client has none.** It can't authenticate, so it can't introspect: its page has no **Introspection** tab, and a non-empty list for one is refused.
 - **Only `authserver:manage` adds the `authserver` resource.** A client listed for it can introspect the tokens of every sign-in, across every app. `authserver:manage-clients` edits the rest of the list, and can remove `authserver` from it.
 - **Deleting the client or a resource** removes its entries.
 

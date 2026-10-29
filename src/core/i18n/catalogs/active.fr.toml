@@ -324,6 +324,7 @@
 "adminconsole.client_tabs.web_origins" = "Origines web"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
+"adminconsole.client_tabs.introspection" = "Introspection"
 
 "adminconsole.group_tabs.settings" = "Paramètres"
 "adminconsole.group_tabs.attributes" = "Attributs"
@@ -855,6 +856,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "Le client dispose déjà de cette permission."
 "adminconsole.admin_clients.permissions.added" = "Permission accordée. Enregistrez pour conserver la modification."
 "adminconsole.admin_clients.permissions.removed" = "Permission retirée. Enregistrez pour conserver la modification."
+"adminconsole.admin_clients.introspection.lead" = "Les ressources dont ce client peut introspecter les jetons. Une API qui vérifie des jetons auprès du serveur d’authentification appelle en tant que client confidentiel, et n’apprend qu’un jeton est actif que s’il est destiné à une ressource listée ici."
+"adminconsole.admin_clients.introspection.field.resource" = "Ressource"
+"adminconsole.admin_clients.introspection.select_resource" = "Choisir une ressource"
+"adminconsole.admin_clients.introspection.add_button" = "Ajouter la ressource"
+"adminconsole.admin_clients.introspection.col_listed" = "Ressources d’introspection"
+"adminconsole.admin_clients.introspection.remove_label" = "Retirer"
+"adminconsole.admin_clients.introspection.none_yet" = "Aucune ressource d’introspection pour le moment."
+"adminconsole.admin_clients.introspection.public_client" = "Un client public ne peut pas s’authentifier, il ne peut donc pas introspecter de jetons. Rendez le client confidentiel, dans l’onglet Authentification, pour lister des ressources d’introspection."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Ressources d’introspection enregistrées."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Choisissez une ressource à ajouter."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "Le client liste déjà cette ressource."
+"adminconsole.admin_clients.introspection.added" = "Ressource ajoutée. Enregistrez pour conserver la modification."
+"adminconsole.admin_clients.introspection.removed" = "Ressource retirée. Enregistrez pour conserver la modification."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 

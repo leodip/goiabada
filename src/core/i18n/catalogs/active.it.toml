@@ -328,6 +328,7 @@
 "adminconsole.client_tabs.web_origins" = "Origini web"
 "adminconsole.client_tabs.user_sessions" = "Sessioni"
 "adminconsole.client_tabs.permissions" = "Permessi"
+"adminconsole.client_tabs.introspection" = "Introspezione"
 
 "adminconsole.group_tabs.settings" = "Impostazioni"
 "adminconsole.group_tabs.attributes" = "Attributi"
@@ -859,6 +860,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "Il client ha già questo permesso."
 "adminconsole.admin_clients.permissions.added" = "Permesso assegnato. Salva per mantenere la modifica."
 "adminconsole.admin_clients.permissions.removed" = "Permesso rimosso. Salva per mantenere la modifica."
+"adminconsole.admin_clients.introspection.lead" = "Le risorse di cui questo client può fare l’introspezione dei token. Un’API che verifica i token con il server di autenticazione chiama come client confidenziale, e sa che un token è attivo solo quando è per una risorsa elencata qui."
+"adminconsole.admin_clients.introspection.field.resource" = "Risorsa"
+"adminconsole.admin_clients.introspection.select_resource" = "Scegli una risorsa"
+"adminconsole.admin_clients.introspection.add_button" = "Aggiungi risorsa"
+"adminconsole.admin_clients.introspection.col_listed" = "Risorse di introspezione"
+"adminconsole.admin_clients.introspection.remove_label" = "Rimuovi"
+"adminconsole.admin_clients.introspection.none_yet" = "Non ci sono ancora risorse di introspezione."
+"adminconsole.admin_clients.introspection.public_client" = "Un client pubblico non può autenticarsi, quindi non può fare l’introspezione dei token. Rendi il client confidenziale, nella scheda Autenticazione, per elencare risorse di introspezione."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Risorse di introspezione salvate."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Scegli una risorsa da aggiungere."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "Il client elenca già questa risorsa."
+"adminconsole.admin_clients.introspection.added" = "Risorsa aggiunta. Salva per mantenere la modifica."
+"adminconsole.admin_clients.introspection.removed" = "Risorsa rimossa. Salva per mantenere la modifica."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 

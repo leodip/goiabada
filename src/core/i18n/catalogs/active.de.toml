@@ -325,6 +325,7 @@
 "adminconsole.client_tabs.web_origins" = "Web-Origins"
 "adminconsole.client_tabs.user_sessions" = "Sitzungen"
 "adminconsole.client_tabs.permissions" = "Berechtigungen"
+"adminconsole.client_tabs.introspection" = "Introspektion"
 
 "adminconsole.group_tabs.settings" = "Einstellungen"
 "adminconsole.group_tabs.attributes" = "Attribute"
@@ -856,6 +857,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "Der Client hat diese Berechtigung bereits."
 "adminconsole.admin_clients.permissions.added" = "Berechtigung erteilt. Speichern Sie, um die Änderung zu übernehmen."
 "adminconsole.admin_clients.permissions.removed" = "Berechtigung entfernt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.introspection.lead" = "Die Ressourcen, deren Tokens dieser Client introspektieren darf. Eine API, die Tokens beim Authentifizierungsserver prüft, ruft als vertraulicher Client auf und erfährt nur dann, dass ein Token aktiv ist, wenn es für eine hier aufgeführte Ressource ausgestellt ist."
+"adminconsole.admin_clients.introspection.field.resource" = "Ressource"
+"adminconsole.admin_clients.introspection.select_resource" = "Ressource wählen"
+"adminconsole.admin_clients.introspection.add_button" = "Ressource hinzufügen"
+"adminconsole.admin_clients.introspection.col_listed" = "Introspektionsressourcen"
+"adminconsole.admin_clients.introspection.remove_label" = "Entfernen"
+"adminconsole.admin_clients.introspection.none_yet" = "Noch keine Introspektionsressourcen."
+"adminconsole.admin_clients.introspection.public_client" = "Ein öffentlicher Client kann sich nicht authentifizieren und daher keine Tokens introspektieren. Machen Sie den Client im Tab „Authentifizierung“ vertraulich, um Introspektionsressourcen aufzulisten."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Introspektionsressourcen gespeichert."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Wählen Sie eine Ressource aus, die Sie hinzufügen möchten."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "Der Client führt diese Ressource bereits auf."
+"adminconsole.admin_clients.introspection.added" = "Ressource hinzugefügt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.introspection.removed" = "Ressource entfernt. Speichern Sie, um die Änderung zu übernehmen."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 

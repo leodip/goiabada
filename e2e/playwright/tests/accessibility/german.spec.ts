@@ -38,7 +38,7 @@ for (const theme of ["light", "dark"] as const) {
     const urls = [
       `${env.adminUrl}/`,
       ...["clients", "groups", "resources", "users"].flatMap((kind) => [`${env.adminUrl}/admin/${kind}`, `${env.adminUrl}/admin/${kind}/new`]),
-      ...(["settings", "logo", "tokens", "authentication", "oauth2-flows", "redirect-uris", "web-origins", "user-sessions", "permissions", "delete"] as const).map((tab) => clientUrl(client.id, tab)),
+      ...(["settings", "logo", "tokens", "authentication", "oauth2-flows", "redirect-uris", "web-origins", "user-sessions", "permissions", "introspection", "delete"] as const).map((tab) => clientUrl(client.id, tab)),
       ...(["settings", "attributes", "members", "permissions", "delete"] as const).map((tab) => groupUrl(group.id, tab)),
       `${groupUrl(group.id, "attributes")}/add`, `${groupUrl(group.id, "members")}/add`, new URL(groupEdit!, env.adminUrl).href,
       ...(["details", "profile", "picture", "email", "phone", "address", "authentication", "consents", "sessions", "attributes", "permissions", "groups", "delete"] as const).map((tab) => userUrl(user.id, tab)),

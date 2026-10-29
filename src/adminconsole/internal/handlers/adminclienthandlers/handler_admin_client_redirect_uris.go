@@ -82,11 +82,13 @@ func HandleRedirectURIsGet(
 			CanManageRedirectURIs bool
 			RedirectURIs          []string
 			IsSystemLevelClient   bool
+			IsPublic              bool
 		}{
 			ClientId:              clientResp.Id,
 			ClientIdentifier:      clientResp.ClientIdentifier,
 			CanManageRedirectURIs: clientResp.AuthorizationCodeEnabled || implicitEnabled,
 			IsSystemLevelClient:   clientResp.IsSystemLevelClient,
+			IsPublic:              clientResp.IsPublic,
 		}
 
 		sort.Slice(clientResp.RedirectURIs, func(i, j int) bool {

@@ -1,0 +1,81 @@
+{{define "title"}}{{ T $.ctx "adminconsole.client_tabs.introspection" }} – {{ .client.ClientIdentifier }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}
+{{ if not .client.IsPublic }}<script src="{{ asset "/static/pages/introspection-resources.js" }}" defer></script>{{ end }}
+{{end}}
+
+{{define "page"}}
+{{ template "client_header" (args "introspection" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+
+{{ if .client.IsPublic }}
+<div class="panel">
+  <div class="panel-body">
+    <div class="notice notice-note">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.introspection.public_client" }}</p>
+    </div>
+  </div>
+</div>
+{{ else }}
+{{/* The resources are drawn as stored; introspection-resources.js edits them in the page and saves
+     the list whole, with the list as drawn, so the server refuses a save from an outdated page (#428). */}}
+<form class="panel" id="introspectionListForm" novalidate data-save-url="/admin/clients/{{ .client.ClientId }}/introspection" data-list-key="resourceIds" data-expected-key="expectedResourceIds"
+  data-unchosen="{{ T $.ctx "adminconsole.admin_clients.introspection.error_select_resource" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_clients.introspection.error_already_in_list" }}"
+  data-added="{{ T $.ctx "adminconsole.admin_clients.introspection.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_clients.introspection.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_clients.introspection.remove_label" }}"
+  data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}"{{ if .client.IsSystemLevelClient }} data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
+  <div class="panel-body stacked">
+    {{ if .savedSuccessfully }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_clients.introspection.saved_successfully" }}</p>
+    </div>
+    {{ end }}
+    <div class="not-empty:block hidden" id="introspectionListStatus" role="status"></div>
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.introspection.lead" }}</p>
+
+    <div class="field max-w-2xl">
+      <label class="field-label" for="introspectionResourcesSelect">{{ T $.ctx "adminconsole.admin_clients.introspection.field.resource" }}</label>
+      <div class="input-row">
+        <select class="control" id="introspectionResourcesSelect" data-resource-select aria-describedby="introspectionResourcesSelect-description introspectionResourcesSelect-error">
+          <option value="">{{ T $.ctx "adminconsole.admin_clients.introspection.select_resource" }}</option>
+          {{ range .resources }}
+          <option value="{{ .Id }}" data-resource-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
+          {{ end }}
+        </select>
+        <button class="button" type="button" id="addIntrospectionResourceBtn" data-resource-add>{{ T $.ctx "adminconsole.admin_clients.introspection.add_button" }}</button>
+      </div>
+      <p class="field-hint" id="introspectionResourcesSelect-description" data-resource-description aria-live="polite"></p>
+      <p class="field-error" id="introspectionResourcesSelect-error" data-resource-error hidden></p>
+    </div>
+
+    <div>
+      <div class="table-scroll" role="region" aria-labelledby="introspectionListTitle" tabindex="0"{{ if not .client.Resources }} hidden{{ end }} data-list-region>
+        <table class="data-table" id="introspectionResourcesTable">
+          <thead>
+            <tr>
+              <th scope="col" id="introspectionListTitle">{{ T $.ctx "adminconsole.admin_clients.introspection.col_listed" }}</th>
+              <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.admin_clients.list.col_actions" }}</span></th>
+            </tr>
+          </thead>
+          <tbody data-list-rows>
+            {{ range .client.Resources }}
+            <tr data-id="{{ .Id }}">
+              <td class="cell-mono cell-wrap"><a class="text-link" href="/admin/resources/{{ .Id }}/settings">{{ .Identifier }}</a></td>
+              <td class="cell-actions"><button class="button button-sm" type="button" data-list-remove>{{ T $.ctx "adminconsole.admin_clients.introspection.remove_label" }}<span class="sr-only"> {{ .Identifier }}</span></button></td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+      <p class="panel empty-state" data-list-empty{{ if .client.Resources }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_clients.introspection.none_yet" }}</p>
+    </div>
+    <p class="sr-only" role="status" data-list-announce></p>
+  </div>
+  <div class="panel-footer">
+    <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_clients.save_button" }}</button>
+  </div>
+</form>
+
+{{ template "modal_dialog" (args "confirmSave" "confirm_change" $.ctx (T $.ctx "adminconsole.admin_clients.save_button") (T $.ctx "adminconsole.admin_clients.modal.save_title")) }}
+{{ end }}
+{{end}}
