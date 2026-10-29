@@ -265,12 +265,14 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   every endpoint that authenticates its caller. Reading the credentials off a request and logging a
   refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
   Bearer challenges share, as the lowest package that writes a challenge (#676)
-- `internal/liveness/` - Whether an access token the auth server issued is still live: its user
-  exists and is enabled; its `sid` session exists, belongs to the user, is within its bounds and on
-  the user's generation; or, without `sid`, its own generation is current. It returns a verdict and
-  leaves the answer and the log record to the caller: the bearer guard `RequireValidSession` now,
-  introspection too, so the two cannot disagree. `Subject` is the one reading of a token's subject,
-  which `reqctx` answers through (#676)
+- `internal/liveness/` - Whether a token the auth server issued is still live. An access token:
+  its user exists and is enabled; its `sid` session exists, belongs to the user, is within its
+  bounds and on the user's generation; or, without `sid`, its own generation is current. A refresh
+  token: `FindRefreshToken` reads its row and what it names, and `RefreshToken` judges the state the
+  refresh grant checks, leaving ownership, PKCE and scope to the grant's validator. Each returns a
+  verdict and leaves the answer and the log record to the caller: the bearer guard
+  `RequireValidSession` and the refresh grant now, introspection too, so they cannot disagree.
+  `Subject` is the one reading of a token's subject, which `reqctx` answers through (#676)
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit
   helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a

@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -49,7 +50,7 @@ const expiredRefreshTokenMessage = "The refresh token is invalid because it has 
 // IsROPC says which grant minted the token, which decides both the flow switch that governs the
 // refresh (#250) and where its user and client are read from. A password grant's token carries no
 // code, so its user and client are on the token row; an authorization code's are on
-// RefreshToken.Code, loaded by the validator.
+// RefreshToken.Code, loaded by the refresh token check (liveness.FindRefreshToken).
 type RefreshTokenGrant struct {
 	Client         *record.Client
 	RefreshToken   *record.RefreshToken
@@ -62,7 +63,9 @@ func (*RefreshTokenGrant) GrantType() oidc.GrantType { return oidc.GrantTypeRefr
 // validateRefreshTokenGrant validates a refresh (RFC 6749 section 6) for a client
 // ValidateTokenRequest has already found and found enabled. It serves both shapes of refresh
 // token: one descended from an authorization code, and one the password grant issued, which has
-// no code.
+// no code. The token's state is judged by the refresh token check, liveness.RefreshToken, which
+// introspection is to share (#676 decision 7); what is left here belongs to the request:
+// authenticating the client, matching it to the token, PKCE for a public client, and the scope.
 func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settings *record.Settings,
 	client *record.Client, input *ValidateTokenRequestInput) (*RefreshTokenGrant, error) {
 	// No flow rule lives on this arm, deliberately. A refresh is governed by the switch
@@ -104,24 +107,15 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", description, http.StatusBadRequest)
 	}
 
-	jti := refreshTokenInfo.StringClaim("jti")
-	if len(jti) == 0 {
-		return nil, errs.New("the refresh token is invalid because it does not contain a jti claim")
-	}
-
-	refreshToken, err := val.database.GetRefreshTokenByJti(ctx, nil, jti)
+	stored, err := liveness.FindRefreshToken(ctx, val.database, *refreshTokenInfo)
 	if err != nil {
 		return nil, err
 	}
-	if refreshToken == nil {
+	if stored == nil {
 		// A validly signed, unexpired refresh token with no row. RFC 6749 Section 5.2
 		// classifies an invalid, expired or revoked refresh token as invalid_grant, so
 		// this is a 400 rather than the 500 a plain error would produce through
 		// JSONError's fallback mapping (#128).
-		//
-		// Retention (DeleteExpiredRefreshTokens) makes this rare but cannot remove it:
-		// user deletion, referential cascades and database restores all leave a signed
-		// token with no row.
 		//
 		// The message stays generic and does NOT say the row was missing. A caller
 		// cannot be told apart from an attacker here, and distinguishing "no such row"
@@ -129,114 +123,25 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidRefreshTokenMessage, http.StatusBadRequest)
 	}
-
-	// Determine if this is an auth code flow token (with CodeId) or ROPC token (with UserId/ClientId)
-	isROPCToken := !refreshToken.CodeId.Valid
-
-	var tokenClientId int64
-	var tokenUserId int64
-	var tokenScope string
-	// tokenUser is the grant's user as loaded: the token row's for ROPC, the code's otherwise.
-	var tokenUser *record.User
-
-	if isROPCToken {
-		// ROPC refresh token - load User and Client directly from RefreshToken
-		err = val.database.RefreshTokenLoadUser(ctx, nil, refreshToken)
-		if err != nil {
-			return nil, err
-		}
-		err = val.database.RefreshTokenLoadClient(ctx, nil, refreshToken)
-		if err != nil {
-			return nil, err
-		}
-
-		tokenClientId = refreshToken.ClientId.Int64
-		tokenUserId = refreshToken.UserId.Int64
-		tokenScope = refreshToken.Scope
-		tokenUser = &refreshToken.User
-	} else {
-		// Auth code flow refresh token - load Code and User from Code
-		err = val.database.RefreshTokenLoadCode(ctx, nil, refreshToken)
-		if err != nil {
-			return nil, err
-		}
-
-		err = val.database.CodeLoadUser(ctx, nil, &refreshToken.Code)
-		if err != nil {
-			return nil, err
-		}
-
-		tokenClientId = refreshToken.Code.ClientId
-		tokenUserId = refreshToken.Code.UserId
-		tokenScope = refreshToken.Code.Scope
-		tokenUser = &refreshToken.Code.User
-	}
+	refreshToken := stored.Row
+	isROPCToken := stored.IsROPC
+	tokenClientId := stored.ClientId
+	tokenUserId := stored.UserId
+	tokenScope := stored.Scope
 
 	// RFC 6749 section 5.2 names this case under invalid_grant: a refresh token "issued to another
 	// client". It was invalid_request, the code for a malformed request, so a client following the
 	// RFC read its own bug where there was a token to throw away. The authorization code arm
 	// answers the same situation with invalid_grant.
+	//
+	// Between the two calls of the refresh token check, so nothing about the token's state is
+	// answered to another client: a public client_id is no secret, so until #137 anyone holding a
+	// stolen refresh token could present it under any public client and tell three outcomes apart:
+	// "does not belong to the client" for an untouched account, "The user account is disabled." and
+	// the superseded wording. A check on the token's state placed above ownership reopens that.
 	if tokenClientId != client.Id {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
-	}
-
-	// The user's state is read only below the ownership check, for both shapes of token. A
-	// public client_id is no secret, so until #137 anyone holding a stolen refresh token could
-	// present it under any public client and tell three outcomes apart: "does not belong to the
-	// client" for an untouched account, "The user account is disabled." and the superseded
-	// wording. A check on the grant's user placed above ownership reopens that.
-	//
-	// A disabled user's token gets the wording that says nothing about why (#137), and
-	// UserDisabledError is what still tells the handler to write EventUserDisabled.
-	if !tokenUser.Enabled {
-		return nil, userDisabled(invalidRefreshTokenMessage, tokenUser.Id)
-	}
-
-	// The generation boundary (#106), read from the TOKEN row, not from any joined record (#106
-	// decision 11(a)): refreshToken.AuthStateGeneration, NOT refreshToken.Code.AuthStateGeneration.
-	// The two legitimately differ on the code shape: a self-service password change promotes the
-	// preserved session's tokens to the new generation while their codes stay on the old one, so
-	// reading the code here would reject exactly the tokens #106 decision 4 exists to keep working.
-	if refreshToken.AuthStateGeneration != tokenUser.AuthStateGeneration {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-			invalidGenerationMessage, http.StatusBadRequest)
-	}
-
-	// An ROPC token issued before migration 000051 records no authentication instant, so no
-	// refresh of it can issue the auth_time OpenID Connect Core 1.0 section 12.2 requires, the
-	// time of the original authentication, and RFC 6749 section 5.2 answers a refresh token
-	// that cannot be used as invalid_grant. Its client makes one password grant again, and the
-	// new family records the instant (#125). After the ownership check, so another client
-	// presenting it learns nothing about the token beyond that it is not theirs.
-	if isROPCToken && !refreshToken.AuthenticatedAt.Valid {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-			invalidRefreshTokenMessage, http.StatusBadRequest)
-	}
-
-	// One message for both ways a grant's session can stop backing it, so the two
-	// cannot drift into two spellings of one fact. Declared here rather than inside the
-	// Refresh branch because the revoked check below needs it too.
-	const invalidTokenMessage = "The refresh token is invalid because the associated session has expired or been terminated."
-
-	// The termination boundary (#129 decision 4), the half that closes gap 2 for free.
-	// A rotated child inherits its parent's code_id, so a marked code rejects every
-	// descendant of that grant, including one inserted after the termination committed:
-	// the child is born already rejected rather than caught by a sweep.
-	//
-	// This is what reaches an OFFLINE token, which the typ switch below never can. Its
-	// Offline branch checks only the max lifetime and deliberately does not consult the
-	// session, because a session merely expiring must leave an offline grant working
-	// (decision 2). Termination has to be a positive fact for exactly that reason.
-	//
-	// ROPC is excluded because it has no grant origin to terminate: code_id is NULL,
-	// there is no session, and refreshToken.Code is the zero value on that path.
-	//
-	// Placed after the ownership check above so an unauthenticated presenter of someone
-	// else's token cannot learn from it that a session was ended (decision 7).
-	if !isROPCToken && refreshToken.Code.Revoked {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-			invalidTokenMessage, http.StatusBadRequest)
 	}
 
 	// The PKCE boundary again, on the arm where the exposure is durable (#245). A code
@@ -244,141 +149,77 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// so a client that becomes public keeps handing out tokens against a challenge-less
 	// grant indefinitely unless this refuses them.
 	//
-	// It costs nothing: RefreshTokenLoadCode above already put the code in hand, so this
-	// is the same struct the revoked check just read, for the same kind of code-borne rule.
+	// It costs nothing: FindRefreshToken already put the code in hand. ROPC is excluded: code_id
+	// is NULL, there is no code, and refreshToken.Code is the zero value on that path. On the
+	// auth code path a missing code row leaves the same zero value, so CodeChallenge.Valid is
+	// false and the token is refused. Fail-closed either way.
 	//
-	// ROPC is excluded by isROPCToken exactly as the revoked check excludes it: code_id is
-	// NULL, there is no code, and refreshToken.Code is the zero value on that path. On the
-	// auth code path a missing code row leaves the same zero value, so CodeChallenge.Valid
-	// is false and the token is refused. Fail-closed either way.
-	//
-	// Placed after the ownership check above for the reason that check documents: an
-	// unauthenticated presenter of someone else's token learns nothing from it.
-	if !isROPCToken && client.IsPublic &&
-		(!refreshToken.Code.CodeChallenge.Valid || refreshToken.Code.CodeChallenge.String == "") {
+	// Decided here and answered below, at its place among the check's refusals.
+	challengeless := !isROPCToken && client.IsPublic &&
+		(!refreshToken.Code.CodeChallenge.Valid || refreshToken.Code.CodeChallenge.String == "")
+
+	refusal, err := liveness.RefreshToken(ctx, val.database, stored, *refreshTokenInfo, settings, time.Now().UTC())
+
+	// One message for every way a grant's session can stop backing it, so they cannot drift into
+	// several spellings of one fact: a terminated grant, a session gone, past its bounds, or of
+	// another user. "Expired or terminated" already covers each, and another wording would tell a
+	// presenter that the session exists and belongs to someone else.
+	const invalidTokenMessage = "The refresh token is invalid because the associated session has expired or been terminated."
+
+	// The refusals the check reads off what was loaded with the row answer first, in its order: a
+	// disabled user's token gets the wording that says nothing about why (#137), and
+	// UserDisabledError is what still tells the handler to write EventUserDisabled. A revoked code's
+	// marker refuses a flipped client's code-descended children before PKCE does.
+	switch refusal {
+	case liveness.RefreshUserDisabled:
+		return nil, userDisabled(invalidRefreshTokenMessage, stored.User.Id)
+	case liveness.RefreshGenerationSuperseded:
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			invalidGenerationMessage, http.StatusBadRequest)
+	case liveness.RefreshNoAuthenticationInstant:
+		// RFC 6749 section 5.2 answers a refresh token that cannot be used as invalid_grant (#125).
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			invalidRefreshTokenMessage, http.StatusBadRequest)
+	case liveness.RefreshCodeRevoked:
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			invalidTokenMessage, http.StatusBadRequest)
+	}
+
+	// Every refusal below, and every fault the check met, comes from what it read after those, and
+	// PKCE was answered before any of it was read. It still is: a challenge-less token is refused
+	// for PKCE whatever the family's record and the session say, and whether or not they could be
+	// read.
+	if challengeless {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"This refresh token descends from an authorization code issued without PKCE, and public clients are required to use PKCE.",
 			http.StatusBadRequest)
 	}
+	if err != nil {
+		return nil, err
+	}
 
-	// A live token whose rotation family is recorded as revoked is refused here. The record is
-	// written by replay containment and by a client made public, in the same transaction as the
-	// revocation, and it outlives every member of the family, which is what makes it more than the
-	// live-row sweep it accompanies: a rotation claims its parent and inserts its child in separate
-	// statements, so a sweep that ran between them found no child to revoke, the child then
-	// committed live, and this is the check that refuses it when it is presented. It is born
-	// refused, as #129 and #245 make a code's child (#132, #259).
-	//
-	// Below every refusal above it, so a token one of them already answers keeps its wording: the
-	// revoked code's marker (which refuses a flipped client's code-descended children first), the
-	// user's state, the generation and the authentication instant. Below the ownership check for the
-	// reason those are (#137): another client presenting a token must learn nothing about what
-	// became of it.
-	//
-	// Skipped for a token whose own row is revoked: that one is a replay, which the refresh
-	// redemption contains and audits, and its answer says the token was revoked. The record exists
-	// for the live token nothing else refuses.
-	//
-	// The same text as a disabled user's token and as an unknown jti, because the record says
-	// nothing a client can act on and naming it would confirm which families were contained.
-	if !refreshToken.Revoked {
-		familyRevoked, familyErr := val.database.IsRefreshTokenFamilyRevoked(ctx, nil, refreshToken.FirstRefreshTokenJti)
-		if familyErr != nil {
-			return nil, familyErr
-		}
-		if familyRevoked {
-			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-				invalidRefreshTokenMessage, http.StatusBadRequest)
-		}
+	switch refusal {
+	case liveness.RefreshFamilyRevoked:
+		// The same text as a disabled user's token and as an unknown jti, because the record says
+		// nothing a client can act on and naming it would confirm which families were contained.
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			invalidRefreshTokenMessage, http.StatusBadRequest)
+	case liveness.RefreshSessionNotFound, liveness.RefreshSessionOfAnotherUser, liveness.RefreshSessionExpired:
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			invalidTokenMessage, http.StatusBadRequest)
+	case liveness.RefreshOfflineExpired:
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			"The refresh token is invalid because it has expired (offline_access_max_lifetime).",
+			http.StatusBadRequest)
+	case liveness.RefreshLive, liveness.RefreshTokenRevoked:
+		// A token refused only for its own revoked row is a replay of a grant nothing else ended.
+		// The refresh redemption contains its family and audits it, and its answer says the token
+		// was revoked, so it goes on as a live one does.
+	default:
+		return nil, errs.Errorf("unexpected refresh token refusal %d", refusal)
 	}
 
 	refreshTokenType := refreshTokenInfo.StringClaim("typ")
-	switch refreshTokenType {
-	case issuance.TokenTypeRefresh.String():
-		// this is a normal refresh token
-		// check the associated user session to see if it's still valid
-
-		userSession, getUserSessionErr := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.SessionIdentifier)
-		if getUserSessionErr != nil {
-			return nil, getUserSessionErr
-		}
-		if userSession == nil {
-			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", invalidTokenMessage,
-				http.StatusBadRequest)
-		}
-		isSessionValid := userSession.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
-		if !isSessionValid {
-			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", invalidTokenMessage,
-				http.StatusBadRequest)
-		}
-
-		// The session has to belong to the grant's user. Without this a token bound to
-		// someone else's session refreshes indefinitely and bumps that session as it
-		// goes, so the wrong person's activity keeps the session alive and the wrong
-		// person's logout ends the grant (#133).
-		//
-		// tokenUserId is the code's user on this arm, and only auth code flow reaches
-		// it: ROPC refresh tokens are typed Offline unconditionally because there is no
-		// browser session to bind to (generateRefreshTokenForROPC).
-		//
-		// The shared message again, deliberately. "Expired or terminated" already covers
-		// both ways a session stops backing a grant, and a third wording here would tell
-		// a presenter that the session exists and belongs to someone else.
-		if userSession.UserId != tokenUserId {
-			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", invalidTokenMessage,
-				http.StatusBadRequest)
-		}
-	case issuance.TokenTypeOffline.String():
-		// this is an offline refresh token
-		// its lifetime is not linked to the user session
-
-		// check if it's still valid according to its max lifetime
-		maxLifetime := refreshTokenInfo.TimeClaim("offline_access_max_lifetime")
-		if maxLifetime.IsZero() {
-			return nil, errs.New("the refresh token is invalid because it does not contain an offline_access_max_lifetime claim")
-		}
-		if time.Now().UTC().After(maxLifetime) {
-			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-				"The refresh token is invalid because it has expired (offline_access_max_lifetime).",
-				http.StatusBadRequest)
-		}
-
-		// The ownership boundary (#133), the half the Refresh arm cannot reach. An offline
-		// grant is meant to outlive its session, which is why this arm otherwise never
-		// looks at one, and that deliberate silence is what a grant cross-bound before the
-		// fix slips through: it keeps rotating for the offline maximum lifetime, seeded at
-		// a year, re-copying the code's acr each time. That is the single claim the old
-		// path took from a session belonging to somebody else; amr and auth_time always
-		// described the ceremony that actually happened.
-		//
-		// Read from the CODE, not from the token row. Only a Refresh token stores a session
-		// identifier of its own; for an Offline one the issuer records the max lifetime in
-		// that column instead, so refreshToken.SessionIdentifier is empty here and the
-		// grant's session is the one its code was stamped with.
-		//
-		// Refuses only while the row is still there and its owner differs, exactly as the
-		// code branch does, and for the same reason: absence is the ordinary state of a
-		// healthy offline grant, so absence must not refuse. That is also the precise limit
-		// of what this reaches, since the session sweep removes the evidence long before
-		// the grant expires.
-		//
-		// Placed after the max-lifetime check so an already-expired token is refused
-		// without a lookup, and ROPC excluded for the same reason as the revoked check
-		// above: code_id is NULL, refreshToken.Code is the zero value, and there was never
-		// a session to own the grant.
-		if !isROPCToken && refreshToken.Code.SessionIdentifier != "" {
-			codeSession, getUserSessionErr := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.Code.SessionIdentifier)
-			if getUserSessionErr != nil {
-				return nil, getUserSessionErr
-			}
-			if codeSession != nil && codeSession.UserId != tokenUserId {
-				return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
-					invalidTokenMessage, http.StatusBadRequest)
-			}
-		}
-	default:
-		return nil, errs.New("the refresh token is invalid because it does not contain a valid typ claim")
-	}
 
 	if len(input.Scope) > 0 {
 		// must be equal to, or a subset of the original scopes requested

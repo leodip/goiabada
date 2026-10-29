@@ -59,8 +59,16 @@ Exchange refresh token for new access/refresh tokens. Works with auth code and R
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
+- Liveness: `liveness.FindRefreshToken` reads the row with its code, user and client, and
+  `liveness.RefreshToken` judges it: user enabled, the row's generation current, a password grant
+  token's authentication instant, the code not revoked, no family revocation record, then the
+  session (session-bound) or the maximum lifetime and the code's session owner (offline), and last
+  the row's own revocation. The validator matches the client to the token between the two calls and
+  keeps PKCE, which it answers before the family and session refusals, and the scope checks. A token
+  refused only for its own revoked row goes on to the redemption, which contains its family (#676)
 - Implementation: `handler_token_refresh_token.go`,
-  `protocolvalidation/token_grant_refresh_token.go`, `issuance/grant_refresh_token.go`
+  `protocolvalidation/token_grant_refresh_token.go`, `liveness/refresh.go`,
+  `issuance/grant_refresh_token.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
