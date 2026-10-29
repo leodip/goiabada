@@ -712,3 +712,95 @@ func TestAccessToken_RevokedJtiFault(t *testing.T) {
 	assert.False(t, verdict.Live())
 	assert.NotEqual(t, AccessTokenRevoked, verdict.Refusal, "a fault is not a revoked token")
 }
+
+// A client deleted and created again under the same identifier is another client, and the tokens of
+// the deleted one never work again under it (#676 decision 6): a token issued before the client's
+// creation second is refused unread, one issued after it is judged as before, and one issued in that
+// second reads the identifier's deletion and is refused when it was deleted in or after that second.
+func TestAccessToken_AClientCreatedAfterTheToken(t *testing.T) {
+	created := time.Date(2026, 10, 29, 11, 0, 0, 0, time.UTC).Add(400 * time.Millisecond)
+	createdSecond := float64(created.Unix())
+	recreated := &record.Client{Id: 8, ClientIdentifier: clientIdentifier, Enabled: true,
+		CreatedAt: sql.NullTime{Time: created, Valid: true}}
+
+	type deletionRead int
+	const (
+		notRead deletionRead = iota
+		noDeletion
+		deletedEarlier
+		deletedInTheSecond
+	)
+
+	tests := []struct {
+		label       string
+		iat         interface{}
+		deletion    deletionRead
+		wantRefusal Refusal
+	}{
+		{label: "issued a second before the client was created", iat: createdSecond - 1, wantRefusal: ClientNotFound},
+		{label: "issued long before", iat: createdSecond - 86400, wantRefusal: ClientNotFound},
+		{label: "issued a second after", iat: createdSecond + 1, wantRefusal: Live},
+		{label: "issued in the creation second, the identifier never deleted", iat: createdSecond,
+			deletion: noDeletion, wantRefusal: Live},
+		{label: "issued in the creation second, the identifier deleted a second earlier", iat: createdSecond,
+			deletion: deletedEarlier, wantRefusal: Live},
+		{label: "issued in the creation second, the identifier deleted in that second", iat: createdSecond,
+			deletion: deletedInTheSecond, wantRefusal: ClientNotFound},
+		// The auth server signs iat on every token, as an integral NumericDate.
+		{label: "no iat", wantRefusal: ClientNotFound},
+		{label: "an iat that is not a number", iat: "1761735600", wantRefusal: ClientNotFound},
+		{label: "an iat that is not integral", iat: createdSecond + 0.5, wantRefusal: ClientNotFound},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).Return(recreated, nil).Once()
+			switch tc.deletion {
+			case noDeletion:
+				database.On("GetDeletedClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).
+					Return(nil, nil).Once()
+			case deletedEarlier:
+				database.On("GetDeletedClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).
+					Return(&record.DeletedClient{ClientIdentifier: clientIdentifier, DeletedAt: created.Add(-time.Second)}, nil).Once()
+			case deletedInTheSecond:
+				database.On("GetDeletedClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).
+					Return(&record.DeletedClient{ClientIdentifier: clientIdentifier, DeletedAt: created.Add(-100 * time.Millisecond)}, nil).Once()
+			}
+			if tc.wantRefusal == Live {
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+			}
+			claims := map[string]interface{}{"sub": clientIdentifier}
+			if tc.iat != nil {
+				claims["iat"] = tc.iat
+			}
+
+			verdict, err := AccessToken(context.Background(), database, accessToken(claims), settings, checkedAt)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRefusal, verdict.Refusal, "refusal")
+			if tc.wantRefusal == ClientNotFound {
+				assert.Nil(t, verdict.Client, "the client found is not the token's")
+			}
+		})
+	}
+}
+
+// A fault reading the deletion is an error and never a refusal.
+func TestAccessToken_DeletedClientFault(t *testing.T) {
+	created := time.Date(2026, 10, 29, 11, 0, 0, 0, time.UTC)
+	recreated := &record.Client{Id: 8, ClientIdentifier: clientIdentifier, Enabled: true,
+		CreatedAt: sql.NullTime{Time: created, Valid: true}}
+	database := datamocks.NewDatabase(t)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).Return(recreated, nil).Once()
+	database.On("GetDeletedClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).
+		Return(nil, errors.New("the database is down")).Once()
+
+	verdict, err := AccessToken(context.Background(), database,
+		accessToken(map[string]interface{}{"sub": clientIdentifier, "iat": float64(created.Unix())}), settings, checkedAt)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "the database is down")
+	assert.False(t, verdict.Live())
+	assert.NotEqual(t, ClientNotFound, verdict.Refusal, "a fault is not a deleted client")
+}

@@ -802,7 +802,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Nouveau secret généré. Enregistrez pour l’utiliser. En attendant, le secret actuel reste valide."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Paramètres d’authentification enregistrés."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Vous modifiez le secret du client. Tout ce qui envoie encore l’ancien secret sera refusé jusqu’à sa mise à jour."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vous rendez le client public. Son secret sera supprimé et tout ce qui utilise ce client pour se connecter devra être mis à jour. Ses jetons de rafraîchissement et codes d’autorisation seront révoqués. Les jetons d’accès déjà émis resteront valides jusqu’à leur expiration, et les utilisateurs resteront connectés aux autres clients."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vous rendez le client public. Son secret sera supprimé et tout ce qui utilise ce client pour se connecter devra être mis à jour. Ses jetons de rafraîchissement et codes d’autorisation seront révoqués, et les jetons d’accès émis avec eux seront refusés aussitôt par le serveur d’authentification et par les API qui vérifient les jetons auprès de lui ; une API qui ne vérifie que la signature d’un jeton les accepte jusqu’à leur expiration. Ses ressources d’introspection seront vidées, et les utilisateurs resteront connectés aux autres clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Vous rendez le client confidentiel. Tout ce qui utilise ce client pour se connecter devra envoyer son secret."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -822,7 +822,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "Si ce client s’exécute dans un navigateur et appelle /auth/token ou /userinfo, enregistrez son origine ici : un schéma, un hôte et un port facultatif, sans rien après, par exemple https://www.example.com ou https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Si ce client s’exécute dans un navigateur et appelle /auth/token, /auth/revoke ou /userinfo, enregistrez son origine ici : un schéma, un hôte et un port facultatif, sans rien après, par exemple https://www.example.com ou https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Origine web"
 "adminconsole.admin_clients.web_origins.add_button" = "Ajouter"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Origines web"

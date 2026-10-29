@@ -397,6 +397,117 @@ func TestAPIClientIntrospectionResources_OnlyManageListsTheAuthServerResource(t 
 	})
 }
 
+// A client listed for the authserver resource introspects every sign-in, and whoever reads or sets
+// its secret authenticates as it, so only authserver:manage does either, as only it lists the
+// resource (#676 decision 14). manage-clients can still take the reach away by making the client
+// public, which clears the list, and reads the secret of a client listed for other resources only.
+func TestAPIClientIntrospectionResources_OnlyManageReadsOrSetsAnAuthServerIntrospectorsSecret(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	manageToken, _ := createAdminClientWithToken(t)
+	clientsToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	authServer := authServerResourceId(t)
+	secretPath := func(client *record.Client) string {
+		return fmt.Sprintf("%s/api/v1/admin/clients/%d/secret", appConfig.AuthServer.BaseURL, client.Id)
+	}
+	authenticationPath := func(client *record.Client) string {
+		return fmt.Sprintf("%s/api/v1/admin/clients/%d/authentication", appConfig.AuthServer.BaseURL, client.Id)
+	}
+	// send makes the request under its own request id, so the audit rows it leaves can be read back
+	// by that id alone.
+	send := func(t *testing.T, method, url, accessToken string, body any) (*http.Response, string) {
+		t.Helper()
+		var reader io.Reader
+		if body != nil {
+			encoded, err := json.Marshal(body)
+			require.NoError(t, err)
+			reader = bytes.NewReader(encoded)
+		}
+		req, err := http.NewRequest(method, url, reader)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Content-Type", "application/json")
+		requestId := "introspect-secret-" + fake.LetterN(16)
+		req.Header.Set("X-Request-Id", requestId)
+		resp, err := createHttpClient(t).Do(req)
+		require.NoError(t, err)
+		return resp, requestId
+	}
+	assertRefused := func(t *testing.T, resp *http.Response, requestId string, client *record.Client, route string) {
+		t.Helper()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		assert.Contains(t, resp.Header.Get("WWW-Authenticate"), `scope="authserver:manage"`)
+		code, _ := errorEnvelope(t, resp)
+		assert.Equal(t, "MANAGE_SCOPE_REQUIRED", code)
+		rows := auditRows(t, manageToken, "administrator_change_refused", requestId)
+		require.Len(t, rows, 1, "exactly one administrator_change_refused row")
+		assert.Equal(t, caller.ClientIdentifier, rows[0]["logged_in_user"])
+		assert.Equal(t, route, rows[0]["route"])
+		assert.Equal(t, "target", rows[0]["ceiling"])
+		assert.Equal(t, "client", rows[0]["target_kind"])
+		assert.InDelta(t, float64(client.Id), rows[0]["target_id"], 0)
+	}
+
+	t.Run("manage-clients cannot read its secret", func(t *testing.T) {
+		client := newIntrospectingClient(t)
+		listIntrospectionResource(t, client.Id, authServer)
+
+		resp, requestId := send(t, http.MethodGet, secretPath(client), clientsToken, nil)
+		defer func() { _ = resp.Body.Close() }()
+
+		assertRefused(t, resp, requestId, client, "/api/v1/admin/clients/{id}/secret")
+	})
+
+	t.Run("manage-clients cannot set its secret", func(t *testing.T) {
+		client := newIntrospectingClient(t)
+		listIntrospectionResource(t, client.Id, authServer)
+
+		resp, requestId := send(t, http.MethodPut, authenticationPath(client), clientsToken,
+			api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)})
+		defer func() { _ = resp.Body.Close() }()
+
+		assertRefused(t, resp, requestId, client, "/api/v1/admin/clients/{id}/authentication")
+		stored, err := database.GetClientById(context.Background(), nil, client.Id)
+		require.NoError(t, err)
+		assert.Equal(t, client.ClientSecretEncrypted, stored.ClientSecretEncrypted, "the secret is the one it had")
+	})
+
+	t.Run("manage reads and sets it", func(t *testing.T) {
+		client := newIntrospectingClient(t)
+		listIntrospectionResource(t, client.Id, authServer)
+
+		resp := makeAPIRequest(t, http.MethodGet, secretPath(client), manageToken, nil)
+		_ = resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		resp = makeAPIRequest(t, http.MethodPut, authenticationPath(client), manageToken,
+			api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)})
+		_ = resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("manage-clients makes it public, which clears the list", func(t *testing.T) {
+		client := newIntrospectingClient(t)
+		listIntrospectionResource(t, client.Id, authServer)
+
+		resp := makeAPIRequest(t, http.MethodPut, authenticationPath(client), clientsToken,
+			api.UpdateClientAuthenticationRequest{IsPublic: true})
+		_ = resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Empty(t, storedIntrospectionResourceIds(t, client.Id))
+	})
+
+	t.Run("manage-clients reads the secret of a client listed for another resource", func(t *testing.T) {
+		client := newIntrospectingClient(t)
+		listIntrospectionResource(t, client.Id, newAPIResource(t).Id)
+
+		resp := makeAPIRequest(t, http.MethodGet, secretPath(client), clientsToken, nil)
+		_ = resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+}
+
 // The route is held to the client permissions' scopes: admin-read reads, manage-clients writes, and
 // another domain's scope reaches neither.
 func TestAPIClientIntrospectionResources_HeldToTheClientsScopes(t *testing.T) {

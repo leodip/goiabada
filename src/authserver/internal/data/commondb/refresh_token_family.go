@@ -152,9 +152,10 @@ func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, 
 
 // IsRefreshTokenFamilyLive reports whether the family stands for a live grant, which is what an
 // access token carrying grant_id lives by (#676 decision 1): it has no revocation record, and it
-// still has a member that is not revoked. Every revocation path either writes the record or revokes
-// every member, so the one rule covers them all, and a rotation keeps the grant live because it
-// revokes the parent and inserts the child in one transaction. A family with no member left, one
+// still has a member that is not revoked. Every revocation that ends a grant writes the record, so
+// a child a rotation inserts after the revocation's sweep read the family is refused with the rest,
+// and a rotation keeps the grant live because it revokes the parent and inserts the child in one
+// transaction. A family with no member left, one
 // whose rows retention or a cascade removed, is no live grant.
 //
 // One statement answers both halves, each with the identifier it matched, and each is compared with

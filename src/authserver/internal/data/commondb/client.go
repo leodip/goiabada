@@ -544,18 +544,32 @@ func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Clie
 // itself, and a transaction of this shape racing an authorization ceremony for the same
 // client, or a termination of a session that holds this client's tokens, is answered by
 // RunInTransaction rerunning whichever of the two the engine aborts (#301).
+//
+// In the same transaction, last, it records the deleted identifier with the moment of the
+// deletion, which the access-token liveness check reads so that a new client taking the
+// identifier does not revive the deleted one's access tokens (#676 decision 6). The identifier
+// is read first, by the client's id; a client that is not there records nothing.
 func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
-		if err := d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId); err != nil {
+		client, err := d.GetClientById(ctx, tx, clientId)
+		if err != nil {
 			return err
 		}
 
-		_, err := d.ExecSQL(ctx, tx, deleteClient.text(d.Dialect), clientId)
+		err = d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
+		if err != nil {
+			return err
+		}
+
+		_, err = d.ExecSQL(ctx, tx, deleteClient.text(d.Dialect), clientId)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete client")
 		}
 
-		return nil
+		if client == nil {
+			return nil
+		}
+		return d.recordClientDeleted(ctx, tx, client.ClientIdentifier, time.Now())
 	})
 }

@@ -803,7 +803,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Neues Secret generiert. Speichern Sie, um es zu verwenden. Bis dahin gilt weiterhin das bisherige Secret."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentifizierung gespeichert."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Sie ändern das Client-Secret. Alles, was noch das alte Secret sendet, wird bis zur Aktualisierung abgelehnt."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Sie machen den Client öffentlich. Sein Secret wird entfernt. Alles, was sich damit anmeldet, muss angepasst werden. Seine Refresh Tokens und Autorisierungscodes werden widerrufen. Bereits ausgestellte Access Tokens bleiben bis zum Ablauf gültig. Anmeldungen bei anderen Clients bleiben bestehen."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Sie machen den Client öffentlich. Sein Secret wird entfernt. Alles, was sich damit anmeldet, muss angepasst werden. Seine Refresh Tokens und Autorisierungscodes werden widerrufen, und die damit ausgestellten Access Tokens werden sofort abgelehnt, vom Authentifizierungsserver und von APIs, die Tokens bei ihm prüfen. Eine API, die nur die Signatur eines Tokens prüft, akzeptiert sie bis zum Ablauf. Seine Introspektions-Ressourcen werden geleert. Anmeldungen bei anderen Clients bleiben bestehen."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Sie machen den Client vertraulich. Alles, was sich damit anmeldet, muss dann das Client-Secret senden."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -823,7 +823,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "Falls dieser Client im Browser läuft und /auth/token oder /userinfo aufruft, tragen Sie hier seine Origin ein: Schema, Host und optionaler Port, ohne weitere Bestandteile. Beispiele: https://www.example.com oder https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Falls dieser Client im Browser läuft und /auth/token, /auth/revoke oder /userinfo aufruft, tragen Sie hier seine Origin ein: Schema, Host und optionaler Port, ohne weitere Bestandteile. Beispiele: https://www.example.com oder https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Web-Origin"
 "adminconsole.admin_clients.web_origins.add_button" = "Hinzufügen"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web-Origins"

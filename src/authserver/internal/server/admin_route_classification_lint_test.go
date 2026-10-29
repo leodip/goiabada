@@ -52,6 +52,7 @@ var adminPolicyCeilings = map[string]string{
 	"userTargetCeilingAllows":            adminCeilingTarget,
 	"groupTargetCeilingAllows":           adminCeilingTarget,
 	"clientTargetCeilingAllows":          adminCeilingTarget,
+	"clientCredentialsCeilingAllows":     adminCeilingTarget,
 	"allowanceCeilingAllows":             adminCeilingTarget,
 	"permissionDescriptionCeilingAllows": adminCeilingTarget,
 	"introspectionResourceCeilingAllows": adminCeilingGrant,

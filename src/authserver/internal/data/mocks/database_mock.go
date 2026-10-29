@@ -7203,6 +7203,80 @@ func (_c *Database_GetCurrentSigningKey_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// GetDeletedClientByClientIdentifier provides a mock function for the type Database
+func (_mock *Database) GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error) {
+	ret := _mock.Called(ctx, tx, clientIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDeletedClientByClientIdentifier")
+	}
+
+	var r0 *record.DeletedClient
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*record.DeletedClient, error)); ok {
+		return returnFunc(ctx, tx, clientIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *record.DeletedClient); ok {
+		r0 = returnFunc(ctx, tx, clientIdentifier)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.DeletedClient)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, clientIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetDeletedClientByClientIdentifier_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDeletedClientByClientIdentifier'
+type Database_GetDeletedClientByClientIdentifier_Call struct {
+	*mock.Call
+}
+
+// GetDeletedClientByClientIdentifier is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientIdentifier string
+func (_e *Database_Expecter) GetDeletedClientByClientIdentifier(ctx any, tx any, clientIdentifier any) *Database_GetDeletedClientByClientIdentifier_Call {
+	return &Database_GetDeletedClientByClientIdentifier_Call{Call: _e.mock.On("GetDeletedClientByClientIdentifier", ctx, tx, clientIdentifier)}
+}
+
+func (_c *Database_GetDeletedClientByClientIdentifier_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string)) *Database_GetDeletedClientByClientIdentifier_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetDeletedClientByClientIdentifier_Call) Return(deletedClient *record.DeletedClient, err error) *Database_GetDeletedClientByClientIdentifier_Call {
+	_c.Call.Return(deletedClient, err)
+	return _c
+}
+
+func (_c *Database_GetDeletedClientByClientIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)) *Database_GetDeletedClientByClientIdentifier_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetGroupAttributeById provides a mock function for the type Database
 func (_mock *Database) GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error) {
 	ret := _mock.Called(ctx, tx, groupAttributeId)

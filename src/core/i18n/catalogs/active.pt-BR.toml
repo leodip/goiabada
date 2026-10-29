@@ -753,7 +753,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Novo segredo gerado. Salve para começar a usá-lo; até lá, o atual continua funcionando."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Autenticação salva."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Você está alterando o segredo do cliente, então tudo o que ainda enviar o antigo será recusado até ser atualizado."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Você está tornando o cliente público. O segredo dele será removido, então tudo o que entra com ele precisará ser atualizado. Os refresh tokens e os códigos de autorização dele serão revogados; os access tokens já emitidos continuarão funcionando até expirarem, e os usuários continuarão conectados nos demais clientes."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Você está tornando o cliente público. O segredo dele será removido, então tudo o que entra com ele precisará ser atualizado. Os refresh tokens e os códigos de autorização dele serão revogados, e os access tokens emitidos com eles serão recusados na hora pelo servidor de autenticação e pelas APIs que verificam tokens com ele; uma API que só verifica a assinatura de um token os aceita até expirarem. Os recursos de introspecção dele serão esvaziados, e os usuários continuarão conectados nos demais clientes."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Você está tornando o cliente confidencial. Tudo o que entra com ele terá de enviar o segredo do cliente."
 
 "adminconsole.admin_clients.redirect_uris.requires_redirect_flow" = "URIs de redirecionamento servem ao fluxo authorization code e ao fluxo implícito. Ative um deles, na aba Fluxos OAuth2, para defini-los aqui."
@@ -769,7 +769,7 @@
 "adminconsole.admin_clients.redirect_uris.added" = "URI de redirecionamento adicionado. Salve para manter a alteração."
 "adminconsole.admin_clients.redirect_uris.removed" = "URI de redirecionamento removido. Salve para manter a alteração."
 
-"adminconsole.admin_clients.web_origins.lead" = "Se este cliente roda em um navegador e chama /auth/token ou /userinfo, registre aqui a origem dele: um esquema, um host e uma porta opcional, sem nada depois, como https://www.example.com ou https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Se este cliente roda em um navegador e chama /auth/token, /auth/revoke ou /userinfo, registre aqui a origem dele: um esquema, um host e uma porta opcional, sem nada depois, como https://www.example.com ou https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Origem web"
 "adminconsole.admin_clients.web_origins.add_button" = "Adicionar"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Origens web"

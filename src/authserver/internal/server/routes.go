@@ -175,9 +175,11 @@ func (s *Server) initRoutes(branches appBranches) {
 	// before anything else, as at the token endpoint's grants that have none (decision 10).
 	revoke.Post("/auth/revoke", handlers.HandleRevokePost(httpHelper, s.database, tokenParser, s.dataCipher, auditLogger, s.revocationMetrics))
 	// Token introspection (RFC 7662, #676), outside the /auth group for the same reason, on a branch
-	// of its own that counts the faults it answers. POST alone: a GET falls to the /auth group's 405,
-	// so no token reaches a URL (decision 13). No rate limit, as for revocation (decision 10).
+	// of its own that counts the faults it answers. POST alone: every other method is a 405 the
+	// endpoint answers itself rather than the /auth group's, so no token reaches a URL and the
+	// refusal is not stored either (decision 13). No rate limit, as for revocation (decision 10).
 	introspect.Post("/auth/introspect", handlers.HandleIntrospectPost(httpHelper, s.database, tokenParser, s.dataCipher, s.introspectionMetrics))
+	introspect.Handle("/auth/introspect", handlers.HandleIntrospectOtherMethods())
 
 	pages.Route("/account", func(r *routing.Router) {
 		// While registration is unavailable both routes are a 404 ahead of the limiter, so a refused

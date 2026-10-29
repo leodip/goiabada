@@ -26,9 +26,11 @@ import (
 // protocolRoutes are the routes whose handlers answer RFC 6749 section 5.2's {error,
 // error_description}: token, introspection, userinfo, JWKS, discovery at both its addresses, and
 // dynamic client registration, whose RFC 7591 section 3.2.2 error body is the same two members.
+// Introspection's refusal of every other method is on its branch too, registered for every method.
 var protocolRoutes = []string{
 	"POST /auth/token",
 	"POST /auth/introspect",
+	"* /auth/introspect",
 	"GET /userinfo",
 	"POST /userinfo",
 	"GET /certs",

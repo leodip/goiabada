@@ -57,7 +57,7 @@ An auth server holds the keys to everything else, so security comes first in eve
 
 - **Passwords** are hashed with bcrypt and follow NIST SP 800-63B by default, refusing commonly used ones. Password and one-time code guessing is rate limited per account.
 - **Tokens**: PKCE is required for every public client, and a refresh token works once, so a replayed one revokes its whole family.
-- **Revocation that holds**: changing a password, disabling a user, ending a session, or an app revoking its token revokes the sessions and refresh tokens it authorized, and the auth server refuses their access tokens at once.
+- **Revocation that holds**: changing a password, disabling a user or ending a session revokes the sessions and refresh tokens it authorized, an app revoking its token ends that one grant and leaves the user signed in, and the auth server refuses their access tokens at once.
 - **Secrets encrypted at rest** with AES-256-GCM, and sessions kept on the server behind an `HttpOnly`, `SameSite` cookie, with CSRF protection on every form.
 - **Minimal container images**, with no package manager, running as a non-root user, and rescanned for vulnerabilities every week.
 - **Every change checked** by static analysis (`gosec`, `govulncheck`), the race detector, and tests on all four databases.

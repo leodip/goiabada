@@ -56,7 +56,9 @@ const (
 	NotAnAccessTokenHeader
 	// ForeignIssuer is a token whose iss is not exactly the configured issuer.
 	ForeignIssuer
-	// ClientNotFound is a token whose client_id names no client, or that carries none.
+	// ClientNotFound is a token whose client_id names no client, or that carries none, or names a
+	// client created after the token was issued: the client it was issued to was deleted, and a new
+	// one took its identifier (#676 decision 6).
 	ClientNotFound
 	// ClientDisabled is a token whose client is disabled (#676 decision 6).
 	ClientDisabled
@@ -68,10 +70,11 @@ const (
 	AccessTokenRevoked
 )
 
-// Database is what the check reads: the token's client, its user, the session its sid names, the
+// Database is what the check reads: the token's client, a deletion of its identifier, its user, the session its sid names, the
 // grant its grant_id names and, for a token without one, whether its jti is stored as revoked.
 type Database interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
@@ -112,9 +115,11 @@ func Subject(token oauth.JwtToken) (string, bool) {
 // issued before #676 carries the header typ JWT and is refused here, as is every token after the
 // issuer setting changes. Neither refusal reads anything.
 //
-// Then its client (decision 6): the client its client_id names exists and is enabled, for a client's
-// token as for a user's. A token from a disabled client is refused while the client stays disabled,
-// and works again if it is re-enabled before the token expires; one from a deleted client never does.
+// Then its client (decision 6): the client its client_id names exists, is the one the token was
+// issued to, and is enabled, for a client's token as for a user's. A token from a disabled client is
+// refused while the client stays disabled, and works again if it is re-enabled before the token
+// expires; one from a deleted client never does, a new client taking its identifier included. See
+// issuedToClient.
 //
 // Last, once everything below has passed, its grant (decision 1): a token carrying grant_id is live
 // only while its grant is, and a token without one only while its jti is not stored as revoked. See
@@ -182,6 +187,13 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 	if client == nil {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
+	issued, err := issuedToClient(ctx, database, token, client)
+	if err != nil {
+		return Verdict{}, err
+	}
+	if !issued {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
 	if !client.Enabled {
 		return Verdict{Refusal: ClientDisabled, Client: client}, nil
 	}
@@ -192,6 +204,44 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 		return verdict, err
 	}
 	return grantAccessToken(ctx, database, token, verdict)
+}
+
+// issuedToClient reports whether the token was issued to this client and not to a deleted client
+// whose identifier it took (#676 decision 6). client_id is all the token names its client by, and a
+// new client may take a deleted client's identifier; a token from the client credentials grant or
+// the implicit flow has no grant whose deletion would end it, so without this it would work again,
+// with its old scopes, under the new client.
+//
+// The token's iat against the client's created_at decides, in whole seconds, as iat is written. A
+// token issued in an earlier second than the client's creation was issued to another client. One
+// issued in a later second was issued to this one: its predecessor was deleted before this client
+// was created. A token issued in the creation second itself cannot be placed by its claims, so it
+// reads the recorded deletion of the identifier, and is refused when the identifier was deleted in
+// or after that second: the token was the deleted client's, or this client was created in the very
+// second its predecessor was deleted, and its own tokens from that second are refused with them,
+// failing closed. Only such a token reads anything.
+//
+// A token without an integral iat is one the auth server never signs, and is refused unread. A
+// client without created_at, which only a row written outside the auth server has, is not judged
+// here.
+func issuedToClient(ctx context.Context, database Database, token oauth.JwtToken, client *record.Client) (bool, error) {
+	if !client.CreatedAt.Valid {
+		return true, nil
+	}
+	issuedAt, ok := token.IntClaim("iat")
+	if !ok {
+		return false, nil
+	}
+	created := client.CreatedAt.Time.Unix()
+	if issuedAt != created {
+		return issuedAt > created, nil
+	}
+
+	deleted, err := database.GetDeletedClientByClientIdentifier(ctx, nil, client.ClientIdentifier)
+	if err != nil {
+		return false, errs.Wrap(err, "failed to look up a deleted client for bearer token validation")
+	}
+	return deleted == nil || deleted.DeletedAt.Unix() < issuedAt, nil
 }
 
 // grantAccessToken is AccessToken's last check, the grant (#676 decision 1), for a token everything

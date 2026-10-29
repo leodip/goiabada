@@ -99,7 +99,12 @@ type Database interface {
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
+	// DeleteClient deletes the client, its refresh tokens and, by cascade, every row referencing it,
+	// and records its identifier as deleted, in one transaction (#676 decision 6).
 	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	// GetDeletedClientByClientIdentifier returns the latest deletion of a client with this
+	// identifier, or nil when none was deleted. An empty identifier is an error.
+	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error

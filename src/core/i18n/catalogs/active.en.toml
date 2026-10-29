@@ -799,7 +799,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "New secret generated. Save to start using it; until then the current one keeps working."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentication saved."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "You're changing the client secret, so anything still sending the old one will be refused until it's updated."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked; access tokens already issued will keep working until they expire, and users will stay signed in to other clients."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked, and the access tokens issued with them will be refused at once by the auth server and by APIs that check tokens with it; an API that only checks a token's signature accepts them until they expire. Its introspection resources will be cleared, and users will stay signed in to other clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "You're making the client confidential. Anything that signs in with it will have to send the client secret."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -819,7 +819,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "If this client runs in a browser and calls /auth/token or /userinfo, register its origin here: a scheme, a host and an optional port, with nothing after them, such as https://www.example.com or https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "If this client runs in a browser and calls /auth/token, /auth/revoke or /userinfo, register its origin here: a scheme, a host and an optional port, with nothing after them, such as https://www.example.com or https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Web origin"
 "adminconsole.admin_clients.web_origins.add_button" = "Add"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web origins"

@@ -206,6 +206,15 @@ func terminationStatements(db data.Database, tx *sql.Tx, session *record.UserSes
 		return err
 	}
 	for _, rt := range tokens {
+		if rt.FirstRefreshTokenJti == "" {
+			continue
+		}
+		if _, err := db.RecordRefreshTokenFamilyRevoked(context.Background(), tx, rt.FirstRefreshTokenJti,
+			revocation.ReasonSessionTerminated); err != nil {
+			return err
+		}
+	}
+	for _, rt := range tokens {
 		if rt.Revoked {
 			continue
 		}

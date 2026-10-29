@@ -11,8 +11,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -256,8 +258,9 @@ func refreshIssuerOn(db data.Database) *issuance.TokenIssuer {
 }
 
 type rotationResult struct {
-	response string
-	err      error
+	response    string
+	accessToken string
+	err         error
 }
 
 // startRotation runs the real rotation of the family's live token in the background, paused at its
@@ -273,6 +276,7 @@ func startRotation(t *testing.T, ctx context.Context, f *family, pause *pausingI
 		result := rotationResult{err: err}
 		if response != nil {
 			result.response = response.RefreshToken
+			result.accessToken = response.AccessToken
 		}
 		outcome <- result
 	}()
@@ -390,6 +394,81 @@ func TestRefreshRotation_AClientMadePublicBetweenTheClaimAndTheInsertLeavesAChil
 			require.NoError(t, err)
 			assert.True(t, recorded, "the flip recorded the family although one of its members was mid-rotation")
 
+			requireNoRedeemableChild(t, f, result)
+		})
+	}
+}
+
+// A session's termination, or the response to a reused authorization code, while a rotation of an
+// offline grant of that session holds its claim. Either sweep read the family before the child
+// existed, so the child can be left live after both commit; the revoked code refuses it at the
+// refresh grant, but the access token the rotation minted names only its grant, and the access-token
+// check reads the family. Each records every family it read, so that token is refused at once
+// (#676 decision 1), and an offline grant is the shape whose token has no session to end it.
+func TestRefreshRotation_ASessionRevocationBetweenTheClaimAndTheInsertEndsTheNewAccessToken(t *testing.T) {
+	skipWhereTransactionsCannotOverlap(t)
+
+	revocations := []struct {
+		name   string
+		revoke func(ctx context.Context, db data.Database, f *family, session *record.UserSession) error
+	}{
+		{"the session's termination", func(ctx context.Context, db data.Database, _ *family, session *record.UserSession) error {
+			_, err := revocation.TerminateUserSessionTx(ctx, db, session)
+			return err
+		}},
+		{"the response to a reused code", func(ctx context.Context, db data.Database, f *family, _ *record.UserSession) error {
+			_, err := revocation.RevokeOnAuthCodeReuseTx(ctx, db, f.code)
+			return err
+		}},
+	}
+	for _, rv := range revocations {
+		t.Run(rv.name, func(t *testing.T) {
+			other := secondDatabase(t)
+			withRealSigningKeyOn(t, database)
+			ctx, cancel := context.WithTimeout(context.Background(), lockWaitCeiling)
+			defer cancel()
+
+			f := newFamilyOfShape(t, database, offlineFamily)
+			// The access-token check reads both, and a fixture's defaults are not what it measures.
+			f.user.Enabled = true
+			require.NoError(t, database.UpdateUser(ctx, nil, f.user))
+			f.client.Enabled = true
+			require.NoError(t, database.UpdateClient(ctx, nil, f.client))
+			session, err := database.GetUserSessionBySessionIdentifier(ctx, nil, f.code.SessionIdentifier)
+			require.NoError(t, err)
+			require.NotNil(t, session)
+
+			pause := newPausingInserts(database)
+			tx, rotation := startRotation(t, ctx, f, pause)
+
+			revoking := goBlocked(t, rv.name, tx, func(reached func()) error {
+				reached()
+				return rv.revoke(ctx, other, f, session)
+			})
+			revoking.requireBlocked(t)
+			revoking.requireStillWaiting(t)
+
+			close(pause.release)
+			result := <-rotation
+			require.NoError(t, revoking.await(t), "the revocation commits, rerun once if the engine chose it as a deadlock victim")
+
+			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJti())
+			require.NoError(t, err)
+			assert.True(t, recorded, "the revocation recorded the family although one of its members was mid-rotation")
+			live, err := database.IsRefreshTokenFamilyLive(context.Background(), nil, f.firstJti())
+			require.NoError(t, err)
+			assert.False(t, live, "the grant is dead")
+
+			if result.err == nil {
+				token, err := signingkeys.NewTokenParser(database).DecodeAndValidateTokenString(
+					context.Background(), result.accessToken, true)
+				require.NoError(t, err)
+				require.Empty(t, token.StringClaim("sid"), "an offline grant's access token names no session")
+				verdict, err := liveness.AccessToken(context.Background(), database, *token, rotationSettings(),
+					time.Now().UTC())
+				require.NoError(t, err)
+				assert.Equal(t, liveness.GrantRevoked, verdict.Refusal, "the access token ends with its grant")
+			}
 			requireNoRedeemableChild(t, f, result)
 		})
 	}

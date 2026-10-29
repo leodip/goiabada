@@ -64,19 +64,26 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
 One check decides whether an access token is one under RFC 9068 and still stands for live state.
 - `liveness.AccessToken` checks the token first: its header `typ` is `at+jwt` (or
   `application/at+jwt`, without regard to case) and its `iss` is exactly the configured issuer, as
-  RFC 9068 section 4 requires of a resource server. Then the client its `client_id` names exists and
-  is enabled. Then it reads the user and the session the token names and returns a verdict: live, or
+  RFC 9068 section 4 requires of a resource server. Then the client its `client_id` names exists, is
+  the one the token was issued to, and is enabled. A new client may take a deleted client's
+  identifier, so a token whose `iat` second is before the client's `created_at` second is refused,
+  and one issued in that very second reads `deleted_clients` (written by `DeleteClient` in its
+  transaction) and is refused when the identifier was deleted in or after that second, failing
+  closed. Then it reads the user and the session the token names and returns a verdict: live, or
   the refusal. A token without `auth_time` is a client's and has no user to check. With `sid`, the
   session decides, its generation included, and the token's own generation claim is ignored; without
   `sid`, the token's claim decides, an absent one reading as 0. Every token past its header needs the
   settings, for the issuer
 - Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
   answers whether the family has no revocation record and still has a member that is not revoked,
-  in one indexed read. Every revocation path writes the record or revokes every member, so consent
-  withdrawal, a client made public, ending the session behind an offline grant and replay
-  containment each refuse the grant's access tokens at once. A rotation revokes the parent and
-  inserts the child in one transaction, and a credential change promotes the preserved session's
-  tokens, so both keep the grant live. A family whose rows are all gone is not live. A token
+  in one indexed read. Every revocation that ends a grant writes the record in its transaction, for
+  every family it reads: consent withdrawal, a client made public, a session's termination,
+  authorization-code reuse containment, replay containment and `/auth/revoke`. A sweep alone misses
+  the child of a rotation that claimed its parent before the sweep read the rows, so the record is
+  what refuses that child's access token at once. A credential change ends access tokens through
+  their generation instead. A rotation revokes the parent and inserts the child in one
+  transaction, and a credential change promotes the preserved session's tokens, so both keep the
+  grant live. A family whose rows are all gone is not live. A token
   without `grant_id` (client credentials, implicit) reads no grant; it is live only while its jti
   is not stored in `revoked_access_tokens` (`IsAccessTokenRevoked`, one indexed read), and one
   without a jti is refused unread
@@ -134,8 +141,9 @@ A client ends one of its grants by sending a token of it.
 
 ### Token introspection (RFC 7662)
 An API, calling as a confidential client, asks whether a token is active.
-- Endpoint: `POST /auth/introspect`, form-encoded, CSRF-exempt, no CORS, GET answered 405 by the
-  `/auth` group; on a branch of its own whose faults answer 500 and count as `error`
+- Endpoint: `POST /auth/introspect`, form-encoded, CSRF-exempt, no CORS; every other method is
+  answered 405 with `Allow: POST` and `no-store` by `HandleIntrospectOtherMethods`, registered for
+  the path on the same branch, whose faults answer 500 and count as `error`
 - Order: the client authenticates first through `clientauth.AuthenticateConfidential`, which
   refuses a public client 401 `invalid_client` whatever it sent (section 4); the token parser
   refuses a malformed or foreign token before reading a key; `token_type_hint` is never read

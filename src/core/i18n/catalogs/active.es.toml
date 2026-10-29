@@ -804,7 +804,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Nuevo secreto generado. Guarda para empezar a usarlo; hasta entonces, seguirá funcionando el actual."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Configuración de autenticación guardada."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Vas a cambiar el secreto del cliente. Todo lo que siga enviando el antiguo será rechazado hasta que se actualice."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vas a convertir el cliente en público. Se eliminará su secreto y habrá que actualizar todo lo que inicie sesión con él. Se revocarán sus refresh tokens y códigos de autorización; los tokens de acceso ya emitidos seguirán funcionando hasta que caduquen y los usuarios mantendrán sus sesiones en otros clientes."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vas a convertir el cliente en público. Se eliminará su secreto y habrá que actualizar todo lo que inicie sesión con él. Se revocarán sus refresh tokens y códigos de autorización, y el servidor de autenticación y las API que comprueban tokens con él rechazarán al instante los tokens de acceso emitidos con ellos; una API que solo comprueba la firma de un token los acepta hasta que caduquen. Se vaciarán sus recursos de introspección y los usuarios mantendrán sus sesiones en otros clientes."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Vas a convertir el cliente en confidencial. Todo lo que inicie sesión con él tendrá que enviar el secreto del cliente."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -824,7 +824,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "Si este cliente se ejecuta en un navegador y llama a /auth/token o /userinfo, registra aquí su origen: un esquema, un host y un puerto opcional, sin nada después, como https://www.example.com o https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Si este cliente se ejecuta en un navegador y llama a /auth/token, /auth/revoke o /userinfo, registra aquí su origen: un esquema, un host y un puerto opcional, sin nada después, como https://www.example.com o https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Origen web"
 "adminconsole.admin_clients.web_origins.add_button" = "Añadir"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Orígenes web"

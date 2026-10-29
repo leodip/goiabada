@@ -316,8 +316,9 @@ const (
 	//
 	// Deliberately NOT EventRevokedUserAuthState, whose payload asserts a generation bracket and
 	// a list of terminated sessions. This action advances no generation and ends no session: it
-	// is scoped to one client, so the users of that client stay signed in everywhere else and
-	// their access tokens keep working until they expire.
+	// is scoped to one client, so the users of that client stay signed in everywhere else. The
+	// access tokens of the revoked grants are refused at once at the auth server's own endpoints
+	// and at introspection, since each names its grant (#676 decision 1).
 	//
 	// Its payload carries client_id, reason, revoked_code_count and revoked_refresh_token_jtis, plus
 	// logged_in_user. Codes get a count rather than a list of ids, following
@@ -335,8 +336,9 @@ const (
 	// It accompanies EventDeletedOwnUserConsent or EventDeletedUserConsent rather than replacing
 	// it, for the reason EventTerminatedUserSession accompanies EventDeletedUserSession: the
 	// deletion event keeps its fields, and this is the record of what the withdrawal revoked.
-	// It advances no generation and ends no session, so the user stays signed in and the
-	// client's access tokens already issued keep working until they expire.
+	// It advances no generation and ends no session, so the user stays signed in. The access
+	// tokens of the revoked grants are refused at once at the auth server's own endpoints and at
+	// introspection, since each names its grant (#676 decision 1).
 	//
 	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
 	// plus logged_in_user.

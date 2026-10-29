@@ -320,6 +320,21 @@ func (e introspectionEndpoint) inactive(w http.ResponseWriter, r *http.Request) 
 	e.answer(w, r, introspection{})
 }
 
+// HandleIntrospectOtherMethods answers every method at /auth/introspect but POST, which
+// HandleIntrospectPost answers: 405 with Allow: POST and an empty body, as the router answers a path
+// registered for other methods, so no token reaches a URL (RFC 7662 section 4 MAY disallow GET). It
+// is registered for the endpoint rather than left to the router because every introspection answer
+// carries Cache-Control: no-store, the refusal included (#676 decision 13). It counts nothing: no
+// token reached the endpoint.
+func HandleIntrospectOtherMethods() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Allow", http.MethodPost)
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
 // answer writes an introspection, which no cache may keep (RFC 7662 section 4), with the pair RFC
 // 6749 section 5.1 writes on a response carrying token information.
 func (e introspectionEndpoint) answer(w http.ResponseWriter, r *http.Request, answer introspection) {

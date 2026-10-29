@@ -184,3 +184,111 @@ func TestRevokeOnConsentWithdrawalTx_ALostKeyRunsTheWithdrawalOnceMore(t *testin
 		assertNotAttempted(t, db, "UpdateRefreshToken")
 	})
 }
+
+// expectTerminationFamilyRecords expects one record per family, on the terminating transaction,
+// carrying the reason a session's termination gives.
+func expectTerminationFamilyRecords(db *datamocks.Database, families ...string) {
+	for _, family := range families {
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, family, ReasonSessionTerminated).
+			Return(true, nil).Once()
+	}
+}
+
+// A termination and the response to a reused code sweep the tokens their transaction read, so a
+// rotation that claimed its parent before the read inserts a child neither reaches. The revoked code
+// refuses that child at the refresh grant, but the access token the rotation minted names only its
+// grant, so each records every family it read: that is what the access-token check refuses the
+// token by (#676 decision 1). A losing record leaves both to run once more, as a client's revocation
+// does.
+func TestTerminateUserSessionTx_ALostKeyRunsTheTerminationOnceMore(t *testing.T) {
+	lostTheKey := errs.Errorf("%w: a containment recorded the family first", data.ErrUniqueViolation)
+	db := datamocks.NewDatabase(t)
+	first := datamocks.ExpectRunInTransaction(db, revokeTx)
+	second := datamocks.ExpectRunInTransaction(db, revokeTx)
+	token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Twice()
+	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(1), nil).Twice()
+	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
+		Return([]*record.RefreshToken{token}, nil).Twice()
+	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonSessionTerminated).
+		Return(false, lostTheKey).Once()
+	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonSessionTerminated).
+		Return(false, nil).Once()
+	db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
+
+	require.NoError(t, err)
+	require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
+	require.NoError(t, second.BodyErr)
+	assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
+	assert.Equal(t, int64(1), result.RevokedCodeCount)
+}
+
+func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
+	t.Run("each family once, a revoked member's included", func(t *testing.T) {
+		db := datamocks.NewDatabase(t)
+		tokens := []*record.RefreshToken{
+			{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-a", Revoked: true},
+			{Id: 2, RefreshTokenJti: "a-2", FirstRefreshTokenJti: "fam-a"},
+			{Id: 3, RefreshTokenJti: "b-1", FirstRefreshTokenJti: "fam-b", Revoked: true},
+		}
+		datamocks.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(tokens, nil).Once()
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", ReasonAuthCodeReuse).
+			Return(true, nil).Once()
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-b", ReasonAuthCodeReuse).
+			Return(true, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a-2"}, result.RevokedRefreshTokenJtis)
+		db.AssertNumberOfCalls(t, "RecordRefreshTokenFamilyRevoked", 2)
+	})
+
+	t.Run("a failed record sweeps nothing", func(t *testing.T) {
+		db := datamocks.NewDatabase(t)
+		boom := errs.New("connection refused")
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		datamocks.ExpectRunInTransaction(db, revokeTx)
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*record.RefreshToken{token}, nil).Once()
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonAuthCodeReuse).
+			Return(false, boom).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.ErrorIs(t, err, boom)
+		assert.Equal(t, AuthCodeReuseResult{}, result)
+		assertNotAttempted(t, db, "UpdateRefreshToken", "DeleteUserSession")
+	})
+
+	t.Run("a lost key runs the response once more", func(t *testing.T) {
+		lostTheKey := errs.Errorf("%w: a containment recorded the family first", data.ErrUniqueViolation)
+		db := datamocks.NewDatabase(t)
+		first := datamocks.ExpectRunInTransaction(db, revokeTx)
+		second := datamocks.ExpectRunInTransaction(db, revokeTx)
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Twice()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
+			Return([]*record.RefreshToken{token}, nil).Twice()
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonAuthCodeReuse).
+			Return(false, lostTheKey).Once()
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonAuthCodeReuse).
+			Return(false, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
+
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid})
+
+		require.NoError(t, err)
+		require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)
+		require.NoError(t, second.BodyErr)
+		assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
+	})
+}

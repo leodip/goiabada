@@ -419,6 +419,20 @@ func TestIntrospect_RefusesGet(t *testing.T) {
 
 	assert.Equal(t, http.StatusMethodNotAllowed, answer.status, answer.body)
 	assert.Equal(t, "POST", answer.header.Get("Allow"))
+	assert.Equal(t, "no-store", answer.header.Get("Cache-Control"), "every introspection answer, the refusal included")
+	assert.Empty(t, answer.body)
+
+	t.Run("at the trailing-slash spelling", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+"/auth/introspect/", nil)
+		require.NoError(t, err)
+		resp, err := createHttpClient(t).Do(req)
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+
+		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+		assert.Equal(t, "POST", resp.Header.Get("Allow"))
+		assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+	})
 }
 
 // The endpoint is exempt from the CSRF check, as an API calls it from wherever it runs, and answers
