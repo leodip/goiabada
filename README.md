@@ -39,6 +39,7 @@ Goiabada is an open-source authentication server built on **OAuth 2.0** and **Op
 ## Standards
 
 - **OAuth 2.0** (RFC 6749): authorization code with PKCE (RFC 7636), client credentials, and refresh tokens.
+- **Token revocation** (RFC 7009): an app ends a grant, typically at sign-out, by sending its refresh token or an access token.
 - **OpenID Connect**: Core 1.0 with ID tokens and userinfo, Discovery 1.0, and RP-Initiated Logout 1.0.
 - **Metadata and keys**: authorization server metadata (RFC 8414) and a JWKS endpoint (RFC 7517).
 - **Access tokens**: JWT access tokens (RFC 9068), which an API checks on its own with the auth server's public keys.
@@ -55,7 +56,7 @@ An auth server holds the keys to everything else, so security comes first in eve
 
 - **Passwords** are hashed with bcrypt and follow NIST SP 800-63B by default, refusing commonly used ones. Password and one-time code guessing is rate limited per account.
 - **Tokens**: PKCE is required for every public client, and a refresh token works once, so a replayed one revokes its whole family.
-- **Revocation that holds**: changing a password, disabling a user, or ending a session revokes the sessions and refresh tokens it authorized.
+- **Revocation that holds**: changing a password, disabling a user, ending a session, or an app revoking its token revokes the sessions and refresh tokens it authorized, and the auth server refuses their access tokens at once.
 - **Secrets encrypted at rest** with AES-256-GCM, and sessions kept on the server behind an `HttpOnly`, `SameSite` cookie, with CSRF protection on every form.
 - **Minimal container images**, with no package manager, running as a non-root user, and rescanned for vulnerabilities every week.
 - **Every change checked** by static analysis (`gosec`, `govulncheck`), the race detector, and tests on all four databases.

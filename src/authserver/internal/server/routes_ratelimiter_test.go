@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
@@ -208,22 +209,23 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 
 	registry := metrics.NewRegistry()
 	s := &Server{
-		router:       routing.New(),
-		database:     database,
-		sessionStore: sessionStore,
-		templateFS:   web.TemplateFS(),
-		staticFS:     web.StaticFS(),
-		cfg:          cfg,
-		jobs:         afterresponse.New(registry),
-		metrics:      registry,
-		tokenMetrics: tokenmetrics.Register(registry),
+		router:            routing.New(),
+		database:          database,
+		sessionStore:      sessionStore,
+		templateFS:        web.TemplateFS(),
+		staticFS:          web.StaticFS(),
+		cfg:               cfg,
+		jobs:              afterresponse.New(registry),
+		metrics:           registry,
+		tokenMetrics:      tokenmetrics.Register(registry),
+		revocationMetrics: revocationmetrics.Register(registry),
 	}
 	// What a forgot-password request hands off runs against this test's mocks, so it is waited
 	// for before they are torn down, as the server waits for it on shutdown.
 	t.Cleanup(func() { s.jobs.Wait(10 * time.Second) })
 	// Every branch is the bare router: these tests drive the registrations rather than the
 	// application chain, and put the settings on each request's context themselves.
-	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router})
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router})
 	return s
 }
 

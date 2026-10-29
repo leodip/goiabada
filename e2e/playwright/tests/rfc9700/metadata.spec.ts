@@ -53,8 +53,9 @@ test("the discovery document matches the server: its issuer, its endpoints, and 
   // OpenID Connect Discovery 4.3: the issuer is the address the document is published under.
   expect(metadata.issuer).toBe(env.authUrl);
   expect(metadata.token_endpoint_auth_methods_supported).toEqual(["client_secret_post", "client_secret_basic", "none"]);
+  expect(metadata.revocation_endpoint_auth_methods_supported).toEqual(["client_secret_basic", "client_secret_post", "none"]);
 
-  for (const field of ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "jwks_uri", "end_session_endpoint"]) {
+  for (const field of ["authorization_endpoint", "token_endpoint", "userinfo_endpoint", "jwks_uri", "end_session_endpoint", "revocation_endpoint"]) {
     await test.step(field, async () => {
       const url = String(metadata[field]);
       expect(new URL(url).origin).toBe(authOrigin);

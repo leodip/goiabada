@@ -275,8 +275,11 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   verdict and leaves the answer and the log record to the caller: the bearer guard
   `RequireValidSession` and the refresh grant now, introspection too, so they cannot disagree.
   `Subject` is the one reading of a token's subject, which `reqctx` answers through (#676)
-- `internal/revocation/` - The five revocation operations, their results, reason constants and audit
-  helpers. No handler package owns revocation orchestration or its transactions any more (#387)
+- `internal/revocation/` - The six revocation operations, their results, reason constants and audit
+  helpers, the sixth, `RevokeGrantTx`, ending one grant at its client's request at `/auth/revoke`
+  (#676). No handler package owns revocation orchestration or its transactions any more (#387)
+- `internal/revocationmetrics/` - `goiabada_revocation_requests_total`, the revocation endpoint's
+  answers by outcome, a closed set (#676)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a
   manage grant, a password held to the stored policy and the authenticator's removal, each only as
   asked, in one transaction with the #106 revocation sweep, the user, the authenticator and the

@@ -132,7 +132,7 @@ func corsOriginAllowed(r *http.Request, database corsDatabase, origin string) bo
 		// Always allow both discovery addresses and the JWKS: they are public, and a client
 		// running in a browser, an MCP client among them, reads them cross-origin (#576).
 		return true
-	case "/auth/token", "/auth/logout", "/userinfo":
+	case "/auth/token", "/auth/revoke", "/auth/logout", "/userinfo":
 		// Allow when any client has registered this origin. An index lookup, on the
 		// UNIQUE (origin, client_id) migration 000034 adds, rather than the whole-table
 		// scan this used to perform on every CORS-checked request with no cache (#250).

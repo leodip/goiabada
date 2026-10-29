@@ -24,6 +24,7 @@ type Database interface {
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
@@ -268,7 +269,8 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
 // is recorded on EventRevokedClientGrants, and is also the reason a family's revocation record
 // carries when RevokeClientGrants wrote it (#245, #259). ReasonConsentWithdrawn is the reason a
-// family's revocation record carries when a consent withdrawal's sweep wrote it (#622).
+// family's revocation record carries when a consent withdrawal's sweep wrote it (#622), and
+// ReasonClientRevoked the one it carries when a client revoked the grant at /auth/revoke (#676).
 // Constants rather than inline strings so the sites cannot drift and a log consumer has
 // something to match against, and one block so the next site's reason has one place to go.
 // Every value is stored data: renaming a constant is free, changing its string is not.
@@ -286,6 +288,7 @@ const (
 	ReasonAccountDisabled    = "account_disabled"
 	ReasonClientBecamePublic = "client_became_public"
 	ReasonConsentWithdrawn   = "consent_withdrawn"
+	ReasonClientRevoked      = "client_revoked"
 )
 
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
@@ -908,7 +911,77 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 	return result, nil
 }
 
-// AuditLogger records one security event. This package declares only the shape its five Log*
+// GrantRevocationResult reports what a client's revocation of one grant actually did (#676).
+type GrantRevocationResult struct {
+	// RevokedRefreshTokenJtis lists only the members this call transitioned, per
+	// RevokeRefreshTokens. A member already revoked before the call, by a rotation or an earlier
+	// revocation, is absent. Non-nil on the success path, so a JSON audit payload carries [] rather
+	// than null.
+	RevokedRefreshTokenJtis []string
+}
+
+// RevokeGrantTx ends one grant at its client's request, the revocation endpoint's operation (RFC
+// 7009, #676 decision 1): it records the grant's refresh token family revoked under
+// ReasonClientRevoked and revokes every member of it, in ONE transaction it opens and commits. The
+// grant is named by its family's identifier, the first refresh token's jti, which a refresh token's
+// row carries and an access token names as grant_id.
+//
+// The two writes, in this order:
+//
+//  1. RecordRefreshTokenFamilyRevoked, first for the reason RevokeClientGrants states (#259): a
+//     rotation claims its parent and inserts its child in separate statements, so a refresh that
+//     validated before this transaction can insert a live child after it commits. The record
+//     outlives the sweep, and the refresh validator and the rotation's own transaction refuse a
+//     token of a recorded family, so that child is refused at its next refresh or never inserted. It
+//     is also what ends the grant's access tokens: the access-token check refuses a grant_id whose
+//     family is recorded. A family another path recorded first keeps its reason.
+//  2. The family's members, read afresh and swept, which flips what stands now and gives the audit
+//     record the jtis it moved.
+//
+// It ends the grant and nothing else: no session, no generation, no other grant of the user or the
+// client, since the client asked to be done with this one grant (decision 12).
+//
+// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the body, and so does a
+// family record lost to a containment of the same family that overlaps this transaction, as
+// RevokeClientGrantsTx states. The body is safe to rerun: the record is written or found already
+// written, the members are read afresh on each attempt, and result is the committing attempt's.
+//
+// The audit event is the CALLER's, through LogRevokedGrant after this returns. On any error the
+// result is the zero value, so a caller cannot audit a rolled-back revocation, and the commit
+// contract RevokeUserAuthStateTx documents holds: a reported commit failure's outcome is
+// indeterminate, and the caller answers it as a fault, never as a revocation.
+func RevokeGrantTx(ctx context.Context, db Database, grantId string) (GrantRevocationResult, error) {
+	// Refused before a transaction is opened, so a caller bug is not reported as a database failure
+	// after a round trip.
+	if grantId == "" {
+		return GrantRevocationResult{}, errs.New("revoking a grant requires its family identifier")
+	}
+
+	var result GrantRevocationResult
+	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
+		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, grantId, ReasonClientRevoked); err != nil {
+			return err
+		}
+
+		members, err := db.GetRefreshTokensByFirstRefreshTokenJti(ctx, tx, grantId)
+		if err != nil {
+			return err
+		}
+
+		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, members)
+		if err != nil {
+			return err
+		}
+		result = GrantRevocationResult{RevokedRefreshTokenJtis: revokedJtis}
+		return nil
+	})
+	if err != nil {
+		return GrantRevocationResult{}, err
+	}
+	return result, nil
+}
+
+// AuditLogger records one security event. This package declares only the shape its Log*
 // helpers need rather than depending on the audit implementation that satisfies it, and rather
 // than importing a handler package to borrow the declaration: the context is first because every
 // audit event raised while serving a request is correlated to that request, so the console record
@@ -1064,5 +1137,53 @@ func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, user
 		"revoked_code_count": result.RevokedCodeCount,
 		// Always a list rather than null: TerminationResult initialises it on the success path.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
+// The type of token a client sent to the revocation endpoint, as its audit records name it: RFC
+// 7009 section 2.1's token_type_hint values, read from the token itself, never from the hint.
+const (
+	TokenTypeAccessToken  = "access_token"
+	TokenTypeRefreshToken = "refresh_token"
+)
+
+// LogRevokedGrant emits EventRevokedGrant, the security record of a client ending one grant at the
+// revocation endpoint (#676 decision 11). One function, beside the operation, following the other
+// Log* helpers: the payload has one place to be asserted field by field.
+//
+// clientId is the client that revoked, which is the grant's own, since another client's token is
+// refused; userId is the grant's user; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
+//
+// Call this only after RevokeGrantTx returned without error.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedGrant(ctx context.Context, auditLogger AuditLogger, clientId int64, userId int64, grantId string,
+	tokenType string, result GrantRevocationResult) {
+
+	auditLogger.Log(ctx, audit.EventRevokedGrant, map[string]interface{}{
+		"client_id":  clientId,
+		"user_id":    userId,
+		"grant_id":   grantId,
+		"token_type": tokenType,
+		// What this call TRANSITIONED, not what the family had. Always a list rather than null:
+		// the success path fills it from RevokeRefreshTokens.
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
+// LogTokenRevocationRefused emits EventTokenRevocationRefused, the record of a client that sent the
+// revocation endpoint another client's live token and was refused (#676 decisions 8 and 11).
+// Nothing is revoked, so there is no operation to wait for. clientId is the client that called,
+// which client authentication proved; tokenClientId the client the token was issued to, which the
+// token's signature or row proves; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogTokenRevocationRefused(ctx context.Context, auditLogger AuditLogger, clientId int64, tokenClientId int64,
+	tokenType string) {
+
+	auditLogger.Log(ctx, audit.EventTokenRevocationRefused, map[string]interface{}{
+		"client_id":       clientId,
+		"token_client_id": tokenClientId,
+		"token_type":      tokenType,
 	})
 }

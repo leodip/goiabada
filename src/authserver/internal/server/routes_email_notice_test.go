@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
@@ -122,17 +123,18 @@ func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 	armRoutesTestAPIClient(database)
 	registry := metrics.NewRegistry()
 	s := &Server{
-		router:       routing.New(),
-		database:     database,
-		sessionStore: newTestSessionStore(),
-		templateFS:   web.TemplateFS(),
-		staticFS:     web.StaticFS(),
-		cfg:          &config.Config{},
-		jobs:         afterresponse.New(registry),
-		metrics:      registry,
-		tokenMetrics: tokenmetrics.Register(registry),
+		router:            routing.New(),
+		database:          database,
+		sessionStore:      newTestSessionStore(),
+		templateFS:        web.TemplateFS(),
+		staticFS:          web.StaticFS(),
+		cfg:               &config.Config{},
+		jobs:              afterresponse.New(registry),
+		metrics:           registry,
+		tokenMetrics:      tokenmetrics.Register(registry),
+		revocationMetrics: revocationmetrics.Register(registry),
 	}
-	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router})
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router})
 	return s
 }
 

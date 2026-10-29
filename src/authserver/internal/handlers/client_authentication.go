@@ -22,6 +22,7 @@ type clientAuthenticationEndpoint int
 
 const (
 	atTokenEndpoint clientAuthenticationEndpoint = iota + 1
+	atRevocationEndpoint
 )
 
 // logClientAuthenticationRefusal writes the Warn record of a client that could not be authenticated
@@ -43,12 +44,18 @@ func (endpoint clientAuthenticationEndpoint) logClientAuthenticationRefusal(r *h
 		return
 	}
 	// One literal message per endpoint, so a record is found by its message.
-	if endpoint == atTokenEndpoint {
+	switch endpoint {
+	case atTokenEndpoint:
 		slog.WarnContext(r.Context(), "client authentication refused at the token endpoint",
 			"reason", errDetail.Description(),
 			"client_identifier", logging.FieldForLog(clientIdentifier),
 			"client_auth_method", clientAuthMethod(r),
 			"grant_type", requestedGrantType(r).String())
+	case atRevocationEndpoint:
+		slog.WarnContext(r.Context(), "client authentication refused at the revocation endpoint",
+			"reason", errDetail.Description(),
+			"client_identifier", logging.FieldForLog(clientIdentifier),
+			"client_auth_method", clientAuthMethod(r))
 	}
 }
 

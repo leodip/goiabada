@@ -1,4 +1,4 @@
-// Package revocation invalidates what the auth server issued. Callers enter through five *Tx
+// Package revocation invalidates what the auth server issued. Callers enter through six *Tx
 // operations, each of which opens its own transaction through RunInTransaction or, where a
 // family record can lose its key to a concurrent containment, RunInTransactionRetryingConflict:
 // RevokeUserAuthStateTx, which advances a user's authentication generation and sweeps the
@@ -7,11 +7,12 @@
 // RevokeOnAuthCodeReuseTx, the answer to a redeemed code presented again;
 // RevokeClientGrantsTx, for a client that no longer has to authenticate; and
 // RevokeOnConsentWithdrawalTx, which deletes a user's consent to one client, marks that user's
-// unused codes with it revoked and revokes the refresh tokens that user holds with it (#622).
+// unused codes with it revoked and revokes the refresh tokens that user holds with it (#622); and
+// RevokeGrantTx, which ends one grant at its client's request at /auth/revoke (#676).
 // RevokeUserAuthState, RevokeOnAuthCodeReuse and RevokeClientGrants are the same operations on a
 // transaction the caller owns, which they require, and RevokeRefreshTokens, beneath them, runs on
 // the caller's transaction or, given nil, on none. The Reason* constants are the reasons a
-// revocation records (#106, #129, #245, #387, #622).
+// revocation records (#106, #129, #245, #387, #622, #676).
 //
 // Each operation reports what it actually did, the sessions it ended and only the tokens it moved
 // from live to revoked. On an error each *Tx operation reports nothing, the zero result, so a

@@ -341,6 +341,33 @@ const (
 	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
 	// plus logged_in_user.
 	EventRevokedConsentGrants = "revoked_consent_grants"
+	// EventRevokedGrant records that a client ended one of its grants at the revocation endpoint
+	// (RFC 7009, #676), by sending the grant's refresh token or an access token carrying its
+	// grant_id: the grant's refresh token family was recorded revoked under client_revoked and every
+	// member of it revoked, which ends the grant's access tokens at the auth server's own endpoints
+	// too. Emitted AFTER the revocation's transaction commits, on success only, and also when the
+	// grant had nothing left to move, so the event attests that the client asked and the server
+	// acted. A token answered 200 because it was invalid records nothing.
+	//
+	// It ends no session and advances no generation: the user stays signed in, and their other
+	// grants keep working.
+	//
+	// Its payload carries client_id (the client that revoked, the grant's own), user_id, grant_id
+	// (the family's identifier), token_type (access_token or refresh_token, read from the token,
+	// never from the hint) and revoked_refresh_token_jtis, the members this call moved, always a
+	// list.
+	EventRevokedGrant = "revoked_grant"
+	// EventTokenRevocationRefused records that a client sent the revocation endpoint another
+	// client's live token and was refused with invalid_grant, RFC 7009 section 2.1's check that the
+	// token was issued to the client making the request (#676 decision 8). Nothing was revoked.
+	//
+	// An audit event where a refused client authentication is only a log record, because both
+	// clients are proven: the caller authenticated, and the token's owner is named by its signature
+	// or its row. It means a live token reached the wrong client.
+	//
+	// Its payload carries client_id (the calling client), token_client_id (the client the token was
+	// issued to) and token_type (access_token or refresh_token).
+	EventTokenRevocationRefused = "token_revocation_refused"
 	// EventCrossUserSessionReplaced records that a different user signed in on a browser that was
 	// still carrying someone else's session cookie, so that session was ended. The browser reaches
 	// that state through prompt=login, through an id_token_hint naming another user, or simply by
@@ -593,6 +620,7 @@ var auditEventTypes = []string{
 	EventRequestedRegistration,
 	EventRevokedClientGrants,
 	EventRevokedConsentGrants,
+	EventRevokedGrant,
 	EventRevokedKey,
 	EventRevokedUserAuthState,
 	EventROPCAuthFailed,
@@ -607,6 +635,7 @@ var auditEventTypes = []string{
 	EventTokenIssuedImplicitResponse,
 	EventTokenIssuedRefreshTokenResponse,
 	EventTokenIssuedROPCResponse,
+	EventTokenRevocationRefused,
 	EventTokenScopeDenied,
 	EventUpdatedAuditLogsSettings,
 	EventUpdatedClientAdministrativeScopes,

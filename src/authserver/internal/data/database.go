@@ -752,6 +752,10 @@ type Database interface {
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and
+	// revoked, which is what a client revoking the grant ends (#676 decision 1). An empty identifier
+	// is an error, for the reason RevokeRefreshTokenFamily states.
+	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByUserId returns every refresh token belonging to a user,

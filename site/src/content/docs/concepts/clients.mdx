@@ -115,7 +115,7 @@ Prefer `127.0.0.1` or `[::1]` to `localhost`. Resolving `localhost` isn't guaran
 
 ## Web origins
 
-Register a web origin when JavaScript in the browser calls `/auth/token`, `/auth/logout` or `/userinfo` directly, such as a single-page app. Without it, the browser blocks the call (CORS).
+Register a web origin when JavaScript in the browser calls `/auth/token`, `/auth/revoke`, `/auth/logout` or `/userinfo` directly, such as a single-page app. Without it, the browser blocks the call (CORS).
 
 An origin is a scheme, a host and an optional port, with nothing after the host: `https://app.example.com` or `https://app.example.com:8443`. The auth server stores it lowercased, without a default port, and with any path, query or fragment dropped. It refuses what a browser would send differently, such as a scheme other than `http` or `https`, a non-ASCII host, an IPv6 literal or user information.
 

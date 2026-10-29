@@ -25,6 +25,7 @@ func TestRegisterRoutes_APreflightIsAnsweredBeforeRouting(t *testing.T) {
 		wantAllow bool
 	}{
 		{path: "/auth/token", wantAllow: true},
+		{path: "/auth/revoke", wantAllow: true},
 		{path: "/certs", wantAllow: true},
 		{path: "/auth/authorize"},
 		{path: "/no-such-path"},

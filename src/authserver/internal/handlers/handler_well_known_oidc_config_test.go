@@ -44,6 +44,8 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 			"groups", "attributes",
 		},
 		TokenEndpointAuthMethodsSupported:          []string{"client_secret_post", "client_secret_basic", "none"},
+		RevocationEndpoint:                         testBaseURL + "/auth/revoke",
+		RevocationEndpointAuthMethodsSupported:     []string{"client_secret_basic", "client_secret_post", "none"},
 		CodeChallengeMethodsSupported:              []string{"S256"},
 		RequestParameterSupported:                  false,
 		RequestURIParameterSupported:               false,

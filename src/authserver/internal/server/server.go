@@ -28,6 +28,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/poolmetrics"
 	"github.com/leodip/goiabada/authserver/internal/render"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/errs"
@@ -78,6 +79,10 @@ type Server struct {
 	// listener. Registered here rather than in initRoutes because the token endpoint's branch, which
 	// initMiddleware builds, counts the refusals its faults answer too (#400 decision 5).
 	tokenMetrics *tokenmetrics.Recorder
+
+	// The requests the revocation endpoint answers, by outcome (#676 decision 11). Registered here
+	// for the reason tokenMetrics is: the endpoint's branch counts the faults it answers too.
+	revocationMetrics *revocationmetrics.Recorder
 }
 
 func NewServer(router *routing.Router, database data.Database, sessionStore *sessionstore.ConditionalStore,
@@ -98,7 +103,8 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 
 		metrics: registry,
 
-		tokenMetrics: tokenmetrics.Register(registry),
+		tokenMetrics:      tokenmetrics.Register(registry),
+		revocationMetrics: revocationmetrics.Register(registry),
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)
@@ -530,6 +536,7 @@ func (s *Server) initMiddleware() appBranches {
 		pages:    s.router.With(s.applicationChain(middleware.PageFaults())...),
 		protocol: s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
 		token:    s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
+		revoke:   s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS), s.revocationMetrics)))...),
 		api:      s.router.With(s.applicationChain(middleware.APIFaults())...),
 	}
 
@@ -593,6 +600,10 @@ type appBranches struct {
 	// answers as a token request refused, which the protocol branch cannot, since its faults are
 	// every protocol endpoint's (#400 decision 5).
 	token *routing.Router
+	// revoke carries the revocation endpoint alone. It answers a fault as its handler answers its
+	// own, 503 with the token left as it was (RFC 7009 section 2.2.1), and counts it as an error,
+	// which the protocol branch's 500 would not say (#676 decision 12).
+	revoke *routing.Router
 }
 
 // csrfPolicy is the auth server's CSRF exemption policy: the endpoints this binary serves that are
@@ -624,6 +635,12 @@ func csrfPolicy() httpmw.CSRFPolicy {
 			// public client instead redeems a one-time code bound to its registered redirect URI
 			// and, when PKCE was used, to a code verifier. No session cookie is read either way.
 			"/auth/token",
+
+			// OAuth2 token revocation (POST, RFC 7009). The client authenticates as at the token
+			// endpoint, or a public client names itself, and sends a token it holds; no session
+			// cookie is read, and a cross-site POST can only end a grant whose token it already
+			// has. A browser app revokes at sign-out from its own origin (#676).
+			"/auth/revoke",
 
 			// OIDC userinfo; bearer-token authenticated (GET/POST).
 			"/userinfo",

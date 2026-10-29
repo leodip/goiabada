@@ -53,7 +53,7 @@ Each of these means the server caught something and refused it. One entry is wor
 | `otp_authenticator_disabled` | A user's authenticator got its 100th wrong code in a row and was disabled. Someone who knew the user's password, or held one of their sessions, got that far, so treat the password as known. [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator) is the way back. |
 | `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. Each auth server instance writes it at most once per limiter and key per window, not once per refused request. |
 
-Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI.
+Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI. `token_revocation_refused` means a client held a live token issued to another client.
 
 ## Where events go
 
@@ -124,6 +124,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `email_digest` | The SHA-256 hex digest of an address typed into a form nobody has signed in to, or named by a password grant. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
+| `grant_id` | The grant a client revoked: the `jti` of its first refresh token, which its access tokens carry as `grant_id`. |
 | `grant_type` | The `grant_type` of a token request. |
 | `grant_types` | The grant types a client asked for when it registered itself. |
 | `granted_permission_ids` | The row ids of the permissions a client permission save granted. |
@@ -177,7 +178,9 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |
 | `to` | The address an administrator sent a test email to. |
+| `token_client_id` | The row id of the client a token sent to the revocation endpoint was issued to. |
 | `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
+| `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |
 | `user_attribute_id` | The row id of a user's custom attribute. |
 | `user_id` | The user's row id. |
 | `user_session_id` | The row id of a user's session. |
@@ -258,6 +261,8 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
 | `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
+| `revoked_grant` | A client revoked one of its grants at the [revocation endpoint](/reference/endpoints/revoke/), by sending its refresh token or one of its access tokens, so every refresh token of the grant was revoked. It names the client, the user, the grant, the type of token sent and the refresh tokens revoked. |
+| `token_revocation_refused` | A client sent the revocation endpoint another client's live token, and was refused. Nothing was revoked. It names both clients and the type of token. |
 
 ### Registration and emailed links
 

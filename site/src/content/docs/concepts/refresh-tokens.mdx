@@ -73,6 +73,7 @@ A normal refresh token follows the session it's tied to instead: it stops workin
 | When the session expires | It stops working | It keeps working |
 | When someone [ends the session](/concepts/ending-sessions/#end-a-session) | It's revoked | It's revoked |
 | When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked, unless it belongs to the session the user changed their own password in | It's revoked, with the same exception |
+| When your app [revokes](#revoking-a-grant) it or an access token of its grant | It's revoked | It's revoked |
 
 ## What a refresh checks
 
@@ -83,10 +84,15 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 - the user was disabled, or their password changed or was reset, apart from the tokens of the session a user changed their own password in;
 - the user no longer holds a permission the token carries;
 - the user withdrew their consent to your app, or an administrator revoked it. That revokes your app's refresh tokens for the user at once, whatever **Ask users for consent** says;
+- your app revoked the grant at `/auth/revoke`;
 - your app's **Ask users for consent** was turned on after the user signed in, and they haven't approved it since. A token from the [password grant](/legacy-flows/ropc/) isn't checked for this;
 - the user hasn't approved `authserver:manage-account` for your app, or withdrew it, when the refresh renews that scope from a sign-in, whatever **Ask users for consent** says. The admin console's own client is the one exception.
 
 A token issued to another client is refused with `invalid_grant`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#other-reasons-a-refresh-fails) gives each `error_description` and why it happens.
+
+## Revoking a grant
+
+When your app is done with a grant, typically when the user signs out, it sends the refresh token, or any access token of the grant, to the [revocation endpoint](/reference/endpoints/revoke/), `/auth/revoke`. The whole grant ends at once: the refresh token, every refresh token it was rotated into, and the grant's access tokens at `/userinfo` and the auth server's APIs. The user's session and your app's other grants are left alone.
 
 ## Rotation
 

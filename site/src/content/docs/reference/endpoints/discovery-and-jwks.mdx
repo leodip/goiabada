@@ -31,6 +31,7 @@ Two endpoints do this, and neither needs a token:
      "token_endpoint": "https://auth.example.com/auth/token",
      "userinfo_endpoint": "https://auth.example.com/userinfo",
      "end_session_endpoint": "https://auth.example.com/auth/logout",
+     "revocation_endpoint": "https://auth.example.com/auth/revoke",
      "jwks_uri": "https://auth.example.com/certs",
      ...
    }
@@ -95,6 +96,8 @@ The auth server describes what it implements, which no setting changes but two: 
 | `scopes_supported` | `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes` and `offline_access`. Permission scopes aren't listed. See [Scopes](/concepts/scopes/). |
 | `claims_supported` | The claims about the user and the sign-in the auth server can supply, in ID tokens, access tokens and `/userinfo` |
 | `token_endpoint_auth_methods_supported` | `client_secret_post`, `client_secret_basic` and `none`, the last for a public client |
+| `revocation_endpoint` | `/auth/revoke`, the [revocation endpoint](/reference/endpoints/revoke/) |
+| `revocation_endpoint_auth_methods_supported` | `client_secret_basic`, `client_secret_post` and `none`, the last for a public client |
 | `code_challenge_methods_supported` | `S256`. See [PKCE](/concepts/pkce/). |
 | `request_parameter_supported` | `false`: a `request` object is refused |
 | `request_uri_parameter_supported` | `false`: a `request_uri` is refused |

@@ -101,6 +101,29 @@ Exchange refresh token for new access/refresh tokens. Works with auth code and R
   `protocolvalidation/token_grant_refresh_token.go`, `liveness/refresh.go`,
   `issuance/grant_refresh_token.go`
 
+### Token revocation (RFC 7009)
+A client ends one of its grants by sending a token of it.
+- Endpoint: `POST /auth/revoke`, form-encoded, CSRF-exempt, CORS for registered web origins, on a
+  branch of its own whose faults answer 503
+- Order: the client authenticates first through `clientauth` (a public client by `client_id`
+  alone); the token parser refuses a malformed or foreign token before reading a key; the token
+  says its type (an access token by its `at+jwt` header, a refresh token by its `typ` claim), and
+  `token_type_hint` is never read
+- Liveness before ownership: an access token is judged by `liveness.AccessToken`, a refresh token
+  by `liveness.FindRefreshToken` and `liveness.RefreshToken`; a token that is not live is answered
+  200 with nothing revoked or recorded, whatever client it names. A live token of another client is
+  400 `invalid_grant`, "The token was issued to another client.", and `token_revocation_refused`;
+  a refresh token's owner is read to tell a disabled or deleted owner's token (invalid) from a live
+  one
+- Revocation: `revocation.RevokeGrantTx`, the sixth operation, records the family under
+  `client_revoked` and revokes every member in one transaction; `revoked_grant` is written after the
+  commit. It ends no session and no other grant
+- A live access token without `grant_id` (client credentials, implicit) answers
+  `unsupported_token_type` for now; a fault reading the database or the keys answers 503
+  `temporarily_unavailable`, never 200. `goiabada_revocation_requests_total` counts each answer by
+  outcome (#676)
+- Implementation: `handler_revoke.go`, `revocation/revocation.go`, `revocationmetrics`
+
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
 - Endpoint: `GET /auth/authorize` with `response_type=token|id_token|id_token token`
@@ -526,6 +549,7 @@ names (section 2.2.2).
 
 - `/auth/authorize` - OAuth2 authorization endpoint
 - `/auth/token` - Token endpoint
+- `/auth/revoke` - Token revocation endpoint (RFC 7009)
 - `/auth/logout` - Sign-out and post-logout redirect endpoint
 - `/userinfo` - OIDC userinfo
 - `/certs` - JWKS endpoint
