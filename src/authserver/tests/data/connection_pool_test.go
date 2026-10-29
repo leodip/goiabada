@@ -181,7 +181,13 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 		held = append(held, tx)
 	}
 
+	// The context's timer starts before BeginTx reaches the pool, and database/sql measures the
+	// wait only from there, so the reported wait can fall short of the timeout by the time BeginTx
+	// spends before it waits: it once read 0.299884656. That moment cannot be observed from
+	// here, so the floor leaves a margin far wider than it. A wait reported as zero, or in
+	// milliseconds or nanoseconds, still fails.
 	const waited = 300 * time.Millisecond
+	const waitFloor = 250 * time.Millisecond
 	waitCtx, cancel := context.WithTimeout(ctx, waited)
 	defer cancel()
 	_, err = handle.BeginTx(waitCtx, nil)
@@ -198,7 +204,7 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 		`goiabada_db_connections_closed_total{reason="max_idle_time"}`: "0",
 		`goiabada_db_connections_closed_total{reason="max_lifetime"}`:  "0",
 	}, atCap, "the pool at its cap, one request having waited")
-	assertSecondsAtLeast(t, atCap["goiabada_db_wait_duration_seconds_total"], waited,
+	assertSecondsAtLeast(t, atCap["goiabada_db_wait_duration_seconds_total"], waitFloor,
 		"the wait is reported in seconds, for as long as it lasted")
 
 	for _, tx := range held {
