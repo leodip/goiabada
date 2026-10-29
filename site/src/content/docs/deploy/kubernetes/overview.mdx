@@ -7,13 +7,17 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you plan a Goiabada deployment on a Kubernetes cluster.
 
+<Aside type="tip" title="Use the setup wizard">
+The [setup wizard](/deploy/setup-wizard/) asks about your cluster and writes the manifest, with the Secrets in a file of their own. Start from its files rather than writing your own: every page in this section assumes them.
+</Aside>
+
 ## Deploy it
 
 <Steps>
 
-1. **Check you have what Goiabada needs,** below: a cluster with `kubectl` access, a database server, and two host names on one domain.
+1. **Check you have what Goiabada needs,** below: a cluster with `kubectl` access, a database server, two host names on one domain, and the setup wizard.
 
-2. **Set up a gateway and its certificates, then deploy,** as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) walks through with Envoy Gateway and cert-manager. On a cluster that already has a Gateway, an Ingress controller or routing of its own, follow [Routing](/deploy/kubernetes/routing/) instead. The [setup wizard](/deploy/setup-wizard/) writes the manifest and the Secrets in either procedure.
+2. **Set up a gateway and its certificates, then generate the files with the setup wizard and apply them,** as [Gateway and certificates](/deploy/kubernetes/gateway-and-certificates/) walks through with Envoy Gateway and cert-manager. On a cluster that already has a Gateway, an Ingress controller or routing of its own, follow [Routing](/deploy/kubernetes/routing/) instead.
 
 3. **Sign in** at your admin console's URL, as [First sign-in](/get-started/first-sign-in/) describes, with the password you read back out of the cluster.
 
