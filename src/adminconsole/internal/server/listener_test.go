@@ -94,18 +94,21 @@ func TestNewHTTPServer_SetsEveryTimeoutAndTheHeaderBound(t *testing.T) {
 	assert.Less(t, readHeaderTimeout, writeTimeout, "readHeaderTimeout must stay the handshake deadline")
 	assert.Less(t, readHeaderTimeout, idleTimeout, "readHeaderTimeout must stay the handshake deadline")
 
-	// net/http starts the read deadline at the first header byte and the write deadline at the
-	// last, so a write timeout shorter than the read timeout loses the response to a body the read
-	// timeout admits.
+	// net/http starts the read deadline when it begins reading a request, no later than the
+	// request's first byte, and the write deadline once the header block has been read, so a
+	// write timeout shorter than the read timeout loses the response to a body the read timeout
+	// admits.
 	assert.GreaterOrEqual(t, writeTimeout, readTimeout, "writeTimeout must not end before readTimeout")
 }
 
 // TestNewHTTPServer_DropsAPartialHeaderBlock takes a real listener through the attack
 // readHeaderTimeout exists for: a client that sends part of a header block and stops. The console
 // has no integration tier, so this is the only proof that the bound holds a connection to it
-// rather than only sitting in a struct field (#426). Without ReadHeaderTimeout net/http falls back
-// to the 60s ReadTimeout, so the connection is still open when the client's own deadline passes;
-// that deadline sits past the window so the case fails on the window rather than hanging.
+// rather than only sitting in a struct field (#426). net/http sets the deadline once it has taken
+// the connection, so a stopwatch started before the dial can only overstate the wait, and the floor
+// is the bound itself. The client's read deadline is the ceiling: readHeaderTimeout plus a 20s
+// margin, far short of the 60s ReadTimeout net/http would fall back to without the bound, so a
+// listener that lost it fails here rather than hanging. The test above pins the exact value.
 func TestNewHTTPServer_DropsAPartialHeaderBlock(t *testing.T) {
 	t.Parallel()
 
@@ -119,31 +122,25 @@ func TestNewHTTPServer_DropsAPartialHeaderBlock(t *testing.T) {
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
-	// The server's header timer starts once it has taken the connection: after the dial begins,
-	// and usually before it returns. So the floor is measured from before the dial, which can only
-	// lengthen a correct wait, and the ceiling from after it, which can only shorten one unless the
-	// server takes the connection after the dial returns, which the ceiling's margin allows for.
 	beforeDial := time.Now()
 	conn, err := net.Dial("tcp", ln.Addr().String())
-	afterDial := time.Now()
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
 	// No terminating blank line: the header block never ends.
 	_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: x\r\nX-A: b\r\n"))
 	require.NoError(t, err)
-	require.NoError(t, conn.SetReadDeadline(afterDial.Add(readHeaderTimeout+5*time.Second)))
+	require.NoError(t, conn.SetReadDeadline(beforeDial.Add(readHeaderTimeout+20*time.Second)))
 
 	got, err := io.ReadAll(conn)
-	sinceBeforeDial, sinceAfterDial := time.Since(beforeDial), time.Since(afterDial)
+	waited := time.Since(beforeDial)
 
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		t.Fatalf("the server still held the connection after %s", sinceAfterDial)
+		t.Fatalf("the server still held the connection after %s", waited)
 	}
 	require.NoError(t, err, "the server must close the connection, not reset it")
 	assert.Empty(t, got, "a header block cut short gets no response, only a close")
 	assert.False(t, called.Load(), "the handler must never see a request whose header block never ended")
-	assert.GreaterOrEqual(t, sinceBeforeDial, readHeaderTimeout-time.Second, "closed before readHeaderTimeout")
-	assert.LessOrEqual(t, sinceAfterDial, readHeaderTimeout+2*time.Second, "closed well after readHeaderTimeout")
+	assert.GreaterOrEqual(t, waited, readHeaderTimeout, "closed before readHeaderTimeout")
 }

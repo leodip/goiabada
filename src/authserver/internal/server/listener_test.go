@@ -90,8 +90,9 @@ func TestNewHTTPServer_SetsEveryTimeoutAndTheHeaderBound(t *testing.T) {
 	assert.Less(t, readHeaderTimeout, writeTimeout, "readHeaderTimeout must stay the handshake deadline")
 	assert.Less(t, readHeaderTimeout, idleTimeout, "readHeaderTimeout must stay the handshake deadline")
 
-	// net/http starts the read deadline at the first header byte and the write deadline at the
-	// last, so a write timeout shorter than the read timeout loses the response to a body the read
-	// timeout admits.
+	// net/http starts the read deadline when it begins reading a request, no later than the
+	// request's first byte, and the write deadline once the header block has been read, so a
+	// write timeout shorter than the read timeout loses the response to a body the read timeout
+	// admits.
 	assert.GreaterOrEqual(t, writeTimeout, readTimeout, "writeTimeout must not end before readTimeout")
 }
