@@ -117,9 +117,10 @@ func TestConnectionPool_TheConfiguredCapIsTheHandlesMaximum(t *testing.T) {
 }
 
 // waitPastTheCap begins one transaction more than the pool's cap allows, requires it to queue for a
-// connection rather than open one, and ends it by cancelling its context. It is cancelled only once
-// the handle counts it as waiting, and a moment later, so the wait is recorded however the
-// goroutine is scheduled: a timeout started before BeginTx could run out before it queued.
+// connection rather than open one, and ends it by cancelling its context. The cancel comes only
+// after the handle counts the request as waiting, so the wait is counted however the goroutine is
+// scheduled, where a timeout started before BeginTx could run out before it queued. The 20 ms pause
+// gives the wait a realistic duration to report.
 func waitPastTheCap(t *testing.T, handle *sql.DB) {
 	t.Helper()
 	waitsBefore := handle.Stats().WaitCount
@@ -127,7 +128,11 @@ func waitPastTheCap(t *testing.T, handle *sql.DB) {
 	defer cancel()
 	ended := make(chan error, 1)
 	go func() {
-		_, err := handle.BeginTx(ctx, nil)
+		tx, err := handle.BeginTx(ctx, nil)
+		if err == nil {
+			// The cap let it through, which the test reports; the connection goes back at once.
+			_ = tx.Rollback()
+		}
 		ended <- err
 	}()
 	require.Eventually(t, func() bool { return handle.Stats().WaitCount == waitsBefore+1 }, 10*time.Second,
@@ -196,6 +201,9 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 	for i := 0; i < wantCap; i++ {
 		tx, beginErr := handle.BeginTx(ctx, nil)
 		require.NoErrorf(t, beginErr, "transaction %d of the cap's %d", i+1, wantCap)
+		// Closing the handle leaves a transaction still open holding its connection, so a failure
+		// before the rollbacks below must not skip them.
+		t.Cleanup(func() { _ = tx.Rollback() })
 		held = append(held, tx)
 	}
 
@@ -238,7 +246,8 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 }
 
 // assertSeconds reads an exposition value as seconds and holds it to d. The exposition writes the
-// shortest form that reads back as the same float, so the tolerance is for the comparison alone.
+// shortest form that reads back as the same float, so the two are equal; the tolerance is there
+// because testifylint refuses an exact float comparison.
 func assertSeconds(t *testing.T, value string, d time.Duration, msg string) {
 	t.Helper()
 	seconds, err := strconv.ParseFloat(value, 64)
