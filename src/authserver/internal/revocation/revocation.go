@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -1186,4 +1187,62 @@ func LogTokenRevocationRefused(ctx context.Context, auditLogger AuditLogger, cli
 		"token_client_id": tokenClientId,
 		"token_type":      tokenType,
 	})
+}
+
+// AccessTokenDatabase is what RevokeAccessToken writes: the stored jtis of revoked access tokens
+// without a grant. A port of its own rather than a method on Database, since no other operation
+// here touches them.
+type AccessTokenDatabase interface {
+	RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)
+}
+
+// RevokeAccessToken revokes one access token without a grant at its client's request, the
+// revocation endpoint's operation for a token of the client credentials grant or the implicit flow
+// (#676 decision 1). Such a token carries no grant_id, so no refresh token family stands behind it
+// for RevokeGrantTx to end; its jti is stored with its expiry instead, and the access-token liveness
+// check refuses it while the row exists. The cleanup job deletes the row once the token has expired.
+//
+// It reports whether this call stored the jti. A token whose jti another revocation stored first is
+// not stored again and reports false: the token is revoked either way, and the event is the other
+// call's. It is one statement on no transaction, so there is nothing to rerun after a deadlock.
+//
+// A token without a jti or an expiry is one the auth server never signs, and is an error.
+//
+// The audit event is the CALLER's, through LogRevokedAccessToken after this returns true.
+func RevokeAccessToken(ctx context.Context, db AccessTokenDatabase, jti string, expiresAt time.Time) (bool, error) {
+	if jti == "" {
+		return false, errs.New("revoking an access token requires its jti")
+	}
+	if expiresAt.IsZero() {
+		return false, errs.New("revoking an access token requires its expiry")
+	}
+
+	stored, err := db.RecordAccessTokenRevoked(ctx, nil, jti, expiresAt)
+	if err != nil {
+		return false, err
+	}
+	return stored, nil
+}
+
+// LogRevokedAccessToken emits EventRevokedAccessToken, the security record of a client revoking one
+// of its access tokens without a grant at the revocation endpoint (#676 decision 11). One function,
+// beside the operation, following the other Log* helpers: the payload has one place to be asserted
+// field by field.
+//
+// clientId is the client that revoked, which is the token's own, since another client's token is
+// refused; userId is the token's user, for a token of the implicit flow, and 0 for a client
+// credentials token, which has none and records none; jti is the token's.
+//
+// Call this only after RevokeAccessToken returned true.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedAccessToken(ctx context.Context, auditLogger AuditLogger, clientId int64, userId int64, jti string) {
+	details := map[string]interface{}{
+		"client_id": clientId,
+		"jti":       jti,
+	}
+	if userId != 0 {
+		details["user_id"] = userId
+	}
+	auditLogger.Log(ctx, audit.EventRevokedAccessToken, details)
 }

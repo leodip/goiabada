@@ -78,6 +78,7 @@ const (
 	// which the session guard reads (#676).
 	routesTestIssuer      = "https://auth.example.com"
 	routesTestAPIClientId = "routes-test-api-client"
+	routesTestAccessJti   = "routes-test-access-jti"
 
 	// What the caller submits where a credential is expected. Never the right one: these
 	// tiers count failures, so a correct credential would spend nothing and the budget
@@ -269,19 +270,21 @@ func accountAPIToken() oauth.JwtToken {
 }
 
 // routesTestAccessToken is claims as an access token issuance mints since #676: the at+jwt header,
-// routesTestIssuer and routesTestAPIClientId on top of claims.
+// routesTestIssuer, routesTestAPIClientId and routesTestAccessJti on top of claims.
 func routesTestAccessToken(claims jwt.MapClaims) oauth.JwtToken {
-	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientId}
+	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientId, "jti": routesTestAccessJti}
 	for name, value := range claims {
 		all[name] = value
 	}
 	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
 }
 
-// armRoutesTestAPIClient has the session guard find routesTestAPIClientId, enabled.
+// armRoutesTestAPIClient has the session guard find routesTestAPIClientId, enabled, and
+// routesTestAccessJti not revoked, which it reads of a token without grant_id (#676).
 func armRoutesTestAPIClient(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
 		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
+	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, routesTestAccessJti).Return(false, nil).Maybe()
 }
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:

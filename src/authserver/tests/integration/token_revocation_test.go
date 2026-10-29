@@ -281,6 +281,65 @@ func TestRevoke_TheClientAuthenticates(t *testing.T) {
 	assertUserinfoAdmits(t, data["access_token"].(string), code.User.Subject)
 }
 
+// An access token without a grant, of the client credentials grant, is revoked by its own jti (#676
+// decision 1): the admin API refuses it at once, though it has not expired, and revoking it again is
+// answered as any invalid token is. Before that, another client's attempt to revoke it is refused and
+// leaves it working.
+func TestRevoke_AClientCredentialsTokenIsRevokedByItsJti(t *testing.T) {
+	accessToken, client, clientSecret := createAdminClientWithTokenAndSecret(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	claims := decodeJWTPayload(t, accessToken)
+	require.NotContains(t, claims, "grant_id", "a client credentials token has no grant")
+	jti := claims["jti"].(string)
+	const target = "/api/v1/admin/resources"
+	assertAPIAdmitsToken(t, target, accessToken)
+
+	_, other, otherSecret := createAdminClientWithTokenAndSecret(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, other.Id) })
+	answer := postRevoke(t, revokeRequest{form: url.Values{
+		"token": {accessToken}, "client_id": {other.ClientIdentifier}, "client_secret": {otherSecret},
+	}})
+	assertRevokeError(t, answer, http.StatusBadRequest, "invalid_grant", "The token was issued to another client.")
+	assertAPIAdmitsToken(t, target, accessToken)
+
+	revokeAs(t, client.ClientIdentifier, clientSecret, accessToken)
+
+	assertAPIRefusesToken(t, target, accessToken)
+	revoked, err := database.IsAccessTokenRevoked(context.Background(), nil, jti)
+	require.NoError(t, err)
+	assert.True(t, revoked, "the token's jti is stored")
+
+	revokeAs(t, client.ClientIdentifier, clientSecret, accessToken)
+	assertAPIRefusesToken(t, target, accessToken)
+}
+
+// An access token of the implicit flow, which has no grant either, is revoked by its jti, by a
+// public client with its client_id alone as a browser app does at sign-out: /userinfo refuses it at
+// once.
+func TestRevoke_AnImplicitFlowTokenIsRevokedByItsJti(t *testing.T) {
+	enableImplicitFlowGlobally(t)
+	implicitEnabled := true
+	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
+	client.IsPublic = true
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	user, password := createTestUserForImplicit(t)
+	resp := signInToIssue(t, createHttpClient(t),
+		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "", fake.LetterN(12), ""), user, password)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	accessToken := getTokensFromFragment(t, resp)["access_token"]
+	require.NotEmpty(t, accessToken)
+	require.NotContains(t, decodeJWTPayload(t, accessToken), "grant_id", "an implicit-flow token has no grant")
+	assertUserinfoAdmits(t, accessToken, user.Subject)
+
+	answer := postRevoke(t, revokeRequest{form: url.Values{"token": {accessToken}, "client_id": {client.ClientIdentifier}}})
+
+	require.Equal(t, http.StatusOK, answer.status, answer.body)
+	assert.Empty(t, answer.body)
+	assertUserinfoRefusesTheToken(t, accessToken)
+}
+
 // Discovery announces the endpoint and the client authentication methods it accepts (RFC 8414
 // section 2), at both addresses.
 func TestRevoke_IsAnnouncedInDiscovery(t *testing.T) {

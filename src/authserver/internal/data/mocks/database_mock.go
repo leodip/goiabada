@@ -3814,6 +3814,69 @@ func (_c *Database_DeleteExpiredRefreshTokens_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
+// DeleteExpiredRevokedAccessTokens provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredRevokedAccessTokens")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteExpiredRevokedAccessTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredRevokedAccessTokens'
+type Database_DeleteExpiredRevokedAccessTokens_Call struct {
+	*mock.Call
+}
+
+// DeleteExpiredRevokedAccessTokens is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - now time.Time
+func (_e *Database_Expecter) DeleteExpiredRevokedAccessTokens(ctx any, tx any, now any) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	return &Database_DeleteExpiredRevokedAccessTokens_Call{Call: _e.mock.On("DeleteExpiredRevokedAccessTokens", ctx, tx, now)}
+}
+
+func (_c *Database_DeleteExpiredRevokedAccessTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx, now time.Time)) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteExpiredRevokedAccessTokens_Call) Return(err error) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteExpiredRevokedAccessTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteExpiredSessions provides a mock function for the type Database
 func (_mock *Database) DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error {
 	ret := _mock.Called(ctx, tx, maxLifetime)
@@ -12112,6 +12175,78 @@ func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) RunAndReturn(run fu
 	return _c
 }
 
+// IsAccessTokenRevoked provides a mock function for the type Database
+func (_mock *Database) IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error) {
+	ret := _mock.Called(ctx, tx, jti)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsAccessTokenRevoked")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, jti)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) bool); ok {
+		r0 = returnFunc(ctx, tx, jti)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, jti)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_IsAccessTokenRevoked_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsAccessTokenRevoked'
+type Database_IsAccessTokenRevoked_Call struct {
+	*mock.Call
+}
+
+// IsAccessTokenRevoked is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - jti string
+func (_e *Database_Expecter) IsAccessTokenRevoked(ctx any, tx any, jti any) *Database_IsAccessTokenRevoked_Call {
+	return &Database_IsAccessTokenRevoked_Call{Call: _e.mock.On("IsAccessTokenRevoked", ctx, tx, jti)}
+}
+
+func (_c *Database_IsAccessTokenRevoked_Call) Run(run func(ctx context.Context, tx *sql.Tx, jti string)) *Database_IsAccessTokenRevoked_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_IsAccessTokenRevoked_Call) Return(b bool, err error) *Database_IsAccessTokenRevoked_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_IsAccessTokenRevoked_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, jti string) (bool, error)) *Database_IsAccessTokenRevoked_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsEmpty provides a mock function for the type Database
 func (_mock *Database) IsEmpty(ctx context.Context) (bool, error) {
 	ret := _mock.Called(ctx)
@@ -12839,6 +12974,84 @@ func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Return(err error)
 }
 
 func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RecordAccessTokenRevoked provides a mock function for the type Database
+func (_mock *Database) RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, jti, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecordAccessTokenRevoked")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, jti, expiresAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, jti, expiresAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, jti, expiresAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RecordAccessTokenRevoked_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordAccessTokenRevoked'
+type Database_RecordAccessTokenRevoked_Call struct {
+	*mock.Call
+}
+
+// RecordAccessTokenRevoked is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - jti string
+//   - expiresAt time.Time
+func (_e *Database_Expecter) RecordAccessTokenRevoked(ctx any, tx any, jti any, expiresAt any) *Database_RecordAccessTokenRevoked_Call {
+	return &Database_RecordAccessTokenRevoked_Call{Call: _e.mock.On("RecordAccessTokenRevoked", ctx, tx, jti, expiresAt)}
+}
+
+func (_c *Database_RecordAccessTokenRevoked_Call) Run(run func(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time)) *Database_RecordAccessTokenRevoked_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RecordAccessTokenRevoked_Call) Return(b bool, err error) *Database_RecordAccessTokenRevoked_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_RecordAccessTokenRevoked_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)) *Database_RecordAccessTokenRevoked_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -25,13 +25,15 @@ const (
 	guardIssuer = "https://auth.example.com"
 	// guardClientIdentifier is the client every token the guard tests present was issued to.
 	guardClientIdentifier = "client-1"
+	// guardJti is the jti of every token the guard tests present unless a row says otherwise.
+	guardJti = "at-of-the-guard"
 )
 
 // issuedAccessToken is an access token as issuance mints it since #676: the at+jwt header, the
-// configured issuer and the client it was issued to, with claims on top, which may replace any of
-// them.
+// configured issuer, the client it was issued to and its jti, with claims on top, which may replace
+// any of them.
 func issuedAccessToken(claims map[string]interface{}) oauth.JwtToken {
-	all := map[string]interface{}{"iss": guardIssuer, "client_id": guardClientIdentifier}
+	all := map[string]interface{}{"iss": guardIssuer, "client_id": guardClientIdentifier, "jti": guardJti}
 	for name, value := range claims {
 		all[name] = value
 	}
@@ -48,11 +50,14 @@ func guardSettings() *record.Settings {
 	}
 }
 
-// armGuardClient has the session guard's client lookup find guardClientIdentifier enabled. Maybe,
-// since a row refused before the client is read never reads it.
+// armGuardClient has the session guard's client lookup find guardClientIdentifier enabled, and the
+// lookup of guardJti find it not revoked, which a live token without grant_id reads last (#676
+// decision 1). Maybe, since a row refused before the client is read never reads it, and a token of
+// a grant never reads the jti.
 func armGuardClient(mockDB *datamocks.Database) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), guardClientIdentifier).
 		Return(&record.Client{Id: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}, nil).Maybe()
+	mockDB.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), guardJti).Return(false, nil).Maybe()
 }
 
 // The session guard refuses what RFC 9068 section 4 says a resource server MUST refuse, and a token
@@ -108,6 +113,10 @@ func TestRequireValidSession_RFC9068(t *testing.T) {
 			if tc.readsUser {
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
 					Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil).Once()
+			}
+			if tc.wantStatus == http.StatusOK {
+				// A live token without grant_id is judged last by its jti (#676 decision 1).
+				mockDB.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), guardJti).Return(false, nil).Once()
 			}
 
 			token := issuedAccessToken(tc.claims)

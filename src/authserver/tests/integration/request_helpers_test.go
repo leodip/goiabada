@@ -134,6 +134,13 @@ func dumpResponseBody(t *testing.T, response *http.Response) {
 
 // createAdminClientWithToken creates a client with admin permissions and returns an access token
 func createAdminClientWithToken(t *testing.T) (string, *record.Client) {
+	accessToken, client, _ := createAdminClientWithTokenAndSecret(t)
+	return accessToken, client
+}
+
+// createAdminClientWithTokenAndSecret is createAdminClientWithToken, with the client's secret too,
+// for a test that authenticates as the client again.
+func createAdminClientWithTokenAndSecret(t *testing.T) (string, *record.Client, string) {
 	// Generate client secret
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -189,7 +196,7 @@ func createAdminClientWithToken(t *testing.T) (string, *record.Client) {
 	assert.True(t, ok, "access_token should be a string")
 	assert.NotEmpty(t, accessToken, "access_token should not be empty")
 
-	return accessToken, client
+	return accessToken, client, clientSecret
 }
 
 // makeAPIRequest makes an authenticated API request

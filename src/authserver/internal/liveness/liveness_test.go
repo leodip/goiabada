@@ -33,15 +33,18 @@ const (
 	testIssuer = "https://auth.example.com"
 	// clientIdentifier is the client every token in these tests was issued to.
 	clientIdentifier = "client-1"
+	// testJti is the jti every token in these tests carries, unless a row says otherwise.
+	testJti = "at-of-the-test"
 )
 
 // enabledClient is the client every token names: it exists and is enabled.
 var enabledClient = &record.Client{Id: 7, ClientIdentifier: clientIdentifier, Enabled: true}
 
 // accessToken is an access token as issuance mints it since #676: the at+jwt header, the configured
-// issuer and the client it was issued to, with claims on top, which may replace any of the three.
+// issuer, the client it was issued to and its jti, with claims on top, which may replace any of the
+// four.
 func accessToken(claims map[string]interface{}) oauth.JwtToken {
-	all := map[string]interface{}{"iss": testIssuer, "client_id": clientIdentifier}
+	all := map[string]interface{}{"iss": testIssuer, "client_id": clientIdentifier, "jti": testJti}
 	for name, value := range claims {
 		all[name] = value
 	}
@@ -227,6 +230,10 @@ func TestAccessToken(t *testing.T) {
 			case tc.session != nil:
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), sid).Return(tc.session, nil).Once()
 			}
+			if tc.wantRefusal == Live {
+				// A live token without grant_id is judged last by its jti (#676 decision 1).
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+			}
 
 			verdict, err := AccessToken(context.Background(), database, accessToken(tc.claims), settings, checkedAt)
 
@@ -339,6 +346,10 @@ func TestAccessToken_RFC9068(t *testing.T) {
 			}
 			if tc.readsUser {
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").Return(enabledUser, nil).Once()
+			}
+			if tc.wantRefusal == Live {
+				// A live token without grant_id is judged last by its jti (#676 decision 1).
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
 			}
 
 			verdict, err := AccessToken(context.Background(), database, token, settings, checkedAt)
@@ -464,7 +475,8 @@ func TestAccessToken_Faults(t *testing.T) {
 // The grant check (#676 decision 1): a token carrying grant_id is live only while its refresh token
 // family is, which the family's own query answers. It runs last, once everything else has passed,
 // so a token refused for its user or its session keeps that refusal and reads no grant; a token
-// without grant_id, a client's or one from the implicit flow, never reads one.
+// without grant_id, a client's or one from the implicit flow, never reads one, and is judged by its
+// jti instead (TestAccessToken_RevokedJti).
 func TestAccessToken_Grant(t *testing.T) {
 	const grantId = "grant-1"
 	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
@@ -543,6 +555,10 @@ func TestAccessToken_Grant(t *testing.T) {
 			case dead:
 				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(false, nil).Once()
 			}
+			if tc.wantRefusal == Live && tc.grant == notRead {
+				// A live token without grant_id is judged last by its jti (#676 decision 1).
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+			}
 
 			verdict, err := AccessToken(context.Background(), database, accessToken(tc.claims), settings, checkedAt)
 
@@ -591,4 +607,108 @@ func TestSubject(t *testing.T) {
 		assert.Falsef(t, ok, "claims %v", claims)
 		assert.Emptyf(t, subject, "claims %v", claims)
 	}
+}
+
+// The stored jti (#676 decision 1): an access token without grant_id, a client's or one from the
+// implicit flow, is live only while its jti is not stored as revoked. It is read last, once
+// everything else has passed, so a token refused for its client, its user or its session keeps that
+// refusal and reads no jti; a token carrying grant_id never reads one, since its grant answers.
+func TestAccessToken_RevokedJti(t *testing.T) {
+	const jti = "at-1"
+	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+
+	type jtiRead int
+	const (
+		notRead jtiRead = iota
+		notStored
+		stored
+	)
+
+	tests := []struct {
+		label       string
+		claims      map[string]interface{}
+		user        *record.User
+		grantLive   bool
+		jti         jtiRead
+		wantRefusal Refusal
+	}{
+		{label: "a client's token, not revoked",
+			claims: map[string]interface{}{"sub": clientIdentifier, "jti": jti}, jti: notStored, wantRefusal: Live},
+		{label: "a client's token, revoked",
+			claims: map[string]interface{}{"sub": clientIdentifier, "jti": jti}, jti: stored, wantRefusal: AccessTokenRevoked},
+		{label: "an implicit-flow token, not revoked",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti},
+			user:   enabledUser, jti: notStored, wantRefusal: Live},
+		{label: "an implicit-flow token, revoked",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti},
+			user:   enabledUser, jti: stored, wantRefusal: AccessTokenRevoked},
+
+		// A token carrying grant_id is judged by its grant and reads no jti.
+		{label: "a token of a live grant",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti, "grant_id": "grant-1"},
+			user:   enabledUser, grantLive: true, wantRefusal: Live},
+
+		// Refused before the jti: the earlier refusal stands, and no jti is read.
+		{label: "a disabled user's implicit-flow token",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti},
+			user:   &record.User{Id: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
+
+		// A jti the auth server would never sign names no token it could have stored, and reads
+		// nothing.
+		{label: "a client's token without jti",
+			claims: map[string]interface{}{"sub": clientIdentifier}, wantRefusal: AccessTokenRevoked},
+		{label: "an empty jti",
+			claims: map[string]interface{}{"sub": clientIdentifier, "jti": ""}, wantRefusal: AccessTokenRevoked},
+		{label: "a jti that is not a string",
+			claims: map[string]interface{}{"sub": clientIdentifier, "jti": float64(1)}, wantRefusal: AccessTokenRevoked},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			expectEnabledClient(database)
+			if tc.user != nil {
+				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").Return(tc.user, nil).Once()
+			}
+			if tc.grantLive {
+				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), "grant-1").Return(true, nil).Once()
+			}
+			switch tc.jti {
+			case notStored:
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), jti).Return(false, nil).Once()
+			case stored:
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), jti).Return(true, nil).Once()
+			}
+			token := accessToken(tc.claims)
+			if _, hasJti := tc.claims["jti"]; !hasJti {
+				delete(token.Claims, "jti")
+			}
+
+			verdict, err := AccessToken(context.Background(), database, token, settings, checkedAt)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRefusal, verdict.Refusal, "refusal")
+			assert.Equal(t, tc.wantRefusal == Live, verdict.Live(), "live")
+			assert.Same(t, enabledClient, verdict.Client, "the client read, so the revocation endpoint can name the owner")
+			if tc.user != nil {
+				assert.Same(t, tc.user, verdict.User, "the user read")
+			}
+		})
+	}
+}
+
+// A fault reading the stored jti is an error and never a refusal, as every other read's is: a
+// revocation answered as a dead token would tell the client a live one was revoked.
+func TestAccessToken_RevokedJtiFault(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	expectEnabledClient(database)
+	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, "at-1").Return(false, errors.New("the database is down"))
+
+	verdict, err := AccessToken(context.Background(), database,
+		accessToken(map[string]interface{}{"sub": clientIdentifier, "jti": "at-1"}), settings, checkedAt)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "the database is down")
+	assert.False(t, verdict.Live())
+	assert.NotEqual(t, AccessTokenRevoked, verdict.Refusal, "a fault is not a revoked token")
 }

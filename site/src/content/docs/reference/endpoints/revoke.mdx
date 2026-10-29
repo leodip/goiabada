@@ -47,7 +47,7 @@ It leaves everything else alone. The user stays signed in to the auth server, an
 
 An API that checks access tokens by their signature alone accepts them until they expire. Keep access tokens short-lived if that matters.
 
-An access token from the client credentials grant or the implicit flow belongs to no grant, and the endpoint answers it with `unsupported_token_type`.
+An access token from the client credentials grant or the implicit flow belongs to no grant. Revoking it ends that token alone: `/userinfo` and the auth server's APIs refuse it until it expires.
 
 ## The request
 
@@ -70,16 +70,15 @@ The auth server's log has a `client authentication refused at the revocation end
 
 | Status | When |
 |---|---|
-| `200 OK`, empty body | The grant was revoked, or the token was invalid already: expired, revoked, unknown, malformed, an ID token, or one the auth server doesn't accept any more. Either way, your app can delete it |
+| `200 OK`, empty body | The grant or the token was revoked, or the token was invalid already: expired, revoked, unknown, malformed, an ID token, or one the auth server doesn't accept any more. Either way, your app can delete it |
 | `400 Bad Request`, `invalid_grant` | The token is live and was issued to another client: "The token was issued to another client." Nothing is revoked |
-| `400 Bad Request`, `unsupported_token_type` | The token is a live access token of yours with no grant behind it |
 | `400 Bad Request`, `invalid_request` | `token` is missing, or a parameter is repeated |
 | `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated |
 | `503 Service Unavailable`, `temporarily_unavailable` | The auth server couldn't check or revoke the token. The token still works: try again later |
 
 An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors).
 
-A token sent by another client is recorded in the [audit log](/concepts/audit-log/) as `token_revocation_refused`, and every revocation as `revoked_grant`.
+A token sent by another client is recorded in the [audit log](/concepts/audit-log/) as `token_revocation_refused`, and every revocation as `revoked_grant`, or as `revoked_access_token` for an access token that belongs to no grant.
 
 ## Calling it from a browser
 

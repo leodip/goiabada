@@ -392,6 +392,20 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
 			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, revokeGrantId).Return(false, nil).Once()
 		}},
+		{"an access token without a grant, revoked already", func(e *revokeEndpoint) {
+			e.parses(grantlessAccessToken(revokeCallerName, false, time.Now().Add(time.Hour)))
+			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeCallerName).
+				Return(confidentialCaller(t), nil).Once()
+			e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti).Return(true, nil).Once()
+		}},
+		{"another client's access token without a grant, revoked already", func(e *revokeEndpoint) {
+			e.parses(grantlessAccessToken(revokeOwnerName, true, time.Now().Add(time.Hour)))
+			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeOwnerName).
+				Return(owner, nil).Once()
+			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
+				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
+			e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti).Return(true, nil).Once()
+		}},
 		{"a refresh token with no row", func(e *revokeEndpoint) {
 			e.parses(offlineRefreshToken())
 			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(nil, nil).Once()
@@ -430,6 +444,7 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			assertRevokedAnswer(t, rr)
 			assert.Equal(t, revokeOutcome("invalid_token"), e.samples(t))
 			assertNotAttempted(t, e.database, "RunInTransaction")
+			assertNotAttempted(t, e.database, "RecordAccessTokenRevoked")
 		})
 	}
 }
@@ -460,6 +475,21 @@ func TestHandleRevokePost_AFaultAnswersServiceUnavailable(t *testing.T) {
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
 				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
 			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, revokeGrantId).Return(false, boom).Once()
+		}},
+		{"an access token's stored jti cannot be read", func(e *revokeEndpoint) {
+			e.callerFound(confidentialCaller(t))
+			e.parses(grantlessAccessToken(revokeCallerName, false, time.Now().Add(time.Hour)))
+			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeCallerName).
+				Return(confidentialCaller(t), nil).Once()
+			e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti).Return(false, boom).Once()
+		}},
+		{"an access token's jti cannot be stored", func(e *revokeEndpoint) {
+			caller := confidentialCaller(t)
+			e.callerFound(caller)
+			e.parses(grantlessAccessToken(revokeCallerName, false, time.Now().Add(time.Hour)))
+			e.grantlessAccessTokenLive(caller, false)
+			e.database.On("RecordAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti, mock.Anything).
+				Return(false, boom).Once()
 		}},
 		{"the refresh token's row cannot be read", func(e *revokeEndpoint) {
 			e.callerFound(confidentialCaller(t))
@@ -616,25 +646,109 @@ func TestHandleRevokePost_AMalformedRequestIsRefused(t *testing.T) {
 	})
 }
 
-// An access token without grant_id, of the client credentials grant or the implicit flow, is not
-// revoked yet (#676 slice 7 stores its jti): RFC 7009 section 2.2.1's unsupported_token_type, never
-// the 200 that would claim it was.
-func TestHandleRevokePost_AGrantlessAccessTokenIsNotRevokedYet(t *testing.T) {
+// grantlessAccessToken is a live access token without grant_id, issued to clientIdentifier and
+// expiring at expiresAt: a client's, of the client credentials grant, or, with user true, a user's,
+// of the implicit flow.
+func grantlessAccessToken(clientIdentifier string, user bool, expiresAt time.Time) *oauth.JwtToken {
+	claims := map[string]interface{}{
+		"iss": revokeIssuer, "sub": clientIdentifier, "client_id": clientIdentifier, "jti": revokeAccessJti,
+		"typ": "Bearer", "exp": float64(expiresAt.Unix()),
+	}
+	if user {
+		claims["sub"] = "the-subject"
+		claims["auth_time"] = float64(time.Now().Unix())
+		claims["auth_state_generation"] = float64(0)
+	}
+	return &oauth.JwtToken{TokenBase64: revokeTokenString, Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"},
+		Claims: claims}
+}
+
+// grantlessAccessTokenLive arms the reads the access-token check makes of a live token without a
+// grant issued to owner: its client, its user when it has one, and its jti, not stored.
+func (e *revokeEndpoint) grantlessAccessTokenLive(owner *record.Client, user bool) {
+	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, owner.ClientIdentifier).
+		Return(owner, nil).Once()
+	if user {
+		e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
+			Return(&record.User{Id: revokeUserId, Subject: "the-subject", Enabled: true}, nil).Once()
+	}
+	e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti).Return(false, nil).Once()
+}
+
+// An access token without grant_id is revoked by its own jti (#676 decision 1): the jti is stored
+// with the token's expiry, revoked_access_token records the client, the jti and the user when the
+// token has one, and the answer is 200 with nothing in the body, counted as revoked. No grant is
+// revoked.
+func TestHandleRevokePost_RevokesAnAccessTokenWithoutAGrant(t *testing.T) {
+	expiresAt := time.Now().Add(time.Hour).Truncate(time.Second).UTC()
+
+	for _, tc := range []struct {
+		name    string
+		user    bool
+		payload map[string]interface{}
+	}{
+		{"of the client credentials grant", false,
+			map[string]interface{}{"client_id": revokeCallerId, "jti": revokeAccessJti}},
+		{"of the implicit flow", true,
+			map[string]interface{}{"client_id": revokeCallerId, "user_id": revokeUserId, "jti": revokeAccessJti}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newRevokeEndpoint(t)
+			caller := confidentialCaller(t)
+			e.callerFound(caller)
+			e.parses(grantlessAccessToken(revokeCallerName, tc.user, expiresAt))
+			e.grantlessAccessTokenLive(caller, tc.user)
+			e.database.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokeAccessJti, expiresAt).
+				Return(true, nil).Once()
+			e.auditLogger.On("Log", mock.Anything, "revoked_access_token", tc.payload).Return().Once()
+
+			rr := e.post(t, callerForm())
+
+			assertRevokedAnswer(t, rr)
+			assert.Equal(t, revokeOutcome("revoked"), e.samples(t))
+			assertNotAttempted(t, e.database, "RunInTransaction")
+		})
+	}
+}
+
+// A revocation that loses the jti to an overlapping one stores nothing, so it is answered as a token
+// already revoked is: 200, nothing audited, counted as invalid_token. The client is told the same
+// either way, and the event is the other revocation's.
+func TestHandleRevokePost_AnAccessTokenRevokedMeanwhileIsAnsweredOK(t *testing.T) {
+	expiresAt := time.Now().Add(time.Hour).Truncate(time.Second).UTC()
 	e := newRevokeEndpoint(t)
 	caller := confidentialCaller(t)
 	e.callerFound(caller)
-	token := grantAccessToken(revokeCallerName)
-	delete(token.Claims, "grant_id")
-	delete(token.Claims, "auth_time")
-	e.parses(token)
-	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeCallerName).Return(caller, nil).Once()
+	e.parses(grantlessAccessToken(revokeCallerName, false, expiresAt))
+	e.grantlessAccessTokenLive(caller, false)
+	e.database.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokeAccessJti, expiresAt).
+		Return(false, nil).Once()
 
 	rr := e.post(t, callerForm())
 
-	assertErrorAnswer(t, rr, http.StatusBadRequest, "unsupported_token_type",
-		"The authorization server does not support the revocation of the presented token type.")
+	assertRevokedAnswer(t, rr)
+	assert.Equal(t, revokeOutcome("invalid_token"), e.samples(t))
+}
+
+// Another client's live access token without a grant is refused as another client's grant token is
+// (decision 8): 400 invalid_grant, token_revocation_refused, and no jti stored.
+func TestHandleRevokePost_RefusesAnotherClientsAccessTokenWithoutAGrant(t *testing.T) {
+	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
+	e := newRevokeEndpoint(t)
+	e.callerFound(confidentialCaller(t))
+	e.parses(grantlessAccessToken(revokeOwnerName, false, time.Now().Add(time.Hour)))
+	e.grantlessAccessTokenLive(owner, false)
+	e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", map[string]interface{}{
+		"client_id":       revokeCallerId,
+		"token_client_id": revokeOwnerId,
+		"token_type":      "access_token",
+	}).Return().Once()
+
+	rr := e.post(t, callerForm())
+
+	assertErrorAnswer(t, rr, http.StatusBadRequest, "invalid_grant", "The token was issued to another client.")
 	assert.Equal(t, revokeOutcome("refused"), e.samples(t))
-	assertNotAttempted(t, e.database, "RunInTransaction")
+	assertNotAttempted(t, e.database, "RecordAccessTokenRevoked")
 }
 
 // A fault met before the handler, on the revocation branch, is answered as the handler answers its

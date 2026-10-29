@@ -71,3 +71,64 @@ func TestRequireValidSession_Grant(t *testing.T) {
 		})
 	}
 }
+
+// The session guard refuses an access token without a grant whose jti is stored as revoked (#676
+// decision 1), a client's or one from the implicit flow, as 401 invalid_token with the sentence a
+// token that does not parse gets, and logs it once as a warning naming the jti. Such a token whose
+// jti is not stored goes through and logs nothing.
+func TestRequireValidSession_RevokedJti(t *testing.T) {
+	const jti = "at-1"
+
+	for _, tc := range []struct {
+		label   string
+		claims  map[string]interface{}
+		revoked bool
+	}{
+		{label: "a client's token, not revoked", claims: map[string]interface{}{"sub": guardClientIdentifier, "jti": jti}},
+		{label: "a client's token, revoked", claims: map[string]interface{}{"sub": guardClientIdentifier, "jti": jti}, revoked: true},
+		{label: "an implicit-flow token, not revoked", claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti}},
+		{label: "an implicit-flow token, revoked", claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti}, revoked: true},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			logs := logtest.CaptureSlog(t)
+			mockDB := datamocks.NewDatabase(t)
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), guardClientIdentifier).
+				Return(&record.Client{Id: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}, nil).Once()
+			if _, isUsers := tc.claims["auth_time"]; isUsers {
+				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
+					Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil).Once()
+			}
+			mockDB.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), jti).Return(tc.revoked, nil).Once()
+
+			token := issuedAccessToken(tc.claims)
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			ctx := reqctx.WithBearerToken(req.Context(), token)
+			req = req.WithContext(reqctx.WithSettings(ctx, guardSettings()))
+			rr := httptest.NewRecorder()
+			nextCalled := false
+
+			apiBearerForTest.RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				nextCalled = true
+			})).ServeHTTP(rr, req)
+
+			if !tc.revoked {
+				assert.Equal(t, http.StatusOK, rr.Code)
+				assert.True(t, nextCalled, "a token not revoked reaches the handler")
+				assert.Empty(t, logs.Records(), "a token let through writes no rejection")
+				return
+			}
+			assert.Equal(t, http.StatusUnauthorized, rr.Code)
+			assert.False(t, nextCalled, "a revoked token must not reach the handler")
+			assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+				rr.Header().Get("WWW-Authenticate"))
+			var body api.ErrorResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+			assert.Equal(t, api.ErrorResponse{ErrorCode: "INVALID_TOKEN", ErrorDescription: "The access token is invalid."}, body)
+			records := logs.Records()
+			require.Len(t, records, 1, "one record per refusal")
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Equal(t, "rejecting bearer token: it has been revoked", records[0].Message)
+			assert.Equal(t, jti, records[0].Attrs["jti"])
+		})
+	}
+}

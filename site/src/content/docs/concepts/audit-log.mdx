@@ -138,6 +138,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `is_public` | Whether a client that registered itself is public, with no secret. |
 | `issue_access_token` | Whether the implicit flow issued an access token. |
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
+| `jti` | The `jti` of an access token a client revoked. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `limiter` | The name of the rate limiter that refused. |
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
@@ -262,6 +263,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
 | `revoked_grant` | A client revoked one of its grants at the [revocation endpoint](/reference/endpoints/revoke/), by sending its refresh token or one of its access tokens, so every refresh token of the grant was revoked. It names the client, the user, the grant, the type of token sent and the refresh tokens revoked. |
+| `revoked_access_token` | A client revoked one of its access tokens that belongs to no grant, from the client credentials grant or the implicit flow, at the [revocation endpoint](/reference/endpoints/revoke/). The token stops working until it expires. It names the client, the token's `jti` and, for a token of the implicit flow, the user. |
 | `token_revocation_refused` | A client sent the revocation endpoint another client's live token, and was refused. Nothing was revoked. It names both clients and the type of token. |
 
 ### Registration and emailed links

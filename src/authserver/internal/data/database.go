@@ -750,6 +750,17 @@ type Database interface {
 	// DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families that have no
 	// refresh token left, which is when a record has nothing left to refuse.
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
+	// RecordAccessTokenRevoked stores the jti of a revoked access token without a grant, with the
+	// token's expiry, and reports whether this call stored it (#676 decision 1). A jti already
+	// stored is left as it was and reported false, a first write lost to an overlapping one
+	// included. An empty jti is an error.
+	RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)
+	// IsAccessTokenRevoked reports whether an access token's jti is stored as revoked. An empty jti
+	// is an error.
+	IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error)
+	// DeleteExpiredRevokedAccessTokens reaps on expires_at alone: past it the token is refused for
+	// its expiry, so its row has nothing left to refuse.
+	DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and

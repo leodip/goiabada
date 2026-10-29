@@ -357,6 +357,20 @@ const (
 	// never from the hint) and revoked_refresh_token_jtis, the members this call moved, always a
 	// list.
 	EventRevokedGrant = "revoked_grant"
+	// EventRevokedAccessToken records that a client revoked one of its access tokens without a grant
+	// at the revocation endpoint (RFC 7009, #676 decision 1): a token of the client credentials grant
+	// or the implicit flow, which carries no grant_id, so no refresh token family stands behind it to
+	// end. Its jti was stored with its expiry, which refuses the token at the auth server's own
+	// endpoints until it expires. Emitted AFTER the jti is stored, and only by the call that stored
+	// it: a second revocation of the same token stores nothing and records nothing, as a token
+	// answered 200 because it was invalid records nothing.
+	//
+	// It ends no session and no grant: the user, when there is one, stays signed in.
+	//
+	// Its payload carries client_id (the client that revoked, the token's own), jti (the token's
+	// identifier) and, for a token of the implicit flow, user_id; a client credentials token has no
+	// user, and names none.
+	EventRevokedAccessToken = "revoked_access_token"
 	// EventTokenRevocationRefused records that a client sent the revocation endpoint another
 	// client's live token and was refused with invalid_grant, RFC 7009 section 2.1's check that the
 	// token was issued to the client making the request (#676 decision 8). Nothing was revoked.
@@ -618,6 +632,7 @@ var auditEventTypes = []string{
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,
+	EventRevokedAccessToken,
 	EventRevokedClientGrants,
 	EventRevokedConsentGrants,
 	EventRevokedGrant,

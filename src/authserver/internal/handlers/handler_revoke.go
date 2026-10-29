@@ -25,9 +25,11 @@ import (
 )
 
 // revokeDatabase is what the revocation endpoint reads and writes: the calling client, the state the
-// two liveness checks read, the client a refresh token was issued to, and the grant it revokes.
+// two liveness checks read, the client a refresh token was issued to, the grant it revokes, and the
+// jti of an access token without a grant it stores.
 type revokeDatabase interface {
 	revocation.Database
+	revocation.AccessTokenDatabase
 	liveness.Database
 	liveness.RefreshDatabase
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
@@ -43,17 +45,13 @@ var revokeRequestParameters = []string{"token", "client_id", "client_secret"}
 var errAnotherClientsToken = oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 	"The token was issued to another client.", http.StatusBadRequest)
 
-// errUnsupportedTokenType is RFC 7009 section 2.2.1's answer to a live access token without a
-// grant, of the client credentials grant or the implicit flow, which nothing here revokes yet. 200
-// would tell the client a token was revoked that is still live.
-var errUnsupportedTokenType = oauth.NewErrorDetailWithHTTPStatus("unsupported_token_type",
-	"The authorization server does not support the revocation of the presented token type.",
-	http.StatusBadRequest)
-
 // HandleRevokePost is the token revocation endpoint, RFC 7009 (#676 decisions 1, 8, 9, 10 and 12).
 // A client sends one of its tokens, and the whole grant behind it ends: a refresh token's family,
 // or the family an access token names as grant_id, is recorded revoked and every member of it
-// revoked, which ends the grant's access tokens at the auth server's own endpoints too.
+// revoked, which ends the grant's access tokens at the auth server's own endpoints too. An access
+// token without a grant, of the client credentials grant or the implicit flow, is revoked on its own:
+// its jti is stored until it expires, which ends it at those endpoints as well. A second revocation
+// of it finds the token no longer live, and is answered as any invalid token is.
 //
 // The order is decision 10's countermeasure: the client is authenticated before anything else, as at
 // the token endpoint, so a request with no client costs one read of it. The token parser refuses a
@@ -190,17 +188,41 @@ func (e revocationEndpoint) revokeAccessToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	grantId := token.StringClaim("grant_id")
-	if grantId == "" {
-		e.refuse(w, r, errUnsupportedTokenType)
-		return
-	}
-	// Every token carrying grant_id is a user's, so the check has read its user.
+	// A user's token, of a grant or of the implicit flow, has had its user read by the check; a
+	// client's has none.
 	var userId int64
 	if verdict.User != nil {
 		userId = verdict.User.Id
 	}
+	grantId := token.StringClaim("grant_id")
+	if grantId == "" {
+		e.revokeByJti(w, r, client, userId, token)
+		return
+	}
 	e.revokeGrant(w, r, client, userId, grantId, revocation.TokenTypeAccessToken)
+}
+
+// revokeByJti revokes a live access token without a grant, of the client credentials grant or the
+// implicit flow, by storing its jti until it expires (decision 1), audits it, and answers 200 with
+// an empty body. The check found its jti not stored, so it carries one. A revocation that overlapped
+// this one and stored the jti first leaves nothing for this one to do: it is answered as a token
+// already revoked is, and the event is the other's.
+func (e revocationEndpoint) revokeByJti(w http.ResponseWriter, r *http.Request, client *record.Client, userId int64,
+	token oauth.JwtToken) {
+
+	jti := token.StringClaim("jti")
+	stored, err := revocation.RevokeAccessToken(r.Context(), e.database, jti, token.TimeClaim("exp").UTC())
+	if err != nil {
+		e.fault(w, r, err)
+		return
+	}
+	if !stored {
+		e.invalid(w)
+		return
+	}
+	revocation.LogRevokedAccessToken(r.Context(), e.auditLogger, client.Id, userId, jti)
+	e.metrics.Count(revocationmetrics.Revoked)
+	w.WriteHeader(http.StatusOK)
 }
 
 // revokeRefreshToken judges a refresh token by the refresh grant's own check and answers it.

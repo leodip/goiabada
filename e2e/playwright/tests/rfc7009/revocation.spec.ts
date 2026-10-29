@@ -2,13 +2,14 @@
 // behind it ends (section 2.1), the refresh token at the token endpoint and the access tokens at
 // /userinfo. An invalid token is answered 200 (2.2), another client's live token is refused with
 // invalid_grant and left live, the hint is ignored, and a public client revokes with its client_id
-// alone (section 5). The test app's sign-out, which revokes first, is in ../testapp/sign-out.spec.ts
+// alone (section 5). A client credentials token, which belongs to no grant, is revoked on its own. The test app's sign-out, which revokes first, is in ../testapp/sign-out.spec.ts
 // and ../testapp/spa.spec.ts.
 import type { APIRequestContext } from "@playwright/test";
+import { grantClientPermission, readClientSecret } from "../../lib/admin-console";
 import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
-import { refreshToken, userTokens, userinfo } from "../../lib/oauth";
+import { clientCredentialsToken, refreshToken, userTokens, userinfo } from "../../lib/oauth";
 import { passwordGrantClient, publicSignInClient } from "../../lib/test-clients";
 
 const revocationEndpoint = `${env.authUrl}/auth/revoke`;
@@ -137,4 +138,31 @@ test("a public client revokes with its client_id alone (section 5)", async ({ pa
   expect(await revoke(request, client.identifier, null, { token: tokens.refresh_token })).toEqual({ status: 200, text: "" });
 
   expect((await userinfo(request, tokens.access_token)).status).toBe(401);
+});
+
+// The admin API checks a token before its scope, so a token for another of the auth server's
+// permissions shows whether it is live: refused for its scope while it is, refused as a token once
+// it is revoked.
+test("a client credentials token belongs to no grant and is revoked on its own (section 2.1)", async ({ page, clients, request }) => {
+  const client = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, client.id, "authserver", "manage-account");
+  const secret = await readClientSecret(page, client.id);
+  const answer = await clientCredentialsToken(request, client.identifier, secret, "authserver:manage-account");
+  expect(answer.status, JSON.stringify(answer.body)).toBe(200);
+  const accessToken = answer.body.access_token as string;
+  const listResources = () =>
+    request.get(`${env.authUrl}/api/v1/admin/resources`, { headers: { Authorization: `Bearer ${accessToken}` }, failOnStatusCode: false });
+  const live = await listResources();
+  expect(live.status()).toBe(403);
+  expect((await live.json()).error_code).toBe("INSUFFICIENT_SCOPE");
+
+  expect(await revoke(request, client.identifier, secret, { token: accessToken })).toEqual({ status: 200, text: "" });
+
+  const refused = await listResources();
+  expect(refused.status()).toBe(401);
+  expect(await refused.json()).toEqual({ error_code: "INVALID_TOKEN", error_description: "The access token is invalid." });
+
+  await test.step("revoking it again is answered as any invalid token (section 2.2)", async () => {
+    expect(await revoke(request, client.identifier, secret, { token: accessToken })).toEqual({ status: 200, text: "" });
+  });
 });

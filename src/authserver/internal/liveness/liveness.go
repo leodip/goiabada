@@ -1,6 +1,7 @@
 // Package liveness decides whether a token the auth server issued is still live: whether the
 // client, the user, the session, the authentication generation and the grant it stands for still
-// hold, and, for an access token, whether it is one at all under RFC 9068. It reads the stored state
+// hold, and, for an access token, whether it is one at all under RFC 9068 and, without a grant,
+// whether its jti was revoked. It reads the stored state
 // and returns a verdict; what to answer and what to log are the caller's. The bearer guard in front of /userinfo and the admin and account APIs calls
 // AccessToken, the refresh grant calls RefreshToken, and introspection is to call the same checks,
 // so they can never disagree about a token (#676 decisions 1 and 7).
@@ -62,15 +63,19 @@ const (
 	// GrantRevoked is a token whose grant_id names a grant that is no longer live: its refresh
 	// token family is recorded as revoked or has no member left that is not (#676 decision 1).
 	GrantRevoked
+	// AccessTokenRevoked is a token without grant_id whose jti is stored as revoked, or that carries
+	// no jti, which the auth server never signs (#676 decision 1).
+	AccessTokenRevoked
 )
 
-// Database is what the check reads: the token's client, its user, the session its sid names and
-// the grant its grant_id names.
+// Database is what the check reads: the token's client, its user, the session its sid names, the
+// grant its grant_id names and, for a token without one, whether its jti is stored as revoked.
 type Database interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error)
 }
 
 // Verdict is the check's answer, with what it read on the way so a caller can log it: the client,
@@ -112,10 +117,11 @@ func Subject(token oauth.JwtToken) (string, bool) {
 // and works again if it is re-enabled before the token expires; one from a deleted client never does.
 //
 // Last, once everything below has passed, its grant (decision 1): a token carrying grant_id is live
-// only while its grant is. See grantAccessToken.
+// only while its grant is, and a token without one only while its jti is not stored as revoked. See
+// grantAccessToken and revokedAccessToken.
 //
 // A token with no `auth_time` claim is a client's, from the client credentials grant, and is live
-// once its client is: it has no user to check anything about. `auth_time`, not `sid`, is the "this
+// once its client is and its jti is not stored as revoked: it has no user to check anything about. `auth_time`, not `sid`, is the "this
 // is a user token" discriminator. sid is conditional: password-grant and offline tokens have none,
 // so keying on it would let exactly those tokens past every check below.
 //
@@ -197,12 +203,12 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 // credential change that preserves the caller's session, since its tokens are promoted, not
 // revoked.
 //
-// A token without grant_id, a client's or one from the implicit flow, has no grant to check. One
-// whose grant_id is present but empty or not a string is one the auth server never signs, and is
-// refused without a read.
+// A token without grant_id, a client's or one from the implicit flow, has no grant to check, and is
+// judged by its own jti instead: see revokedAccessToken. One whose grant_id is present but empty or
+// not a string is one the auth server never signs, and is refused without a read.
 func grantAccessToken(ctx context.Context, database Database, token oauth.JwtToken, verdict Verdict) (Verdict, error) {
 	if _, hasGrant := token.Claims["grant_id"]; !hasGrant {
-		return verdict, nil
+		return revokedAccessToken(ctx, database, token, verdict)
 	}
 	grantId := token.StringClaim("grant_id")
 	if grantId == "" {
@@ -217,6 +223,32 @@ func grantAccessToken(ctx context.Context, database Database, token oauth.JwtTok
 	}
 	if !live {
 		verdict.Refusal = GrantRevoked
+	}
+	return verdict, nil
+}
+
+// revokedAccessToken is AccessToken's last check for a token without grant_id, whose verdict so far
+// is passed in (#676 decision 1). Such a token, of the client credentials grant or the implicit
+// flow, has no grant whose revocation could end it, so the revocation endpoint stores its jti
+// instead, and the token is live only while its jti is not stored. A token carrying grant_id never
+// reaches here: its grant already answers, so it costs no read of the stored jtis.
+//
+// One whose jti is absent, empty or not a string is one the auth server never signs, and is refused
+// without a read: no revocation could ever store it.
+func revokedAccessToken(ctx context.Context, database Database, token oauth.JwtToken, verdict Verdict) (Verdict, error) {
+	jti := token.StringClaim("jti")
+	if jti == "" {
+		verdict.Refusal = AccessTokenRevoked
+		return verdict, nil
+	}
+
+	revoked, err := database.IsAccessTokenRevoked(ctx, nil, jti)
+	if err != nil {
+		verdict.Refusal = 0
+		return verdict, errs.Wrap(err, "failed to look up the revoked access token for bearer token validation")
+	}
+	if revoked {
+		verdict.Refusal = AccessTokenRevoked
 	}
 	return verdict, nil
 }

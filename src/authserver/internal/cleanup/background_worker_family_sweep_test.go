@@ -17,7 +17,8 @@ import (
 // nothing left to refuse, and a record with one is what refuses a child born into a revoked
 // family, so the sweep must never run before the tokens it follows or be skipped by a failure.
 
-// The sweep runs after the refresh token sweep and before the code sweep.
+// The sweep runs after the refresh token sweep and before the code sweep, with the revoked access
+// tokens' sweep between it and the codes.
 func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB, metrics.NewRegistry())
@@ -30,6 +31,7 @@ func TestWorker_PerformTask_SweepsFamilyRevocationsAfterTheTokens(t *testing.T) 
 		Run(recordStep("tokens")).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).
 		Run(recordStep("families")).Return(nil).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).
 		Run(recordStep("codes")).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -50,6 +52,7 @@ func TestWorker_PerformTask_ContinuesAfterTheFamilySweepFails(t *testing.T) {
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{

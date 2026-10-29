@@ -90,6 +90,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 
 	mockDB.On("DeleteExpiredRefreshTokens", theWorkersContext(), mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", theWorkersContext(), mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", theWorkersContext(), mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", theWorkersContext(), mock.Anything, mock.Anything).

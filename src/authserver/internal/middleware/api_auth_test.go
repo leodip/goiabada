@@ -1719,6 +1719,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 				Started:           now.Add(-1 * time.Hour),
 				LastAccessed:      now.Add(-5 * time.Minute),
 			}, nil).Once()
+		mockDB.On("IsAccessTokenRevoked", theRequestsContext, mock.Anything, guardJti).Return(false, nil).Once()
 
 		req := requestWithId()
 		req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(
@@ -1736,9 +1737,10 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("a client_credentials token reads its client and no user", func(t *testing.T) {
+	t.Run("a client_credentials token reads its client, its jti and no user", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetClientByClientIdentifier", theRequestsContext, mock.Anything, guardClientIdentifier).Return(enabledClient, nil).Once()
+		mockDB.On("IsAccessTokenRevoked", theRequestsContext, mock.Anything, guardJti).Return(false, nil).Once()
 
 		req := requestWithId()
 		req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(

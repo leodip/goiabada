@@ -77,12 +77,15 @@ One check decides whether an access token is one under RFC 9068 and still stands
   containment each refuse the grant's access tokens at once. A rotation revokes the parent and
   inserts the child in one transaction, and a credential change promotes the preserved session's
   tokens, so both keep the grant live. A family whose rows are all gone is not live. A token
-  without `grant_id` (client credentials, implicit) reads no grant
+  without `grant_id` (client credentials, implicit) reads no grant; it is live only while its jti
+  is not stored in `revoked_access_tokens` (`IsAccessTokenRevoked`, one indexed read), and one
+  without a jti is refused unread
 - An access token issued before #676 carries the header `typ: JWT` and is refused, and changing the
   issuer setting ends every outstanding access token at the auth server's own endpoints
 - `RequireValidSession` calls it in front of `/userinfo` and the admin and account APIs, and owns
   the 401 `invalid_token` descriptions and the Warn record of each refusal; a revoked grant answers
-  "The access token is invalid." as a refusal of the token or its client does; a fault is a 500,
+  "The access token is invalid." as a refusal of the token or its client does, and so does a
+  revoked jti; a fault is a 500,
   never a refusal (#106, #133, #676)
 
 ### Refresh Token
@@ -118,10 +121,15 @@ A client ends one of its grants by sending a token of it.
 - Revocation: `revocation.RevokeGrantTx`, the sixth operation, records the family under
   `client_revoked` and revokes every member in one transaction; `revoked_grant` is written after the
   commit. It ends no session and no other grant
-- A live access token without `grant_id` (client credentials, implicit) answers
-  `unsupported_token_type` for now; a fault reading the database or the keys answers 503
-  `temporarily_unavailable`, never 200. `goiabada_revocation_requests_total` counts each answer by
-  outcome (#676)
+- A live access token without `grant_id` (client credentials, implicit) is revoked by its jti:
+  `revocation.RevokeAccessToken` stores the jti with the token's `exp` in `revoked_access_tokens`,
+  one statement on no transaction, and `revoked_access_token` is written only by the call that
+  stored it. `liveness.AccessToken` refuses a token without `grant_id` while its jti is stored, or
+  when it carries none, so a second revocation answers 200 as an invalid token; a token with
+  `grant_id` never reads the table. The cleanup worker deletes a stored jti once its token has
+  expired
+- A fault reading the database or the keys answers 503 `temporarily_unavailable`, never 200.
+  `goiabada_revocation_requests_total` counts each answer by outcome (#676)
 - Implementation: `handler_revoke.go`, `revocation/revocation.go`, `revocationmetrics`
 
 ### Implicit Flow (Deprecated)
