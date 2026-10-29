@@ -58,7 +58,8 @@ func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func
 // UUID is a valid client identifier whenever its first hex digit is a-f.
 //
 // Neither existing guard catches this. RequireBearerTokenScope checks only the scope
-// string, and RequireValidSession deliberately passes through tokens with no `sid`.
+// string, and RequireValidSession finds no user in a client_credentials token, so it judges
+// only the token itself, its client and its jti.
 //
 // The discriminator is the `auth_time` claim, NOT `sid`. `sid` is conditional: it is set
 // only when a session exists, so ROPC tokens issued without a browser session have none
