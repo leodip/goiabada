@@ -1996,8 +1996,12 @@ paths:
         refused here. The secret of an administrator client, one holding an
         administrative permission or the admin console's own client, is read with
         `authserver:manage` alone, and `authserver:manage-clients` is refused it
-        with MANAGE_SCOPE_REQUIRED. A client holding no secret, a public one, is
-        answered an empty `clientSecret`.
+        with MANAGE_SCOPE_REQUIRED. So is the secret of a client listed for the
+        `authserver` resource among its introspection resources, since whoever
+        holds it can introspect the tokens of every sign-in as that client;
+        `authserver:manage-clients` reads the secret of a client listed only for
+        other resources. A client holding no secret, a public one, is answered an
+        empty `clientSecret`.
 
         Every read that answers a secret leaves a `viewed_client_secret` audit
         record naming the client and the caller. A read of a client holding none
@@ -2036,6 +2040,15 @@ paths:
         redeeming them took a secret are no longer honoured. It sets pkceRequired to true for
         the same reason, and disables the client credentials flow. The reverse transition and a
         secret rotation revoke nothing.
+
+        The route admits `authserver:manage-clients` and `authserver:manage`. A write to an
+        administrator client is reserved to `authserver:manage`, and so is setting the secret of a
+        client listed for the `authserver` resource among its introspection resources, since
+        whoever holds that secret can introspect the tokens of every sign-in as the client:
+        `authserver:manage-clients` is refused with `MANAGE_SCOPE_REQUIRED` and an
+        `administrator_change_refused` audit record. `authserver:manage-clients` may still make
+        such a client public, which empties its introspection resources, and sets the secret of a
+        client listed only for other resources.
       operationId: updateClientAuthentication
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -4063,8 +4076,9 @@ components:
         with 403 MANAGE_SCOPE_REQUIRED, when the request grants or revokes an administrative
         permission (directly, or by moving a user into or out of a group holding one, or by
         deleting such a group), writes to an administrator, switches whether a client may
-        request the administrative scopes, reads an administrator client's secret, changes the
-        email or audit-log settings, or changes an administrative permission's description. It keeps
+        request the administrative scopes, reads an administrator client's secret, reads or sets
+        the secret of a client listed for the `authserver` resource, changes the email or
+        audit-log settings, or changes an administrative permission's description. It keeps
         full control of everyone else, and still reads administrators. `authserver:manage`
         alone meets 409 LAST_ADMINISTRATOR, on the operations that could leave no enabled user
         holding it.
@@ -4207,7 +4221,9 @@ components:
             token settings, permissions, logo, deletion);
           - switches whether a client may request the administrative scopes,
             on or off, on any client;
-          - reads an administrator client's secret;
+          - reads an administrator client's secret, or reads or sets the
+            secret of a client listed for the `authserver` resource among its
+            introspection resources;
           - changes the email or the audit-log settings;
           - changes an administrative permission's description.
         Granular scopes still read administrators. The refusal is answered
