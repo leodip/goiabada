@@ -106,8 +106,7 @@ When the **same** user signs in again, none of this applies. Their session is re
 
 An access token is checked by signature, and an API doesn't ask the auth server about it, so nothing on this page can take back one already issued:
 
-- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token whose session has ended or expired, or whose user was disabled or changed their credentials, on the very next request.
-- **An access token from an offline grant** carries no `sid`, so ending the session it came from doesn't reach it, even at the auth server's own endpoints. A credential change does.
+- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. Ending a session revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. So does withdrawing the user's consent to the client, or making the client public.
 - **Your own APIs**, checking the signature alone, accept the token until it expires.
 
 That's inherent to signed tokens, and it's the main reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last): the token lifetime, 5 minutes in a new install, is the longest a token can outlive any of this.

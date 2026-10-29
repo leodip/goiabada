@@ -461,6 +461,122 @@ func TestAccessToken_Faults(t *testing.T) {
 	})
 }
 
+// The grant check (#676 decision 1): a token carrying grant_id is live only while its refresh token
+// family is, which the family's own query answers. It runs last, once everything else has passed,
+// so a token refused for its user or its session keeps that refusal and reads no grant; a token
+// without grant_id, a client's or one from the implicit flow, never reads one.
+func TestAccessToken_Grant(t *testing.T) {
+	const grantId = "grant-1"
+	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+
+	type grantRead int
+	const (
+		notRead grantRead = iota
+		live
+		dead
+	)
+
+	tests := []struct {
+		label       string
+		claims      map[string]interface{}
+		user        *record.User
+		session     *record.UserSession
+		grant       grantRead
+		wantRefusal Refusal
+	}{
+		{label: "an offline token of a live grant",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			user:   enabledUser, grant: live, wantRefusal: Live},
+		{label: "an offline token of a revoked grant",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			user:   enabledUser, grant: dead, wantRefusal: GrantRevoked},
+		{label: "a session-bound token of a live grant",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
+			user:   enabledUser, session: liveSession(0), grant: live, wantRefusal: Live},
+		{label: "a session-bound token of a revoked grant",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
+			user:   enabledUser, session: liveSession(0), grant: dead, wantRefusal: GrantRevoked},
+
+		// Refused before the grant: the earlier refusal stands, and no grant is read.
+		{label: "a disabled user's token",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			user:   &record.User{Id: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
+		{label: "a superseded generation",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			user:   &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1}, wantRefusal: TokenGenerationSuperseded},
+		{label: "a session past its idle timeout",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
+			user:   enabledUser, session: func() *record.UserSession {
+				s := liveSession(0)
+				s.LastAccessed = checkedAt.Add(-2 * time.Hour)
+				return s
+			}(), wantRefusal: SessionExpired},
+
+		// No grant to read.
+		{label: "a user's token without grant_id, as the implicit flow issues",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1"},
+			user:   enabledUser, wantRefusal: Live},
+		{label: "a client's token", claims: map[string]interface{}{"sub": clientIdentifier}, wantRefusal: Live},
+
+		// A grant_id the auth server would never sign is no grant at all, and reads nothing.
+		{label: "an empty grant_id",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": ""},
+			user:   enabledUser, wantRefusal: GrantRevoked},
+		{label: "a grant_id that is not a string",
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": float64(1)},
+			user:   enabledUser, wantRefusal: GrantRevoked},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			expectEnabledClient(database)
+			if tc.user != nil {
+				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").Return(tc.user, nil).Once()
+			}
+			if tc.session != nil {
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), sid).Return(tc.session, nil).Once()
+			}
+			switch tc.grant {
+			case live:
+				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(true, nil).Once()
+			case dead:
+				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(false, nil).Once()
+			}
+
+			verdict, err := AccessToken(context.Background(), database, accessToken(tc.claims), settings, checkedAt)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRefusal, verdict.Refusal, "refusal")
+			assert.Equal(t, tc.wantRefusal == Live, verdict.Live(), "live")
+			assert.Same(t, enabledClient, verdict.Client, "the client read")
+			if tc.user != nil {
+				assert.Same(t, tc.user, verdict.User, "the user read")
+			}
+			if tc.session != nil {
+				assert.Same(t, tc.session, verdict.Session, "the session read")
+			}
+		})
+	}
+}
+
+// A fault reading the grant is an error and never a refusal, as every other read's is.
+func TestAccessToken_GrantFault(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	expectEnabledClient(database)
+	database.On("GetUserBySubject", mock.Anything, mock.Anything, "user-1").
+		Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
+	database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, "grant-1").Return(false, errors.New("the database is down"))
+
+	verdict, err := AccessToken(context.Background(), database,
+		accessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": "grant-1"}), settings, checkedAt)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "the database is down")
+	assert.False(t, verdict.Live())
+	assert.NotEqual(t, GrantRevoked, verdict.Refusal, "a fault is not a dead grant")
+}
+
 // The subject is read trimmed, and a blank one is none, so a subject with surrounding whitespace
 // names the same user to the check as to reqctx's readers.
 func TestSubject(t *testing.T) {

@@ -70,11 +70,20 @@ One check decides whether an access token is one under RFC 9068 and still stands
   session decides, its generation included, and the token's own generation claim is ignored; without
   `sid`, the token's claim decides, an absent one reading as 0. Every token past its header needs the
   settings, for the issuer
+- Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
+  answers whether the family has no revocation record and still has a member that is not revoked,
+  in one indexed read. Every revocation path writes the record or revokes every member, so consent
+  withdrawal, a client made public, ending the session behind an offline grant and replay
+  containment each refuse the grant's access tokens at once. A rotation revokes the parent and
+  inserts the child in one transaction, and a credential change promotes the preserved session's
+  tokens, so both keep the grant live. A family whose rows are all gone is not live. A token
+  without `grant_id` (client credentials, implicit) reads no grant
 - An access token issued before #676 carries the header `typ: JWT` and is refused, and changing the
   issuer setting ends every outstanding access token at the auth server's own endpoints
 - `RequireValidSession` calls it in front of `/userinfo` and the admin and account APIs, and owns
-  the 401 `invalid_token` descriptions and the Warn record of each refusal; a fault is a 500, never
-  a refusal (#106, #133, #676)
+  the 401 `invalid_token` descriptions and the Warn record of each refusal; a revoked grant answers
+  "The access token is invalid." as a refusal of the token or its client does; a fault is a 500,
+  never a refusal (#106, #133, #676)
 
 ### Refresh Token
 Exchange refresh token for new access/refresh tokens. Works with auth code and ROPC flows.

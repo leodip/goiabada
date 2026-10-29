@@ -111,7 +111,7 @@ A retired refresh token coming back is a replay. The auth server can't tell whet
 
 Only that family is revoked. The user's session, their sign-ins to other clients and their other grants keep working, a second grant from the same session included.
 
-Access tokens already issued aren't revoked: they're signed JWTs your APIs check on their own, so revoking the family stops the next refresh, not an access token already handed out. That's one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
+Your APIs go on accepting the access tokens already issued: they're signed JWTs your APIs check on their own, so revoking the family stops the next refresh, not an access token already handed out. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse them at once. That's one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
 
 A replay leaves a `refresh_token_replay_detected` entry in the [audit log](/concepts/audit-log/) when it changes something: it revokes at least one live token, or records the family as revoked for the first time. A repeat that does neither leaves no entry, so one incident isn't a row per attempt. The entry never holds the refresh token itself. It doesn't prove an attack either: an app that refreshes in parallel causes one too.
 

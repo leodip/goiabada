@@ -33,6 +33,24 @@ var selectRefreshTokenFamilyRevocation = statement{
 		"WHERE first_refresh_token_jti = @p1",
 }
 
+// selectRefreshTokenFamilyLiveness answers, in one row, the family's revocation record and one of
+// its members that is not revoked, each as the identifier it matched or NULL. Both read by an
+// index: the record by its key, the members by idx_refresh_tokens_first_refresh_token_jti.
+var selectRefreshTokenFamilyLiveness = statement{
+	sqlite: "SELECT (SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = ?), " +
+		"(SELECT MIN(first_refresh_token_jti) FROM refresh_tokens WHERE first_refresh_token_jti = ? AND revoked = ?)",
+	mysql: "SELECT (SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = ?), " +
+		"(SELECT MIN(first_refresh_token_jti) FROM refresh_tokens WHERE first_refresh_token_jti = ? AND revoked = ?)",
+	postgres: "SELECT (SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = $1), " +
+		"(SELECT MIN(first_refresh_token_jti) FROM refresh_tokens WHERE first_refresh_token_jti = $2 AND revoked = $3)",
+	mssql: "SELECT (SELECT first_refresh_token_jti FROM refresh_token_family_revocations " +
+		"WHERE first_refresh_token_jti = @p1), " +
+		"(SELECT MIN(first_refresh_token_jti) FROM refresh_tokens WHERE first_refresh_token_jti = @p2 AND revoked = @p3)",
+}
+
 var deleteOrphanedRefreshTokenFamilyRevocations = statement{
 	sqlite: "DELETE FROM refresh_token_family_revocations WHERE NOT EXISTS (SELECT 1 FROM refresh_tokens " +
 		"WHERE refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti)",
@@ -130,6 +148,49 @@ func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, 
 	}
 
 	return false, nil
+}
+
+// IsRefreshTokenFamilyLive reports whether the family stands for a live grant, which is what an
+// access token carrying grant_id lives by (#676 decision 1): it has no revocation record, and it
+// still has a member that is not revoked. Every revocation path either writes the record or revokes
+// every member, so the one rule covers them all, and a rotation keeps the grant live because it
+// revokes the parent and inserts the child in one transaction. A family with no member left, one
+// whose rows retention or a cascade removed, is no live grant.
+//
+// One statement answers both halves, each with the identifier it matched, and each is compared with
+// the identifier asked for in Go, for the reason IsRefreshTokenFamilyRevoked states (#283). A match
+// of another spelling is no match: a record of another spelling refuses nothing here, and a live
+// member of another spelling is not this family's, so it answers not live.
+//
+// An error and false are different answers, as for IsRefreshTokenFamilyRevoked: false refuses the
+// token as a dead grant, and an error says the lookup could not be performed.
+func (d *Database) IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+
+	if firstRefreshTokenJti == "" {
+		return false, errs.New("can't look up a refresh token family with an empty first refresh token jti")
+	}
+
+	rows, err := d.QuerySQL(ctx, tx, selectRefreshTokenFamilyLiveness.text(d.Dialect),
+		firstRefreshTokenJti, firstRefreshTokenJti, false)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to query database")
+	}
+	defer func() { _ = rows.Close() }()
+
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return false, errs.Wrap(err, "unable to read query results")
+		}
+		return false, errs.New("the refresh token family liveness query returned no row")
+	}
+	var recorded, liveMember sql.NullString
+	if err := rows.Scan(&recorded, &liveMember); err != nil {
+		return false, errs.Wrap(err, "unable to scan refresh token family liveness")
+	}
+	if recorded.Valid && !engineFoldedTheMatch(recorded.String, firstRefreshTokenJti) {
+		return false, nil
+	}
+	return liveMember.Valid && !engineFoldedTheMatch(liveMember.String, firstRefreshTokenJti), nil
 }
 
 // DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families with no refresh

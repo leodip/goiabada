@@ -744,6 +744,9 @@ type Database interface {
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 	// IsRefreshTokenFamilyRevoked reports whether a rotation family has a revocation record.
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	// IsRefreshTokenFamilyLive reports whether a rotation family stands for a live grant: it has no
+	// revocation record and still has a member that is not revoked (#676 decision 1).
+	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
 	// DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families that have no
 	// refresh token left, which is when a record has nothing left to refuse.
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error

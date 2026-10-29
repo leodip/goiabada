@@ -268,7 +268,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/liveness/` - Whether a token the auth server issued is still live. An access token:
   its header is `at+jwt` and its `iss` the configured issuer (RFC 9068 section 4); its client exists
   and is enabled; its user exists and is enabled; its `sid` session exists, belongs to the user, is within its
-  bounds and on the user's generation; or, without `sid`, its own generation is current. A refresh
+  bounds and on the user's generation; or, without `sid`, its own generation is current; and, with
+  `grant_id`, its refresh token family has no revocation record and a member not revoked. A refresh
   token: `FindRefreshToken` reads its row and what it names, and `RefreshToken` judges the state the
   refresh grant checks, leaving ownership, PKCE and scope to the grant's validator. Each returns a
   verdict and leaves the answer and the log record to the caller: the bearer guard

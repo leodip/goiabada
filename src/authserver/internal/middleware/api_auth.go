@@ -114,11 +114,11 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 // RequireValidSession rejects bearer tokens that are not access tokens under RFC 9068 or no
 // longer represent live, current authentication state, as liveness.AccessToken judges it: the
 // at+jwt header, the configured issuer and the client the token names, then the user, the session
-// the token names and the authentication generation. The check decides; this guard answers and
-// logs. Each refusal is 401 invalid_token. A refusal of the token itself or of its client answers
-// what a token that does not parse answers, "The access token is invalid.", so an access token
-// issued before #676, one from another issuer and one whose client is disabled or gone all read as
-// one. Of the rest, only two descriptions say why: a blank subject and an expired session. Every
+// the token names and the authentication generation, and last the grant the token names. The check
+// decides; this guard answers and logs. Each refusal is 401 invalid_token. A refusal of the token
+// itself, of its client or of its grant answers what a token that does not parse answers, "The
+// access token is invalid.", so an access token issued before #676, one from another issuer, one
+// whose client is disabled or gone and one whose grant was revoked all read as one. Of the rest, only two descriptions say why: a blank subject and an expired session. Every
 // other refusal reuses "Session has been terminated", a session of another user included (#133): a
 // presenter has already proven it holds the token, but the wording still reaches a caller, and a
 // distinct message would say which sessions exist.
@@ -178,6 +178,11 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			case liveness.ClientDisabled:
 				slog.WarnContext(r.Context(), "rejecting bearer token: client is disabled",
 					"client_id", verdict.Client.ClientIdentifier)
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.GrantRevoked:
+				slog.WarnContext(r.Context(), "rejecting bearer token: its grant has been revoked",
+					"grant_id", jwtToken.StringClaim("grant_id"))
 				m.refusals.invalidToken(w, r, invalidTokenDescription)
 				return
 			case liveness.BlankSubject:
