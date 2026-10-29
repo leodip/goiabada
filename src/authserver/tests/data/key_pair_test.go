@@ -2,12 +2,14 @@ package datatests
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateKeyPair(t *testing.T) {
@@ -249,12 +251,6 @@ func compareKeyPairs(t *testing.T, expected, actual *record.KeyPair) {
 		t.Errorf("Expected PublicKeyJWK %s, got %s", expected.PublicKeyJWK, actual.PublicKeyJWK)
 	}
 }
-
-// contentionHold is how long the winning transaction keeps its row lock in
-// TestUpdateKeyPairState_Concurrent before committing. Long enough that the loser's
-// wait is unmistakable against scheduling noise, short enough to pay four times
-// (once per engine) without the suite noticing.
-const contentionHold = 300 * time.Millisecond
 
 // clearKeyPairState deletes every key pair sitting in state, so a row can be created
 // there or moved into it. Stage 4's UNIQUE (state) refuses an update into an occupied
@@ -498,97 +494,55 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 //
 // One winner is not on its own evidence of a race: two calls run end to end in
 // sequence produce the same pair of answers, because the second finds the row no
-// longer in the from-state. So each goroutine times the span from just before
-// BeginTransaction to just after UpdateKeyPairState returns, and the loser's span
-// must be at least a third of contentionHold, which it can only be if it was blocked
-// while the winner still held. The winner commits only once the loser has begun, and
-// contentionHold after that, so a loser that waits for the commit measures the whole hold
-// however the two goroutines are scheduled; a loser that never waits measures near zero.
-//
-// The mechanism differs per engine and the observable does not: on postgres, mysql
-// and mssql the loser waits on the row lock, and on sqlite it waits on the pool,
-// which SetMaxOpenConns(1) limits to one connection. Asserting that the two
-// transactions overlapped would be unprovable on sqlite, where that setting makes
-// overlap impossible by construction, so the assertion is on being blocked (#251).
+// longer in the from-state. So the first transition holds its transaction open, and
+// the second must be seen blocked behind it before the first commits, by the engine's
+// own lock-wait view where it has one (goBlocked). On sqlite the second waits for the
+// pool, which SetMaxOpenConns(1) limits to one connection, so its BeginTransaction is
+// where it blocks; the harness settles there and requires it still waiting (#251).
 func TestUpdateKeyPairState_Concurrent(t *testing.T) {
+	ctx := context.Background()
 	current := record.KeyStateCurrent.String()
 	previous := record.KeyStatePrevious.String()
 
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
+	first, err := database.BeginTransaction(ctx)
+	require.NoError(t, err)
+	defer func() { _ = database.RollbackTransaction(ctx, first) }()
+	moved, err := database.UpdateKeyPairState(ctx, first, keyPair.Id, current, previous)
+	require.NoError(t, err)
+	require.True(t, moved, "the first transition moves the row")
+
 	type outcome struct {
 		moved bool
 		err   error
-		span  time.Duration
 	}
-	outcomes := make([]outcome, 2)
-
-	// Both goroutines wait on the same barrier so they reach the row together, and each
-	// says when it has begun, before BeginTransaction, which on sqlite is where the loser
-	// blocks.
-	start := make(chan struct{})
-	begun := []chan struct{}{make(chan struct{}), make(chan struct{})}
-	var wg sync.WaitGroup
-
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			<-start
-
-			began := time.Now()
-			close(begun[i])
-			tx, err := database.BeginTransaction(context.Background())
-			if err != nil {
-				outcomes[i] = outcome{err: err, span: time.Since(began)}
-				return
-			}
-			moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)
-			span := time.Since(began)
-			if err != nil {
-				_ = database.RollbackTransaction(context.Background(), tx)
-				outcomes[i] = outcome{err: err, span: span}
-				return
-			}
-
-			// The winner holds its lock until the loser has begun, and contentionHold
-			// after that, so the loser's wait is observable. The loser does not wait
-			// here: the winner began before the loser's update could return.
-			<-begun[1-i]
-			time.Sleep(contentionHold)
-
-			if err := database.CommitTransaction(context.Background(), tx); err != nil {
-				outcomes[i] = outcome{moved: moved, err: err, span: span}
-				return
-			}
-			outcomes[i] = outcome{moved: moved, span: span}
-		}(i)
-	}
-
-	close(start)
-	wg.Wait()
-
-	wins := 0
-	var loser outcome
-	for i, o := range outcomes {
-		if o.err != nil {
-			t.Fatalf("goroutine %d: expected no error, got: %v", i, o.err)
+	second := goBlocked(t, "the second transition", first, func(reached func()) outcome {
+		if dbType() == data.SQLite {
+			reached()
 		}
-		if o.moved {
-			wins++
-		} else {
-			loser = o
+		tx, beginErr := database.BeginTransaction(ctx)
+		if beginErr != nil {
+			return outcome{err: beginErr}
 		}
-	}
+		reached()
+		moved, updateErr := database.UpdateKeyPairState(ctx, tx, keyPair.Id, current, previous)
+		if updateErr != nil {
+			_ = database.RollbackTransaction(ctx, tx)
+			return outcome{err: updateErr}
+		}
+		return outcome{moved: moved, err: database.CommitTransaction(ctx, tx)}
+	})
+	second.requireBlocked(t)
+	second.requireStillWaiting(t)
 
-	if wins != 1 {
-		t.Fatalf("Expected exactly 1 winner among 2 concurrent transitions, got %d", wins)
-	}
+	require.NoError(t, database.CommitTransaction(ctx, first))
+	got := second.await(t)
+	require.NoError(t, got.err, "the loser reports false, not an error")
+	assert.False(t, got.moved, "the row had already moved when the second transition reached it")
 
-	minWait := contentionHold / 3
-	if loser.span < minWait {
-		t.Errorf("Expected the loser to be blocked for at least %v while the winner held, "+
-			"but it returned after %v: the two transitions did not contend", minWait, loser.span)
-	}
+	retrieved, err := database.GetKeyPairById(ctx, nil, keyPair.Id)
+	require.NoError(t, err)
+	assert.Equal(t, previous, retrieved.State, "the row moved once")
 }
