@@ -119,26 +119,31 @@ func TestNewHTTPServer_DropsAPartialHeaderBlock(t *testing.T) {
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
+	// The server's header timer starts once it has taken the connection: after the dial begins,
+	// and usually before it returns. So the floor is measured from before the dial, which can only
+	// lengthen a correct wait, and the ceiling from after it, which can only shorten one unless the
+	// server takes the connection after the dial returns, which the ceiling's margin allows for.
+	beforeDial := time.Now()
 	conn, err := net.Dial("tcp", ln.Addr().String())
+	afterDial := time.Now()
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
-	start := time.Now()
 	// No terminating blank line: the header block never ends.
 	_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: x\r\nX-A: b\r\n"))
 	require.NoError(t, err)
-	require.NoError(t, conn.SetReadDeadline(start.Add(readHeaderTimeout+5*time.Second)))
+	require.NoError(t, conn.SetReadDeadline(afterDial.Add(readHeaderTimeout+5*time.Second)))
 
 	got, err := io.ReadAll(conn)
-	elapsed := time.Since(start)
+	sinceBeforeDial, sinceAfterDial := time.Since(beforeDial), time.Since(afterDial)
 
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		t.Fatalf("the server still held the connection after %s", elapsed)
+		t.Fatalf("the server still held the connection after %s", sinceAfterDial)
 	}
 	require.NoError(t, err, "the server must close the connection, not reset it")
 	assert.Empty(t, got, "a header block cut short gets no response, only a close")
 	assert.False(t, called.Load(), "the handler must never see a request whose header block never ended")
-	assert.GreaterOrEqual(t, elapsed, readHeaderTimeout-time.Second, "closed before readHeaderTimeout")
-	assert.LessOrEqual(t, elapsed, readHeaderTimeout+2*time.Second, "closed well after readHeaderTimeout")
+	assert.GreaterOrEqual(t, sinceBeforeDial, readHeaderTimeout-time.Second, "closed before readHeaderTimeout")
+	assert.LessOrEqual(t, sinceAfterDial, readHeaderTimeout+2*time.Second, "closed well after readHeaderTimeout")
 }

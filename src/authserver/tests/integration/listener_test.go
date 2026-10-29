@@ -40,29 +40,32 @@ func dialAuthServer(t *testing.T) net.Conn {
 
 func TestListener_DropsAPartialHeaderBlock(t *testing.T) {
 	t.Parallel()
-	// Before the dial, so the server's header timer, which starts once it has the connection,
-	// cannot have started before the stopwatch.
-	start := time.Now()
+	// The server's header timer starts once it has taken the connection: after the dial begins,
+	// and usually before it returns. So the floor is measured from before the dial, which can only
+	// lengthen a correct wait, and the ceiling from after it, which can only shorten one unless the
+	// server takes the connection after the dial returns, which the ceiling's margin allows for.
+	beforeDial := time.Now()
 	conn := dialAuthServer(t)
+	afterDial := time.Now()
 
 	// No terminating blank line: the header block never ends.
 	_, err := conn.Write([]byte("GET /health HTTP/1.1\r\nHost: x\r\nX-A: b\r\n"))
 	require.NoError(t, err)
 	// Past the window, so a listener without ReadHeaderTimeout fails on the window below rather
 	// than hanging on the 60s ReadTimeout it would fall back to.
-	require.NoError(t, conn.SetReadDeadline(start.Add(listenerHeaderTimeout+5*time.Second)))
+	require.NoError(t, conn.SetReadDeadline(afterDial.Add(listenerHeaderTimeout+5*time.Second)))
 
 	got, err := io.ReadAll(conn)
-	elapsed := time.Since(start)
+	sinceBeforeDial, sinceAfterDial := time.Since(beforeDial), time.Since(afterDial)
 
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		t.Fatalf("the server still held the connection after %s", elapsed)
+		t.Fatalf("the server still held the connection after %s", sinceAfterDial)
 	}
 	require.NoError(t, err, "the server must close the connection, not reset it")
 	assert.Empty(t, got, "a header block cut short gets no response, only a close")
-	assert.GreaterOrEqual(t, elapsed, listenerHeaderTimeout-time.Second, "closed before readHeaderTimeout")
-	assert.LessOrEqual(t, elapsed, listenerHeaderTimeout+2*time.Second, "closed well after readHeaderTimeout")
+	assert.GreaterOrEqual(t, sinceBeforeDial, listenerHeaderTimeout-time.Second, "closed before readHeaderTimeout")
+	assert.LessOrEqual(t, sinceAfterDial, listenerHeaderTimeout+2*time.Second, "closed well after readHeaderTimeout")
 }
 
 // headOfLength builds a GET /health request head exactly n bytes long, request line and
