@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -85,9 +86,13 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	grant.AuthenticatedAt = now
 	input = &grant
 
+	// The grant's identifier is the jti its first refresh token takes, fixed before the access token
+	// that names it (#676 decision 1).
+	grantId := uuid.New()
+
 	// Generate access token
 	// nil parent: initial password grant, so the validated User snapshot is the source.
-	accessTokenStr, err := t.generateROPCAccessToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
+	accessTokenStr, err := t.generateROPCAccessToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantId)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +110,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	}
 
 	// Generate refresh token with direct UserId/ClientId (no Code entity needed)
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantId)
 	if err != nil {
 		return nil, err
 	}

@@ -38,6 +38,9 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 
 	claims["iss"] = settings.Issuer
 	claims["sub"] = client.ClientIdentifier
+	// RFC 9068 section 2.2 REQUIRES client_id, though sub names the client too. No grant_id: the
+	// grant issues no refresh token, so there is no family to name (#676 decisions 1 and 2).
+	claims["client_id"] = client.ClientIdentifier
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["jti"] = uuid.New()
@@ -69,6 +72,7 @@ func (t *TokenIssuer) IssueClientCredentialsGrant(ctx context.Context, settings 
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyIdentifier
+	token.Header["typ"] = AccessTokenHeaderType
 	accessToken, err := token.SignedString(privKey)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to sign access_token")

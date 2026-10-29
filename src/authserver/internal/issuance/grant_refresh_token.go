@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -372,8 +373,10 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 		return nil, err
 	}
 
-	// The PARENT refresh token is the authorizing credential here, not the code.
-	accessTokenStr, err := t.generateAccessToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent)
+	// The PARENT refresh token is the authorizing credential here, not the code, and its family is
+	// the grant the access token names (#676 decision 1).
+	accessTokenStr, err := t.generateAccessToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent,
+		parent.FirstRefreshTokenJti)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +398,8 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
 	originalRefreshTokenScope := parent.Scope
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, tx, settings, code, originalRefreshTokenScope, now, privKey, keyIdentifier, parent)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, tx, settings, code, originalRefreshTokenScope, now, privKey, keyIdentifier, parent,
+		uuid.New())
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +478,8 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	// access_token -----------------------------------------------------------------------
 
 	// The parent refresh token authorizes this, not the reloaded user.
-	accessTokenStr, err := t.generateROPCAccessToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier, parent)
+	accessTokenStr, err := t.generateROPCAccessToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier, parent,
+		parent.FirstRefreshTokenJti)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +501,8 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
 	originalRefreshTokenScope := parent.Scope
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, tx, settings, ropcInput, originalRefreshTokenScope, now, privKey, keyIdentifier, parent)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, tx, settings, ropcInput, originalRefreshTokenScope, now, privKey, keyIdentifier, parent,
+		uuid.New())
 	if err != nil {
 		return nil, err
 	}

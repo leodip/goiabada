@@ -113,7 +113,7 @@ There are three ways, and which one fits depends on who's making the change:
 
 Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The reference also lists one public operation outside `/api/v1/`, the client logo, `GET /client/logo/{clientIdentifier}`, which takes none.
 
-The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you. An ID token or a refresh token is refused.
+The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you, with `typ: at+jwt` in its header and the current issuer as its `iss`. An ID token or a refresh token is refused.
 
 ## Which tokens each API accepts
 
@@ -123,14 +123,14 @@ The Account API accepts only a token issued for a user. A token from the client 
 
 ## When a token stops working
 
-A user's token is checked against the user and their session on every call, so it stops working before it expires once the user is disabled or the session it was issued through ends. The call is then answered `401` with `INVALID_TOKEN`.
+Every token is checked against its client on every call, and a user's token against the user and their session too, so it stops working before it expires once the client or the user is disabled or the session it was issued through ends. The call is then answered `401` with `INVALID_TOKEN`.
 
 The other refusals:
 
 | Answer | Error code | Why |
 |---|---|---|
 | `401` | `ACCESS_TOKEN_REQUIRED` | No token was sent. |
-| `401` | `INVALID_TOKEN` | The token is malformed, expired, not an access token for `authserver`, or its user or session is gone. |
+| `401` | `INVALID_TOKEN` | The token is malformed, expired, not an access token for `authserver`, from another issuer, or its client, user or session is gone or disabled. |
 | `403` | `INSUFFICIENT_SCOPE` | The token carries none of the scopes the operation accepts. |
 
 The [errors](/reference/api/errors/) page has the format of every error answer.

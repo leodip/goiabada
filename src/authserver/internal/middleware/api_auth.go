@@ -74,10 +74,8 @@ func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func
 // is which of the two access-token kinds it holds.
 //
 // Presence only, never the value. That is safe because those claims are server-issued and
-// cannot be forged. It is also necessary: on
-// the ROPC refresh path the value is wrong (createTokenInputFromROPC passes `now`, so a
-// refreshed token reports the refresh moment as the authentication moment), a pre-existing
-// defect this guard neither depends on nor fixes.
+// cannot be forged, and the guard has no use for the value: when the user authenticated says
+// nothing about whether a user is present.
 //
 // This is a dependency, not an assumption: if a future change ever puts an unvalidated
 // token into reqctx.WithBearerToken, this guard weakens with it. And if a sixth user-token
@@ -113,16 +111,20 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 	}
 }
 
-// RequireValidSession rejects bearer tokens that no longer represent live, current
-// authentication state, as liveness.AccessToken judges it: the user, the session the token names
-// and the authentication generation. The check decides; this guard answers and logs. Each
-// refusal is 401 invalid_token, and only two descriptions say why: a blank subject and an expired
-// session. Every other refusal reuses "Session has been terminated", a session of another user
-// included (#133): a presenter has already proven it holds the token, but the wording still
-// reaches a caller, and a distinct message would say which sessions exist.
+// RequireValidSession rejects bearer tokens that are not access tokens under RFC 9068 or no
+// longer represent live, current authentication state, as liveness.AccessToken judges it: the
+// at+jwt header, the configured issuer and the client the token names, then the user, the session
+// the token names and the authentication generation. The check decides; this guard answers and
+// logs. Each refusal is 401 invalid_token. A refusal of the token itself or of its client answers
+// what a token that does not parse answers, "The access token is invalid.", so an access token
+// issued before #676, one from another issuer and one whose client is disabled or gone all read as
+// one. Of the rest, only two descriptions say why: a blank subject and an expired session. Every
+// other refusal reuses "Session has been terminated", a session of another user included (#133): a
+// presenter has already proven it holds the token, but the wording still reaches a caller, and a
+// distinct message would say which sessions exist.
 //
-// A client credentials token passes through, since the check finds no user to check anything
-// about. The middleware also passes through when the request has no bearer token at all, since
+// A client credentials token passes once its own checks and its client's do, since the check finds
+// no user to check anything about. The middleware also passes through when the request has no bearer token at all, since
 // enforcing "must be authenticated" belongs to a scope middleware running alongside this one.
 //
 // Reads reqctx.BearerTokenFrom (set by JwtAuthorizationHeaderToContext),
@@ -137,9 +139,8 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 				return
 			}
 
-			// Missing settings are passed on as nil: the check needs them only for a session's
-			// bounds, and refuses what it can decide before them, a session of another user
-			// among them, rather than turning it into a 500.
+			// Missing settings are passed on as nil: the check refuses a header that is not at+jwt
+			// without them, and answers anything else as the fault below.
 			settings, _ := reqctx.SettingsFrom(r.Context())
 			verdict, err := liveness.AccessToken(r.Context(), database, jwtToken, settings, time.Now().UTC())
 			if err != nil {
@@ -158,6 +159,26 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			switch verdict.Refusal {
 			case liveness.Live:
 				next.ServeHTTP(w, r)
+				return
+			case liveness.NotAnAccessTokenHeader:
+				slog.WarnContext(r.Context(), "rejecting bearer token: the header's typ is not at+jwt",
+					"typ", jwtToken.Header["typ"])
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.ForeignIssuer:
+				slog.WarnContext(r.Context(), "rejecting bearer token: iss is not the configured issuer",
+					"iss", jwtToken.StringClaim("iss"))
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.ClientNotFound:
+				slog.WarnContext(r.Context(), "rejecting bearer token: client_id does not resolve to a client",
+					"client_id", jwtToken.StringClaim("client_id"))
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.ClientDisabled:
+				slog.WarnContext(r.Context(), "rejecting bearer token: client is disabled",
+					"client_id", verdict.Client.ClientIdentifier)
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
 				return
 			case liveness.BlankSubject:
 				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")

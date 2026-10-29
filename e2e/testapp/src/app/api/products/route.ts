@@ -2,8 +2,8 @@ import { createRemoteJWKSet, errors, jwtVerify } from "jose";
 import { apiResource, apiScope, issuer } from "@/lib/config";
 
 // Protect an API, step 6: check the access token on every request, on its own, with the auth
-// server's public keys at /certs: the signature, iss, exp, the resource among aud, and the
-// permission in scope. 401 for a token that fails a check, 403 for one without the permission
+// server's public keys at /certs: the signature, the at+jwt header (RFC 9068 section 4), iss, exp,
+// the resource among aud, and the permission in scope. 401 for a token that fails a check, 403 for one without the permission
 // (RFC 6750 section 3.1). jose fetches the key set once, and again when a token names a kid it
 // doesn't have.
 
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   try {
     keys ??= createRemoteJWKSet(new URL(`${issuer}/certs`));
-    const { payload } = await jwtVerify(token, keys, { issuer, audience: apiResource });
+    const { payload } = await jwtVerify(token, keys, { issuer, audience: apiResource, typ: "at+jwt" });
     const scopes = typeof payload.scope === "string" ? payload.scope.split(" ") : [];
     if (!scopes.includes(apiScope)) {
       return refuse(403, `Bearer realm="${apiResource}", error="insufficient_scope", scope="${apiScope}"`, {

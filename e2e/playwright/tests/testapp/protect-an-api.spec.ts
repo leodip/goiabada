@@ -1,5 +1,7 @@
 // Protect an API, through the test app's API (/api/products) and its service: the API checks each
-// token on its own against the auth server's public keys, and answers 401 or 403.
+// token on its own against the auth server's public keys, requiring the at+jwt header as RFC 9068
+// section 4 asks, so every answer of 200 here is also a token the auth server issued as one, and
+// answers 401 or 403.
 import { grantUserPermission } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";

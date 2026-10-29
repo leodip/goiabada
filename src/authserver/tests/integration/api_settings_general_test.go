@@ -103,6 +103,9 @@ func TestAPISettingsGeneralPut_DisablingSelfRegKeepsTheVerificationChoice(t *tes
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, preReq)
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
+	// The issuer changed, and with it every access token issued under the old one is refused, so
+	// the second save takes a token issued under the new one.
+	accessToken, _ = createAdminClientWithToken(t)
 
 	// Now disable self-registration, keeping the verification flag on
 	req := api.UpdateSettingsGeneralRequest{

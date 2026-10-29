@@ -58,7 +58,7 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `SMTP_NOT_ENABLED` | `400` | The operation needs to send email, and SMTP is off: a test email, or sending or checking an email verification code. |
 | `SEND_FAILED` | `400` | The test email couldn't be sent. `error_description` says what to check. |
 | `ACCESS_TOKEN_REQUIRED` | `401` | No access token was sent. |
-| `INVALID_TOKEN` | `401` | The token is malformed, expired, not an access token for `authserver`, or its user or session is gone. |
+| `INVALID_TOKEN` | `401` | The token is malformed, expired, not an access token for `authserver`, from another issuer, or its client, user or session is gone or disabled. |
 | `INVALID_SESSION` | `401` | On `POST /api/v1/account/logout-request`: the token carries no session id (`sid`), its session is gone, or the token's client isn't part of that session. |
 | `INSUFFICIENT_SCOPE` | `403` | The token carries none of the scopes the operation accepts. The `WWW-Authenticate` header says `error="insufficient_scope"`. |
 | `USER_CONTEXT_REQUIRED` | `403` | An Account API call was made with a token that wasn't issued for a user, such as one from the client credentials flow, carrying `authserver:manage-account`. Without it, the answer is `INSUFFICIENT_SCOPE`. |

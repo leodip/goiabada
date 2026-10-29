@@ -210,9 +210,9 @@ The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, e
 
 ## Disabling and deleting a client
 
-Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. Access tokens it already has stay valid until they expire.
+Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse the client's access tokens while it stays disabled, and accept them again if you turn it back on before they expire. An API that checks tokens by their signature alone accepts them until they expire.
 
-**Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, logo, unredeemed codes, refresh tokens and users' consents to it. Access tokens it already has stay valid until they expire.
+**Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, logo, unredeemed codes, refresh tokens and users' consents to it. The auth server's own endpoints refuse its access tokens from then on; an API that checks tokens by their signature alone accepts them until they expire.
 
 ## The admin console's client
 

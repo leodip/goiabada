@@ -44,12 +44,34 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
 - The token validator calls `FindClient` before it looks at the grant and `VerifySecret` at each
   grant's own point of authentication, so the token endpoint's answers keep their order (#437, #676)
 
+### Access token claims (RFC 9068)
+Every access token, from every grant, is an RFC 9068 JWT access token.
+- `generateAccessTokenCore` and the client credentials grant sign it with the JOSE header
+  `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and the claim `client_id`; ID and refresh tokens
+  keep the library's `JWT` header. The `typ: Bearer` claim stays
+- The authorization code, refresh and password grants add `grant_id`, the identifier the grant's
+  refresh token family shares (`FirstRefreshTokenJti`). The code exchange and the password grant fix
+  it, as the first refresh token's jti, before they mint the access token; a refresh copies its
+  parent's. The client credentials grant and the implicit flow issue no refresh token and no
+  `grant_id`
+- `offline_access` names `authserver` in `aud`, as the claim scopes do (RFC 9068 section 2.2.3)
+- Departures from its SHOULDs, documented on the tokens page: a request naming several resources
+  gets one token for all of them rather than `invalid_scope` (section 3; no RFC 8707), `groups` is
+  an array of identifiers rather than SCIM objects (section 2.2.3.1), and the private claims have
+  plain names (section 2.2.2 MAY) (#676)
+
 ### Access token liveness
-One check decides whether a user's access token still stands for live authentication state.
-- `liveness.AccessToken` reads the user and the session the token names and returns a verdict: live,
-  or the refusal. A token without `auth_time` is a client's and has no user to check. With `sid`,
-  the session decides, its generation included, and the token's own generation claim is ignored;
-  without `sid`, the token's claim decides, an absent one reading as 0
+One check decides whether an access token is one under RFC 9068 and still stands for live state.
+- `liveness.AccessToken` checks the token first: its header `typ` is `at+jwt` (or
+  `application/at+jwt`, without regard to case) and its `iss` is exactly the configured issuer, as
+  RFC 9068 section 4 requires of a resource server. Then the client its `client_id` names exists and
+  is enabled. Then it reads the user and the session the token names and returns a verdict: live, or
+  the refusal. A token without `auth_time` is a client's and has no user to check. With `sid`, the
+  session decides, its generation included, and the token's own generation claim is ignored; without
+  `sid`, the token's claim decides, an absent one reading as 0. Every token past its header needs the
+  settings, for the issuer
+- An access token issued before #676 carries the header `typ: JWT` and is refused, and changing the
+  issuer setting ends every outstanding access token at the auth server's own endpoints
 - `RequireValidSession` calls it in front of `/userinfo` and the admin and account APIs, and owns
   the 401 `invalid_token` descriptions and the Warn record of each refusal; a fault is a 500, never
   a refusal (#106, #133, #676)
@@ -481,8 +503,15 @@ the relevant section of the official text (rfc-editor.org, openid.net) rather th
 memory, and follow its MUST and SHOULD requirements. The main ones: OAuth 2.0 (RFC 6749) and bearer
 tokens (RFC 6750), PKCE (RFC 7636), revocation (RFC 7009), introspection (RFC 7662), dynamic client
 registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519) and JWK (RFC
-7517), the OAuth 2.0 Security Best Current Practice (RFC 9700), and OpenID Connect Core 1.0 and
-Discovery 1.0.
+7517), JWT access tokens (RFC 9068), the OAuth 2.0 Security Best Current Practice (RFC 9700), and
+OpenID Connect Core 1.0 and Discovery 1.0.
+
+Goiabada departs from three of RFC 9068's SHOULDs and MAYs, and the tokens page documents each:
+a request whose scopes name several resources gets one token naming them all in `aud` (section 3,
+since there is no RFC 8707 `resource` parameter; each scope still belongs to one resource in `aud`),
+`groups` is an array of group identifiers rather than SCIM objects (section 2.2.3.1), and the
+private claims `attributes`, `auth_state_generation`, `grant_id` and the `typ` claim have plain
+names (section 2.2.2).
 
 ## API Routes
 

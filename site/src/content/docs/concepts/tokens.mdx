@@ -23,23 +23,36 @@ Your API checks every access token it's sent, and your app checks the ID token b
 
 1. Check the signature. Take the key whose `kid` matches the one in the token's header from the key set at `/certs`, and verify the token with it. Tokens are signed with RS256. See [Discovery and JWKS](/reference/endpoints/discovery-and-jwks/).
 
-2. Check `iss` is the `issuer` from the discovery document, and that `exp` hasn't passed.
+2. Check an access token's header has `typ` set to `at+jwt`, as [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068#section-4) requires of an API. That's what tells it from an ID token, which is signed with the same keys. Some JWT libraries accept only `typ: JWT` until you allow `at+jwt`.
 
-3. Check `aud`. An ID token's is your client identifier. An access token's names the resource of each permission it carries, such as `product-api`, so your API checks its own resource identifier is there.
+3. Check `iss` is the `issuer` from the discovery document, and that `exp` hasn't passed.
 
-4. Check what the token is for:
+4. Check `aud`. An ID token's is your client identifier. An access token's names the resource of each permission it carries, such as `product-api`, so your API checks its own resource identifier is there.
+
+5. Check what the token is for:
    - An ID token's `nonce` is the one your app sent in the authorization request.
    - An access token's `scope` holds the permission the operation needs, such as `product-api:read`.
 
 </Steps>
 
-A decoded access token looks like this:
+A decoded access token's header looks like this:
+
+```json
+{
+  "alg": "RS256",
+  "kid": "6f1d7a8e-3c2b-4e5f-9a0b-1c2d3e4f5a6b",
+  "typ": "at+jwt"
+}
+```
+
+And its claims like this:
 
 ```json
 {
   "iss": "https://auth.example.com",
   "sub": "c5b9b6a2-4b39-4b8e-9a8e-6f7f2b3a1d10",
   "aud": ["authserver", "product-api"],
+  "client_id": "my-web-app",
   "scope": "openid profile product-api:read",
   "typ": "Bearer",
   "iat": 1760000000,
@@ -50,6 +63,7 @@ A decoded access token looks like this:
   "acr": "urn:goiabada:level2_optional",
   "amr": ["pwd"],
   "sid": "0b7e6a31-5f2c-4d8e-9c1a-3e4f5a6b7c8d",
+  "grant_id": "4d2f8b1a-7e3c-4a9d-b6e5-2c1f0a9b8d7e",
   "auth_state_generation": 1
 }
 ```
@@ -76,21 +90,33 @@ An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/ref
 |---|---|
 | `iss` | The issuer |
 | `sub` | The user's [subject](/concepts/glossary/#subject). In a token from the client credentials flow, the client identifier |
-| `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope, since `/userinfo` belongs to it. A string when there's one, an array when there are more |
+| `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope, since `/userinfo` belongs to it, or `offline_access`, which only the auth server acts on. A string when there's one, an array when there are more |
+| `client_id` | The client identifier of the client the token was issued to |
 | `scope` | The scopes the token carries |
 | `typ` | `Bearer` |
 | `iat`, `nbf`, `exp` | When it was issued, when it becomes valid, which is the same moment, and when it expires |
 | `jti` | The token's own identifier |
 | `auth_time`, `acr`, `amr` | When and how the user signed in. See [ACR and AMR](/concepts/acr-and-amr/) |
 | `sid` | The session the token came from, when there is one. See below |
+| `grant_id` | The grant the token belongs to: one sign-in, or one password grant, and every refresh after it. See below |
 | `auth_state_generation` | Reserved. See below |
 | `nonce` | The `nonce` of the authorization request, when it had one |
 
-User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A token from the client credentials flow names no user, so it carries none of `auth_time`, `acr`, `amr`, `sid`, `auth_state_generation` or `nonce`.
+The header's `typ` is `at+jwt`. User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A token from the client credentials flow names no user, so it carries none of `auth_time`, `acr`, `amr`, `sid`, `grant_id`, `auth_state_generation` or `nonce`.
 
 **`sid` isn't always there.** It's in an access token only when the grant it came from is tied to a session. A token from an `offline_access` grant has none, nor does one from the [password grant](/legacy-flows/ropc/): those grants are meant to outlive the browser session that started them. Don't treat a missing `sid` as an invalid token.
 
+**`grant_id` is there only when a refresh token is.** Every access token a sign-in issues carries the same `grant_id`, through every refresh, and so does every one a password grant issues. A token from the client credentials flow or the [implicit flow](/legacy-flows/implicit/) has none, since neither issues a refresh token.
+
 **`auth_state_generation` is reserved.** It's how the auth server tells a token issued before the user's credentials last changed from one issued after. Don't parse it, compare it between tokens or build anything on it: its meaning can change.
+
+## Where tokens depart from RFC 9068
+
+Access tokens follow [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068), the JWT profile for access tokens, in everything it requires. Three of its recommendations are left aside:
+
+- **One token for several APIs.** When the scopes your app asks for belong to more than one resource, it gets one token naming them all in `aud`. RFC 9068 recommends refusing that request with `invalid_scope`, which only makes sense with the `resource` parameter of [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707), and Goiabada doesn't support that. Each permission scope belongs to one resource in `aud`, so your API checks the scope it needs as usual.
+- **`groups` holds group identifiers,** an array of strings, rather than the objects RFC 9068 borrows from SCIM.
+- **Plain names for Goiabada's own claims,** `attributes`, `auth_state_generation`, `grant_id`, and the `typ` claim, where RFC 9068 suggests names that can't collide with anyone else's.
 
 ## The ID token
 

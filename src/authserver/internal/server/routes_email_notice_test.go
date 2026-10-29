@@ -25,7 +25,6 @@ import (
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/metrics"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -120,6 +119,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 // runner, which is what the notice tests wait on before they read their capture.
 func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 	t.Helper()
+	armRoutesTestAPIClient(database)
 	registry := metrics.NewRegistry()
 	s := &Server{
 		router:       routing.New(),
@@ -147,7 +147,7 @@ func noticeTestRequest(capture *smtpCapture, target string, body string, claims 
 
 	r := httptest.NewRequest(http.MethodPut, target, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	ctx := reqctx.WithBearerToken(r.Context(), oauth.JwtToken{Claims: claims})
+	ctx := reqctx.WithBearerToken(r.Context(), routesTestAccessToken(claims))
 	return r.WithContext(reqctx.WithSettings(ctx, settings))
 }
 

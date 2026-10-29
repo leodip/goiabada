@@ -11,6 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -100,8 +101,12 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 		return nil, err
 	}
 
+	// The grant's identifier is the jti its first refresh token takes, fixed here so the access token
+	// minted before that token can name its grant (#676 decision 1).
+	grantId := uuid.New()
+
 	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
-	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
+	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +126,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId)
 	if err != nil {
 		if errors.Is(err, errSessionRowGone) {
 			// The code's session has ended since it was issued (a sign-out, a newer sign-in

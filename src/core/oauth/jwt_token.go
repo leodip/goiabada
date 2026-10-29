@@ -10,7 +10,11 @@ import (
 
 type JwtToken struct {
 	TokenBase64 string
-	Claims      jwt.MapClaims
+	// Header is the token's JOSE header, as the parser that verified it read it. The auth server's
+	// access-token check reads its typ (RFC 9068 section 4); a parser that does not fill it leaves
+	// it nil.
+	Header map[string]interface{}
+	Claims jwt.MapClaims
 }
 
 // maxSafeFloat64Int is 2^53-1, the largest integer a float64 represents UNAMBIGUOUSLY.

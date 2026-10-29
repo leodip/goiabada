@@ -44,6 +44,10 @@ type tokenGenerationInput struct {
 	// correct source differs per flow and reading the convenient one is the bug decision
 	// 13 of #106 exists to prevent.
 	AuthStateGeneration int64
+	// GrantId is the grant_id claim of the access token: the identifier the grant's refresh token
+	// family shares, its first refresh token's jti (#676 decision 1). Empty for a flow that issues
+	// no refresh token, the implicit flow, whose access token names no grant.
+	GrantId string
 	// GrantIsOffline suppresses the sid claim on ACCESS tokens only. An offline grant
 	// outlives the browser session by design, so binding its access tokens to a session
 	// identifier the middleware will later fail to resolve breaks exactly the use case
@@ -63,12 +67,17 @@ type tokenGenerationInput struct {
 //
 // tx is the transaction the grant runs in, nil for one that runs in none, as generateAccessTokenCore
 // states. A refresh hands over the one its rotation runs in (#132, #437).
+//
+// grantId is the grant's identifier, which the caller fixes before the access token is minted: on
+// the code exchange the jti the first refresh token is about to take, on a refresh the parent's
+// FirstRefreshTokenJti (#676 decision 1).
 func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *record.RefreshToken) (string, error) {
+	parentRefreshToken *record.RefreshToken, grantId string) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
+	input.GrantId = grantId
 
 	if parentRefreshToken == nil {
 		input.AuthStateGeneration = code.AuthStateGeneration
@@ -132,6 +141,12 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 	// Standard claims (same for all flows)
 	claims["iss"] = settings.Issuer
 	claims["sub"] = input.User.Subject
+	// RFC 9068 section 2.2 REQUIRES client_id. The auth server's own access-token check reads the
+	// client from it and refuses the token once that client is disabled or gone (#676 decision 6).
+	claims["client_id"] = input.Client.ClientIdentifier
+	if input.GrantId != "" {
+		claims["grant_id"] = input.GrantId
+	}
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
@@ -156,23 +171,26 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 	// Build audience collection from scopes
 	audCollection := []string{}
 	for _, s := range scopes {
-		if oidc.IsClaimScope(s) {
+		if oidc.IsClaimScope(s) || oidc.IsOfflineAccessScope(s) {
 			// A claim scope is answered at /userinfo, which the authserver resource serves, so it
 			// names authserver as an audience. A groups-only grant, which carries no openid and
 			// may carry no resource scope, would otherwise have no audience at all.
+			//
+			// offline_access names it too: the auth server is the one resource it means anything
+			// to, since it is what lets the refresh token outlive the session, and RFC 9068 section
+			// 2.2.3 says every scope in the token MUST mean something to a resource in aud (#676
+			// decision 3).
 			if !slices.Contains(audCollection, builtin.AuthServerResourceIdentifier) {
 				audCollection = append(audCollection, builtin.AuthServerResourceIdentifier)
 			}
 			continue
 		}
-		if !oidc.IsOfflineAccessScope(s) {
-			parts := strings.Split(s, ":")
-			if len(parts) != 2 {
-				return "", errs.Errorf("invalid scope: %v", s)
-			}
-			if !slices.Contains(audCollection, parts[0]) {
-				audCollection = append(audCollection, parts[0])
-			}
+		parts := strings.Split(s, ":")
+		if len(parts) != 2 {
+			return "", errs.Errorf("invalid scope: %v", s)
+		}
+		if !slices.Contains(audCollection, parts[0]) {
+			audCollection = append(audCollection, parts[0])
 		}
 	}
 	switch {
@@ -216,6 +234,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyIdentifier
+	token.Header["typ"] = AccessTokenHeaderType
 	accessToken, err := token.SignedString(signingKey)
 	if err != nil {
 		return "", errs.Wrap(err, "unable to sign access_token")
@@ -371,13 +390,15 @@ func (t *TokenIssuer) calculateAtHash(accessToken string) string {
 // the user: reading that reloaded user would stamp a grant authenticated under an older
 // generation with the current one, laundering it forward (#106 decision 13).
 //
-// ROPC grants are always offline, so no access token here ever carries sid.
+// ROPC grants are always offline, so no access token here ever carries sid. grantId is
+// generateAccessToken's.
 func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *record.RefreshToken) (string, error) {
+	parentRefreshToken *record.RefreshToken, grantId string) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
+	tokenInput.GrantId = grantId
 	tokenInput.GrantIsOffline = true
 
 	if parentRefreshToken == nil {

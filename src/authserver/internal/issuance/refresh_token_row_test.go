@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -62,7 +63,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -136,7 +137,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -211,7 +212,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -300,7 +301,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 	// Now generate the third refresh token
 	thirdRefreshTime := initialTime
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)

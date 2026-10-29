@@ -10,7 +10,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -24,15 +23,17 @@ func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
 
 // generateRefreshToken signs a refresh token for a code-descended grant and inserts its row.
 //
+// jti is the new token's: on the code exchange the grant's identifier, which the access token issued
+// beside it already names, and on a refresh a fresh one (#676 decision 1).
+//
 // tx is the transaction the row is inserted in and the session read behind the max lifetime runs
 // in, nil for a grant that runs in none. A rotation hands over its own, so the child commits with
 // the claim on its parent and the check of the family's revocation record (#132, #437).
 func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *record.RefreshToken) (string, int64, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *record.RefreshToken, jti string) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
-	jti := uuid.New()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
@@ -200,13 +201,12 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
 // Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
-// instead of referencing a Code entity.
+// instead of referencing a Code entity. jti is generateRefreshToken's.
 func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *record.RefreshToken) (string, int64, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *record.RefreshToken, jti string) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
-	jti := uuid.New()
 	claims["iss"] = settings.Issuer
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()

@@ -74,7 +74,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -152,7 +152,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -246,7 +246,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -336,7 +336,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
@@ -2339,7 +2339,7 @@ func audienceOf(t *testing.T, claims jwt.MapClaims) []string {
 // refresh echoing the reported scope was then refused for (RFC 6749 section 6 lets a refresh request
 // any scope "originally granted"). /userinfo gates on openid now, so the append bought nothing. The
 // audience is unchanged: a claim scope still names authserver, whose /userinfo answers it, which a
-// groups-only grant needs since it may name no other audience.
+// groups-only grant needs since it may name no other audience, and since #676 offline_access names it.
 func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 	grants := []string{
 		"openid",
@@ -2355,8 +2355,10 @@ func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 
 	for _, grant := range grants {
 		grantScopes := strings.Split(grant, " ")
-		hasClaimScope := slices.ContainsFunc(grantScopes, func(s string) bool {
-			return slices.Contains([]string{"openid", "profile", "email", "address", "phone", "groups", "attributes"}, s)
+		// offline_access names authserver too, since the auth server is the one resource it means
+		// anything to (#676 decision 3).
+		namesAuthServer := slices.ContainsFunc(grantScopes, func(s string) bool {
+			return slices.Contains([]string{"openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access"}, s)
 		})
 		for _, flow := range flows {
 			t.Run(flow+"/"+grant, func(t *testing.T) {
@@ -2367,8 +2369,8 @@ func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 				assert.Equal(t, grant, accessClaims["scope"], "access token scope claim")
 
 				audience := audienceOf(t, accessClaims)
-				assert.Equal(t, hasClaimScope, slices.Contains(audience, builtin.AuthServerResourceIdentifier),
-					"aud names authserver exactly when the grant has a claim scope: %v", audience)
+				assert.Equal(t, namesAuthServer, slices.Contains(audience, builtin.AuthServerResourceIdentifier),
+					"aud names authserver exactly when the grant has a claim scope or offline_access: %v", audience)
 				assert.Equal(t, slices.Contains(grantScopes, "resource1:read"), slices.Contains(audience, "resource1"),
 					"aud names resource1 exactly when the grant does: %v", audience)
 

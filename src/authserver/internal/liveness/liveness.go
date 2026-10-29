@@ -1,6 +1,6 @@
-// Package liveness decides whether a token the auth server issued is still live: whether the user,
-// the session, the authentication generation and, for a refresh token, the grant it stands for
-// still hold. It reads the stored state and returns a verdict; what to answer and what to log are
+// Package liveness decides whether a token the auth server issued is still live: whether the
+// client, the user, the session, the authentication generation and, for a refresh token, the grant
+// it stands for still hold, and, for an access token, whether it is one at all under RFC 9068. It reads the stored state and returns a verdict; what to answer and what to log are
 // the caller's. The bearer guard in front of /userinfo and the admin and account APIs calls
 // AccessToken, the refresh grant calls RefreshToken, and introspection is to call the same checks,
 // so they can never disagree about a token (#676 decisions 1 and 7).
@@ -13,15 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// ErrNoSettings is the fault of a caller that passed no settings for a session-bound token: the
-// session's idle and max-lifetime bounds cannot be measured without them, and skipping the
-// measurement would let an expired session ride a still-valid JWT.
-var ErrNoSettings = errors.New("no settings to measure the session's bounds against")
+// ErrNoSettings is the fault of a caller that passed no settings where a check needs them: an
+// access token's issuer cannot be compared without them, nor a session's idle and max-lifetime
+// bounds measured, and skipping either would let a token the settings refuse ride a still-valid
+// JWT.
+var ErrNoSettings = errors.New("no settings to check the token against")
 
 // Refusal names why a token is not live, or Live when it is.
 type Refusal int
@@ -48,19 +50,30 @@ const (
 	SessionExpired
 	// SessionGenerationSuperseded is a token whose session is on a generation its user has left.
 	SessionGenerationSuperseded
+	// NotAnAccessTokenHeader is a token whose JOSE header typ is not at+jwt: an access token issued
+	// before #676, or a token of another kind (RFC 9068 section 4).
+	NotAnAccessTokenHeader
+	// ForeignIssuer is a token whose iss is not exactly the configured issuer.
+	ForeignIssuer
+	// ClientNotFound is a token whose client_id names no client, or that carries none.
+	ClientNotFound
+	// ClientDisabled is a token whose client is disabled (#676 decision 6).
+	ClientDisabled
 )
 
-// Database is what the check reads: the token's user and the session its sid names.
+// Database is what the check reads: the token's client, its user and the session its sid names.
 type Database interface {
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 }
 
-// Verdict is the check's answer, with what it read on the way so a caller can log it: the user,
-// once the subject resolved to one; the session identifier, once the check reached the token's
+// Verdict is the check's answer, with what it read on the way so a caller can log it: the client,
+// once the token's client_id resolved to one; the user, once the subject resolved to one; the session identifier, once the check reached the token's
 // session; and the session, once it was found.
 type Verdict struct {
 	Refusal           Refusal
+	Client            *record.Client
 	User              *record.User
 	SessionIdentifier string
 	Session           *record.UserSession
@@ -84,10 +97,19 @@ func Subject(token oauth.JwtToken) (string, bool) {
 // AccessToken checks an access token whose signature, audience and expiry the caller has already
 // verified, against the state it stands for at now.
 //
-// A token with no `auth_time` claim is a client's, from the client credentials grant, and is live:
-// it has no user to check anything about. `auth_time`, not `sid`, is the "this is a user token"
-// discriminator. sid is conditional: password-grant and offline tokens have none, so keying on it
-// would let exactly those tokens past every check below.
+// First the token itself, as RFC 9068 section 4 asks of every resource server (#676 decisions 2 and
+// 4): its JOSE header typ is at+jwt, and its iss is exactly the configured issuer. An access token
+// issued before #676 carries the header typ JWT and is refused here, as is every token after the
+// issuer setting changes. Neither refusal reads anything.
+//
+// Then its client (decision 6): the client its client_id names exists and is enabled, for a client's
+// token as for a user's. A token from a disabled client is refused while the client stays disabled,
+// and works again if it is re-enabled before the token expires; one from a deleted client never does.
+//
+// A token with no `auth_time` claim is a client's, from the client credentials grant, and is live
+// once its client is: it has no user to check anything about. `auth_time`, not `sid`, is the "this
+// is a user token" discriminator. sid is conditional: password-grant and offline tokens have none,
+// so keying on it would let exactly those tokens past every check below.
 //
 // A user's token is checked for four things, and which apply depends on the token:
 //
@@ -114,15 +136,50 @@ func Subject(token oauth.JwtToken) (string, bool) {
 //   - Without one (offline grants and the password grant), the token's own claim decides, since
 //     there is no session to defer to.
 //
-// A token with no generation claim at all reads as generation 0, which is what keeps access tokens
-// issued before that feature shipped working until their user's generation first advances (#106
-// decision 15).
+// A token with no generation claim at all reads as generation 0, as it did for the access tokens
+// issued before that feature shipped (#106 decision 15).
 //
-// settings bound the session, and only a session-bound token that gets as far as its bounds needs
-// them: a nil settings is ErrNoSettings there, and a refusal decided before it stands without
-// them. Any error is a fault, never a refusal: the token's state could not be read, and a caller
-// must not answer it as a dead token.
+// settings carry the issuer and bound the session, so every token that gets past its header needs
+// them: a nil settings is ErrNoSettings. Any error is a fault, never a refusal: the token's state
+// could not be read, and a caller must not answer it as a dead token.
 func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, settings *record.Settings,
+	now time.Time) (Verdict, error) {
+
+	if !hasAccessTokenHeader(token) {
+		return Verdict{Refusal: NotAnAccessTokenHeader}, nil
+	}
+	if settings == nil {
+		return Verdict{}, ErrNoSettings
+	}
+	// Exactly, as RFC 9068 section 4 and RFC 7519 section 4.1.1 compare it: StringOrURI values are
+	// case-sensitive, and the issuer is a string the server writes, never a URL it normalizes.
+	if token.StringClaim("iss") != settings.Issuer {
+		return Verdict{Refusal: ForeignIssuer}, nil
+	}
+
+	clientIdentifier := token.StringClaim("client_id")
+	if clientIdentifier == "" {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
+	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
+	if err != nil {
+		return Verdict{}, errs.Wrap(err, "failed to look up client for bearer token validation")
+	}
+	if client == nil {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
+	if !client.Enabled {
+		return Verdict{Refusal: ClientDisabled, Client: client}, nil
+	}
+
+	verdict, err := userAccessToken(ctx, database, token, settings, now)
+	verdict.Client = client
+	return verdict, err
+}
+
+// userAccessToken is AccessToken's checks of the user, the session and the generation, for a token
+// whose own checks and client have passed.
+func userAccessToken(ctx context.Context, database Database, token oauth.JwtToken, settings *record.Settings,
 	now time.Time) (Verdict, error) {
 
 	if _, hasAuthTime := token.Claims["auth_time"]; !hasAuthTime {
@@ -172,16 +229,10 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 	// ending when its owner's session ends and staying alive while its owner keeps using the browser
 	// (#133).
 	//
-	// Placed before the settings are needed, not merely before the lifetime check it guards: this
-	// comparison needs no settings, so a cross-bound token is refused even when missing settings
-	// would otherwise make it a fault.
 	if session.UserId != user.Id {
 		return Verdict{Refusal: SessionOfAnotherUser, User: user, SessionIdentifier: sid, Session: session}, nil
 	}
 
-	if settings == nil {
-		return Verdict{User: user, SessionIdentifier: sid, Session: session}, ErrNoSettings
-	}
 	if !session.IsValid(now, settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 		return Verdict{Refusal: SessionExpired, User: user, SessionIdentifier: sid, Session: session}, nil
 	}
@@ -193,6 +244,15 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 	}
 
 	return Verdict{Refusal: Live, User: user, SessionIdentifier: sid, Session: session}, nil
+}
+
+// hasAccessTokenHeader reports whether the token's JOSE header typ is at+jwt, which RFC 9068
+// section 4 says a resource server MUST require, accepting application/at+jwt too. A typ is a media
+// type, compared without regard to case (RFC 7515 section 4.1.9).
+func hasAccessTokenHeader(token oauth.JwtToken) bool {
+	typ, _ := token.Header["typ"].(string)
+	return strings.EqualFold(typ, issuance.AccessTokenHeaderType) ||
+		strings.EqualFold(typ, "application/"+issuance.AccessTokenHeaderType)
 }
 
 // tokenGeneration reads a token's authentication generation, reporting validity as a second

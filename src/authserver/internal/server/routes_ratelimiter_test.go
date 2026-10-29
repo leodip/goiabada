@@ -73,6 +73,11 @@ const (
 	// buckets on.
 	routesTestSubject = "8b0d8c7e-3a0f-4c8b-9d3a-0f4c8b9d3a0f"
 
+	// The configured issuer, and the client every bearer token these tests present was issued to,
+	// which the session guard reads (#676).
+	routesTestIssuer      = "https://auth.example.com"
+	routesTestAPIClientId = "routes-test-api-client"
+
 	// What the caller submits where a credential is expected. Never the right one: these
 	// tiers count failures, so a correct credential would spend nothing and the budget
 	// would never fill.
@@ -132,6 +137,7 @@ func routesTestSettings() *record.Settings {
 	return &record.Settings{
 		Id:                         1,
 		AppName:                    "Goiabada",
+		Issuer:                     routesTestIssuer,
 		SelfRegistrationEnabled:    true,
 		SMTPEnabled:                true,
 		AuditLogsInConsoleEnabled:  false,
@@ -187,6 +193,7 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
 		Return(&record.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
+	armRoutesTestAPIClient(database)
 	ropcEnabled := true
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestROPCClientId).
 		Return(&record.Client{Id: 2, ClientIdentifier: routesTestROPCClientId, Enabled: true, IsPublic: true,
@@ -252,11 +259,27 @@ func apiRequest(method string, target string, body string) *http.Request {
 
 // accountAPIToken is the decoded bearer token apiRequest carries.
 func accountAPIToken() oauth.JwtToken {
-	return oauth.JwtToken{Claims: jwt.MapClaims{
+	return routesTestAccessToken(jwt.MapClaims{
 		"sub":       routesTestSubject,
 		"scope":     builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier,
 		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
-	}}
+	})
+}
+
+// routesTestAccessToken is claims as an access token issuance mints since #676: the at+jwt header,
+// routesTestIssuer and routesTestAPIClientId on top of claims.
+func routesTestAccessToken(claims jwt.MapClaims) oauth.JwtToken {
+	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientId}
+	for name, value := range claims {
+		all[name] = value
+	}
+	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
+}
+
+// armRoutesTestAPIClient has the session guard find routesTestAPIClientId, enabled.
+func armRoutesTestAPIClient(database *datamocks.Database) {
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
+		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
 }
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:

@@ -299,11 +299,12 @@ func TestBearerGuardChain_AParserFaultOnEachSurface(t *testing.T) {
 	}
 }
 
-// userSessionToken is a user token the session guard reads: auth_time present and a sid.
+// userSessionToken is a user token the session guard reads: auth_time present and a sid, presented
+// as issued.
 func userSessionToken() oauth.JwtToken {
-	return oauth.JwtToken{Claims: map[string]interface{}{
+	return issuedAccessToken(map[string]interface{}{
 		"sub": "u1", "auth_time": float64(1), "sid": "sid-1", "scope": "openid",
-	}}
+	})
 }
 
 // TestBearerGuardChain_SessionRefusalsOnEachSurface: RequireValidSession's refusals reach each
@@ -322,10 +323,11 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 		for _, surface := range chainSurfaces() {
 			t.Run(surface.name, func(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
+				armGuardClient(mockDB)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").Return(nil, nil)
 
 				req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
-				req = req.WithContext(reqctx.WithBearerToken(req.Context(), userSessionToken()))
+				req = req.WithContext(reqctx.WithSettings(reqctx.WithBearerToken(req.Context(), userSessionToken()), guardSettings()))
 				rr := httptest.NewRecorder()
 				surface.build().RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 					t.Error("a refused session must not reach the handler")
@@ -341,6 +343,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 			t.Run(surface.name, func(t *testing.T) {
 				logs := logtest.CaptureSlog(t)
 				mockDB := datamocks.NewDatabase(t)
+				armGuardClient(mockDB)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").
 					Return(&record.User{Id: 7, Enabled: true}, nil)
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
@@ -348,7 +351,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 
 				req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
 				ctx := requestid.NewContext(req.Context(), "req-chain-1")
-				req = req.WithContext(reqctx.WithBearerToken(ctx, userSessionToken()))
+				req = req.WithContext(reqctx.WithSettings(reqctx.WithBearerToken(ctx, userSessionToken()), guardSettings()))
 				rr := httptest.NewRecorder()
 				surface.build().RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 					t.Error("a failed lookup must not reach the handler")

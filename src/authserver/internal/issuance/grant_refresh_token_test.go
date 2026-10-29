@@ -300,7 +300,8 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, user.Subject, accessClaims["sub"])
-	assert.Equal(t, "resource1", accessClaims["aud"])
+	// offline_access names authserver (#676 decision 3).
+	assert.Equal(t, []interface{}{"resource1", "authserver"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])

@@ -33,7 +33,7 @@ Callers show what they may do with an [access token](/concepts/tokens/): a signe
      -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9..."
    ```
 
-6. Your API checks the token before it answers, as [Tokens](/concepts/tokens/#check-a-token) describes: its signature against the keys at `https://auth.example.com/certs`, an `iss` equal to the auth server's issuer, an `exp` that hasn't passed, `product-api` among its `aud`, and the permission the operation needs in its `scope`.
+6. Your API checks the token before it answers, as [Tokens](/concepts/tokens/#check-a-token) describes: its signature against the keys at `https://auth.example.com/certs`, `at+jwt` as the `typ` in its header, an `iss` equal to the auth server's issuer, an `exp` that hasn't passed, `product-api` among its `aud`, and the permission the operation needs in its `scope`. If your JWT library accepts only `typ: JWT` by default, allow `at+jwt`, or it refuses every token.
 
 </Steps>
 
@@ -75,7 +75,7 @@ A service that calls your API on its own, with no user, such as a nightly job, g
 
 ## What a user's token carries
 
-An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope, since the auth server's own `/userinfo` accepts it. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
+An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope, since the auth server's own `/userinfo` accepts it, or `offline_access`. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
 
 ## What a service's token carries
 
@@ -86,6 +86,7 @@ A token from the client credentials flow names no user. Decoded, the one from th
   "iss": "https://auth.example.com",
   "sub": "billing-service",
   "aud": "product-api",
+  "client_id": "billing-service",
   "scope": "product-api:read",
   "typ": "Bearer",
   "iat": 1760000000,
@@ -95,7 +96,7 @@ A token from the client credentials flow names no user. Decoded, the one from th
 }
 ```
 
-`sub` is the client identifier, and there's no `auth_time`, `acr`, `amr` or `sid`, since nobody signed in. Your API checks it exactly as it checks a user's token.
+`sub` and `client_id` are both the client identifier, and there's no `auth_time`, `acr`, `amr` or `sid`, since nobody signed in. Its header's `typ` is `at+jwt` too, and your API checks it exactly as it checks a user's token.
 
 The scope is the client's own permissions, never a user's. Leave `scope` out of the request to get every permission the client holds, as long as it holds one. A scope the client doesn't hold is refused with `invalid_scope`, and so is an OpenID Connect scope such as `openid`, since there's no user for it to describe. [Token](/reference/endpoints/token/#client-credentials-grant) lists every refusal.
 

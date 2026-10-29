@@ -266,7 +266,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
   Bearer challenges share, as the lowest package that writes a challenge (#676)
 - `internal/liveness/` - Whether a token the auth server issued is still live. An access token:
-  its user exists and is enabled; its `sid` session exists, belongs to the user, is within its
+  its header is `at+jwt` and its `iss` the configured issuer (RFC 9068 section 4); its client exists
+  and is enabled; its user exists and is enabled; its `sid` session exists, belongs to the user, is within its
   bounds and on the user's generation; or, without `sid`, its own generation is current. A refresh
   token: `FindRefreshToken` reads its row and what it names, and `RefreshToken` judges the state the
   refresh grant checks, leaving ownership, PKCE and scope to the grant's validator. Each returns a

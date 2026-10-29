@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
-	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +18,7 @@ import (
 // the trimmed subject and the per-subject rate limiter keys on it; the account handlers used to
 // read the raw claim, so the same token was authenticated as the user and then served as nobody.
 // All three now read reqctx's one spelling. The auth server mints no such subject, so the token is
-// a real one re-signed with the current signing key, its sub padded.
+// a real one re-signed with the current signing key under its at+jwt header, its sub padded.
 func TestAPIAccount_ASubjectWithSurroundingWhitespaceNamesOneUser(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
 
@@ -28,14 +26,7 @@ func TestAPIAccount_ASubjectWithSurroundingWhitespaceNamesOneUser(t *testing.T) 
 	require.Equal(t, code.User.Subject, claims["sub"])
 	claims["sub"] = " " + code.User.Subject + "\t"
 
-	keyPair, err := database.GetCurrentSigningKey(context.Background(), nil)
-	require.NoError(t, err)
-	privKey, err := signingkeys.ParsePrivateKey(dataCipher, keyPair)
-	require.NoError(t, err)
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyPair.KeyIdentifier
-	paddedToken, err := token.SignedString(privKey)
-	require.NoError(t, err)
+	paddedToken := resignWithCurrentKey(t, claims, "at+jwt")
 
 	t.Run("the profile is the user's", func(t *testing.T) {
 		resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/account/profile", paddedToken, nil)

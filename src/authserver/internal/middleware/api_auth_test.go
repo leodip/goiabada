@@ -793,10 +793,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 
 func TestRequireValidSession(t *testing.T) {
 	settingsInCtx := func(req *http.Request) *http.Request {
-		ctx := reqctx.WithSettings(req.Context(), &record.Settings{
-			UserSessionIdleTimeoutInSeconds: 3600,
-			UserSessionMaxLifetimeInSeconds: 86400,
-		})
+		ctx := reqctx.WithSettings(req.Context(), guardSettings())
 		return req.WithContext(ctx)
 	}
 
@@ -818,17 +815,17 @@ func TestRequireValidSession(t *testing.T) {
 
 	t.Run("passes through when token has no sid claim (client_credentials/ROPC)", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sub":   "client123",
-				"scope": "authserver:manage",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sub":   "client123",
+			"scope": "authserver:manage",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
 		req = req.WithContext(ctx)
+		req = settingsInCtx(req)
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -840,11 +837,12 @@ func TestRequireValidSession(t *testing.T) {
 
 		assert.True(t, nextCalled, "next handler should be called")
 		assert.Equal(t, http.StatusOK, rr.Code)
-		// No DB calls expected; mock auto-asserts via NewDatabase(t)
+		// Its client is read; nothing about a user is.
 	})
 
 	t.Run("passes through when token sid resolves to a valid session", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
@@ -857,13 +855,11 @@ func TestRequireValidSession(t *testing.T) {
 				LastAccessed:      now.Add(-5 * time.Minute),
 			}, nil)
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-abc",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-abc",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
@@ -884,23 +880,23 @@ func TestRequireValidSession(t *testing.T) {
 
 	t.Run("returns 401 invalid_token when session has been deleted", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-deleted").
 			Return(nil, nil)
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-deleted",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-deleted",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
 		req = req.WithContext(ctx)
+		req = settingsInCtx(req)
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -919,6 +915,7 @@ func TestRequireValidSession(t *testing.T) {
 
 	t.Run("returns 401 invalid_token when session has expired (idle timeout)", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
@@ -931,13 +928,11 @@ func TestRequireValidSession(t *testing.T) {
 				LastAccessed:      now.Add(-2 * time.Hour), // older than 1h idle timeout
 			}, nil)
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-expired",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-expired",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
@@ -960,10 +955,11 @@ func TestRequireValidSession(t *testing.T) {
 	})
 
 	t.Run("returns 500 when settings not in context", func(t *testing.T) {
-		// Without settings we cannot enforce idle/max-lifetime limits.
-		// Silently skipping would let an expired session ride a still-valid
-		// JWT past us, so we fail closed with a 500.
+		// Without settings we cannot check the issuer or enforce idle/max-lifetime limits.
+		// Silently skipping would let a token from another issuer or an expired session
+		// ride a still-valid JWT past us, so we fail closed with a 500 before reading anything.
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -973,15 +969,13 @@ func TestRequireValidSession(t *testing.T) {
 				UserId:            1, // owned by the caller, so the settings gate is what fails
 				Started:           time.Now().UTC().Add(-100 * time.Hour),
 				LastAccessed:      time.Now().UTC().Add(-100 * time.Hour),
-			}, nil)
+			}, nil).Maybe()
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-no-settings",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-no-settings",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
@@ -1010,6 +1004,7 @@ func TestRequireValidSession(t *testing.T) {
 
 	t.Run("returns 500 when the settings on the context are a nil pointer", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
@@ -1019,15 +1014,13 @@ func TestRequireValidSession(t *testing.T) {
 				UserId:            1, // owned by the caller, so the settings gate is what fails
 				Started:           time.Now().UTC(),
 				LastAccessed:      time.Now().UTC(),
-			}, nil)
+			}, nil).Maybe()
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-bad-settings",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-bad-settings",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
@@ -1049,23 +1042,23 @@ func TestRequireValidSession(t *testing.T) {
 
 	t.Run("returns 500 when database lookup fails", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-boom").
 			Return(nil, errors.New("connection refused"))
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-boom",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-boom",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
 		req = req.WithContext(ctx)
+		req = settingsInCtx(req)
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -1083,23 +1076,23 @@ func TestRequireValidSession(t *testing.T) {
 
 	t.Run("body matches WWW-Authenticate description on rejection", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-x").
 			Return(nil, nil)
 
-		token := oauth.JwtToken{
-			Claims: map[string]interface{}{
-				"sid":       "sid-x",
-				"auth_time": float64(1),
-				"sub":       "user-1",
-			},
-		}
+		token := issuedAccessToken(map[string]interface{}{
+			"sid":       "sid-x",
+			"auth_time": float64(1),
+			"sub":       "user-1",
+		})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := reqctx.WithBearerToken(req.Context(), token)
 		req = req.WithContext(ctx)
+		req = settingsInCtx(req)
 
 		rr := httptest.NewRecorder()
 		apiBearerForTest.RequireValidSession(mockDB)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})).
@@ -1123,11 +1116,9 @@ func TestRequireValidSession(t *testing.T) {
 // covers the full matrix once the Enabled and generation checks are in play.
 //
 // Every negative row varies exactly ONE field from a passing row, so none of them can pass
-// with its gate removed. The gate each row is meant to hit is named in its label. The one
-// deliberate exception is "foreign session is refused before the settings gate is reached",
-// which varies two because its subject is the ORDER of two gates rather than either gate:
-// it differs by one field from the foreign-session row above it, and what it adds is the
-// missing settings that would otherwise produce a 500.
+// with its gate removed. The gate each row is meant to hit is named in its label. Every token is
+// presented as issued, with the at+jwt header, the configured issuer and an enabled client, which
+// TestRequireValidSession_RFC9068 varies.
 //
 // Two rows will look wrong to a reader and must not be "cleaned up":
 //
@@ -1240,9 +1231,9 @@ func TestRequireValidSession_Table(t *testing.T) {
 			wantStatus: http.StatusInternalServerError,
 		},
 		{
+			// The issuer is checked against the settings before anything is read.
 			label:      "settings missing from context",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
-			session:    &sessionSpec{},
 			noSettings: true,
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -1265,17 +1256,6 @@ func TestRequireValidSession_Table(t *testing.T) {
 			label:           "session belongs to a different user",
 			claims:          map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
 			session:         &sessionSpec{foreign: true},
-			wantStatus:      http.StatusUnauthorized,
-			wantDescription: "Session has been terminated",
-		},
-		{
-			// Pins the placement, not just the comparison: the owner check runs before the
-			// settings lookup, so a foreign session is refused on the path that would
-			// otherwise 500 for want of settings to measure the lifetime against.
-			label:           "foreign session is refused before the settings gate is reached",
-			claims:          map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
-			session:         &sessionSpec{foreign: true},
-			noSettings:      true,
 			wantStatus:      http.StatusUnauthorized,
 			wantDescription: "Session has been terminated",
 		},
@@ -1420,9 +1400,10 @@ func TestRequireValidSession_Table(t *testing.T) {
 		t.Run(tc.label, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			mockDB := datamocks.NewDatabase(t)
+			armGuardClient(mockDB)
 			now := time.Now().UTC()
 
-			if !tc.noBearer && tc.claims["auth_time"] != nil &&
+			if !tc.noBearer && !tc.noSettings && tc.claims["auth_time"] != nil &&
 				strings.TrimSpace(fmt.Sprint(tc.claims["sub"])) != "" {
 				switch {
 				case tc.userErrs:
@@ -1474,13 +1455,10 @@ func TestRequireValidSession_Table(t *testing.T) {
 			case tc.noBearer:
 				// nothing in context
 			default:
-				req = req.WithContext(reqctx.WithBearerToken(req.Context(), oauth.JwtToken{Claims: tc.claims}))
+				req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(tc.claims)))
 			}
 			if !tc.noSettings {
-				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
-					UserSessionIdleTimeoutInSeconds: 3600,
-					UserSessionMaxLifetimeInSeconds: 86400,
-				}))
+				req = req.WithContext(reqctx.WithSettings(req.Context(), guardSettings()))
 			}
 
 			rr := httptest.NewRecorder()
@@ -1667,16 +1645,18 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	const requestId = "req-bearer-1"
 
 	mockDB := datamocks.NewDatabase(t)
+	armGuardClient(mockDB)
 	mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
 		Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-boom").
 		Return(nil, errors.New("the database is down"))
 
-	token := oauth.JwtToken{Claims: map[string]interface{}{
+	token := issuedAccessToken(map[string]interface{}{
 		"sid": "sid-boom", "auth_time": float64(1), "sub": "user-1",
-	}}
+	})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
 	ctx := reqctx.WithBearerToken(req.Context(), token)
+	ctx = reqctx.WithSettings(ctx, guardSettings())
 	ctx = requestid.NewContext(ctx, requestId)
 	req = req.WithContext(ctx)
 
@@ -1709,29 +1689,29 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 // acceptance criterion forbids below a request boundary, and would also outlive the request it
 // serves.
 //
-// The accept arm matches on the request id, which nothing but this request's context carries.
-// The reject arm is a token with no auth_time -- client_credentials, no user -- which reaches no
-// port at all, so there is no context to get wrong.
+// The accept arm matches on the request id, which nothing but this request's context carries, on
+// the client read and the user read. The other arm is a token with no auth_time --
+// client_credentials, no user -- which reads its client under the request's context and no user.
 func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 	const requestId = "goiabada/req-valid-session-1"
 
 	requestWithId := func() *http.Request {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		ctx := requestid.NewContext(req.Context(), requestId)
-		ctx = reqctx.WithSettings(ctx, &record.Settings{
-			UserSessionIdleTimeoutInSeconds: 3600,
-			UserSessionMaxLifetimeInSeconds: 86400,
-		})
+		ctx = reqctx.WithSettings(ctx, guardSettings())
 		return req.WithContext(ctx)
 	}
+	theRequestsContext := mock.MatchedBy(func(ctx context.Context) bool {
+		return requestid.FromContext(ctx) == requestId
+	})
+	enabledClient := &record.Client{Id: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}
 
 	t.Run("a user token reads the subject under the request's own context", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 
 		now := time.Now().UTC()
-		mockDB.On("GetUserBySubject", mock.MatchedBy(func(ctx context.Context) bool {
-			return requestid.FromContext(ctx) == requestId
-		}), mock.Anything, "user-1").Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+		mockDB.On("GetClientByClientIdentifier", theRequestsContext, mock.Anything, guardClientIdentifier).Return(enabledClient, nil).Once()
+		mockDB.On("GetUserBySubject", theRequestsContext, mock.Anything, "user-1").Return(&record.User{Id: 1, Enabled: true}, nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-abc").
 			Return(&record.UserSession{
 				SessionIdentifier: "sid-abc",
@@ -1741,9 +1721,9 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 			}, nil).Once()
 
 		req := requestWithId()
-		req = req.WithContext(reqctx.WithBearerToken(req.Context(), oauth.JwtToken{
-			Claims: map[string]interface{}{"sid": "sid-abc", "auth_time": float64(1), "sub": "user-1"},
-		}))
+		req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(
+			map[string]interface{}{"sid": "sid-abc", "auth_time": float64(1), "sub": "user-1"},
+		)))
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -1756,13 +1736,14 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 		mockDB.AssertExpectations(t)
 	})
 
-	t.Run("a client_credentials token reaches no port", func(t *testing.T) {
+	t.Run("a client_credentials token reads its client and no user", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
+		mockDB.On("GetClientByClientIdentifier", theRequestsContext, mock.Anything, guardClientIdentifier).Return(enabledClient, nil).Once()
 
 		req := requestWithId()
-		req = req.WithContext(reqctx.WithBearerToken(req.Context(), oauth.JwtToken{
-			Claims: map[string]interface{}{"sub": "client-1"},
-		}))
+		req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(
+			map[string]interface{}{"sub": guardClientIdentifier},
+		)))
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
