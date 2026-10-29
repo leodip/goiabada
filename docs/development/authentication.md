@@ -44,6 +44,16 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
 - The token validator calls `FindClient` before it looks at the grant and `VerifySecret` at each
   grant's own point of authentication, so the token endpoint's answers keep their order (#437, #676)
 
+### Access token liveness
+One check decides whether a user's access token still stands for live authentication state.
+- `liveness.AccessToken` reads the user and the session the token names and returns a verdict: live,
+  or the refusal. A token without `auth_time` is a client's and has no user to check. With `sid`,
+  the session decides, its generation included, and the token's own generation claim is ignored;
+  without `sid`, the token's claim decides, an absent one reading as 0
+- `RequireValidSession` calls it in front of `/userinfo` and the admin and account APIs, and owns
+  the 401 `invalid_token` descriptions and the Warn record of each refusal; a fault is a 500, never
+  a refusal (#106, #133, #676)
+
 ### Refresh Token
 Exchange refresh token for new access/refresh tokens. Works with auth code and ROPC flows.
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)

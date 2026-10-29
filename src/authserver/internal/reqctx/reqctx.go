@@ -8,9 +8,9 @@ package reqctx
 import (
 	"context"
 	"errors"
-	"strings"
 	"sync/atomic"
 
+	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -72,36 +72,15 @@ func ValidatedTokenFrom(ctx context.Context) (oauth.JwtToken, bool) {
 	return t, ok
 }
 
-// BearerSubject answers the subject of the bearer token, read as subjectOf reads it. It is for
-// RequireValidSession, which reads the bearer token so that it runs whether or not a scope guard
-// ran first. False means there is no bearer token or its subject is blank.
-func BearerSubject(ctx context.Context) (string, bool) {
-	t, ok := BearerTokenFrom(ctx)
-	if !ok {
-		return "", false
-	}
-	return subjectOf(t)
-}
-
-// ValidatedSubject answers the subject of the token a scope guard accepted, read as subjectOf
-// reads it: the user a per-subject rate-limit tier counts against and the user an account
-// handler acts as. False means no guard accepted a token or its subject is blank.
+// ValidatedSubject answers the subject of the token a scope guard accepted, read as
+// liveness.Subject reads it: the user a per-subject rate-limit tier counts against and the user an
+// account handler acts as. False means no guard accepted a token or its subject is blank.
 func ValidatedSubject(ctx context.Context) (string, bool) {
 	t, ok := ValidatedTokenFrom(ctx)
 	if !ok {
 		return "", false
 	}
-	return subjectOf(t)
-}
-
-// subjectOf is the one reading of a token's subject on a bearer-authenticated route: trimmed,
-// and false when nothing is left. The session check looks the user up by it, the per-subject
-// rate limiter keys on it and the account handlers act as it, so the three cannot name different
-// users for one token. They used to read it separately, the first two trimming and the handlers
-// not, which agreed only because the auth server mints no subject with surrounding whitespace.
-func subjectOf(t oauth.JwtToken) (string, bool) {
-	subject := strings.TrimSpace(t.StringClaim("sub"))
-	return subject, subject != ""
+	return liveness.Subject(t)
 }
 
 // CredentialReservation is the slot a failures-only rate-limit tier holds for the life of one

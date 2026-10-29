@@ -134,15 +134,15 @@ func TestReqctx_ErrNoSettingsMatchesThroughAWrap(t *testing.T) {
 	assert.ErrorIs(t, errs.Wrap(ErrNoSettings, "x"), ErrNoSettings)
 }
 
-// TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent: BearerSubject and ValidatedSubject are the one
-// reading of a caller's subject the session check, the per-subject rate limiter and the account
-// handlers share, so a subject with surrounding whitespace names the same user to all three.
+// TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent: ValidatedSubject reads a caller's subject as
+// liveness.Subject does, the reading the liveness check looks the user up by, so the per-subject
+// rate limiter, the account handlers and the check name the same user for a subject with
+// surrounding whitespace.
 func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
 	readers := map[string]struct {
 		write func(context.Context, oauth.JwtToken) context.Context
 		read  func(context.Context) (string, bool)
 	}{
-		"bearer":    {WithBearerToken, BearerSubject},
 		"validated": {WithValidatedToken, ValidatedSubject},
 	}
 	for name, r := range readers {
@@ -169,8 +169,5 @@ func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
 		ctx := WithBearerToken(context.Background(), oauth.JwtToken{Claims: jwt.MapClaims{"sub": "bearer-user"}})
 		_, ok := ValidatedSubject(ctx)
 		assert.False(t, ok, "a bearer token alone is not a validated one")
-		subject, ok := BearerSubject(ctx)
-		assert.True(t, ok)
-		assert.Equal(t, "bearer-user", subject)
 	})
 }
