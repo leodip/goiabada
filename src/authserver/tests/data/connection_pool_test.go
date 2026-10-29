@@ -109,15 +109,33 @@ func TestConnectionPool_TheConfiguredCapIsTheHandlesMaximum(t *testing.T) {
 		t.Cleanup(func() { _ = tx.Rollback() })
 	}
 
-	waitCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
-	defer cancel()
-	_, err = handle.BeginTx(waitCtx, nil)
-	require.Error(t, err, "a transaction past the cap must wait for a connection, not open one")
-	require.ErrorIsf(t, err, context.DeadlineExceeded, "it waited until its context ended: %v", err)
+	waitPastTheCap(t, handle)
 
 	stats := handle.Stats()
 	assert.Equal(t, wantCap, stats.OpenConnections, "no connection was opened past the cap")
 	assert.Positive(t, stats.WaitCount, "the pool counted the wait")
+}
+
+// waitPastTheCap begins one transaction more than the pool's cap allows, requires it to queue for a
+// connection rather than open one, and ends it by cancelling its context. It is cancelled only once
+// the handle counts it as waiting, and a moment later, so the wait is recorded however the
+// goroutine is scheduled: a timeout started before BeginTx could run out before it queued.
+func waitPastTheCap(t *testing.T, handle *sql.DB) {
+	t.Helper()
+	waitsBefore := handle.Stats().WaitCount
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ended := make(chan error, 1)
+	go func() {
+		_, err := handle.BeginTx(ctx, nil)
+		ended <- err
+	}()
+	require.Eventually(t, func() bool { return handle.Stats().WaitCount == waitsBefore+1 }, 10*time.Second,
+		time.Millisecond, "a transaction past the cap must wait for a connection, not open one")
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	err := <-ended
+	require.ErrorIsf(t, err, context.Canceled, "it waited until its context ended: %v", err)
 }
 
 // poolSamples scrapes reg as Prometheus would and answers the goiabada_db_* samples, each line's
@@ -181,10 +199,13 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 		held = append(held, tx)
 	}
 
-	waitCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
-	defer cancel()
-	_, err = handle.BeginTx(waitCtx, nil)
-	require.ErrorIsf(t, err, context.DeadlineExceeded, "a transaction past the cap waits until its context ends: %v", err)
+	// No request has waited yet, so the wait counters read zero: a collector that kept its first
+	// value would fail the scrape after the wait below.
+	beforeWait := poolSamples(t, reg)
+	assert.Equal(t, "0", beforeWait["goiabada_db_wait_count_total"], "nothing has waited yet")
+	assert.Equal(t, "0", beforeWait["goiabada_db_wait_duration_seconds_total"], "nothing has waited yet")
+
+	waitPastTheCap(t, handle)
 
 	atCap := poolSamples(t, reg)
 	assert.Equal(t, map[string]string{
@@ -197,8 +218,8 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 		`goiabada_db_connections_closed_total{reason="max_idle_time"}`: "0",
 		`goiabada_db_connections_closed_total{reason="max_lifetime"}`:  "0",
 	}, atCap, "the pool at its cap, one request having waited")
-	// The wait is judged against the handle's own measurement, not the context's timeout: the timer
-	// starts before BeginTx reaches the pool, so how much of it the pool waited depends on scheduling.
+	// The wait is judged against the handle's own measurement: how long it lasted is the scheduler's
+	// to decide, and the metric's job is to report what the handle measured.
 	waitDuration := handle.Stats().WaitDuration
 	require.Positive(t, waitDuration, "the handle measured a wait")
 	assertSeconds(t, atCap["goiabada_db_wait_duration_seconds_total"], waitDuration,
