@@ -40,9 +40,11 @@ func dialAuthServer(t *testing.T) net.Conn {
 
 func TestListener_DropsAPartialHeaderBlock(t *testing.T) {
 	t.Parallel()
+	// Before the dial, so the server's header timer, which starts once it has the connection,
+	// cannot have started before the stopwatch.
+	start := time.Now()
 	conn := dialAuthServer(t)
 
-	start := time.Now()
 	// No terminating blank line: the header block never ends.
 	_, err := conn.Write([]byte("GET /health HTTP/1.1\r\nHost: x\r\nX-A: b\r\n"))
 	require.NoError(t, err)

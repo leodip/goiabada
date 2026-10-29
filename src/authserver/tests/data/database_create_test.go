@@ -509,6 +509,9 @@ func TestNewDatabase_CreateTrue_AHeldCreationLockWaitEndsWithTheCallersContext(t
 	const deadline = 2 * time.Second
 	const bound = 10 * time.Second
 
+	// The stopwatch starts before the deadline does, so a constructor that waits out the deadline
+	// is measured at no less than it, however late its goroutine is scheduled.
+	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 
@@ -518,7 +521,6 @@ func TestNewDatabase_CreateTrue_AHeldCreationLockWaitEndsWithTheCallersContext(t
 	}
 	done := make(chan outcome, 1)
 	go func() {
-		start := time.Now()
 		h, err := constructCreating(ctx, cfg, name)
 		if h != nil {
 			_ = h.Close()
@@ -531,7 +533,7 @@ func TestNewDatabase_CreateTrue_AHeldCreationLockWaitEndsWithTheCallersContext(t
 		require.Errorf(t, got.err, "a constructor whose context ended while it waited on the creation lock must fail, not construct")
 		require.ErrorIsf(t, got.err, context.DeadlineExceeded,
 			"the wait must end because the caller's context did, and say so through errors.Is; got %v", got.err)
-		require.GreaterOrEqualf(t, got.elapsed, deadline-100*time.Millisecond,
+		require.GreaterOrEqualf(t, got.elapsed, deadline,
 			"the constructor returned after %s, before the deadline: it failed for some other reason than the held lock", got.elapsed)
 	case <-time.After(bound):
 		t.Fatalf("the constructor was still waiting on the creation lock %s after its context's %s deadline: the wait does not run under the caller's context (#438 decision 3)", bound, deadline)
