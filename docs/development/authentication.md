@@ -31,6 +31,19 @@ Server-to-server auth. No user context, client authenticates directly for access
 - Implementation: `handler_token_client_credentials.go`,
   `protocolvalidation/token_grant_client_credentials.go`, `issuance/grant_client_credentials.go`
 
+### Client authentication
+Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does so the one way.
+- Credentials: `client_authentication.go` reads them from the Authorization header or the form,
+  never both, the header's values percent-decoded, and writes the Warn record of a refusal, naming
+  the endpoint that refused. A refusal is a log record, not an audit event: the identifier is the
+  caller's own and unproven
+- Decision: `clientauth` takes the identifier and the secret as plain values and owns the
+  refusals: an unknown or disabled client, or a confidential client's missing or wrong secret, is
+  401 `invalid_client` with the Basic challenge; a public client that presents a secret is 400
+  `invalid_request`; the secret is compared in constant time
+- The token validator calls `FindClient` before it looks at the grant and `VerifySecret` at each
+  grant's own point of authentication, so the token endpoint's answers keep their order (#437, #676)
+
 ### Refresh Token
 Exchange refresh token for new access/refresh tokens. Works with auth code and ROPC flows.
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)

@@ -405,14 +405,19 @@ func formReads(t *testing.T, file string, isReceiver func(ast.Expr) bool) []stri
 	return reads
 }
 
+// The token endpoint reads its own parameters in handler_token.go and the client's credentials
+// through the reader every client-authenticating endpoint shares, in client_authentication.go, so
+// the reads of both files are the token request's (#676).
 func TestTokenRequestParameters_EveryReadIsListed(t *testing.T) {
-	reads := formReads(t, "handler_token.go", func(e ast.Expr) bool {
+	isPostForm := func(e ast.Expr) bool {
 		sel, ok := e.(*ast.SelectorExpr)
 		if !ok || sel.Sel.Name != "PostForm" {
 			return false
 		}
 		ident, ok := sel.X.(*ast.Ident)
 		return ok && ident.Name == "r"
-	})
+	}
+	reads := append(formReads(t, "handler_token.go", isPostForm),
+		formReads(t, "client_authentication.go", isPostForm)...)
 	assert.ElementsMatch(t, tokenRequestParameters, slices.Compact(slices.Sorted(slices.Values(reads))))
 }

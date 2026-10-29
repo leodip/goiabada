@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 
+	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -52,7 +53,9 @@ type TokenValidator struct {
 	database          tokenValidatorDatabase
 	tokenParser       TokenParser
 	permissionChecker PermissionChecker
-	dataCipher        *encryption.DataCipher
+	// clients authenticates the client: FindClient before the grant is looked at, VerifySecret at
+	// the point in each grant's own order where it authenticates the client (#437, #676).
+	clients *clientauth.Authenticator
 	// verifyPassword is the password comparison the password grant makes, a field so a test can
 	// see which hash each refusal compared against (#681).
 	verifyPassword func(hashedPassword string, password string) bool
@@ -64,7 +67,7 @@ func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
 		database:          database,
 		tokenParser:       tokenParser,
 		permissionChecker: permissionChecker,
-		dataCipher:        dataCipher,
+		clients:           clientauth.NewAuthenticator(database, dataCipher),
 		verifyPassword:    passwordhash.Verify,
 	}
 }
@@ -97,23 +100,11 @@ type TokenGrant interface {
 func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *record.Settings,
 	input *ValidateTokenRequestInput) (TokenGrant, error) {
 
-	if len(input.ClientId) == 0 {
-		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
-			"Missing required client_id parameter.", http.StatusBadRequest)
-	}
-
-	client, err := val.database.GetClientByClientIdentifier(ctx, nil, input.ClientId)
+	// A missing client_id, an unknown client and a disabled one, each answered before the grant is
+	// looked at; the client's secret is checked later, by the grant.
+	client, err := val.clients.FindClient(ctx, input.ClientId)
 	if err != nil {
 		return nil, err
-	}
-	// An unknown client and a disabled one are failed client authentications, RFC 6749 section
-	// 5.2's invalid_client, whose own example is the unknown client: until #437 they answered
-	// invalid_request and invalid_grant at 400. The descriptions are unchanged.
-	if client == nil {
-		return nil, invalidClientError(clientDoesNotExistErrorMsg)
-	}
-	if !client.Enabled {
-		return nil, invalidClientError(clientDisabledErrorMsg)
 	}
 
 	// RFC 6749 section 5.2 reserves unsupported_grant_type for a grant type the authorization

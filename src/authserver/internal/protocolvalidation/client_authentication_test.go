@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// TestValidateTokenRequest_ClientAuthentication is authenticateClient's table, one row per grant
+// TestValidateTokenRequest_ClientAuthentication is client authentication's table, one row per grant
 // that authenticates and per way a secret can be wrong. It is driven through the exported method
 // (seam 2), so every row also proves where in its grant's order authentication sits: each grant's
 // fixture arms only the reads that come before it, and a row that passes arms the one read or
@@ -148,7 +148,8 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 		http.StatusUnauthorized, `Basic realm="goiabada"`}
 	// A public client that sends a secret is refused without a challenge, because it is not a
 	// failed authentication (#245 decision 11).
-	superfluous := &refusal{"invalid_request", clientSecretNotRequiredErrorMsg, http.StatusBadRequest, ""}
+	superfluous := &refusal{"invalid_request", "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.",
+		http.StatusBadRequest, ""}
 
 	rows := []row{
 		{"confidential, no secret", false, "", required},
@@ -188,7 +189,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				f.arrange(t, mockDB, client, input)
 
 				// The client credentials grant refuses a public client before it authenticates,
-				// so its public rows never reach authenticateClient (#437).
+				// so its public rows never reach the secret check (#437).
 				if f.grant == oidc.GrantTypeClientCredentials && r.isPublic {
 					result, refusedErr := validator.ValidateTokenRequest(context.Background(), settings, input)
 					assert.Nil(t, result)

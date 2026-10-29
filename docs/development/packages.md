@@ -260,6 +260,11 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/`
   - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image
   uploads, themes
+- `internal/clientauth/` - Client authentication from plain values, the client identifier and the
+  secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
+  every endpoint that authenticates its caller. Reading the credentials off a request and logging a
+  refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
+  Bearer challenges share, as the lowest package that writes a challenge (#676)
 - `internal/revocation/` - The five revocation operations, their results, reason constants and audit
   helpers. No handler package owns revocation orchestration or its transactions any more (#387)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a

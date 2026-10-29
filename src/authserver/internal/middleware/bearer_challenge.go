@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -10,9 +10,9 @@ import (
 // defines a protection space as the origin plus the realm, and these routes are one protection
 // space. The realm is also what gives a challenge with no error an auth-param at all, which
 // RFC 6750 section 3 requires of every Bearer challenge ("MUST be followed by one or more
-// auth-param values") (#435). Its one definition is protocolvalidation.ChallengeRealm, which the token
-// endpoint's Basic challenge reads too, so the two cannot name two realms (#437).
-const BearerRealm = protocolvalidation.ChallengeRealm
+// auth-param values") (#435). Its one definition is clientauth.ChallengeRealm, which the Basic
+// challenge on every invalid_client reads too, so the two cannot name two realms (#437).
+const BearerRealm = clientauth.ChallengeRealm
 
 // BearerChallenge builds the WWW-Authenticate value for a bearer refusal: `Bearer
 // realm="goiabada"`, then `error="<errorCode>"` when errorCode is set, then
