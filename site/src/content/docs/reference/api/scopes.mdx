@@ -17,7 +17,7 @@ Give each integration the smallest scope that does its job. A service that creat
 |---|---|---|
 | `authserver:admin-read` | Every Admin API operation that reads, administrators included, except a client's secret | Nothing |
 | `authserver:manage-users` | Users and groups, with their attributes, sessions, consents, memberships and permissions | The same, except administrators and administrative permissions |
-| `authserver:manage-clients` | Clients, their secrets included | Clients, except administrator clients |
+| `authserver:manage-clients` | Clients, their secrets included | Clients, except administrator clients and listing the `authserver` resource among a client's introspection resources |
 | `authserver:manage-settings` | Settings, resources and their permissions, signing keys, and the audit log | Settings except email and audit logging, resources and their permissions, signing keys |
 | `authserver:manage` | Everything | Everything, administrators included |
 
@@ -44,7 +44,7 @@ Each Admin API operation belongs to one domain, and the domain decides which gra
 | Domain | Operations |
 |---|---|
 | Users | Users, user attributes, user sessions, user consents, groups, group members, group attributes, and the permissions of users and groups |
-| Clients | Clients, with their authentication, flows, redirect URIs, web origins, tokens, permissions, sessions, logo and secret |
+| Clients | Clients, with their authentication, flows, redirect URIs, web origins, tokens, permissions, introspection resources, sessions, logo and secret |
 | Settings | General, email, session, token, theme and audit log settings, signing keys, resources and their permissions, and the audit log |
 
 ## Administrative scopes on a user's behalf

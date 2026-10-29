@@ -70,7 +70,7 @@ A public client has no secret, so two rules make up for it:
 - **It always uses PKCE.** PKCE ties an authorization code to the app that asked for it, so a stolen code is useless. You can't turn it off for a public client. See [PKCE](/concepts/pkce/).
 - **It can't use the client credentials flow,** since that flow is nothing but the client's own secret.
 
-Switching a client from confidential to public deletes its secret, turns off the client credentials flow, and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing.
+Switching a client from confidential to public deletes its secret, turns off the client credentials flow, empties its [introspection resources](#introspection-resources), and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing, and the client starts again with no introspection resources.
 
 ## Flows
 
@@ -190,6 +190,16 @@ Each switch leaves an `updated_client_administrative_scopes` event in the [audit
 
 The **Permissions** tab grants permissions to the client itself, for the client credentials flow, and is available only while **Client credentials** is on: a token the client gets for itself can carry only these permissions. It has no effect on tokens a client gets for a user, which carry the user's permissions. See [Resources and permissions](/concepts/resources-and-permissions/).
 
+## Introspection resources
+
+An API checking a token with the auth server calls as a confidential client, since a resource holds no credentials of its own. A client's introspection resources are the resources whose tokens that client may introspect. The list starts empty, so a client introspects nothing until you add the resources it stands for. One client can stand for several resources, and several clients for one resource.
+
+Set the list through the Admin API: read it with [`GET /api/v1/admin/clients/{id}/introspection-resources`](/reference/api/admin/operations/getclientintrospectionresources/), and replace it whole with [`PUT`](/reference/api/admin/operations/updateclientintrospectionresources/) on the same path, sending the list as you read it in `expectedResourceIds`. Each save leaves an `updated_client_introspection_resources` entry in the [audit log](/concepts/audit-log/).
+
+- **A public client has none.** It can't authenticate, so it can't introspect, and a non-empty list for one is refused.
+- **Only `authserver:manage` adds the `authserver` resource.** A client listed for it can introspect the tokens of every sign-in, across every app. `authserver:manage-clients` edits the rest of the list, and can remove `authserver` from it.
+- **Deleting the client or a resource** removes its entries.
+
 ## Tokens
 
 The **Tokens** tab overrides the global token settings for this client:
@@ -212,7 +222,7 @@ The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, e
 
 Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse the client's access tokens while it stays disabled, and accept them again if you turn it back on before they expire. An API that checks tokens by their signature alone accepts them until they expire.
 
-**Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, logo, unredeemed codes, refresh tokens and users' consents to it. The auth server's own endpoints refuse its access tokens from then on; an API that checks tokens by their signature alone accepts them until they expire.
+**Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, introspection resources, logo, unredeemed codes, refresh tokens and users' consents to it. The auth server's own endpoints refuse its access tokens from then on; an API that checks tokens by their signature alone accepts them until they expire.
 
 ## The admin console's client
 

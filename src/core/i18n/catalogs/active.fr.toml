@@ -1660,6 +1660,7 @@
 "handler.client.secret_invalid" = "Secret du client invalide. Veuillez en générer un nouveau."
 "handler.client_administrative_scopes.allowed_required" = "allowed est obligatoire."
 "handler.client_administrative_scopes.console_always_allowed" = "Le client de la console d’administration est toujours autorisé à demander les scopes d’administration."
+"handler.client_introspection_resources.public_client" = "Un client public ne peut pas introspecter de jetons, il ne peut donc pas lister de ressources d’introspection."
 "handler.client_permissions.client_credentials_disabled" = "Les permissions d’un client ne peuvent être configurées que si le flux d’identifiants du client est activé."
 "handler.client_redirect_uris.no_redirect_flow" = "Les URI de redirection sont utilisées par le flux de code d’autorisation avec PKCE et le flux implicite. Aucun de ces flux n’est activé pour ce client."
 "handler.client_redirect_uris.too_many" = "Un client peut avoir au plus {{.max}} URI de redirection. Cette liste en contient {{.count}}."

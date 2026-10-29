@@ -1664,6 +1664,7 @@
 "handler.client.secret_invalid" = "Client secret non valido. Generane uno nuovo."
 "handler.client_administrative_scopes.allowed_required" = "allowed è obbligatorio."
 "handler.client_administrative_scopes.console_always_allowed" = "Il client della console di amministrazione è sempre autorizzato a richiedere scope amministrativi."
+"handler.client_introspection_resources.public_client" = "Un client pubblico non può fare l’introspezione dei token, quindi non può elencare risorse di introspezione."
 "handler.client_permissions.client_credentials_disabled" = "I permessi del client possono essere configurati solo quando il flusso credenziali client è attivo"
 "handler.client_redirect_uris.no_redirect_flow" = "Gli URI di reindirizzamento sono usati dai flussi codice di autorizzazione con PKCE e implicito, ma nessuno dei due è attivo per questo client."
 "handler.client_redirect_uris.too_many" = "Un client può avere al massimo {{.max}} URI di reindirizzamento; questo elenco ne contiene {{.count}}."

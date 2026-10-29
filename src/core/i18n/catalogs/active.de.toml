@@ -1661,6 +1661,7 @@
 "handler.client.secret_invalid" = "Ungültiges Client-Secret. Bitte generieren Sie ein neues."
 "handler.client_administrative_scopes.allowed_required" = "allowed muss angegeben werden."
 "handler.client_administrative_scopes.console_always_allowed" = "Der Client der Verwaltungskonsole darf immer administrative Scopes anfordern."
+"handler.client_introspection_resources.public_client" = "Ein öffentlicher Client kann keine Tokens introspektieren und daher keine Introspektionsressourcen auflisten."
 "handler.client_permissions.client_credentials_disabled" = "Client-Berechtigungen können nur bei aktiviertem Client Credentials Flow konfiguriert werden."
 "handler.client_redirect_uris.no_redirect_flow" = "Redirect-URIs werden vom Authorization Code Flow mit PKCE und vom Implicit Flow verwendet. Für diesen Client ist keiner der beiden aktiviert."
 "handler.client_redirect_uris.too_many" = "Ein Client kann höchstens {{.max}} Redirect-URIs haben. Diese Liste enthält {{.count}}."

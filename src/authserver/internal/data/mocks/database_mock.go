@@ -1525,6 +1525,69 @@ func (_c *Database_CreateClient_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// CreateClientIntrospectionResource provides a mock function for the type Database
+func (_mock *Database) CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error {
+	ret := _mock.Called(ctx, tx, link)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateClientIntrospectionResource")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.ClientIntrospectionResource) error); ok {
+		r0 = returnFunc(ctx, tx, link)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateClientIntrospectionResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateClientIntrospectionResource'
+type Database_CreateClientIntrospectionResource_Call struct {
+	*mock.Call
+}
+
+// CreateClientIntrospectionResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - link *record.ClientIntrospectionResource
+func (_e *Database_Expecter) CreateClientIntrospectionResource(ctx any, tx any, link any) *Database_CreateClientIntrospectionResource_Call {
+	return &Database_CreateClientIntrospectionResource_Call{Call: _e.mock.On("CreateClientIntrospectionResource", ctx, tx, link)}
+}
+
+func (_c *Database_CreateClientIntrospectionResource_Call) Run(run func(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource)) *Database_CreateClientIntrospectionResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.ClientIntrospectionResource
+		if args[2] != nil {
+			arg2 = args[2].(*record.ClientIntrospectionResource)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateClientIntrospectionResource_Call) Return(err error) *Database_CreateClientIntrospectionResource_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateClientIntrospectionResource_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error) *Database_CreateClientIntrospectionResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateClientLogo provides a mock function for the type Database
 func (_mock *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error {
 	ret := _mock.Called(ctx, tx, clientLogo)
@@ -3249,6 +3312,132 @@ func (_c *Database_DeleteClient_Call) Return(err error) *Database_DeleteClient_C
 }
 
 func (_c *Database_DeleteClient_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) error) *Database_DeleteClient_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteClientIntrospectionResource provides a mock function for the type Database
+func (_mock *Database) DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error {
+	ret := _mock.Called(ctx, tx, clientIntrospectionResourceId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteClientIntrospectionResource")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, clientIntrospectionResourceId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteClientIntrospectionResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteClientIntrospectionResource'
+type Database_DeleteClientIntrospectionResource_Call struct {
+	*mock.Call
+}
+
+// DeleteClientIntrospectionResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientIntrospectionResourceId int64
+func (_e *Database_Expecter) DeleteClientIntrospectionResource(ctx any, tx any, clientIntrospectionResourceId any) *Database_DeleteClientIntrospectionResource_Call {
+	return &Database_DeleteClientIntrospectionResource_Call{Call: _e.mock.On("DeleteClientIntrospectionResource", ctx, tx, clientIntrospectionResourceId)}
+}
+
+func (_c *Database_DeleteClientIntrospectionResource_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64)) *Database_DeleteClientIntrospectionResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResource_Call) Return(err error) *Database_DeleteClientIntrospectionResource_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResource_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error) *Database_DeleteClientIntrospectionResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteClientIntrospectionResourcesByClientId provides a mock function for the type Database
+func (_mock *Database) DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error {
+	ret := _mock.Called(ctx, tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteClientIntrospectionResourcesByClientId")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, clientId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteClientIntrospectionResourcesByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteClientIntrospectionResourcesByClientId'
+type Database_DeleteClientIntrospectionResourcesByClientId_Call struct {
+	*mock.Call
+}
+
+// DeleteClientIntrospectionResourcesByClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) DeleteClientIntrospectionResourcesByClientId(ctx any, tx any, clientId any) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	return &Database_DeleteClientIntrospectionResourcesByClientId_Call{Call: _e.mock.On("DeleteClientIntrospectionResourcesByClientId", ctx, tx, clientId)}
+}
+
+func (_c *Database_DeleteClientIntrospectionResourcesByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResourcesByClientId_Call) Return(err error) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResourcesByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) error) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6184,6 +6373,80 @@ func (_c *Database_GetClientById_Call) Return(client *record.Client, err error) 
 }
 
 func (_c *Database_GetClientById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)) *Database_GetClientById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetClientIntrospectionResourcesByClientId provides a mock function for the type Database
+func (_mock *Database) GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error) {
+	ret := _mock.Called(ctx, tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClientIntrospectionResourcesByClientId")
+	}
+
+	var r0 []record.ClientIntrospectionResource
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]record.ClientIntrospectionResource, error)); ok {
+		return returnFunc(ctx, tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []record.ClientIntrospectionResource); ok {
+		r0 = returnFunc(ctx, tx, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.ClientIntrospectionResource)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetClientIntrospectionResourcesByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientIntrospectionResourcesByClientId'
+type Database_GetClientIntrospectionResourcesByClientId_Call struct {
+	*mock.Call
+}
+
+// GetClientIntrospectionResourcesByClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) GetClientIntrospectionResourcesByClientId(ctx any, tx any, clientId any) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	return &Database_GetClientIntrospectionResourcesByClientId_Call{Call: _e.mock.On("GetClientIntrospectionResourcesByClientId", ctx, tx, clientId)}
+}
+
+func (_c *Database_GetClientIntrospectionResourcesByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetClientIntrospectionResourcesByClientId_Call) Return(clientIntrospectionResources []record.ClientIntrospectionResource, err error) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Return(clientIntrospectionResources, err)
+	return _c
+}
+
+func (_c *Database_GetClientIntrospectionResourcesByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)) *Database_GetClientIntrospectionResourcesByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }

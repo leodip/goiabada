@@ -240,6 +240,7 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 	// stake. The handler must believe this over its own snapshot.
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
@@ -313,6 +314,7 @@ func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothin
 		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
@@ -345,6 +347,7 @@ func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicIn
 	}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	var written record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = *args.Get(2).(*record.Client) }).Return(nil).Once()

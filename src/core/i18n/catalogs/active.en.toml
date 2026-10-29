@@ -1657,6 +1657,7 @@
 "handler.client.secret_invalid" = "Invalid client secret. Please generate a new one."
 "handler.client_administrative_scopes.allowed_required" = "allowed is required."
 "handler.client_administrative_scopes.console_always_allowed" = "The admin console's client is always allowed to request the administrative scopes."
+"handler.client_introspection_resources.public_client" = "A public client can't introspect tokens, so it can't list introspection resources."
 "handler.client_permissions.client_credentials_disabled" = "Client permissions can only be configured when client credentials flow is enabled"
 "handler.client_redirect_uris.no_redirect_flow" = "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client."
 "handler.client_redirect_uris.too_many" = "A client can have at most {{.max}} redirect URIs, and this list has {{.count}}."

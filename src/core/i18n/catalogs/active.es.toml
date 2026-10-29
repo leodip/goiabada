@@ -1662,6 +1662,7 @@
 "handler.client.secret_invalid" = "El secreto del cliente no es válido. Genera uno nuevo."
 "handler.client_administrative_scopes.allowed_required" = "El campo allowed es obligatorio."
 "handler.client_administrative_scopes.console_always_allowed" = "El cliente de la consola de administración siempre tiene permiso para solicitar los scopes administrativos."
+"handler.client_introspection_resources.public_client" = "Un cliente público no puede hacer introspección de tokens, así que no puede tener recursos de introspección."
 "handler.client_permissions.client_credentials_disabled" = "Solo se pueden configurar los permisos del cliente si el flujo de credenciales del cliente está activado"
 "handler.client_redirect_uris.no_redirect_flow" = "Las URI de redirección se usan en los flujos de código de autorización con PKCE e implícito, y ninguno está activado para este cliente."
 "handler.client_redirect_uris.too_many" = "Un cliente puede tener como máximo {{.max}} URI de redirección y esta lista contiene {{.count}}."

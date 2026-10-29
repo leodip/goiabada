@@ -371,6 +371,15 @@ const (
 	// identifier) and, for a token of the implicit flow, user_id; a client credentials token has no
 	// user, and names none.
 	EventRevokedAccessToken = "revoked_access_token"
+	// EventUpdatedClientIntrospectionResources records a committed save of a client's
+	// introspection resources, the resources whose tokens the client may introspect (#676 decision
+	// 14), through PUT /api/v1/admin/clients/{id}/introspection-resources. Written once per save,
+	// after it commits, as every other client edit is.
+	//
+	// Payload: client_id; added_resource_ids and removed_resource_ids, the row ids of the resources
+	// the save listed and unlisted, each always a list, empty when the save changed nothing on that
+	// side; and logged_in_user.
+	EventUpdatedClientIntrospectionResources = "updated_client_introspection_resources"
 	// EventTokenRevocationRefused records that a client sent the revocation endpoint another
 	// client's live token and was refused with invalid_grant, RFC 7009 section 2.1's check that the
 	// token was issued to the client making the request (#676 decision 8). Nothing was revoked.
@@ -655,6 +664,7 @@ var auditEventTypes = []string{
 	EventUpdatedAuditLogsSettings,
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
+	EventUpdatedClientIntrospectionResources,
 	EventUpdatedClientLogo,
 	EventUpdatedClientOAuth2Flows,
 	EventUpdatedClientPermissions,

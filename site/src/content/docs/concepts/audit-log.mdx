@@ -33,13 +33,13 @@ These record who can administer Goiabada and who tried to reach past that. See [
 
 | Event | Written when | Details |
 |---|---|---|
-| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, rewording an administrative permission's description, switching a client's **May request administrative scopes**, and deleting a group holding an administrative permission. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, and `group_ids` for a group membership change |
+| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, rewording an administrative permission's description, switching a client's **May request administrative scopes**, deleting a group holding an administrative permission, and listing the `authserver` resource among a client's introspection resources. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, `group_ids` for a group membership change, and `resource_ids` for a client's introspection resources |
 | `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user`, or `command` for the `recover` command's grant |
 | `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. The Admin API writes it for every call to that route, even one that keeps the value it had; the admin console's **Save** calls it only when the switch changed. | `client_id`, `client_identifier`, `allowed` (the new value) and `logged_in_user` |
 | `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session and the request doesn't ask for `prompt=login`, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session, or held back until after the password because of `prompt=login`, writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
 | `viewed_client_secret` | Someone read a client's secret through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time you open a confidential client's **Authentication** tab. Reading a client with no secret writes nothing. | `client_id`, `client_identifier` and `logged_in_user` |
 
-The `updated_client_permissions` entry names what a client permission save changed, the ids of the permissions it granted and of those it revoked, so you can trace a grant to a client back to the permission it was.
+The `updated_client_permissions` entry names what a client permission save changed, the ids of the permissions it granted and of those it revoked, so you can trace a grant to a client back to the permission it was. The `updated_client_introspection_resources` entry does the same for a client's introspection resources, naming the resources it added and removed. A client listed for the `authserver` resource can introspect the tokens of every sign-in, so watch for that resource's id there.
 
 ### Signs of an attack
 
@@ -106,6 +106,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 | Key | Meaning |
 |---|---|
+| `added_resource_ids` | The row ids of the resources a save of a client's introspection resources added. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
@@ -163,8 +164,10 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `refresh_token_jti` | The `jti` of the refresh token issued. |
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
+| `removed_resource_ids` | The row ids of the resources a save of a client's introspection resources removed. |
 | `resource_id` | The resource's row id. |
 | `resource_identifier` | The identifier the resource is known by. |
+| `resource_ids` | The row ids of the resources a refused save of a client's introspection resources would have added: the `authserver` resource. |
 | `response_type` | The `response_type` of an implicit flow request. |
 | `revoked_code_count` | How many authorization codes were revoked. |
 | `revoked_count` | How many refresh tokens of a replayed token's family were revoked. |
@@ -355,6 +358,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_web_origins` | An administrator saved a client's web origins. |
 | `updated_client_tokens` | An administrator saved a client's token settings: lifetimes, and which claims go in its tokens. |
 | `updated_client_permissions` | An administrator changed the permissions granted to a client. |
+| `updated_client_introspection_resources` | An administrator changed the resources whose tokens a client may introspect. |
 | `updated_client_administrative_scopes` | An administrator allowed a client to ask for the administrative scopes, or stopped it. |
 | `updated_client_logo` | An administrator uploaded or replaced a client's logo. |
 | `deleted_client_logo` | An administrator removed a client's logo. |

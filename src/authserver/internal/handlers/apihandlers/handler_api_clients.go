@@ -42,6 +42,7 @@ type clientsDatabase interface {
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
 	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
 	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
 	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
@@ -777,6 +778,14 @@ func HandleClientAuthenticationPut(
 				var err error
 				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.Id)
 				if err != nil {
+					return false, err
+				}
+				// A public client never introspects, so its introspection resources go in the
+				// same transaction, under the row SetClientPublic took: a save adding to the list
+				// reads the client under that row, so none can leave a public client holding one
+				// (#676 decision 14). Run on every save to public, as the list of a client already
+				// public is empty, and clearing an empty list writes nothing.
+				if err := database.DeleteClientIntrospectionResourcesByClientId(r.Context(), tx, client.Id); err != nil {
 					return false, err
 				}
 				if err := database.UpdateClient(r.Context(), tx, client); err != nil {

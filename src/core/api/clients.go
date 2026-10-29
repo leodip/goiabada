@@ -204,3 +204,18 @@ type GetClientPermissionsResponse struct {
 	Client      ClientResponse       `json:"client"`
 	Permissions []PermissionResponse `json:"permissions"`
 }
+
+// UpdateClientIntrospectionResourcesRequest replaces the whole list of resources whose tokens a
+// client may introspect (#676 decision 14). ExpectedResourceIds is the list as the caller last read
+// it, required as on every list save: [] when it was empty (#428).
+type UpdateClientIntrospectionResourcesRequest struct {
+	ResourceIds         []int64 `json:"resourceIds"`
+	ExpectedResourceIds []int64 `json:"expectedResourceIds"`
+}
+
+// GetClientIntrospectionResourcesResponse is a client and the resources whose tokens it may
+// introspect. Resources is never null: a client listing nothing answers [].
+type GetClientIntrospectionResourcesResponse struct {
+	Client    ClientResponse     `json:"client"`
+	Resources []ResourceResponse `json:"resources"`
+}

@@ -184,6 +184,7 @@ const (
 
 	ErrCodeClientAdministrativeScopesAllowedRequired      = "handler.client_administrative_scopes.allowed_required"
 	ErrCodeClientAdministrativeScopesConsoleAlwaysAllowed = "handler.client_administrative_scopes.console_always_allowed"
+	ErrCodeClientIntrospectionResourcesPublicClient       = "handler.client_introspection_resources.public_client"
 	ErrCodeClientPermissionsClientCredentialsDisabled     = "handler.client_permissions.client_credentials_disabled"
 
 	ErrCodeClientRedirectURIsNoRedirectFlow = "handler.client_redirect_uris.no_redirect_flow"

@@ -128,6 +128,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
 | `core/api` | `GetAuditLogsResponse` | both-apps | — |
+| `core/api` | `GetClientIntrospectionResourcesResponse` | contract | Admin API response DTO of `GET /api/v1/admin/clients/{id}/introspection-resources` (#676 decision 14), which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetClientPermissionsResponse` | both-apps | — |
 | `core/api` | `GetClientResponse` | both-apps | — |
 | `core/api` | `GetClientSecretResponse` | both-apps | — |
@@ -193,6 +194,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateAccountPhoneRequest` | both-apps | — |
 | `core/api` | `UpdateClientAdministrativeScopesRequest` | both-apps | — |
 | `core/api` | `UpdateClientAuthenticationRequest` | both-apps | — |
+| `core/api` | `UpdateClientIntrospectionResourcesRequest` | contract | Admin API request DTO of `PUT /api/v1/admin/clients/{id}/introspection-resources` (#676 decision 14), which is what `core/api` is for. The auth server reads it and no admin console file writes it yet; #385 exempts this package by name. |
 | `core/api` | `UpdateClientOAuth2FlowsRequest` | both-apps | — |
 | `core/api` | `UpdateClientPermissionsRequest` | both-apps | — |
 | `core/api` | `UpdateClientRedirectURIsRequest` | both-apps | — |
@@ -379,6 +381,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeClientIdentifierInUse` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientIdentifierNamesResource` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientIdentifierRequired` | both-apps | — |
+| `core/i18n` | `ErrCodeClientIntrospectionResourcesPublicClient` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientPermissionsClientCredentialsDisabled` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientRedirectURIEmpty` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeClientRedirectURIInsecureHTTP` | contract | Catalog key of an admin API refusal whose `error_description` is written in the request's language while its `error_code` stays the call site's (#559 decision 2). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |

@@ -519,6 +519,17 @@ type Database interface {
 	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
 	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
 
+	// The resources whose tokens a confidential client may introspect, one row per client and
+	// resource, removed with either side (#676 decisions 5 and 14). A second row of one pair is a
+	// unique violation.
+	CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error
+	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error
+	// DeleteClientIntrospectionResourcesByClientId clears a client's list, which making the client
+	// public does in the transaction that revokes its grants: a public client cannot authenticate,
+	// so it never introspects.
+	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
+
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)

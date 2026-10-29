@@ -54,6 +54,7 @@ var adminPolicyCeilings = map[string]string{
 	"clientTargetCeilingAllows":          adminCeilingTarget,
 	"allowanceCeilingAllows":             adminCeilingTarget,
 	"permissionDescriptionCeilingAllows": adminCeilingTarget,
+	"introspectionResourceCeilingAllows": adminCeilingGrant,
 	"settingsCeilingAllows":              adminCeilingSettings,
 }
 
@@ -139,6 +140,9 @@ var adminRouteClassification = map[string]adminRouteClass{
 	"PUT /api/v1/admin/clients/{id}/web-origins":    appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/tokens":         appliesCeilings(adminCeilingTarget),
 	"PUT /api/v1/admin/clients/{id}/permissions":    appliesCeilings(adminCeilingGrant, adminCeilingTarget),
+	// Listing the authserver resource for introspection is held where granting an administrative
+	// permission is, and the list is a write on its client like any other (#676 decision 14).
+	"PUT /api/v1/admin/clients/{id}/introspection-resources": appliesCeilings(adminCeilingGrant, adminCeilingTarget),
 	// Switching a client's allowance to request the administrative scopes makes an administrator
 	// client or changes one, so every caller below authserver:manage is refused it (#499 decision 4).
 	"PUT /api/v1/admin/clients/{id}/administrative-scopes": appliesCeilings(adminCeilingTarget),

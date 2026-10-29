@@ -47,11 +47,12 @@ const manageScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManageP
 const manageScopeRequiredDescription = "Only a token with the authserver:manage scope may act on administrators or administrative permissions."
 
 // The ceiling a refusal names. The grant ceiling is granting or revoking an administrative
-// permission, directly or by moving a user into or out of a group that holds one, and deleting such
-// a group; the target ceiling is any other write on an administrator, switching a client's
-// allowance to request the administrative scopes, and changing the description of an administrative
-// permission; the settings ceiling is changing the email or the audit-log settings (#402 decisions
-// 1, 5 and 7, #499 decision 4).
+// permission, directly or by moving a user into or out of a group that holds one, deleting such a
+// group, and listing the authserver resource on a client's introspection resources; the target
+// ceiling is any other write on an administrator, switching a client's allowance to request the
+// administrative scopes, and changing the description of an administrative permission; the settings
+// ceiling is changing the email or the audit-log settings (#402 decisions 1, 5 and 7, #499 decision
+// 4, #676 decision 14).
 const (
 	ceilingGrant    = "grant"
 	ceilingTarget   = "target"
@@ -115,6 +116,9 @@ type administratorChangeRefusal struct {
 	// groupIds is the administrative groups whose membership change caused a grant refusal, when
 	// the target is the user moved into or out of them.
 	groupIds []int64
+	// resourceIds is the resources whose listing on a client's introspection resources caused a
+	// grant refusal: the authserver resource, the one listing reserved to authserver:manage.
+	resourceIds []int64
 }
 
 // refuseAdministratorChange answers a request the policy refused: one administrator_change_refused
@@ -141,6 +145,9 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 	}
 	if refusal.groupIds != nil {
 		details["group_ids"] = refusal.groupIds
+	}
+	if refusal.resourceIds != nil {
+		details["resource_ids"] = refusal.resourceIds
 	}
 	auditLogger.Log(r.Context(), audit.EventAdministratorChangeRefused, details)
 
@@ -641,6 +648,43 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
 		targetId:   client.Id,
+	})
+	return false
+}
+
+// introspectionResourceCeilingAllows applies the grant ceiling to a save of a client's
+// introspection resources: only an authserver:manage token lists the authserver resource there. A
+// client listed for it introspects the tokens every sign-in issues, across every app, and reads
+// their claims, the same reach over users' sign-ins an administrative permission grants, so listing
+// it is held where granting one is (#676 decision 14).
+//
+// The save is judged, as a permission save is, on what it changes, and here on what it adds: the
+// resources in wanted and not in expected, which is exactly what the save adds if it commits, since
+// its transaction refuses with 409 unless the stored list is expected as a set. Keeping the
+// authserver resource listed, or removing it, takes nothing from anyone. wanted is the resources
+// the save names as the request's validation read them. It reports whether the save may go on, and
+// when it may not it has answered the request. The ceiling reads nothing.
+func introspectionResourceCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger,
+	client *record.Client, wanted []record.Resource, expected []int64) bool {
+	listed := make(map[int64]bool, len(expected))
+	for _, resourceId := range expected {
+		listed[resourceId] = true
+	}
+	var causes []int64
+	for _, resource := range wanted {
+		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier && !listed[resource.Id] {
+			causes = append(causes, resource.Id)
+		}
+	}
+	if len(causes) == 0 || callerHoldsManage(r) {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:     ceilingGrant,
+		targetKind:  targetKindClient,
+		targetId:    client.Id,
+		resourceIds: causes,
 	})
 	return false
 }
