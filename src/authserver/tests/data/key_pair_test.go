@@ -501,7 +501,9 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 // longer in the from-state. So each goroutine times the span from just before
 // BeginTransaction to just after UpdateKeyPairState returns, and the loser's span
 // must be at least a third of contentionHold, which it can only be if it was blocked
-// while the winner still held. A sequential run measures the loser at near zero.
+// while the winner still held. The winner commits only once the loser has begun, and
+// contentionHold after that, so a loser that waits for the commit measures the whole hold
+// however the two goroutines are scheduled; a loser that never waits measures near zero.
 //
 // The mechanism differs per engine and the observable does not: on postgres, mysql
 // and mssql the loser waits on the row lock, and on sqlite it waits on the pool,
@@ -522,8 +524,11 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 	}
 	outcomes := make([]outcome, 2)
 
-	// Both goroutines wait on the same barrier so they reach the row together.
+	// Both goroutines wait on the same barrier so they reach the row together, and each
+	// says when it has begun, before BeginTransaction, which on sqlite is where the loser
+	// blocks.
 	start := make(chan struct{})
+	begun := []chan struct{}{make(chan struct{}), make(chan struct{})}
 	var wg sync.WaitGroup
 
 	for i := 0; i < 2; i++ {
@@ -533,6 +538,7 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 			<-start
 
 			began := time.Now()
+			close(begun[i])
 			tx, err := database.BeginTransaction(context.Background())
 			if err != nil {
 				outcomes[i] = outcome{err: err, span: time.Since(began)}
@@ -546,8 +552,10 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 				return
 			}
 
-			// The winner holds its lock while the loser is still trying, so the
-			// loser's wait is observable.
+			// The winner holds its lock until the loser has begun, and contentionHold
+			// after that, so the loser's wait is observable. The loser does not wait
+			// here: the winner began before the loser's update could return.
+			<-begun[1-i]
 			time.Sleep(contentionHold)
 
 			if err := database.CommitTransaction(context.Background(), tx); err != nil {
