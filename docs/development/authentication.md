@@ -89,7 +89,8 @@ One check decides whether an access token is one under RFC 9068 and still stands
   without a jti is refused unread
 - An access token issued before #676 carries the header `typ: JWT` and is refused, and changing the
   issuer setting ends every outstanding access token at the auth server's own endpoints
-- `RequireValidSession` calls it in front of `/userinfo` and the admin and account APIs, and owns
+- `RequireValidSession` calls it in front of `/userinfo`, the admin and account APIs and the
+  admin console's browser session API (`/api/v1/sessions`), and owns
   the 401 `invalid_token` descriptions and the Warn record of each refusal; a revoked grant answers
   "The access token is invalid." as a refusal of the token or its client does, and so does a
   revoked jti; a fault is a 500,

@@ -476,16 +476,20 @@ func (s *Server) initRoutes(branches appBranches) {
 		// middleware exists to make debuggable. What is lost is recoverable from the SQL
 		// log, which records the digest rather than the handle (#266).
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		// The same token lifecycle as the admin API: a token with the pre-#676 header, from
+		// another issuer, of a disabled or deleted client, or revoked by its jti at
+		// /auth/revoke is refused here too, rather than holding the console's sessions
+		// until it expires. The console fetches a fresh token on a 401, so only a client
+		// that can no longer get one stays out.
+		r.Use(apiBearer.RequireValidSession(s.database))
 		// One narrow permission of its own, deliberately not one of the manage-* admin
 		// API scopes: holding the admin console's client secret must not be a way to
 		// drive the whole admin API with no user present.
 		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.BrowserSessionsPermissionIdentifier))
 
-		// No RequireUserBoundToken and no RequireValidSession here, and both absences are
-		// deliberate. This endpoint is reached only by a client_credentials token, which
-		// has no user behind it: RequireUserBoundToken would refuse every call, and
-		// RequireValidSession passes such a token straight through, so mounting it would
-		// add a line that reads like a guard and enforces nothing.
+		// No RequireUserBoundToken here, and the absence is deliberate. This endpoint is
+		// reached only by a client_credentials token, which has no user behind it, so
+		// RequireUserBoundToken would refuse every call.
 		//
 		// The handlers take a database and name the owner themselves. There is no owner
 		// parameter anywhere in this group's contract, which is what makes reaching an

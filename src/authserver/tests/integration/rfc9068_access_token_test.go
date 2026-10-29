@@ -22,9 +22,10 @@ import (
 // Access tokens follow RFC 9068 (#676 decisions 2, 3, 4 and 6). Every one carries the JOSE header
 // typ at+jwt and the client_id of its client; those of the authorization code, refresh and password
 // grants carry grant_id, their refresh token family's identifier; offline_access names authserver
-// in aud. The auth server's own endpoints, /userinfo and the admin and account APIs, refuse an
-// access token whose header is not at+jwt (one issued before the upgrade), whose iss is not the
-// configured issuer, or whose client is disabled or gone, with 401 invalid_token.
+// in aud. The auth server's own endpoints, /userinfo, the admin and account APIs and the browser
+// session API, refuse an access token whose header is not at+jwt (one issued before the upgrade),
+// whose iss is not the configured issuer, or whose client is disabled or gone, with 401
+// invalid_token.
 
 // decodeJWTHeader decodes a JWT's JOSE header, unverified.
 func decodeJWTHeader(t *testing.T, token string) map[string]interface{} {

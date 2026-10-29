@@ -1,10 +1,11 @@
 // Package liveness decides whether a token the auth server issued is still live: whether the
 // client, the user, the session, the authentication generation and the grant it stands for still
 // hold, and, for an access token, whether it is one at all under RFC 9068 and, without a grant,
-// whether its jti was revoked. It reads the stored state
-// and returns a verdict; what to answer and what to log are the caller's. The bearer guard in front of /userinfo and the admin and account APIs calls
-// AccessToken, the refresh grant calls RefreshToken, and revocation and introspection call the same
-// checks, so they can never disagree about a token (#676 decisions 1 and 7).
+// whether its jti was revoked. It reads the stored state and returns a verdict; what to answer and
+// what to log are the caller's. The bearer guard in front of /userinfo, the admin and account APIs
+// and the browser session API calls AccessToken, the refresh grant calls RefreshToken, and
+// revocation and introspection call the same checks, so they can never disagree about a token
+// (#676 decisions 1 and 7).
 package liveness
 
 import (
