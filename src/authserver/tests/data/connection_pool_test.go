@@ -181,14 +181,7 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 		held = append(held, tx)
 	}
 
-	// The context's timer starts before BeginTx reaches the pool, and database/sql measures the
-	// wait only from there, so the reported wait can fall short of the timeout by the time BeginTx
-	// spends before it waits: it once read 0.299884656. That moment cannot be observed from
-	// here, so the floor leaves a margin far wider than it. A wait reported as zero, or in
-	// milliseconds or nanoseconds, still fails.
-	const waited = 300 * time.Millisecond
-	const waitFloor = 250 * time.Millisecond
-	waitCtx, cancel := context.WithTimeout(ctx, waited)
+	waitCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 	defer cancel()
 	_, err = handle.BeginTx(waitCtx, nil)
 	require.ErrorIsf(t, err, context.DeadlineExceeded, "a transaction past the cap waits until its context ends: %v", err)
@@ -204,8 +197,12 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 		`goiabada_db_connections_closed_total{reason="max_idle_time"}`: "0",
 		`goiabada_db_connections_closed_total{reason="max_lifetime"}`:  "0",
 	}, atCap, "the pool at its cap, one request having waited")
-	assertSecondsAtLeast(t, atCap["goiabada_db_wait_duration_seconds_total"], waitFloor,
-		"the wait is reported in seconds, for as long as it lasted")
+	// The wait is judged against the handle's own measurement, not the context's timeout: the timer
+	// starts before BeginTx reaches the pool, so how much of it the pool waited depends on scheduling.
+	waitDuration := handle.Stats().WaitDuration
+	require.Positive(t, waitDuration, "the handle measured a wait")
+	assertSeconds(t, atCap["goiabada_db_wait_duration_seconds_total"], waitDuration,
+		"the wait is reported in seconds, as the handle measured it")
 
 	for _, tx := range held {
 		require.NoError(t, tx.Rollback())
@@ -219,11 +216,11 @@ func TestConnectionPool_TheScrapeReportsThePoolAsItIs(t *testing.T) {
 	assert.Equal(t, "1", released["goiabada_db_wait_count_total"], "a counter keeps what it counted")
 }
 
-// assertSecondsAtLeast reads an exposition value as seconds and holds it to at least d.
-func assertSecondsAtLeast(t *testing.T, value string, d time.Duration, msg string) {
+// assertSeconds reads an exposition value as seconds and holds it to d. The exposition writes the
+// shortest form that reads back as the same float, so the tolerance is for the comparison alone.
+func assertSeconds(t *testing.T, value string, d time.Duration, msg string) {
 	t.Helper()
 	seconds, err := strconv.ParseFloat(value, 64)
 	require.NoError(t, err, "%q is not a number", value)
-	assert.GreaterOrEqual(t, seconds, d.Seconds(), msg)
-	assert.Less(t, seconds, 60.0, "%s: %q is seconds, not nanoseconds", msg, value)
+	assert.InEpsilon(t, d.Seconds(), seconds, 1e-9, msg)
 }
