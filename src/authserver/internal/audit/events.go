@@ -390,6 +390,9 @@ const (
 	// clients are proven: the caller authenticated, and the token's owner is named by its signature
 	// or its row. It means a live token reached the wrong client.
 	//
+	// The endpoint records at most one per token-owning client per minute window per instance,
+	// across callers and token types, so replays cannot write an audit event per request.
+	//
 	// Its payload carries client_id (the calling client), token_client_id (the client the token was
 	// issued to) and token_type (access_token or refresh_token).
 	EventTokenRevocationRefused = "token_revocation_refused"

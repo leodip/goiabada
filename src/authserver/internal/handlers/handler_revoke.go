@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/clientauth"
@@ -14,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
@@ -75,12 +77,13 @@ func HandleRevokePost(
 	revocationMetrics *revocationmetrics.Recorder,
 ) http.HandlerFunc {
 	endpoint := revocationEndpoint{
-		jsonWriter:  jsonWriter,
-		database:    database,
-		tokenParser: tokenParser,
-		clients:     clientauth.NewAuthenticator(database, dataCipher),
-		auditLogger: auditLogger,
-		metrics:     revocationMetrics,
+		jsonWriter:       jsonWriter,
+		database:         database,
+		tokenParser:      tokenParser,
+		clients:          clientauth.NewAuthenticator(database, dataCipher),
+		auditLogger:      auditLogger,
+		metrics:          revocationMetrics,
+		refusalAuditGate: ratelimit.New(1, time.Minute).Gate(),
 	}
 	return endpoint.serve
 }
@@ -93,6 +96,10 @@ type revocationEndpoint struct {
 	clients     *clientauth.Authenticator
 	auditLogger AuditLogger
 	metrics     *revocationmetrics.Recorder
+	// As for rate-limit refusals, audit the first refusal per key per window on this instance.
+	// The key is the verified token owner: public caller identifiers, tokens and token types can
+	// change between replays without earning more writes. Only owners seen in two windows are held.
+	refusalAuditGate *ratelimit.Gate
 }
 
 func (e revocationEndpoint) serve(w http.ResponseWriter, r *http.Request) {
@@ -295,11 +302,14 @@ func (e revocationEndpoint) invalid(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// refuseAnotherClientsToken answers decision 8's refusal and records it.
+// refuseAnotherClientsToken answers decision 8's refusal and records it at most once per token
+// owner per minute window on this instance. Every request is still refused and counted.
 func (e revocationEndpoint) refuseAnotherClientsToken(w http.ResponseWriter, r *http.Request, client *record.Client,
 	owner *record.Client, tokenType string) {
 
-	revocation.LogTokenRevocationRefused(r.Context(), e.auditLogger, client.Id, owner.Id, tokenType)
+	if e.refusalAuditGate.First(strconv.FormatInt(owner.Id, 10)) {
+		revocation.LogTokenRevocationRefused(r.Context(), e.auditLogger, client.Id, owner.Id, tokenType)
+	}
 	e.refuse(w, r, errAnotherClientsToken)
 }
 

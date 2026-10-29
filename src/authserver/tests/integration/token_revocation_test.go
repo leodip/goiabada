@@ -8,7 +8,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -205,6 +207,48 @@ func TestRevoke_AnotherClientsLiveTokenIsRefused(t *testing.T) {
 	assertUserinfoAdmits(t, data["access_token"].(string), code.User.Subject)
 	status, refreshed := refreshAuthCodeGrant(t, httpClient, code, clientSecret, data["refresh_token"].(string), "")
 	assert.Equal(t, http.StatusOK, status, "the grant is untouched: %v", refreshed)
+}
+
+// Replaying live tokens under different public client identifiers must not persist an event per
+// request. The first refusal is still observable, and the token's owner can still revoke its grant.
+func TestRevoke_RepeatedForeignTokensBoundAuditWrites(t *testing.T) {
+	enableAuditLogsInDatabase(t)
+	data, code, _, clientSecret := userTokenResponseWithScope(t, "openid", nil)
+	callers := []*record.Client{createPublicClient(t), createPublicClient(t)}
+	for _, caller := range callers {
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	}
+	countEvents := func() int {
+		t.Helper()
+		_, count, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1,
+			audit.EventTokenRevocationRefused, "")
+		require.NoError(t, err)
+		return count
+	}
+	before := countEvents()
+	started := time.Now()
+	tokens := []string{data["access_token"].(string), data["refresh_token"].(string)}
+	for i := range 12 {
+		answer := postRevoke(t, revokeRequest{
+			form: url.Values{
+				"client_id": {callers[i%2].ClientIdentifier}, "token": {tokens[(i/2)%2]},
+				"token_type_hint": {fake.LetterN(8)},
+			},
+			header: map[string]string{"X-Request-Id": fake.LetterN(16)},
+		})
+		assertRevokeError(t, answer, http.StatusBadRequest, "invalid_grant", "The token was issued to another client.")
+	}
+	// The running server's fixed window can roll during the burst. Allow that boundary and any
+	// full minutes elapsed, without depending on the instant the server constructed its gate.
+	maxEvents := 2 + int(time.Since(started)/time.Minute)
+	written := countEvents() - before
+	assert.GreaterOrEqual(t, written, 1, "the first refusal must be audited")
+	assert.LessOrEqual(t, written, maxEvents, "replays must share the token owner's audit budget")
+
+	assertUserinfoAdmits(t, tokens[0], code.User.Subject)
+	revokeAs(t, code.Client.ClientIdentifier, clientSecret, tokens[1])
+	assertUserinfoRefusesTheToken(t, tokens[0])
+	assertRevokedRefreshRefused(t, code.Client.ClientIdentifier, clientSecret, tokens[1])
 }
 
 // An invalid token is answered 200 with an empty body, whatever it is (RFC 7009 section 2.2): one that

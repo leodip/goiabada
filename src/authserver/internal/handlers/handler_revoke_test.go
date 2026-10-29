@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -343,6 +344,116 @@ func TestHandleRevokePost_RefusesAnotherClientsLiveToken(t *testing.T) {
 		assert.Equal(t, revokeOutcome("refused"), e.samples(t))
 		assertNotAttempted(t, e.database, "RunInTransaction")
 	})
+}
+
+// A live token can be replayed under any enabled public client's identifier. All of an owner's
+// tokens share one audit budget, including access and refresh tokens and tokens without a grant.
+// Every request is still refused and counted, and the owner can still revoke its own grant.
+func TestHandleRevokePost_ForeignTokenAuditIsBoundedPerOwner(t *testing.T) {
+	e := newRevokeEndpoint(t)
+	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true, IsPublic: true}
+	e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", map[string]interface{}{
+		"client_id": int64(1001), "token_client_id": revokeOwnerId, "token_type": "access_token",
+	}).Return().Once()
+
+	cases := []struct {
+		token *oauth.JwtToken
+		arm   func()
+	}{
+		{grantAccessToken(revokeOwnerName), func() { e.accessTokenLive(owner) }},
+		{offlineRefreshToken(), func() {
+			e.refreshTokenLive(revokeOwnerId)
+			e.database.On("GetClientById", mock.Anything, mock.Anything, revokeOwnerId).Return(owner, nil).Once()
+		}},
+		{grantlessAccessToken(revokeOwnerName, false, time.Now().Add(time.Hour)), func() {
+			e.grantlessAccessTokenLive(owner, false)
+		}},
+	}
+	for i, tc := range cases {
+		for j := range 2 {
+			caller := &record.Client{Id: int64(1001 + j), ClientIdentifier: fmt.Sprintf("public-caller-%d", j),
+				Enabled: true, IsPublic: true}
+			e.callerFound(caller)
+			// Different signed representations must not get separate audit budgets.
+			presented := fmt.Sprintf("presented.token.%d.%d", i, j)
+			e.parser.On("DecodeAndValidateTokenString", mock.Anything, presented, true).Return(tc.token, nil).Once()
+			tc.arm()
+
+			rr := e.post(t, url.Values{
+				"client_id": {caller.ClientIdentifier}, "token": {presented},
+				"token_type_hint": {fmt.Sprintf("ignored-hint-%d", j)},
+			})
+			assertErrorAnswer(t, rr, http.StatusBadRequest, "invalid_grant", "The token was issued to another client.")
+		}
+	}
+	assert.Equal(t, []string{`goiabada_revocation_requests_total{outcome="refused"} 6`}, e.samples(t))
+	assertNotAttempted(t, e.database, "RunInTransaction")
+	assertNotAttempted(t, e.database, "RecordAccessTokenRevoked")
+
+	e.callerFound(owner)
+	e.parses(grantAccessToken(revokeOwnerName))
+	e.accessTokenLive(owner)
+	e.grantRevoked()
+	e.auditLogger.On("Log", mock.Anything, "revoked_grant", mock.Anything).Return().Once()
+	assertRevokedAnswer(t, e.post(t, url.Values{"client_id": {revokeOwnerName}, "token": {revokeTokenString}}))
+}
+
+func TestHandleRevokePost_ForeignTokenAuditKeepsIndependentOwners(t *testing.T) {
+	e := newRevokeEndpoint(t)
+	caller := &record.Client{Id: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
+	for i := range 2 {
+		owner := &record.Client{Id: int64(2001 + i), ClientIdentifier: fmt.Sprintf("owner-%d", i), Enabled: true}
+		token := grantlessAccessToken(owner.ClientIdentifier, false, time.Now().Add(time.Hour))
+		token.Claims["jti"] = fmt.Sprintf("owner-token-%d", i)
+		e.callerFound(caller)
+		e.parses(token)
+		e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, owner.ClientIdentifier).
+			Return(owner, nil).Once()
+		e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, token.StringClaim("jti")).Return(false, nil).Once()
+		e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", map[string]interface{}{
+			"client_id": revokeCallerId, "token_client_id": owner.Id, "token_type": "access_token",
+		}).Return().Once()
+
+		assertErrorAnswer(t, e.post(t, url.Values{"client_id": {revokeCallerName}, "token": {revokeTokenString}}),
+			http.StatusBadRequest, "invalid_grant", "The token was issued to another client.")
+	}
+}
+
+func TestHandleRevokePost_ConcurrentForeignTokenAuditIsBounded(t *testing.T) {
+	e := newRevokeEndpoint(t)
+	caller := &record.Client{Id: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
+	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
+	token := grantlessAccessToken(revokeOwnerName, false, time.Now().Add(time.Hour))
+	e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", mock.Anything).Return().Once()
+
+	const requests = 32
+	responses := make([]*httptest.ResponseRecorder, requests)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range requests {
+		e.callerFound(caller)
+		e.parses(token)
+		e.grantlessAccessTokenLive(owner, false)
+		request := httptest.NewRequest(http.MethodPost, "/auth/revoke", strings.NewReader(url.Values{
+			"client_id": {revokeCallerName}, "token": {revokeTokenString},
+		}.Encode()))
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request = withSettings(request, e.settings)
+		responses[i] = httptest.NewRecorder()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			e.handler.ServeHTTP(responses[i], request)
+		}()
+	}
+	close(start)
+	wg.Wait()
+	for _, response := range responses {
+		assertErrorAnswer(t, response, http.StatusBadRequest, "invalid_grant", "The token was issued to another client.")
+	}
+	assert.Equal(t, []string{`goiabada_revocation_requests_total{outcome="refused"} 32`}, e.samples(t))
+	assertNotAttempted(t, e.database, "RecordAccessTokenRevoked")
 }
 
 // A token that is not live is invalid, whatever client it names: 200, nothing revoked, nothing

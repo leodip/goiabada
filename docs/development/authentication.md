@@ -125,6 +125,11 @@ A client ends one of its grants by sending a token of it.
   400 `invalid_grant`, "The token was issued to another client.", and `token_revocation_refused`;
   a refresh token's owner is read to tell a disabled or deleted owner's token (invalid) from a live
   one
+- Refusal auditing: the handler uses `ratelimit.Gate`, as rate-limit refusals do, to record at most
+  one `token_revocation_refused` per verified token owner client id per minute window per instance.
+  The gate is shared across access and refresh tokens and callers: changing public client
+  identifiers, tokens or hints cannot reset it. Every request is still refused and counted;
+  successful revocations are audited independently
 - Revocation: `revocation.RevokeGrantTx`, the sixth operation, records the family under
   `client_revoked` and revokes every member in one transaction; `revoked_grant` is written after the
   commit. It ends no session and no other grant
