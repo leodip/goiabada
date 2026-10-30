@@ -35,19 +35,28 @@ func getTestPublicKey(t *testing.T) []byte {
 	return publicKeyBytes
 }
 
-// assertTimeClaimWithinRange holds a time claim to expectedDuration from now. Every claim it is given
-// was set from a clock reading taken before this one and is truncated to whole seconds, so it is
-// never later than now plus expectedDuration. Below that it allows 5s: the truncation's second, and
-// 4s for the time between that reading and this one, so a slow machine cannot fail a correct claim.
-func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, message string) {
+// assertTimeClaimWithinRange holds a time claim to expectedDuration past the moment it was set from,
+// a clock reading taken between testStart, read before the test built or issued anything, and this
+// call. Claims are whole seconds, so the claim is no earlier than testStart plus expectedDuration,
+// truncated to the second, and no later than now plus expectedDuration.
+func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, testStart time.Time, message string) {
 	t.Helper()
 	assert.Contains(t, claims, claimName)
 	claimUnix := claims[claimName].(float64)
 	claimTime := time.Unix(int64(claimUnix), 0)
 
-	expectedTime := time.Now().UTC().Add(expectedDuration)
+	assert.WithinRange(t, claimTime, testStart.Add(expectedDuration).Truncate(time.Second),
+		time.Now().UTC().Add(expectedDuration), message)
+}
 
-	assert.WithinRange(t, claimTime, expectedTime.Add(-5*time.Second), expectedTime, message)
+// assertCountdown holds a count of whole seconds left until a deadline full seconds past from,
+// taken at a moment between from and to. It is no more than full, and short of it by no more than
+// the whole seconds from to to, plus one for the truncation.
+func assertCountdown(t *testing.T, got, full int64, from, to time.Time, msg string) {
+	t.Helper()
+	elapsed := int64(to.Sub(from) / time.Second)
+	assert.GreaterOrEqual(t, got, full-elapsed-1, msg)
+	assert.LessOrEqual(t, got, full, msg)
 }
 
 func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byte) jwt.MapClaims {

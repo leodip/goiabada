@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func assertWithinLastXSeconds(t *testing.T, timeToCheck time.Time, seconds float64) {
-	now := time.Now().UTC()
-	xSecondsAgo := now.Add(-time.Duration(seconds * float64(time.Second)))
-
-	assert.True(t, timeToCheck.After(xSecondsAgo) && timeToCheck.Before(now),
-		"Expected time to be within the last %.2f seconds", seconds)
+// assertStampedSince holds a time the flow under test stamped to the span from started, read before
+// the flow began, to now. The columns may round it to the microsecond, hence the slack either side.
+func assertStampedSince(t *testing.T, stamp, started time.Time) {
+	t.Helper()
+	assert.WithinRange(t, stamp, started.Add(-time.Microsecond), time.Now().UTC().Add(time.Microsecond),
+		"stamped by the flow under test")
 }
 
 // parseHTMLResponse reads the response body and returns a goquery document

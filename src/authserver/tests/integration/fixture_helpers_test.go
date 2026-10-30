@@ -101,6 +101,7 @@ func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
 }
 
 func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -201,7 +202,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -210,6 +211,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 }
 
 func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -314,7 +316,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -323,6 +325,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 }
 
 func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -440,7 +443,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)

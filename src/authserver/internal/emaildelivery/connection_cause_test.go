@@ -67,14 +67,15 @@ func TestClassifyConnectionError(t *testing.T) {
 }
 
 // A real dial to a loopback port nothing listens on is read as refused: the constructed refusal
-// above is the shape the dial actually returns.
+// above is the shape the dial actually returns. The refusal is immediate, so the dial's minute is
+// never waited out; it is long so that a slow machine cannot turn the refusal into a timeout.
 func TestClassifyConnectionError_ARefusedLoopbackPort(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	address := listener.Addr().String()
 	require.NoError(t, listener.Close())
 
-	_, err = net.DialTimeout("tcp", address, 3*time.Second)
+	_, err = net.DialTimeout("tcp", address, time.Minute)
 	require.Error(t, err)
 
 	assert.Equal(t, ConnectionCauseRefused, ClassifyConnectionError(err))

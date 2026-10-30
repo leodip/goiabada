@@ -3,6 +3,7 @@ package publicsettings
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -202,12 +203,18 @@ func TestCache_ConcurrentMissesShareOneFailure(t *testing.T) {
 	release := make(chan struct{})
 	refused := errors.New("the auth server is down")
 	fetcher := newFakeFetcher(fetchAnswer{err: refused, release: release}, fetchAnswer{appName: "back"})
-	cache := NewCache(fetcher, time.Hour, metrics.NewRegistry())
+	reg := metrics.NewRegistry()
+	cache := NewCache(fetcher, time.Hour, reg)
 
 	first := getAsync(cache, context.Background())
 	fetcher.awaitFetchStart(t)
 	second := getAsync(cache, context.Background())
-	time.Sleep(50 * time.Millisecond)
+	// The second lookup counts its miss and takes the fetch in flight in one hold of the cache's
+	// lock, which the fetch needs before it can finish. Once two misses are counted, the second has
+	// joined this fetch however late its goroutine ran, so the failure is shared.
+	require.Eventually(t, func() bool {
+		return strings.Contains(scrape(t, reg), `goiabada_settings_cache_requests_total{result="miss"} 2`+"\n")
+	}, patience, time.Millisecond, "the second lookup never joined the fetch")
 	close(release)
 
 	require.ErrorIs(t, await(t, first, "the first waiter").err, refused)
