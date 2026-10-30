@@ -9,13 +9,13 @@ import "github.com/leodip/goiabada/core/metrics"
 type Outcome string
 
 const (
-	// Revoked is a grant the client ended, answered 200.
+	// Revoked is a grant, or an access token without one, the client ended, answered 200.
 	Revoked Outcome = "revoked"
 	// InvalidToken is a token that was not live, answered 200 with nothing revoked (RFC 7009
 	// section 2.2).
 	InvalidToken Outcome = "invalid_token"
 	// Refused is a request answered with an error the client caused: its authentication failed, the
-	// request was malformed, the token was another client's or of a type not revoked.
+	// request was malformed, or the token was another client's.
 	Refused Outcome = "refused"
 	// Error is a fault, answered 503, on which the client assumes the token still exists and retries
 	// (RFC 7009 section 2.2.1).

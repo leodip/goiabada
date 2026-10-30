@@ -386,9 +386,10 @@ const (
 	// client's live token and was refused with invalid_grant, RFC 7009 section 2.1's check that the
 	// token was issued to the client making the request (#676 decision 8). Nothing was revoked.
 	//
-	// An audit event where a refused client authentication is only a log record, because both
-	// clients are proven: the caller authenticated, and the token's owner is named by its signature
-	// or its row. It means a live token reached the wrong client.
+	// An audit event where a refused client authentication is only a log record, because the token's
+	// owner is proven by its signature or its row, and a live token reached the wrong client. The
+	// calling client is proven only when it is confidential: a public caller names itself by
+	// client_id alone.
 	//
 	// The endpoint records at most one per token-owning client per minute window per instance,
 	// across callers and token types, so replays cannot write an audit event per request.
