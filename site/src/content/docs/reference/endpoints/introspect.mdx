@@ -62,7 +62,9 @@ Still check `scope` for the permission the operation needs, as [Protect an API](
 
 An access token is active while it's live and its `aud` names a resource on the calling client's introspection resources. Live means the auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and APIs would accept it now: it hasn't expired, its user and its client exist and are enabled, and nothing has ended it since, such as its session ending, its user's credentials changing, or its grant being revoked. See [Ending sessions](/concepts/ending-sessions/).
 
-A refresh token is active only to the client it was issued to, while it would still refresh. So your app's backend can find out whether its refresh token is still good without using it. Introspecting it spends nothing, and the refresh token keeps working.
+A refresh token is active only to the client it was issued to, while it's live and the flow that issued it is still enabled for that client. Live means nothing has ended it: it hasn't expired or been rotated or revoked, its user is enabled, and neither its session ending nor its user's credentials changing has ended it. So your app's backend can find out whether its refresh token is still good without using it. Introspecting it spends nothing, and the refresh token keeps working.
+
+Active doesn't promise the next refresh succeeds. A refresh checks the user's consent and permissions, and your client's scope allowances, when it's made, so a refresh with an active token can still be refused with `invalid_grant`.
 
 Every other token gets `{"active": false}`: one that's expired, revoked, forged or malformed, an ID token, an access token for a resource the client doesn't list, and another client's refresh token. The answer never says which, as [RFC 7662 section 2.2](https://www.rfc-editor.org/rfc/rfc7662.html#section-2.2) requires.
 

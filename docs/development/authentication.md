@@ -156,8 +156,11 @@ An API, calling as a confidential client, asks whether a token is active.
 - An access token is active when `liveness.AccessToken` finds it live and its `aud` names a
   resource on the caller's introspection resources (`clients_introspection_resources`, compared
   exactly); a refresh token only to its own client, compared before `liveness.RefreshToken` runs,
-  so another client's token reads nothing of its grant. Introspection has no side effect: a rotated
-  refresh token is answered inactive and triggers no replay containment
+  so another client's token reads nothing of its grant, and while its issuing flow is enabled
+  (`record.Client.IsRefreshIssuingFlowEnabled`). Active means live, not that a refresh would pass:
+  the grant's consent, permission and scope-allowance re-checks run only at the token endpoint.
+  Introspection has no side effect: a rotated refresh token is answered inactive and triggers no
+  replay containment
 - Every other token is exactly `{"active": false}`. An active access token carries the token's own
   `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`; a refresh
   token `scope`, its client's `client_id`, `sub`, `iss`, `exp`, `iat` and `jti`. Every answer carries

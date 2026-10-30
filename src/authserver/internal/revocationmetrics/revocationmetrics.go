@@ -17,8 +17,8 @@ const (
 	// Refused is a request answered with an error the client caused: its authentication failed, the
 	// request was malformed, the token was another client's or of a type not revoked.
 	Refused Outcome = "refused"
-	// Error is a fault, answered 503 so the client knows the token still exists (RFC 7009 section
-	// 2.2.1).
+	// Error is a fault, answered 503, on which the client assumes the token still exists and retries
+	// (RFC 7009 section 2.2.1).
 	Error Outcome = "error"
 )
 

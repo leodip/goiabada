@@ -610,8 +610,8 @@ type appBranches struct {
 	// every protocol endpoint's (#400 decision 5).
 	token *routing.Router
 	// revoke carries the revocation endpoint alone. It answers a fault as its handler answers its
-	// own, 503 with the token left as it was (RFC 7009 section 2.2.1), and counts it as an error,
-	// which the protocol branch's 500 would not say (#676 decision 12).
+	// own, 503, on which the client treats the token as still live (RFC 7009 section 2.2.1), and
+	// counts it as an error, which the protocol branch's 500 would not say (#676 decision 12).
 	revoke *routing.Router
 	// introspect carries the introspection endpoint alone. It answers a fault as protocol does, 500
 	// and never {"active": false}, and counts it as an error, which the protocol branch cannot (#676

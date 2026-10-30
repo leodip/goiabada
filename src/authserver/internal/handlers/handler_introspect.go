@@ -59,7 +59,8 @@ type introspection struct {
 // finds it live, and its aud names a resource on the caller's introspection resources (decision 5),
 // so a client may see only the tokens of the APIs an administrator listed for it. A refresh token is
 // active only to the client it was issued to, when the refresh grant's own check finds it live
-// (decision 7); introspecting it spends nothing, and a rotated one answered here is no replay. Every
+// (decision 7) and its issuing flow is enabled; introspecting it spends nothing, and a rotated one
+// answered here is no replay. Every
 // other token, and every token the caller may not see, is answered {"active": false} and nothing
 // else (RFC 7662 section 2.2).
 //
@@ -244,7 +245,9 @@ func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *reco
 
 // introspectRefreshToken answers a refresh token: active only to the client it was issued to, and
 // only when the refresh grant's own check finds it live (decision 7) and the flow that issued it is
-// still enabled for the client, which the grant also requires (#250). Another client's token is
+// still enabled for the client, which the grant also requires (#250). Active says the token is
+// live, not that a refresh would succeed: the grant re-checks consent, permissions and the client's
+// scope allowances against the scope a refresh asks for, when it is made. Another client's token is
 // inactive before anything about its grant is read, so the answer tells a caller nothing of a grant
 // it does not own. The check reads no client: the caller is the token's own, which client
 // authentication found to exist and be enabled.
