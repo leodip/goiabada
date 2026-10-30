@@ -70,7 +70,7 @@ A public client has no secret, so two rules make up for it:
 - **It always uses PKCE.** PKCE ties an authorization code to the app that asked for it, so a stolen code is useless. You can't turn it off for a public client. See [PKCE](/concepts/pkce/).
 - **It can't use the client credentials flow,** since that flow is nothing but the client's own secret.
 
-Switching a client from confidential to public deletes its secret, turns off the client credentials flow, empties its [introspection resources](#introspection-resources), and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing, and the client starts again with no introspection resources.
+Switching a client from confidential to public deletes its secret, turns off the client credentials flow, empties its [introspection resources](#introspection-resources), and revokes the authorization codes and refresh tokens it already holds, because they were issued to a client that had to authenticate. Switching the other way revokes nothing.
 
 ## Flows
 
@@ -196,9 +196,8 @@ An API checking a token with the auth server's [introspection endpoint](/referen
 
 Set the list on the client's **Introspection** tab: choose a resource, click **Add resource**, and click **Save**. Through the Admin API, read it with [`GET /api/v1/admin/clients/{id}/introspection-resources`](/reference/api/admin/operations/getclientintrospectionresources/), and replace it whole with [`PUT`](/reference/api/admin/operations/updateclientintrospectionresources/) on the same path, sending the list as you read it in `expectedResourceIds`. Each save leaves an `updated_client_introspection_resources` entry in the [audit log](/concepts/audit-log/).
 
-- **A public client has none.** It can't authenticate, so it can't introspect: its page has no **Introspection** tab, and a non-empty list for one is refused.
+- **A public client has none.** It can't authenticate, so it can't introspect, and its page has no **Introspection** tab.
 - **Only `authserver:manage` adds the `authserver` resource.** A client listed for it can introspect the tokens of every sign-in, across every app. `authserver:manage-clients` edits the rest of the list, and can remove `authserver` from it. While the client is listed for it, only `authserver:manage` reads or sets its secret.
-- **Deleting the client or a resource** removes its entries.
 
 ## Tokens
 

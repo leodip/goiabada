@@ -113,7 +113,7 @@ There are three ways, and which one fits depends on who's making the change:
 
 Every operation under `/api/v1/` takes an access token in the `Authorization` header, as `Bearer` followed by the token. The reference also lists one public operation outside `/api/v1/`, the client logo, `GET /client/logo/{clientIdentifier}`, which takes none.
 
-The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you, with `typ: at+jwt` in its header and the current issuer as its `iss`. An ID token or a refresh token is refused.
+The token must be an access token the auth server issued for the `authserver` resource, which is what asking for an `authserver:` scope gets you. An ID token or a refresh token is refused.
 
 ## Which tokens each API accepts
 

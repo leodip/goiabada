@@ -78,7 +78,6 @@ The auth server's log has a `client authentication refused at the revocation end
 
 An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors).
 
-A token sent by another client is recorded in the [audit log](/concepts/audit-log/) as `token_revocation_refused`, and every revocation as `revoked_grant`, or as `revoked_access_token` for an access token that belongs to no grant.
 
 ## Calling it from a browser
 

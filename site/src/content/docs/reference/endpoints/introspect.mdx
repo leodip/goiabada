@@ -13,11 +13,9 @@ It's the [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) token introspection 
 
 <Steps>
 
-1. Give your API a confidential [client](/concepts/clients/) of its own. In the admin console, open **Admin**, **Clients** and click **New client**, enter a **Client identifier**, such as `product-api-introspector`, and click **Create client**. On **Authentication**, click **Show** and copy the **Client secret** to your API's configuration.
+1. Give your API a confidential client listed for its resource, as [Protect an API](/guides/protect-an-api/#ask-the-auth-server-about-a-token) shows. See [Introspection resources](/concepts/clients/#introspection-resources).
 
-2. On the client's **Introspection** tab, choose your API's resource, such as `product-api`, click **Add resource**, and click **Save**. See [Introspection resources](/concepts/clients/#introspection-resources).
-
-3. From your API, send the access token it received, with the client's credentials:
+2. From your API, send the access token it received, with the client's credentials:
 
    ```http
    POST /auth/introspect HTTP/1.1
@@ -28,7 +26,7 @@ It's the [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662) token introspection 
    token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiIsInR5cCI6ImF0K2p3dCJ9...
    ```
 
-4. Read whether it's active:
+3. Read whether it's active:
 
    ```json
    {
@@ -98,7 +96,7 @@ The members are read from the token, and they're the same for every client that 
 
 The calling client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here: `401 Unauthorized` with `invalid_client`.
 
-A [public client](/concepts/clients/#public-and-confidential-clients) can't introspect, since it has no secret to authenticate with. It's refused with `401 Unauthorized` and `invalid_client`.
+A [public client](/concepts/clients/#public-and-confidential-clients) can't introspect, since it has no secret to authenticate with.
 
 The auth server's log has a `client authentication refused at the introspection endpoint` warning for each refusal. See [Logs](/deploy/logs/#records-worth-knowing).
 
