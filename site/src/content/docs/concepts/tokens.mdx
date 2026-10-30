@@ -90,7 +90,7 @@ An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/ref
 |---|---|
 | `iss` | The issuer |
 | `sub` | The user's [subject](/concepts/glossary/#subject). In a token from the client credentials flow, the client identifier |
-| `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope, since `/userinfo` belongs to it, or `offline_access`, which only the auth server acts on. A string when there's one, an array when there are more |
+| `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope or `offline_access`. A string when there's one, an array when there are more |
 | `client_id` | The client identifier of the client the token was issued to |
 | `scope` | The scopes the token carries |
 | `typ` | `Bearer` |

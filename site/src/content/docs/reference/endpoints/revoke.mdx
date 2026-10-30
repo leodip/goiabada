@@ -7,7 +7,7 @@ import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This page helps you end a grant from your app, typically when a user signs out, with the revocation endpoint, `/auth/revoke`.
 
-It's the [RFC 7009](https://www.rfc-editor.org/rfc/rfc7009) token revocation endpoint, the `revocation_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). A grant is what one sign-in gave your app: its refresh token, every refresh token that one was rotated into, and every access token issued with them.
+It's the [RFC 7009](https://www.rfc-editor.org/rfc/rfc7009) token revocation endpoint, the `revocation_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). A [grant](/concepts/glossary/#grant) is what one sign-in gave your app: its refresh token, every refresh token that one was rotated into, and every access token issued with them.
 
 ## Revoke a token
 
@@ -47,7 +47,7 @@ It leaves everything else alone. The user stays signed in to the auth server, an
 
 An API that checks access tokens by their signature alone accepts them until they expire, so keep access tokens [short-lived](/concepts/tokens/#how-long-tokens-last). An API that [introspects](/reference/endpoints/introspect/) them sees them inactive at once.
 
-An access token from the client credentials grant or the implicit flow belongs to no grant. Revoking it ends that token alone: `/userinfo` and the auth server's APIs refuse it until it expires.
+An access token from the client credentials grant or the [implicit flow](/legacy-flows/implicit/) belongs to no grant. Revoking it ends that token alone: `/userinfo` and the auth server's APIs refuse it until it expires.
 
 ## The request
 

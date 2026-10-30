@@ -2041,14 +2041,13 @@ paths:
         the same reason, and disables the client credentials flow. The reverse transition and a
         secret rotation revoke nothing.
 
-        The route admits `authserver:manage-clients` and `authserver:manage`. A write to an
-        administrator client is reserved to `authserver:manage`, and so is setting the secret of a
-        client listed for the `authserver` resource among its introspection resources, since
-        whoever holds that secret can introspect the tokens of every sign-in as the client:
-        `authserver:manage-clients` is refused with `MANAGE_SCOPE_REQUIRED` and an
-        `administrator_change_refused` audit record. `authserver:manage-clients` may still make
-        such a client public, which empties its introspection resources, and sets the secret of a
-        client listed only for other resources.
+        The route admits `authserver:manage-clients` and `authserver:manage`. Only
+        `authserver:manage` writes to an administrator client, or sets the secret of a client
+        listed for the `authserver` resource among its introspection resources: whoever holds that
+        secret can introspect access tokens from every app. `authserver:manage-clients` is refused
+        with `MANAGE_SCOPE_REQUIRED` and an `administrator_change_refused` audit record. It can
+        still make such a client public, which empties its introspection resources, and it sets
+        the secret of a client listed only for other resources.
       operationId: updateClientAuthentication
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'

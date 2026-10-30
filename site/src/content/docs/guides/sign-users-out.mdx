@@ -17,7 +17,7 @@ Ending your app's own session isn't enough. The auth server keeps a [session](/c
 
 2. Decide where the user lands afterwards, such as `https://app.example.com/signed-out`, and add it to your client's **Redirect URIs** in the admin console, if it isn't there already. The auth server sends the browser only to an address registered there.
 
-3. When the user clicks your app's sign-out button, read the ID token from their session, and revoke the refresh token at `/auth/revoke`, or the access token if your app keeps no refresh token, with your client's credentials:
+3. When the user clicks your app's sign-out button, read the ID token from their session. Then revoke the [refresh token](/concepts/refresh-tokens/) at `/auth/revoke` with your client's credentials, or the [access token](/concepts/tokens/) if your app keeps no refresh token:
 
    ```http
    POST /auth/revoke HTTP/1.1

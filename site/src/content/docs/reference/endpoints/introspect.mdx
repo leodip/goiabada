@@ -111,7 +111,7 @@ The auth server's log has a `client authentication refused at the introspection 
 
 Every answer carries `Cache-Control: no-store`. If your API caches answers itself, keep each one no longer than you can accept a revoked token being honored, and never past the token's `exp`.
 
-An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors). Browsers can't call the endpoint: it answers no CORS, since only a confidential client may.
+An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors). Browsers can't call the endpoint, since only a confidential client may: it sends no CORS headers.
 
 ## Next steps
 

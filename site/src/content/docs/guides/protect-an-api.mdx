@@ -75,7 +75,7 @@ A service that calls your API on its own, with no user, such as a nightly job, g
 
 ## What a user's token carries
 
-An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope, since the auth server's own `/userinfo` accepts it, or `offline_access`. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
+An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope or `offline_access`. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
 
 ## What a service's token carries
 
@@ -120,7 +120,7 @@ When an operation must stop the moment a token is cut off, have your API also [i
 
 2. On the client's **Introspection** tab, choose `product-api`, click **Add resource**, and click **Save**. The client can now introspect the tokens whose `aud` names `product-api`, and no others.
 
-3. On each request, send the token to the introspection endpoint with the client's credentials:
+3. On each request that needs it, send the token to the introspection endpoint with the client's credentials:
 
    ```bash
    curl -X POST https://auth.example.com/auth/introspect \
