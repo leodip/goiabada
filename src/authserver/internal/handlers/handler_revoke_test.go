@@ -102,8 +102,17 @@ func (e *revokeEndpoint) parses(token *oauth.JwtToken) {
 // post submits form, with the caller's credentials in the body when secret is not empty.
 func (e *revokeEndpoint) post(t *testing.T, form url.Values) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, "/auth/revoke", strings.NewReader(form.Encode()))
+	return e.postBody(t, form.Encode(), nil)
+}
+
+// postBody posts body as it is, form-encoded or not, with the given Authorization header, if any.
+func (e *revokeEndpoint) postBody(t *testing.T, body string, authorization *string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/auth/revoke", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if authorization != nil {
+		req.Header.Set("Authorization", *authorization)
+	}
 	req = withSettings(req, e.settings)
 	rr := httptest.NewRecorder()
 	e.handler.ServeHTTP(rr, req)
@@ -754,6 +763,28 @@ func TestHandleRevokePost_AMalformedRequestIsRefused(t *testing.T) {
 		rr := e.post(t, form)
 
 		assertRevokedAnswer(t, rr)
+	})
+
+	// Both refused before the client or the token is read: no lookup is armed, so one would fail.
+	t.Run("a body that cannot be parsed", func(t *testing.T) {
+		e := newRevokeEndpoint(t)
+
+		rr := e.postBody(t, "token=%zz", nil)
+
+		assertErrorAnswer(t, rr, http.StatusBadRequest, "invalid_request", "The request body could not be parsed.")
+		assert.Equal(t, revokeOutcome("refused"), e.samples(t))
+	})
+
+	t.Run("client credentials sent both as Basic and in the body", func(t *testing.T) {
+		e := newRevokeEndpoint(t)
+		basic := "Basic " + base64.StdEncoding.EncodeToString([]byte("a-client:a-secret"))
+
+		rr := e.postBody(t, callerForm().Encode(), &basic)
+
+		assertErrorAnswer(t, rr, http.StatusBadRequest, "invalid_request",
+			"Client authentication failed: multiple authentication methods provided. "+
+				"Use either HTTP Basic authentication OR client_secret in the request body, but not both.")
+		assert.Equal(t, revokeOutcome("refused"), e.samples(t))
 	})
 }
 
