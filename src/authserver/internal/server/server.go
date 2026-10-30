@@ -397,9 +397,10 @@ const (
 	// is dropped at the same point.
 	readHeaderTimeout = 10 * time.Second
 
-	// readTimeout bounds the whole request, header and body, from when net/http starts reading it:
-	// for a connection's first request before any of it has arrived, for each later one once its
-	// first bytes have. 60s carries a 3 MiB profile picture or logo upload at about 53 KB/s.
+	// readTimeout bounds the whole request, header and body. net/http starts it as it begins reading
+	// the request: on a new connection once any TLS handshake is done, on a kept-alive one once the
+	// next request's first bytes have arrived. 60s carries a 3 MiB profile picture or logo upload at
+	// about 53 KB/s.
 	readTimeout = 60 * time.Second
 
 	// writeTimeout must outlast the body read plus the slowest handler, because a handler that runs

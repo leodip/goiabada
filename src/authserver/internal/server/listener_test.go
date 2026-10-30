@@ -84,15 +84,15 @@ func TestNewHTTPServer_SetsEveryTimeoutAndTheHeaderBound(t *testing.T) {
 		})
 	}
 
-	// The smallest non-zero timeout is the TLS handshake's deadline, so a client that never says
-	// hello is dropped at readHeaderTimeout only while it stays the smallest.
+	// The TLS handshake's deadline is the smallest of the non-zero header, read and write timeouts
+	// (net/http's tlsHandshakeTimeout; the idle timeout plays no part), so a client that never says
+	// hello is dropped at readHeaderTimeout only while it stays the smallest of the three.
 	assert.Less(t, readHeaderTimeout, readTimeout, "readHeaderTimeout must stay the handshake deadline")
 	assert.Less(t, readHeaderTimeout, writeTimeout, "readHeaderTimeout must stay the handshake deadline")
-	assert.Less(t, readHeaderTimeout, idleTimeout, "readHeaderTimeout must stay the handshake deadline")
 
-	// net/http starts the read deadline when it begins reading a request, no later than the
-	// request's first byte, and the write deadline once the header block has been read, so a
-	// write timeout shorter than the read timeout loses the response to a body the read timeout
-	// admits.
+	// net/http times readTimeout from when it begins reading a request, and writeTimeout from when it
+	// has read the request's header block, which is no earlier. With writeTimeout no shorter, the
+	// write deadline never falls before the read deadline, so a body the read timeout admits still
+	// has time for its response.
 	assert.GreaterOrEqual(t, writeTimeout, readTimeout, "writeTimeout must not end before readTimeout")
 }
