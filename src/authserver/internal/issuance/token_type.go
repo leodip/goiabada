@@ -40,3 +40,10 @@ func IsNotIDTokenTyp(typ string) bool {
 	}
 	return false
 }
+
+// AccessTokenHeaderType is the JOSE header typ every access token carries, from every grant (RFC
+// 9068 section 2.1 MUST). The auth server's own access-token check requires it, as section 4 asks of
+// every resource server, so an ID or refresh token, which keep the library's default header, and an
+// access token issued before #676, whose header said JWT, are never taken for one. The typ CLAIM
+// stays TokenTypeBearer, since APIs may read it.
+const AccessTokenHeaderType = "at+jwt"

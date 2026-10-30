@@ -325,6 +325,7 @@
 "adminconsole.client_tabs.web_origins" = "Web-Origins"
 "adminconsole.client_tabs.user_sessions" = "Sitzungen"
 "adminconsole.client_tabs.permissions" = "Berechtigungen"
+"adminconsole.client_tabs.introspection" = "Introspektion"
 
 "adminconsole.group_tabs.settings" = "Einstellungen"
 "adminconsole.group_tabs.attributes" = "Attribute"
@@ -802,7 +803,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Neues Secret generiert. Speichern Sie, um es zu verwenden. Bis dahin gilt weiterhin das bisherige Secret."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentifizierung gespeichert."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Sie ändern das Client-Secret. Alles, was noch das alte Secret sendet, wird bis zur Aktualisierung abgelehnt."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Sie machen den Client öffentlich. Sein Secret wird entfernt. Alles, was sich damit anmeldet, muss angepasst werden. Seine Refresh Tokens und Autorisierungscodes werden widerrufen. Bereits ausgestellte Access Tokens bleiben bis zum Ablauf gültig. Anmeldungen bei anderen Clients bleiben bestehen."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Sie machen den Client öffentlich. Sein Secret wird entfernt. Alles, was sich damit anmeldet, muss angepasst werden. Seine Refresh Tokens und Autorisierungscodes werden widerrufen, und die damit ausgestellten Access Tokens werden sofort abgelehnt, vom Authentifizierungsserver und von APIs, die Tokens bei ihm prüfen. Eine API, die nur die Signatur eines Tokens prüft, akzeptiert sie bis zum Ablauf. Seine Introspektions-Ressourcen werden geleert. Anmeldungen bei anderen Clients bleiben bestehen."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Sie machen den Client vertraulich. Alles, was sich damit anmeldet, muss dann das Client-Secret senden."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -822,7 +823,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "Falls dieser Client im Browser läuft und /auth/token oder /userinfo aufruft, tragen Sie hier seine Origin ein: Schema, Host und optionaler Port, ohne weitere Bestandteile. Beispiele: https://www.example.com oder https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Falls dieser Client im Browser läuft und /auth/token, /auth/revoke oder /userinfo aufruft, tragen Sie hier seine Origin ein: Schema, Host und optionaler Port, ohne weitere Bestandteile. Beispiele: https://www.example.com oder https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Web-Origin"
 "adminconsole.admin_clients.web_origins.add_button" = "Hinzufügen"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web-Origins"
@@ -856,6 +857,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "Der Client hat diese Berechtigung bereits."
 "adminconsole.admin_clients.permissions.added" = "Berechtigung erteilt. Speichern Sie, um die Änderung zu übernehmen."
 "adminconsole.admin_clients.permissions.removed" = "Berechtigung entfernt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.introspection.lead" = "Die Ressourcen, deren Tokens dieser Client introspektieren darf. Eine API, die Tokens beim Authentifizierungsserver prüft, ruft als vertraulicher Client auf und erfährt nur dann, dass ein Token aktiv ist, wenn es für eine hier aufgeführte Ressource ausgestellt ist."
+"adminconsole.admin_clients.introspection.field.resource" = "Ressource"
+"adminconsole.admin_clients.introspection.select_resource" = "Ressource wählen"
+"adminconsole.admin_clients.introspection.add_button" = "Ressource hinzufügen"
+"adminconsole.admin_clients.introspection.col_listed" = "Introspektionsressourcen"
+"adminconsole.admin_clients.introspection.remove_label" = "Entfernen"
+"adminconsole.admin_clients.introspection.none_yet" = "Noch keine Introspektionsressourcen."
+"adminconsole.admin_clients.introspection.public_client" = "Ein öffentlicher Client kann sich nicht authentifizieren und daher keine Tokens introspektieren. Machen Sie den Client im Tab „Authentifizierung“ vertraulich, um Introspektionsressourcen aufzulisten."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Introspektionsressourcen gespeichert."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Wählen Sie eine Ressource aus, die Sie hinzufügen möchten."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "Der Client führt diese Ressource bereits auf."
+"adminconsole.admin_clients.introspection.added" = "Ressource hinzugefügt. Speichern Sie, um die Änderung zu übernehmen."
+"adminconsole.admin_clients.introspection.removed" = "Ressource entfernt. Speichern Sie, um die Änderung zu übernehmen."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 
@@ -1661,6 +1675,7 @@
 "handler.client.secret_invalid" = "Ungültiges Client-Secret. Bitte generieren Sie ein neues."
 "handler.client_administrative_scopes.allowed_required" = "allowed muss angegeben werden."
 "handler.client_administrative_scopes.console_always_allowed" = "Der Client der Verwaltungskonsole darf immer administrative Scopes anfordern."
+"handler.client_introspection_resources.public_client" = "Ein öffentlicher Client kann keine Tokens introspektieren und daher keine Introspektionsressourcen auflisten."
 "handler.client_permissions.client_credentials_disabled" = "Client-Berechtigungen können nur bei aktiviertem Client Credentials Flow konfiguriert werden."
 "handler.client_redirect_uris.no_redirect_flow" = "Redirect-URIs werden vom Authorization Code Flow mit PKCE und vom Implicit Flow verwendet. Für diesen Client ist keiner der beiden aktiviert."
 "handler.client_redirect_uris.too_many" = "Ein Client kann höchstens {{.max}} Redirect-URIs haben. Diese Liste enthält {{.count}}."

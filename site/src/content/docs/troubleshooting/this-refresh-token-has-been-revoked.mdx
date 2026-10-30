@@ -21,7 +21,7 @@ Or every refresh token the user holds with your app fails at once, on every devi
 
 ## Why it happens
 
-There are two causes: a refresh token that came back after it was rotated, which is the usual one, and a consent withdrawn.
+There are three causes: a refresh token that came back after it was rotated, which is the usual one, a consent withdrawn, and your app revoking the grant.
 
 A refresh token is good for one refresh. Each refresh returns a new one and retires the old one, and that's called rotation.
 
@@ -40,6 +40,10 @@ When the user withdraws their consent to your app under **Account**, **Consents*
 
 There's nothing to fix in your app beyond signing the user in again. If your app asks for consent, the user is asked again.
 
+### A grant your app revoked
+
+When your app sends one of a grant's tokens to [`/auth/revoke`](/reference/endpoints/revoke/), at sign-out for example, the grant's refresh tokens are refused from then on, usually with "This refresh token has been revoked." The audit log holds a `revoked_grant` event for your client, and no `refresh_token_replay_detected`. Look for a sign-out in one tab or instance while another was refreshing. Sign the user in again.
+
 ## Fix it
 
 This is for a refresh token sent twice.
@@ -57,7 +61,7 @@ Once a family is revoked, the user has to sign in to your app again. Their sessi
 
 **After a replay, only that one grant is revoked.** The user's session with the auth server, their sign-ins to other clients and their other grants keep working.
 
-**Access tokens already issued stay valid** until they expire. They're signed JWTs your APIs check on their own, so revoking the refresh token stops the next refresh, not an access token already handed out. Keep access token lifetimes short.
+**Access tokens already issued stay valid at an API that checks only their signature**, until they expire. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/), its Admin and Account APIs, and an API that [introspects](/reference/endpoints/introspect/) them refuse them at once. Keep access token lifetimes short.
 
 **The replay check comes last.** A refresh that fails for another reason first, such as a user who was disabled or whose password changed, gets that reason, and nothing is revoked.
 

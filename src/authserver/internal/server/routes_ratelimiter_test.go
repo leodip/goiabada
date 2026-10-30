@@ -16,10 +16,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
@@ -72,6 +74,12 @@ const (
 	// The subject every account-API case presents, and therefore the key its limiter
 	// buckets on.
 	routesTestSubject = "8b0d8c7e-3a0f-4c8b-9d3a-0f4c8b9d3a0f"
+
+	// The configured issuer, and the client every bearer token these tests present was issued to,
+	// which the session guard reads (#676).
+	routesTestIssuer      = "https://auth.example.com"
+	routesTestAPIClientId = "routes-test-api-client"
+	routesTestAccessJti   = "routes-test-access-jti"
 
 	// What the caller submits where a credential is expected. Never the right one: these
 	// tiers count failures, so a correct credential would spend nothing and the budget
@@ -132,6 +140,7 @@ func routesTestSettings() *record.Settings {
 	return &record.Settings{
 		Id:                         1,
 		AppName:                    "Goiabada",
+		Issuer:                     routesTestIssuer,
 		SelfRegistrationEnabled:    true,
 		SMTPEnabled:                true,
 		AuditLogsInConsoleEnabled:  false,
@@ -187,6 +196,7 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
 		Return(&record.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
+	armRoutesTestAPIClient(database)
 	ropcEnabled := true
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestROPCClientId).
 		Return(&record.Client{Id: 2, ClientIdentifier: routesTestROPCClientId, Enabled: true, IsPublic: true,
@@ -201,22 +211,24 @@ func newRoutesTestServerOver(t *testing.T, configure func(*config.Config), sessi
 
 	registry := metrics.NewRegistry()
 	s := &Server{
-		router:       routing.New(),
-		database:     database,
-		sessionStore: sessionStore,
-		templateFS:   web.TemplateFS(),
-		staticFS:     web.StaticFS(),
-		cfg:          cfg,
-		jobs:         afterresponse.New(registry),
-		metrics:      registry,
-		tokenMetrics: tokenmetrics.Register(registry),
+		router:               routing.New(),
+		database:             database,
+		sessionStore:         sessionStore,
+		templateFS:           web.TemplateFS(),
+		staticFS:             web.StaticFS(),
+		cfg:                  cfg,
+		jobs:                 afterresponse.New(registry),
+		metrics:              registry,
+		tokenMetrics:         tokenmetrics.Register(registry),
+		revocationMetrics:    revocationmetrics.Register(registry),
+		introspectionMetrics: introspectionmetrics.Register(registry),
 	}
 	// What a forgot-password request hands off runs against this test's mocks, so it is waited
 	// for before they are torn down, as the server waits for it on shutdown.
 	t.Cleanup(func() { s.jobs.Wait(10 * time.Second) })
 	// Every branch is the bare router: these tests drive the registrations rather than the
 	// application chain, and put the settings on each request's context themselves.
-	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router})
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router})
 	return s
 }
 
@@ -252,11 +264,29 @@ func apiRequest(method string, target string, body string) *http.Request {
 
 // accountAPIToken is the decoded bearer token apiRequest carries.
 func accountAPIToken() oauth.JwtToken {
-	return oauth.JwtToken{Claims: jwt.MapClaims{
+	return routesTestAccessToken(jwt.MapClaims{
 		"sub":       routesTestSubject,
 		"scope":     builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier,
 		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
-	}}
+	})
+}
+
+// routesTestAccessToken is claims as an access token issuance mints since #676: the at+jwt header,
+// routesTestIssuer, routesTestAPIClientId and routesTestAccessJti on top of claims.
+func routesTestAccessToken(claims jwt.MapClaims) oauth.JwtToken {
+	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientId, "jti": routesTestAccessJti}
+	for name, value := range claims {
+		all[name] = value
+	}
+	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
+}
+
+// armRoutesTestAPIClient has the session guard find routesTestAPIClientId, enabled, and
+// routesTestAccessJti not revoked, which it reads of a token without grant_id (#676).
+func armRoutesTestAPIClient(database *datamocks.Database) {
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
+		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
+	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, routesTestAccessJti).Return(false, nil).Maybe()
 }
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:

@@ -65,12 +65,14 @@ func HandlePermissionsGet(
 			ClientCredentialsEnabled bool
 			Permissions              []grantedPermission
 			IsSystemLevelClient      bool
+			IsPublic                 bool
 		}{
 			ClientId:                 clientResp.Id,
 			ClientIdentifier:         clientResp.ClientIdentifier,
 			ClientCredentialsEnabled: clientResp.ClientCredentialsEnabled,
 			Permissions:              make([]grantedPermission, 0, len(perms)),
 			IsSystemLevelClient:      clientResp.IsSystemLevelClient,
+			IsPublic:                 clientResp.IsPublic,
 		}
 		for _, permission := range perms {
 			adminClientPermissions.Permissions = append(adminClientPermissions.Permissions, grantedPermission{

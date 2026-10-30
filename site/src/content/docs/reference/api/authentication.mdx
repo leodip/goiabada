@@ -123,14 +123,14 @@ The Account API accepts only a token issued for a user. A token from the client 
 
 ## When a token stops working
 
-A user's token is checked against the user and their session on every call, so it stops working before it expires once the user is disabled or the session it was issued through ends. The call is then answered `401` with `INVALID_TOKEN`.
+Every token is checked against its client on every call, and a user's token against the user and their session too, so it stops working before it expires once the client or the user is disabled, the session it was issued through ends, or it or its grant is revoked. The call is then answered `401` with `INVALID_TOKEN`.
 
 The other refusals:
 
 | Answer | Error code | Why |
 |---|---|---|
 | `401` | `ACCESS_TOKEN_REQUIRED` | No token was sent. |
-| `401` | `INVALID_TOKEN` | The token is malformed, expired, not an access token for `authserver`, or its user or session is gone. |
+| `401` | `INVALID_TOKEN` | The token is malformed, expired, revoked, not an access token for `authserver`, from another issuer, its grant was revoked, or its client, user or session is gone or disabled. |
 | `403` | `INSUFFICIENT_SCOPE` | The token carries none of the scopes the operation accepts. |
 
 The [errors](/reference/api/errors/) page has the format of every error answer.

@@ -19,15 +19,16 @@ func TestCreateAuditLog(t *testing.T) {
 			Details:    `{"user_id": "123", "action": "login"}`,
 		}
 
+		before := time.Now().UTC()
 		err := database.CreateAuditLog(context.Background(), nil, auditLog)
+		after := time.Now().UTC()
 		require.NoError(t, err)
 
 		// Verify ID was assigned
 		assert.Positive(t, auditLog.Id)
 
-		// Verify CreatedAt was set
-		assert.False(t, auditLog.CreatedAt.IsZero())
-		assert.WithinDuration(t, time.Now().UTC(), auditLog.CreatedAt, 2*time.Second)
+		// Verify CreatedAt was set, from a reading taken during the call
+		assert.WithinRange(t, auditLog.CreatedAt, before, after)
 	})
 
 	t.Run("Success - CreatedAt overridden", func(t *testing.T) {
@@ -39,12 +40,13 @@ func TestCreateAuditLog(t *testing.T) {
 			CreatedAt:  pastTime,
 		}
 
+		before := time.Now().UTC()
 		err := database.CreateAuditLog(context.Background(), nil, auditLog)
+		after := time.Now().UTC()
 		require.NoError(t, err)
 
 		// Verify CreatedAt was overridden to current time (not pastTime)
-		assert.NotEqual(t, pastTime, auditLog.CreatedAt)
-		assert.WithinDuration(t, time.Now().UTC(), auditLog.CreatedAt, 2*time.Second)
+		assert.WithinRange(t, auditLog.CreatedAt, before, after)
 	})
 
 	t.Run("Error - Empty audit event", func(t *testing.T) {

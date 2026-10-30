@@ -398,6 +398,15 @@ func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *tes
 	assert.Empty(t, *requested, "nothing precedes the first attempt, cancelled or not")
 }
 
+// bodyDeadline is the deadline the cases below hand RunInTransaction, to end while their statement
+// is blocked. What runs before that statement takes microseconds, so only a stall of most of the
+// deadline could spend it first. Each statement blocks for statementBlock, far past it, and gives
+// way the moment the deadline ends it.
+const (
+	bodyDeadline   = 5 * time.Second
+	statementBlock = time.Minute
+)
+
 // TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried is the exit that does NOT go
 // through abandoned, because on a first attempt there is no deadlock waiting to be joined: the
 // statement's own context error is not a deadlock, so the ordinary not-a-deadlock arm returns it
@@ -407,10 +416,10 @@ func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *tes
 // a caller that has already gone.
 func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T) {
 	// The statement takes longer than the deadline allows, interruptibly.
-	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
+	d := &scriptedDriver{execs: []*scriptedExec{{delay: statementBlock}}}
 	db := retryingDB(t, d)
 	requested := recordBackoff(db)
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), bodyDeadline)
 	defer cancel()
 	ran := 0
 
@@ -441,10 +450,10 @@ func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T)
 func TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched(t *testing.T) {
 	// The same shape as the case above: one attempt, blocked inside its statement for longer
 	// than the deadline allows, so no deadlock ever reaches lastDeadlock.
-	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
+	d := &scriptedDriver{execs: []*scriptedExec{{delay: statementBlock}}}
 	db := retryingDB(t, d)
 	requested := recordBackoff(db)
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), bodyDeadline)
 	defer cancel()
 	ran := 0
 	var captured error
@@ -469,10 +478,10 @@ func TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched(t *te
 // transaction, which is an operator sent after a non-event (#386).
 func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
+	d := &scriptedDriver{execs: []*scriptedExec{{delay: statementBlock}}}
 	db := retryingDB(t, d)
 	recordBackoff(db)
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), bodyDeadline)
 	defer cancel()
 	ran := 0
 
@@ -585,10 +594,10 @@ func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor
 	// longer than the deadline allows, which is what puts the cancellation INSIDE the rerun
 	// rather than between the two attempts. The recorded backoff is instant, so the whole
 	// deadline is still unspent when the second attempt begins.
-	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {delay: 10 * time.Second}}}
+	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {delay: statementBlock}}}
 	db := retryingDB(t, d)
 	requested := recordBackoff(db)
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), bodyDeadline)
 	defer cancel()
 	ran := 0
 	var captured error

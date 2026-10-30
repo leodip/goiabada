@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "settings" .client.ClientId .storedClient.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
+{{ template "client_header" (args "settings" .client.ClientId .storedClient.ClientIdentifier .client.IsSystemLevelClient .storedClient.IsPublic $.ctx) }}
 
 {{/* errorField names the field a refusal is about, which is marked invalid, described by the
      notice and focused. A save asks first, in one dialog, about each change below marked

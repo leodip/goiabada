@@ -18,7 +18,12 @@ type WellKnownConfig struct {
 	ScopesSupported                   []string `json:"scopes_supported"`
 	ClaimsSupported                   []string `json:"claims_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
-	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
+	// RFC 8414 section 2 (#676): revocation (RFC 7009) and introspection (RFC 7662).
+	RevocationEndpoint                        string   `json:"revocation_endpoint"`
+	RevocationEndpointAuthMethodsSupported    []string `json:"revocation_endpoint_auth_methods_supported"`
+	IntrospectionEndpoint                     string   `json:"introspection_endpoint"`
+	IntrospectionEndpointAuthMethodsSupported []string `json:"introspection_endpoint_auth_methods_supported"`
+	CodeChallengeMethodsSupported             []string `json:"code_challenge_methods_supported"`
 	// Written false, never omitted: OIDC Discovery 1.0 section 3 reads an absent
 	// request_uri_parameter_supported as true, while the authorize endpoint refuses request_uri
 	// (request_uri_not_supported). request_parameter_supported defaults to false and is written

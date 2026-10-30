@@ -321,6 +321,7 @@
 "adminconsole.client_tabs.web_origins" = "Web origins"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
+"adminconsole.client_tabs.introspection" = "Introspection"
 
 "adminconsole.group_tabs.settings" = "Settings"
 "adminconsole.group_tabs.attributes" = "Attributes"
@@ -798,7 +799,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "New secret generated. Save to start using it; until then the current one keeps working."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Authentication saved."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "You're changing the client secret, so anything still sending the old one will be refused until it's updated."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked; access tokens already issued will keep working until they expire, and users will stay signed in to other clients."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "You're making the client public. Its secret will be removed, so anything that signs in with it will need updating. Its refresh tokens and authorization codes will be revoked, and the access tokens issued with them will be refused at once by the auth server and by APIs that check tokens with it; an API that only checks a token's signature accepts them until they expire. Its introspection resources will be cleared, and users will stay signed in to other clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "You're making the client confidential. Anything that signs in with it will have to send the client secret."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -818,7 +819,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "If this client runs in a browser and calls /auth/token or /userinfo, register its origin here: a scheme, a host and an optional port, with nothing after them, such as https://www.example.com or https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "If this client runs in a browser and calls /auth/token, /auth/revoke or /userinfo, register its origin here: a scheme, a host and an optional port, with nothing after them, such as https://www.example.com or https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Web origin"
 "adminconsole.admin_clients.web_origins.add_button" = "Add"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web origins"
@@ -852,6 +853,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "The client already has that permission."
 "adminconsole.admin_clients.permissions.added" = "Permission granted. Save to keep the change."
 "adminconsole.admin_clients.permissions.removed" = "Permission removed. Save to keep the change."
+"adminconsole.admin_clients.introspection.lead" = "The resources whose tokens this client may introspect. An API checking tokens with the auth server calls as a confidential client, and learns that a token is active only when it is for a resource listed here."
+"adminconsole.admin_clients.introspection.field.resource" = "Resource"
+"adminconsole.admin_clients.introspection.select_resource" = "Choose a resource"
+"adminconsole.admin_clients.introspection.add_button" = "Add resource"
+"adminconsole.admin_clients.introspection.col_listed" = "Introspection resources"
+"adminconsole.admin_clients.introspection.remove_label" = "Remove"
+"adminconsole.admin_clients.introspection.none_yet" = "No introspection resources yet."
+"adminconsole.admin_clients.introspection.public_client" = "A public client can't authenticate, so it can't introspect tokens. Make the client confidential, on the Authentication tab, to list introspection resources."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Introspection resources saved."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Choose a resource to add."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "The client already lists that resource."
+"adminconsole.admin_clients.introspection.added" = "Resource added. Save to keep the change."
+"adminconsole.admin_clients.introspection.removed" = "Resource removed. Save to keep the change."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 
@@ -1657,6 +1671,7 @@
 "handler.client.secret_invalid" = "Invalid client secret. Please generate a new one."
 "handler.client_administrative_scopes.allowed_required" = "allowed is required."
 "handler.client_administrative_scopes.console_always_allowed" = "The admin console's client is always allowed to request the administrative scopes."
+"handler.client_introspection_resources.public_client" = "A public client can't introspect tokens, so it can't list introspection resources."
 "handler.client_permissions.client_credentials_disabled" = "Client permissions can only be configured when client credentials flow is enabled"
 "handler.client_redirect_uris.no_redirect_flow" = "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client."
 "handler.client_redirect_uris.too_many" = "A client can have at most {{.max}} redirect URIs, and this list has {{.count}}."

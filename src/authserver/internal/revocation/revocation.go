@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -24,6 +25,7 @@ type Database interface {
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
@@ -268,7 +270,10 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
 // is recorded on EventRevokedClientGrants, and is also the reason a family's revocation record
 // carries when RevokeClientGrants wrote it (#245, #259). ReasonConsentWithdrawn is the reason a
-// family's revocation record carries when a consent withdrawal's sweep wrote it (#622).
+// family's revocation record carries when a consent withdrawal's sweep wrote it (#622),
+// ReasonClientRevoked the one it carries when a client revoked the grant at /auth/revoke (#676),
+// and ReasonSessionTerminated and ReasonAuthCodeReuse the ones it carries when a session's
+// termination or the response to a reused authorization code wrote it (#676).
 // Constants rather than inline strings so the sites cannot drift and a log consumer has
 // something to match against, and one block so the next site's reason has one place to go.
 // Every value is stored data: renaming a constant is free, changing its string is not.
@@ -286,6 +291,9 @@ const (
 	ReasonAccountDisabled    = "account_disabled"
 	ReasonClientBecamePublic = "client_became_public"
 	ReasonConsentWithdrawn   = "consent_withdrawn"
+	ReasonClientRevoked      = "client_revoked"
+	ReasonSessionTerminated  = "session_terminated"
+	ReasonAuthCodeReuse      = "auth_code_reuse"
 )
 
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
@@ -364,7 +372,7 @@ type TerminationResult struct {
 // the grants of that session are revoked, sweeps the tokens those grants issued, and deletes the
 // session row, in ONE transaction it owns and commits (#129 decision 5).
 //
-// The three writes, in the order this transaction issues them. #129 decision 5 put the code sweep
+// The four writes, in the order this transaction issues them. #129 decision 5 put the code sweep
 // first; #139 moved the deletion ahead of it, and the reason is the whole of write 1 below.
 //
 //  1. DeleteUserSession, FIRST because it is the statement that TAKES THE SESSION ROW. An
@@ -387,13 +395,18 @@ type TerminationResult struct {
 //     offline grant's tokens, because an offline refresh token's own session_identifier is empty
 //     and the sid its grant came from lives on the codes row. Filtering these rows by
 //     rt.SessionIdentifier would therefore drop exactly the offline tokens decision 2 exists to
-//     revoke.
+//     revoke. Before it flips a row, recordFamilies writes the revocation record of every family
+//     the sweep read, for the reason RevokeClientGrants states (#259): a rotation that claimed its
+//     parent before this transaction read the rows inserts its child after the read, so the sweep
+//     never reaches the child. The revoked code refuses that child at the refresh grant, but the
+//     access token the rotation minted names only its grant, and the access-token check reads the
+//     family, not the code: the record is what ends that token at once (#676 decision 1).
 //
 // Neither sweep is affected by running after the deletion: RevokeCodesBySessionIdentifier keys on
 // codes.session_identifier and the refresh sweep joins refresh_tokens to codes, so neither reads
 // user_sessions, and codes carries no foreign key to it.
 //
-// Writes 1 and 3 are cleanup. Absence of a session row is never read as termination anywhere,
+// Writes 1 and 4 are cleanup. Absence of a session row is never read as termination anywhere,
 // because the background worker reaps idle and expired sessions routinely while an offline grant
 // is designed to outlive that, which is why the durable fact has to be written down positively
 // (decision 4).
@@ -433,11 +446,13 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		return TerminationResult{}, errs.New("terminating a user session requires a session identifier")
 	}
 
-	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
-	// The body is safe to rerun: it reads nothing from outside the closure but the session it
-	// was handed, and the counts it reports are the committing attempt's.
+	// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the writes together
+	// (#301), and so does a family record lost to a containment of the same family that overlaps
+	// this transaction, as RevokeClientGrantsTx states. The body is safe to rerun: it reads nothing
+	// from outside the closure but the session it was handed, the family records are written or
+	// found already written, and the counts it reports are the committing attempt's.
 	var result TerminationResult
-	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		// First, and write 1 of the doc comment above is why: it is the statement that takes the
 		// session row, which is what orders this transaction against a ceremony minting a code
 		// for the session it is ending (#139).
@@ -451,6 +466,11 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		}
 
 		tokens, err := db.GetRefreshTokensBySessionIdentifier(ctx, tx, userSession.SessionIdentifier)
+		if err != nil {
+			return err
+		}
+
+		err = recordFamilies(ctx, db, tx, tokens, ReasonSessionTerminated)
 		if err != nil {
 			return err
 		}
@@ -483,8 +503,9 @@ type AuthCodeReuseResult struct {
 }
 
 // RevokeOnAuthCodeReuse is the RFC 6749 section 10.5 response to a reused authorization code, on
-// the caller's transaction: it revokes the refresh tokens issued through the replayed code's session
-// and deletes that session when it revoked something.
+// the caller's transaction: it records the families of the refresh tokens issued through the
+// replayed code's session revoked, revokes those tokens, and deletes that session when it revoked
+// something.
 //
 // Its first statement takes the session row, ahead of every grant that hangs off it, so that this
 // response and a termination of the same session serialize on that row (#139). See the comment on
@@ -536,6 +557,16 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 			"code_id", code.Id)
 		refreshTokens, err = db.GetRefreshTokensByCodeId(ctx, tx, code.Id)
 	}
+	if err != nil {
+		return AuthCodeReuseResult{}, err
+	}
+
+	// A record for every family the sweep read, before it flips a row, for the reason
+	// TerminateUserSessionTx states: a rotation of one of these families that claimed its parent
+	// before the read inserts a child the sweep never reaches, and the access token it minted would
+	// otherwise stay live under a grant this response ended (#676 decision 1). A losing racer of a
+	// concurrent redemption reads no committed token, so it records nothing, as it revokes nothing.
+	err = recordFamilies(ctx, db, tx, refreshTokens, ReasonAuthCodeReuse)
 	if err != nil {
 		return AuthCodeReuseResult{}, err
 	}
@@ -593,10 +624,13 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 		return AuthCodeReuseResult{}, errs.New("the response to a reused authorization code requires the reused code")
 	}
 
-	// Opened through RunInTransaction, so a deadlock reruns the body (#301). It is safe to rerun:
-	// every read is inside the closure, and result is whatever the attempt that committed revoked.
+	// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the body (#301), and so
+	// does a family record lost to an overlapping containment of the same family, as
+	// RevokeClientGrantsTx states. It is safe to rerun: every read is inside the closure, the family
+	// records are written or found already written, and result is whatever the attempt that
+	// committed revoked.
 	var result AuthCodeReuseResult
-	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		var err error
 		result, err = RevokeOnAuthCodeReuse(ctx, db, tx, code)
 		return err
@@ -650,8 +684,10 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // its own sweep, and the user withdrawing consent to one app is signed in with a session
 // that may be serving every other app.
 //
-// Access tokens already issued keep working until they expire, exactly as they do under
-// RevokeClientGrants, because nothing in resource validation consults a refresh token.
+// The access tokens those grants issued are refused at once, exactly as under
+// RevokeClientGrants: each names its grant, and liveness.AccessToken, which the bearer guard
+// and introspection share, refuses a grant whose family is recorded (#676 decision 1). An API
+// that checks tokens by their signature alone accepts them until they expire.
 //
 // Opened through RunInTransactionRetryingConflict, so a deadlock reruns the body together
 // (#301), and so does a family record lost to a containment of the same family that
@@ -766,8 +802,11 @@ type ClientGrantResult struct {
 // It deliberately does NOT advance any user's authentication generation and does NOT delete any
 // session. Both are user-scoped: deleting the sessions of everyone who ever used this client would
 // sign each of them out of every OTHER client they hold, which is the collateral damage a
-// client-scoped action exists to avoid. Access tokens already issued keep working until they
-// expire, because nothing in session validation consults a code or a refresh token.
+// client-scoped action exists to avoid. The access tokens the client's grants issued are refused
+// at once by liveness.AccessToken, which the bearer guard and introspection share, since each names
+// its grant and the grant's family is recorded below (#676 decision 1); its client credentials
+// tokens, which have no grant, are not. An API that checks tokens by their signature alone accepts
+// them until they expire.
 //
 // No compensating "revoke a code that landed after the sweep" pass exists or is owed, and that is
 // deliberate rather than an omission. A code inserted after this commits belongs to a client that
@@ -908,7 +947,77 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 	return result, nil
 }
 
-// AuditLogger records one security event. This package declares only the shape its five Log*
+// GrantRevocationResult reports what a client's revocation of one grant actually did (#676).
+type GrantRevocationResult struct {
+	// RevokedRefreshTokenJtis lists only the members this call transitioned, per
+	// RevokeRefreshTokens. A member already revoked before the call, by a rotation or an earlier
+	// revocation, is absent. Non-nil on the success path, so a JSON audit payload carries [] rather
+	// than null.
+	RevokedRefreshTokenJtis []string
+}
+
+// RevokeGrantTx ends one grant at its client's request, the revocation endpoint's operation (RFC
+// 7009, #676 decision 1): it records the grant's refresh token family revoked under
+// ReasonClientRevoked and revokes every member of it, in ONE transaction it opens and commits. The
+// grant is named by its family's identifier, the first refresh token's jti, which a refresh token's
+// row carries and an access token names as grant_id.
+//
+// The two writes, in this order:
+//
+//  1. RecordRefreshTokenFamilyRevoked, first for the reason RevokeClientGrants states (#259): a
+//     rotation claims its parent and inserts its child in separate statements, so a refresh that
+//     validated before this transaction can insert a live child after it commits. The record
+//     outlives the sweep, and the refresh validator and the rotation's own transaction refuse a
+//     token of a recorded family, so that child is refused at its next refresh or never inserted. It
+//     is also what ends the grant's access tokens: the access-token check refuses a grant_id whose
+//     family is recorded. A family another path recorded first keeps its reason.
+//  2. The family's members, read afresh and swept, which flips what stands now and gives the audit
+//     record the jtis it moved.
+//
+// It ends the grant and nothing else: no session, no generation, no other grant of the user or the
+// client, since the client asked to be done with this one grant (decision 12).
+//
+// Opened through RunInTransactionRetryingConflict, so a deadlock reruns the body, and so does a
+// family record lost to a containment of the same family that overlaps this transaction, as
+// RevokeClientGrantsTx states. The body is safe to rerun: the record is written or found already
+// written, the members are read afresh on each attempt, and result is the committing attempt's.
+//
+// The audit event is the CALLER's, through LogRevokedGrant after this returns. On any error the
+// result is the zero value, so a caller cannot audit a rolled-back revocation, and the commit
+// contract RevokeUserAuthStateTx documents holds: a reported commit failure's outcome is
+// indeterminate, and the caller answers it as a fault, never as a revocation.
+func RevokeGrantTx(ctx context.Context, db Database, grantId string) (GrantRevocationResult, error) {
+	// Refused before a transaction is opened, so a caller bug is not reported as a database failure
+	// after a round trip.
+	if grantId == "" {
+		return GrantRevocationResult{}, errs.New("revoking a grant requires its family identifier")
+	}
+
+	var result GrantRevocationResult
+	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
+		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, grantId, ReasonClientRevoked); err != nil {
+			return err
+		}
+
+		members, err := db.GetRefreshTokensByFirstRefreshTokenJti(ctx, tx, grantId)
+		if err != nil {
+			return err
+		}
+
+		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, members)
+		if err != nil {
+			return err
+		}
+		result = GrantRevocationResult{RevokedRefreshTokenJtis: revokedJtis}
+		return nil
+	})
+	if err != nil {
+		return GrantRevocationResult{}, err
+	}
+	return result, nil
+}
+
+// AuditLogger records one security event. This package declares only the shape its Log*
 // helpers need rather than depending on the audit implementation that satisfies it, and rather
 // than importing a handler package to borrow the declaration: the context is first because every
 // audit event raised while serving a request is correlated to that request, so the console record
@@ -1065,4 +1174,111 @@ func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, user
 		// Always a list rather than null: TerminationResult initialises it on the success path.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
 	})
+}
+
+// The type of token a client sent to the revocation endpoint, as its audit records name it: RFC
+// 7009 section 2.1's token_type_hint values, read from the token itself, never from the hint.
+const (
+	TokenTypeAccessToken  = "access_token"
+	TokenTypeRefreshToken = "refresh_token"
+)
+
+// LogRevokedGrant emits EventRevokedGrant, the security record of a client ending one grant at the
+// revocation endpoint (#676 decision 11). One function, beside the operation, following the other
+// Log* helpers: the payload has one place to be asserted field by field.
+//
+// clientId is the client that revoked, which is the grant's own, since another client's token is
+// refused; userId is the grant's user; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
+//
+// Call this only after RevokeGrantTx returned without error.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedGrant(ctx context.Context, auditLogger AuditLogger, clientId int64, userId int64, grantId string,
+	tokenType string, result GrantRevocationResult) {
+
+	auditLogger.Log(ctx, audit.EventRevokedGrant, map[string]interface{}{
+		"client_id":  clientId,
+		"user_id":    userId,
+		"grant_id":   grantId,
+		"token_type": tokenType,
+		// What this call TRANSITIONED, not what the family had. Always a list rather than null:
+		// the success path fills it from RevokeRefreshTokens.
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
+// LogTokenRevocationRefused emits EventTokenRevocationRefused, the record of a client that sent the
+// revocation endpoint another client's live token and was refused (#676 decisions 8 and 11).
+// Nothing is revoked, so there is no operation to wait for. clientId is the client that called,
+// which client authentication proved; tokenClientId the client the token was issued to, which the
+// token's signature or row proves; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogTokenRevocationRefused(ctx context.Context, auditLogger AuditLogger, clientId int64, tokenClientId int64,
+	tokenType string) {
+
+	auditLogger.Log(ctx, audit.EventTokenRevocationRefused, map[string]interface{}{
+		"client_id":       clientId,
+		"token_client_id": tokenClientId,
+		"token_type":      tokenType,
+	})
+}
+
+// AccessTokenDatabase is what RevokeAccessToken writes: the stored jtis of revoked access tokens
+// without a grant. A port of its own rather than a method on Database, since no other operation
+// here touches them.
+type AccessTokenDatabase interface {
+	RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)
+}
+
+// RevokeAccessToken revokes one access token without a grant at its client's request, the
+// revocation endpoint's operation for a token of the client credentials grant or the implicit flow
+// (#676 decision 1). Such a token carries no grant_id, so no refresh token family stands behind it
+// for RevokeGrantTx to end; its jti is stored with its expiry instead, and the access-token liveness
+// check refuses it while the row exists. The cleanup job deletes the row once the token has expired.
+//
+// It reports whether this call stored the jti. A token whose jti another revocation stored first is
+// not stored again and reports false: the token is revoked either way, and the event is the other
+// call's. It runs on no transaction: a lookup, then an insert that a row another call stored in
+// between refuses as a duplicate, which also reports false.
+//
+// A token without a jti or an expiry is one the auth server never signs, and is an error.
+//
+// The audit event is the CALLER's, through LogRevokedAccessToken after this returns true.
+func RevokeAccessToken(ctx context.Context, db AccessTokenDatabase, jti string, expiresAt time.Time) (bool, error) {
+	if jti == "" {
+		return false, errs.New("revoking an access token requires its jti")
+	}
+	if expiresAt.IsZero() {
+		return false, errs.New("revoking an access token requires its expiry")
+	}
+
+	stored, err := db.RecordAccessTokenRevoked(ctx, nil, jti, expiresAt)
+	if err != nil {
+		return false, err
+	}
+	return stored, nil
+}
+
+// LogRevokedAccessToken emits EventRevokedAccessToken, the security record of a client revoking one
+// of its access tokens without a grant at the revocation endpoint (#676 decision 11). One function,
+// beside the operation, following the other Log* helpers: the payload has one place to be asserted
+// field by field.
+//
+// clientId is the client that revoked, which is the token's own, since another client's token is
+// refused; userId is the token's user, for a token of the implicit flow, and 0 for a client
+// credentials token, which has none and records none; jti is the token's.
+//
+// Call this only after RevokeAccessToken returned true.
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedAccessToken(ctx context.Context, auditLogger AuditLogger, clientId int64, userId int64, jti string) {
+	details := map[string]interface{}{
+		"client_id": clientId,
+		"jti":       jti,
+	}
+	if userId != 0 {
+		details["user_id"] = userId
+	}
+	auditLogger.Log(ctx, audit.EventRevokedAccessToken, details)
 }

@@ -10,7 +10,7 @@ claims and answers.
 | `/web2` | `testapp-web2`, confidential | Single sign-on across clients |
 | `/spa` | `testapp-spa`, public | Add sign-in to a SPA or mobile app |
 | `/service` | `testapp-service`, client credentials | Protect an API |
-| `/api/products` | (the API) | Protect an API: checks the token, answers 401 or 403 |
+| `/api/products` | `testapp-api`, confidential, introspects | Protect an API: checks and introspects the token, answers 401 or 403 |
 
 The e2e environment (see [../README.md](../README.md)) deploys it on its two test app hosts:
 `e2e/infra/testapp.sh` sets up the clients below through the admin console, the way these steps say,
@@ -42,6 +42,9 @@ which `e2e/infra/prepare.sh` wrote, and add the `http://localhost:3000/...` addr
 5. **`testapp-service`** (Protect an API, "Let a service call your API", steps 1 and 2). Create
    it with **Client credentials flow** on and **Authorization code flow with PKCE** off, grant it `product-api` `read` on **Permissions**, and
    copy its secret to `SERVICE_CLIENT_SECRET`.
+6. **`testapp-api`** (Protect an API, "Ask the auth server about a token", steps 1 and 2). Create
+   it with **Authorization code flow with PKCE** on, choose `product-api` on its **Introspection**
+   tab, click **Add resource** and **Save**, and copy its secret to `API_CLIENT_SECRET`.
 
 ## Configure and run
 

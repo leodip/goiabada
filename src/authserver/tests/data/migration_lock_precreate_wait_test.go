@@ -99,8 +99,8 @@ func TestMigrationLock_AStopWhileQueuedAtThePreCreateEndsTheWait(t *testing.T) {
 	case res := <-done:
 		require.ErrorIs(t, res.err, context.Canceled,
 			"the stop is answered as the cancellation it was, so the process can tell it from a failure")
-	case <-time.After(migrationLockHoldBudget):
-		t.Fatalf("the start went on waiting at the pre-create for %s after it was asked to stop", migrationLockHoldBudget)
+	case <-time.After(migrationLockAnswerBudget):
+		t.Fatalf("the start went on waiting at the pre-create for %s after it was asked to stop", migrationLockAnswerBudget)
 	}
 	assert.Empty(t, recordsNamed(capture, "migrating the database"), "a stopped start migrates nothing")
 	assert.False(t, versionTableExists(t, h), "and creates nothing")
@@ -157,9 +157,9 @@ func TestMigrationLock_MigrateToInterruptedAtThePreCreateLeavesTheDatabaseUnchan
 	var err error
 	select {
 	case err = <-exited:
-	case <-time.After(migrationLockHoldBudget):
+	case <-time.After(migrationLockAnswerBudget):
 		t.Fatalf("migrate went on waiting at the pre-create for %s after SIGINT\nstdout: %s\nstderr: %s",
-			migrationLockHoldBudget, stdout.String(), stderr.String())
+			migrationLockAnswerBudget, stdout.String(), stderr.String())
 	}
 	var exitErr *exec.ExitError
 	require.ErrorAsf(t, err, &exitErr, "migrate must exit non-zero on a stop: %v\nstdout: %s\nstderr: %s",

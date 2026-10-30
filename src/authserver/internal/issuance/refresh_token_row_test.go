@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -18,6 +19,7 @@ import (
 )
 
 func TestGenerateRefreshToken_Offline(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -62,7 +64,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -76,10 +78,10 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	assert.Equal(t, "Offline", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 7200*time.Second, testStart, "exp should be 7200 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 172800*time.Second, testStart, "offline_access_max_lifetime should be 172800 seconds from now")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -88,6 +90,7 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_Refresh(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -136,7 +139,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -151,9 +154,9 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	assert.Equal(t, code.Scope, claims["scope"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 1800*time.Second, "exp should be 1800 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 1800*time.Second, testStart, "exp should be 1800 seconds from now")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -162,6 +165,7 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -211,7 +215,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", existingRefreshToken, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -225,10 +229,10 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	assert.Equal(t, "Offline", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 24*time.Hour, "offline_access_max_lifetime should match existing refresh token")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, testStart, "exp should be 3600 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", 24*time.Hour, testStart, "offline_access_max_lifetime should match existing refresh token")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -242,6 +246,7 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 }
 
 func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -300,7 +305,7 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 	// Now generate the third refresh token
 	thirdRefreshTime := initialTime
-	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken)
+	refreshToken, refreshExpiresIn, err := tokenIssuer.generateRefreshToken(context.Background(), nil, settings, code, code.Scope, thirdRefreshTime, privKey, "test-key-id", secondRefreshToken, uuid.New())
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, refreshToken)
@@ -317,10 +322,10 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	assert.Equal(t, "Offline", claims["typ"])
 	assert.Equal(t, code.Scope, claims["scope"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", time.Duration(expectedRemainingTime)*time.Second, "exp should be close to the remaining time in the max lifetime")
-	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", time.Duration(expectedRemainingTime)*time.Second, "offline_access_max_lifetime is not correct")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", time.Duration(expectedRemainingTime)*time.Second, testStart, "exp should be close to the remaining time in the max lifetime")
+	assertTimeClaimWithinRange(t, claims, "offline_access_max_lifetime", time.Duration(expectedRemainingTime)*time.Second, testStart, "offline_access_max_lifetime is not correct")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)

@@ -504,19 +504,19 @@ func terminatedSession() *record.UserSession {
 func terminationFixture() []*record.RefreshToken {
 	return []*record.RefreshToken{
 		{
-			Id: 1, RefreshTokenJti: "rt-session-bound",
+			Id: 1, RefreshTokenJti: "rt-session-bound", FirstRefreshTokenJti: "fam-session-bound",
 			SessionIdentifier: terminateSid,
 			RefreshTokenType:  "Refresh",
 			CodeId:            sql.NullInt64{Int64: 21, Valid: true},
 		},
 		{
-			Id: 2, RefreshTokenJti: "rt-offline",
+			Id: 2, RefreshTokenJti: "rt-offline", FirstRefreshTokenJti: "fam-offline",
 			SessionIdentifier: "",
 			RefreshTokenType:  "Offline",
 			CodeId:            sql.NullInt64{Int64: 22, Valid: true},
 		},
 		{
-			Id: 3, RefreshTokenJti: "rt-already-gone",
+			Id: 3, RefreshTokenJti: "rt-already-gone", FirstRefreshTokenJti: "fam-already-gone",
 			SessionIdentifier: terminateSid,
 			RefreshTokenType:  "Refresh",
 			CodeId:            sql.NullInt64{Int64: 23, Valid: true},
@@ -537,6 +537,9 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(2), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(tokens, nil).Once()
+	// Every family the sweep read, rt-already-gone's included: a sibling mid-rotation is the one the
+	// sweep cannot see (#676 decision 1).
+	expectTerminationFamilyRecords(db, "fam-session-bound", "fam-offline", "fam-already-gone")
 	// The two live tokens only. rt-already-gone is not written again.
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
@@ -575,6 +578,8 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	tokenSweep := callIndex(t, db, "GetRefreshTokensBySessionIdentifier")
 	assert.Less(t, deletion, codeSweep, "the session row is taken first, by deleting it")
 	assert.Less(t, codeSweep, tokenSweep, "codes are marked before the tokens are swept")
+	assert.Less(t, callIndex(t, db, "RecordRefreshTokenFamilyRevoked"), callIndex(t, db, "UpdateRefreshToken"),
+		"the families are recorded before any token is flipped")
 
 	// The negative control, and the reason this seam is worth having. Terminating one session
 	// must not advance the user's generation nor sweep user-scoped tokens: either would sign out
@@ -721,8 +726,26 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 					Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 					Return(tokens, nil).Once()
+				expectTerminationFamilyRecords(db, "fam-session-bound", "fam-offline", "fam-already-gone")
 				db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(boom).Once()
 			},
+		},
+		{
+			// A family left unrecorded would leave the access tokens of a grant whose child a
+			// rotation inserts after the sweep live, so the termination fails whole instead.
+			name: "a family record fails",
+			setup: func(db *datamocks.Database) {
+				tokens := terminationFixture()
+				datamocks.ExpectRunInTransaction(db, revokeTx)
+				db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
+				db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
+					Return(int64(2), nil).Once()
+				db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
+					Return(tokens, nil).Once()
+				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-session-bound",
+					ReasonSessionTerminated).Return(false, boom).Once()
+			},
+			notAttempted: []string{"UpdateRefreshToken"},
 		},
 		{
 			// The one failure whose durable outcome is unknowable, per the helper's comment. The
@@ -1212,12 +1235,14 @@ const reuseSid = "sid-reused"
 func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 	t.Run("the session row is taken before any grant is read", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
-		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
 
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
 			Return([]*record.RefreshToken{token}, nil).Once()
+		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonAuthCodeReuse).
+			Return(true, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
 			Return(&record.UserSession{Id: 9, SessionIdentifier: reuseSid}, nil).Once()
@@ -1234,6 +1259,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			"RunInTransaction",
 			"AcquireUserSessionRow",
 			"GetRefreshTokensBySessionIdentifier",
+			"RecordRefreshTokenFamilyRevoked",
 			"UpdateRefreshToken",
 			"GetUserSessionBySessionIdentifier",
 			"DeleteUserSession",

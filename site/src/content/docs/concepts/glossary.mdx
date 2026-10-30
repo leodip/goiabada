@@ -77,6 +77,10 @@ A user's approval for a client to receive what it asked for. The auth server ask
 
 A way for a client to register itself, by calling `/connect/register`, instead of an administrator creating it in the admin console. It's off until you turn it on. See [Let clients register themselves (DCR)](/guides/let-clients-register-themselves-dcr/).
 
+### Grant
+
+What one sign-in gives a client: its refresh token, every refresh token that one is rotated into, and every access token issued with them, which carry its identifier as `grant_id`. A password grant makes one too. Tokens from the client credentials flow and the implicit flow belong to no grant. Your app ends a grant by sending one of its tokens to [`/auth/revoke`](/reference/endpoints/revoke/). See [Refresh tokens](/concepts/refresh-tokens/#revoking-a-grant).
+
 ### Group
 
 A set of users. Permissions and attributes you give a group apply to every user in it. See [Users and groups](/concepts/users-and-groups/).
@@ -88,6 +92,10 @@ A token that tells a client who the user is and how they signed in. Only clients
 ### Implicit flow
 
 A deprecated flow in which the browser comes back from sign-in with the tokens themselves rather than an authorization code. It's off by default. See [Implicit flow](/legacy-flows/implicit/).
+
+### Introspection
+
+An API asking the auth server whether a token is still active, at [`/auth/introspect`](/reference/endpoints/introspect/). The API calls as a confidential client, and an access token is active to it only when its `aud` names one of that client's introspection resources, which you set on the client's **Introspection** tab. See [Introspection resources](/concepts/clients/#introspection-resources).
 
 ### Permission
 

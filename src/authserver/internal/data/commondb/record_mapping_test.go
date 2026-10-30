@@ -193,6 +193,23 @@ func clientPermissionMapping() mappingCase {
 	}
 }
 
+// clientIntrospectionResourceMapping has no update: a link is created and deleted, never rewritten.
+func clientIntrospectionResourceMapping() mappingCase {
+	return mappingCase{
+		name:   "client introspection resource",
+		table:  "clients_introspection_resources",
+		record: reflect.TypeOf(record.ClientIntrospectionResource{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetClientIntrospectionResourcesByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetClientIntrospectionResourcesByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateClientIntrospectionResource(ctx, nil, rec.(*record.ClientIntrospectionResource))
+		},
+	}
+}
+
 // redirectURIMapping has no update: a redirect URI is created and deleted, never rewritten.
 func redirectURIMapping() mappingCase {
 	return mappingCase{
@@ -801,7 +818,8 @@ func preRegistrationMapping() mappingCase {
 func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 	for _, c := range []mappingCase{
 		permissionMapping(), resourceMapping(),
-		clientMapping(), clientLogoMapping(), clientPermissionMapping(), redirectURIMapping(), webOriginMapping(),
+		clientMapping(), clientLogoMapping(), clientPermissionMapping(), clientIntrospectionResourceMapping(),
+		redirectURIMapping(), webOriginMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),

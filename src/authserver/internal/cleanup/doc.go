@@ -1,6 +1,6 @@
 // Package cleanup is the auth server's background sweep of rows nothing will read again: expired
-// and idle user sessions, expired refresh tokens and the revoked-family rows they leave,
-// authorization codes no refresh token references, pending registrations that can no longer
+// and idle user sessions, expired refresh tokens and the revoked-family rows they leave, the stored
+// jtis of revoked access tokens that have expired, authorization codes no refresh token references, pending registrations that can no longer
 // complete, old audit logs, expired browser sessions and expired parked authorization requests. Worker polls from Start until Stop.
 //
 // One instance sweeps per interval, whichever claims the run on the settings row first, so a

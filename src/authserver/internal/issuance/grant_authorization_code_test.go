@@ -20,6 +20,7 @@ import (
 )
 
 func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -138,11 +139,11 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 
-	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
-	assertTimeClaimWithinRange(t, idClaims, "updated_at", -60*time.Second, "updated_at should be 60 seconds ago")
-	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
+	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, testStart, "exp should be 900 seconds from now")
+	assertTimeClaimWithinRange(t, idClaims, "updated_at", -60*time.Second, testStart, "updated_at should be 60 seconds ago")
+	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, testStart, "auth_time should be 300 seconds ago")
 
 	assert.Contains(t, idClaims, "auth_time")
 	authTimeUnix := idClaims["auth_time"].(float64)
@@ -205,11 +206,11 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.NotContains(t, accessClaims, "sid")
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
-	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
-	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -60*time.Second, "updated_at should be 60 seconds ago")
-	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 900*time.Second, testStart, "exp should be 900 seconds from now")
+	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -60*time.Second, testStart, "updated_at should be 60 seconds ago")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, testStart, "auth_time should be 300 seconds ago")
 
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
@@ -260,10 +261,10 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "Offline", refreshClaims["typ"])
 	assert.Equal(t, "openid profile email address phone groups attributes offline_access", refreshClaims["scope"])
 
-	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
-	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 7200*time.Second, "offline_access_max_lifetime should be 7200 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3600*time.Second, testStart, "exp should be 3600 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 7200*time.Second, testStart, "offline_access_max_lifetime should be 7200 seconds from now")
 
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	require.NoError(t, err)
@@ -272,6 +273,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 }
 
 func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -336,6 +338,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	}, nil)
 
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -345,7 +348,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid", response.Scope)
-	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
+	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "what the session's maximum lifetime leaves")
 
 	// validate Id token --------------------------------------------
 
@@ -358,10 +361,10 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 
-	assertTimeClaimWithinRange(t, idClaims, "auth_time", -120*time.Second, "auth_time should be 2 minutes ago")
-	assertTimeClaimWithinRange(t, idClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
-	assertTimeClaimWithinRange(t, idClaims, "iat", 0, "iat should be now")
-	assertTimeClaimWithinRange(t, idClaims, "nbf", 0, "nbf should be now")
+	assertTimeClaimWithinRange(t, idClaims, "auth_time", -120*time.Second, testStart, "auth_time should be 2 minutes ago")
+	assertTimeClaimWithinRange(t, idClaims, "exp", 600*time.Second, testStart, "exp should be 10 minutes in the future")
+	assertTimeClaimWithinRange(t, idClaims, "iat", 0, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0, testStart, "nbf should be now")
 
 	_, err = uuidtest.Parse(idClaims["jti"].(string))
 	require.NoError(t, err)
@@ -378,10 +381,10 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, "openid", accessClaims["scope"])
 
-	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -120*time.Second, "auth_time should be 2 minutes ago")
-	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
-	assertTimeClaimWithinRange(t, accessClaims, "iat", 0, "iat should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0, "nbf should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -120*time.Second, testStart, "auth_time should be 2 minutes ago")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, testStart, "exp should be 10 minutes in the future")
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0, testStart, "nbf should be now")
 
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
@@ -395,9 +398,9 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
 	assert.Equal(t, "openid", refreshClaims["scope"])
 
-	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
-	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0, "iat should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0, "nbf should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, testStart, "exp should be 10 minutes in the future")
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0, testStart, "nbf should be now")
 
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	require.NoError(t, err)
@@ -522,6 +525,7 @@ func TestMintAuthorizationCodeTokens_RefreshTokenInsertFails(t *testing.T) {
 }
 
 func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -604,6 +608,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	}, nil)
 
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -613,7 +618,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid profile email resource1:read resource2:write", response.Scope)
-	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
+	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "what the session's maximum lifetime leaves")
 
 	// validate Id token --------------------------------------------
 
@@ -626,11 +631,11 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 
-	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, idClaims, "exp", 1500*time.Second, "exp should be 1500 seconds from now")
-	assertTimeClaimWithinRange(t, idClaims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
-	assertTimeClaimWithinRange(t, idClaims, "updated_at", -24*time.Hour, "updated_at should be 24 hours ago")
+	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, idClaims, "exp", 1500*time.Second, testStart, "exp should be 1500 seconds from now")
+	assertTimeClaimWithinRange(t, idClaims, "auth_time", -60*time.Second, testStart, "auth_time should be 60 seconds ago")
+	assertTimeClaimWithinRange(t, idClaims, "updated_at", -24*time.Hour, testStart, "updated_at should be 24 hours ago")
 
 	_, err = uuidtest.Parse(idClaims["jti"].(string))
 	require.NoError(t, err)
@@ -658,11 +663,11 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
-	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "exp", 1500*time.Second, "exp should be 1500 seconds from now")
-	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
-	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -24*time.Hour, "updated_at should be 24 hours ago")
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 1500*time.Second, testStart, "exp should be 1500 seconds from now")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -60*time.Second, testStart, "auth_time should be 60 seconds ago")
+	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -24*time.Hour, testStart, "updated_at should be 24 hours ago")
 
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
@@ -689,9 +694,9 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
 	assert.Equal(t, "openid profile email resource1:read resource2:write", refreshClaims["scope"])
 
-	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, testStart, "exp should be 600 seconds from now")
 
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	require.NoError(t, err)
@@ -700,6 +705,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 }
 
 func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -775,7 +781,8 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, user.Subject, accessClaims["sub"])
-	assert.Equal(t, []interface{}{"resource1", "resource2"}, accessClaims["aud"])
+	// offline_access names authserver (#676 decision 3).
+	assert.Equal(t, []interface{}{"resource1", "resource2", "authserver"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
@@ -787,10 +794,10 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 	assert.NotContains(t, accessClaims, "sid")
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
-	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
-	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, "auth_time should be 30 seconds ago")
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, testStart, "exp should be 1200 seconds from now")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, testStart, "auth_time should be 30 seconds ago")
 
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
@@ -806,10 +813,10 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 	assert.Equal(t, "Offline", refreshClaims["typ"])
 	assert.Equal(t, "resource1:read resource2:write offline_access", refreshClaims["scope"])
 
-	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3000*time.Second, "exp should be 3000 seconds from now")
-	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 6000*time.Second, "offline_access_max_lifetime should be 6000 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3000*time.Second, testStart, "exp should be 3000 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 6000*time.Second, testStart, "offline_access_max_lifetime should be 6000 seconds from now")
 
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	require.NoError(t, err)
@@ -818,6 +825,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndCustomScope(t *testing.T) 
 }
 
 func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -881,6 +889,7 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	}, nil)
 
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code)
+	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -890,7 +899,7 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	assert.Empty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "resource1:read", response.Scope)
-	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
+	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "what the session's maximum lifetime leaves")
 
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
@@ -902,10 +911,10 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
-	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
-	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, "auth_time should be 30 seconds ago")
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, testStart, "exp should be 600 seconds from now")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -30*time.Second, testStart, "auth_time should be 30 seconds ago")
 
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
@@ -921,9 +930,9 @@ func TestMintAuthorizationCodeTokens_CustomScope(t *testing.T) {
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, "resource1:read", refreshClaims["scope"])
 
-	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, testStart, "exp should be 600 seconds from now")
 
 	_, err = uuidtest.Parse(refreshClaims["jti"].(string))
 	require.NoError(t, err)

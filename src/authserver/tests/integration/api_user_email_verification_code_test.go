@@ -33,7 +33,9 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	}()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	before := time.Now().UTC()
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
+	after := time.Now().UTC()
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -46,14 +48,17 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	assert.NotNil(t, body.VerificationCodeExpiresAt)
 	assert.Equal(t, user.Id, body.UserId)
 	assert.Equal(t, user.Email, body.Email)
-	assert.WithinDuration(t, time.Now().UTC().Add(5*time.Minute), *body.VerificationCodeExpiresAt, 5*time.Second)
+	// Issued during the request, and good for five minutes.
+	assert.WithinRange(t, *body.VerificationCodeExpiresAt, before.Add(5*time.Minute), after.Add(5*time.Minute))
 
 	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
 	assert.False(t, updatedUser.EmailVerified)
-	assert.WithinDuration(t, time.Now().UTC(), updatedUser.EmailVerificationCodeIssuedAt.Time, 3*time.Second)
+	// Stamped during the request; the column may round it to the microsecond.
+	assert.WithinRange(t, updatedUser.EmailVerificationCodeIssuedAt.Time,
+		before.Add(-time.Microsecond), after.Add(time.Microsecond))
 
 	decrypted, err := dataCipher.Decrypt(updatedUser.EmailVerificationCodeEncrypted)
 	require.NoError(t, err)

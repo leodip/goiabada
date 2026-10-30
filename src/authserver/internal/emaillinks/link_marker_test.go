@@ -192,8 +192,9 @@ func TestSaveLinkMarkerRefusesASecondLiveContinuation(t *testing.T) {
 }
 
 // The same link followed twice is one continuation, not two, and gets a fresh window. The
-// seeded marker has a second left, so a replacement is visible as an ExpiresAt a full
-// lifetime out rather than being indistinguishable from leaving it alone.
+// seeded marker has a minute left, so a replacement is visible as an ExpiresAt a full
+// lifetime out rather than being indistinguishable from leaving it alone, and the marker is
+// still live when the link is followed again, short of a stall of a minute.
 func TestSaveLinkMarkerRefreshesTheSameContinuation(t *testing.T) {
 	store := newMarkerTestStore()
 
@@ -201,7 +202,7 @@ func TestSaveLinkMarkerRefreshesTheSameContinuation(t *testing.T) {
 		Flow:           LinkMarkerFlowResetPassword,
 		Id:             42,
 		CodeHash:       "hash-a",
-		ExpiresAt:      time.Now().UTC().Add(time.Second),
+		ExpiresAt:      time.Now().UTC().Add(time.Minute),
 		ContinuationId: "the-continuation-id",
 	}))
 

@@ -348,9 +348,11 @@ const (
 	// is dropped at the same point.
 	readHeaderTimeout = 10 * time.Second
 
-	// readTimeout bounds the whole request, header and body, from its first byte. The console's
-	// upload form refuses a source image over 3 MB and sends a 512x512 crop (image-upload.js), so
-	// 60s leaves this far above any upload the console's own pages send.
+	// readTimeout bounds the whole request, header and body. net/http starts it as it begins reading
+	// the request: on a new connection once any TLS handshake is done, on a kept-alive one once the
+	// next request's first bytes have arrived. The console's upload form refuses a source image over
+	// 3 MB and sends a 512x512 crop (image-upload.js), so 60s leaves this far above any upload the
+	// console's own pages send.
 	readTimeout = 60 * time.Second
 
 	// writeTimeout must outlast the body read plus the slowest handler, because a handler that runs

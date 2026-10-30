@@ -17,13 +17,13 @@ Give each integration the smallest scope that does its job. A service that creat
 |---|---|---|
 | `authserver:admin-read` | Every Admin API operation that reads, administrators included, except a client's secret | Nothing |
 | `authserver:manage-users` | Users and groups, with their attributes, sessions, consents, memberships and permissions | The same, except administrators and administrative permissions |
-| `authserver:manage-clients` | Clients, their secrets included | Clients, except administrator clients |
+| `authserver:manage-clients` | Clients, their secrets included, except an administrator client's or one listed for the `authserver` resource | Clients, except administrator clients, adding the `authserver` resource to a client's [introspection resources](/concepts/clients/#introspection-resources), and setting the secret of a client listed for it |
 | `authserver:manage-settings` | Settings, resources and their permissions, signing keys, and the audit log | Settings except email and audit logging, resources and their permissions, signing keys |
 | `authserver:manage` | Everything | Everything, administrators included |
 
 Every operation that reads accepts `authserver:admin-read`, the scope of its domain, or `authserver:manage`. Every operation that writes accepts the scope of its domain or `authserver:manage`. The phone countries (`GET /api/v1/admin/phone-countries`) belong to no domain, so every administrative scope reads them.
 
-One read is different: **a client's secret** (`GET /api/v1/admin/clients/{id}/secret`) is a credential, so `authserver:admin-read` doesn't reach it. It takes `authserver:manage-clients` or `authserver:manage`.
+One read is different: **a client's secret** (`GET /api/v1/admin/clients/{id}/secret`) is a credential, so `authserver:admin-read` doesn't reach it. It takes `authserver:manage-clients` or `authserver:manage`, and `authserver:manage` alone for an administrator client or a client listed for the `authserver` resource.
 
 A token with none of the scopes an operation accepts is answered `403` with the error code `INSUFFICIENT_SCOPE`.
 
@@ -44,7 +44,7 @@ Each Admin API operation belongs to one domain, and the domain decides which gra
 | Domain | Operations |
 |---|---|
 | Users | Users, user attributes, user sessions, user consents, groups, group members, group attributes, and the permissions of users and groups |
-| Clients | Clients, with their authentication, flows, redirect URIs, web origins, tokens, permissions, sessions, logo and secret |
+| Clients | Clients, with their authentication, flows, redirect URIs, web origins, tokens, permissions, introspection resources, sessions, logo and secret |
 | Settings | General, email, session, token, theme and audit log settings, signing keys, resources and their permissions, and the audit log |
 
 ## Administrative scopes on a user's behalf

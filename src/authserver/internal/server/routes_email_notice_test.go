@@ -17,15 +17,16 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/afterresponse"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/metrics"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -120,19 +121,22 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 // runner, which is what the notice tests wait on before they read their capture.
 func noticeTestServer(t *testing.T, database *datamocks.Database) *Server {
 	t.Helper()
+	armRoutesTestAPIClient(database)
 	registry := metrics.NewRegistry()
 	s := &Server{
-		router:       routing.New(),
-		database:     database,
-		sessionStore: newTestSessionStore(),
-		templateFS:   web.TemplateFS(),
-		staticFS:     web.StaticFS(),
-		cfg:          &config.Config{},
-		jobs:         afterresponse.New(registry),
-		metrics:      registry,
-		tokenMetrics: tokenmetrics.Register(registry),
+		router:               routing.New(),
+		database:             database,
+		sessionStore:         newTestSessionStore(),
+		templateFS:           web.TemplateFS(),
+		staticFS:             web.StaticFS(),
+		cfg:                  &config.Config{},
+		jobs:                 afterresponse.New(registry),
+		metrics:              registry,
+		tokenMetrics:         tokenmetrics.Register(registry),
+		revocationMetrics:    revocationmetrics.Register(registry),
+		introspectionMetrics: introspectionmetrics.Register(registry),
 	}
-	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router})
+	s.initRoutes(appBranches{pages: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router})
 	return s
 }
 
@@ -147,7 +151,7 @@ func noticeTestRequest(capture *smtpCapture, target string, body string, claims 
 
 	r := httptest.NewRequest(http.MethodPut, target, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	ctx := reqctx.WithBearerToken(r.Context(), oauth.JwtToken{Claims: claims})
+	ctx := reqctx.WithBearerToken(r.Context(), routesTestAccessToken(claims))
 	return r.WithContext(reqctx.WithSettings(ctx, settings))
 }
 

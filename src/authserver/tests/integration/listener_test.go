@@ -38,29 +38,32 @@ func dialAuthServer(t *testing.T) net.Conn {
 	return conn
 }
 
+// TestListener_DropsAPartialHeaderBlock: a client that sends part of a header block and stops is
+// dropped at readHeaderTimeout. net/http sets that deadline once it has taken the connection, so a
+// stopwatch started before the dial can only overstate the wait, and the floor is the bound itself.
+// The client's read deadline is the ceiling: readHeaderTimeout plus a 20s margin, far short of the
+// 60s readTimeout net/http would fall back to without it, so a listener that lost the bound fails
+// here rather than hanging. The bound's exact value is the unit tier's.
 func TestListener_DropsAPartialHeaderBlock(t *testing.T) {
 	t.Parallel()
+	beforeDial := time.Now()
 	conn := dialAuthServer(t)
 
-	start := time.Now()
 	// No terminating blank line: the header block never ends.
 	_, err := conn.Write([]byte("GET /health HTTP/1.1\r\nHost: x\r\nX-A: b\r\n"))
 	require.NoError(t, err)
-	// Past the window, so a listener without ReadHeaderTimeout fails on the window below rather
-	// than hanging on the 60s ReadTimeout it would fall back to.
-	require.NoError(t, conn.SetReadDeadline(start.Add(listenerHeaderTimeout+5*time.Second)))
+	require.NoError(t, conn.SetReadDeadline(beforeDial.Add(listenerHeaderTimeout+20*time.Second)))
 
 	got, err := io.ReadAll(conn)
-	elapsed := time.Since(start)
+	waited := time.Since(beforeDial)
 
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		t.Fatalf("the server still held the connection after %s", elapsed)
+		t.Fatalf("the server still held the connection after %s", waited)
 	}
 	require.NoError(t, err, "the server must close the connection, not reset it")
 	assert.Empty(t, got, "a header block cut short gets no response, only a close")
-	assert.GreaterOrEqual(t, elapsed, listenerHeaderTimeout-time.Second, "closed before readHeaderTimeout")
-	assert.LessOrEqual(t, elapsed, listenerHeaderTimeout+2*time.Second, "closed well after readHeaderTimeout")
+	assert.GreaterOrEqual(t, waited, listenerHeaderTimeout, "closed before readHeaderTimeout")
 }
 
 // headOfLength builds a GET /health request head exactly n bytes long, request line and

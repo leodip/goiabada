@@ -316,8 +316,9 @@ const (
 	//
 	// Deliberately NOT EventRevokedUserAuthState, whose payload asserts a generation bracket and
 	// a list of terminated sessions. This action advances no generation and ends no session: it
-	// is scoped to one client, so the users of that client stay signed in everywhere else and
-	// their access tokens keep working until they expire.
+	// is scoped to one client, so the users of that client stay signed in everywhere else. The
+	// access tokens of the revoked grants are refused at once at the auth server's own endpoints
+	// and at introspection, since each names its grant (#676 decision 1).
 	//
 	// Its payload carries client_id, reason, revoked_code_count and revoked_refresh_token_jtis, plus
 	// logged_in_user. Codes get a count rather than a list of ids, following
@@ -335,12 +336,67 @@ const (
 	// It accompanies EventDeletedOwnUserConsent or EventDeletedUserConsent rather than replacing
 	// it, for the reason EventTerminatedUserSession accompanies EventDeletedUserSession: the
 	// deletion event keeps its fields, and this is the record of what the withdrawal revoked.
-	// It advances no generation and ends no session, so the user stays signed in and the
-	// client's access tokens already issued keep working until they expire.
+	// It advances no generation and ends no session, so the user stays signed in. The access
+	// tokens of the revoked grants are refused at once at the auth server's own endpoints and at
+	// introspection, since each names its grant (#676 decision 1).
 	//
 	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
 	// plus logged_in_user.
 	EventRevokedConsentGrants = "revoked_consent_grants"
+	// EventRevokedGrant records that a client ended one of its grants at the revocation endpoint
+	// (RFC 7009, #676), by sending the grant's refresh token or an access token carrying its
+	// grant_id: the grant's refresh token family was recorded revoked under client_revoked and every
+	// member of it revoked, which ends the grant's access tokens at the auth server's own endpoints
+	// too. Emitted AFTER the revocation's transaction commits, on success only, and also when the
+	// grant had nothing left to move, so the event attests that the client asked and the server
+	// acted. A token answered 200 because it was invalid records nothing.
+	//
+	// It ends no session and advances no generation: the user stays signed in, and their other
+	// grants keep working.
+	//
+	// Its payload carries client_id (the client that revoked, the grant's own), user_id, grant_id
+	// (the family's identifier), token_type (access_token or refresh_token, read from the token,
+	// never from the hint) and revoked_refresh_token_jtis, the members this call moved, always a
+	// list.
+	EventRevokedGrant = "revoked_grant"
+	// EventRevokedAccessToken records that a client revoked one of its access tokens without a grant
+	// at the revocation endpoint (RFC 7009, #676 decision 1): a token of the client credentials grant
+	// or the implicit flow, which carries no grant_id, so no refresh token family stands behind it to
+	// end. Its jti was stored with its expiry, which refuses the token at the auth server's own
+	// endpoints until it expires. Emitted AFTER the jti is stored, and only by the call that stored
+	// it: a second revocation of the same token stores nothing and records nothing, as a token
+	// answered 200 because it was invalid records nothing.
+	//
+	// It ends no session and no grant: the user, when there is one, stays signed in.
+	//
+	// Its payload carries client_id (the client that revoked, the token's own), jti (the token's
+	// identifier) and, for a token of the implicit flow, user_id; a client credentials token has no
+	// user, and names none.
+	EventRevokedAccessToken = "revoked_access_token"
+	// EventUpdatedClientIntrospectionResources records a committed save of a client's
+	// introspection resources, the resources whose tokens the client may introspect (#676 decision
+	// 14), through PUT /api/v1/admin/clients/{id}/introspection-resources. Written once per save,
+	// after it commits, as every other client edit is.
+	//
+	// Payload: client_id; added_resource_ids and removed_resource_ids, the row ids of the resources
+	// the save listed and unlisted, each always a list, empty when the save changed nothing on that
+	// side; and logged_in_user.
+	EventUpdatedClientIntrospectionResources = "updated_client_introspection_resources"
+	// EventTokenRevocationRefused records that a client sent the revocation endpoint another
+	// client's live token and was refused with invalid_grant, RFC 7009 section 2.1's check that the
+	// token was issued to the client making the request (#676 decision 8). Nothing was revoked.
+	//
+	// An audit event where a refused client authentication is only a log record, because the token's
+	// owner is proven by its signature or its row, and a live token reached the wrong client. The
+	// calling client is proven only when it is confidential: a public caller names itself by
+	// client_id alone.
+	//
+	// The endpoint records at most one per token-owning client per minute window per instance,
+	// across callers and token types, so replays cannot write an audit event per request.
+	//
+	// Its payload carries client_id (the calling client), token_client_id (the client the token was
+	// issued to) and token_type (access_token or refresh_token).
+	EventTokenRevocationRefused = "token_revocation_refused"
 	// EventCrossUserSessionReplaced records that a different user signed in on a browser that was
 	// still carrying someone else's session cookie, so that session was ended. The browser reaches
 	// that state through prompt=login, through an id_token_hint naming another user, or simply by
@@ -591,8 +647,10 @@ var auditEventTypes = []string{
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,
+	EventRevokedAccessToken,
 	EventRevokedClientGrants,
 	EventRevokedConsentGrants,
+	EventRevokedGrant,
 	EventRevokedKey,
 	EventRevokedUserAuthState,
 	EventROPCAuthFailed,
@@ -607,10 +665,12 @@ var auditEventTypes = []string{
 	EventTokenIssuedImplicitResponse,
 	EventTokenIssuedRefreshTokenResponse,
 	EventTokenIssuedROPCResponse,
+	EventTokenRevocationRefused,
 	EventTokenScopeDenied,
 	EventUpdatedAuditLogsSettings,
 	EventUpdatedClientAdministrativeScopes,
 	EventUpdatedClientAuthentication,
+	EventUpdatedClientIntrospectionResources,
 	EventUpdatedClientLogo,
 	EventUpdatedClientOAuth2Flows,
 	EventUpdatedClientPermissions,

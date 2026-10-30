@@ -1525,6 +1525,69 @@ func (_c *Database_CreateClient_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// CreateClientIntrospectionResource provides a mock function for the type Database
+func (_mock *Database) CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error {
+	ret := _mock.Called(ctx, tx, link)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateClientIntrospectionResource")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.ClientIntrospectionResource) error); ok {
+		r0 = returnFunc(ctx, tx, link)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateClientIntrospectionResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateClientIntrospectionResource'
+type Database_CreateClientIntrospectionResource_Call struct {
+	*mock.Call
+}
+
+// CreateClientIntrospectionResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - link *record.ClientIntrospectionResource
+func (_e *Database_Expecter) CreateClientIntrospectionResource(ctx any, tx any, link any) *Database_CreateClientIntrospectionResource_Call {
+	return &Database_CreateClientIntrospectionResource_Call{Call: _e.mock.On("CreateClientIntrospectionResource", ctx, tx, link)}
+}
+
+func (_c *Database_CreateClientIntrospectionResource_Call) Run(run func(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource)) *Database_CreateClientIntrospectionResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.ClientIntrospectionResource
+		if args[2] != nil {
+			arg2 = args[2].(*record.ClientIntrospectionResource)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateClientIntrospectionResource_Call) Return(err error) *Database_CreateClientIntrospectionResource_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateClientIntrospectionResource_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error) *Database_CreateClientIntrospectionResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateClientLogo provides a mock function for the type Database
 func (_mock *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error {
 	ret := _mock.Called(ctx, tx, clientLogo)
@@ -3253,6 +3316,132 @@ func (_c *Database_DeleteClient_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// DeleteClientIntrospectionResource provides a mock function for the type Database
+func (_mock *Database) DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error {
+	ret := _mock.Called(ctx, tx, clientIntrospectionResourceId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteClientIntrospectionResource")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, clientIntrospectionResourceId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteClientIntrospectionResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteClientIntrospectionResource'
+type Database_DeleteClientIntrospectionResource_Call struct {
+	*mock.Call
+}
+
+// DeleteClientIntrospectionResource is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientIntrospectionResourceId int64
+func (_e *Database_Expecter) DeleteClientIntrospectionResource(ctx any, tx any, clientIntrospectionResourceId any) *Database_DeleteClientIntrospectionResource_Call {
+	return &Database_DeleteClientIntrospectionResource_Call{Call: _e.mock.On("DeleteClientIntrospectionResource", ctx, tx, clientIntrospectionResourceId)}
+}
+
+func (_c *Database_DeleteClientIntrospectionResource_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64)) *Database_DeleteClientIntrospectionResource_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResource_Call) Return(err error) *Database_DeleteClientIntrospectionResource_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResource_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error) *Database_DeleteClientIntrospectionResource_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteClientIntrospectionResourcesByClientId provides a mock function for the type Database
+func (_mock *Database) DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error {
+	ret := _mock.Called(ctx, tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteClientIntrospectionResourcesByClientId")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, clientId)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteClientIntrospectionResourcesByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteClientIntrospectionResourcesByClientId'
+type Database_DeleteClientIntrospectionResourcesByClientId_Call struct {
+	*mock.Call
+}
+
+// DeleteClientIntrospectionResourcesByClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) DeleteClientIntrospectionResourcesByClientId(ctx any, tx any, clientId any) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	return &Database_DeleteClientIntrospectionResourcesByClientId_Call{Call: _e.mock.On("DeleteClientIntrospectionResourcesByClientId", ctx, tx, clientId)}
+}
+
+func (_c *Database_DeleteClientIntrospectionResourcesByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResourcesByClientId_Call) Return(err error) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteClientIntrospectionResourcesByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) error) *Database_DeleteClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteClientLogo provides a mock function for the type Database
 func (_mock *Database) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error {
 	ret := _mock.Called(ctx, tx, clientId)
@@ -3810,6 +3999,69 @@ func (_c *Database_DeleteExpiredRefreshTokens_Call) Return(err error) *Database_
 }
 
 func (_c *Database_DeleteExpiredRefreshTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) error) *Database_DeleteExpiredRefreshTokens_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteExpiredRevokedAccessTokens provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredRevokedAccessTokens")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, now)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_DeleteExpiredRevokedAccessTokens_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteExpiredRevokedAccessTokens'
+type Database_DeleteExpiredRevokedAccessTokens_Call struct {
+	*mock.Call
+}
+
+// DeleteExpiredRevokedAccessTokens is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - now time.Time
+func (_e *Database_Expecter) DeleteExpiredRevokedAccessTokens(ctx any, tx any, now any) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	return &Database_DeleteExpiredRevokedAccessTokens_Call{Call: _e.mock.On("DeleteExpiredRevokedAccessTokens", ctx, tx, now)}
+}
+
+func (_c *Database_DeleteExpiredRevokedAccessTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx, now time.Time)) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_DeleteExpiredRevokedAccessTokens_Call) Return(err error) *Database_DeleteExpiredRevokedAccessTokens_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_DeleteExpiredRevokedAccessTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredRevokedAccessTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6125,6 +6377,80 @@ func (_c *Database_GetClientById_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// GetClientIntrospectionResourcesByClientId provides a mock function for the type Database
+func (_mock *Database) GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error) {
+	ret := _mock.Called(ctx, tx, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetClientIntrospectionResourcesByClientId")
+	}
+
+	var r0 []record.ClientIntrospectionResource
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]record.ClientIntrospectionResource, error)); ok {
+		return returnFunc(ctx, tx, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []record.ClientIntrospectionResource); ok {
+		r0 = returnFunc(ctx, tx, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.ClientIntrospectionResource)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetClientIntrospectionResourcesByClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetClientIntrospectionResourcesByClientId'
+type Database_GetClientIntrospectionResourcesByClientId_Call struct {
+	*mock.Call
+}
+
+// GetClientIntrospectionResourcesByClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+func (_e *Database_Expecter) GetClientIntrospectionResourcesByClientId(ctx any, tx any, clientId any) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	return &Database_GetClientIntrospectionResourcesByClientId_Call{Call: _e.mock.On("GetClientIntrospectionResourcesByClientId", ctx, tx, clientId)}
+}
+
+func (_c *Database_GetClientIntrospectionResourcesByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetClientIntrospectionResourcesByClientId_Call) Return(clientIntrospectionResources []record.ClientIntrospectionResource, err error) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Return(clientIntrospectionResources, err)
+	return _c
+}
+
+func (_c *Database_GetClientIntrospectionResourcesByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)) *Database_GetClientIntrospectionResourcesByClientId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetClientLogoByClientId provides a mock function for the type Database
 func (_mock *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error) {
 	ret := _mock.Called(ctx, tx, clientId)
@@ -6873,6 +7199,80 @@ func (_c *Database_GetCurrentSigningKey_Call) Return(keyPair *record.KeyPair, er
 }
 
 func (_c *Database_GetCurrentSigningKey_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)) *Database_GetCurrentSigningKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetDeletedClientByClientIdentifier provides a mock function for the type Database
+func (_mock *Database) GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error) {
+	ret := _mock.Called(ctx, tx, clientIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDeletedClientByClientIdentifier")
+	}
+
+	var r0 *record.DeletedClient
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*record.DeletedClient, error)); ok {
+		return returnFunc(ctx, tx, clientIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *record.DeletedClient); ok {
+		r0 = returnFunc(ctx, tx, clientIdentifier)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.DeletedClient)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, clientIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetDeletedClientByClientIdentifier_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDeletedClientByClientIdentifier'
+type Database_GetDeletedClientByClientIdentifier_Call struct {
+	*mock.Call
+}
+
+// GetDeletedClientByClientIdentifier is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientIdentifier string
+func (_e *Database_Expecter) GetDeletedClientByClientIdentifier(ctx any, tx any, clientIdentifier any) *Database_GetDeletedClientByClientIdentifier_Call {
+	return &Database_GetDeletedClientByClientIdentifier_Call{Call: _e.mock.On("GetDeletedClientByClientIdentifier", ctx, tx, clientIdentifier)}
+}
+
+func (_c *Database_GetDeletedClientByClientIdentifier_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string)) *Database_GetDeletedClientByClientIdentifier_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetDeletedClientByClientIdentifier_Call) Return(deletedClient *record.DeletedClient, err error) *Database_GetDeletedClientByClientIdentifier_Call {
+	_c.Call.Return(deletedClient, err)
+	return _c
+}
+
+func (_c *Database_GetDeletedClientByClientIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)) *Database_GetDeletedClientByClientIdentifier_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -8831,6 +9231,80 @@ func (_c *Database_GetRefreshTokensByCodeId_Call) Return(refreshTokens []*record
 }
 
 func (_c *Database_GetRefreshTokensByCodeId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)) *Database_GetRefreshTokensByCodeId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRefreshTokensByFirstRefreshTokenJti provides a mock function for the type Database
+func (_mock *Database) GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, firstRefreshTokenJti)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRefreshTokensByFirstRefreshTokenJti")
+	}
+
+	var r0 []*record.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) ([]*record.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, firstRefreshTokenJti)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) []*record.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, firstRefreshTokenJti)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*record.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, firstRefreshTokenJti)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetRefreshTokensByFirstRefreshTokenJti_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRefreshTokensByFirstRefreshTokenJti'
+type Database_GetRefreshTokensByFirstRefreshTokenJti_Call struct {
+	*mock.Call
+}
+
+// GetRefreshTokensByFirstRefreshTokenJti is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - firstRefreshTokenJti string
+func (_e *Database_Expecter) GetRefreshTokensByFirstRefreshTokenJti(ctx any, tx any, firstRefreshTokenJti any) *Database_GetRefreshTokensByFirstRefreshTokenJti_Call {
+	return &Database_GetRefreshTokensByFirstRefreshTokenJti_Call{Call: _e.mock.On("GetRefreshTokensByFirstRefreshTokenJti", ctx, tx, firstRefreshTokenJti)}
+}
+
+func (_c *Database_GetRefreshTokensByFirstRefreshTokenJti_Call) Run(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string)) *Database_GetRefreshTokensByFirstRefreshTokenJti_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByFirstRefreshTokenJti_Call) Return(refreshTokens []*record.RefreshToken, err error) *Database_GetRefreshTokensByFirstRefreshTokenJti_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetRefreshTokensByFirstRefreshTokenJti_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)) *Database_GetRefreshTokensByFirstRefreshTokenJti_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -12038,6 +12512,78 @@ func (_c *Database_IncrementUserOtpConsecutiveFailures_Call) RunAndReturn(run fu
 	return _c
 }
 
+// IsAccessTokenRevoked provides a mock function for the type Database
+func (_mock *Database) IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error) {
+	ret := _mock.Called(ctx, tx, jti)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsAccessTokenRevoked")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, jti)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) bool); ok {
+		r0 = returnFunc(ctx, tx, jti)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, jti)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_IsAccessTokenRevoked_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsAccessTokenRevoked'
+type Database_IsAccessTokenRevoked_Call struct {
+	*mock.Call
+}
+
+// IsAccessTokenRevoked is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - jti string
+func (_e *Database_Expecter) IsAccessTokenRevoked(ctx any, tx any, jti any) *Database_IsAccessTokenRevoked_Call {
+	return &Database_IsAccessTokenRevoked_Call{Call: _e.mock.On("IsAccessTokenRevoked", ctx, tx, jti)}
+}
+
+func (_c *Database_IsAccessTokenRevoked_Call) Run(run func(ctx context.Context, tx *sql.Tx, jti string)) *Database_IsAccessTokenRevoked_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_IsAccessTokenRevoked_Call) Return(b bool, err error) *Database_IsAccessTokenRevoked_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_IsAccessTokenRevoked_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, jti string) (bool, error)) *Database_IsAccessTokenRevoked_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsEmpty provides a mock function for the type Database
 func (_mock *Database) IsEmpty(ctx context.Context) (bool, error) {
 	ret := _mock.Called(ctx)
@@ -12094,6 +12640,78 @@ func (_c *Database_IsEmpty_Call) Return(b bool, err error) *Database_IsEmpty_Cal
 }
 
 func (_c *Database_IsEmpty_Call) RunAndReturn(run func(ctx context.Context) (bool, error)) *Database_IsEmpty_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsRefreshTokenFamilyLive provides a mock function for the type Database
+func (_mock *Database) IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+	ret := _mock.Called(ctx, tx, firstRefreshTokenJti)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsRefreshTokenFamilyLive")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, firstRefreshTokenJti)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) bool); ok {
+		r0 = returnFunc(ctx, tx, firstRefreshTokenJti)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, firstRefreshTokenJti)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_IsRefreshTokenFamilyLive_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsRefreshTokenFamilyLive'
+type Database_IsRefreshTokenFamilyLive_Call struct {
+	*mock.Call
+}
+
+// IsRefreshTokenFamilyLive is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - firstRefreshTokenJti string
+func (_e *Database_Expecter) IsRefreshTokenFamilyLive(ctx any, tx any, firstRefreshTokenJti any) *Database_IsRefreshTokenFamilyLive_Call {
+	return &Database_IsRefreshTokenFamilyLive_Call{Call: _e.mock.On("IsRefreshTokenFamilyLive", ctx, tx, firstRefreshTokenJti)}
+}
+
+func (_c *Database_IsRefreshTokenFamilyLive_Call) Run(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string)) *Database_IsRefreshTokenFamilyLive_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_IsRefreshTokenFamilyLive_Call) Return(b bool, err error) *Database_IsRefreshTokenFamilyLive_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_IsRefreshTokenFamilyLive_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)) *Database_IsRefreshTokenFamilyLive_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -12693,6 +13311,84 @@ func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Return(err error)
 }
 
 func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RecordAccessTokenRevoked provides a mock function for the type Database
+func (_mock *Database) RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, jti, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecordAccessTokenRevoked")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, jti, expiresAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, jti, expiresAt)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, jti, expiresAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RecordAccessTokenRevoked_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordAccessTokenRevoked'
+type Database_RecordAccessTokenRevoked_Call struct {
+	*mock.Call
+}
+
+// RecordAccessTokenRevoked is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - jti string
+//   - expiresAt time.Time
+func (_e *Database_Expecter) RecordAccessTokenRevoked(ctx any, tx any, jti any, expiresAt any) *Database_RecordAccessTokenRevoked_Call {
+	return &Database_RecordAccessTokenRevoked_Call{Call: _e.mock.On("RecordAccessTokenRevoked", ctx, tx, jti, expiresAt)}
+}
+
+func (_c *Database_RecordAccessTokenRevoked_Call) Run(run func(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time)) *Database_RecordAccessTokenRevoked_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RecordAccessTokenRevoked_Call) Return(b bool, err error) *Database_RecordAccessTokenRevoked_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *Database_RecordAccessTokenRevoked_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)) *Database_RecordAccessTokenRevoked_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -7,7 +7,8 @@ import (
 )
 
 // The statements of a grant's records, held on all four engines to what each asks of the engine:
-// codes, refresh tokens, revoked rotation families and parked authorize requests (#644).
+// codes, refresh tokens, revoked rotation families, revoked access tokens and parked authorize
+// requests (#644, #676).
 //
 // Most of these exist for their condition. A code is claimed only while it is neither used nor
 // revoked, a refresh token is revoked only while it is live, a sweep of a session's, a client's or
@@ -23,6 +24,7 @@ const (
 	grantClientId  = 3
 	grantSessionId = "sid-1"
 	grantFamilyJti = "first-jti"
+	grantAccessJti = "at-jti"
 )
 
 func grantStatements() []narrowWrite {
@@ -317,6 +319,53 @@ func grantStatements() []narrowWrite {
 				"DELETE FROM refresh_token_family_revocations WHERE NOT EXISTS (SELECT 1 FROM refresh_tokens " +
 					"WHERE refresh_tokens.first_refresh_token_jti = refresh_token_family_revocations.first_refresh_token_jti)",
 			},
+		},
+
+		// Revoked access tokens without a grant.
+		{
+			name: "RecordAccessTokenRevoked",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.RecordAccessTokenRevoked(ctx, nil, grantAccessJti, staleBefore)
+			},
+			answer: true,
+			statements: []string{
+				"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti'",
+				"INSERT INTO revoked_access_tokens (jti, expires_at) VALUES ('at-jti', 2003-03-03T00:00:00Z)",
+			},
+		},
+		{
+			name: "RecordAccessTokenRevoked for a token already revoked",
+			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJti}}}},
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.RecordAccessTokenRevoked(ctx, nil, grantAccessJti, staleBefore)
+			},
+			answer:     false,
+			statements: []string{"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti'"},
+		},
+		{
+			name: "IsAccessTokenRevoked",
+			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJti}}}},
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.IsAccessTokenRevoked(ctx, nil, grantAccessJti)
+			},
+			answer:     true,
+			statements: []string{"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti'"},
+		},
+		{
+			name: "IsAccessTokenRevoked when the engine folded the match",
+			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJti}}}},
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.IsAccessTokenRevoked(ctx, nil, grantAccessJti+" ")
+			},
+			answer:     false,
+			statements: []string{"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti '"},
+		},
+		{
+			name: "DeleteExpiredRevokedAccessTokens",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return nil, d.DeleteExpiredRevokedAccessTokens(ctx, nil, staleBefore)
+			},
+			statements: []string{"DELETE FROM revoked_access_tokens WHERE expires_at < 2003-03-03T00:00:00Z"},
 		},
 
 		// Parked authorize requests.

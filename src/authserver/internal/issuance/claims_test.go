@@ -22,6 +22,7 @@ import (
 )
 
 func TestGenerateAccessToken(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -74,7 +75,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -89,10 +90,10 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 900*time.Second, "exp should be 900 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 900*time.Second, testStart, "exp should be 900 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, testStart, "auth_time should be 300 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -106,10 +107,11 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, user.EmailVerified, claims["email_verified"])
 	assert.Equal(t, "openid profile email", claims["scope"])
 
-	assertTimeClaimWithinRange(t, claims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
+	assertTimeClaimWithinRange(t, claims, "updated_at", -1*time.Hour, testStart, "updated_at should be 1 hour ago")
 }
 
 func TestGenerateAccessToken_CustomScope(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -152,7 +154,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -167,10 +169,10 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, testStart, "exp should be 600 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "auth_time", -600*time.Second, testStart, "auth_time should be 600 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -184,6 +186,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 }
 
 func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -246,7 +249,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 
@@ -261,10 +264,10 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "auth_time", -900*time.Second, "auth_time should be 900 seconds ago")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, testStart, "exp should be 1200 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "auth_time", -900*time.Second, testStart, "auth_time should be 900 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -279,7 +282,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	assert.Equal(t, "openid profile email groups attributes", claims["scope"])
 
-	assertTimeClaimWithinRange(t, claims, "updated_at", -2*time.Hour, "updated_at should be 2 hours ago")
+	assertTimeClaimWithinRange(t, claims, "updated_at", -2*time.Hour, testStart, "updated_at should be 2 hours ago")
 
 	// Check groups claim
 	groups, ok := claims["groups"].([]interface{})
@@ -336,12 +339,13 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	_, err = tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
 
 func TestGenerateIdToken_FullScope(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -432,10 +436,10 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, "exp should be 600 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 600*time.Second, testStart, "exp should be 600 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "auth_time", -300*time.Second, testStart, "auth_time should be 300 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -472,10 +476,11 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.Equal(t, "value1", attributes["attr1"])
 	assert.NotContains(t, attributes, "attr2")
 
-	assertTimeClaimWithinRange(t, claims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
+	assertTimeClaimWithinRange(t, claims, "updated_at", -1*time.Hour, testStart, "updated_at should be 1 hour ago")
 }
 
 func TestGenerateIdToken_MinimalScope(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -531,10 +536,10 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 300*time.Second, "exp should be 300 seconds from now")
-	assertTimeClaimWithinRange(t, claims, "auth_time", -60*time.Second, "auth_time should be 60 seconds ago")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 300*time.Second, testStart, "exp should be 300 seconds from now")
+	assertTimeClaimWithinRange(t, claims, "auth_time", -60*time.Second, testStart, "auth_time should be 60 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -548,6 +553,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 }
 
 func TestGenerateIdToken_ClientOverride(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -613,10 +619,10 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
-	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, "exp should be 1200 seconds from now (client override)")
-	assertTimeClaimWithinRange(t, claims, "auth_time", -120*time.Second, "auth_time should be 120 seconds ago")
+	assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+	assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+	assertTimeClaimWithinRange(t, claims, "exp", 1200*time.Second, testStart, "exp should be 1200 seconds from now (client override)")
+	assertTimeClaimWithinRange(t, claims, "auth_time", -120*time.Second, testStart, "auth_time should be 120 seconds ago")
 
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
@@ -629,7 +635,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assert.Equal(t, user.Email, claims["email"])
 	assert.Equal(t, user.EmailVerified, claims["email_verified"])
 
-	assertTimeClaimWithinRange(t, claims, "updated_at", -30*time.Minute, "updated_at should be 30 minutes ago")
+	assertTimeClaimWithinRange(t, claims, "updated_at", -30*time.Minute, testStart, "updated_at should be 30 minutes ago")
 }
 
 // The one lifetime rule every grant reads (#437 decision 11): a client's positive lifetime wins,
@@ -2339,7 +2345,7 @@ func audienceOf(t *testing.T, claims jwt.MapClaims) []string {
 // refresh echoing the reported scope was then refused for (RFC 6749 section 6 lets a refresh request
 // any scope "originally granted"). /userinfo gates on openid now, so the append bought nothing. The
 // audience is unchanged: a claim scope still names authserver, whose /userinfo answers it, which a
-// groups-only grant needs since it may name no other audience.
+// groups-only grant needs since it may name no other audience, and since #676 offline_access names it.
 func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 	grants := []string{
 		"openid",
@@ -2355,8 +2361,10 @@ func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 
 	for _, grant := range grants {
 		grantScopes := strings.Split(grant, " ")
-		hasClaimScope := slices.ContainsFunc(grantScopes, func(s string) bool {
-			return slices.Contains([]string{"openid", "profile", "email", "address", "phone", "groups", "attributes"}, s)
+		// offline_access names authserver too, since the auth server is the one resource it means
+		// anything to (#676 decision 3).
+		namesAuthServer := slices.ContainsFunc(grantScopes, func(s string) bool {
+			return slices.Contains([]string{"openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access"}, s)
 		})
 		for _, flow := range flows {
 			t.Run(flow+"/"+grant, func(t *testing.T) {
@@ -2367,8 +2375,8 @@ func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
 				assert.Equal(t, grant, accessClaims["scope"], "access token scope claim")
 
 				audience := audienceOf(t, accessClaims)
-				assert.Equal(t, hasClaimScope, slices.Contains(audience, builtin.AuthServerResourceIdentifier),
-					"aud names authserver exactly when the grant has a claim scope: %v", audience)
+				assert.Equal(t, namesAuthServer, slices.Contains(audience, builtin.AuthServerResourceIdentifier),
+					"aud names authserver exactly when the grant has a claim scope or offline_access: %v", audience)
 				assert.Equal(t, slices.Contains(grantScopes, "resource1:read"), slices.Contains(audience, "resource1"),
 					"aud names resource1 exactly when the grant does: %v", audience)
 

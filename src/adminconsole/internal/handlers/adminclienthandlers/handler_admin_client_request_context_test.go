@@ -65,6 +65,13 @@ func (s *ctxRecordingApiClient) GetClientPermissions(ctx context.Context, _ stri
 	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil, nil
 }
 
+// GetClientIntrospectionResources records and succeeds for the same reason: the Introspection tab
+// reads it first, and the resources to choose from below it.
+func (s *ctxRecordingApiClient) GetClientIntrospectionResources(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, []api.ResourceResponse, error) {
+	s.seen = append(s.seen, ctx)
+	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil, nil
+}
+
 func (s *ctxRecordingApiClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, s.record(ctx)
 }
@@ -130,6 +137,10 @@ func (s *ctxRecordingApiClient) UpdateClientPermissions(ctx context.Context, _ s
 	return s.recordWrite(ctx, "UpdateClientPermissions")
 }
 
+func (s *ctxRecordingApiClient) UpdateClientIntrospectionResources(ctx context.Context, _ string, _ int64, _ *api.UpdateClientIntrospectionResourcesRequest) error {
+	return s.recordWrite(ctx, "UpdateClientIntrospectionResources")
+}
+
 func (s *ctxRecordingApiClient) UpdateClientRedirectURIs(ctx context.Context, _ string, _ int64, _ *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientRedirectURIs")
 }
@@ -167,6 +178,14 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				return HandlePermissionsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/permissions",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
+		},
+		{
+			name: "HandleIntrospectionGet",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleIntrospectionGet(h, newTestSessionStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/introspection",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3")),
 		},
 		{
@@ -326,6 +345,17 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(
 					`{"clientId":3,"assignedPermissionsIds":[5],"expectedPermissionIds":[]}`)),
+				handlertest.WithContentType("application/json")),
+		},
+		{
+			name: "HandleIntrospectionPost",
+			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+				return HandleIntrospectionPost(h, newTestSessionStore(), c)
+			},
+			write: "UpdateClientIntrospectionResources",
+			request: handlertest.Request(http.MethodPost, "/admin/clients/3/introspection",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
+				handlertest.WithBody(strings.NewReader(`{"resourceIds":[5],"expectedResourceIds":[]}`)),
 				handlertest.WithContentType("application/json")),
 		},
 		{

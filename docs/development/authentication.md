@@ -31,13 +31,142 @@ Server-to-server auth. No user context, client authenticates directly for access
 - Implementation: `handler_token_client_credentials.go`,
   `protocolvalidation/token_grant_client_credentials.go`, `issuance/grant_client_credentials.go`
 
+### Client authentication
+Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does so the one way.
+- Credentials: `client_authentication.go` reads them from the Authorization header or the form,
+  never both, the header's values percent-decoded, and writes the Warn record of a refusal, naming
+  the endpoint that refused. A refusal is a log record, not an audit event: the identifier is the
+  caller's own and unproven
+- Decision: `clientauth` takes the identifier and the secret as plain values and owns the
+  refusals: an unknown or disabled client, or a confidential client's missing or wrong secret, is
+  401 `invalid_client` with the Basic challenge; a public client that presents a secret is 400
+  `invalid_request`; the secret is compared in constant time
+- The token validator calls `FindClient` before it looks at the grant and `VerifySecret` at each
+  grant's own point of authentication, so the token endpoint's answers keep their order (#437, #676)
+
+### Access token claims (RFC 9068)
+Every access token, from every grant, is an RFC 9068 JWT access token.
+- `generateAccessTokenCore` and the client credentials grant sign it with the JOSE header
+  `typ: at+jwt` (`issuance.AccessTokenHeaderType`) and the claim `client_id`; ID and refresh tokens
+  keep the library's `JWT` header. The `typ: Bearer` claim stays
+- The authorization code, refresh and password grants add `grant_id`, the identifier the grant's
+  refresh token family shares (`FirstRefreshTokenJti`). The code exchange and the password grant fix
+  it, as the first refresh token's jti, before they mint the access token; a refresh copies its
+  parent's. The client credentials grant and the implicit flow issue no refresh token and no
+  `grant_id`
+- `offline_access` names `authserver` in `aud`, as the claim scopes do (RFC 9068 section 2.2.3)
+- Departures from its SHOULDs, documented on the tokens page: a request naming several resources
+  gets one token for all of them rather than `invalid_scope` (section 3; no RFC 8707), `groups` is
+  an array of identifiers rather than SCIM objects (section 2.2.3.1), and the private claims have
+  plain names (section 2.2.2 MAY) (#676)
+
+### Access token liveness
+One check decides whether an access token is one under RFC 9068 and still stands for live state.
+- `liveness.AccessToken` checks the token first: its header `typ` is `at+jwt` (or
+  `application/at+jwt`, without regard to case) and its `iss` is exactly the configured issuer, as
+  RFC 9068 section 4 requires of a resource server. Then the client its `client_id` names exists, is
+  the one the token was issued to, and is enabled. A new client may take a deleted client's
+  identifier, so a token whose `iat` second is before the client's `created_at` second is refused,
+  and one issued in that very second reads `deleted_clients` (written by `DeleteClient` in its
+  transaction) and is refused when the identifier was deleted in or after that second, failing
+  closed. Then it reads the user and the session the token names and returns a verdict: live, or
+  the refusal. A token without `auth_time` is a client's and has no user to check. With `sid`, the
+  session decides, its generation included, and the token's own generation claim is ignored; without
+  `sid`, the token's claim decides, an absent one reading as 0. Every token past its header needs the
+  settings, for the issuer
+- Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
+  answers whether the family has no revocation record and still has a member that is not revoked,
+  in one indexed read. Every revocation that ends a grant writes the record in its transaction, for
+  every family it reads: consent withdrawal, a client made public, a session's termination,
+  authorization-code reuse containment, replay containment and `/auth/revoke`. A sweep alone misses
+  the child of a rotation that claimed its parent before the sweep read the rows, so the record is
+  what refuses that child's access token at once. A credential change ends access tokens through
+  their generation instead. A rotation revokes the parent and inserts the child in one
+  transaction, and a credential change promotes the preserved session's tokens, so both keep the
+  grant live. A family whose rows are all gone is not live. A token
+  without `grant_id` (client credentials, implicit) reads no grant; it is live only while its jti
+  is not stored in `revoked_access_tokens` (`IsAccessTokenRevoked`, one indexed read), and one
+  without a jti is refused unread
+- An access token issued before #676 carries the header `typ: JWT` and is refused, and changing the
+  issuer setting ends every outstanding access token at the auth server's own endpoints
+- `RequireValidSession` calls it in front of `/userinfo`, the admin and account APIs and the
+  admin console's browser session API (`/api/v1/sessions`), and owns
+  the 401 `invalid_token` descriptions and the Warn record of each refusal; a revoked grant answers
+  "The access token is invalid." as a refusal of the token or its client does, and so does a
+  revoked jti; a fault is a 500,
+  never a refusal (#106, #133, #676)
+
 ### Refresh Token
 Exchange refresh token for new access/refresh tokens. Works with auth code and ROPC flows.
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
+- Liveness: `liveness.FindRefreshToken` reads the row with its code, user and client, and
+  `liveness.RefreshToken` judges it: user enabled, the row's generation current, a password grant
+  token's authentication instant, the code not revoked, no family revocation record, then the
+  session (session-bound) or the maximum lifetime and the code's session owner (offline), and last
+  the row's own revocation. The validator matches the client to the token between the two calls and
+  keeps PKCE, which it answers before the family and session refusals, and the scope checks. A token
+  refused only for its own revoked row goes on to the redemption, which contains its family (#676)
 - Implementation: `handler_token_refresh_token.go`,
-  `protocolvalidation/token_grant_refresh_token.go`, `issuance/grant_refresh_token.go`
+  `protocolvalidation/token_grant_refresh_token.go`, `liveness/refresh.go`,
+  `issuance/grant_refresh_token.go`
+
+### Token revocation (RFC 7009)
+A client ends one of its grants by sending a token of it.
+- Endpoint: `POST /auth/revoke`, form-encoded, CSRF-exempt, CORS for registered web origins, on a
+  branch of its own whose faults answer 503
+- Order: the client authenticates first through `clientauth` (a public client by `client_id`
+  alone); the token parser refuses a malformed or non-RS256 token before reading a key, and checks
+  any other against the current key and then each stored one; the token says its type (an access token by its `at+jwt` header, a refresh token by its `typ` claim), and
+  `token_type_hint` is never read
+- Liveness before ownership: an access token is judged by `liveness.AccessToken`, a refresh token
+  by `liveness.FindRefreshToken` and `liveness.RefreshToken`; a token that is not live is answered
+  200 with nothing revoked or recorded, whatever client it names. A live token of another client is
+  400 `invalid_grant`, "The token was issued to another client.", and `token_revocation_refused`;
+  a refresh token's owner is read to tell a disabled or deleted owner's token (invalid) from a live
+  one
+- Refusal auditing: the handler uses `ratelimit.Gate`, as rate-limit refusals do, to record at most
+  one `token_revocation_refused` per verified token owner client id per minute window per instance.
+  The gate is shared across access and refresh tokens and callers: changing public client
+  identifiers, tokens or hints cannot reset it. Every request is still refused and counted;
+  successful revocations are audited independently
+- Revocation: `revocation.RevokeGrantTx`, the sixth operation, records the family under
+  `client_revoked` and revokes every member in one transaction; `revoked_grant` is written after the
+  commit. It ends no session and no other grant
+- A live access token without `grant_id` (client credentials, implicit) is revoked by its jti:
+  `revocation.RevokeAccessToken` stores the jti with the token's `exp` in `revoked_access_tokens`,
+  on no transaction (a lookup, then an insert a concurrent revocation's row refuses as a duplicate),
+  and `revoked_access_token` is written only by the call that stored it. `liveness.AccessToken` refuses a token without `grant_id` while its jti is stored, or
+  when it carries none, so a second revocation answers 200 as an invalid token; a token with
+  `grant_id` never reads the table. The cleanup worker deletes a stored jti once its token has
+  expired
+- A fault reading the database or the keys answers 503 `temporarily_unavailable`, never 200.
+  `goiabada_revocation_requests_total` counts each answer by outcome (#676)
+- Implementation: `handler_revoke.go`, `revocation/revocation.go`, `revocationmetrics`
+
+### Token introspection (RFC 7662)
+An API, calling as a confidential client, asks whether a token is active.
+- Endpoint: `POST /auth/introspect`, form-encoded, CSRF-exempt, no CORS; every other method is
+  answered 405 with `Allow: POST` and `no-store` by `HandleIntrospectOtherMethods`, registered for
+  the path on the same branch, whose faults answer 500 and count as `error`
+- Order: the client authenticates first through `clientauth.AuthenticateConfidential`, which
+  refuses a public client 401 `invalid_client` whatever it sent (section 4); the token parser
+  refuses a malformed or non-RS256 token before reading a key; `token_type_hint` is never read
+- An access token is active when `liveness.AccessToken` finds it live and its `aud` names a
+  resource on the caller's introspection resources (`clients_introspection_resources`, compared
+  exactly); a refresh token only to its own client, compared before `liveness.RefreshToken` runs,
+  so another client's token reads nothing of its grant, and while its issuing flow is enabled
+  (`record.Client.IsRefreshIssuingFlowEnabled`). Active means live, not that a refresh would pass:
+  the grant's consent, permission and scope-allowance re-checks run only at the token endpoint.
+  Introspection has no side effect: a rotated refresh token is answered inactive and triggers no
+  replay containment
+- Every other token is exactly `{"active": false}`. An active access token carries the token's own
+  `scope`, `client_id`, `sub`, `aud`, `iss`, `exp`, `iat`, `nbf`, `jti` and `token_type`; a refresh
+  token `scope`, its client's `client_id`, `sub`, `iss`, `exp`, `iat` and `jti`. Every answer carries
+  `Cache-Control: no-store`; a fault answers 500, never inactive. No audit event;
+  `goiabada_introspection_requests_total` counts each answer by outcome (#676)
+- Implementation: `handler_introspect.go`, `clientauth`, `liveness`, `introspectionmetrics`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
@@ -450,13 +579,22 @@ the relevant section of the official text (rfc-editor.org, openid.net) rather th
 memory, and follow its MUST and SHOULD requirements. The main ones: OAuth 2.0 (RFC 6749) and bearer
 tokens (RFC 6750), PKCE (RFC 7636), revocation (RFC 7009), introspection (RFC 7662), dynamic client
 registration (RFC 7591), authorization server metadata (RFC 8414), JWT (RFC 7519) and JWK (RFC
-7517), the OAuth 2.0 Security Best Current Practice (RFC 9700), and OpenID Connect Core 1.0 and
-Discovery 1.0.
+7517), JWT access tokens (RFC 9068), the OAuth 2.0 Security Best Current Practice (RFC 9700), and
+OpenID Connect Core 1.0 and Discovery 1.0.
+
+Goiabada departs from three of RFC 9068's SHOULDs and MAYs, and the tokens page documents each:
+a request whose scopes name several resources gets one token naming them all in `aud` (section 3,
+since there is no RFC 8707 `resource` parameter; each scope still belongs to one resource in `aud`),
+`groups` is an array of group identifiers rather than SCIM objects (section 2.2.3.1), and the
+private claims `attributes`, `auth_state_generation`, `grant_id` and the `typ` claim have plain
+names (section 2.2.2).
 
 ## API Routes
 
 - `/auth/authorize` - OAuth2 authorization endpoint
 - `/auth/token` - Token endpoint
+- `/auth/revoke` - Token revocation endpoint (RFC 7009)
+- `/auth/introspect` - Token introspection endpoint (RFC 7662)
 - `/auth/logout` - Sign-out and post-logout redirect endpoint
 - `/userinfo` - OIDC userinfo
 - `/certs` - JWKS endpoint

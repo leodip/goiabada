@@ -214,6 +214,7 @@ cause, each a whole sentence.
 | `handler.client.secret_invalid` | (none) | Invalid client secret. Please generate a new one. |
 | `handler.client_administrative_scopes.allowed_required` | (none) | allowed is required. |
 | `handler.client_administrative_scopes.console_always_allowed` | (none) | The admin console's client is always allowed to request the administrative scopes. |
+| `handler.client_introspection_resources.public_client` | (none) | A public client can't introspect tokens, so it can't list introspection resources. |
 | `handler.client_permissions.client_credentials_disabled` | (none) | Client permissions can only be configured when client credentials flow is enabled |
 | `handler.client_redirect_uris.no_redirect_flow` | (none) | Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client. |
 | `handler.client_redirect_uris.too_many` | `max` (int), `count` (int) | A client can have at most {{.max}} redirect URIs, and this list has {{.count}}. |

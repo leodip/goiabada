@@ -1996,8 +1996,12 @@ paths:
         refused here. The secret of an administrator client, one holding an
         administrative permission or the admin console's own client, is read with
         `authserver:manage` alone, and `authserver:manage-clients` is refused it
-        with MANAGE_SCOPE_REQUIRED. A client holding no secret, a public one, is
-        answered an empty `clientSecret`.
+        with MANAGE_SCOPE_REQUIRED. So is the secret of a client listed for the
+        `authserver` resource among its introspection resources, since whoever
+        holds it can introspect the tokens of every sign-in as that client;
+        `authserver:manage-clients` reads the secret of a client listed only for
+        other resources. A client holding no secret, a public one, is answered an
+        empty `clientSecret`.
 
         Every read that answers a secret leaves a `viewed_client_secret` audit
         record naming the client and the caller. A read of a client holding none
@@ -2036,6 +2040,14 @@ paths:
         redeeming them took a secret are no longer honoured. It sets pkceRequired to true for
         the same reason, and disables the client credentials flow. The reverse transition and a
         secret rotation revoke nothing.
+
+        The route admits `authserver:manage-clients` and `authserver:manage`. Only
+        `authserver:manage` writes to an administrator client, or sets the secret of a client
+        listed for the `authserver` resource among its introspection resources: whoever holds that
+        secret can introspect access tokens from every app. `authserver:manage-clients` is refused
+        with `MANAGE_SCOPE_REQUIRED` and an `administrator_change_refused` audit record. It can
+        still make such a client public, which empties its introspection resources, and it sets
+        the secret of a client listed only for other resources.
       operationId: updateClientAuthentication
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2270,6 +2282,92 @@ paths:
           description: |
             Another save changed the client's permissions after expectedPermissionIds was read.
             error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/clients/{id}/introspection-resources:
+    get:
+      tags: [Clients]
+      summary: Get client introspection resources
+      description: |
+        The resources whose tokens the client may introspect. A client lists none until an
+        administrator adds them, and a public client never lists any. `resources` is `[]` for a
+        client listing none, never null.
+
+        The route admits `authserver:admin-read`, `authserver:manage-clients` and
+        `authserver:manage`.
+      operationId: getClientIntrospectionResources
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: The client and its introspection resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClientIntrospectionResourcesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Clients]
+      summary: Set client introspection resources
+      description: |
+        Replace the whole list of resources whose tokens the client may introspect. A repeated id
+        is listed once. `expectedResourceIds` is the list as you last read it, `[]` when it was
+        empty; absent or null is refused with `VALIDATION_ERROR`.
+
+        The route admits `authserver:manage-clients` and `authserver:manage`. Adding the
+        `authserver` resource is reserved to `authserver:manage`, because a client listed for it
+        can introspect the tokens of every sign-in: `authserver:manage-clients` is refused with
+        `MANAGE_SCOPE_REQUIRED` and an `administrator_change_refused` audit record naming the
+        resource under `resource_ids`. Keeping it listed, or removing it, is not reserved. A write
+        to an administrator client is reserved to `authserver:manage` too.
+
+        A public client cannot authenticate, so it never introspects: a non-empty list for one is
+        refused with `handler.client_introspection_resources.public_client`, while its empty list is
+        saved. Making a client public empties its list. An unknown resource id is answered 404 and
+        saves nothing. Every save leaves an `updated_client_introspection_resources` audit record
+        naming the client, the resources added and removed, and the caller.
+      operationId: updateClientIntrospectionResources
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientIntrospectionResourcesRequest'
+      responses:
+        '200':
+          description: Introspection resources updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the client's introspection resources after expectedResourceIds
+            was read. error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
           content:
             application/json:
               schema:
@@ -3977,8 +4075,10 @@ components:
         with 403 MANAGE_SCOPE_REQUIRED, when the request grants or revokes an administrative
         permission (directly, or by moving a user into or out of a group holding one, or by
         deleting such a group), writes to an administrator, switches whether a client may
-        request the administrative scopes, reads an administrator client's secret, changes the
-        email or audit-log settings, or changes an administrative permission's description. It keeps
+        request the administrative scopes, reads an administrator client's secret, adds the
+        `authserver` resource to a client's introspection resources, reads or sets the secret of
+        a client listed for it, changes the email or
+        audit-log settings, or changes an administrative permission's description. It keeps
         full control of everyone else, and still reads administrators. `authserver:manage`
         alone meets 409 LAST_ADMINISTRATOR, on the operations that could leave no enabled user
         holding it.
@@ -4118,10 +4218,15 @@ components:
             deletion), an administrative group (settings, attributes,
             members, permissions, deletion), or an administrator client
             (settings, authentication, flows, redirect URIs, web origins,
-            token settings, permissions, logo, deletion);
+            token settings, permissions, introspection resources, logo,
+            deletion);
           - switches whether a client may request the administrative scopes,
             on or off, on any client;
-          - reads an administrator client's secret;
+          - adds the `authserver` resource to a client's introspection
+            resources;
+          - reads an administrator client's secret, or reads or sets the
+            secret of a client listed for the `authserver` resource among its
+            introspection resources;
           - changes the email or the audit-log settings;
           - changes an administrative permission's description.
         Granular scopes still read administrators. The refusal is answered
@@ -5975,6 +6080,37 @@ components:
       required:
         - client
         - permissions
+
+    UpdateClientIntrospectionResourcesRequest:
+      type: object
+      required: [expectedResourceIds]
+      properties:
+        resourceIds:
+          type: array
+          description: The whole new list. Absent or null saves an empty list.
+          items:
+            type: integer
+            format: int64
+        expectedResourceIds:
+          type: array
+          description: The client's introspection resource ids as last read; [] if there were none.
+          items:
+            type: integer
+            format: int64
+
+    GetClientIntrospectionResourcesResponse:
+      type: object
+      properties:
+        client:
+          $ref: '#/components/schemas/ClientResponse'
+        resources:
+          type: array
+          description: The resources whose tokens the client may introspect; [] when there are none.
+          items:
+            $ref: '#/components/schemas/ResourceResponse'
+      required:
+        - client
+        - resources
 
     ClientLogoInfoResponse:
       type: object

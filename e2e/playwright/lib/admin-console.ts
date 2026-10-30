@@ -13,6 +13,7 @@ export type ClientTab =
   | "web-origins"
   | "user-sessions"
   | "permissions"
+  | "introspection"
   | "delete";
 
 export function clientUrl(id: number, tab: ClientTab): string {
@@ -92,6 +93,14 @@ export async function submitNewClient(page: Page, client: NewClient) {
   await page.locator('input[name="authorizationCodeEnabled"]').setChecked(client.authorizationCode ?? true);
   await page.locator('input[name="clientCredentialsEnabled"]').setChecked(client.clientCredentials ?? false);
   await page.locator("#btnCreate").click();
+}
+
+// Adds a resource, by its identifier, to the introspection resources a client's Introspection tab
+// shows, without saving.
+export async function addIntrospectionResource(page: Page, identifier: string) {
+  const select = page.locator("#introspectionResourcesSelect");
+  await select.selectOption((await select.locator(`option[data-resource-identifier="${identifier}"]`).getAttribute("value"))!);
+  await page.locator("#addIntrospectionResourceBtn").click();
 }
 
 // The value a page's record (a dl.detail-list, as on the delete pages and a user's details) lists

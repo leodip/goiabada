@@ -177,6 +177,16 @@ func (o *outboundContext) client() *http.Client {
 	})}
 }
 
+// assertTokenExchangeDeadline holds a request's deadline to TokenExchangeTimeout, which the client
+// adds to a reading it takes between before and after. The deadline is therefore no earlier than
+// before plus the timeout and no later than after plus it. A slow machine cannot fail those bounds,
+// and they refuse any value further from the ten seconds chosen in #338 than the call took.
+func assertTokenExchangeDeadline(t *testing.T, deadline, before, after time.Time) {
+	t.Helper()
+	assert.WithinRange(t, deadline, before.Add(TokenExchangeTimeout), after.Add(TokenExchangeTimeout),
+		"bounded by TokenExchangeTimeout, which is what replaces the cancellation")
+}
+
 // Both grants are single use. The code is burned by the time the auth server answers,
 // and the refresh token is revoked as part of issuing its replacement, so a browser
 // that goes away mid-call must not take the call with it: it would be abandoned with
@@ -200,7 +210,9 @@ func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestI
 			cancel()
 
 			outbound := &outboundContext{}
+			before := time.Now()
 			tokenResponse, err := g.send(ctx, NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil))
+			after := time.Now()
 
 			require.Error(t, err)
 			assert.Nil(t, tokenResponse)
@@ -209,13 +221,7 @@ func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestI
 				"the request runs on a context detached from the caller's, which is already cancelled")
 
 			require.True(t, outbound.hasLimit, "detached, but not unbounded")
-			assert.LessOrEqual(t, time.Until(outbound.deadline), TokenExchangeTimeout,
-				"bounded by TokenExchangeTimeout, which is what replaces the cancellation")
-			// The tolerance is what the client spends between taking the deadline and the
-			// transport reading it, which is microseconds; a second is generous for a loaded
-			// machine and still refuses any value that is not the ten seconds chosen in #338.
-			assert.Greater(t, time.Until(outbound.deadline), TokenExchangeTimeout-time.Second,
-				"and by that value rather than by something shorter")
+			assertTokenExchangeDeadline(t, outbound.deadline, before, after)
 
 			assert.Equal(t, wantRequestID, outbound.requestID,
 				"the detached request keeps the caller's values, so request_id still reaches its records")
@@ -250,14 +256,15 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 		ctx := requestid.NewContext(context.Background(), wantRequestID)
 
 		outbound := &outboundContext{}
+		before := time.Now()
 		_, err := NewTokenClient(testTokenURL, "ci", "cs", outbound.client(), nil).ClientCredentials(ctx, "s")
+		after := time.Now()
 
 		require.Error(t, err)
 		require.True(t, outbound.called.Load())
 		require.NoError(t, outbound.ctxErr)
 		require.True(t, outbound.hasLimit, "a browser context carries no deadline, so the client sets one")
-		assert.LessOrEqual(t, time.Until(outbound.deadline), TokenExchangeTimeout)
-		assert.Greater(t, time.Until(outbound.deadline), TokenExchangeTimeout-time.Second)
+		assertTokenExchangeDeadline(t, outbound.deadline, before, after)
 		assert.Equal(t, wantRequestID, outbound.requestID)
 	})
 

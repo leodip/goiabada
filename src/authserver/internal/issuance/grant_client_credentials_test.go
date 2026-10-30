@@ -14,6 +14,7 @@ import (
 )
 
 func TestIssueClientCredentialsGrant(t *testing.T) {
+	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -111,9 +112,9 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			assert.Equal(t, "Bearer", claims["typ"])
 			assert.Equal(t, tt.scope, claims["scope"])
 
-			assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
-			assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, "nbf should be now")
-			assertTimeClaimWithinRange(t, claims, "exp", time.Duration(tt.expectedLifetime)*time.Second,
+			assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, testStart, "iat should be now")
+			assertTimeClaimWithinRange(t, claims, "nbf", 0*time.Second, testStart, "nbf should be now")
+			assertTimeClaimWithinRange(t, claims, "exp", time.Duration(tt.expectedLifetime)*time.Second, testStart,
 				"exp should be the expected lifetime from now")
 
 			_, err = uuidtest.Parse(claims["jti"].(string))

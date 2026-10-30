@@ -411,15 +411,17 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	})
 
 	t.Run("the code's lifetime boundary", func(t *testing.T) {
-		// Both sides of the 5-minute window, so the constant cannot be widened or narrowed
-		// without a test noticing.
+		// Both sides of the 5-minute window: a handler that keeps a code 3s or more past the
+		// lifetime, or drops it 30s or more before, fails a case. Each code's age is set when its case runs. A slow
+		// machine can only age a code further, so the inside case keeps 30s in hand and the
+		// outside case needs only 2s.
 		for _, tc := range []struct {
-			name     string
-			issuedAt time.Time
-			expired  bool
+			name    string
+			age     time.Duration
+			expired bool
 		}{
-			{"just inside the window", time.Now().UTC().Add(-emaillinks.ActivationCodeLifetime + 2*time.Second), false},
-			{"just outside the window", time.Now().UTC().Add(-emaillinks.ActivationCodeLifetime - 2*time.Second), true},
+			{"just inside the window", emaillinks.ActivationCodeLifetime - 30*time.Second, false},
+			{"just outside the window", emaillinks.ActivationCodeLifetime + 2*time.Second, true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -427,7 +429,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				store := newMarkerTestStore()
 
-				preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, tc.issuedAt)
+				preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-tc.age))
 				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 				if tc.expired {
 					database.On("DeletePreRegistrationHoldingCode", mock.Anything, (*sql.Tx)(nil), int64(7), codeHash).Return(true, nil).Once()

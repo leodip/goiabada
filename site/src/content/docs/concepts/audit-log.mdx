@@ -33,13 +33,13 @@ These record who can administer Goiabada and who tried to reach past that. See [
 
 | Event | Written when | Details |
 |---|---|---|
-| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, rewording an administrative permission's description, switching a client's **May request administrative scopes**, and deleting a group holding an administrative permission. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, and `group_ids` for a group membership change |
+| `administrator_change_refused` | An Admin API request reached for something only `authserver:manage` may do, and was refused `403 MANAGE_SCOPE_REQUIRED`. That's creating or changing an administrator, granting or revoking an administrative permission, changing what reaches an administrator, or changing the email or audit log settings. It also covers reading an administrator client's secret, reading or setting the secret of a client listed for the `authserver` resource, rewording an administrative permission's description, switching a client's **May request administrative scopes**, deleting a group holding an administrative permission, and listing the `authserver` resource among a client's introspection resources. One entry per refused request, so a client that retries leaves one per attempt. A token with none of a route's scopes is refused `INSUFFICIENT_SCOPE` instead, and writes nothing. | `logged_in_user`, `method`, `route` (the route pattern, such as `/api/v1/admin/users/{id}/permissions`), `ceiling` (`grant`, `target` or `settings`), `target_kind` and `target_id` when the request has a target, `permission_ids` for a grant or a description change, `group_ids` for a group membership change, and `resource_ids` for a client's introspection resources |
 | `administrative_permission_changed` | An administrative permission was granted to or revoked from a user, a group or a client, or a user joined or left a group holding one. It's written after the change's own entries, such as `added_user_permission` or `user_added_to_group`, never instead of them. Deleting an administrator or an administrative group writes only its own deletion entry. | `change` (`granted` or `revoked`), `target_kind` and `target_id`, `permission_identifiers` (such as `authserver:manage`), `group_id` for a membership change, and `logged_in_user`, or `command` for the `recover` command's grant |
 | `updated_client_administrative_scopes` | A client's **May request administrative scopes** switch was saved, on or off. An allowed client is an administrator client, so watch this beside `administrative_permission_changed`. The Admin API writes it for every call to that route, even one that keeps the value it had; the admin console's **Save** calls it only when the switch changed. | `client_id`, `client_identifier`, `allowed` (the new value) and `logged_in_user` |
 | `administrative_scope_refused` | A client that isn't allowed to ask for the administrative scopes asked for one on a signed-in user's behalf, and was refused (see the answers on [Authorize](/reference/endpoints/authorize/#administrative-scopes) and [Token](/reference/endpoints/token/#administrative-scopes)). It's written at the authorization endpoint when the browser holds a valid session and the request doesn't ask for `prompt=login`, at the last step before a code or tokens are issued, and on the token endpoint's authorization code, refresh token and password grants. A refusal at the authorization endpoint with no valid session, or held back until after the password because of `prompt=login`, writes a Warn log record instead, since anyone can reach that endpoint. | `client_id`, `client_identifier`, `scopes`, `checkpoint` (`"authorize"`, `"issue"`, `"authorization_code"`, `"refresh_token"` or `"password"`) and `user_id` |
 | `viewed_client_secret` | Someone read a client's secret through `GET /api/v1/admin/clients/{id}/secret`. The admin console reads it there each time you open a confidential client's **Authentication** tab. Reading a client with no secret writes nothing. | `client_id`, `client_identifier` and `logged_in_user` |
 
-The `updated_client_permissions` entry names what a client permission save changed, the ids of the permissions it granted and of those it revoked, so you can trace a grant to a client back to the permission it was.
+The `updated_client_permissions` entry names what a client permission save changed, the ids of the permissions it granted and of those it revoked, so you can trace a grant to a client back to the permission it was. The `updated_client_introspection_resources` entry does the same for a client's introspection resources, naming the resources it added and removed. Watch for the `authserver` resource's id there: see [Introspection resources](/concepts/clients/#introspection-resources).
 
 ### Signs of an attack
 
@@ -53,7 +53,7 @@ Each of these means the server caught something and refused it. One entry is wor
 | `otp_authenticator_disabled` | A user's authenticator got its 100th wrong code in a row and was disabled. Someone who knew the user's password, or held one of their sessions, got that far, so treat the password as known. [A user who lost their authenticator](/guides/require-two-factor-authentication/#a-user-who-lost-their-authenticator) is the way back. |
 | `rate_limit_exceeded` | A rate limiter started refusing requests, often a password or code guessing run. Each auth server instance writes it at most once per limiter and key per window, not once per refused request. |
 
-Two more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI.
+Three more are worth watching. A run of `auth_ceremony_mismatch` against one client is a page trying to act on sign-ins its users never started. And `redemption_refused_redirect_uri` means someone who held a valid code, and passed client authentication and PKCE, tried to redeem it after you removed its redirect URI. `token_revocation_refused` means a client held a live token issued to another client.
 
 ## Where events go
 
@@ -106,6 +106,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 | Key | Meaning |
 |---|---|
+| `added_resource_ids` | The row ids of the resources a save of a client's introspection resources added. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
@@ -124,6 +125,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `email_digest` | The SHA-256 hex digest of an address typed into a form nobody has signed in to, or named by a password grant. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
+| `grant_id` | The grant a client revoked: the `jti` of its first refresh token, which its access tokens carry as `grant_id`. |
 | `grant_type` | The `grant_type` of a token request. |
 | `grant_types` | The grant types a client asked for when it registered itself. |
 | `granted_permission_ids` | The row ids of the permissions a client permission save granted. |
@@ -137,6 +139,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `is_public` | Whether a client that registered itself is public, with no secret. |
 | `issue_access_token` | Whether the implicit flow issued an access token. |
 | `issue_id_token` | Whether the implicit flow issued an ID token. |
+| `jti` | The `jti` of an access token a client revoked. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
 | `limiter` | The name of the rate limiter that refused. |
 | `logged_in_user` | The subject of the token that made an Admin API or Account API request: a user's subject, or the client identifier for a token from the client credentials flow. Empty on the entries a sign-out or a sign-in writes, which no token makes, and on the `revoked_user_auth_state` a recovery writes, which names the `recover` command under `command`. |
@@ -161,8 +164,10 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `refresh_token_jti` | The `jti` of the refresh token issued. |
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
+| `removed_resource_ids` | The row ids of the resources a save of a client's introspection resources removed. |
 | `resource_id` | The resource's row id. |
 | `resource_identifier` | The identifier the resource is known by. |
+| `resource_ids` | The row ids of the resources a refused save of a client's introspection resources would have added: the `authserver` resource. |
 | `response_type` | The `response_type` of an implicit flow request. |
 | `revoked_code_count` | How many authorization codes were revoked. |
 | `revoked_count` | How many refresh tokens of a replayed token's family were revoked. |
@@ -177,7 +182,9 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |
 | `to` | The address an administrator sent a test email to. |
+| `token_client_id` | The row id of the client a token sent to the revocation endpoint was issued to. |
 | `token_expiration_in_seconds` | Under `old` and `new`: the default access token lifetime, in seconds. |
+| `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |
 | `user_attribute_id` | The row id of a user's custom attribute. |
 | `user_id` | The user's row id. |
 | `user_session_id` | The row id of a user's session. |
@@ -258,6 +265,9 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `refresh_token_replay_detected` | A refresh token that had already been rotated came back, so the rest of its family was revoked. |
 | `revoked_consent_grants` | A user's consent to a client was withdrawn, by the user or by an administrator, so the refresh tokens the user held with that client, and the authorization codes not yet redeemed, were revoked. It's written beside `deleted_own_user_consent` or `deleted_user_consent`, and names the client, the tokens revoked and how many codes. |
 | `redemption_refused_redirect_uri` | The token endpoint refused an authorization code because its redirect URI was removed from the client after the code was issued. |
+| `revoked_grant` | A client revoked one of its grants at the [revocation endpoint](/reference/endpoints/revoke/), by sending its refresh token or one of its access tokens, so every refresh token of the grant was revoked. It names the client, the user, the grant, the type of token sent and the refresh tokens revoked. |
+| `revoked_access_token` | A client revoked one of its access tokens that belongs to no grant, from the client credentials grant or the implicit flow, at the [revocation endpoint](/reference/endpoints/revoke/). It names the client, the token's `jti` and, for a token of the implicit flow, the user. |
+| `token_revocation_refused` | A client sent the revocation endpoint another client's live token, and was refused. Nothing was revoked. It names both clients and the type of token. Each auth server instance records at most one per token-owning client per one-minute window, across callers and token types. |
 
 ### Registration and emailed links
 
@@ -348,6 +358,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_web_origins` | An administrator saved a client's web origins. |
 | `updated_client_tokens` | An administrator saved a client's token settings: lifetimes, and which claims go in its tokens. |
 | `updated_client_permissions` | An administrator changed the permissions granted to a client. |
+| `updated_client_introspection_resources` | An administrator changed the resources whose tokens a client may introspect. |
 | `updated_client_administrative_scopes` | An administrator allowed a client to ask for the administrative scopes, or stopped it. |
 | `updated_client_logo` | An administrator uploaded or replaced a client's logo. |
 | `deleted_client_logo` | An administrator removed a client's logo. |

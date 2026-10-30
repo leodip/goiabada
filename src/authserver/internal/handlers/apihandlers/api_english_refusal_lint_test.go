@@ -109,6 +109,7 @@ var machineOnlyRefusals = map[string]machineOnlyClass{
 	"expectedGroupIds is required: send the group ids as you last read them, or [] if there were none.":                 classMissingExpected,
 	"expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.":       classMissingExpected,
 	"expectedPermissions is required: send the resource's permissions as you last read them, or [] if there were none.": classMissingExpected,
+	"expectedResourceIds is required: send the resource ids as you last read them, or [] if there were none.":           classMissingExpected,
 	"expectedRedirectURIs is required: send the redirect URIs as you last read them, or [] if there were none.":         classMissingExpected,
 	"expectedWebOrigins is required: send the web origins as you last read them, or [] if there were none.":             classMissingExpected,
 

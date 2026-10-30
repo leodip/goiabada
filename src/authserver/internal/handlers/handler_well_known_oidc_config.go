@@ -55,9 +55,17 @@ func HandleWellKnownOIDCConfigGet(
 			// none is a public client, which authenticates with its client_id alone (RFC 7591
 			// section 2) and which DCR registers.
 			TokenEndpointAuthMethodsSupported: []string{"client_secret_post", "client_secret_basic", "none"},
-			CodeChallengeMethodsSupported:     []string{"S256"},
-			RequestParameterSupported:         false,
-			RequestURIParameterSupported:      false,
+			// RFC 7009 (#676 decision 9): a confidential client authenticates as at the token
+			// endpoint, and a public client names itself with its client_id alone (section 5).
+			RevocationEndpoint:                     baseURL + "/auth/revoke",
+			RevocationEndpointAuthMethodsSupported: []string{"client_secret_basic", "client_secret_post", "none"},
+			// RFC 7662 (#676 decision 9): a caller MUST authenticate (section 4), so none is not
+			// among them.
+			IntrospectionEndpoint:                     baseURL + "/auth/introspect",
+			IntrospectionEndpointAuthMethodsSupported: []string{"client_secret_basic", "client_secret_post"},
+			CodeChallengeMethodsSupported:             []string{"S256"},
+			RequestParameterSupported:                 false,
+			RequestURIParameterSupported:              false,
 			// Every authorization response carries iss, whatever form the issuer setting has: the
 			// value is the issuer above, so the three that RFC 9207 section 2.4 has a client compare
 			// are one (#576, decision 2).

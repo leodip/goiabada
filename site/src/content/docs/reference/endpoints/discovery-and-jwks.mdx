@@ -31,6 +31,8 @@ Two endpoints do this, and neither needs a token:
      "token_endpoint": "https://auth.example.com/auth/token",
      "userinfo_endpoint": "https://auth.example.com/userinfo",
      "end_session_endpoint": "https://auth.example.com/auth/logout",
+     "revocation_endpoint": "https://auth.example.com/auth/revoke",
+     "introspection_endpoint": "https://auth.example.com/auth/introspect",
      "jwks_uri": "https://auth.example.com/certs",
      ...
    }
@@ -78,7 +80,7 @@ The auth server describes what it implements, which no setting changes but two: 
 
 | Field | Value |
 |---|---|
-| `issuer` | **Issuer**, under **Admin**, **General** in the admin console: an `https` URL with no query, fragment or user info, or exactly the auth server's base URL, at most 60 characters. A new installation starts with the base URL. Every token's `iss` is this value. |
+| `issuer` | **Issuer**, under **Admin**, **General** in the admin console: an `https` URL with no query, fragment or user info, or exactly the auth server's base URL, at most 60 characters. A new installation starts with the base URL. Every token's `iss` is this value. Changing it ends every access token already issued at the auth server's own `/userinfo` and APIs, which accept only the current issuer, and the [introspection endpoint](/reference/endpoints/introspect/) answers them `{"active": false}`. |
 | `authorization_endpoint` | `/auth/authorize`, the [authorization endpoint](/reference/endpoints/authorize/) |
 | `token_endpoint` | `/auth/token`, the [token endpoint](/reference/endpoints/token/) |
 | `userinfo_endpoint` | `/userinfo`, the [UserInfo endpoint](/reference/endpoints/userinfo/) |
@@ -95,6 +97,10 @@ The auth server describes what it implements, which no setting changes but two: 
 | `scopes_supported` | `openid`, `profile`, `email`, `address`, `phone`, `groups`, `attributes` and `offline_access`. Permission scopes aren't listed. See [Scopes](/concepts/scopes/). |
 | `claims_supported` | The claims about the user and the sign-in the auth server can supply, in ID tokens, access tokens and `/userinfo` |
 | `token_endpoint_auth_methods_supported` | `client_secret_post`, `client_secret_basic` and `none`, the last for a public client |
+| `revocation_endpoint` | `/auth/revoke`, the [revocation endpoint](/reference/endpoints/revoke/) |
+| `revocation_endpoint_auth_methods_supported` | `client_secret_basic`, `client_secret_post` and `none`, the last for a public client |
+| `introspection_endpoint` | `/auth/introspect`, the [introspection endpoint](/reference/endpoints/introspect/) |
+| `introspection_endpoint_auth_methods_supported` | `client_secret_basic` and `client_secret_post`: a public client can't introspect |
 | `code_challenge_methods_supported` | `S256`. See [PKCE](/concepts/pkce/). |
 | `request_parameter_supported` | `false`: a `request` object is refused |
 | `request_uri_parameter_supported` | `false`: a `request_uri` is refused |

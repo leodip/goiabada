@@ -134,6 +134,9 @@ type clientTargetWrite struct {
 	// refusedEarlierForTheConsoleClient says the route answers the admin console's own client 400
 	// before the ceiling, as deleting a system-level client does.
 	refusedEarlierForTheConsoleClient bool
+	// credentials says the route reads or sets the client's secret, which the credentials ceiling
+	// also holds for a client listed for the authserver resource's tokens (#676 decision 14).
+	credentials bool
 }
 
 // clientRequest builds a request for one of the routes, with its id path value set.
@@ -168,7 +171,7 @@ var clientTargetWrites = []clientTargetWrite{
 			HandleClientAuthenticationPut(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
-		writes:           []string{"RunInTransaction", "SetClientPublic", "UpdateClient"},
+		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientId", "UpdateClient"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
@@ -180,8 +183,9 @@ var clientTargetWrites = []clientTargetWrite{
 			HandleClientAuthenticationPut(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
-		writes:           []string{"RunInTransaction", "SetClientPublic", "UpdateClient"},
+		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientId", "UpdateClient"},
 		expectFirstWrite: failingWrite("UpdateClient", mock.Anything, (*sql.Tx)(nil), mock.Anything),
+		credentials:      true,
 	},
 	{
 		name: "PUT /clients/{id}/oauth2-flows",
@@ -311,6 +315,7 @@ var clientTargetWrites = []clientTargetWrite{
 			HandleClientSecretGet(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
+		credentials: true,
 	},
 }
 
@@ -450,6 +455,9 @@ func TestClientTargetCeiling_AGranularTokenWritingToAnOrdinaryClientProceeds(t *
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			if write.expectFirstWrite != nil {
 				write.expectFirstWrite(database)
+			}
+			if write.credentials {
+				expectIntrospectionResources(database)
 			}
 
 			rr, records := serveClientCase(t, clientTargetCase{write, ordinaryClient}, granularScopeOfClients, database, auditLogger)

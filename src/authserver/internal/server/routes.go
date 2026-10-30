@@ -32,7 +32,8 @@ import (
 // protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
 // (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, protocol, api, token := branches.pages, branches.protocol, branches.api, branches.token
+	pages, protocol, api, token, revoke, introspect := branches.pages, branches.protocol, branches.api, branches.token,
+		branches.revoke, branches.introspect
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database))
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -169,6 +170,16 @@ func (s *Server) initRoutes(branches appBranches) {
 	// group its path is under, whose chain runs before the 405, as it did when the route was its
 	// own (#435).
 	token.With(rateLimiter.LimitROPC).Post("/auth/token", handlers.HandleTokenPost(httpHelper, s.database, tokenIssuer, tokenValidator, auditLogger, rateLimiter, tokenMetrics))
+	// Token revocation (RFC 7009, #676), outside the /auth group for the reason the token endpoint
+	// is, on a branch of its own that answers a fault 503. No rate limit: the client authenticates
+	// before anything else, as at the token endpoint's grants that have none (decision 10).
+	revoke.Post("/auth/revoke", handlers.HandleRevokePost(httpHelper, s.database, tokenParser, s.dataCipher, auditLogger, s.revocationMetrics))
+	// Token introspection (RFC 7662, #676), outside the /auth group for the same reason, on a branch
+	// of its own that counts the faults it answers. POST alone: every other method is a 405 the
+	// endpoint answers itself rather than the /auth group's, so no token reaches a URL and the
+	// refusal is not stored either (decision 13). No rate limit, as for revocation (decision 10).
+	introspect.Post("/auth/introspect", handlers.HandleIntrospectPost(httpHelper, s.database, tokenParser, s.dataCipher, s.introspectionMetrics))
+	introspect.Handle("/auth/introspect", handlers.HandleIntrospectOtherMethods())
 
 	pages.Route("/account", func(r *routing.Router) {
 		// While registration is unavailable both routes are a 404 ahead of the limiter, so a refused
@@ -332,6 +343,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/tokens", apihandlers.HandleClientTokensPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/permissions", apihandlers.HandleClientPermissionsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/permissions", apihandlers.HandleClientPermissionsPut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/introspection-resources", apihandlers.HandleClientIntrospectionResourcesGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/introspection-resources", apihandlers.HandleClientIntrospectionResourcesPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/administrative-scopes", apihandlers.HandleClientAdministrativeScopesPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}", apihandlers.HandleClientDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleClientLogoGet(s.database, baseURL))
@@ -463,16 +476,20 @@ func (s *Server) initRoutes(branches appBranches) {
 		// middleware exists to make debuggable. What is lost is recoverable from the SQL
 		// log, which records the digest rather than the handle (#266).
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		// The same token lifecycle as the admin API: a token with the pre-#676 header, from
+		// another issuer, of a disabled or deleted client, or revoked by its jti at
+		// /auth/revoke is refused here too, rather than holding the console's sessions
+		// until it expires. The console fetches a fresh token on a 401, so only a client
+		// that can no longer get one stays out.
+		r.Use(apiBearer.RequireValidSession(s.database))
 		// One narrow permission of its own, deliberately not one of the manage-* admin
 		// API scopes: holding the admin console's client secret must not be a way to
 		// drive the whole admin API with no user present.
 		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.BrowserSessionsPermissionIdentifier))
 
-		// No RequireUserBoundToken and no RequireValidSession here, and both absences are
-		// deliberate. This endpoint is reached only by a client_credentials token, which
-		// has no user behind it: RequireUserBoundToken would refuse every call, and
-		// RequireValidSession passes such a token straight through, so mounting it would
-		// add a line that reads like a guard and enforces nothing.
+		// No RequireUserBoundToken here, and the absence is deliberate. This endpoint is
+		// reached only by a client_credentials token, which has no user behind it, so
+		// RequireUserBoundToken would refuse every call.
 		//
 		// The handlers take a database and name the owner themselves. There is no owner
 		// parameter anywhere in this group's contract, which is what makes reaching an

@@ -1,7 +1,8 @@
 {{define "manage_clients_tabs"}}
 {{- $type := index . 0 }}
 {{- $id := index . 1 }}
-{{- $ctx := index . 2 }}
+{{- $public := index . 2 }}
+{{- $ctx := index . 3 }}
 <nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
   <a class="tab-item" href="/admin/clients/{{$id}}/settings"{{ if eq $type "settings" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.settings" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/logo"{{ if eq $type "logo" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.logo" }}</a>
@@ -12,5 +13,8 @@
   <a class="tab-item" href="/admin/clients/{{$id}}/web-origins"{{ if eq $type "web-origins" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.web_origins" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/user-sessions"{{ if eq $type "user-sessions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.user_sessions" }}</a>
   <a class="tab-item" href="/admin/clients/{{$id}}/permissions"{{ if eq $type "permissions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.permissions" }}</a>
+  {{- if not $public }}
+  <a class="tab-item" href="/admin/clients/{{$id}}/introspection"{{ if eq $type "introspection" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.introspection" }}</a>
+  {{- end }}
 </nav>
 {{end}}

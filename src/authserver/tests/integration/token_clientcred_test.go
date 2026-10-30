@@ -2,7 +2,10 @@ package integration
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -113,6 +116,46 @@ func TestToken_ClientCred_ClientSecretBasic_FormEncodedCredentials(t *testing.T)
 
 	assert.Nil(t, data["error"], "error_description: %v", data["error_description"])
 	assert.NotNil(t, data["access_token"])
+}
+
+// The authentication scheme name is case-insensitive (RFC 9110 section 11.1), so a client that
+// writes basic or BASIC authenticates as one writing Basic does. Sending both methods is still
+// refused, whatever the case.
+func TestToken_ClientCred_ClientSecretBasic_SchemeInAnyCase(t *testing.T) {
+	_, client, clientSecret := createAdminClientWithTokenAndSecret(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	credentials := base64.StdEncoding.EncodeToString([]byte(client.ClientIdentifier + ":" + clientSecret))
+
+	post := func(t *testing.T, authorization string, form url.Values) (int, map[string]interface{}) {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+"/auth/token/",
+			strings.NewReader(form.Encode()))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", authorization)
+		resp, err := createHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		var data map[string]interface{}
+		require.NoError(t, json.Unmarshal(body, &data), string(body))
+		return resp.StatusCode, data
+	}
+
+	for _, scheme := range []string{"basic", "BASIC", "bAsIc"} {
+		t.Run(scheme, func(t *testing.T) {
+			status, data := post(t, scheme+" "+credentials, url.Values{"grant_type": {"client_credentials"}})
+			require.Equal(t, http.StatusOK, status, "%v", data)
+			assert.NotEmpty(t, data["access_token"])
+
+			status, data = post(t, scheme+" "+credentials, url.Values{
+				"grant_type": {"client_credentials"}, "client_secret": {clientSecret},
+			})
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, "invalid_request", data["error"])
+		})
+	}
 }
 
 func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {

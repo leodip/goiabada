@@ -145,6 +145,13 @@ var selectRefreshTokensByCodeId = statement{
 	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE code_id = @p1",
 }
 
+var selectRefreshTokensByFirstRefreshTokenJti = statement{
+	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE first_refresh_token_jti = ?",
+	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE first_refresh_token_jti = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE first_refresh_token_jti = $1",
+	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE first_refresh_token_jti = @p1",
+}
+
 var selectRefreshTokensBySessionIdentifier = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.session_identifier = ?",
@@ -479,6 +486,38 @@ func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refre
 
 func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error) {
 	return queryOne(ctx, d, tx, selectRefreshTokenByJti.text(d.Dialect), []any{jti}, scanRefreshToken, "refreshToken")
+}
+
+// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and
+// revoked: the rows a client revoking the grant at /auth/revoke ends, and the jtis its audit record
+// lists (#676 decision 1). It reads by idx_refresh_tokens_first_refresh_token_jti.
+//
+// Each row is compared with the identifier asked for in Go, for the reason
+// IsRefreshTokenFamilyRevoked states (#283): SQL Server pads for `=`, so a trailing space would
+// otherwise find the members of the family without one, and a revocation would end a grant other
+// than the one asked for. An empty identifier is an error, for the reason RevokeRefreshTokenFamily
+// states.
+func (d *Database) GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx,
+	firstRefreshTokenJti string) ([]*record.RefreshToken, error) {
+
+	if firstRefreshTokenJti == "" {
+		return nil, errs.New("can't read a refresh token family with an empty first refresh token jti")
+	}
+
+	rows, err := queryRefreshTokens(ctx, d, tx, selectRefreshTokensByFirstRefreshTokenJti.text(d.Dialect),
+		[]any{firstRefreshTokenJti})
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]*record.RefreshToken, 0, len(rows))
+	for _, rt := range rows {
+		if engineFoldedTheMatch(rt.FirstRefreshTokenJti, firstRefreshTokenJti) {
+			continue
+		}
+		members = append(members, rt)
+	}
+	return members, nil
 }
 
 func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error) {

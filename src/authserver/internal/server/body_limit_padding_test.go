@@ -64,6 +64,7 @@ type readCount struct {
 // validation is not what these cases claim.
 func newPaddingTestServer(t *testing.T, database *datamocks.Database) (*httptest.Server, <-chan readCount) {
 	t.Helper()
+	armRoutesTestAPIClient(database)
 
 	s := newStaticBranchTestServer(database)
 	s.templateFS = web.TemplateFS()
@@ -168,7 +169,7 @@ func assertReadNoFurtherThanTheValue(t *testing.T, server *httptest.Server, coun
 // paddingTestSettings is what middleware.Settings reads. Registration is on so DCR reaches its
 // decode; both audit sinks are off so the real audit.Logger writes no row.
 func paddingTestSettings() *record.Settings {
-	return &record.Settings{Id: 1, AppName: "Goiabada", DynamicClientRegistrationEnabled: true}
+	return &record.Settings{Id: 1, AppName: "Goiabada", Issuer: routesTestIssuer, DynamicClientRegistrationEnabled: true}
 }
 
 // paddingDCRTx is the transaction the registration's writes are stubbed on.

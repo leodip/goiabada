@@ -5,7 +5,7 @@
 {{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "web-origins" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
+{{ template "client_header" (args "web-origins" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* The list is drawn as stored; client-uri-list.js edits it in the page, keeping of each entry
      only its origin, data-origins, and saves it whole, with the list as drawn, so the server

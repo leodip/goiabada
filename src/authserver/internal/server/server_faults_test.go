@@ -24,10 +24,13 @@ import (
 // package's ServerFaults table; this owns the assignment of routes to branches (#435).
 
 // protocolRoutes are the routes whose handlers answer RFC 6749 section 5.2's {error,
-// error_description}: token, userinfo, JWKS, discovery at both its addresses, and dynamic client registration, whose RFC
-// 7591 section 3.2.2 error body is the same two members.
+// error_description}: token, introspection, userinfo, JWKS, discovery at both its addresses, and
+// dynamic client registration, whose RFC 7591 section 3.2.2 error body is the same two members.
+// Introspection's refusal of every other method is on its branch too, registered for every method.
 var protocolRoutes = []string{
 	"POST /auth/token",
+	"POST /auth/introspect",
+	"* /auth/introspect",
 	"GET /userinfo",
 	"POST /userinfo",
 	"GET /certs",
@@ -39,11 +42,18 @@ var protocolRoutes = []string{
 	"POST /connect/register",
 }
 
-// routeFormat is the format a registered route must answer a fault in: the protocol routes above,
-// the API routes by their prefix, and a page's text/plain for everything else.
+// revocationRoutes answer a fault in RFC 6749 section 5.2's shape too, but 503, on which RFC 7009
+// section 2.2.1 has the client assume the token still exists and retry (#676 decision 12).
+var revocationRoutes = []string{"POST /auth/revoke"}
+
+// routeFormat is the format a registered route must answer a fault in: the protocol and revocation
+// routes above, the API routes by their prefix, and a page's text/plain for everything else.
 func routeFormat(route string) string {
 	if slices.Contains(protocolRoutes, route) {
 		return "protocol"
+	}
+	if slices.Contains(revocationRoutes, route) {
+		return "revocation"
 	}
 	_, pattern, _ := strings.Cut(route, " ")
 	if strings.HasPrefix(pattern, "/api/") {
@@ -77,6 +87,16 @@ func newFaultsTestServer(database *datamocks.Database) *Server {
 // on a page route.
 func assertFaultFormat(t *testing.T, format string, pageSentence string, rr *httptest.ResponseRecorder) {
 	t.Helper()
+	if format == "revocation" {
+		require.Equal(t, http.StatusServiceUnavailable, rr.Code, rr.Body.String())
+		assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+		var body map[string]string
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body), rr.Body.String())
+		assert.Equal(t, "temporarily_unavailable", body["error"])
+		assert.Contains(t, body["error_description"], "The token could not be revoked. Retry later.")
+		assert.Len(t, body, 2, "RFC 6749 section 5.2's two members: %s", rr.Body.String())
+		return
+	}
 	require.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
 	switch format {
 	case "page":
@@ -109,10 +129,10 @@ func requireEveryFormatReached(t *testing.T, routes []string) {
 	for _, route := range routes {
 		seen[routeFormat(route)] = true
 	}
-	for _, format := range []string{"page", "protocol", "api"} {
+	for _, format := range []string{"page", "protocol", "revocation", "api"} {
 		require.True(t, seen[format], "no registered route answers in the %s format", format)
 	}
-	for _, protocol := range protocolRoutes {
+	for _, protocol := range append(slices.Clone(protocolRoutes), revocationRoutes...) {
 		require.Contains(t, routes, protocol, "a protocol route this test names is not registered")
 	}
 }

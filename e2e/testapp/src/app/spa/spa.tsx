@@ -113,9 +113,18 @@ export function Spa({ issuer, clientId, redirectUri, scope, apiUrl }: Props) {
     setShown({ title: `The API answered ${response.status}`, ok: response.ok, body });
   }
 
-  function signOut() {
+  // Sign users out: revoke the refresh token, or the access token when there is none, with the
+  // client_id alone, which ends the whole grant; then post to /auth/logout. A revocation that fails
+  // keeps the tokens, so the failure shows.
+  async function signOut() {
     const endpoint = config?.serverMetadata().end_session_endpoint;
-    if (!endpoint || !tokens) return;
+    if (!config || !endpoint || !tokens) return;
+    try {
+      await client.tokenRevocation(config, tokens.refreshToken ?? tokens.accessToken);
+    } catch (error) {
+      setShown({ title: "Revocation failed", ok: false, body: describe(error) });
+      return;
+    }
     const state = client.randomState();
     sessionStorage.setItem("spa-logout-state", state);
     const form = document.createElement("form");

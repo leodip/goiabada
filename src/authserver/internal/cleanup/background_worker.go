@@ -54,7 +54,7 @@ const (
 )
 
 // backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
-// the sweeper, and the ten deletes it sweeps with.
+// the sweeper, and the eleven deletes it sweeps with.
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
@@ -62,6 +62,7 @@ type backgroundWorkerDatabase interface {
 	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
+	DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
@@ -352,6 +353,21 @@ func (w *Worker) sweep(ctx context.Context) (ranEveryStep, stepFailed bool) {
 		stepFailed = true
 	} else {
 		slog.InfoContext(ctx, "deleted orphaned refresh token family revocations")
+	}
+
+	if cancelled(ctx) {
+		return false, stepFailed
+	}
+
+	// The jtis of revoked access tokens without a grant, once their tokens have expired: past its exp
+	// a token is refused for that alone, so its row has nothing left to refuse (#676). By the run's
+	// own moment, since before it the row is what refuses a token that has not expired.
+	err = w.database.DeleteExpiredRevokedAccessTokens(ctx, nil, time.Now().UTC())
+	if err != nil {
+		slog.ErrorContext(ctx, "unable to delete expired revoked access tokens", "error", err)
+		stepFailed = true
+	} else {
+		slog.InfoContext(ctx, "deleted expired revoked access tokens")
 	}
 
 	if cancelled(ctx) {

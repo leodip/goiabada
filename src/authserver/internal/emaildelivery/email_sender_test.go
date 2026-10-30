@@ -1242,7 +1242,11 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 }
 
 // TestSendEmail_ConversationTimeout holds decision 7: one deadline covers EHLO through QUIT, so a
-// relay that stops answering cannot hang the request that is sending the mail.
+// relay that stops answering cannot hang the request that is sending the mail. The seam sets that
+// deadline to a second. The stopwatch starts before the send, which sets the deadline after its
+// dial, so a send that ends at its deadline cannot be timed at under the second. A sender that ignored the seam would
+// run to defaultConversationTimeout, which is the ceiling, so only a stall of most of that could
+// fail a correct send.
 func TestSendEmail_ConversationTimeout(t *testing.T) {
 
 	f := &fakeSMTP{ext: []string{"8BITMIME"}, stallAfterData: true}
@@ -1264,5 +1268,6 @@ func TestSendEmail_ConversationTimeout(t *testing.T) {
 	// A connection that stalls after the dial is a connection failure too, with the same cause.
 	assertSendFailure(t, err, SendFailureConnection)
 	assert.Equal(t, ConnectionCauseTimedOut, ClassifyConnectionError(err))
-	assert.Less(t, elapsed, 2*time.Second, "the deadline was one second, so the send must not outlive it")
+	assert.GreaterOrEqual(t, elapsed, sender.convTimeout, "the send ended before its deadline")
+	assert.Less(t, elapsed, defaultConversationTimeout, "the send ran on the default rather than the second set")
 }

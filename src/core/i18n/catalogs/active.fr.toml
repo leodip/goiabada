@@ -324,6 +324,7 @@
 "adminconsole.client_tabs.web_origins" = "Origines web"
 "adminconsole.client_tabs.user_sessions" = "Sessions"
 "adminconsole.client_tabs.permissions" = "Permissions"
+"adminconsole.client_tabs.introspection" = "Introspection"
 
 "adminconsole.group_tabs.settings" = "Paramètres"
 "adminconsole.group_tabs.attributes" = "Attributs"
@@ -801,7 +802,7 @@
 "adminconsole.admin_clients.authentication.secret_generated" = "Nouveau secret généré. Enregistrez pour l’utiliser. En attendant, le secret actuel reste valide."
 "adminconsole.admin_clients.authentication.saved_successfully" = "Paramètres d’authentification enregistrés."
 "adminconsole.admin_clients.authentication.modal.secret_change" = "Vous modifiez le secret du client. Tout ce qui envoie encore l’ancien secret sera refusé jusqu’à sa mise à jour."
-"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vous rendez le client public. Son secret sera supprimé et tout ce qui utilise ce client pour se connecter devra être mis à jour. Ses jetons de rafraîchissement et codes d’autorisation seront révoqués. Les jetons d’accès déjà émis resteront valides jusqu’à leur expiration, et les utilisateurs resteront connectés aux autres clients."
+"adminconsole.admin_clients.authentication.modal.confidential_to_public" = "Vous rendez le client public. Son secret sera supprimé et tout ce qui utilise ce client pour se connecter devra être mis à jour. Ses jetons de rafraîchissement et codes d’autorisation seront révoqués, et les jetons d’accès émis avec eux seront refusés aussitôt par le serveur d’authentification et par les API qui vérifient les jetons auprès de lui ; une API qui ne vérifie que la signature d’un jeton les accepte jusqu’à leur expiration. Ses ressources d’introspection seront vidées, et les utilisateurs resteront connectés aux autres clients."
 "adminconsole.admin_clients.authentication.modal.public_to_confidential" = "Vous rendez le client confidentiel. Tout ce qui utilise ce client pour se connecter devra envoyer son secret."
 
 # --- Client redirect URIs --------------------------------------------------
@@ -821,7 +822,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "Si ce client s’exécute dans un navigateur et appelle /auth/token ou /userinfo, enregistrez son origine ici : un schéma, un hôte et un port facultatif, sans rien après, par exemple https://www.example.com ou https://myapp:8080."
+"adminconsole.admin_clients.web_origins.lead" = "Si ce client s’exécute dans un navigateur et appelle /auth/token, /auth/revoke ou /userinfo, enregistrez son origine ici : un schéma, un hôte et un port facultatif, sans rien après, par exemple https://www.example.com ou https://myapp:8080."
 "adminconsole.admin_clients.web_origins.field.origin" = "Origine web"
 "adminconsole.admin_clients.web_origins.add_button" = "Ajouter"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Origines web"
@@ -855,6 +856,19 @@
 "adminconsole.admin_clients.permissions.error_already_in_list" = "Le client dispose déjà de cette permission."
 "adminconsole.admin_clients.permissions.added" = "Permission accordée. Enregistrez pour conserver la modification."
 "adminconsole.admin_clients.permissions.removed" = "Permission retirée. Enregistrez pour conserver la modification."
+"adminconsole.admin_clients.introspection.lead" = "Les ressources dont ce client peut introspecter les jetons. Une API qui vérifie des jetons auprès du serveur d’authentification appelle en tant que client confidentiel, et n’apprend qu’un jeton est actif que s’il est destiné à une ressource listée ici."
+"adminconsole.admin_clients.introspection.field.resource" = "Ressource"
+"adminconsole.admin_clients.introspection.select_resource" = "Choisir une ressource"
+"adminconsole.admin_clients.introspection.add_button" = "Ajouter la ressource"
+"adminconsole.admin_clients.introspection.col_listed" = "Ressources d’introspection"
+"adminconsole.admin_clients.introspection.remove_label" = "Retirer"
+"adminconsole.admin_clients.introspection.none_yet" = "Aucune ressource d’introspection pour le moment."
+"adminconsole.admin_clients.introspection.public_client" = "Un client public ne peut pas s’authentifier, il ne peut donc pas introspecter de jetons. Rendez le client confidentiel, dans l’onglet Authentification, pour lister des ressources d’introspection."
+"adminconsole.admin_clients.introspection.saved_successfully" = "Ressources d’introspection enregistrées."
+"adminconsole.admin_clients.introspection.error_select_resource" = "Choisissez une ressource à ajouter."
+"adminconsole.admin_clients.introspection.error_already_in_list" = "Le client liste déjà cette ressource."
+"adminconsole.admin_clients.introspection.added" = "Ressource ajoutée. Enregistrez pour conserver la modification."
+"adminconsole.admin_clients.introspection.removed" = "Ressource retirée. Enregistrez pour conserver la modification."
 
 # --- Client OAuth2 flows ---------------------------------------------------
 
@@ -1660,6 +1674,7 @@
 "handler.client.secret_invalid" = "Secret du client invalide. Veuillez en générer un nouveau."
 "handler.client_administrative_scopes.allowed_required" = "allowed est obligatoire."
 "handler.client_administrative_scopes.console_always_allowed" = "Le client de la console d’administration est toujours autorisé à demander les scopes d’administration."
+"handler.client_introspection_resources.public_client" = "Un client public ne peut pas introspecter de jetons, il ne peut donc pas lister de ressources d’introspection."
 "handler.client_permissions.client_credentials_disabled" = "Les permissions d’un client ne peuvent être configurées que si le flux d’identifiants du client est activé."
 "handler.client_redirect_uris.no_redirect_flow" = "Les URI de redirection sont utilisées par le flux de code d’autorisation avec PKCE et le flux implicite. Aucun de ces flux n’est activé pour ce client."
 "handler.client_redirect_uris.too_many" = "Un client peut avoir au plus {{.max}} URI de redirection. Cette liste en contient {{.count}}."

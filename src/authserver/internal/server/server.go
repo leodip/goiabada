@@ -25,9 +25,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/poolmetrics"
 	"github.com/leodip/goiabada/authserver/internal/render"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/errs"
@@ -78,6 +80,14 @@ type Server struct {
 	// listener. Registered here rather than in initRoutes because the token endpoint's branch, which
 	// initMiddleware builds, counts the refusals its faults answer too (#400 decision 5).
 	tokenMetrics *tokenmetrics.Recorder
+
+	// The requests the revocation endpoint answers, by outcome (#676 decision 11). Registered here
+	// for the reason tokenMetrics is: the endpoint's branch counts the faults it answers too.
+	revocationMetrics *revocationmetrics.Recorder
+
+	// The requests the introspection endpoint answers, by outcome (#676 decision 11), registered here
+	// for the same reason.
+	introspectionMetrics *introspectionmetrics.Recorder
 }
 
 func NewServer(router *routing.Router, database data.Database, sessionStore *sessionstore.ConditionalStore,
@@ -98,7 +108,9 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 
 		metrics: registry,
 
-		tokenMetrics: tokenmetrics.Register(registry),
+		tokenMetrics:         tokenmetrics.Register(registry),
+		revocationMetrics:    revocationmetrics.Register(registry),
+		introspectionMetrics: introspectionmetrics.Register(registry),
 	}
 	metrics.RegisterBuildInfo(s.metrics)
 	metrics.RegisterRuntime(s.metrics)
@@ -385,8 +397,10 @@ const (
 	// is dropped at the same point.
 	readHeaderTimeout = 10 * time.Second
 
-	// readTimeout bounds the whole request, header and body, from its first byte. 60s carries a
-	// 3 MiB profile picture or logo upload at about 53 KB/s.
+	// readTimeout bounds the whole request, header and body. net/http starts it as it begins reading
+	// the request: on a new connection once any TLS handshake is done, on a kept-alive one once the
+	// next request's first bytes have arrived. 60s carries a 3 MiB profile picture or logo upload at
+	// about 53 KB/s.
 	readTimeout = 60 * time.Second
 
 	// writeTimeout must outlast the body read plus the slowest handler, because a handler that runs
@@ -527,10 +541,12 @@ func (s *Server) initMiddleware() appBranches {
 	// Everything below is on the application branch, not the root.
 
 	branches := appBranches{
-		pages:    s.router.With(s.applicationChain(middleware.PageFaults())...),
-		protocol: s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
-		token:    s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
-		api:      s.router.With(s.applicationChain(middleware.APIFaults())...),
+		pages:      s.router.With(s.applicationChain(middleware.PageFaults())...),
+		protocol:   s.router.With(s.applicationChain(middleware.ProtocolFaults(render.New(s.templateFS, s.staticFS)))...),
+		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS))))...),
+		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS), s.revocationMetrics)))...),
+		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS), s.introspectionMetrics)))...),
+		api:        s.router.With(s.applicationChain(middleware.APIFaults())...),
 	}
 
 	slog.Info("finished initializing middleware")
@@ -593,6 +609,14 @@ type appBranches struct {
 	// answers as a token request refused, which the protocol branch cannot, since its faults are
 	// every protocol endpoint's (#400 decision 5).
 	token *routing.Router
+	// revoke carries the revocation endpoint alone. It answers a fault as its handler answers its
+	// own, 503, on which the client treats the token as still live (RFC 7009 section 2.2.1), and
+	// counts it as an error, which the protocol branch's 500 would not say (#676 decision 12).
+	revoke *routing.Router
+	// introspect carries the introspection endpoint alone. It answers a fault as protocol does, 500
+	// and never {"active": false}, and counts it as an error, which the protocol branch cannot (#676
+	// decisions 11 and 13).
+	introspect *routing.Router
 }
 
 // csrfPolicy is the auth server's CSRF exemption policy: the endpoints this binary serves that are
@@ -624,6 +648,17 @@ func csrfPolicy() httpmw.CSRFPolicy {
 			// public client instead redeems a one-time code bound to its registered redirect URI
 			// and, when PKCE was used, to a code verifier. No session cookie is read either way.
 			"/auth/token",
+
+			// OAuth2 token revocation (POST, RFC 7009). The client authenticates as at the token
+			// endpoint, or a public client names itself, and sends a token it holds; no session
+			// cookie is read, and a cross-site POST can only end a grant whose token it already
+			// has. A browser app revokes at sign-out from its own origin (#676).
+			"/auth/revoke",
+
+			// OAuth2 token introspection (POST, RFC 7662). An API's confidential client
+			// authenticates with its secret and sends a token; no session cookie is read, and the
+			// caller cannot authenticate without the secret a cross-site page does not have (#676).
+			"/auth/introspect",
 
 			// OIDC userinfo; bearer-token authenticated (GET/POST).
 			"/userinfo",

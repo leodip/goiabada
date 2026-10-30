@@ -99,7 +99,12 @@ type Database interface {
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
+	// DeleteClient deletes the client, its refresh tokens and, by cascade, every row referencing it,
+	// and records its identifier as deleted, in one transaction (#676 decision 6).
 	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	// GetDeletedClientByClientIdentifier returns the latest deletion of a client with this
+	// identifier, or nil when none was deleted. An empty identifier is an error.
+	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
@@ -519,6 +524,17 @@ type Database interface {
 	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
 	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
 
+	// The resources whose tokens a confidential client may introspect, one row per client and
+	// resource, removed with either side (#676 decisions 5 and 14). A second row of one pair is a
+	// unique violation.
+	CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error
+	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error
+	// DeleteClientIntrospectionResourcesByClientId clears a client's list, which making the client
+	// public does in the transaction that revokes its grants: a public client cannot authenticate,
+	// so it never introspects.
+	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
+
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
@@ -744,11 +760,29 @@ type Database interface {
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 	// IsRefreshTokenFamilyRevoked reports whether a rotation family has a revocation record.
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	// IsRefreshTokenFamilyLive reports whether a rotation family stands for a live grant: it has no
+	// revocation record and still has a member that is not revoked (#676 decision 1).
+	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
 	// DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families that have no
 	// refresh token left, which is when a record has nothing left to refuse.
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
+	// RecordAccessTokenRevoked stores the jti of a revoked access token without a grant, with the
+	// token's expiry, and reports whether this call stored it (#676 decision 1). A jti already
+	// stored is left as it was and reported false, a first write lost to an overlapping one
+	// included. An empty jti is an error.
+	RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string, expiresAt time.Time) (bool, error)
+	// IsAccessTokenRevoked reports whether an access token's jti is stored as revoked. An empty jti
+	// is an error.
+	IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error)
+	// DeleteExpiredRevokedAccessTokens reaps on expires_at alone: past it the token is refused for
+	// its expiry, so its row has nothing left to refuse.
+	DeleteExpiredRevokedAccessTokens(ctx context.Context, tx *sql.Tx, now time.Time) error
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and
+	// revoked, which is what a client revoking the grant ends (#676 decision 1). An empty identifier
+	// is an error, for the reason RevokeRefreshTokenFamily states.
+	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByUserId returns every refresh token belonging to a user,

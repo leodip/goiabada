@@ -47,11 +47,12 @@ const manageScope = builtin.AuthServerResourceIdentifier + ":" + builtin.ManageP
 const manageScopeRequiredDescription = "Only a token with the authserver:manage scope may act on administrators or administrative permissions."
 
 // The ceiling a refusal names. The grant ceiling is granting or revoking an administrative
-// permission, directly or by moving a user into or out of a group that holds one, and deleting such
-// a group; the target ceiling is any other write on an administrator, switching a client's
-// allowance to request the administrative scopes, and changing the description of an administrative
-// permission; the settings ceiling is changing the email or the audit-log settings (#402 decisions
-// 1, 5 and 7, #499 decision 4).
+// permission, directly or by moving a user into or out of a group that holds one, deleting such a
+// group, and listing the authserver resource on a client's introspection resources; the target
+// ceiling is any other write on an administrator, switching a client's allowance to request the
+// administrative scopes, and changing the description of an administrative permission; the settings
+// ceiling is changing the email or the audit-log settings (#402 decisions 1, 5 and 7, #499 decision
+// 4, #676 decision 14).
 const (
 	ceilingGrant    = "grant"
 	ceilingTarget   = "target"
@@ -115,6 +116,9 @@ type administratorChangeRefusal struct {
 	// groupIds is the administrative groups whose membership change caused a grant refusal, when
 	// the target is the user moved into or out of them.
 	groupIds []int64
+	// resourceIds is the resources whose listing on a client's introspection resources caused a
+	// grant refusal: the authserver resource, the one listing reserved to authserver:manage.
+	resourceIds []int64
 }
 
 // refuseAdministratorChange answers a request the policy refused: one administrator_change_refused
@@ -141,6 +145,9 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 	}
 	if refusal.groupIds != nil {
 		details["group_ids"] = refusal.groupIds
+	}
+	if refusal.resourceIds != nil {
+		details["resource_ids"] = refusal.resourceIds
 	}
 	auditLogger.Log(r.Context(), audit.EventAdministratorChangeRefused, details)
 
@@ -641,6 +648,114 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
 		targetId:   client.Id,
+	})
+	return false
+}
+
+// clientCredentialsPolicyDatabase is what the policy reads to judge reading or replacing a client's
+// secret: what the target ceiling reads, and whether the client is listed for the authserver
+// resource's tokens.
+type clientCredentialsPolicyDatabase interface {
+	clientTargetPolicyDatabase
+	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
+}
+
+// clientIntrospectsAuthServer reports whether the authserver resource is among the client's
+// introspection resources. Read outside any transaction; a client with no list reads nothing more.
+func clientIntrospectsAuthServer(ctx context.Context, database clientCredentialsPolicyDatabase, client *record.Client) (bool, error) {
+	links, err := database.GetClientIntrospectionResourcesByClientId(ctx, nil, client.Id)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to read the client's introspection resources for the administrative policy")
+	}
+	if len(links) == 0 {
+		return false, nil
+	}
+	authServer, err := database.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to read the authserver resource for the administrative policy")
+	}
+	if authServer == nil {
+		return false, errs.New("the authserver resource is missing")
+	}
+	for _, link := range links {
+		if link.ResourceId == authServer.Id {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// clientCredentialsCeilingAllows applies the target ceiling to reading a client's secret or
+// replacing it, and holds one more client to authserver:manage there: a client listed for the
+// authserver resource's tokens. Listing it takes authserver:manage because the client then
+// introspects every sign-in's tokens (#676 decision 14), and whoever reads or sets its secret
+// authenticates as it and holds that reach, so a token that could do either would take what the
+// listing rule reserves. Only these two are held: the rest of such a client stays
+// authserver:manage-clients', removing authserver from its list included, and so does making it
+// public, which clears the list. client is the client as the request leaves it: a public one holds
+// no secret to read and no list, and a write making it public clears the list in its transaction,
+// so it reads nothing more. It reports whether the request may go on, and when it may not it has
+// answered the request. An authserver:manage caller reads nothing here.
+func clientCredentialsCeilingAllows(w http.ResponseWriter, r *http.Request, database clientCredentialsPolicyDatabase,
+	auditLogger AuditLogger, client *record.Client) bool {
+	if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+		return false
+	}
+	if callerHoldsManage(r) || client.IsPublic {
+		return true
+	}
+
+	introspects, err := clientIntrospectsAuthServer(r.Context(), database, client)
+	if err != nil {
+		writeInternalServerError(w, r, err, "client_id", client.Id)
+		return false
+	}
+	if !introspects {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:    ceilingTarget,
+		targetKind: targetKindClient,
+		targetId:   client.Id,
+	})
+	return false
+}
+
+// introspectionResourceCeilingAllows applies the grant ceiling to a save of a client's
+// introspection resources: only an authserver:manage token lists the authserver resource there. A
+// client listed for it introspects the tokens every sign-in issues, across every app, and reads
+// their claims, the same reach over users' sign-ins an administrative permission grants, so listing
+// it is held where granting one is (#676 decision 14).
+//
+// The save is judged, as a permission save is, on what it changes, and here on what it adds: the
+// resources in wanted and not in expected, which is exactly what the save adds if it commits, since
+// its transaction refuses with 409 unless the stored list is expected as a set. Keeping the
+// authserver resource listed, or removing it, takes nothing from anyone. wanted is the resources
+// the save names as the request's validation read them. It reports whether the save may go on, and
+// when it may not it has answered the request. The ceiling reads nothing.
+func introspectionResourceCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger,
+	client *record.Client, wanted []record.Resource, expected []int64) bool {
+	listed := make(map[int64]bool, len(expected))
+	for _, resourceId := range expected {
+		listed[resourceId] = true
+	}
+	var causes []int64
+	for _, resource := range wanted {
+		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier && !listed[resource.Id] {
+			causes = append(causes, resource.Id)
+		}
+	}
+	if len(causes) == 0 || callerHoldsManage(r) {
+		return true
+	}
+
+	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
+		ceiling:     ceilingGrant,
+		targetKind:  targetKindClient,
+		targetId:    client.Id,
+		resourceIds: causes,
 	})
 	return false
 }

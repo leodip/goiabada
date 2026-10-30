@@ -12,7 +12,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -284,24 +283,16 @@ func TestUserinfo_EndedSessionIsRefused(t *testing.T) {
 	assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 }
 
-// TestUserinfo_LegacyAccessTokenCarryingTheAppendedScope is an access token issued before #449,
-// presented after it: its scope carries both openid and the appended authserver:userinfo. It is
-// admitted on its openid, so no live token loses /userinfo across the upgrade. The token is a real
-// one re-signed with the current signing key, its scope claim set to what issuance used to write.
+// TestUserinfo_LegacyAccessTokenCarryingTheAppendedScope is an access token whose scope carries
+// both openid and the authserver:userinfo issuance appended before #449. It is admitted on its
+// openid. The token is a real one re-signed with the current signing key under its at+jwt header,
+// its scope claim set to what issuance used to write.
 func TestUserinfo_LegacyAccessTokenCarryingTheAppendedScope(t *testing.T) {
 	data, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
 
 	claims := jwt.MapClaims(decodeJWTPayload(t, data["access_token"].(string)))
 	claims["scope"] = "openid authserver:userinfo"
-
-	keyPair, err := database.GetCurrentSigningKey(context.Background(), nil)
-	require.NoError(t, err)
-	privKey, err := signingkeys.ParsePrivateKey(dataCipher, keyPair)
-	require.NoError(t, err)
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = keyPair.KeyIdentifier
-	legacyAccessToken, err := token.SignedString(privKey)
-	require.NoError(t, err)
+	legacyAccessToken := resignWithCurrentKey(t, claims, "at+jwt")
 
 	resp := userinfoGet(t, legacyAccessToken)
 	defer func() { _ = resp.Body.Close() }()

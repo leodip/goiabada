@@ -94,7 +94,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 			http.StatusBadRequest)
 	}
 
-	err = val.authenticateClient(client, input.ClientSecret)
+	err = val.clients.VerifySecret(client, input.ClientSecret)
 	if err != nil {
 		return nil, err
 	}

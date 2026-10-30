@@ -1,19 +1,21 @@
 {{define "client_header"}}
-{{- /* (args tab clientId clientIdentifier isSystemLevelClient ctx): what every page of one client
-     opens with, the link back to the list, the client's identifier as the page's heading, the tabs
-     with tab current, and, on the admin console's own client, the caution that goes with it. */ -}}
+{{- /* (args tab clientId clientIdentifier isSystemLevelClient isPublic ctx): what every page of one
+     client opens with, the link back to the list, the client's identifier as the page's heading, the
+     tabs with tab current, a public client's without Introspection, and, on the admin console's own
+     client, the caution that goes with it. */ -}}
 {{- $tab := index . 0 }}
 {{- $id := index . 1 }}
 {{- $identifier := index . 2 }}
 {{- $system := index . 3 }}
-{{- $ctx := index . 4 }}
+{{- $public := index . 4 }}
+{{- $ctx := index . 5 }}
 <div class="page-header">
   <div>
     <p class="page-eyebrow"><a class="text-link inline-flex items-center gap-1" href="/admin/clients"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg>{{ T $ctx "adminconsole.admin_menu.clients" }}</a></p>
     <h1 class="page-title" id="page-title">{{ $identifier }}</h1>
   </div>
 </div>
-{{ template "manage_clients_tabs" (args $tab $id $ctx) }}
+{{ template "manage_clients_tabs" (args $tab $id $public $ctx) }}
 {{- if $system }}
 <div class="notice notice-caution mb-6">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>

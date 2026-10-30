@@ -1,5 +1,7 @@
 // Sign users out, through the test app's web app: RP-initiated logout with and without the ID token,
-// and the difference between ending the app's session and ending the auth server's.
+// and the difference between ending the app's session and ending the auth server's. The app revokes
+// its refresh token at /auth/revoke before it signs out, and answers "Sign-out failed" when the
+// revocation is refused, so each "Signed out" below is a revocation that succeeded too (RFC 7009).
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { expectResult, resultBody, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";

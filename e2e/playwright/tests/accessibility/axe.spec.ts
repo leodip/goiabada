@@ -8,6 +8,7 @@ import type { Page } from "@playwright/test";
 import {
   addGroupAttribute,
   addGroupMember,
+  addIntrospectionResource,
   addPermissionRow,
   addRedirectUri,
   clientIdFromList,
@@ -559,6 +560,15 @@ test("the clients' pages", async ({ page, clients, resources }) => {
     saved(page, "a client's permissions saved", async () => {
       await page.goto(clientUrl(machine.id, "permissions"));
       await addPermissionRow(page, resource.identifier, "read");
+      await page.locator("#btnSave").click();
+    }),
+    at(page, "a client's introspection resources, none yet", tab("introspection")),
+    refused(page, "a client's introspection resources, Add with nothing chosen", "introspectionResourcesSelect", () =>
+      page.locator("#addIntrospectionResourceBtn").click(),
+    ),
+    saved(page, "a client's introspection resources saved", async () => {
+      await page.goto(tab("introspection"));
+      await addIntrospectionResource(page, resource.identifier);
       await page.locator("#btnSave").click();
     }),
   ]);

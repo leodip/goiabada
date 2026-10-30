@@ -8,7 +8,7 @@
 {{- $pkce := .client.PKCERequired }}
 {{- $implicit := .client.ImplicitGrantEnabled }}
 {{- $ropc := .client.ResourceOwnerPasswordCredentialsEnabled }}
-{{ template "client_header" (args "oauth2-flows" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
+{{ template "client_header" (args "oauth2-flows" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* Each three-way choice holds an explicit value or "global", the global setting, whose value now
      the form carries in data-global-* for the script, which shows a choice's warning while the

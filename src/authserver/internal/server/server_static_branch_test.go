@@ -10,7 +10,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/introspectionmetrics"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/revocationmetrics"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/core/metrics"
@@ -98,13 +100,15 @@ func newStaticBranchTestServer(database *datamocks.Database) *Server {
 
 	registry := metrics.NewRegistry()
 	return &Server{
-		router:       routing.New(),
-		database:     database,
-		sessionStore: newTestSessionStore(),
-		staticFS:     fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},
-		cfg:          cfg,
-		metrics:      registry,
-		tokenMetrics: tokenmetrics.Register(registry),
+		router:               routing.New(),
+		database:             database,
+		sessionStore:         newTestSessionStore(),
+		staticFS:             fstest.MapFS{"probe.css": &fstest.MapFile{Data: []byte("body{}")}},
+		cfg:                  cfg,
+		metrics:              registry,
+		tokenMetrics:         tokenmetrics.Register(registry),
+		revocationMetrics:    revocationmetrics.Register(registry),
+		introspectionMetrics: introspectionmetrics.Register(registry),
 	}
 }
 

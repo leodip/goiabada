@@ -1,6 +1,9 @@
 // Protect an API, through the test app's API (/api/products) and its service: the API checks each
-// token on its own against the auth server's public keys, and answers 401 or 403.
-import { grantUserPermission } from "../../lib/admin-console";
+// token on its own against the auth server's public keys, requiring the at+jwt header as RFC 9068
+// section 4 asks, so every answer of 200 here is also a token the auth server issued as one, and
+// answers 401 or 403. It then introspects the token with its own client (RFC 7662), so a token cut
+// off since it was issued is refused at once.
+import { confirmDialog, grantUserPermission, userUrl } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { expectResult, resultBody, shownClaims, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
@@ -59,4 +62,27 @@ test("the API refuses a request with no token, a token it can't verify, and a to
   const forged = await request.get(testapp.api.url, { headers: { Authorization: `Bearer ${header}.${payload}.c2lnbmF0dXJl` }, failOnStatusCode: false });
   expect(forged.status()).toBe(401);
   expect(forged.headers()["www-authenticate"]).toContain('error="invalid_token"');
+});
+
+test("the API introspects each token, so one whose session was ended is refused at once", async ({ page, browser, users }) => {
+  const user = await users.create();
+  await grantUserPermission(page, user.id, testapp.api.resource, "read");
+  const { context, page: app } = await userBrowser(browser);
+  await signInToWebApp(app, testapp.web, user);
+  await expectResult(app, "Signed in");
+  await app.getByRole("button", { name: "Call the API" }).click();
+  await expectResult(app, "The API answered 200");
+
+  // The administrator ends the user's session: the token's signature and expiry still check out.
+  await page.goto(userUrl(user.id, "sessions"));
+  await page.locator("#sessionsTable tbody tr").first().getByRole("button", { name: /^End session/ }).click();
+  await confirmDialog(page, "Clients the user signed in to from it");
+  await expect(page.locator("#sessions-status")).toContainText("Session ended.");
+
+  await app.getByRole("button", { name: "Call the API" }).click();
+  await expectResult(app, "The API answered 401");
+  const refused = await resultBody(app);
+  expect(refused.www_authenticate).toContain('error="invalid_token"');
+  expect(refused.body).toEqual({ error: "invalid_token", error_description: "The auth server says the token is no longer active." });
+  await context.close();
 });

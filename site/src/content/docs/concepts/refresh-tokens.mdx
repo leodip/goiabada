@@ -73,6 +73,7 @@ A normal refresh token follows the session it's tied to instead: it stops workin
 | When the session expires | It stops working | It keeps working |
 | When someone [ends the session](/concepts/ending-sessions/#end-a-session) | It's revoked | It's revoked |
 | When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked, unless it belongs to the session the user changed their own password in | It's revoked, with the same exception |
+| When your app [revokes](#revoking-a-grant) it or an access token of its grant | It's revoked | It's revoked |
 
 ## What a refresh checks
 
@@ -83,10 +84,19 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 - the user was disabled, or their password changed or was reset, apart from the tokens of the session a user changed their own password in;
 - the user no longer holds a permission the token carries;
 - the user withdrew their consent to your app, or an administrator revoked it. That revokes your app's refresh tokens for the user at once, whatever **Ask users for consent** says;
+- your app revoked the grant at `/auth/revoke`;
 - your app's **Ask users for consent** was turned on after the user signed in, and they haven't approved it since. A token from the [password grant](/legacy-flows/ropc/) isn't checked for this;
 - the user hasn't approved `authserver:manage-account` for your app, or withdrew it, when the refresh renews that scope from a sign-in, whatever **Ask users for consent** says. The admin console's own client is the one exception.
 
 A token issued to another client is refused with `invalid_grant`. The [token endpoint](/reference/endpoints/token/#refresh-token-grant) lists every answer, and `scope` can narrow one refresh's access token. [This refresh token has been revoked](/troubleshooting/this-refresh-token-has-been-revoked/#other-reasons-a-refresh-fails) gives each `error_description` and why it happens.
+
+## Revoking a grant
+
+When your app is done with a grant, typically when the user signs out, it sends the refresh token, or any access token of the grant, to the [revocation endpoint](/reference/endpoints/revoke/), `/auth/revoke`. That ends the whole grant and leaves the user's session and your app's other grants alone. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
+
+## Checking a refresh token
+
+A confidential client's backend can check whether its refresh token is still good, without using it, at the [introspection endpoint](/reference/endpoints/introspect/#when-a-token-is-active). Asking spends nothing, and asking about a token that was already rotated is no replay.
 
 ## Rotation
 
@@ -111,7 +121,7 @@ A retired refresh token coming back is a replay. The auth server can't tell whet
 
 Only that family is revoked. The user's session, their sign-ins to other clients and their other grants keep working, a second grant from the same session included.
 
-Access tokens already issued aren't revoked: they're signed JWTs your APIs check on their own, so revoking the family stops the next refresh, not an access token already handed out. That's one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
+The family's access tokens are refused at once by the auth server's own [`/userinfo`](/reference/endpoints/userinfo/), its Admin and Account APIs, and an API that [introspects](/reference/endpoints/introspect/) them. An API that checks them by their signature alone accepts them until they expire, one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
 
 A replay leaves a `refresh_token_replay_detected` entry in the [audit log](/concepts/audit-log/) when it changes something: it revokes at least one live token, or records the family as revoked for the first time. A repeat that does neither leaves no entry, so one incident isn't a row per attempt. The entry never holds the refresh token itself. It doesn't prove an attack either: an app that refreshes in parallel causes one too.
 

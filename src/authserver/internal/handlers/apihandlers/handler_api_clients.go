@@ -42,9 +42,11 @@ type clientsDatabase interface {
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
 	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
 	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
 	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
+	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
@@ -246,8 +248,9 @@ func HandleClientSecretGet(
 		}
 
 		// Only authserver:manage reads an administrator client's secret, which is signing in as it
-		// (#402 decisions 1 and 8).
-		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+		// (#402 decisions 1 and 8), or the secret of a client listed for the authserver resource's
+		// tokens (#676 decision 14).
+		if !clientCredentialsCeilingAllows(w, r, database, auditLogger, client) {
 			return
 		}
 
@@ -747,8 +750,10 @@ func HandleClientAuthenticationPut(
 			// Preserve ClientCredentialsEnabled as-is
 		}
 
-		// Only authserver:manage writes to an administrator client (#402 decision 1).
-		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
+		// Only authserver:manage writes to an administrator client (#402 decision 1), or sets the
+		// secret of a client listed for the authserver resource's tokens (#676 decision 14). Making
+		// such a client public clears that list, which the ceiling reads off the client as written.
+		if !clientCredentialsCeilingAllows(w, r, database, auditLogger, client) {
 			return
 		}
 
@@ -777,6 +782,14 @@ func HandleClientAuthenticationPut(
 				var err error
 				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.Id)
 				if err != nil {
+					return false, err
+				}
+				// A public client never introspects, so its introspection resources go in the
+				// same transaction, under the row SetClientPublic took: a save adding to the list
+				// reads the client under that row, so none can leave a public client holding one
+				// (#676 decision 14). Run on every save to public, as the list of a client already
+				// public is empty, and clearing an empty list writes nothing.
+				if err := database.DeleteClientIntrospectionResourcesByClientId(r.Context(), tx, client.Id); err != nil {
 					return false, err
 				}
 				if err := database.UpdateClient(r.Context(), tx, client); err != nil {

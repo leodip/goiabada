@@ -260,8 +260,28 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imageupload,uithemes}/`
   - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, image
   uploads, themes
-- `internal/revocation/` - The five revocation operations, their results, reason constants and audit
-  helpers. No handler package owns revocation orchestration or its transactions any more (#387)
+- `internal/clientauth/` - Client authentication from plain values, the client identifier and the
+  secret presented: the lookup, the secret check and their refusals' wording and shape, shared by
+  every endpoint that authenticates its caller. Reading the credentials off a request and logging a
+  refusal stay in `internal/handlers`. It also declares `ChallengeRealm`, the realm the Basic and
+  Bearer challenges share, as the lowest package that writes a challenge (#676)
+- `internal/introspectionmetrics/` - `goiabada_introspection_requests_total`, the introspection
+  endpoint's answers by outcome, a closed set (#676)
+- `internal/liveness/` - Whether a token the auth server issued is still live. An access token:
+  its header is `at+jwt` and its `iss` the configured issuer (RFC 9068 section 4); its client exists
+  and is enabled; its user exists and is enabled; its `sid` session exists, belongs to the user, is within its
+  bounds and on the user's generation; or, without `sid`, its own generation is current; and, with
+  `grant_id`, its refresh token family has no revocation record and a member not revoked. A refresh
+  token: `FindRefreshToken` reads its row and what it names, and `RefreshToken` judges the state the
+  refresh grant checks, leaving ownership, PKCE and scope to the grant's validator. Each returns a
+  verdict and leaves the answer and the log record to the caller: the bearer guard
+  `RequireValidSession`, the refresh grant, revocation and introspection, so they cannot disagree.
+  `Subject` is the one reading of a token's subject, which `reqctx` answers through (#676)
+- `internal/revocation/` - The six revocation operations, their results, reason constants and audit
+  helpers, the sixth, `RevokeGrantTx`, ending one grant at its client's request at `/auth/revoke`
+  (#676). No handler package owns revocation orchestration or its transactions any more (#387)
+- `internal/revocationmetrics/` - `goiabada_revocation_requests_total`, the revocation endpoint's
+  answers by outcome, a closed set (#676)
 - `internal/recovery/` - The `recover` subcommand's operation, `Run`: for one named, enabled user, a
   manage grant, a password held to the stored policy and the authenticator's removal, each only as
   asked, in one transaction with the #106 revocation sweep, the user, the authenticator and the

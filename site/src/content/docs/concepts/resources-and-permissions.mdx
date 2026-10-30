@@ -57,7 +57,7 @@ A **client's** own permissions are for the client credentials flow alone, when t
 
 Renaming a resource or a permission changes its scope, so every app asking for the old one starts getting refused. The admin console asks you to confirm a renamed resource identifier.
 
-Deleting a permission takes it away from every user, group and client that held it. Deleting a resource deletes all its permissions too, with the same effect.
+Deleting a permission takes it away from every user, group and client that held it. Deleting a resource deletes all its permissions too, with the same effect, and removes it from every client's [introspection resources](/concepts/clients/#introspection-resources).
 
 ## The authserver resource
 

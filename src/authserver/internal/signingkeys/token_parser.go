@@ -110,7 +110,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 	// current key is read for no token that cannot be valid.
 	var pubKey *rsa.PublicKey
 	var keyErr error
-	_, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
+	parsed, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
 		pubKey, keyErr = tp.getPublicKey(ctx)
 		if keyErr != nil {
 			return nil, keyErr
@@ -121,6 +121,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 		return nil, keyErr
 	}
 	if err == nil {
+		result.Header = parsed.Header
 		result.Claims = claims
 		return result, nil
 	}
@@ -137,11 +138,10 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 	}
 
 	// Tried with each fallback key
-	tryParse := func(pk *rsa.PublicKey) error {
-		_, perr := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
+	tryParse := func(pk *rsa.PublicKey) (*jwt.Token, error) {
+		return jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
 			return pk, nil
 		}, opts...)
-		return perr
 	}
 
 	// Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key.
@@ -170,10 +170,11 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 		}
 		slog.DebugContext(ctx, "trying a fallback key", "index", i, "key_id", kp.Id,
 			"state", kp.State, "key_identifier", kp.KeyIdentifier)
-		perr2 := tryParse(parsedPk)
+		fallbackParsed, perr2 := tryParse(parsedPk)
 		if perr2 == nil {
 			// success with a fallback key
 			slog.DebugContext(ctx, "parsed the token with a fallback key", "index", i, "key_id", kp.Id)
+			result.Header = fallbackParsed.Header
 			result.Claims = claims
 			return result, nil
 		}

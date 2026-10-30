@@ -16,6 +16,7 @@ import (
 )
 
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
@@ -79,7 +80,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -91,6 +92,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 }
 
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	user.OTPEnabled = false
@@ -164,7 +166,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -176,6 +178,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 }
 
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	otpSecret := newOTPSecretForTest(t, user.Email)
@@ -260,7 +263,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -272,6 +275,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 }
 
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	user.OTPEnabled = false
@@ -354,7 +358,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -366,6 +370,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 }
 
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Enable OTP for the user
@@ -451,7 +456,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -463,6 +468,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
@@ -526,7 +532,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -538,6 +544,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// Ensure OTP is disabled for the user
@@ -608,7 +615,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -620,6 +627,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// in this test we simulate an existing session where OTP was disabled,
@@ -714,7 +722,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -737,6 +745,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// Ensure OTP is disabled for the user
@@ -820,7 +829,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -840,6 +849,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 }
 
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
 	// Ensure OTP is enabled for the user
@@ -925,7 +935,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -947,6 +957,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
 	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
@@ -1010,7 +1021,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1022,6 +1033,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
 	// The client's level is a floor that acr_values never lowers (#240), so the request below is at
@@ -1106,7 +1118,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	// The level and methods the lowered session holds: the code no longer names the removed
 	// authenticator, where it said level 3 and "pwd otp" before the removal lowered the session.
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
@@ -1127,6 +1139,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
 	// As in the OtpDisabled case above: the client's level is a floor acr_values never lowers
@@ -1203,7 +1216,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1223,6 +1236,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
 	// Disable OTP for the user
@@ -1322,7 +1336,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1342,6 +1356,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
+	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
 	// Ensure OTP is enabled for the user
@@ -1410,7 +1425,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)

@@ -5,7 +5,7 @@
 {{define "page"}}
 {{- $access := .settings.IncludeOpenIDConnectClaimsInAccessToken }}
 {{- $id := .settings.IncludeOpenIDConnectClaimsInIdToken }}
-{{ template "client_header" (args "tokens" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient $.ctx) }}
+{{ template "client_header" (args "tokens" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* errorField names the duration a refusal is about, which is marked invalid, described by the
      notice and focused. */}}

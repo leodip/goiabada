@@ -3,7 +3,7 @@ title: Protect an API
 description: Decide who may call your API, and check the access token on every request, for users and for services.
 ---
 
-import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This guide protects your API with Goiabada, so it answers only callers holding the right permission, whether an app calls it for a user or a service calls it on its own.
 
@@ -33,7 +33,7 @@ Callers show what they may do with an [access token](/concepts/tokens/): a signe
      -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9..."
    ```
 
-6. Your API checks the token before it answers, as [Tokens](/concepts/tokens/#check-a-token) describes: its signature against the keys at `https://auth.example.com/certs`, an `iss` equal to the auth server's issuer, an `exp` that hasn't passed, `product-api` among its `aud`, and the permission the operation needs in its `scope`.
+6. Your API checks the token before it answers, as [Tokens](/concepts/tokens/#check-a-token) describes: its signature against the keys at `https://auth.example.com/certs`, `at+jwt` as the `typ` in its header, an `iss` equal to the auth server's issuer, an `exp` that hasn't passed, `product-api` among its `aud`, and the permission the operation needs in its `scope`. If your JWT library accepts only `typ: JWT` by default, allow `at+jwt`, or it refuses every token.
 
 </Steps>
 
@@ -75,7 +75,7 @@ A service that calls your API on its own, with no user, such as a nightly job, g
 
 ## What a user's token carries
 
-An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope, since the auth server's own `/userinfo` accepts it. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
+An access token from a sign-in names the user in `sub`, and carries in `scope` the permission scopes your app asked for that the user holds, directly or through a group. A permission the user doesn't hold is left out without an error, so check `scope` rather than assuming your app got what it asked for. Its `aud` names the resource of each permission scope, and `authserver` too when the token carries an OpenID Connect scope or `offline_access`. [Tokens](/concepts/tokens/#the-access-token) lists every claim.
 
 ## What a service's token carries
 
@@ -86,6 +86,7 @@ A token from the client credentials flow names no user. Decoded, the one from th
   "iss": "https://auth.example.com",
   "sub": "billing-service",
   "aud": "product-api",
+  "client_id": "billing-service",
   "scope": "product-api:read",
   "typ": "Bearer",
   "iat": 1760000000,
@@ -95,7 +96,7 @@ A token from the client credentials flow names no user. Decoded, the one from th
 }
 ```
 
-`sub` is the client identifier, and there's no `auth_time`, `acr`, `amr` or `sid`, since nobody signed in. Your API checks it exactly as it checks a user's token.
+`sub` and `client_id` are both the client identifier, and there's no `auth_time`, `acr`, `amr` or `sid`, since nobody signed in. Its header's `typ` is `at+jwt` too, and your API checks it exactly as it checks a user's token.
 
 The scope is the client's own permissions, never a user's. Leave `scope` out of the request to get every permission the client holds, as long as it holds one. A scope the client doesn't hold is refused with `invalid_scope`, and so is an OpenID Connect scope such as `openid`, since there's no user for it to describe. [Token](/reference/endpoints/token/#client-credentials-grant) lists every refusal.
 
@@ -107,11 +108,31 @@ Fetch the key set from `/certs` once and cache it, then pick the key whose `kid`
 
 ## What your API can't see
 
-Your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
+An API that checks only the signature trusts a valid token until it expires, even after the user's session ends or the user is disabled. That's why access tokens are short, 5 minutes in a new install.
 
-<Aside type="caution">
-If an operation must stop the moment a user is disabled or their session is ended, check the signature and also call [`/userinfo`](/reference/endpoints/userinfo/) with the token: the auth server refuses it from then on. That works for a token carrying `openid`, except one from an `offline_access` grant: it names no session, so `/userinfo` goes on accepting it after the session ends, and refuses it only once the user is disabled or their credentials change. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
-</Aside>
+## Ask the auth server about a token
+
+When an operation must stop the moment a token is cut off, have your API also [introspect](/reference/endpoints/introspect/) the token: ask the auth server whether it's still active. [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued) lists what cuts a token off.
+
+<Steps>
+
+1. Give your API a confidential client of its own: open **Admin**, **Clients**, click **New client**, enter a **Client identifier**, such as `product-api-introspector`, and click **Create client**. On **Authentication**, click **Show** and copy the **Client secret** to your API's configuration.
+
+2. On the client's **Introspection** tab, choose `product-api`, click **Add resource**, and click **Save**. The client can now introspect the tokens whose `aud` names `product-api`, and no others.
+
+3. On each request that needs it, send the token to the introspection endpoint with the client's credentials:
+
+   ```bash
+   curl -X POST https://auth.example.com/auth/introspect \
+     -u product-api-introspector:CLIENT_SECRET \
+     -d token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+   ```
+
+4. Answer the request only when the answer's `active` is `true`, and still check its `scope` for the permission the operation needs.
+
+</Steps>
+
+Each check is a call to the auth server, so keep it for the operations that need it. See [Introspect](/reference/endpoints/introspect/) for the answer's members and errors.
 
 ## When something goes wrong
 
@@ -125,4 +146,5 @@ If an operation must stop the moment a user is disabled or their session is ende
   <LinkCard title="Resources and permissions" description="Who holds a permission, and the authserver resource." href="/concepts/resources-and-permissions/" />
   <LinkCard title="Tokens" description="Every claim an access token carries, and how long it lasts." href="/concepts/tokens/" />
   <LinkCard title="Token" description="The token endpoint's grants, answers and errors." href="/reference/endpoints/token/" />
+  <LinkCard title="Introspect" description="Ask the auth server whether a token is still active." href="/reference/endpoints/introspect/" />
 </CardGrid>

@@ -133,15 +133,17 @@ const endlessQuery = "WITH RECURSIVE c(i) AS (SELECT 1 UNION ALL SELECT i + 1 FR
 // statement starts, so the driver reports the connection unusable and database/sql closes it;
 // the pool's next statement runs on a connection it opens in its place. That replacement is what
 // both tests below are about, so its absence fails them rather than letting them pass on the
-// connection New set up.
+// connection New set up. The deadline is five seconds so that the query has started stepping
+// before it ends, short of a stall of most of that: a context already done when the query is asked
+// for is refused before the connection is touched, and nothing is interrupted.
 func interruptAQuery(t *testing.T, db *Database) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var n int64
 	err := db.DB.QueryRowContext(ctx, endlessQuery).Scan(&n)
 	require.ErrorIs(t, err, context.DeadlineExceeded, "the query ends with its context")
-	require.Eventually(t, func() bool { return db.DB.Stats().OpenConnections == 0 }, time.Second, 10*time.Millisecond,
+	require.Eventually(t, func() bool { return db.DB.Stats().OpenConnections == 0 }, 20*time.Second, 10*time.Millisecond,
 		"the interrupted connection is closed rather than kept, so the next statement opens another")
 }
 

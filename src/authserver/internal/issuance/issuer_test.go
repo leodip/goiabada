@@ -35,16 +35,28 @@ func getTestPublicKey(t *testing.T) []byte {
 	return publicKeyBytes
 }
 
-func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, message string) {
+// assertTimeClaimWithinRange holds a time claim to expectedDuration past the moment it was set from,
+// a clock reading taken between testStart, read before the test built or issued anything, and this
+// call. Claims are whole seconds, so the claim is no earlier than testStart plus expectedDuration,
+// truncated to the second, and no later than now plus expectedDuration.
+func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, testStart time.Time, message string) {
+	t.Helper()
 	assert.Contains(t, claims, claimName)
 	claimUnix := claims[claimName].(float64)
 	claimTime := time.Unix(int64(claimUnix), 0)
 
-	expectedTime := time.Now().UTC().Add(expectedDuration)
+	assert.WithinRange(t, claimTime, testStart.Add(expectedDuration).Truncate(time.Second),
+		time.Now().UTC().Add(expectedDuration), message)
+}
 
-	start := expectedTime.Add(-3 * time.Second)
-	end := expectedTime.Add(3 * time.Second)
-	assert.True(t, claimTime.After(start) && claimTime.Before(end), "%s: %s", message, claimTime)
+// assertCountdown holds a count of whole seconds left until a deadline full seconds past from,
+// taken at a moment between from and to. It is no more than full, and short of it by no more than
+// the whole seconds from to to, plus one for the truncation.
+func assertCountdown(t *testing.T, got, full int64, from, to time.Time, msg string) {
+	t.Helper()
+	elapsed := int64(to.Sub(from) / time.Second)
+	assert.GreaterOrEqual(t, got, full-elapsed-1, msg)
+	assert.LessOrEqual(t, got, full, msg)
 }
 
 func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byte) jwt.MapClaims {

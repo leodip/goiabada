@@ -19,6 +19,13 @@ import (
 // createClientWithGranularScope creates a client with a specific granular permission scope
 // and returns an access token for that client
 func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (string, *record.Client) {
+	accessToken, client, _ := createClientWithGranularScopeAndSecret(t, permissionIdentifier)
+	return accessToken, client
+}
+
+// createClientWithGranularScopeAndSecret is createClientWithGranularScope, with the client's
+// secret too, for a test that authenticates as the client again.
+func createClientWithGranularScopeAndSecret(t *testing.T, permissionIdentifier string) (string, *record.Client, string) {
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
@@ -73,7 +80,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 	assert.True(t, ok, "access_token should be a string")
 	assert.NotEmpty(t, accessToken, "access_token should not be empty")
 
-	return accessToken, client
+	return accessToken, client, clientSecret
 }
 
 // TestGranularScopes_AdminReadCanOnlyReadUserEndpoints verifies that admin-read scope

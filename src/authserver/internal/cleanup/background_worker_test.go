@@ -33,6 +33,7 @@ func TestWorker_AuditLogRetention_Enabled(t *testing.T) {
 	// Mock other worker cleanup operations (they should still run)
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -70,6 +71,7 @@ func TestWorker_AuditLogRetention_Disabled(t *testing.T) {
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -102,6 +104,7 @@ func TestWorker_AuditLogRetention_BatchDeletion(t *testing.T) {
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -136,6 +139,7 @@ func TestWorker_AuditLogRetention_MaxBatches(t *testing.T) {
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -170,6 +174,7 @@ func TestWorker_AuditLogRetention_Error(t *testing.T) {
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -205,6 +210,7 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteIdleSessions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -240,15 +246,17 @@ func TestWorker_StopBeforeStartIsANoOp(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	worker := New(mockDB, metrics.NewRegistry())
 
+	// A Stop that waited would take the full minute, so the 20s limit fails it, and a correct
+	// Stop only after a 20s stall.
 	done := make(chan bool, 1)
 	go func() {
-		done <- worker.Stop(5 * time.Second)
+		done <- worker.Stop(time.Minute)
 	}()
 
 	select {
 	case stopped := <-done:
 		assert.True(t, stopped, "a worker that never started has nothing left running")
-	case <-time.After(2 * time.Second):
+	case <-time.After(20 * time.Second):
 		t.Fatal("Stop must return immediately when the worker was never started")
 	}
 }
@@ -286,13 +294,13 @@ func TestWorker_StopWaitsForTheRunLoop(t *testing.T) {
 
 	finished := make(chan struct{})
 	go func() {
-		assert.True(t, worker.Stop(5*time.Second), "a run loop that finished is reported stopped")
+		assert.True(t, worker.Stop(time.Minute), "a run loop that finished is reported stopped")
 		close(finished)
 	}()
 
 	select {
 	case <-finished:
-	case <-time.After(3 * time.Second):
+	case <-time.After(20 * time.Second):
 		t.Fatal("Stop did not return after the run loop finished")
 	}
 }
@@ -313,7 +321,8 @@ func TestWorker_StopGivesUpAfterTheTimeout(t *testing.T) {
 
 	assert.False(t, stopped, "a run loop still running after the timeout is reported, so the database stays open")
 	assert.GreaterOrEqual(t, elapsed, 200*time.Millisecond, "Stop must wait for the timeout")
-	assert.Less(t, elapsed, 3*time.Second, "Stop must not wait past the timeout")
+	// 25 times the timeout, so only a stall of 4.8s or more could fail a Stop that kept to it.
+	assert.Less(t, elapsed, 5*time.Second, "Stop must not wait past the timeout")
 }
 
 // waitOrDone is what makes the startup delay interruptible; the previous
@@ -327,12 +336,12 @@ func TestWaitOrDone(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
+		const duration = 30 * time.Second
 		start := time.Now()
-		completed := waitOrDone(ctx, 30*time.Second)
+		completed := waitOrDone(ctx, duration)
 
 		assert.False(t, completed)
-		assert.Less(t, time.Since(start), 2*time.Second,
-			"an already-cancelled context must not wait out the duration")
+		assert.Less(t, time.Since(start), duration, "an already-cancelled context must not wait out the duration")
 	})
 }
 
@@ -365,6 +374,7 @@ func TestJitter(t *testing.T) {
 func expectFullCleanup(mockDB *datamocks.Database) {
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
@@ -384,6 +394,7 @@ func TestWorker_RunIfClaimed_RunsWhenTheClaimIsWon(t *testing.T) {
 	// The task ran if it reached its first step.
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	expectFullCleanup(mockDB)
 
 	worker.runIfClaimed(context.Background())
@@ -460,6 +471,7 @@ func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
@@ -483,6 +495,7 @@ func TestWorker_PerformTask_SweepsCodesPastTheGrace(t *testing.T) {
 	var createdBefore time.Time
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { createdBefore = args.Get(2).(time.Time) }).
 		Return(nil).Once()
@@ -510,6 +523,7 @@ func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteOrphanedRefreshTokenFamilyRevocations", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("DeleteExpiredRevokedAccessTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{

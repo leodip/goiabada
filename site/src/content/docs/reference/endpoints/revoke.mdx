@@ -1,0 +1,92 @@
+---
+title: Revoke
+description: Tell the auth server your app is done with a token, so the grant behind it ends, with /auth/revoke.
+---
+
+import { CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
+
+This page helps you end a grant from your app, typically when a user signs out, with the revocation endpoint, `/auth/revoke`.
+
+It's the [RFC 7009](https://www.rfc-editor.org/rfc/rfc7009) token revocation endpoint, the `revocation_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). A [grant](/concepts/glossary/#grant) is what one sign-in gave your app: its refresh token, every refresh token that one was rotated into, and every access token issued with them.
+
+## Revoke a token
+
+<Steps>
+
+1. Send the refresh token, or an access token, with your client's credentials:
+
+   ```http
+   POST /auth/revoke HTTP/1.1
+   Host: auth.example.com
+   Content-Type: application/x-www-form-urlencoded
+   Authorization: Basic bXktYXBwOm15LXNlY3JldA==
+
+   token=eyJhbGciOiJSUzI1NiIsImtpZCI6Ii4uLiJ9...
+   ```
+
+2. The auth server ends the grant and answers with an empty body:
+
+   ```http
+   HTTP/1.1 200 OK
+   ```
+
+3. Delete the tokens your app holds.
+
+</Steps>
+
+Sending either token ends the whole grant, so one call is enough. A library that revokes the access token and then the refresh token gets `200` for both.
+
+## What revoking ends
+
+Revoking ends the grant the token belongs to, at once:
+
+- The refresh token is refused at the [token endpoint](/reference/endpoints/token/), and so is every refresh token of the grant.
+- Every access token of the grant is refused at [`/userinfo`](/reference/endpoints/userinfo/) and the auth server's APIs.
+
+It leaves everything else alone. The user stays signed in to the auth server, and your app's other grants and other apps keep working. To sign the user out of the auth server too, send them to the [logout endpoint](/reference/endpoints/logout/). See [Sign users out](/guides/sign-users-out/).
+
+An API that checks access tokens by their signature alone accepts them until they expire, so keep access tokens [short-lived](/concepts/tokens/#how-long-tokens-last). An API that [introspects](/reference/endpoints/introspect/) them sees them inactive at once.
+
+An access token from the client credentials grant or the [implicit flow](/legacy-flows/implicit/) belongs to no grant. Revoking it ends that token alone: `/userinfo` and the auth server's APIs refuse it until it expires.
+
+## The request
+
+`/auth/revoke` takes a POST, with the parameters in an `application/x-www-form-urlencoded` body. Each parameter goes in once.
+
+| Parameter | Required | What it does |
+|---|---|---|
+| `token` | Yes | A refresh token or an access token the auth server issued to your client |
+| `token_type_hint` | No | Ignored. The auth server reads the token's type from the token |
+
+## Client authentication
+
+A confidential client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here.
+
+A [public client](/concepts/clients/#public-and-confidential-clients), such as a single-page app or a mobile app, sends its `client_id` in the body and no secret.
+
+The auth server's log has a `client authentication refused at the revocation endpoint` warning for each refusal. See [Logs](/deploy/logs/#records-worth-knowing).
+
+## The answer
+
+| Status | When |
+|---|---|
+| `200 OK`, empty body | The grant or the token was revoked, or the token was invalid already: expired, revoked, unknown, malformed, an ID token, or one the auth server doesn't accept any more. Either way, your app can delete it |
+| `400 Bad Request`, `invalid_grant` | The token is live and was issued to another client: "The token was issued to another client." Nothing is revoked |
+| `400 Bad Request`, `invalid_request` | `token` or `client_id` is missing, a parameter is repeated, the body can't be read, the secret is sent both ways, or a public client sent a secret |
+| `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated |
+| `503 Service Unavailable`, `temporarily_unavailable` | The auth server couldn't check or revoke the token, or couldn't confirm it did. Treat the token as still working, and try again later |
+
+An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors).
+
+
+## Calling it from a browser
+
+JavaScript in a browser can call the revocation endpoint when its origin is registered as a [web origin](/concepts/clients/#web-origins) on a client, as for the token endpoint.
+
+## Next steps
+
+<CardGrid>
+  <LinkCard title="Sign users out" description="End the user's session and your app's tokens together." href="/guides/sign-users-out/" />
+  <LinkCard title="Refresh tokens" description="How a grant's refresh tokens rotate and end." href="/concepts/refresh-tokens/" />
+  <LinkCard title="Token" description="Get the tokens this endpoint revokes." href="/reference/endpoints/token/" />
+</CardGrid>

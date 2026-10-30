@@ -7,10 +7,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -257,6 +261,83 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+// TestAPISessions_RefusesATokenNoLongerLive: the group follows the admin API's token lifecycle
+// (#676 decisions 4 and 6). A token with the pre-upgrade header, one from another issuer, one
+// whose client is disabled or deleted, and one revoked by its jti are refused with 401
+// invalid_token instead of reaching the console's sessions until they expire.
+func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
+	newClient := func(t *testing.T) (string, *record.Client, string) {
+		accessToken, client, clientSecret := createClientWithGranularScopeAndSecret(t, builtin.BrowserSessionsPermissionIdentifier)
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		assertSessionsAdmitToken(t, accessToken)
+		return accessToken, client, clientSecret
+	}
+
+	t.Run("a token from before the upgrade", func(t *testing.T) {
+		accessToken, _, _ := newClient(t)
+		claims := jwt.MapClaims(decodeJWTPayload(t, accessToken))
+
+		assertSessionsAdmitToken(t, resignWithCurrentKey(t, claims, "at+jwt"))
+		assertSessionsRefuseToken(t, resignWithCurrentKey(t, claims, "JWT"))
+	})
+
+	t.Run("a token from another issuer", func(t *testing.T) {
+		accessToken, _, _ := newClient(t)
+
+		changeSettings(t, func(settings *record.Settings) {
+			settings.Issuer = "https://issuer-" + strings.ToLower(fake.LetterN(6)) + ".example.org"
+		})
+
+		assertSessionsRefuseToken(t, accessToken)
+	})
+
+	t.Run("a disabled or deleted client's token", func(t *testing.T) {
+		accessToken, client, _ := newClient(t)
+
+		setClientEnabled(t, client.Id, false)
+		assertSessionsRefuseToken(t, accessToken)
+
+		setClientEnabled(t, client.Id, true)
+		assertSessionsAdmitToken(t, accessToken)
+
+		require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+		assertSessionsRefuseToken(t, accessToken)
+	})
+
+	t.Run("a token revoked by its jti", func(t *testing.T) {
+		accessToken, client, clientSecret := newClient(t)
+
+		revokeAs(t, client.ClientIdentifier, clientSecret, accessToken)
+
+		assertSessionsRefuseToken(t, accessToken)
+	})
+}
+
+// assertSessionsAdmitToken asserts the token reaches the handler, which answers 404 for an
+// identifier no session has.
+func assertSessionsAdmitToken(t *testing.T, accessToken string) {
+	t.Helper()
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: newTestSessionId(t)})
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
+}
+
+// assertSessionsRefuseToken asserts the token is answered 401 INVALID_TOKEN, "The access token is
+// invalid.", in the challenge and the body, as the admin API answers it.
+func assertSessionsRefuseToken(t *testing.T, accessToken string) {
+	t.Helper()
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: newTestSessionId(t)})
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
+	assert.Equal(t, `Bearer realm="goiabada", error="invalid_token", error_description="The access token is invalid."`,
+		resp.Header.Get("WWW-Authenticate"))
+	var errResp api.ErrorResponse
+	require.NoError(t, json.Unmarshal(body, &errResp))
+	assert.Equal(t, api.ErrorResponse{ErrorCode: "INVALID_TOKEN", ErrorDescription: "The access token is invalid."}, errResp)
 }
 
 // TestAPISessions_BadRequests: a body that is not JSON, and one with no identifier, are

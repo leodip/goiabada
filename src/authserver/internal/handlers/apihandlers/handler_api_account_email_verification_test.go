@@ -298,9 +298,10 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	} {
 		t.Run("a code issued four minutes ago refuses the send, with "+tc.name, func(t *testing.T) {
 			// Past the minute the cooldown used to be, so this is the five minutes refusing.
+			before := time.Now().UTC()
 			user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
 				EmailVerificationCodeEncrypted: tc.code,
-				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Add(-4 * time.Minute), Valid: true}}
+				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: before.Add(-4 * time.Minute), Valid: true}}
 
 			// The renderer, the sender and the logger expect nothing, so a send fails the case.
 			database := datamocks.NewDatabase(t)
@@ -310,7 +311,7 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assert.True(t, resp.TooManyRequests)
-			assert.InDelta(t, 60, resp.WaitInSeconds, 2, "the wait is what is left of the five minutes")
+			assertWaitLeft(t, resp.WaitInSeconds, 60, before, "the wait is what is left of the five minutes")
 			assert.False(t, resp.EmailVerificationSent)
 		})
 	}
@@ -379,10 +380,12 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 
+	before := time.Now().UTC()
 	rr := sendVerification(t, database, pageRenderer, emailSender, auditLogger)
+	after := time.Now().UTC()
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.WithinDuration(t, time.Now().UTC(), issuedAt, 5*time.Second)
+	assert.WithinRange(t, issuedAt, before, after, "the code is stamped during the request")
 	assert.Equal(t, issuedAt.Add(-5*time.Minute), issuedNotAfter, "the cutoff is one code lifetime before the issue")
 	decrypted, err := testDataCipher.Decrypt(stored)
 	require.NoError(t, err)
@@ -390,11 +393,22 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 	assert.Equal(t, mailedCode, decrypted, "the code stored is the code mailed")
 }
 
+// assertWaitLeft holds a cooldown answer to the seconds left of a wait that was full seconds long
+// at from, read by the handler between from and now and rounded up. It is no more than full, and
+// short of it by no more than the whole seconds since from.
+func assertWaitLeft(t *testing.T, got, full int, from time.Time, msg string) {
+	t.Helper()
+	elapsed := int(time.Since(from) / time.Second)
+	assert.GreaterOrEqual(t, got, full-elapsed, msg)
+	assert.LessOrEqual(t, got, full, msg)
+}
+
 // TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing is the other side of
 // the claim: a send whose write matched no row mails nothing and answers what the row says now,
 // read again. A concurrent send that claimed the code leaves a cooldown, a verification leaves
 // the address verified, and an email change leaves neither, which is a 409 (#404).
 func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testing.T) {
+	claimedAt := time.Now().UTC()
 	for _, tc := range []struct {
 		name   string
 		reread *record.User
@@ -403,13 +417,13 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 		{
 			name: "a concurrent send claimed the code",
 			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
-				EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}},
+				EmailVerificationCodeIssuedAt: sql.NullTime{Time: claimedAt, Valid: true}},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 				var resp api.AccountEmailVerificationSendResponse
 				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
 				assert.True(t, resp.TooManyRequests)
-				assert.InDelta(t, 300, resp.WaitInSeconds, 2)
+				assertWaitLeft(t, resp.WaitInSeconds, 300, claimedAt, "the whole five minutes, less the time since the claim")
 				assert.False(t, resp.EmailVerificationSent)
 			},
 		},

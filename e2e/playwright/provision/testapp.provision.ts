@@ -5,6 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import {
+  addIntrospectionResource,
   addRedirectUri,
   addResourcePermission,
   clientIdFromList,
@@ -40,7 +41,7 @@ async function createClient(page: Page, client: NewClient): Promise<number> {
 test("set up the test app's clients and API", async ({ page }) => {
   await signInAsAdmin(page);
 
-  const clientIds = [testapp.web, testapp.web2, testapp.spa, testapp.service].map((c) => c.clientId);
+  const clientIds = [testapp.web, testapp.web2, testapp.spa, testapp.service, testapp.api].map((c) => c.clientId);
   await page.goto(clientsList);
   for (const identifier of clientIds) {
     if ((await clientRow(page, identifier).count()) > 0) {
@@ -99,6 +100,16 @@ test("set up the test app's clients and API", async ({ page }) => {
   await grantClientPermission(page, serviceId, resource, permission);
   secrets.SERVICE_CLIENT_ID = testapp.service.clientId;
   secrets.SERVICE_CLIENT_SECRET = await readClientSecret(page, serviceId);
+
+  // Protect an API, "Ask the auth server about a token", steps 1 and 2: the API's own client, listed
+  // for the API's resource, with which it introspects.
+  const apiId = await createClient(page, { identifier: testapp.api.clientId });
+  await page.goto(clientUrl(apiId, "introspection"));
+  await addIntrospectionResource(page, testapp.api.resource);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Introspection resources saved.")).toBeVisible();
+  secrets.API_CLIENT_ID = testapp.api.clientId;
+  secrets.API_CLIENT_SECRET = await readClientSecret(page, apiId);
 
   secrets.API_RESOURCE = testapp.api.resource;
   secrets.API_SCOPE = testapp.api.scope;

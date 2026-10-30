@@ -6,7 +6,7 @@ import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { expectResult, resultBody, testapp, userBrowser } from "../../lib/testapp";
 
-test("the SPA signs a user in, refreshes, calls /userinfo and the API, and signs out, all from the browser", async ({ page, browser, users }) => {
+test("the SPA signs a user in, refreshes, calls /userinfo and the API, revokes and signs out, all from the browser", async ({ page, browser, users }) => {
   const user = await users.create();
   await grantUserPermission(page, user.id, testapp.api.resource, "read");
   const { context, page: spa } = await userBrowser(browser);
@@ -30,7 +30,13 @@ test("the SPA signs a user in, refreshes, calls /userinfo and the API, and signs
   await spa.getByRole("button", { name: "Call the API" }).click();
   await expectResult(spa, "The API answered 200");
 
-  await spa.getByRole("button", { name: "Sign out" }).click();
+  // Sign-out revokes the refresh token first, cross-origin with the client_id alone (RFC 7009).
+  const [revocation] = await Promise.all([
+    spa.waitForResponse((response) => response.url() === `${env.authUrl}/auth/revoke`),
+    spa.getByRole("button", { name: "Sign out" }).click(),
+  ]);
+  expect(revocation.status()).toBe(200);
+  expect(revocation.headers()["access-control-allow-origin"]).toBe(testapp.spa.origin);
   await spa.waitForURL(testapp.spa.url);
   await expectResult(spa, "Signed out");
   await spa.getByRole("button", { name: "Sign in" }).click();

@@ -88,6 +88,7 @@ var committedClientWrites = []committedClientWrite{
 		expectWrite: func(database *datamocks.Database) {
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			database.On("SetClientPublic", mock.Anything, clientUpdateTx, targetClientId).Return(true, nil).Once()
+			database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, targetClientId).Return(nil).Once()
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, targetClientId).Return(int64(1), nil).Once()
 			database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, targetClientId).

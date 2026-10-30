@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you sign a user out of the auth server from your app, with the logout endpoint, `/auth/logout`.
 
-It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out).
+It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out). Signing out revokes none of your app's tokens: revoke them first at [`/auth/revoke`](/reference/endpoints/revoke/), as [Sign users out](/guides/sign-users-out/) shows.
 
 ## Sign a user out
 
@@ -130,6 +130,7 @@ A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [au
 ## Next steps
 
 <CardGrid>
+  <LinkCard title="Sign users out" description="Revoke your app's tokens, then sign the user out." href="/guides/sign-users-out/" />
   <LinkCard title="Ending sessions" description="What signing out ends, and what it leaves alone." href="/concepts/ending-sessions/#signing-out" />
   <LinkCard title="id_token_hint" description="What the hint is, and how the auth server checks it." href="/concepts/id-token-hint/" />
   <LinkCard title="Sign-out answers 403" description="When a POST to /auth/logout is refused." href="/troubleshooting/sign-out-answers-403/" />

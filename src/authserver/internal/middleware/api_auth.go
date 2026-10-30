@@ -1,16 +1,13 @@
 package middleware
 
 import (
-	"context"
-	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/liveness"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
-	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // RequireBearerTokenScope requires a bearer token carrying requiredScope.
@@ -61,7 +58,8 @@ func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func
 // UUID is a valid client identifier whenever its first hex digit is a-f.
 //
 // Neither existing guard catches this. RequireBearerTokenScope checks only the scope
-// string, and RequireValidSession deliberately passes through tokens with no `sid`.
+// string, and RequireValidSession finds no user in a client_credentials token, so it judges
+// only the token itself, its client and its jti.
 //
 // The discriminator is the `auth_time` claim, NOT `sid`. `sid` is conditional: it is set
 // only when a session exists, so ROPC tokens issued without a browser session have none
@@ -77,10 +75,8 @@ func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func
 // is which of the two access-token kinds it holds.
 //
 // Presence only, never the value. That is safe because those claims are server-issued and
-// cannot be forged. It is also necessary: on
-// the ROPC refresh path the value is wrong (createTokenInputFromROPC passes `now`, so a
-// refreshed token reports the refresh moment as the authentication moment), a pre-existing
-// defect this guard neither depends on nor fixes.
+// cannot be forged, and the guard has no use for the value: when the user authenticated says
+// nothing about whether a user is present.
 //
 // This is a dependency, not an assumption: if a future change ever puts an unvalidated
 // token into reqctx.WithBearerToken, this guard weakens with it. And if a sixth user-token
@@ -116,56 +112,27 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 	}
 }
 
-// apiAuthDatabase is what the API session check needs: the bearer's user row and the session the
-// token names.
-type apiAuthDatabase interface {
-	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-}
-
-// RequireValidSession rejects bearer tokens that no longer represent live, current
-// authentication state.
+// RequireValidSession rejects bearer tokens that are not access tokens under RFC 9068 or no
+// longer represent live, current authentication state, as liveness.AccessToken judges it: the
+// at+jwt header, the configured issuer and the client the token names, then the user, the session
+// the token names and the authentication generation, and last the grant the token names. The check
+// decides; this guard answers and logs. Each refusal is 401 invalid_token. A refusal of the token
+// itself, of its client or of its grant answers what a token that does not parse answers, "The
+// access token is invalid.", so an access token issued before #676, one from another issuer, one
+// whose client is disabled or gone, one whose grant was revoked and one without a grant revoked by
+// its jti all read as one. Of the rest, only two descriptions say why: a blank subject and an expired session. Every
+// other refusal reuses "Session has been terminated", a session of another user included (#133): a
+// presenter has already proven it holds the token, but the wording still reaches a caller, and a
+// distinct message would say which sessions exist.
 //
-// Four things are checked, and which of them apply depends on the token:
-//
-//  1. The account is still enabled. Verified that NO handler under /api/v1/account/*
-//     checks this for itself, so without it a disabled user keeps working access for the
-//     remainder of their access token's lifetime (#106 decision 6).
-//  2. For a token carrying a `sid`, the session still exists and belongs to the token's
-//     own user. The owner comparison backs up issuance rather than duplicating it: a
-//     ceremony can no longer bind a grant to someone else's session, so anything reaching
-//     this check was minted before the fix (#133).
-//  3. That session is within its idle and max-lifetime bounds. This is what makes deleting
-//     a session take effect immediately despite the JWT remaining cryptographically valid.
-//  4. The authentication generation still matches. This is the boundary that survives a
-//     credential change: a token authenticated under generation N stops working once the
-//     user advances to N+1 (#106 decision 11).
-//
-// The generation check is deliberately ASYMMETRIC, and it looks wrong until you know why:
-//
-//   - With a `sid`, the SESSION's generation decides and the token's own claim is IGNORED.
-//     That is what lets a self-service password change preserve the caller's own session:
-//     the session is promoted forward while the access tokens already issued from it still
-//     carry the old value. Checking the claim too would sign that caller out, which is the
-//     thing decision 4 exists to avoid.
-//   - Without one (offline grants and ROPC), the token's own claim decides, since there is
-//     no session to defer to.
-//
-// A token with no generation claim at all reads as generation 0, which is what keeps access
-// tokens issued before this feature shipped working until their user's generation first
-// advances (#106 decision 15). Presence is tested against the raw claim map rather than
-// through IntClaim, because that accessor cannot distinguish absent from malformed and
-// conflating the two would reject every legacy token.
-//
-// Tokens with no `auth_time` claim pass through untouched: that is the client_credentials
-// discriminator, and such a token has no user to check anything about. The middleware also
-// passes through when the request has no bearer token at all, since enforcing "must be
-// authenticated" belongs to a scope middleware running alongside this one.
+// A client credentials token passes once its own checks, its client's and its jti's do, since the
+// check finds no user to check anything about. The middleware also passes through when the request has no bearer token at all, since
+// enforcing "must be authenticated" belongs to a scope middleware running alongside this one.
 //
 // Reads reqctx.BearerTokenFrom (set by JwtAuthorizationHeaderToContext),
 // not reqctx.ValidatedTokenFrom, so it works regardless of whether a scope
 // middleware ran first.
-func (m *BearerToken) RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handler {
+func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			jwtToken, ok := reqctx.BearerTokenFrom(r.Context())
@@ -174,136 +141,87 @@ func (m *BearerToken) RequireValidSession(database apiAuthDatabase) func(http.Ha
 				return
 			}
 
-			// auth_time, not sid, is the "this is a user token" discriminator. sid is
-			// conditional: ROPC and offline grants have none, so requiring it would let
-			// exactly those tokens past every check below.
-			if _, hasAuthTime := jwtToken.Claims["auth_time"]; !hasAuthTime {
-				// client_credentials: no user, nothing to enforce.
-				next.ServeHTTP(w, r)
+			// Missing settings are passed on as nil: the check refuses a header that is not at+jwt
+			// without them, and answers anything else as the fault below.
+			settings, _ := reqctx.SettingsFrom(r.Context())
+			verdict, err := liveness.AccessToken(r.Context(), database, jwtToken, settings, time.Now().UTC())
+			if err != nil {
+				if errors.Is(err, liveness.ErrNoSettings) {
+					// The check reached a session's bounds on a request the settings middleware
+					// never ran for: the wiring defect reqctx names.
+					err = reqctx.ErrNoSettings
+				}
+				m.refusals.internalError(w, r, err, verdict.SessionIdentifier)
 				return
 			}
 
-			sub, hasSub := reqctx.BearerSubject(r.Context())
-			if !hasSub {
+			// Each refusal is logged here. The two that say why answer at once; the rest share the
+			// refusal below the switch.
+			sid := verdict.SessionIdentifier
+			switch verdict.Refusal {
+			case liveness.Live:
+				next.ServeHTTP(w, r)
+				return
+			case liveness.NotAnAccessTokenHeader:
+				slog.WarnContext(r.Context(), "rejecting bearer token: the header's typ is not at+jwt",
+					"typ", jwtToken.Header["typ"])
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.ForeignIssuer:
+				slog.WarnContext(r.Context(), "rejecting bearer token: iss is not the configured issuer",
+					"iss", jwtToken.StringClaim("iss"))
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.ClientNotFound:
+				slog.WarnContext(r.Context(), "rejecting bearer token: client_id does not resolve to a client",
+					"client_id", jwtToken.StringClaim("client_id"))
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.ClientDisabled:
+				slog.WarnContext(r.Context(), "rejecting bearer token: client is disabled",
+					"client_id", verdict.Client.ClientIdentifier)
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.GrantRevoked:
+				slog.WarnContext(r.Context(), "rejecting bearer token: its grant has been revoked",
+					"grant_id", jwtToken.StringClaim("grant_id"))
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.AccessTokenRevoked:
+				slog.WarnContext(r.Context(), "rejecting bearer token: it has been revoked",
+					"jti", jwtToken.StringClaim("jti"))
+				m.refusals.invalidToken(w, r, invalidTokenDescription)
+				return
+			case liveness.BlankSubject:
 				slog.WarnContext(r.Context(), "rejecting bearer token: user token has no sub claim")
 				m.refusals.invalidToken(w, r, "Invalid token subject")
 				return
-			}
-
-			user, err := database.GetUserBySubject(r.Context(), nil, sub)
-			if err != nil {
-				m.refusals.internalError(w, r,
-					errs.Wrap(err, "failed to look up user for bearer token validation"), "")
-				return
-			}
-			if user == nil {
+			case liveness.UserNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: subject does not resolve to a user")
-				m.refusals.invalidToken(w, r, "Session has been terminated")
-				return
-			}
-			if !user.Enabled {
-				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", user.Id)
-				m.refusals.invalidToken(w, r, "Session has been terminated")
-				return
-			}
-
-			sid := jwtToken.StringClaim("sid")
-			if sid == "" {
-				// Offline grant or ROPC: no session to defer to, so the token's own
-				// generation claim decides. A malformed claim is rejected on !wellFormed, before
-				// the comparison, so it can never collide with a stored generation.
-				generation, wellFormed := tokenGeneration(jwtToken)
-				if !wellFormed || generation != user.AuthStateGeneration {
-					slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
-						"user_id", user.Id)
-					m.refusals.invalidToken(w, r, "Session has been terminated")
-					return
-				}
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			session, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sid)
-			if err != nil {
-				m.refusals.internalError(w, r,
-					errs.Wrap(err, "failed to look up user session for bearer token validation"), sid)
-				return
-			}
-
-			if session == nil {
+			case liveness.UserDisabled:
+				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", verdict.User.Id)
+			case liveness.TokenGenerationSuperseded:
+				slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
+					"user_id", verdict.User.Id)
+			case liveness.SessionNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has been terminated",
 					"session_identifier", sid)
-				m.refusals.invalidToken(w, r, "Session has been terminated")
-				return
-			}
-
-			// The session has to belong to the token's user. Nothing else here compares the
-			// two: the lifetime check reads dates and the generation check reads a counter,
-			// so a token whose `sid` names another user's session would otherwise be governed
-			// by that session in every respect, ending when its owner's session ends and
-			// staying alive while its owner keeps using the browser (#133).
-			//
-			// Placed before the settings lookup, not merely before the lifetime check it
-			// guards: this comparison needs no settings, so a cross-bound token is refused
-			// even on the path where missing settings would otherwise produce a 500.
-			//
-			// Reuses "Session has been terminated" rather than naming the mismatch. A
-			// presenter has already proven it holds the token, but the wording still reaches
-			// a caller, and a distinct message would say which sessions exist.
-			if session.UserId != user.Id {
+			case liveness.SessionOfAnotherUser:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session belongs to a different user",
-					"session_identifier", sid, "session_id", session.Id,
-					"session_user_id", session.UserId, "user_id", user.Id)
-				m.refusals.invalidToken(w, r, "Session has been terminated")
-				return
-			}
-
-			settings, ok := reqctx.SettingsFrom(r.Context())
-			if !ok {
-				// Fail closed: without settings we cannot enforce idle/max-lifetime
-				// limits, and silently skipping the check would let an expired
-				// session ride a still-valid JWT past us.
-				m.refusals.internalError(w, r, reqctx.ErrNoSettings, sid)
-				return
-			}
-			if !session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
+					"session_identifier", sid, "session_id", verdict.Session.Id,
+					"session_user_id", verdict.Session.UserId, "user_id", verdict.User.Id)
+			case liveness.SessionExpired:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
-					"session_identifier", sid, "session_id", session.Id)
+					"session_identifier", sid, "session_id", verdict.Session.Id)
 				m.refusals.invalidToken(w, r, "Session has expired")
 				return
-			}
-
-			// The SESSION's generation, not the token's. See the asymmetry note above: the
-			// token's own claim is deliberately not consulted on this branch.
-			if session.AuthStateGeneration != user.AuthStateGeneration {
+			case liveness.SessionGenerationSuperseded:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session is on a superseded authentication generation",
-					"session_identifier", sid, "session_id", session.Id, "user_id", user.Id)
-				m.refusals.invalidToken(w, r, "Session has been terminated")
-				return
+					"session_identifier", sid, "session_id", verdict.Session.Id, "user_id", verdict.User.Id)
+			default:
+				slog.WarnContext(r.Context(), "rejecting bearer token: liveness check refused it", "refusal", int(verdict.Refusal))
 			}
-
-			next.ServeHTTP(w, r)
+			m.refusals.invalidToken(w, r, "Session has been terminated")
 		})
 	}
-}
-
-// tokenGeneration reads a token's authentication generation, reporting validity as a second
-// return value rather than in band.
-//
-// An ABSENT claim is generation 0, and valid. That is what keeps access tokens issued before
-// this feature shipped working until their user's generation first advances (#106 decision
-// 15). Presence is tested against the raw claim map because IntClaim reports only whether
-// a PRESENT claim parsed, so it returns (0, false) for both absent and malformed; conflating
-// them would reject every legacy token.
-//
-// A malformed claim is (0, false), and callers must reject on !ok BEFORE comparing. Do not
-// reintroduce an in-band sentinel such as -1: `auth_state_generation` is a signed
-// BIGINT/INTEGER on all four engines with no nonnegative constraint, so any sentinel value a
-// caller might compare against is also a value a user row can legitimately hold, and a user
-// sitting on it would accept every malformed claim.
-func tokenGeneration(jwtToken oauth.JwtToken) (int64, bool) {
-	if _, present := jwtToken.Claims["auth_state_generation"]; !present {
-		return 0, true
-	}
-	return jwtToken.IntClaim("auth_state_generation")
 }

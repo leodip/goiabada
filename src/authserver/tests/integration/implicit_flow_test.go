@@ -175,6 +175,13 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 
 	// Verify NO refresh token (implicit flow never issues refresh tokens)
 	assert.Empty(t, tokens["refresh_token"], "refresh_token should NOT be present in implicit flow")
+
+	// An RFC 9068 access token naming its client, and no grant, since nothing refreshes it (#676).
+	assert.Equal(t, "at+jwt", decodeJWTHeader(t, tokens["access_token"])["typ"])
+	claims := decodeJWTPayload(t, tokens["access_token"])
+	assert.Equal(t, client.ClientIdentifier, claims["client_id"])
+	assert.NotContains(t, claims, "grant_id")
+	assertUserinfoAdmits(t, tokens["access_token"], user.Subject)
 }
 
 // TestImplicitFlow_IdTokenResponseType tests implicit flow with response_type=id_token

@@ -93,13 +93,13 @@ Pragma: no-cache
 | 401 | none | none | No token was sent. The answer has only `WWW-Authenticate: Bearer realm="goiabada"` and no body. |
 | 400 | `invalid_request` | "The Authorization header must be sent once.", "The access_token parameter must be sent once." or "The access token must be sent by one method only." | The token was sent twice |
 | 400 | `invalid_request` | "The request body could not be parsed." | A POST body that can't be read |
-| 401 | `invalid_token` | "The access token is invalid." | The token is expired, its signature doesn't verify, or it isn't an access token |
+| 401 | `invalid_token` | "The access token is invalid." | The token is expired, its signature doesn't verify, it isn't an access token, its `iss` isn't the current issuer, its client is disabled or deleted, or it or its grant was revoked |
 | 403 | `insufficient_scope` | "Insufficient scope." | The token's scope has no `openid` |
 | 401 | `invalid_token` | "Session has been terminated" | The user signed out, was disabled or deleted, or their credentials changed |
 | 401 | `invalid_token` | "Session has expired" | The session the token was issued in reached its idle timeout or maximum lifetime |
 | 500 | `server_error` | "An unexpected server error has occurred. …" | Something failed on the server. The description ends with a request id to find it in the logs. |
 
-The two session errors make `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends. A token with no session, from an offline refresh token or the password grant, stops when the user is disabled or their credentials change. See [Ending sessions](/concepts/ending-sessions/#what-it-doesnt-reach).
+This makes `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends or its grant is revoked, such as when the user withdraws their consent to the client. A token from an offline grant or the password grant names no session. It stops when its grant is revoked, the user is disabled or their credentials change. See [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued).
 
 ## Calling it from a browser
 

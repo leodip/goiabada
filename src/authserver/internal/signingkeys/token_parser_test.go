@@ -457,3 +457,41 @@ func exportRSAPublicKeyAsPEMStr(pubkey *rsa.PublicKey) string {
 	)
 	return string(pubkeyPem)
 }
+
+// The token's JOSE header comes back with its claims, whichever key verified it: the access-token
+// check reads its typ, at+jwt since #676, and a parser that dropped it would refuse every access
+// token.
+func TestDecodeAndValidateTokenString_ReturnsTheHeader(t *testing.T) {
+	signed := func(t *testing.T, key *rsa.PrivateKey) string {
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{"sub": "user123", "exp": time.Now().Add(time.Hour).Unix()})
+		token.Header["typ"] = "at+jwt"
+		token.Header["kid"] = "key-1"
+		tokenString, err := token.SignedString(key)
+		require.NoError(t, err)
+		return tokenString
+	}
+	want := map[string]interface{}{"alg": "RS256", "typ": "at+jwt", "kid": "key-1"}
+
+	t.Run("verified by the current key", func(t *testing.T) {
+		key, _ := rsa.GenerateKey(rand.Reader, 2048)
+
+		result, err := NewTokenParser(currentKeyDatabase(t, key)).DecodeAndValidateTokenString(context.Background(), signed(t, key), true)
+
+		require.NoError(t, err)
+		assert.Equal(t, want, result.Header)
+	})
+
+	t.Run("verified by a fallback key", func(t *testing.T) {
+		currentKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		previousKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+		mockDB := currentKeyDatabase(t, currentKey)
+		mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{
+			{Id: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
+		}, nil).Once()
+
+		result, err := NewTokenParser(mockDB).DecodeAndValidateTokenString(context.Background(), signed(t, previousKey), true)
+
+		require.NoError(t, err)
+		assert.Equal(t, want, result.Header)
+	})
+}

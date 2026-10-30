@@ -102,18 +102,18 @@ Each handover leaves a `cross_user_session_replaced` entry in the audit log, nam
 When the **same** user signs in again, none of this applies. Their session is reused while it's still valid. When it isn't, they get a new session, and nothing is revoked.
 </Aside>
 
-## What it doesn't reach
+## Access tokens already issued
 
-An access token is checked by signature, and an API doesn't ask the auth server about it, so nothing on this page can take back one already issued:
+An access token is a signed JWT, and nothing on this page changes a token already issued. What happens to it depends on who checks it:
 
-- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token whose session has ended or expired, or whose user was disabled or changed their credentials, on the very next request.
-- **An access token from an offline grant** carries no `sid`, so ending the session it came from doesn't reach it, even at the auth server's own endpoints. A credential change does.
-- **Your own APIs**, checking the signature alone, accept the token until it expires.
+- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. [Ending a session](#end-a-session) from the admin console or the API revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. Signing out revokes nothing. So does withdrawing the user's consent to the client, making the client public, or disabling the client.
+- **An API that introspects the token**, asking the [introspection endpoint](/reference/endpoints/introspect/), gets `{"active": false}` from the same moment, for every one of these.
+- **An API checking the signature alone** accepts the token until it expires.
 
-That's inherent to signed tokens, and it's the main reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last): the token lifetime, 5 minutes in a new install, is the longest a token can outlive any of this.
+That's inherent to signed tokens, and it's the main reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last): the token lifetime, 5 minutes in a new install, is the longest a token can outlive any of this at an API that doesn't introspect.
 
 <Aside type="caution">
-If an API must refuse access the moment a session ends or a user's credentials change, it has to ask the auth server on every request rather than check the signature alone. A token carrying `openid` can be checked by calling [`/userinfo`](/reference/endpoints/userinfo/) with it.
+If an API must refuse access the moment a session ends or a user's credentials change, have it introspect the token on every request rather than check the signature alone. See [Introspect](/reference/endpoints/introspect/).
 </Aside>
 
 ## Next steps

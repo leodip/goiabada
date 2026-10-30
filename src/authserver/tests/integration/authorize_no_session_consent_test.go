@@ -19,6 +19,7 @@ import (
 )
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -136,7 +137,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -149,11 +150,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -274,7 +276,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -287,11 +289,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -414,7 +417,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -427,11 +430,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -558,7 +562,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -571,11 +575,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -710,7 +715,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -723,11 +728,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -866,7 +872,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -879,11 +885,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -1016,7 +1023,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1029,11 +1036,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -1170,7 +1178,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1183,11 +1191,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsFullyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -1322,7 +1331,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1335,11 +1344,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
 
 func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsRequired_ConsentIsPartiallyGranted(t *testing.T) {
+	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -1478,7 +1488,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
-	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
+	assertStampedSince(t, code.AuthenticatedAt, started)
 	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
@@ -1491,7 +1501,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.NotNil(t, consent)
 	assert.Equal(t, user.Id, consent.UserId)
 	assert.Equal(t, client.Id, consent.ClientId)
-	assertWithinLastXSeconds(t, consent.GrantedAt.Time, 3)
+	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
 

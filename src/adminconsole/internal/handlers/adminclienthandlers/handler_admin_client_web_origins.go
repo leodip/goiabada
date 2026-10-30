@@ -109,11 +109,13 @@ func HandleWebOriginsGet(
 			WebOrigins          []string
 			EffectiveWebOrigins []effectiveWebOrigin
 			IsSystemLevelClient bool
+			IsPublic            bool
 		}{
 			ClientId:            clientResp.Id,
 			ClientIdentifier:    clientResp.ClientIdentifier,
 			EffectiveWebOrigins: effectiveWebOrigins,
 			IsSystemLevelClient: clientResp.IsSystemLevelClient,
+			IsPublic:            clientResp.IsPublic,
 		}
 
 		sort.Slice(clientResp.WebOrigins, func(i, j int) bool {
