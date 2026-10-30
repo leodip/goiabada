@@ -92,7 +92,7 @@ A token issued to another client is refused with `invalid_grant`. The [token end
 
 ## Revoking a grant
 
-When your app is done with a grant, typically when the user signs out, it sends the refresh token, or any access token of the grant, to the [revocation endpoint](/reference/endpoints/revoke/), `/auth/revoke`. The whole grant ends at once: the refresh token, every refresh token it was rotated into, and the grant's access tokens at `/userinfo` and the auth server's APIs. The user's session and your app's other grants are left alone. An API that [introspects](/reference/endpoints/introspect/) the grant's access tokens sees them inactive at once too.
+When your app is done with a grant, typically when the user signs out, it sends the refresh token, or any access token of the grant, to the [revocation endpoint](/reference/endpoints/revoke/), `/auth/revoke`. That ends the whole grant and leaves the user's session and your app's other grants alone. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
 
 ## Checking a refresh token
 
@@ -121,7 +121,7 @@ A retired refresh token coming back is a replay. The auth server can't tell whet
 
 Only that family is revoked. The user's session, their sign-ins to other clients and their other grants keep working, a second grant from the same session included.
 
-Your APIs go on accepting the access tokens already issued, unless they introspect them: they're signed JWTs your APIs check on their own, so revoking the family stops the next refresh, not an access token already handed out. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse them at once. That's one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
+The family's access tokens are refused at once by the auth server's own [`/userinfo`](/reference/endpoints/userinfo/), its Admin and Account APIs, and an API that [introspects](/reference/endpoints/introspect/) them. An API that checks them by their signature alone accepts them until they expire, one more reason to keep [access tokens short-lived](/concepts/tokens/#how-long-tokens-last).
 
 A replay leaves a `refresh_token_replay_detected` entry in the [audit log](/concepts/audit-log/) when it changes something: it revokes at least one live token, or records the family as revoked for the first time. A repeat that does neither leaves no entry, so one incident isn't a row per attempt. The entry never holds the refresh token itself. It doesn't prove an attack either: an app that refreshes in parallel causes one too.
 

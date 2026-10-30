@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This guide adds a sign-out button that ends your app's tokens, signs the user out of the auth server too, and brings them back to your app.
 
-Ending your app's own session isn't enough. The auth server keeps a [session](/concepts/sessions/) of its own, so the next time your app sent the user to sign in, they'd be signed straight back in. And the tokens your app was given keep working until they're revoked. Your app revokes its tokens at the revocation endpoint, `/auth/revoke`, then sends the browser to the logout endpoint, `/auth/logout`, with the ID token the user signed in with, and the auth server signs them out and sends them back.
+Ending your app's own session isn't enough. The auth server keeps a [session](/concepts/sessions/) of its own, so the next time your app sent the user to sign in, they'd be signed straight back in. And the tokens your app was given can outlive the sign-out. Your app revokes its tokens at the revocation endpoint, `/auth/revoke`, then sends the browser to the logout endpoint, `/auth/logout`, with the ID token the user signed in with, and the auth server signs them out and sends them back.
 
 ## Sign users out
 
@@ -63,9 +63,9 @@ An ID token that has expired still works as a hint while the session it came fro
 Signing out at `/auth/logout` revokes no token. That's why step 3 revokes them:
 
 - **A refresh token** keeps working while the session it's tied to does, which, when other apps share that session, is after your app has signed out. An offline refresh token, from the `offline_access` scope, isn't tied to a session at all.
-- **An access token** is checked by its signature, so your APIs accept it until it expires.
+- **An access token** works at `/userinfo` and the auth server's APIs until it expires or is revoked. An API that checks only its signature accepts it until it expires, revoked or not.
 
-Revoking either token ends the whole grant: the refresh token, every refresh token it was rotated into, and every access token issued with them, which `/userinfo` and the auth server's APIs then refuse. An API that checks access tokens by their signature alone still accepts them until they expire. See [Revoke](/reference/endpoints/revoke/).
+Revoking either token ends the whole grant, so one call is enough. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
 
 To cut off everything a session handed out, to every app, end the session instead. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session).
 

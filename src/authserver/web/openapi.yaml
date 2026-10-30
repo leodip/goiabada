@@ -4076,8 +4076,9 @@ components:
         with 403 MANAGE_SCOPE_REQUIRED, when the request grants or revokes an administrative
         permission (directly, or by moving a user into or out of a group holding one, or by
         deleting such a group), writes to an administrator, switches whether a client may
-        request the administrative scopes, reads an administrator client's secret, reads or sets
-        the secret of a client listed for the `authserver` resource, changes the email or
+        request the administrative scopes, reads an administrator client's secret, adds the
+        `authserver` resource to a client's introspection resources, reads or sets the secret of
+        a client listed for it, changes the email or
         audit-log settings, or changes an administrative permission's description. It keeps
         full control of everyone else, and still reads administrators. `authserver:manage`
         alone meets 409 LAST_ADMINISTRATOR, on the operations that could leave no enabled user
@@ -4218,9 +4219,12 @@ components:
             deletion), an administrative group (settings, attributes,
             members, permissions, deletion), or an administrator client
             (settings, authentication, flows, redirect URIs, web origins,
-            token settings, permissions, logo, deletion);
+            token settings, permissions, introspection resources, logo,
+            deletion);
           - switches whether a client may request the administrative scopes,
             on or off, on any client;
+          - adds the `authserver` resource to a client's introspection
+            resources;
           - reads an administrator client's secret, or reads or sets the
             secret of a client listed for the `authserver` resource among its
             introspection resources;
@@ -6084,6 +6088,7 @@ components:
       properties:
         resourceIds:
           type: array
+          description: The whole new list. Absent or null saves an empty list.
           items:
             type: integer
             format: int64

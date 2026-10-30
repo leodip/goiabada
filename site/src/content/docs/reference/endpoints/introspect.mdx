@@ -58,13 +58,13 @@ Still check `scope` for the permission the operation needs, as [Protect an API](
 
 ## When a token is active
 
-An access token is active while it's live and its `aud` names a resource on the calling client's introspection resources. Live means the auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and APIs would accept it now: it hasn't expired, its user and its client exist and are enabled, and nothing has ended it since, such as its session ending, its user's credentials changing, or its grant being revoked. See [Ending sessions](/concepts/ending-sessions/).
+An access token is active while it's live and its `aud` names a resource on the calling client's introspection resources. Live means it hasn't expired, its `iss` is the current issuer, its user and its client exist and are enabled, and nothing has ended it since, such as its session ending, its user's credentials changing, or it or its grant being revoked. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and APIs make the same checks. See [Ending sessions](/concepts/ending-sessions/).
 
 A refresh token is active only to the client it was issued to, while it's live and the flow that issued it is still enabled for that client. Live means nothing has ended it: it hasn't expired or been rotated or revoked, its user is enabled, and neither its session ending nor its user's credentials changing has ended it. So your app's backend can find out whether its refresh token is still good without using it. Introspecting it spends nothing, and the refresh token keeps working.
 
 Active doesn't promise the next refresh succeeds. A refresh checks the user's consent and permissions, and your client's scope allowances, when it's made, so a refresh with an active token can still be refused with `invalid_grant`.
 
-Every other token gets `{"active": false}`: one that's expired, revoked, forged or malformed, an ID token, an access token for a resource the client doesn't list, and another client's refresh token. The answer never says which, as [RFC 7662 section 2.2](https://www.rfc-editor.org/rfc/rfc7662.html#section-2.2) requires.
+Every other token gets `{"active": false}`: one that's expired, revoked, forged or malformed, an ID token, an access token for a resource the client doesn't list, and another client's refresh token. The answer never says which, as [RFC 7662 section 2.2](https://www.rfc-editor.org/rfc/rfc7662.html#section-2.2) recommends.
 
 ## What an active answer carries
 
@@ -94,7 +94,7 @@ The members are read from the token, and they're the same for every client that 
 
 ## Client authentication
 
-The calling client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here: `401 Unauthorized` with `invalid_client`.
+The calling client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here.
 
 A [public client](/concepts/clients/#public-and-confidential-clients) can't introspect, since it has no secret to authenticate with.
 
@@ -105,7 +105,7 @@ The auth server's log has a `client authentication refused at the introspection 
 | Status | When |
 |---|---|
 | `200 OK` | The token is active, or `{"active": false}` |
-| `400 Bad Request`, `invalid_request` | `token` is missing, or a parameter is repeated |
+| `400 Bad Request`, `invalid_request` | `token` or `client_id` is missing, a parameter is repeated, the body can't be read, or the secret is sent both ways |
 | `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated, or it's a public client |
 | `500 Internal Server Error`, `server_error` | The auth server couldn't check the token. That says nothing about the token: try again, or refuse the request |
 

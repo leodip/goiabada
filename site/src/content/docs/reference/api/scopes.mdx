@@ -17,7 +17,7 @@ Give each integration the smallest scope that does its job. A service that creat
 |---|---|---|
 | `authserver:admin-read` | Every Admin API operation that reads, administrators included, except a client's secret | Nothing |
 | `authserver:manage-users` | Users and groups, with their attributes, sessions, consents, memberships and permissions | The same, except administrators and administrative permissions |
-| `authserver:manage-clients` | Clients, their secrets included, except an administrator client's or one listed for the `authserver` resource | Clients, except administrator clients, listing the `authserver` resource among a client's introspection resources, and setting the secret of a client listed for it |
+| `authserver:manage-clients` | Clients, their secrets included, except an administrator client's or one listed for the `authserver` resource | Clients, except administrator clients, adding the `authserver` resource to a client's [introspection resources](/concepts/clients/#introspection-resources), and setting the secret of a client listed for it |
 | `authserver:manage-settings` | Settings, resources and their permissions, signing keys, and the audit log | Settings except email and audit logging, resources and their permissions, signing keys |
 | `authserver:manage` | Everything | Everything, administrators included |
 

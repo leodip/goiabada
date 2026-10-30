@@ -102,11 +102,11 @@ Each handover leaves a `cross_user_session_replaced` entry in the audit log, nam
 When the **same** user signs in again, none of this applies. Their session is reused while it's still valid. When it isn't, they get a new session, and nothing is revoked.
 </Aside>
 
-## What it doesn't reach
+## Access tokens already issued
 
 An access token is a signed JWT, and nothing on this page changes a token already issued. What happens to it depends on who checks it:
 
-- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. Ending a session revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. So does withdrawing the user's consent to the client, making the client public, or disabling the client.
+- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. [Ending a session](#end-a-session) from the admin console or the API revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. Signing out revokes nothing. So does withdrawing the user's consent to the client, making the client public, or disabling the client.
 - **An API that introspects the token**, asking the [introspection endpoint](/reference/endpoints/introspect/), gets `{"active": false}` from the same moment, for every one of these.
 - **An API checking the signature alone** accepts the token until it expires.
 

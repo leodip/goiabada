@@ -45,7 +45,7 @@ Revoking ends the grant the token belongs to, at once:
 
 It leaves everything else alone. The user stays signed in to the auth server, and your app's other grants and other apps keep working. To sign the user out of the auth server too, send them to the [logout endpoint](/reference/endpoints/logout/). See [Sign users out](/guides/sign-users-out/).
 
-An API that checks access tokens by their signature alone accepts them until they expire. Keep access tokens short-lived if that matters.
+An API that checks access tokens by their signature alone accepts them until they expire, so keep access tokens [short-lived](/concepts/tokens/#how-long-tokens-last). An API that [introspects](/reference/endpoints/introspect/) them sees them inactive at once.
 
 An access token from the client credentials grant or the implicit flow belongs to no grant. Revoking it ends that token alone: `/userinfo` and the auth server's APIs refuse it until it expires.
 
@@ -60,7 +60,7 @@ An access token from the client credentials grant or the implicit flow belongs t
 
 ## Client authentication
 
-A confidential client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here: `401 Unauthorized` with `invalid_client`.
+A confidential client authenticates exactly as at the token endpoint, with `client_secret_basic` or `client_secret_post`. See [Client authentication](/reference/endpoints/token/#client-authentication) for the rules and the refusals, which are the same here.
 
 A [public client](/concepts/clients/#public-and-confidential-clients), such as a single-page app or a mobile app, sends its `client_id` in the body and no secret.
 
@@ -72,7 +72,7 @@ The auth server's log has a `client authentication refused at the revocation end
 |---|---|
 | `200 OK`, empty body | The grant or the token was revoked, or the token was invalid already: expired, revoked, unknown, malformed, an ID token, or one the auth server doesn't accept any more. Either way, your app can delete it |
 | `400 Bad Request`, `invalid_grant` | The token is live and was issued to another client: "The token was issued to another client." Nothing is revoked |
-| `400 Bad Request`, `invalid_request` | `token` is missing, or a parameter is repeated |
+| `400 Bad Request`, `invalid_request` | `token` or `client_id` is missing, a parameter is repeated, the body can't be read, the secret is sent both ways, or a public client sent a secret |
 | `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated |
 | `503 Service Unavailable`, `temporarily_unavailable` | The auth server couldn't check or revoke the token, or couldn't confirm it did. Treat the token as still working, and try again later |
 

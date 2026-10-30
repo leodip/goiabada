@@ -192,12 +192,12 @@ The **Permissions** tab grants permissions to the client itself, for the client 
 
 ## Introspection resources
 
-An API checking a token with the auth server's [introspection endpoint](/reference/endpoints/introspect/) calls as a confidential client, since a resource holds no credentials of its own. A client's introspection resources are the resources whose tokens that client may introspect. The list starts empty, so a client introspects nothing until you add the resources it stands for. One client can stand for several resources, and several clients for one resource.
+Introspection is an API asking the auth server whether a token is still active, at the [introspection endpoint](/reference/endpoints/introspect/). The API calls as a confidential client, since a resource holds no credentials of its own. A client's introspection resources are the resources whose access tokens it may introspect: an access token is active to it only when its `aud` names one of them. The list starts empty. One client can stand for several resources, and several clients for one resource. A client needs no list to introspect its own refresh tokens.
 
 Set the list on the client's **Introspection** tab: choose a resource, click **Add resource**, and click **Save**. Through the Admin API, read it with [`GET /api/v1/admin/clients/{id}/introspection-resources`](/reference/api/admin/operations/getclientintrospectionresources/), and replace it whole with [`PUT`](/reference/api/admin/operations/updateclientintrospectionresources/) on the same path, sending the list as you read it in `expectedResourceIds`. Each save leaves an `updated_client_introspection_resources` entry in the [audit log](/concepts/audit-log/).
 
 - **A public client has none.** It can't authenticate, so it can't introspect, and its page has no **Introspection** tab.
-- **Only `authserver:manage` adds the `authserver` resource.** A client listed for it can introspect the tokens of every sign-in, across every app. `authserver:manage-clients` edits the rest of the list, and can remove `authserver` from it. While the client is listed for it, only `authserver:manage` reads or sets its secret.
+- **Only `authserver:manage` adds the `authserver` resource.** A client listed for it can introspect every access token issued with an OpenID Connect scope or `offline_access`, from every app. `authserver:manage-clients` edits the rest of the list, and can remove `authserver` from it. While the client is listed for it, only `authserver:manage` reads or sets its secret.
 
 ## Tokens
 
@@ -219,7 +219,7 @@ The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, e
 
 ## Disabling and deleting a client
 
-Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse the client's access tokens while it stays disabled, and accept them again if you turn it back on before they expire. An API that checks tokens by their signature alone accepts them until they expire.
+Untick **Enabled** on the **Settings** tab to stop a client while keeping its settings. The authorization endpoint then shows an error page instead of signing users in, and the token endpoint answers 401 with `invalid_client`, so its refresh tokens stop working too. The auth server's own [`/userinfo`](/reference/endpoints/userinfo/) and its Admin and Account APIs refuse the client's access tokens while it stays disabled, and accept them again if you turn it back on before they expire. An API that [introspects](/reference/endpoints/introspect/) them gets `{"active": false}` for as long. An API that checks tokens by their signature alone accepts them until they expire.
 
 **Delete** on the list of clients removes the client with its redirect URIs, web origins, permissions, introspection resources, logo, unredeemed codes, refresh tokens and users' consents to it. The auth server's own endpoints refuse its access tokens from then on, even after a new client takes its identifier; an API that checks tokens by their signature alone accepts them until they expire.
 

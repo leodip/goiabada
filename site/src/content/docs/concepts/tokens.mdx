@@ -80,7 +80,7 @@ These settings are under **Admin**, **Tokens** in the admin console, and apply t
 
 The first sets how long both the access token and the ID token last. The other two decide whether user claims such as `email` or `name` go in each token, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A client can override all three on its own **Tokens** tab: a lifetime of 0 there uses this setting, and each claims switch can be on, off, or left to this setting. See [Clients](/concepts/clients/#tokens).
 
-Keep the lifetime short. An access token can't be taken back once it's issued: an API checking it by signature alone accepts it until `exp`, whatever happens to the user's session meanwhile, unless it [introspects](/reference/endpoints/introspect/) the token. The lifetime is the longest that can last. See [what ending a session doesn't reach](/concepts/ending-sessions/#what-it-doesnt-reach).
+Keep the lifetime short. An API that checks an access token by its signature alone accepts it until `exp`, whatever happens to the session or the grant meanwhile, unless it [introspects](/reference/endpoints/introspect/) the token. The lifetime is the longest that can last. See [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued).
 
 An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/refresh-tokens/#how-long-a-refresh-token-lasts) have lifetimes of their own.
 

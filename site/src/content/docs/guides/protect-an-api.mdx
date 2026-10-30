@@ -108,11 +108,11 @@ Fetch the key set from `/certs` once and cache it, then pick the key whose `kid`
 
 ## What your API can't see
 
-Checking the signature, your API trusts a valid token until it expires. Ending the user's session, disabling them or changing their password stops the next refresh, not a token already issued. That's why access tokens are short, 5 minutes in a new install.
+An API that checks only the signature trusts a valid token until it expires, even after the user's session ends or the user is disabled. That's why access tokens are short, 5 minutes in a new install.
 
 ## Ask the auth server about a token
 
-When an operation must stop the moment a token is cut off, have your API introspect the token as well as check it. The auth server answers `{"active": false}` from the moment the user's session ends, the user or the client is disabled, the user's credentials change or the grant is revoked.
+When an operation must stop the moment a token is cut off, have your API also [introspect](/reference/endpoints/introspect/) the token: ask the auth server whether it's still active. [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued) lists what cuts a token off.
 
 <Steps>
 

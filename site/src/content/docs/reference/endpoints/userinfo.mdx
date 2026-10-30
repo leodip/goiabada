@@ -99,7 +99,7 @@ Pragma: no-cache
 | 401 | `invalid_token` | "Session has expired" | The session the token was issued in reached its idle timeout or maximum lifetime |
 | 500 | `server_error` | "An unexpected server error has occurred. …" | Something failed on the server. The description ends with a request id to find it in the logs. |
 
-This makes `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends or its grant is revoked, such as when the user withdraws their consent to the client. A token from an offline grant or the password grant names no session. It stops when its grant is revoked, the user is disabled or their credentials change. See [Ending sessions](/concepts/ending-sessions/#what-it-doesnt-reach).
+This makes `/userinfo` stricter than the token's own `exp`: an access token stops working here as soon as the session it came from ends or its grant is revoked, such as when the user withdraws their consent to the client. A token from an offline grant or the password grant names no session. It stops when its grant is revoked, the user is disabled or their credentials change. See [Access tokens already issued](/concepts/ending-sessions/#access-tokens-already-issued).
 
 ## Calling it from a browser
 
