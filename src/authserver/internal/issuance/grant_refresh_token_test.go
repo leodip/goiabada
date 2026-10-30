@@ -101,6 +101,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	}, nil)
 
 	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, refreshToken, "openid profile resource1:read")
+	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -192,9 +193,11 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, sessionIdentifier, capturedRefreshToken.SessionIdentifier)
 	assert.False(t, capturedRefreshToken.Revoked)
 	assert.True(t, capturedRefreshToken.IssuedAt.Valid)
-	assert.WithinDuration(t, now, capturedRefreshToken.IssuedAt.Time, 1*time.Second)
+	assert.WithinRange(t, capturedRefreshToken.IssuedAt.Time, now, after)
 	assert.True(t, capturedRefreshToken.ExpiresAt.Valid)
-	assert.WithinDuration(t, now.Add(600*time.Second), capturedRefreshToken.ExpiresAt.Time, 1*time.Second)
+	// The row's expiry is the claim's, in whole seconds, so it can sit up to a second below now plus
+	// the lifetime.
+	assert.WithinRange(t, capturedRefreshToken.ExpiresAt.Time, now.Truncate(time.Second).Add(600*time.Second), after.Add(600*time.Second))
 
 	mockDB.AssertExpectations(t)
 }
@@ -284,6 +287,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	}, nil)
 
 	response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, refreshToken, "resource1:write offline_access")
+	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
@@ -356,11 +360,13 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assert.Empty(t, capturedRefreshToken.SessionIdentifier)
 	assert.False(t, capturedRefreshToken.Revoked)
 	assert.True(t, capturedRefreshToken.IssuedAt.Valid)
-	assert.WithinDuration(t, now, capturedRefreshToken.IssuedAt.Time, 1*time.Second)
+	assert.WithinRange(t, capturedRefreshToken.IssuedAt.Time, now, after)
 	assert.True(t, capturedRefreshToken.ExpiresAt.Valid)
-	assert.WithinDuration(t, now.Add(7200*time.Second), capturedRefreshToken.ExpiresAt.Time, 1*time.Second)
+	// The row's expiry and maximum lifetime are the claims', in whole seconds, so each can sit up to a
+	// second below now plus its lifetime.
+	assert.WithinRange(t, capturedRefreshToken.ExpiresAt.Time, now.Truncate(time.Second).Add(7200*time.Second), after.Add(7200*time.Second))
 	assert.True(t, capturedRefreshToken.MaxLifetime.Valid)
-	assert.WithinDuration(t, now.Add(172800*time.Second), capturedRefreshToken.MaxLifetime.Time, 1*time.Second)
+	assert.WithinRange(t, capturedRefreshToken.MaxLifetime.Time, now.Truncate(time.Second).Add(172800*time.Second), after.Add(172800*time.Second))
 
 	mockDB.AssertExpectations(t)
 }

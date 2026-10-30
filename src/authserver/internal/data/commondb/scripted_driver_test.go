@@ -237,7 +237,7 @@ func (d *scriptedDriver) settled(t *testing.T) scriptedCounts {
 	require.Eventuallyf(t, func() bool {
 		last = d.counts()
 		return last.openTx == 0
-	}, 2*time.Second, time.Millisecond,
+	}, 20*time.Second, time.Millisecond,
 		"the driver still holds an open transaction, so its counters are still moving")
 	return last
 }

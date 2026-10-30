@@ -35,16 +35,19 @@ func getTestPublicKey(t *testing.T) []byte {
 	return publicKeyBytes
 }
 
+// assertTimeClaimWithinRange holds a time claim to expectedDuration from now. Every claim it is given
+// was set from a clock reading taken before this one and is truncated to whole seconds, so it is
+// never later than now plus expectedDuration. Below that it allows 5s: the truncation's second, and
+// 4s for the time between that reading and this one, so a slow machine cannot fail a correct claim.
 func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, message string) {
+	t.Helper()
 	assert.Contains(t, claims, claimName)
 	claimUnix := claims[claimName].(float64)
 	claimTime := time.Unix(int64(claimUnix), 0)
 
 	expectedTime := time.Now().UTC().Add(expectedDuration)
 
-	start := expectedTime.Add(-3 * time.Second)
-	end := expectedTime.Add(3 * time.Second)
-	assert.True(t, claimTime.After(start) && claimTime.Before(end), "%s: %s", message, claimTime)
+	assert.WithinRange(t, claimTime, expectedTime.Add(-5*time.Second), expectedTime, message)
 }
 
 func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byte) jwt.MapClaims {

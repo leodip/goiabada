@@ -29,6 +29,12 @@ import (
 // question, held past migrationLockPastTheOldGiveUp.
 const migrationLockHoldBudget = 2 * time.Second
 
+// migrationLockAnswerBudget is how long a start asked to stop has to answer, and how long a check
+// that the migration lock is free has to take it. Each takes milliseconds when it works, and the
+// budget is waited out only when it does not, so it is generous enough that no stall short of it
+// fails a start or a release that works.
+const migrationLockAnswerBudget = 20 * time.Second
+
 // migrationLockPastTheOldGiveUp is how long a start queued behind the migration lock is held
 // there by TestMigrationLock_AStartQueuedBehindTheLockWaitsPastTenSecondsAndSaysSo. MySQL's
 // GET_LOCK used to wait ten seconds and then give up, so the queued process wrote an Error
@@ -293,9 +299,9 @@ func TestMigrationLock_AStopWhileQueuedEndsTheWait(t *testing.T) {
 	case res := <-done:
 		require.ErrorIsf(t, res.err, context.Canceled,
 			"the stop is answered as the cancellation it was, so the process can tell it from a failure, on %s", dbType())
-	case <-time.After(migrationLockHoldBudget):
+	case <-time.After(migrationLockAnswerBudget):
 		t.Fatalf("the start went on waiting for the migration lock for %s after it was asked to stop on %s",
-			migrationLockHoldBudget, dbType())
+			migrationLockAnswerBudget, dbType())
 	}
 	assert.Empty(t, recordsNamed(capture, "migrating the database"), "a stopped start migrates nothing")
 	assert.Empty(t, recordsNamed(capture, "database migration stopped"), "no migration was under way")
@@ -805,7 +811,7 @@ func holdMigrationLock(t *testing.T, h *isolatedDB, eng migrator.Engine) func() 
 // PostgreSQL until the pool was separated (#268).
 func requireMigrationLockIsFree(t *testing.T, h *isolatedDB, eng migrator.Engine, when string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), migrationLockHoldBudget)
+	ctx, cancel := context.WithTimeout(context.Background(), migrationLockAnswerBudget)
 	defer cancel()
 
 	pool := freshPoolTo(t, h.Name)

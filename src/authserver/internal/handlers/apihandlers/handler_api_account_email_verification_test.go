@@ -379,10 +379,12 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 	emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventSentEmailVerificationMessage, mock.Anything).Return().Once()
 
+	before := time.Now().UTC()
 	rr := sendVerification(t, database, pageRenderer, emailSender, auditLogger)
+	after := time.Now().UTC()
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assert.WithinDuration(t, time.Now().UTC(), issuedAt, 5*time.Second)
+	assert.WithinRange(t, issuedAt, before, after, "the code is stamped during the request")
 	assert.Equal(t, issuedAt.Add(-5*time.Minute), issuedNotAfter, "the cutoff is one code lifetime before the issue")
 	decrypted, err := testDataCipher.Decrypt(stored)
 	require.NoError(t, err)

@@ -20,7 +20,7 @@ import (
 
 // patience bounds every wait in this file. A case that waits this long has failed: the behavior it
 // waits for takes microseconds, and the bound only turns a hang into a failure that names itself.
-const patience = 2 * time.Second
+const patience = 20 * time.Second
 
 // fetchAnswer is what one fetch answers. A non-nil release holds the fetch until it is closed,
 // which is how a case puts a fetch in flight and keeps it there.

@@ -27,7 +27,9 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
+	before := time.Now().UTC()
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
+	after := time.Now().UTC()
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
@@ -50,7 +52,9 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, updated.EmailVerificationCodeEncrypted)
 	assert.True(t, updated.EmailVerificationCodeIssuedAt.Valid)
-	assert.WithinDuration(t, time.Now().UTC(), updated.EmailVerificationCodeIssuedAt.Time, 3*time.Second)
+	// Stamped during the request; the column may round it to the microsecond.
+	assert.WithinRange(t, updated.EmailVerificationCodeIssuedAt.Time,
+		before.Add(-time.Microsecond), after.Add(time.Microsecond))
 }
 
 func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {

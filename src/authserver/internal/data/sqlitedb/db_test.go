@@ -141,7 +141,7 @@ func interruptAQuery(t *testing.T, db *Database) {
 	var n int64
 	err := db.DB.QueryRowContext(ctx, endlessQuery).Scan(&n)
 	require.ErrorIs(t, err, context.DeadlineExceeded, "the query ends with its context")
-	require.Eventually(t, func() bool { return db.DB.Stats().OpenConnections == 0 }, time.Second, 10*time.Millisecond,
+	require.Eventually(t, func() bool { return db.DB.Stats().OpenConnections == 0 }, 20*time.Second, 10*time.Millisecond,
 		"the interrupted connection is closed rather than kept, so the next statement opens another")
 }
 

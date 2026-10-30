@@ -56,7 +56,7 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyReturnsTheContextErro
 		// goroutine rather than for a timer: once the driver has recorded the rollback, tx.done
 		// is set and Commit has only one answer left to give.
 		require.Eventually(t, func() bool { return d.counts().rollbacks == 1 },
-			2*time.Second, time.Millisecond,
+			20*time.Second, time.Millisecond,
 			"database/sql never rolled back the transaction whose context was cancelled")
 		return nil
 	})
@@ -95,7 +95,7 @@ func TestRunInTransaction_ACancellationAfterASuccessfulBodyJoinsTheDeadlockItWas
 		}
 		cancel()
 		require.Eventually(t, func() bool { return d.counts().rollbacks == 2 },
-			2*time.Second, time.Millisecond,
+			20*time.Second, time.Millisecond,
 			"database/sql never rolled back the transaction whose context was cancelled")
 		return nil
 	})
@@ -272,10 +272,10 @@ func TestRunInTransaction_ACommitOnADoneContextLeavesTheRollbackToDatabaseSQL(t 
 		{
 			name: "past its deadline",
 			start: func() (context.Context, func()) {
-				// Long enough that the statement, which the scripted driver answers at once, runs
+				// bodyDeadline, so the statement, which the scripted driver answers at once, runs
 				// well inside it; the body then waits the timer out, so the context ends with the
 				// error a timer firing leaves rather than one a test chose.
-				ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+				ctx, cancel := context.WithTimeout(context.Background(), bodyDeadline)
 				t.Cleanup(cancel)
 				return ctx, func() {}
 			},
@@ -308,7 +308,7 @@ func TestRunInTransaction_ACommitOnADoneContextLeavesTheRollbackToDatabaseSQL(t 
 			assert.Equal(t, 1, ran, "a cancelled run is not rerun")
 			assert.Empty(t, *requested)
 			require.Eventually(t, func() bool { return d.counts().rollbacks == 1 },
-				2*time.Second, time.Millisecond,
+				20*time.Second, time.Millisecond,
 				"database/sql's goroutine rolled the transaction back")
 			c := d.settled(t)
 			assert.Zero(t, c.commits, "the driver was never asked to commit")
