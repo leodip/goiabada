@@ -96,7 +96,7 @@ When your app is done with a grant, typically when the user signs out, it sends 
 
 ## Checking a refresh token
 
-A confidential client's backend can ask whether its refresh token is still live, without using it, at the [introspection endpoint](/reference/endpoints/introspect/), `/auth/introspect`. The answer is `"active": true` with the token's scope, subject and expiry while it is, and `{"active": false}` once anything has ended it. A refresh still checks consent and permissions when it's made, so an active token can still be refused. Asking spends nothing: the token keeps working, and asking about a token that was already rotated is no replay. Only the client the token was issued to gets an answer about it, and a public client can't introspect at all.
+A confidential client's backend can check its refresh token without using it, at the [introspection endpoint](/reference/endpoints/introspect/), `/auth/introspect`. The answer is `"active": true` with the token's scope, subject and expiry while it is live and the flow that issued it is still enabled for your client, and `{"active": false}` otherwise. A refresh still checks consent and permissions when it's made, so an active token can still be refused. Asking spends nothing: the token keeps working, and asking about a token that was already rotated is no replay. Only the client the token was issued to gets an answer about it, and a public client can't introspect at all.
 
 ## Rotation
 

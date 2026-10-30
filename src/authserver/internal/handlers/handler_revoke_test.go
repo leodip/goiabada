@@ -50,8 +50,8 @@ const (
 	revokeOwnerName   = "the-owner"
 )
 
-// revokeUnavailable is the answer to a fault: RFC 7009 section 2.2.1's 503, which tells the client
-// the token still exists and it may retry.
+// revokeUnavailable is the answer to a fault: RFC 7009 section 2.2.1's 503, on which the client
+// assumes the token still exists and may retry.
 const revokeUnavailableCode = "temporarily_unavailable"
 
 // revokeEndpoint is the handler over a mocked database, token parser and audit logger, answering

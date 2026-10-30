@@ -42,8 +42,8 @@ var protocolRoutes = []string{
 	"POST /connect/register",
 }
 
-// revocationRoutes answer a fault in RFC 6749 section 5.2's shape too, but 503: RFC 7009 section
-// 2.2.1's "the token still exists, retry later" (#676 decision 12).
+// revocationRoutes answer a fault in RFC 6749 section 5.2's shape too, but 503, on which RFC 7009
+// section 2.2.1 has the client assume the token still exists and retry (#676 decision 12).
 var revocationRoutes = []string{"POST /auth/revoke"}
 
 // routeFormat is the format a registered route must answer a fault in: the protocol and revocation
