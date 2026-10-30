@@ -219,6 +219,32 @@ func TestIntrospect_ARefreshTokenIsActiveToItsOwnClientAlone(t *testing.T) {
 	assert.Equal(t, http.StatusOK, status, "%v", again)
 }
 
+// A refresh token whose issuing flow is switched off for its client is inactive while it is off, as
+// the refresh grant refuses it, and active again once it is back on: switching a flow off spends
+// nothing (#250).
+func TestIntrospect_ARefreshTokenIsInactiveWhileItsFlowIsSwitchedOff(t *testing.T) {
+	data, code, httpClient, clientSecret := userTokenResponseWithScope(t, "openid", nil)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	refreshToken := data["refresh_token"].(string)
+	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	require.NoError(t, err)
+
+	client.AuthorizationCodeEnabled = false
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
+
+	assertInactive(t, introspectAs(t, code.Client.ClientIdentifier, clientSecret, refreshToken))
+	status, refused := refreshAuthCodeGrant(t, httpClient, code, clientSecret, refreshToken, "")
+	require.Equal(t, http.StatusBadRequest, status, "%v", refused)
+	assert.Equal(t, "unauthorized_client", refused["error"], "the refresh grant refuses it too")
+
+	client.AuthorizationCodeEnabled = true
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
+
+	assertActive(t, introspectAs(t, code.Client.ClientIdentifier, clientSecret, refreshToken))
+	status, rotated := refreshAuthCodeGrant(t, httpClient, code, clientSecret, refreshToken, "")
+	assert.Equal(t, http.StatusOK, status, "the refusal spent nothing: %v", rotated)
+}
+
 // A credential change revokes the user's authentication state: the grant's access token and its
 // refresh token are inactive.
 func TestIntrospect_FollowsACredentialChange(t *testing.T) {

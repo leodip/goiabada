@@ -411,8 +411,8 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 	})
 
 	t.Run("the code's lifetime boundary", func(t *testing.T) {
-		// Both sides of the 5-minute window: a handler that keeps a code 2s past the lifetime, or
-		// drops it 30s before, fails a case. Each code's age is set when its case runs. A slow
+		// Both sides of the 5-minute window: a handler that keeps a code 3s or more past the
+		// lifetime, or drops it 30s or more before, fails a case. Each code's age is set when its case runs. A slow
 		// machine can only age a code further, so the inside case keeps 30s in hand and the
 		// outside case needs only 2s.
 		for _, tc := range []struct {

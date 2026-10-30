@@ -448,3 +448,29 @@ func TestClient_DescriptionForUsers(t *testing.T) {
 		})
 	}
 }
+
+// TestClient_IsRefreshIssuingFlowEnabled holds a refresh token to the switch of the flow that minted
+// it (#250): the password grant's, resolved against the global setting, for one it issued, and the
+// authorization code flow's otherwise, whatever the other switch says.
+func TestClient_IsRefreshIssuingFlowEnabled(t *testing.T) {
+	on, off := true, false
+	tests := []struct {
+		name   string
+		client Client
+		isROPC bool
+		global bool
+		want   bool
+	}{
+		{"a code flow token, the code flow on", Client{AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &off}, false, false, true},
+		{"a code flow token, the code flow off", Client{ResourceOwnerPasswordCredentialsEnabled: &on}, false, true, false},
+		{"a password grant token, inheriting a global on", Client{}, true, true, true},
+		{"a password grant token, inheriting a global off", Client{AuthorizationCodeEnabled: true}, true, false, false},
+		{"a password grant token, switched on for the client", Client{ResourceOwnerPasswordCredentialsEnabled: &on}, true, false, true},
+		{"a password grant token, switched off for the client", Client{AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &off}, true, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.client.IsRefreshIssuingFlowEnabled(tt.isROPC, tt.global))
+		})
+	}
+}

@@ -134,11 +134,7 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 	// because the password grant does. Otherwise turning the global switch off would block new
 	// logins while inheriting clients kept refreshing indefinitely, which is not what the switch
 	// says it does.
-	if input.IsROPC {
-		if !input.Client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled) {
-			return nil, nil, ErrRefreshFlowDisabled
-		}
-	} else if !input.Client.AuthorizationCodeEnabled {
+	if !input.Client.IsRefreshIssuingFlowEnabled(input.IsROPC, settings.ResourceOwnerPasswordCredentialsEnabled) {
 		return nil, nil, ErrRefreshFlowDisabled
 	}
 

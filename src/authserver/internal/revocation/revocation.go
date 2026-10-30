@@ -1239,7 +1239,8 @@ type AccessTokenDatabase interface {
 //
 // It reports whether this call stored the jti. A token whose jti another revocation stored first is
 // not stored again and reports false: the token is revoked either way, and the event is the other
-// call's. It is one statement on no transaction, so there is nothing to rerun after a deadlock.
+// call's. It runs on no transaction: a lookup, then an insert that a row another call stored in
+// between refuses as a duplicate, which also reports false.
 //
 // A token without a jti or an expiry is one the auth server never signs, and is an error.
 //

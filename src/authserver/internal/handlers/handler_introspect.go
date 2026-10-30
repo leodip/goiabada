@@ -65,7 +65,8 @@ type introspection struct {
 //
 // The client is authenticated before anything else, as at the token endpoint, and a public client is
 // refused, since a caller MUST authenticate (RFC 7662 section 4). The token parser refuses a
-// malformed or foreign token before it reads a key, and token_type_hint is never read: the token
+// malformed or non-RS256 token before it reads a key, and checks any other against the current key
+// and, when that signature fails, each stored one. token_type_hint is never read: the token
 // says what it is, an access token by its at+jwt header and a refresh token by its typ claim.
 //
 // A fault reading the database or the signing keys is 500, never {"active": false}, which would
@@ -242,7 +243,8 @@ func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *reco
 }
 
 // introspectRefreshToken answers a refresh token: active only to the client it was issued to, and
-// only when the refresh grant's own check finds it live (decision 7). Another client's token is
+// only when the refresh grant's own check finds it live (decision 7) and the flow that issued it is
+// still enabled for the client, which the grant also requires (#250). Another client's token is
 // inactive before anything about its grant is read, so the answer tells a caller nothing of a grant
 // it does not own. The check reads no client: the caller is the token's own, which client
 // authentication found to exist and be enabled.
@@ -265,6 +267,10 @@ func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *
 		return
 	}
 	if refusal != liveness.RefreshLive {
+		e.inactive(w, r)
+		return
+	}
+	if !client.IsRefreshIssuingFlowEnabled(stored.IsROPC, settings.ResourceOwnerPasswordCredentialsEnabled) {
 		e.inactive(w, r)
 		return
 	}

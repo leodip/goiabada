@@ -194,3 +194,14 @@ func (c *Client) IsResourceOwnerPasswordCredentialsEnabled(globalROPCEnabled boo
 	}
 	return globalROPCEnabled
 }
+
+// IsRefreshIssuingFlowEnabled returns whether the flow that minted a refresh token is enabled for
+// this client: the password grant for a token it issued, resolved against the global setting as the
+// password grant resolves it, and the authorization code flow otherwise. A refresh is governed by
+// that switch (#250), and introspection answers a token the switch refuses as inactive.
+func (c *Client) IsRefreshIssuingFlowEnabled(isROPC bool, globalROPCEnabled bool) bool {
+	if isROPC {
+		return c.IsResourceOwnerPasswordCredentialsEnabled(globalROPCEnabled)
+	}
+	return c.AuthorizationCodeEnabled
+}

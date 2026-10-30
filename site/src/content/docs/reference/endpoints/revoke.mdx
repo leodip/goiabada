@@ -74,7 +74,7 @@ The auth server's log has a `client authentication refused at the revocation end
 | `400 Bad Request`, `invalid_grant` | The token is live and was issued to another client: "The token was issued to another client." Nothing is revoked |
 | `400 Bad Request`, `invalid_request` | `token` is missing, or a parameter is repeated |
 | `401 Unauthorized`, `invalid_client` | The client couldn't be authenticated |
-| `503 Service Unavailable`, `temporarily_unavailable` | The auth server couldn't check or revoke the token. The token still works: try again later |
+| `503 Service Unavailable`, `temporarily_unavailable` | The auth server couldn't check or revoke the token, or couldn't confirm it did. Treat the token as still working, and try again later |
 
 An error is a JSON body with `error` and `error_description`, as on the [token endpoint](/reference/endpoints/token/#errors).
 

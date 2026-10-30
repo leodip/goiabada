@@ -117,8 +117,8 @@ A client ends one of its grants by sending a token of it.
 - Endpoint: `POST /auth/revoke`, form-encoded, CSRF-exempt, CORS for registered web origins, on a
   branch of its own whose faults answer 503
 - Order: the client authenticates first through `clientauth` (a public client by `client_id`
-  alone); the token parser refuses a malformed or foreign token before reading a key; the token
-  says its type (an access token by its `at+jwt` header, a refresh token by its `typ` claim), and
+  alone); the token parser refuses a malformed or non-RS256 token before reading a key, and checks
+  any other against the current key and then each stored one; the token says its type (an access token by its `at+jwt` header, a refresh token by its `typ` claim), and
   `token_type_hint` is never read
 - Liveness before ownership: an access token is judged by `liveness.AccessToken`, a refresh token
   by `liveness.FindRefreshToken` and `liveness.RefreshToken`; a token that is not live is answered
@@ -136,8 +136,8 @@ A client ends one of its grants by sending a token of it.
   commit. It ends no session and no other grant
 - A live access token without `grant_id` (client credentials, implicit) is revoked by its jti:
   `revocation.RevokeAccessToken` stores the jti with the token's `exp` in `revoked_access_tokens`,
-  one statement on no transaction, and `revoked_access_token` is written only by the call that
-  stored it. `liveness.AccessToken` refuses a token without `grant_id` while its jti is stored, or
+  on no transaction (a lookup, then an insert a concurrent revocation's row refuses as a duplicate),
+  and `revoked_access_token` is written only by the call that stored it. `liveness.AccessToken` refuses a token without `grant_id` while its jti is stored, or
   when it carries none, so a second revocation answers 200 as an invalid token; a token with
   `grant_id` never reads the table. The cleanup worker deletes a stored jti once its token has
   expired
@@ -152,7 +152,7 @@ An API, calling as a confidential client, asks whether a token is active.
   the path on the same branch, whose faults answer 500 and count as `error`
 - Order: the client authenticates first through `clientauth.AuthenticateConfidential`, which
   refuses a public client 401 `invalid_client` whatever it sent (section 4); the token parser
-  refuses a malformed or foreign token before reading a key; `token_type_hint` is never read
+  refuses a malformed or non-RS256 token before reading a key; `token_type_hint` is never read
 - An access token is active when `liveness.AccessToken` finds it live and its `aud` names a
   resource on the caller's introspection resources (`clients_introspection_resources`, compared
   exactly); a refresh token only to its own client, compared before `liveness.RefreshToken` runs,

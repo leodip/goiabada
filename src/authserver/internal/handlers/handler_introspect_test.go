@@ -67,7 +67,8 @@ func newIntrospectEndpoint(t *testing.T) *introspectEndpoint {
 		database: datamocks.NewDatabase(t),
 		parser:   handlersmocks.NewTokenParser(t),
 		registry: metrics.NewRegistry(),
-		settings: &record.Settings{Id: 1, Issuer: introspectIssuer},
+		// The password grant is on, as it must be for refreshTokenRow's token to refresh.
+		settings: &record.Settings{Id: 1, Issuer: introspectIssuer, ResourceOwnerPasswordCredentialsEnabled: true},
 	}
 	e.handler = HandleIntrospectPost(render.New(nil, nil), e.database, e.parser, testDataCipher,
 		introspectionmetrics.Register(e.registry))
@@ -324,6 +325,38 @@ func TestHandleIntrospectPost_ARefreshTokenIsActiveToItsOwnClient(t *testing.T) 
 	}`)
 	assert.Equal(t, introspectOutcome("active"), e.samples(t))
 	assertNotAttempted(t, e.database, "GetClientIntrospectionResourcesByClientId", "UpdateRefreshToken", "RunInTransaction")
+}
+
+// A live refresh token whose issuing flow is switched off for its client is inactive, as the refresh
+// grant refuses it (#250): here the password grant, off for the deployment and inherited, or off for
+// the client alone.
+func TestHandleIntrospectPost_ARefreshTokenWhoseFlowIsSwitchedOffIsInactive(t *testing.T) {
+	off := false
+	cases := []struct {
+		name   string
+		global bool
+		client *bool
+	}{
+		{"off for the deployment", false, nil},
+		{"off for the client", true, &off},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newIntrospectEndpoint(t)
+			e.settings.ResourceOwnerPasswordCredentialsEnabled = tc.global
+			caller := introspectingCaller(t)
+			caller.ResourceOwnerPasswordCredentialsEnabled = tc.client
+			e.callerFound(caller)
+			e.parses(callerRefreshToken())
+			e.refreshTokenRow(introspectCallerId)
+			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(false, nil).Once()
+
+			rr := e.post(t, apiForm())
+
+			assertIntrospection(t, rr, inactiveAnswer)
+			assert.Equal(t, introspectOutcome("inactive"), e.samples(t))
+		})
+	}
 }
 
 // Another client's refresh token is inactive, live or not, and nothing about its grant is read once

@@ -57,8 +57,9 @@ var errAnotherClientsToken = oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 //
 // The order is decision 10's countermeasure: the client is authenticated before anything else, as at
 // the token endpoint, so a request with no client costs one read of it. The token parser refuses a
-// malformed or foreign token before it reads a key, and token_type_hint is never read, so it causes
-// no lookup at all: the token says what it is, an access token by its at+jwt header and a refresh
+// malformed or non-RS256 token before it reads a key, and checks any other against the current key
+// and, when that signature fails, each stored one. token_type_hint is never read, so it causes no
+// lookup at all: the token says what it is, an access token by its at+jwt header and a refresh
 // token by its typ claim.
 //
 // Then the token is judged by the same liveness checks the auth server's own endpoints apply, and
@@ -66,8 +67,9 @@ var errAnotherClientsToken = oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 // whatever client it names (RFC 7009 section 2.2), and a live one of another client 400
 // invalid_grant, with nothing revoked.
 //
-// A fault reading the database or the signing keys is 503, RFC 7009 section 2.2.1's "the token still
-// exists, retry later", never the 200 of an invalid token.
+// A fault reading the database or the signing keys is 503, never the 200 of an invalid token: RFC 7009
+// section 2.2.1 has the client assume the token still exists and retry. The revocation may have
+// committed all the same, when the fault is in the commit's acknowledgement.
 func HandleRevokePost(
 	jsonWriter JSONWriter,
 	database revokeDatabase,
@@ -325,9 +327,9 @@ func (e revocationEndpoint) fault(w http.ResponseWriter, r *http.Request, err er
 }
 
 // answerRevocationFault answers a fault at the revocation endpoint, the handler's own or one met
-// before it: logged once at Error, counted as error, and answered 503, which RFC 7009 section 2.2.1
-// defines as "the token still exists, retry later". temporarily_unavailable is RFC 6749's code for
-// that status. The request id is in the description, as in a 500's.
+// before it: logged once at Error, counted as error, and answered 503, on which RFC 7009 section
+// 2.2.1 has the client assume the token still exists and retry later. temporarily_unavailable is
+// RFC 6749's code for that status. The request id is in the description, as in a 500's.
 func answerRevocationFault(w http.ResponseWriter, r *http.Request, jsonWriter JSONWriter,
 	revocationMetrics *revocationmetrics.Recorder, err error) {
 
