@@ -32,6 +32,7 @@
 </div>
 <nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
   <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/draft"{{ if eq $tab "draft" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.draft" }}</a>
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/apps"{{ if eq $tab "apps" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.apps" }}</a>
   <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/versions"{{ if eq $tab "versions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.versions" }}</a>
 </nav>
 {{- if $doc.Retired }}
@@ -40,6 +41,17 @@
 {{ template "modal_dialog" (args "confirmRetire" "confirm_change" $ctx (T $ctx "adminconsole.admin_legal_documents.header.retire_button") (T $ctx "adminconsole.admin_legal_documents.header.retire_title")) }}
 {{- end }}
 {{end}}
+
+{{define "legal_document_applies_to"}}
+{{- /* (args doc ctx): a document's Applies to: all apps, or selected apps, flagged when it lists
+     none and so applies to nobody. A retired document applies to no app whatever it lists, so it
+     is not flagged. */ -}}
+{{- $doc := index . 0 }}
+{{- $ctx := index . 1 }}
+{{- if eq $doc.AppliesTo "all_apps" }}{{ T $ctx "adminconsole.admin_legal_documents.common.applies_all_apps" }}
+{{- else if and (not $doc.ClientIds) (not $doc.Retired) }}<span class="tag tag-caution">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_no_apps" }}</span><span class="cell-secondary">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_nobody" }}</span>
+{{- else }}{{ T $ctx "adminconsole.admin_legal_documents.common.applies_selected_apps" }}{{ end }}
+{{- end}}
 
 {{define "legal_document_tags"}}
 {{- /* (args doc ctx): a document's kind and its state, as tags: retired, not published, or the

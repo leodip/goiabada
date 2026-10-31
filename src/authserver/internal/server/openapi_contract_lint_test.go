@@ -905,10 +905,11 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					out[409] = true
 					out[500] = true
 				}
-				// The legal document handlers' four readers answer their own refusals (#622):
+				// The legal document handlers' readers answer their own refusals (#622):
 				// legalDocumentId 400 for a path id that is not one, loadLegalDocument that 400,
-				// 404 for no such document and 500 for a failed read, legalDocumentVersions 500
-				// for a failed read, and shortNameIsFree 400 for a short name another document
+				// 404 for no such document and 500 for a failed read, legalDocumentVersions and
+				// legalDocumentApps 500 for a failed read, writeLegalDocumentDetail the 500 of
+				// the apps it reads, and shortNameIsFree 400 for a short name another document
 				// holds and 500 for a failed read. writeLegalDocumentNotFound is the 404.
 				switch f.Name {
 				case "legalDocumentId":
@@ -917,7 +918,7 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					out[400] = true
 					out[404] = true
 					out[500] = true
-				case "legalDocumentVersions":
+				case "legalDocumentVersions", "legalDocumentApps", "writeLegalDocumentDetail":
 					out[500] = true
 				case "shortNameIsFree":
 					out[400] = true
@@ -2015,6 +2016,9 @@ var publishedRequestEnums = map[string]string{
 		"handler_api_clients.go parses the trimmed value through record.ThreeStateSettingFromString " +
 		"and refuses anything outside [on, off, default] with 400 before writing. Covered by " +
 		"TestAPIClientTokensPut_ValidationErrors' invalid_three_state_id case. Published in #562",
+	"UpdateLegalDocumentAppsRequest.appliesTo": "enforced: handler_api_legal_document_apps.go refuses any " +
+		"value but [all_apps, selected_apps], an absent one included, with 400 before writing. Covered by " +
+		"TestLegalDocumentApps_Refusals' unknown and missing applies to cases. Published in #622",
 	"UpdateSettingsGeneralRequest.passwordPolicy": "enforced: handler_api_settings_general.go parses " +
 		"the trimmed value through record.PasswordPolicyFromString and refuses anything outside " +
 		"[none, low, medium, high, nist] with 400 before saving. Covered by " +

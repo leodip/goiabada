@@ -1,0 +1,85 @@
+{{define "title"}}{{ T $.ctx "adminconsole.legal_document_tabs.apps" }} – {{ .doc.Title }} – {{ .appName }}{{end}}
+{{define "menu"}}{{ template "admin_menu" . }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "page"}}
+{{ template "legal_document_header" (args "apps" .doc $.ctx) }}
+
+{{/* All apps, or the apps ticked. The admin console's own client is never offered. The document's
+     list as stored goes back with the save in expectedClientId, so a save from a page another save
+     has outdated is refused. A retired document's apps are read only until it is restored. */}}
+<form class="panel" id="appsForm" method="post" action="/admin/legal-documents/{{ .doc.Id }}/apps" novalidate>
+  {{ range .expectedClientIds }}<input type="hidden" name="expectedClientId" value="{{ . }}">{{ end }}
+  <div class="panel-body stacked">
+    {{ if .error }}
+    <div class="notice notice-danger" role="alert" id="apps-error">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ .error }}</p>
+    </div>
+    {{ end }}
+    {{ if .appsSaved }}
+    <div class="notice notice-positive" role="status">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_legal_documents.apps.saved" }}</p>
+    </div>
+    {{ end }}
+    {{ if .doc.Retired }}
+    <div class="notice notice-caution">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_legal_documents.apps.retired_notice" }}</p>
+    </div>
+    {{ else if .noApps }}
+    <div class="notice notice-caution" id="noAppsNotice">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+      <p>{{ T $.ctx "adminconsole.admin_legal_documents.apps.no_apps_notice" }}</p>
+    </div>
+    {{ end }}
+    <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_legal_documents.apps.lead" }}</p>
+
+    <fieldset{{ if .doc.Retired }} disabled{{ end }}>
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_legal_documents.apps.applies_to_legend" }}</legend>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="option-card">
+          <input type="radio" id="appliesToAllApps" name="appliesTo" value="all_apps"{{ if .allApps }} checked{{ end }} aria-labelledby="applies-name-all" aria-describedby="applies-hint-all">
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="choice-label" id="applies-name-all">{{ T $.ctx "adminconsole.admin_legal_documents.common.applies_all_apps" }}</span>
+            <span class="field-hint" id="applies-hint-all">{{ T $.ctx "adminconsole.admin_legal_documents.apps.all_apps_hint" }}</span>
+          </span>
+        </label>
+        <label class="option-card">
+          <input type="radio" id="appliesToSelectedApps" name="appliesTo" value="selected_apps"{{ if not .allApps }} checked{{ end }} aria-labelledby="applies-name-selected" aria-describedby="applies-hint-selected">
+          <span class="grid min-w-0 flex-1 gap-1">
+            <span class="choice-label" id="applies-name-selected">{{ T $.ctx "adminconsole.admin_legal_documents.common.applies_selected_apps" }}</span>
+            <span class="field-hint" id="applies-hint-selected">{{ T $.ctx "adminconsole.admin_legal_documents.apps.selected_apps_hint" }}</span>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset{{ if .doc.Retired }} disabled{{ end }}>
+      <legend class="field-label mb-1">{{ T $.ctx "adminconsole.admin_legal_documents.apps.apps_legend" }}</legend>
+      <p class="field-hint mb-3">{{ T $.ctx "adminconsole.admin_legal_documents.apps.apps_hint" }}</p>
+      {{ if .apps }}
+      <div class="check-list" id="appsList">
+        {{ range .apps }}
+        <label class="check-row" for="app-{{ .Id }}">
+          <input type="checkbox" id="app-{{ .Id }}" name="clientId" value="{{ .Id }}"{{ if .Selected }} checked{{ end }}{{ if .Description }} aria-describedby="app-{{ .Id }}-hint"{{ end }}>
+          <span class="grid min-w-0 flex-1 gap-0.5">
+            <span class="choice-label font-mono">{{ .Identifier }}</span>
+            {{ if .Description }}<span class="field-hint" id="app-{{ .Id }}-hint">{{ .Description }}</span>{{ end }}
+          </span>
+        </label>
+        {{ end }}
+      </div>
+      {{ else }}
+      <p class="panel empty-state">{{ T $.ctx "adminconsole.admin_legal_documents.apps.no_clients" }}</p>
+      {{ end }}
+    </fieldset>
+  </div>
+  {{ if not .doc.Retired }}
+  <div class="panel-footer">
+    <button id="btnSaveApps" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_legal_documents.apps.save_button" }}</button>
+  </div>
+  {{ end }}
+</form>
+{{end}}

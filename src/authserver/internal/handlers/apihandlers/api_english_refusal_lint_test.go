@@ -108,6 +108,7 @@ var machineOnlyRefusals = map[string]machineOnlyClass{
 	"Invalid user session ID format": classMissingOrBadID,
 	"Invalid version number":         classMissingOrBadID,
 
+	"expectedClientIds is required: send the client ids as you last read them, or [] if there were none.":                          classMissingExpected,
 	"expectedGroupIds is required: send the group ids as you last read them, or [] if there were none.":                            classMissingExpected,
 	"expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.":                  classMissingExpected,
 	"expectedPermissions is required: send the resource's permissions as you last read them, or [] if there were none.":            classMissingExpected,

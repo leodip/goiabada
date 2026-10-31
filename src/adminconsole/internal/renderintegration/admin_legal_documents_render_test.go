@@ -15,7 +15,8 @@ import (
 
 func legalDocumentAt(id int64, shortName, kind, title string, version int) api.LegalDocumentResponse {
 	published := time.Date(2026, 10, 20, 12, 30, 0, 0, time.UTC)
-	doc := api.LegalDocumentResponse{Id: id, ShortName: shortName, Kind: kind, Title: title, CurrentVersion: version}
+	doc := api.LegalDocumentResponse{Id: id, ShortName: shortName, Kind: kind, Title: title, CurrentVersion: version,
+		AppliesTo: "all_apps", ClientIds: []int64{}}
 	if version > 0 {
 		doc.PublishedAt = &published
 	}
@@ -208,5 +209,143 @@ func TestRender_AdminLegalDocumentDelete(t *testing.T) {
 		assert.Contains(t, out, "Um documento publicado não pode ser excluído")
 		assert.NotContains(t, out, `id="btnDelete"`)
 		assert.NotContains(t, out, `<form class="panel" method="post"`)
+	})
+}
+
+// The list says what each document applies to, and flags one set to selected apps that lists none,
+// which applies to nobody. A retired document applies to no app anyway, so it is not flagged.
+func TestRender_AdminLegalDocumentsAppliesTo(t *testing.T) {
+	selected := legalDocumentAt(7, "shop-terms", "must_accept", "Termos da loja", 1)
+	selected.AppliesTo, selected.ClientIds = "selected_apps", []int64{4}
+	none := legalDocumentAt(8, "nobody", "must_accept", "Ninguém", 1)
+	none.AppliesTo = "selected_apps"
+	retiredNone := legalDocumentAt(9, "old", "must_accept", "Antigo", 1)
+	retiredNone.AppliesTo, retiredNone.Retired = "selected_apps", true
+	out := renderMenuPage(t, "/admin_legal_documents.html", map[string]interface{}{
+		"legalDocuments": []api.LegalDocumentResponse{
+			legalDocumentAt(6, "privacy", "for_information", "Aviso de privacidade", 1), selected, none, retiredNone,
+		},
+	})
+
+	assert.Contains(t, out, `<th scope="col">Aplica-se a</th>`)
+	assert.Contains(t, out, `<td data-label="Aplica-se a">Todos os aplicativos</td>`)
+	assert.Contains(t, out, `<td data-label="Aplica-se a">Aplicativos selecionados</td>`)
+	assert.Equal(t, 1, strings.Count(out, `<span class="tag tag-caution">Nenhum aplicativo</span><span class="cell-secondary">Não se aplica a ninguém</span>`),
+		"only the document in effect with no apps is flagged")
+}
+
+// The Applies to tab: both choices, the apps offered as boxes, the list as stored carried back
+// with the save, and a document left with no apps said to apply to nobody.
+func TestRender_AdminLegalDocumentApps(t *testing.T) {
+	bind := func(doc api.LegalDocumentResponse, allApps bool, apps []map[string]any) map[string]interface{} {
+		type appChoice struct {
+			Id          int64
+			Identifier  string
+			Description string
+			Selected    bool
+		}
+		choices := []appChoice{}
+		for _, a := range apps {
+			choices = append(choices, appChoice{Id: a["id"].(int64), Identifier: a["identifier"].(string),
+				Description: a["description"].(string), Selected: a["selected"].(bool)})
+		}
+		return map[string]interface{}{
+			"doc": doc, "allApps": allApps, "apps": choices, "expectedClientIds": doc.ClientIds,
+			"noApps": doc.AppliesTo != "all_apps" && len(doc.ClientIds) == 0,
+		}
+	}
+	shop := map[string]any{"id": int64(4), "identifier": "shop", "description": "A loja", "selected": true}
+	blog := map[string]any{"id": int64(6), "identifier": "blog", "description": "", "selected": false}
+
+	t.Run("selected apps", func(t *testing.T) {
+		doc := legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2)
+		doc.AppliesTo, doc.ClientIds = "selected_apps", []int64{4}
+		out := renderMenuPage(t, "/admin_legal_documents_apps.html", bind(doc, false, []map[string]any{blog, shop}))
+
+		assert.Contains(t, out, `href="/admin/legal-documents/7/apps" aria-current="page">Aplica-se a</a>`, "the tab is current")
+		assert.Contains(t, out, `<form class="panel" id="appsForm" method="post" action="/admin/legal-documents/7/apps" novalidate>`)
+		assert.Contains(t, out, `<input type="hidden" name="expectedClientId" value="4">`)
+		assert.Contains(t, out, `name="appliesTo" value="all_apps" aria-labelledby`)
+		assert.Contains(t, out, `name="appliesTo" value="selected_apps" checked`)
+		assert.Contains(t, out, `<input type="checkbox" id="app-4" name="clientId" value="4" checked aria-describedby="app-4-hint">`)
+		assert.Contains(t, out, `<input type="checkbox" id="app-6" name="clientId" value="6">`)
+		assert.Contains(t, out, `<span class="field-hint" id="app-4-hint">A loja</span>`)
+		assert.Contains(t, out, `id="btnSaveApps"`)
+		assert.NotContains(t, out, `id="noAppsNotice"`)
+	})
+
+	t.Run("all apps", func(t *testing.T) {
+		out := renderMenuPage(t, "/admin_legal_documents_apps.html",
+			bind(legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2), true, []map[string]any{blog}))
+
+		assert.Contains(t, out, `name="appliesTo" value="all_apps" checked`)
+		assert.NotContains(t, out, `name="expectedClientId"`, "an empty list carries no id")
+	})
+
+	t.Run("selected apps with none", func(t *testing.T) {
+		doc := legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2)
+		doc.AppliesTo = "selected_apps"
+		out := renderMenuPage(t, "/admin_legal_documents_apps.html", bind(doc, false, []map[string]any{blog}))
+
+		assert.Contains(t, out, `id="noAppsNotice"`)
+		assert.Contains(t, out, "este documento não se aplica a ninguém")
+	})
+
+	t.Run("no app to choose", func(t *testing.T) {
+		out := renderMenuPage(t, "/admin_legal_documents_apps.html",
+			bind(legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2), true, nil))
+
+		assert.Contains(t, out, "Não há aplicativos para escolher.")
+	})
+
+	t.Run("retired", func(t *testing.T) {
+		doc := legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2)
+		doc.Retired = true
+		out := renderMenuPage(t, "/admin_legal_documents_apps.html", bind(doc, true, []map[string]any{blog}))
+
+		assert.Contains(t, out, "Este documento está retirado, então os aplicativos")
+		assert.Equal(t, 2, strings.Count(out, "<fieldset disabled>"), "both choices are read only")
+		assert.NotContains(t, out, `id="btnSaveApps"`)
+	})
+}
+
+// A client's Legal documents tab lists, read only, the documents that apply to it.
+func TestRender_AdminClientLegalDocuments(t *testing.T) {
+	selected := legalDocumentAt(8, "shop-terms", "must_accept", "Termos da loja", 0)
+	selected.AppliesTo, selected.ClientIds = "selected_apps", []int64{3}
+
+	t.Run("an app", func(t *testing.T) {
+		out := renderMenuPage(t, "/admin_clients_legal_documents.html", map[string]interface{}{
+			"client": &api.ClientResponse{Id: 3, ClientIdentifier: "shop"},
+			"legalDocuments": []api.LegalDocumentResponse{
+				legalDocumentAt(7, "privacy", "for_information", "Aviso de privacidade", 1), selected,
+			},
+		})
+
+		assert.Contains(t, out, `href="/admin/clients/3/legal-documents" aria-current="page">Documentos legais</a>`)
+		assert.Contains(t, out, `<a class="text-link" href="/admin/legal-documents/7/draft">Aviso de privacidade</a>`)
+		assert.Contains(t, out, `<td data-label="Aplica-se a">Todos os aplicativos</td>`)
+		assert.Contains(t, out, `<td data-label="Aplica-se a">Aplicativos selecionados</td>`)
+		assert.Contains(t, out, `<span class="tag">Não publicado</span>`, "a document not yet published says so")
+		assert.NotContains(t, out, "<form", "the tab is read only")
+		assert.NotContains(t, out, "nunca são solicitados a aceitar um documento legal ao entrar no console")
+	})
+
+	t.Run("none", func(t *testing.T) {
+		out := renderMenuPage(t, "/admin_clients_legal_documents.html", map[string]interface{}{
+			"client":         &api.ClientResponse{Id: 3, ClientIdentifier: "shop"},
+			"legalDocuments": []api.LegalDocumentResponse{},
+		})
+
+		assert.Contains(t, out, "Nenhum documento legal se aplica a este aplicativo.")
+	})
+
+	t.Run("the admin console's own client", func(t *testing.T) {
+		out := renderMenuPage(t, "/admin_clients_legal_documents.html", map[string]interface{}{
+			"client":         &api.ClientResponse{Id: 1, ClientIdentifier: "admin-console-client", IsSystemLevelClient: true},
+			"legalDocuments": []api.LegalDocumentResponse{legalDocumentAt(7, "privacy", "for_information", "Aviso de privacidade", 1)},
+		})
+
+		assert.Contains(t, out, "Os usuários nunca são solicitados a aceitar um documento legal ao entrar no console de administração.")
 	})
 }

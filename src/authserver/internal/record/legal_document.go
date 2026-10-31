@@ -32,6 +32,13 @@ const (
 //
 // ShortName is the document's public address, /legal/<short-name>. It is unique among documents
 // and fixed once the document is first published (decision 5).
+//
+// AppliesToAllApps is the document's Applies to: true for all apps, the default, and false for the
+// apps listed in LegalDocumentClient rows. A document set to selected apps whose list is empty
+// applies to nobody; it never falls back to all apps. It is dont-update: the whole-row UPDATE a
+// draft save, a retire or a restore writes leaves it alone, and only
+// UpdateLegalDocumentAppliesToAllApps writes it, so a draft saved from an older read cannot put back
+// an Applies to changed since.
 type LegalDocument struct {
 	Id            int64          `db:"id" fieldtag:"pk"`
 	CreatedAt     sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
@@ -41,6 +48,8 @@ type LegalDocument struct {
 	DraftTitle    sql.NullString `db:"draft_title"`
 	DraftMarkdown sql.NullString `db:"draft_markdown"`
 	RetiredAt     sql.NullTime   `db:"retired_at"`
+	// AppliesToAllApps is written by CreateLegalDocument and UpdateLegalDocumentAppliesToAllApps.
+	AppliesToAllApps bool `db:"applies_to_all_apps" fieldtag:"dont-update"`
 }
 
 // HasDraft reports whether the document has an unpublished draft.
@@ -51,6 +60,30 @@ func (d *LegalDocument) HasDraft() bool {
 // IsRetired reports whether the document has been retired.
 func (d *LegalDocument) IsRetired() bool {
 	return d.RetiredAt.Valid
+}
+
+// The two values of a document's Applies to, as the admin API spells them.
+const (
+	LegalDocumentAppliesToAllApps      = "all_apps"
+	LegalDocumentAppliesToSelectedApps = "selected_apps"
+)
+
+// AppliesTo answers the document's Applies to in the admin API's spelling.
+func (d *LegalDocument) AppliesTo() string {
+	if d.AppliesToAllApps {
+		return LegalDocumentAppliesToAllApps
+	}
+	return LegalDocumentAppliesToSelectedApps
+}
+
+// LegalDocumentClient lists one app a legal document set to selected apps applies to (#622). A
+// document lists an app once, and the row goes with either side: deleting the app leaves the
+// document on its other apps. It is created and deleted, never rewritten.
+type LegalDocumentClient struct {
+	Id              int64        `db:"id" fieldtag:"pk"`
+	CreatedAt       sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	LegalDocumentId int64        `db:"legal_document_id"`
+	ClientId        int64        `db:"client_id"`
 }
 
 // LegalDocumentVersion is one published version of a legal document: its title and Markdown as

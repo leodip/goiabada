@@ -68,11 +68,30 @@ A document's short name is its public address: lowercase letters, digits and hyp
 
 You can change it on the draft until the document is first published. From then on it's fixed, so links to the document keep working.
 
+## Which clients a document applies to
+
+A document applies to every client until you choose otherwise. On its **Applies to** tab, pick one:
+
+| Choice | The document applies to |
+|---|---|
+| **All apps** | Every client, including clients you add later. |
+| **Selected apps** | Only the clients you tick in the list below it. |
+
+Click **Save** to keep your choice. It takes effect at once and publishes no new version, so users who accepted the current version aren't asked again. A user who never accepted it is asked at their next sign-in to a client it now covers.
+
+The admin console's own client isn't in the list. Users are never asked to accept a document when they sign in to the admin console, so they can always reach their account.
+
+A client's own **Legal documents** tab lists the documents that apply to it, published or not. It's read only: choose a document's clients on the document itself.
+
+### When a client is deleted
+
+Deleting a client takes it off every document that listed it, and leaves those documents on their other clients. A document set to **Selected apps** whose last client is deleted applies to nobody. It never switches to all apps by itself. The **Legal documents** list flags it with **No apps** until you tick a client or choose **All apps**.
+
 ## Retiring a document
 
 A published document can't be deleted, since that would destroy the record of which version users accepted. Retire it instead: on its page, click **Retire** and confirm.
 
-A retired document is no longer in effect. Its versions stay, and the admin console still shows each one's text. It can't be edited or published while it's retired.
+A retired document is no longer in effect, whichever clients it lists. Its versions stay, and the admin console still shows each one's text. It can't be edited, published, or given other clients while it's retired.
 
 To bring it back, click **Restore**. It's in effect again as it was, at the same version, so users who had accepted that version aren't asked again.
 

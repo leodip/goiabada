@@ -12,6 +12,10 @@ import (
 // information, which is shown and never accepted.
 const kindMustAccept = "must_accept"
 
+// appliesToAllApps is the admin API's spelling of a document that applies to all apps, beside
+// selected_apps, the apps it lists.
+const appliesToAllApps = "all_apps"
+
 // legalDocumentErrorFields maps the refusals the new document form and the draft editor can meet
 // to the field each is about. A publish refused for a draft with no text is about the text.
 var legalDocumentErrorFields = map[string]string{
@@ -33,6 +37,7 @@ const (
 	flashPublished  = "legalDocumentPublished"
 	flashRetired    = "legalDocumentRetired"
 	flashRestored   = "legalDocumentRestored"
+	flashAppsSaved  = "legalDocumentAppsSaved"
 )
 
 // legalDocumentId reads the {legalDocumentId} path value; false when it is not an id.
@@ -45,4 +50,12 @@ func legalDocumentId(r *http.Request) (int64, bool) {
 // CRLF whatever the person typed, so they are stored as the newlines they stand for.
 func postedMarkdown(r *http.Request) string {
 	return strings.ReplaceAll(r.PostFormValue("markdown"), "\r\n", "\n")
+}
+
+// appChoice is one app the Applies to tab offers, ticked when the document lists it.
+type appChoice struct {
+	Id          int64
+	Identifier  string
+	Description string
+	Selected    bool
 }

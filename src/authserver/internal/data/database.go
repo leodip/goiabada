@@ -567,7 +567,8 @@ type Database interface {
 
 	// Legal documents and their published versions (#622). A second document with a short name
 	// already taken, or a second version of one number in a document, is a unique violation.
-	// UpdateLegalDocument writes the whole row but its kind, which is fixed at creation. A version
+	// UpdateLegalDocument writes the whole row but its kind, which is fixed at creation, and its
+	// Applies to, which UpdateLegalDocumentAppliesToAllApps writes. A version
 	// has no update: once published it is never rewritten. DeleteLegalDocument is refused by the
 	// engine for a document that has a published version, which is retired instead.
 	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
@@ -583,6 +584,19 @@ type Database interface {
 	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
 	// GetLegalDocumentVersion answers one version of a document by its number, or nil.
 	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
+	// UpdateLegalDocumentAppliesToAllApps writes a document's Applies to, which UpdateLegalDocument
+	// leaves alone: true is all apps, false the apps its LegalDocumentClient rows list.
+	UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentId int64, appliesToAllApps bool) error
+
+	// The apps a legal document set to selected apps applies to (#622). A document lists an app
+	// once, and a second row for the same pair is a unique violation. Deleting either the document
+	// or the client removes the row.
+	CreateLegalDocumentClient(ctx context.Context, tx *sql.Tx, link *record.LegalDocumentClient) error
+	// GetLegalDocumentClientsByLegalDocumentId answers a document's apps, in id order.
+	GetLegalDocumentClientsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
+	// GetLegalDocumentClientsByClientId answers the documents that list a client, in id order.
+	GetLegalDocumentClientsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
+	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientId int64) error
 
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error

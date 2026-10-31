@@ -38,6 +38,8 @@ type fakeLegalDocumentsAPI struct {
 	version *api.GetLegalDocumentVersionResponse
 	html    string
 
+	clients []api.ClientResponse
+
 	writeErr error
 
 	readIds       []int64
@@ -50,6 +52,8 @@ type fakeLegalDocumentsAPI struct {
 	retired       []int64
 	restored      []int64
 	deleted       []int64
+	appsSaved     *api.UpdateLegalDocumentAppsRequest
+	appsSavedId   int64
 }
 
 func (f *fakeLegalDocumentsAPI) GetAllLegalDocuments(context.Context, string) ([]api.LegalDocumentResponse, error) {
@@ -128,6 +132,19 @@ func (f *fakeLegalDocumentsAPI) GetLegalDocumentVersion(_ context.Context, _ str
 		return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Legal document version not found", StatusCode: http.StatusNotFound}
 	}
 	return f.version, nil
+}
+
+func (f *fakeLegalDocumentsAPI) GetAllClients(context.Context, string) ([]api.ClientResponse, error) {
+	return f.clients, nil
+}
+
+func (f *fakeLegalDocumentsAPI) UpdateLegalDocumentApps(_ context.Context, _ string, id int64,
+	request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error) {
+	f.appsSavedId, f.appsSaved = id, request
+	if f.writeErr != nil {
+		return nil, f.writeErr
+	}
+	return f.detail, nil
 }
 
 // refusal is an admin API refusal of a value, as the API answers it: 400, the catalog key, and its

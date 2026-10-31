@@ -242,6 +242,9 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 	require.Len(t, sessionClients, 1, "expected the session to have one client row")
 	sessionClientId := sessionClients[0].Id
 
+	legalDocument := createLegalDocument(t, record.LegalDocumentKindMustAccept)
+	linkDocumentToClient(t, legalDocument.Id, client.Id)
+
 	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id), "DeleteClient")
 
 	deletedClient, err := database.GetClientById(context.Background(), nil, client.Id)
@@ -288,7 +291,10 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 	require.NoError(t, err, "GetUserSessionClientById")
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from clients")
 
-	// The user, its session and the permission are independent of the client.
+	// legal_documents_clients
+	assert.Empty(t, linkedClientIds(t, legalDocument.Id), "legal_documents_clients must cascade from clients")
+
+	// The user, its session, the permission and the legal document are independent of the client.
 	survivingUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById")
 	assert.NotNil(t, survivingUser, "deleting a client must not delete the user")
@@ -298,4 +304,7 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 	survivingPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
 	require.NoError(t, err, "GetPermissionById")
 	assert.NotNil(t, survivingPermission, "deleting a client must not delete the permission")
+	survivingDocument, err := database.GetLegalDocumentById(context.Background(), nil, legalDocument.Id)
+	require.NoError(t, err, "GetLegalDocumentById")
+	assert.NotNil(t, survivingDocument, "deleting a client must not delete a legal document it was listed on")
 }

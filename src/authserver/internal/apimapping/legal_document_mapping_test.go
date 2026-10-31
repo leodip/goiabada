@@ -31,6 +31,8 @@ func publishedTerms() (*record.LegalDocument, []record.LegalDocumentVersion) {
 		Kind:          record.LegalDocumentKindMustAccept,
 		DraftTitle:    sql.NullString{String: "Terms (draft)", Valid: true},
 		DraftMarkdown: sql.NullString{String: "Next text", Valid: true},
+		// Applies to all apps, the default a document is created with.
+		AppliesToAllApps: true,
 	}
 	versions := []record.LegalDocumentVersion{
 		{Id: 11, PublishedAt: legalPublished, LegalDocumentId: 7, VersionNumber: 1, Title: "Terms", Markdown: "First text"},
@@ -50,20 +52,20 @@ func TestLegalDocumentDetail_APublishedDocumentWithADraft(t *testing.T) {
 	doc, versions := publishedTerms()
 	assert.Equal(t, `{"legalDocument":{"id":7,"createdAt":"2026-10-01T09:00:00Z","updatedAt":"2026-10-02T09:00:00Z",`+
 		`"shortName":"terms","kind":"must_accept","title":"Terms of use","currentVersion":2,`+
-		`"publishedAt":"2026-10-04T09:00:00Z","hasDraft":true,"retired":false,"retiredAt":null},`+
+		`"publishedAt":"2026-10-04T09:00:00Z","hasDraft":true,"retired":false,"retiredAt":null,"appliesTo":"all_apps","clientIds":[]},`+
 		`"draft":{"title":"Terms (draft)","markdown":"Next text"},`+
 		`"versions":[{"version":1,"title":"Terms","publishedAt":"2026-10-03T09:00:00Z"},`+
 		`{"version":2,"title":"Terms of use","publishedAt":"2026-10-04T09:00:00Z"}]}`,
-		wire(t, ToLegalDocumentDetailResponse(doc, versions)))
+		wire(t, ToLegalDocumentDetailResponse(doc, versions, nil)))
 }
 
 func TestLegalDocumentDetail_ANeverPublishedDocumentIsNamedByItsDraft(t *testing.T) {
 	doc, _ := publishedTerms()
 	assert.Equal(t, `{"legalDocument":{"id":7,"createdAt":"2026-10-01T09:00:00Z","updatedAt":"2026-10-02T09:00:00Z",`+
 		`"shortName":"terms","kind":"must_accept","title":"Terms (draft)","currentVersion":0,`+
-		`"publishedAt":null,"hasDraft":true,"retired":false,"retiredAt":null},`+
+		`"publishedAt":null,"hasDraft":true,"retired":false,"retiredAt":null,"appliesTo":"all_apps","clientIds":[]},`+
 		`"draft":{"title":"Terms (draft)","markdown":"Next text"},"versions":[]}`,
-		wire(t, ToLegalDocumentDetailResponse(doc, nil)))
+		wire(t, ToLegalDocumentDetailResponse(doc, nil, nil)))
 }
 
 func TestLegalDocumentDetail_ARetiredDocumentWithNoDraft(t *testing.T) {
@@ -72,10 +74,10 @@ func TestLegalDocumentDetail_ARetiredDocumentWithNoDraft(t *testing.T) {
 	doc.DraftTitle = sql.NullString{}
 	doc.DraftMarkdown = sql.NullString{}
 	doc.RetiredAt = sql.NullTime{Time: legalRetired, Valid: true}
-	got := ToLegalDocumentDetailResponse(doc, versions[:1])
+	got := ToLegalDocumentDetailResponse(doc, versions[:1], nil)
 	assert.Equal(t, `{"id":7,"createdAt":"2026-10-01T09:00:00Z","updatedAt":"2026-10-02T09:00:00Z",`+
 		`"shortName":"terms","kind":"for_information","title":"Terms","currentVersion":1,`+
-		`"publishedAt":"2026-10-03T09:00:00Z","hasDraft":false,"retired":true,"retiredAt":"2026-10-05T09:00:00Z"}`,
+		`"publishedAt":"2026-10-03T09:00:00Z","hasDraft":false,"retired":true,"retiredAt":"2026-10-05T09:00:00Z","appliesTo":"all_apps","clientIds":[]}`,
 		wire(t, got.LegalDocument))
 	assert.Nil(t, got.Draft, "no draft is null on the wire")
 }
@@ -88,11 +90,28 @@ func TestLegalDocumentVersion_CarriesItsText(t *testing.T) {
 
 func TestLegalDocumentList_TakesEachDocumentsCurrentVersion(t *testing.T) {
 	doc, versions := publishedTerms()
-	got := ToLegalDocumentResponse(doc, &versions[1])
+	got := ToLegalDocumentResponse(doc, &versions[1], nil)
 	assert.Equal(t, "Terms of use", got.Title)
 	assert.Equal(t, 2, got.CurrentVersion)
-	unpublished := ToLegalDocumentResponse(doc, nil)
+	unpublished := ToLegalDocumentResponse(doc, nil, nil)
 	assert.Equal(t, "Terms (draft)", unpublished.Title)
 	assert.Equal(t, 0, unpublished.CurrentVersion)
 	assert.Nil(t, unpublished.PublishedAt)
+}
+
+// A document set to selected apps carries the client ids it lists, in the order read; one listing
+// none carries [] and is still selected apps, which applies to nobody, never all apps.
+func TestLegalDocument_SelectedAppsCarryTheirClientIds(t *testing.T) {
+	doc, versions := publishedTerms()
+	doc.AppliesToAllApps = false
+	links := []record.LegalDocumentClient{
+		{Id: 31, LegalDocumentId: 7, ClientId: 5},
+		{Id: 32, LegalDocumentId: 7, ClientId: 3},
+	}
+	got := ToLegalDocumentResponse(doc, &versions[1], links)
+	assert.Equal(t, "selected_apps", got.AppliesTo)
+	assert.Equal(t, []int64{5, 3}, got.ClientIds)
+
+	none := ToLegalDocumentDetailResponse(doc, versions, nil)
+	assert.Contains(t, wire(t, none.LegalDocument), `"appliesTo":"selected_apps","clientIds":[]`)
 }

@@ -11,10 +11,10 @@ import (
 
 // legalDocumentColumns is the legal_documents table as scanLegalDocument reads it.
 var legalDocumentColumns = columnList{
-	sqlite:   "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at",
-	mysql:    "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at",
-	postgres: "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at",
-	mssql:    "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at",
+	sqlite:   "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps",
+	mysql:    "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps",
+	postgres: "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps",
+	mssql:    "id, created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps",
 }
 
 // scanLegalDocument reads one row selected with legalDocumentColumns.
@@ -28,22 +28,25 @@ func scanLegalDocument(row rowScanner, doc *record.LegalDocument) error {
 		&doc.DraftTitle,
 		&doc.DraftMarkdown,
 		&doc.RetiredAt,
+		&doc.AppliesToAllApps,
 	)
 }
 
 var insertLegalDocument = statement{
-	sqlite: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at) " +
-		"VALUES (?, ?, ?, ?, ?, ?, ?)",
-	mysql: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at) " +
-		"VALUES (?, ?, ?, ?, ?, ?, ?)",
-	postgres: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-	mssql: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at) " +
-		"OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)",
+	sqlite: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+	mysql: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+	postgres: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+	mssql: "INSERT INTO legal_documents (created_at, updated_at, short_name, kind, draft_title, draft_markdown, retired_at, applies_to_all_apps) " +
+		"OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)",
 }
 
-// updateLegalDocument writes the whole row but created_at and kind, which are dont-update: a
-// document's kind is fixed when it is created (#622 decision 2).
+// updateLegalDocument writes the whole row but created_at, kind and applies_to_all_apps, which are
+// dont-update: a document's kind is fixed when it is created (#622 decision 2), and its Applies to
+// is written by updateLegalDocumentAppliesToAllApps alone, so a draft saved from an older read
+// cannot put back an Applies to changed since.
 var updateLegalDocument = statement{
 	sqlite: "UPDATE legal_documents SET updated_at = ?, short_name = ?, draft_title = ?, draft_markdown = ?, retired_at = ? " +
 		"WHERE id = ?",
@@ -53,6 +56,14 @@ var updateLegalDocument = statement{
 		"WHERE id = $6",
 	mssql: "UPDATE legal_documents SET updated_at = @p1, short_name = @p2, draft_title = @p3, draft_markdown = @p4, retired_at = @p5 " +
 		"WHERE id = @p6",
+}
+
+// updateLegalDocumentAppliesToAllApps writes a document's Applies to, and nothing else of its row.
+var updateLegalDocumentAppliesToAllApps = statement{
+	sqlite:   "UPDATE legal_documents SET updated_at = ?, applies_to_all_apps = ? WHERE id = ?",
+	mysql:    "UPDATE legal_documents SET updated_at = ?, applies_to_all_apps = ? WHERE id = ?",
+	postgres: "UPDATE legal_documents SET updated_at = $1, applies_to_all_apps = $2 WHERE id = $3",
+	mssql:    "UPDATE legal_documents SET updated_at = @p1, applies_to_all_apps = @p2 WHERE id = @p3",
 }
 
 var selectLegalDocumentById = statement{
@@ -150,7 +161,7 @@ func (d *Database) CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 
 	id, err := d.insert(ctx, tx, insertLegalDocument, "legal document",
 		legalDocument.CreatedAt, legalDocument.UpdatedAt, legalDocument.ShortName, legalDocument.Kind,
-		legalDocument.DraftTitle, legalDocument.DraftMarkdown, legalDocument.RetiredAt)
+		legalDocument.DraftTitle, legalDocument.DraftMarkdown, legalDocument.RetiredAt, legalDocument.AppliesToAllApps)
 	if err != nil {
 		legalDocument.CreatedAt = originalCreatedAt
 		legalDocument.UpdatedAt = originalUpdatedAt
@@ -176,6 +187,22 @@ func (d *Database) UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 	if err != nil {
 		legalDocument.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update legal document")
+	}
+
+	return nil
+}
+
+func (d *Database) UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentId int64,
+	appliesToAllApps bool) error {
+
+	if legalDocumentId == 0 {
+		return errs.New("can't update the applies to of legal document with id 0")
+	}
+
+	_, err := d.ExecSQL(ctx, tx, updateLegalDocumentAppliesToAllApps.text(d.Dialect),
+		sql.NullTime{Time: time.Now().UTC(), Valid: true}, appliesToAllApps, legalDocumentId)
+	if err != nil {
+		return errs.Wrap(err, "unable to update legal document applies to")
 	}
 
 	return nil

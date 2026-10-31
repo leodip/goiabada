@@ -552,9 +552,11 @@ func ToClientResponses(clients []record.Client) []api.ClientResponse {
 	return responses
 }
 
-// ToLegalDocumentResponse maps a legal document and its current version, nil when it has never been
-// published, in which case the document is named by its draft's title (#622).
-func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDocumentVersion) api.LegalDocumentResponse {
+// ToLegalDocumentResponse maps a legal document, its current version, nil when it has never been
+// published, in which case the document is named by its draft's title, and the apps it lists
+// (#622).
+func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDocumentVersion,
+	links []record.LegalDocumentClient) api.LegalDocumentResponse {
 	resp := api.LegalDocumentResponse{
 		Id:        doc.Id,
 		ShortName: doc.ShortName,
@@ -562,6 +564,11 @@ func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDoc
 		Title:     doc.DraftTitle.String,
 		HasDraft:  doc.HasDraft(),
 		Retired:   doc.IsRetired(),
+		AppliesTo: doc.AppliesTo(),
+		ClientIds: make([]int64, 0, len(links)),
+	}
+	for _, link := range links {
+		resp.ClientIds = append(resp.ClientIds, link.ClientId)
 	}
 	if doc.CreatedAt.Valid {
 		resp.CreatedAt = &doc.CreatedAt.Time
@@ -581,15 +588,16 @@ func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDoc
 	return resp
 }
 
-// ToLegalDocumentDetailResponse maps a legal document with its draft and its versions, the first
-// first, which are what the admin console's editor and versions list draw.
-func ToLegalDocumentDetailResponse(doc *record.LegalDocument, versions []record.LegalDocumentVersion) api.LegalDocumentDetailResponse {
+// ToLegalDocumentDetailResponse maps a legal document with its draft, its versions, the first
+// first, and the apps it lists, which are what the admin console's editor and versions list draw.
+func ToLegalDocumentDetailResponse(doc *record.LegalDocument, versions []record.LegalDocumentVersion,
+	links []record.LegalDocumentClient) api.LegalDocumentDetailResponse {
 	var current *record.LegalDocumentVersion
 	if len(versions) > 0 {
 		current = &versions[len(versions)-1]
 	}
 	resp := api.LegalDocumentDetailResponse{
-		LegalDocument: ToLegalDocumentResponse(doc, current),
+		LegalDocument: ToLegalDocumentResponse(doc, current, links),
 		Versions:      make([]api.LegalDocumentVersionSummaryResponse, 0, len(versions)),
 	}
 	if doc.HasDraft() {

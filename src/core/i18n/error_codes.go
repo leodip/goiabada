@@ -158,6 +158,9 @@ const (
 	ErrCodeLegalDocumentNotRetired            = "handler.legal_document.not_retired"
 	ErrCodeLegalDocumentPublishedNotDeleted   = "handler.legal_document.published_not_deleted"
 	ErrCodeLegalDocumentPublishedConcurrently = "handler.legal_document.published_concurrently"
+	ErrCodeLegalDocumentAppliesToInvalid      = "handler.legal_document.applies_to_invalid"
+	ErrCodeLegalDocumentAppsWithAllApps       = "handler.legal_document.apps_with_all_apps"
+	ErrCodeLegalDocumentAdminConsoleClient    = "handler.legal_document.admin_console_client"
 
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.

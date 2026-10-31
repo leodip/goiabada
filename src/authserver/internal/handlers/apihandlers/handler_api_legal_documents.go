@@ -41,6 +41,7 @@ type legalDocumentsDatabase interface {
 	CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error
 	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
 	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
+	GetLegalDocumentClientsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -139,10 +140,26 @@ func legalDocumentVersions(w http.ResponseWriter, r *http.Request, database lega
 	return versions, true
 }
 
-// writeLegalDocumentDetail answers the document with its draft and versions.
-func writeLegalDocumentDetail(w http.ResponseWriter, r *http.Request, status int, doc *record.LegalDocument,
-	versions []record.LegalDocumentVersion) {
-	writeJSON(w, r, status, apimapping.ToLegalDocumentDetailResponse(doc, versions))
+// legalDocumentApps reads the apps a document lists, answering the request when it cannot.
+func legalDocumentApps(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase,
+	doc *record.LegalDocument) ([]record.LegalDocumentClient, bool) {
+	links, err := database.GetLegalDocumentClientsByLegalDocumentId(r.Context(), nil, doc.Id)
+	if err != nil {
+		writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document apps"), "legal_document_id", doc.Id)
+		return nil, false
+	}
+	return links, true
+}
+
+// writeLegalDocumentDetail answers the document with its draft, its versions and the apps it
+// lists, which it reads first, answering the request when it cannot.
+func writeLegalDocumentDetail(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase,
+	doc *record.LegalDocument, versions []record.LegalDocumentVersion) {
+	links, ok := legalDocumentApps(w, r, database, doc)
+	if !ok {
+		return
+	}
+	writeJSON(w, r, http.StatusOK, apimapping.ToLegalDocumentDetailResponse(doc, versions, links))
 }
 
 // shortNameIsFree reports whether no other document holds shortName, answering the request when
@@ -187,11 +204,15 @@ func HandleLegalDocumentsGet(database legalDocumentsDatabase) http.HandlerFunc {
 			if !ok {
 				return
 			}
+			links, ok := legalDocumentApps(w, r, database, &docs[i])
+			if !ok {
+				return
+			}
 			var current *record.LegalDocumentVersion
 			if len(versions) > 0 {
 				current = &versions[len(versions)-1]
 			}
-			response.LegalDocuments = append(response.LegalDocuments, apimapping.ToLegalDocumentResponse(&docs[i], current))
+			response.LegalDocuments = append(response.LegalDocuments, apimapping.ToLegalDocumentResponse(&docs[i], current, links))
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -226,11 +247,13 @@ func HandleLegalDocumentCreatePost(database legalDocumentsDatabase, auditLogger 
 			return
 		}
 
+		// A new document applies to all apps, the default; the editor's app picker narrows it.
 		doc := &record.LegalDocument{
-			ShortName:     shortName,
-			Kind:          req.Kind,
-			DraftTitle:    sql.NullString{String: title, Valid: true},
-			DraftMarkdown: sql.NullString{String: req.Markdown, Valid: true},
+			ShortName:        shortName,
+			Kind:             req.Kind,
+			DraftTitle:       sql.NullString{String: title, Valid: true},
+			DraftMarkdown:    sql.NullString{String: req.Markdown, Valid: true},
+			AppliesToAllApps: true,
 		}
 		if err := database.CreateLegalDocument(r.Context(), nil, doc); err != nil {
 			if !shortNameTaken(w, r, err) {
@@ -246,7 +269,8 @@ func HandleLegalDocumentCreatePost(database legalDocumentsDatabase, auditLogger 
 			"logged_in_user":    callerSubject(r),
 		})
 
-		writeLegalDocumentDetail(w, r, http.StatusCreated, doc, nil)
+		// A document just created lists no app, so there is nothing to read back.
+		writeJSON(w, r, http.StatusCreated, apimapping.ToLegalDocumentDetailResponse(doc, nil, nil))
 	}
 }
 
@@ -263,7 +287,7 @@ func HandleLegalDocumentGet(database legalDocumentsDatabase) http.HandlerFunc {
 			return
 		}
 
-		writeLegalDocumentDetail(w, r, http.StatusOK, doc, versions)
+		writeLegalDocumentDetail(w, r, database, doc, versions)
 	}
 }
 
@@ -330,7 +354,7 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 			"logged_in_user":    callerSubject(r),
 		})
 
-		writeLegalDocumentDetail(w, r, http.StatusOK, doc, versions)
+		writeLegalDocumentDetail(w, r, database, doc, versions)
 	}
 }
 
@@ -447,7 +471,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 			"logged_in_user":    callerSubject(r),
 		})
 
-		writeLegalDocumentDetail(w, r, http.StatusOK, doc, versions)
+		writeLegalDocumentDetail(w, r, database, doc, versions)
 	}
 }
 
@@ -486,7 +510,7 @@ func HandleLegalDocumentRetirePost(database legalDocumentsDatabase, auditLogger 
 			"logged_in_user":    callerSubject(r),
 		})
 
-		writeLegalDocumentDetail(w, r, http.StatusOK, doc, versions)
+		writeLegalDocumentDetail(w, r, database, doc, versions)
 	}
 }
 
@@ -521,7 +545,7 @@ func HandleLegalDocumentRestorePost(database legalDocumentsDatabase, auditLogger
 			"logged_in_user":    callerSubject(r),
 		})
 
-		writeLegalDocumentDetail(w, r, http.StatusOK, doc, versions)
+		writeLegalDocumentDetail(w, r, database, doc, versions)
 	}
 }
 
@@ -599,13 +623,17 @@ func HandleLegalDocumentVersionGet(database legalDocumentsDatabase) http.Handler
 		if !ok {
 			return
 		}
+		links, ok := legalDocumentApps(w, r, database, doc)
+		if !ok {
+			return
+		}
 		var current *record.LegalDocumentVersion
 		if len(versions) > 0 {
 			current = &versions[len(versions)-1]
 		}
 
 		writeJSON(w, r, http.StatusOK, api.GetLegalDocumentVersionResponse{
-			LegalDocument: apimapping.ToLegalDocumentResponse(doc, current),
+			LegalDocument: apimapping.ToLegalDocumentResponse(doc, current, links),
 			Version:       apimapping.ToLegalDocumentVersionResponse(version),
 		})
 	}

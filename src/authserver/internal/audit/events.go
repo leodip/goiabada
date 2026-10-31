@@ -176,7 +176,10 @@ const (
 	// with legal_document_id, short_name and logged_in_user. created_legal_document adds kind and
 	// published_legal_document the version number it published. A draft save that only changed
 	// the draft writes updated_legal_document_draft; publishing writes no draft event.
+	// updated_legal_document_apps records a change of the apps a document applies to, with
+	// applies_to (all_apps or selected_apps), added_client_ids and removed_client_ids.
 	EventCreatedLegalDocument         = "created_legal_document"
+	EventUpdatedLegalDocumentApps     = "updated_legal_document_apps"
 	EventUpdatedLegalDocumentDraft    = "updated_legal_document_draft"
 	EventPublishedLegalDocument       = "published_legal_document"
 	EventRetiredLegalDocument         = "retired_legal_document"
@@ -736,6 +739,7 @@ var auditEventTypes = []string{
 	EventUpdatedGeneralSettings,
 	EventUpdatedGroup,
 	EventUpdatedGroupAttribute,
+	EventUpdatedLegalDocumentApps,
 	EventUpdatedLegalDocumentDraft,
 	EventUpdatedOwnAddress,
 	EventUpdatedOwnEmail,

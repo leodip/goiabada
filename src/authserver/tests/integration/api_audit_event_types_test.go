@@ -40,7 +40,7 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 	// rather than containment: a catalog that had grown an extra entry would offer the operator
 	// a filter value no row can ever carry.
 	assert.Equal(t, audit.EventTypes(), body.AuditEventTypes)
-	assert.Len(t, body.AuditEventTypes, 124,
+	assert.Len(t, body.AuditEventTypes, 125,
 		"the catalog is the 104 declared names less the four #351 decision 11 deleted, "+
 			"plus failed_account_activation_code (#435), requested_password_reset (#404), "+
 			"administrator_change_refused, administrative_permission_changed and "+
@@ -52,7 +52,8 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 			"auth_success_recovery_code, auth_failed_recovery_code and "+
 			"recovery_code_replay_detected (#257), and the six legal document events "+
 			"created_legal_document, updated_legal_document_draft, published_legal_document, "+
-			"retired_legal_document, restored_legal_document and deleted_legal_document (#622)")
+			"retired_legal_document, restored_legal_document and deleted_legal_document (#622), and "+
+			"updated_legal_document_apps (#622)")
 
 	// The wire end of the chain openapi.yaml declares. The unit tier's
 	// TestOpenAPI_SchemaPropertiesMatchTheAPIStructs holds GetAuditEventTypesResponse's schema

@@ -612,6 +612,7 @@ test("the clients' pages", async ({ page, clients, resources }) => {
       await addIntrospectionResource(page, resource.identifier);
       await page.locator("#btnSave").click();
     }),
+    at(page, "a client's legal documents", tab("legal-documents")),
   ]);
 });
 
@@ -805,6 +806,12 @@ test("the legal documents' pages", async ({ page, legalDocuments }) => {
       await page.locator("#shortName").fill("Not Valid");
       await page.locator("#btnSave").click();
     }),
+    at(page, "a document's Applies to", legalDocumentUrl(draft.id, "apps")),
+    saved(page, "a document's Applies to saved, no app ticked", async () => {
+      await page.locator("#appliesToSelectedApps").check();
+      await page.locator("#btnSaveApps").click();
+    }),
+    at(page, "the legal documents list, a document with no apps flagged", list),
     at(page, "a document never published, its versions", legalDocumentUrl(draft.id, "versions")),
     at(page, "deleting a legal document", legalDocumentUrl(draft.id, "delete")),
     refused(page, "deleting a legal document, the short name mistyped", "shortName", async () => {

@@ -27,7 +27,9 @@ const legalDocumentDetailBody = `{
 		"publishedAt": "2026-10-20T12:30:00Z",
 		"hasDraft": true,
 		"retired": false,
-		"retiredAt": null
+		"retiredAt": null,
+		"appliesTo": "selected_apps",
+		"clientIds": [3, 5]
 	},
 	"draft": {"title": "Terms of use (2027)", "markdown": "# Terms\n\nBe kind."},
 	"versions": [
@@ -59,6 +61,8 @@ func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVe
 	assert.True(t, doc.HasDraft)
 	assert.False(t, doc.Retired)
 	assert.Nil(t, doc.RetiredAt)
+	assert.Equal(t, "selected_apps", doc.AppliesTo)
+	assert.Equal(t, []int64{3, 5}, doc.ClientIds)
 
 	require.NotNil(t, detail.Draft)
 	assert.Equal(t, "Terms of use (2027)", detail.Draft.Title)
@@ -155,4 +159,31 @@ func TestAuthServerClient_CreateLegalDocumentDecodesTheNewDocument(t *testing.T)
 	assert.Equal(t, "cookies", detail.LegalDocument.ShortName)
 	require.NotNil(t, detail.Draft)
 	assert.Equal(t, "Cookies", detail.Draft.Title)
+}
+
+// A client's page lists the documents that apply to it beside the client itself, out of one answer.
+func TestAuthServerClient_GetClientLegalDocumentsDecodesTheClientAndItsDocuments(t *testing.T) {
+	client, recorded := serves(t, `{"client":{"id":42,"clientIdentifier":"shop","isPublic":true},"legalDocuments":[`+
+		`{"id":7,"shortName":"privacy","kind":"for_information","title":"Privacy notice","currentVersion":1,`+
+		`"appliesTo":"all_apps","clientIds":[]},`+
+		`{"id":8,"shortName":"shop-terms","kind":"must_accept","title":"Shop terms","currentVersion":0,`+
+		`"appliesTo":"selected_apps","clientIds":[42,43]}]}`)
+
+	got, err := client.GetClientLegalDocuments(context.Background(), "an-access-token", 42)
+	require.NoError(t, err)
+
+	gotPath, gotAuthorization := recorded()
+	assert.Equal(t, "/api/v1/admin/clients/42/legal-documents", gotPath)
+	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
+	assert.Equal(t, int64(42), got.Client.Id)
+	assert.Equal(t, "shop", got.Client.ClientIdentifier)
+	assert.True(t, got.Client.IsPublic)
+	require.Len(t, got.LegalDocuments, 2)
+	assert.Equal(t, "privacy", got.LegalDocuments[0].ShortName)
+	assert.Equal(t, "all_apps", got.LegalDocuments[0].AppliesTo)
+	assert.Equal(t, []int64{}, got.LegalDocuments[0].ClientIds)
+	assert.Equal(t, int64(8), got.LegalDocuments[1].Id)
+	assert.Equal(t, "must_accept", got.LegalDocuments[1].Kind)
+	assert.Equal(t, "selected_apps", got.LegalDocuments[1].AppliesTo)
+	assert.Equal(t, []int64{42, 43}, got.LegalDocuments[1].ClientIds)
 }

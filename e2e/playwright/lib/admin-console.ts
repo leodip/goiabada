@@ -15,6 +15,7 @@ export type ClientTab =
   | "user-sessions"
   | "permissions"
   | "introspection"
+  | "legal-documents"
   | "delete";
 
 export function clientUrl(id: number, tab: ClientTab): string {
@@ -418,7 +419,7 @@ export async function grantUserPermission(page: Page, id: number, resource: stri
   await expect(page.getByText("Permissions saved.")).toBeVisible();
 }
 
-export type LegalDocumentTab = "draft" | "versions" | "delete";
+export type LegalDocumentTab = "draft" | "apps" | "versions" | "delete";
 
 export function legalDocumentUrl(id: number, tab: LegalDocumentTab): string {
   return `${env.adminUrl}/admin/legal-documents/${id}/${tab}`;
@@ -491,4 +492,22 @@ export async function putAwayLegalDocument(page: Page, id: number) {
   } else if ((await page.locator('.page-actions a[href$="/delete"]').count()) > 0) {
     await deleteLegalDocument(page, id);
   }
+}
+
+// Saves a legal document's Applies to tab: all apps, or the clients named by identifier, ticked and
+// every other box cleared.
+export async function setLegalDocumentApps(page: Page, id: number, apps: "all" | string[]) {
+  await page.goto(legalDocumentUrl(id, "apps"));
+  if (apps === "all") {
+    await page.locator("#appliesToAllApps").check();
+  } else {
+    await page.locator("#appliesToSelectedApps").check();
+    const boxes = page.locator('#appsList input[type="checkbox"]');
+    for (const box of await boxes.all()) await box.uncheck();
+    for (const identifier of apps) {
+      await page.locator("#appsList label.check-row").filter({ hasText: identifier }).locator("input").check();
+    }
+  }
+  await page.locator("#btnSaveApps").click();
+  await expect(page.getByText("Applies to saved.", { exact: true })).toBeVisible();
 }

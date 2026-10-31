@@ -114,3 +114,27 @@ func (c *AuthServerClient) GetLegalDocumentVersion(ctx context.Context, accessTo
 		successStatus: http.StatusOK,
 	})
 }
+
+// UpdateLegalDocumentApps sets the document's Applies to and replaces its list of apps whole, with
+// the list as the page read it, so the auth server refuses a save from an outdated page.
+func (c *AuthServerClient) UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentId int64,
+	request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error) {
+	return execute[api.LegalDocumentDetailResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/apps", c.baseURL, legalDocumentId),
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+}
+
+// GetClientLegalDocuments reads the client and the legal documents that apply to it, a read of the
+// client's that the clients-read scopes reach.
+func (c *AuthServerClient) GetClientLegalDocuments(ctx context.Context, accessToken string,
+	clientId int64) (*api.GetClientLegalDocumentsResponse, error) {
+	return execute[api.GetClientLegalDocumentsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fmt.Sprintf("%s/api/v1/admin/clients/%d/legal-documents", c.baseURL, clientId),
+		successStatus: http.StatusOK,
+	})
+}

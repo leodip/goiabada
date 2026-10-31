@@ -72,6 +72,7 @@ var (
 
 	charCreateLegalDocument = &api.CreateLegalDocumentRequest{Kind: "must_accept", ShortName: "terms", Title: "Terms"}
 	charSaveLegalDocDraft   = &api.SaveLegalDocumentDraftRequest{Title: "Terms", Markdown: "Be kind."}
+	charUpdateLegalDocApps  = &api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIds: []int64{3, 4}, ExpectedClientIds: []int64{3}}
 )
 
 const (
@@ -1572,6 +1573,33 @@ func wireCharacterization() []wireCase {
 			verb: "GET", path: "/api/v1/admin/legal-documents/7/versions/2",
 			successStatus: 200, reply: `{"legalDocument":{"id":7},"version":{"version":2,"markdown":"Be kind."}}`,
 			want: "Be kind.",
+		},
+		{
+			name: "UpdateLegalDocumentApps",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.UpdateLegalDocumentApps(ctx, charAccessToken, 7, charUpdateLegalDocApps)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocument.AppliesTo, nil
+			},
+			verb: "PUT", path: "/api/v1/admin/legal-documents/7/apps", contentType: charJSON,
+			body:          `{"appliesTo":"selected_apps","clientIds":[3,4],"expectedClientIds":[3]}`,
+			successStatus: 200, reply: `{"legalDocument":{"id":7,"appliesTo":"selected_apps","clientIds":[3,4]}}`,
+			want: "selected_apps",
+		},
+		{
+			name: "GetClientLegalDocuments",
+			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
+				got, err := c.GetClientLegalDocuments(ctx, charAccessToken, 42)
+				if err != nil {
+					return nil, err
+				}
+				return got.LegalDocuments[0].ShortName, nil
+			},
+			verb: "GET", path: "/api/v1/admin/clients/42/legal-documents",
+			successStatus: 200, reply: `{"client":{"id":42},"legalDocuments":[{"id":7,"shortName":"terms"}]}`,
+			want: "terms",
 		},
 	}
 }

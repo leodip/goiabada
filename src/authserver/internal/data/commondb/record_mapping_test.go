@@ -248,8 +248,9 @@ func postLogoutRedirectURIMapping() mappingCase {
 	}
 }
 
-// legalDocumentMapping holds the document's whole-row writes, kind left out of the UPDATE: a
-// document's kind is fixed at creation (#622 decision 2).
+// legalDocumentMapping holds the document's whole-row writes, kind and applies_to_all_apps left
+// out of the UPDATE: a document's kind is fixed at creation (#622 decision 2), and its Applies to
+// has its own writer.
 func legalDocumentMapping() mappingCase {
 	return mappingCase{
 		name:   "legal document",
@@ -293,6 +294,27 @@ func legalDocumentVersionMapping() mappingCase {
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
 			return d.CreateLegalDocumentVersion(ctx, nil, rec.(*record.LegalDocumentVersion))
+		},
+	}
+}
+
+// legalDocumentClientMapping has no update: a document's app is created and deleted, never
+// rewritten.
+func legalDocumentClientMapping() mappingCase {
+	return mappingCase{
+		name:   "legal document client",
+		table:  "legal_documents_clients",
+		record: reflect.TypeOf(record.LegalDocumentClient{}),
+		reads: map[string]func(ctx context.Context, d *Database) (any, error){
+			"GetLegalDocumentClientsByLegalDocumentId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentClientsByLegalDocumentId(ctx, nil, 1))
+			},
+			"GetLegalDocumentClientsByClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentClientsByClientId(ctx, nil, 1))
+			},
+		},
+		insert: func(ctx context.Context, d *Database, rec any) error {
+			return d.CreateLegalDocumentClient(ctx, nil, rec.(*record.LegalDocumentClient))
 		},
 	}
 }
@@ -887,7 +909,7 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 		permissionMapping(), resourceMapping(),
 		clientMapping(), clientLogoMapping(), clientPermissionMapping(), clientIntrospectionResourceMapping(),
 		redirectURIMapping(), postLogoutRedirectURIMapping(), webOriginMapping(),
-		legalDocumentMapping(), legalDocumentVersionMapping(),
+		legalDocumentMapping(), legalDocumentVersionMapping(), legalDocumentClientMapping(),
 		groupMapping(), groupAttributeMapping(), groupPermissionMapping(), userGroupMapping(),
 		userMapping(), userAttributeMapping(), userPermissionMapping(), userProfilePictureMapping(),
 		codeMapping(), refreshTokenMapping(), authorizeRequestMapping(),

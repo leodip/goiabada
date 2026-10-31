@@ -83,6 +83,12 @@ func publishedVersions(id int64, n int) []record.LegalDocumentVersion {
 
 var legalTx = &sql.Tx{}
 
+// noApps lets a handler read the apps a document lists, answering none, as a document applying to
+// all apps does.
+func noApps(database *datamocks.Database) {
+	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+}
+
 // --- create -------------------------------------------------------------------------------------
 
 func validCreate() map[string]any {
@@ -115,6 +121,7 @@ func TestLegalDocumentCreate_Refusals(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			noApps(database)
 			if c.taken {
 				database.On("GetLegalDocumentByShortName", mock.Anything, mock.Anything, "terms").
 					Return(&record.LegalDocument{Id: 3, ShortName: "terms"}, nil).Once()
@@ -136,6 +143,7 @@ func TestLegalDocumentCreate_Refusals(t *testing.T) {
 
 func TestLegalDocumentCreate_AtTheBoundsIsAccepted(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	shortName := strings.Repeat("a", 63) + "1"
 	database.On("GetLegalDocumentByShortName", mock.Anything, mock.Anything, shortName).Return(nil, nil).Once()
@@ -152,6 +160,7 @@ func TestLegalDocumentCreate_AtTheBoundsIsAccepted(t *testing.T) {
 
 func TestLegalDocumentCreate_StoresADraftAndAuditsIt(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	database.On("GetLegalDocumentByShortName", mock.Anything, mock.Anything, "privacy-notice").Return(nil, nil).Once()
 	var stored *record.LegalDocument
@@ -175,7 +184,10 @@ func TestLegalDocumentCreate_StoresADraftAndAuditsIt(t *testing.T) {
 	assert.Equal(t, sql.NullString{String: "Privacy notice", Valid: true}, stored.DraftTitle, "the title is trimmed")
 	assert.Equal(t, sql.NullString{String: "  We keep little.\n", Valid: true}, stored.DraftMarkdown, "the Markdown is kept as written")
 	assert.False(t, stored.RetiredAt.Valid)
+	assert.True(t, stored.AppliesToAllApps, "a new document applies to all apps")
 	document := body["legalDocument"].(map[string]any)
+	assert.Equal(t, "all_apps", document["appliesTo"])
+	assert.Equal(t, []any{}, document["clientIds"])
 	assert.InDelta(t, 42, document["id"], 0)
 	assert.InDelta(t, 0, document["currentVersion"], 0, "a new document is unpublished")
 	assert.Equal(t, map[string]any{"title": "Privacy notice", "markdown": "  We keep little.\n"}, body["draft"])
@@ -184,6 +196,7 @@ func TestLegalDocumentCreate_StoresADraftAndAuditsIt(t *testing.T) {
 
 func TestLegalDocumentCreate_AShortNameTakenMeanwhileIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	database.On("GetLegalDocumentByShortName", mock.Anything, mock.Anything, "terms").Return(nil, nil).Once()
 	database.On("CreateLegalDocument", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.Errorf("insert: %w", data.ErrUniqueViolation)).Once()
@@ -199,6 +212,7 @@ func TestLegalDocumentCreate_AShortNameTakenMeanwhileIsRefused(t *testing.T) {
 
 func TestLegalDocumentDraft_TheShortNameChangesUntilTheFirstPublish(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
@@ -222,6 +236,7 @@ func TestLegalDocumentDraft_TheShortNameChangesUntilTheFirstPublish(t *testing.T
 
 func TestLegalDocumentDraft_TheShortNameIsFixedOncePublished(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(publishedVersions(5, 1), nil)
 
@@ -237,6 +252,7 @@ func TestLegalDocumentDraft_APublishedDocumentKeepsItsShortNameAndTakesANewDraft
 	for name, shortName := range map[string]string{"its own short name": "terms", "no short name": ""} {
 		t.Run(name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			noApps(database)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			doc := draftDocument(5)
 			doc.DraftTitle, doc.DraftMarkdown = sql.NullString{}, sql.NullString{}
@@ -261,6 +277,7 @@ func TestLegalDocumentDraft_APublishedDocumentKeepsItsShortNameAndTakesANewDraft
 
 func TestLegalDocumentDraft_ARetiredDocumentIsReadOnly(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	doc := draftDocument(5)
 	doc.RetiredAt = sql.NullTime{Time: time.Now(), Valid: true}
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil).Once()
@@ -275,6 +292,7 @@ func TestLegalDocumentDraft_ARetiredDocumentIsReadOnly(t *testing.T) {
 
 func TestLegalDocumentDraft_AnUnknownDocumentIs404(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(nil, nil).Once()
 
 	status, body := serveLegal(HandleLegalDocumentDraftPut(database, handlersmocks.NewAuditLogger(t)), legalRequest(t, http.MethodPut,
@@ -288,6 +306,7 @@ func TestLegalDocumentDraft_AnUnknownDocumentIs404(t *testing.T) {
 
 func TestLegalDocumentPublish_FreezesTheDraftAsTheNextVersion(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	doc := draftDocument(5)
@@ -323,6 +342,7 @@ func TestLegalDocumentPublish_FreezesTheDraftAsTheNextVersion(t *testing.T) {
 
 func TestLegalDocumentPublish_TheFirstVersionIsOne(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("GetLegalDocumentById", mock.Anything, legalTx, int64(5)).Return(draftDocument(5), nil).Once()
@@ -364,6 +384,7 @@ func TestLegalDocumentPublish_Refusals(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			noApps(database)
 			datamocks.ExpectRunInTransaction(database, legalTx)
 			database.On("GetLegalDocumentById", mock.Anything, legalTx, int64(5)).Return(c.doc(), nil).Once()
 			database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(publishedVersions(5, 1), nil).Maybe()
@@ -381,6 +402,7 @@ func TestLegalDocumentPublish_Refusals(t *testing.T) {
 
 func TestLegalDocumentPublish_AnUnknownDocumentIs404(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("GetLegalDocumentById", mock.Anything, legalTx, int64(5)).Return(nil, nil).Once()
 
@@ -395,6 +417,7 @@ func TestLegalDocumentPublish_AnUnknownDocumentIs404(t *testing.T) {
 // answered 409 with nothing published and nothing audited.
 func TestLegalDocumentPublish_LosingARaceIsAConflict(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("GetLegalDocumentById", mock.Anything, legalTx, int64(5)).Return(draftDocument(5), nil).Once()
 	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(publishedVersions(5, 1), nil).Once()
@@ -413,6 +436,7 @@ func TestLegalDocumentPublish_LosingARaceIsAConflict(t *testing.T) {
 
 func TestLegalDocumentRetire_OnlyAPublishedDocument(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil).Once()
 
@@ -426,6 +450,7 @@ func TestLegalDocumentRetire_OnlyAPublishedDocument(t *testing.T) {
 
 func TestLegalDocumentRetire_SetsRetiredAndAuditsIt(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(publishedVersions(5, 1), nil).Once()
@@ -446,6 +471,7 @@ func TestLegalDocumentRetire_SetsRetiredAndAuditsIt(t *testing.T) {
 
 func TestLegalDocumentRetire_AnAlreadyRetiredDocumentIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	doc := draftDocument(5)
 	doc.RetiredAt = sql.NullTime{Time: time.Now(), Valid: true}
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil).Once()
@@ -460,6 +486,7 @@ func TestLegalDocumentRetire_AnAlreadyRetiredDocumentIsRefused(t *testing.T) {
 func TestLegalDocumentRestore(t *testing.T) {
 	t.Run("a document that is not retired is refused", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		noApps(database)
 		database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 
 		status, body := serveLegal(HandleLegalDocumentRestorePost(database, handlersmocks.NewAuditLogger(t)),
@@ -471,6 +498,7 @@ func TestLegalDocumentRestore(t *testing.T) {
 	})
 	t.Run("a retired document is restored and audited", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		noApps(database)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		doc := draftDocument(5)
 		doc.RetiredAt = sql.NullTime{Time: time.Now(), Valid: true}
@@ -492,6 +520,7 @@ func TestLegalDocumentRestore(t *testing.T) {
 
 func TestLegalDocumentDelete_APublishedDocumentIsKept(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(publishedVersions(5, 1), nil).Once()
@@ -506,6 +535,7 @@ func TestLegalDocumentDelete_APublishedDocumentIsKept(t *testing.T) {
 
 func TestLegalDocumentDelete_ANeverPublishedDocumentIsDeleted(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
@@ -526,6 +556,7 @@ func TestLegalDocumentDelete_ANeverPublishedDocumentIsDeleted(t *testing.T) {
 func TestLegalDocumentVersionGet(t *testing.T) {
 	t.Run("a version reads with its text", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		noApps(database)
 		database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 		database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(publishedVersions(5, 2), nil).Once()
 		version := publishedVersions(5, 2)[0]
@@ -540,6 +571,7 @@ func TestLegalDocumentVersionGet(t *testing.T) {
 	})
 	t.Run("a number never published is 404", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
+		noApps(database)
 		database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 		database.On("GetLegalDocumentVersion", mock.Anything, mock.Anything, int64(5), 3).Return(nil, nil).Once()
 
@@ -551,6 +583,7 @@ func TestLegalDocumentVersionGet(t *testing.T) {
 	for _, bad := range []string{"0", "-1", "x", "1.5"} {
 		t.Run("version "+bad+" is a bad request", func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
+			noApps(database)
 
 			status, body := serveLegal(HandleLegalDocumentVersionGet(database), legalRequest(t, http.MethodGet, nil, "id", "5", "version", bad))
 
@@ -562,6 +595,7 @@ func TestLegalDocumentVersionGet(t *testing.T) {
 
 func TestLegalDocumentGet_AnInvalidIdIsABadRequest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 
 	status, body := serveLegal(HandleLegalDocumentGet(database), legalRequest(t, http.MethodGet, nil, "id", "abc"))
 
@@ -571,6 +605,7 @@ func TestLegalDocumentGet_AnInvalidIdIsABadRequest(t *testing.T) {
 
 func TestLegalDocumentsGet_ListsEachWithItsCurrentVersion(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	unpublished := draftDocument(6)
 	unpublished.ShortName = "privacy"
 	unpublished.DraftTitle = sql.NullString{String: "Privacy notice", Valid: true}
@@ -592,6 +627,7 @@ func TestLegalDocumentsGet_ListsEachWithItsCurrentVersion(t *testing.T) {
 
 func TestLegalDocumentsGet_NoDocumentsIsAnEmptyList(t *testing.T) {
 	database := datamocks.NewDatabase(t)
+	noApps(database)
 	database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return(nil, nil).Once()
 
 	rr := httptest.NewRecorder()

@@ -345,6 +345,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/publish", apihandlers.HandleLegalDocumentPublishPost(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/retire", apihandlers.HandleLegalDocumentRetirePost(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/legal-documents/{id}/restore", apihandlers.HandleLegalDocumentRestorePost(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/legal-documents/{id}/apps", apihandlers.HandleLegalDocumentAppsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/legal-documents/{id}/versions/{version}", apihandlers.HandleLegalDocumentVersionGet(s.database))
 
 		// Client management routes
@@ -365,6 +366,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/permissions", apihandlers.HandleClientPermissionsPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/introspection-resources", apihandlers.HandleClientIntrospectionResourcesGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/introspection-resources", apihandlers.HandleClientIntrospectionResourcesPut(s.database, auditLogger))
+		// The legal documents that apply to the client, read as part of the client (#622 decision 6).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/legal-documents", apihandlers.HandleClientLegalDocumentsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Put("/clients/{id}/administrative-scopes", apihandlers.HandleClientAdministrativeScopesPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}", apihandlers.HandleClientDelete(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesClientsRead)).Get("/clients/{id}/logo", apihandlers.HandleClientLogoGet(s.database, baseURL))

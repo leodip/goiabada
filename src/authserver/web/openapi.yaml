@@ -2132,6 +2132,62 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/legal-documents/{id}/apps:
+    put:
+      tags: [Legal Documents]
+      summary: Set the apps a legal document applies to
+      description: |
+        Set the document's Applies to: `all_apps`, the default a document is created with, or
+        `selected_apps` with the client ids it applies to. The whole list is replaced; a repeated
+        id is listed once. `expectedClientIds` is the list as you last read it, `[]` when it was
+        empty; absent or null is refused with `VALIDATION_ERROR`. Changing a document's apps needs
+        no new version.
+
+        `selected_apps` with an empty list is saved, and the document then applies to nobody;
+        deleting a document's last app leaves it the same way. It never becomes `all_apps` by
+        itself. `all_apps` with any client id is refused with
+        handler.legal_document.apps_with_all_apps, and an `appliesTo` that is neither with
+        handler.legal_document.applies_to_invalid. The admin console's own client is never asked
+        to accept a document, so it is refused with handler.legal_document.admin_console_client.
+        A retired document is refused with handler.legal_document.retired. An unknown client id is
+        answered 404 and saves nothing. Every save leaves an `updated_legal_document_apps` audit
+        record naming the document, its Applies to, the client ids added and removed, and the
+        caller.
+      operationId: updateLegalDocumentApps
+      parameters:
+        - $ref: '#/components/parameters/LegalDocumentIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLegalDocumentAppsRequest'
+      responses:
+        '200':
+          description: Applies to saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegalDocumentDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the document's apps after expectedClientIds was read. error_code
+            is CONCURRENT_UPDATE; nothing was saved. Read the document again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/legal-documents/{id}/versions/{version}:
     get:
       tags: [Legal Documents]
@@ -2740,6 +2796,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/clients/{id}/legal-documents:
+    get:
+      tags: [Clients]
+      summary: Get the legal documents that apply to a client
+      description: |
+        The legal documents that apply to the client: every document that is not retired and
+        applies to all apps or lists the client, published or not, in the order they were
+        created. A document never published has `currentVersion` 0. `legalDocuments` is `[]` when
+        none applies, never null. The documents are chosen with the legal document routes, in the
+        settings domain; this read is part of the client.
+
+        The route admits `authserver:admin-read`, `authserver:manage-clients` and
+        `authserver:manage`.
+      operationId: getClientLegalDocuments
+      parameters:
+        - $ref: '#/components/parameters/ClientIdParam'
+      responses:
+        '200':
+          description: The client and the legal documents that apply to it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetClientLegalDocumentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -5976,6 +6066,8 @@ components:
         - hasDraft
         - retired
         - retiredAt
+        - appliesTo
+        - clientIds
       properties:
         id:
           type: integer
@@ -6016,6 +6108,18 @@ components:
           type: string
           format: date-time
           nullable: true
+        appliesTo:
+          type: string
+          enum: [all_apps, selected_apps]
+          description: >-
+            all_apps, the default, or selected_apps, the apps clientIds lists. A document set to
+            selected_apps with no client ids applies to nobody.
+        clientIds:
+          type: array
+          description: The apps a selected_apps document applies to; [] for all_apps, never null.
+          items:
+            type: integer
+            format: int64
 
     LegalDocumentDraftResponse:
       type: object
@@ -6125,6 +6229,42 @@ components:
         markdown:
           type: string
           description: The draft's text, kept as written. At most 100,000 UTF-16 code units.
+
+    UpdateLegalDocumentAppsRequest:
+      type: object
+      required: [appliesTo, expectedClientIds]
+      properties:
+        appliesTo:
+          type: string
+          enum: [all_apps, selected_apps]
+        clientIds:
+          type: array
+          description: >-
+            The whole new list of apps, for selected_apps. Absent or null saves an empty list,
+            which all_apps requires.
+          items:
+            type: integer
+            format: int64
+        expectedClientIds:
+          type: array
+          description: The document's client ids as last read; [] if there were none.
+          items:
+            type: integer
+            format: int64
+
+    GetClientLegalDocumentsResponse:
+      type: object
+      properties:
+        client:
+          $ref: '#/components/schemas/ClientResponse'
+        legalDocuments:
+          type: array
+          description: The legal documents that apply to the client; [] when there are none.
+          items:
+            $ref: '#/components/schemas/LegalDocumentResponse'
+      required:
+        - client
+        - legalDocuments
 
     SaveLegalDocumentDraftRequest:
       type: object

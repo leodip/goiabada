@@ -272,6 +272,9 @@ cause, each a whole sentence.
 | `handler.legal_document.not_retired` | (none) | The document is not retired. |
 | `handler.legal_document.published_not_deleted` | (none) | A published document cannot be deleted, so the record of what users accepted is kept. Retire it instead. |
 | `handler.legal_document.published_concurrently` | (none) | Another version of the document was published at the same moment, so nothing was published. Load the document again and retry. |
+| `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
+| `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
+| `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |
 | `handler.permission.duplicate_ids` | (none) | Duplicate permission IDs in request are not allowed |
 | `handler.permission.identifier_required` | (none) | Permission identifier is required |
 | `handler.permission.duplicated` | `identifier` (string) | Permission {{.identifier}} is duplicated. |

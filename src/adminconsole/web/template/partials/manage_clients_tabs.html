@@ -17,5 +17,6 @@
   {{- if not $public }}
   <a class="tab-item" href="/admin/clients/{{$id}}/introspection"{{ if eq $type "introspection" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.introspection" }}</a>
   {{- end }}
+  <a class="tab-item" href="/admin/clients/{{$id}}/legal-documents"{{ if eq $type "legal-documents" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.client_tabs.legal_documents" }}</a>
 </nav>
 {{end}}

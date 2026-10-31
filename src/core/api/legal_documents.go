@@ -7,7 +7,9 @@ import "time"
 
 // LegalDocumentResponse is a legal document as listed: what stays the same across its versions,
 // and its current version's number, title and publish date. A never-published document has
-// currentVersion 0, no publishedAt, and its draft's title.
+// currentVersion 0, no publishedAt, and its draft's title. AppliesTo is all_apps or selected_apps;
+// ClientIds are the apps a document set to selected apps lists, never null, and empty for all apps.
+// A document set to selected apps with no client ids applies to nobody.
 type LegalDocumentResponse struct {
 	Id             int64      `json:"id"`
 	CreatedAt      *time.Time `json:"createdAt"`
@@ -20,6 +22,8 @@ type LegalDocumentResponse struct {
 	HasDraft       bool       `json:"hasDraft"`
 	Retired        bool       `json:"retired"`
 	RetiredAt      *time.Time `json:"retiredAt"`
+	AppliesTo      string     `json:"appliesTo"`
+	ClientIds      []int64    `json:"clientIds"`
 }
 
 // LegalDocumentDraftResponse is a document's one unpublished draft.
@@ -84,4 +88,21 @@ type PreviewLegalDocumentRequest struct {
 
 type PreviewLegalDocumentResponse struct {
 	Html string `json:"html"`
+}
+
+// UpdateLegalDocumentAppsRequest sets a document's Applies to: all_apps, or selected_apps with the
+// client ids it applies to, which all_apps leaves empty. It replaces the whole list as a list save
+// does: ExpectedClientIds is the list as the caller last read it, [] when it was empty, and a
+// stored list that differs from it refuses the save.
+type UpdateLegalDocumentAppsRequest struct {
+	AppliesTo         string  `json:"appliesTo"`
+	ClientIds         []int64 `json:"clientIds"`
+	ExpectedClientIds []int64 `json:"expectedClientIds"`
+}
+
+// GetClientLegalDocumentsResponse is the client and the documents that apply to it: every document
+// not retired that applies to all apps or lists the client, published or not, in id order.
+type GetClientLegalDocumentsResponse struct {
+	Client         ClientResponse          `json:"client"`
+	LegalDocuments []LegalDocumentResponse `json:"legalDocuments"`
 }

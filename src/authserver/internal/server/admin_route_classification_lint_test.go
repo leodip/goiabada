@@ -178,6 +178,8 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"and gives the caller no authority it lacks"),
 	"POST /api/v1/admin/legal-documents/{id}/restore": outsideCeilings("changes what users read and accept " +
 		"and gives the caller no authority it lacks"),
+	"PUT /api/v1/admin/legal-documents/{id}/apps": outsideCeilings("changes which apps a document applies to, " +
+		"never the admin console's own client, and gives the caller no authority it lacks"),
 
 	// Settings.
 	"PUT /api/v1/admin/settings/email":      appliesCeilings(adminCeilingSettings),
