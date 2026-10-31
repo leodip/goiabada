@@ -193,7 +193,11 @@ type ReplaceRecoveryCodesDatabase interface {
 // stored for a user whose codes it deleted, and one arriving later deletes the new set.
 //
 // Only the set changes. The authenticator, the OTP configuration generation and the user's
-// sessions are left as they are, since the second factor itself did not change.
+// sessions are left as they are, since the second factor itself did not change. A sign-in that
+// accepted a code of the old set spent it before the replacement, so it stands whether it has
+// reached /auth/completed yet or not; refusing it in flight alone would end nothing, since one that
+// went straight on keeps its session. Changing the password advances auth_state_generation, which
+// ends both.
 func ReplaceRecoveryCodes(ctx context.Context, db ReplaceRecoveryCodesDatabase, user *record.User) (codes []string, replaced bool, err error) {
 	// Drawn before the transaction opens, so a deadlocked attempt's rerun stores the same set it
 	// returns rather than a set nobody was shown.
