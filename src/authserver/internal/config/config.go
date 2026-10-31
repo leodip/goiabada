@@ -25,6 +25,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/httpmw"
 	"github.com/leodip/goiabada/core/issuerlength"
+	"github.com/leodip/goiabada/core/loopback"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -207,10 +208,12 @@ type Config struct {
 // its own, which is also what lets it load twice in one process (#320).
 //
 // It answers a whole configuration or an error: the parse's, or one naming every numeric or
-// boolean variable that is set and does not parse, or a base URL longer than the issuer allows.
+// boolean variable that is set and does not parse, a base URL longer than the issuer allows, or,
+// for a server start, an admin console URL that is plain http off loopback.
 // A flag given for the same setting does not rescue the variable, because the value the operator
 // wrote is wrong whichever of the two wins, and a setting only the server reads is refused before
-// `migrate` as well, as its flag already is (#434).
+// `migrate` as well, as its flag already is (#434). The admin console URL is the exception: a
+// start refuses it, `migrate` and `recover` do not, since neither reads it (#590).
 func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	var malformed malformedValues
 	authServerBaseURL := getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090")
@@ -334,6 +337,21 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	checkDatabaseFlags(fs, &c.Database, &malformed)
 	if len(c.Args) == 0 || (c.Args[0] != "migrate" && c.Args[0] != "recover") {
 		checkDatabaseTLS(&c.Database, &malformed)
+
+		// The first start registers the admin console's redirect URI and sign-out redirect URI
+		// from its URL, and either one that is plain http off loopback receives nothing, so a
+		// server started with one would lock its administrators out with nothing to say why. Refused
+		// here, before the database is opened, so the refusal changes nothing and the line can
+		// give the order of the move. `migrate` and `recover` read no console URL, and `recover`
+		// is the way back into a locked instance, so neither waits on it (#590).
+		if loopback.IsPlainHTTPOff(c.AdminConsole.BaseURL) {
+			malformed.addLine("GOIABADA_ADMINCONSOLE_BASEURL (--adminconsole-baseurl) is " + strconv.Quote(c.AdminConsole.BaseURL) +
+				", plain http on a host other than 127.0.0.1, [::1] or localhost, where the admin console cannot sign in; " +
+				"nothing was changed. Move the console to https in this order: on the release that ran before this one, " +
+				"add the console's https URL, and that URL followed by /auth/callback, on the Redirect URIs tab of " +
+				"admin-console-client; serve the console over https and set GOIABADA_ADMINCONSOLE_BASEURL to that URL " +
+				"on both servers; then start this release")
+		}
 	}
 
 	// The base URL is held to the issuer's length limit before anything is seeded, on the value
