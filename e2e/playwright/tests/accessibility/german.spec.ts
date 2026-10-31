@@ -172,13 +172,18 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`German account recovery codes fit a phone in ${theme}`, async ({ browser, users }) => {
+  test(`German account recovery codes fit a phone in ${theme}`, async ({ page, browser, users }) => {
     test.setTimeout(90_000);
     const user = await users.create();
+    // The account page's forms post to an address without ui_locales, so the console answers them in
+    // the profile's language, which the ID token carries.
+    await page.goto(userUrl(user.id, "profile"));
+    await choose(page, "locale", "German (Austria)", /German \(Austria\)/);
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Profile saved.", { exact: true })).toBeVisible();
     const { context, page: own } = await signInToConsole(browser, user, "/account/otp");
     await own.setViewportSize({ width: 320, height: 740 });
     await own.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-    await own.setExtraHTTPHeaders({ "Accept-Language": "de-AT" });
     await own.goto(`${env.adminUrl}/account/otp?ui_locales=de`);
     // Turning on two-factor authentication shows the new authenticator's set once.
     const secret = (await own.locator("#otp-secret").innerText()).trim();
