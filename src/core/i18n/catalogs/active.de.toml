@@ -86,6 +86,20 @@
 "auth.otp_recovery.button" = "Bestätigen"
 "auth.otp_recovery.back" = "Stattdessen die Authenticator-App verwenden"
 
+# --- Recovery codes after the sign-in setup (auth/recovery-codes) -----------
+
+"auth.recovery_codes.page_title" = "Speichern Sie Ihre Wiederherstellungscodes"
+"auth.recovery_codes.title" = "Speichern Sie Ihre Wiederherstellungscodes"
+"auth.recovery_codes.lead" = "Wenn Sie Ihr Smartphone verlieren, können Sie sich mit einem dieser Codes statt mit einem Code aus Ihrer App anmelden. Jeder Code funktioniert einmal. Speichern Sie die Codes jetzt an einem sicheren Ort, etwa in einem Passwort-Manager. Sie werden nicht noch einmal angezeigt."
+"auth.recovery_codes.list_label" = "Wiederherstellungscodes"
+"auth.recovery_codes.copy" = "Codes kopieren"
+"auth.recovery_codes.copied" = "Codes kopiert"
+"auth.recovery_codes.copy_failed_status" = "Die Codes konnten nicht kopiert werden. Sie sind markiert, damit Sie sie selbst kopieren können."
+"auth.recovery_codes.shown_page_title" = "Wiederherstellungscodes"
+"auth.recovery_codes.shown_title" = "Ihre Wiederherstellungscodes wurden bereits angezeigt"
+"auth.recovery_codes.shown_lead" = "Sie werden nur einmal angezeigt. Wenn Sie sie nicht gespeichert haben, fordern Sie in der Verwaltungskonsole unter Konto, Zwei-Faktor-Authentifizierung neue an."
+"auth.recovery_codes.continue" = "Weiter"
+
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
 "auth.otp_enrollment.page_title" = "Zwei-Faktor-Authentifizierung einrichten"

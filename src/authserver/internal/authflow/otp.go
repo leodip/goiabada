@@ -200,7 +200,8 @@ const (
 	OTPClockAhead
 	// OTPAccepted is a code accepted, and for an enrolling user the authenticator stored: the ceremony
 	// recorded it, the browser session's identifier was rotated, and the ceremony saved in
-	// authentication_completed. RunRecoveryCode answers it for a recovery code accepted.
+	// authentication_completed, or, for an enrolling user, in level2_recovery_codes holding the new
+	// authenticator's set of recovery codes. RunRecoveryCode answers it for a recovery code accepted.
 	OTPAccepted
 	// OTPRecoveryCodeMissing is a recovery-code submission with no code. The recovery-code form is
 	// shown again asking for one.
@@ -221,7 +222,8 @@ type OTPSubmissionResult struct {
 	// on the ceremony. The form shown again beside a refusal is the enrolment form when it is set.
 	EnrolmentSecret string
 
-	// NextStep is /auth/completed, set on OTPAccepted.
+	// NextStep is set on OTPAccepted: /auth/recovery-codes for an enrolling user, whose new set of
+	// recovery codes is shown there first, and /auth/completed otherwise.
 	NextStep string
 	// SaveErr is the rotation's failure, or the save's, on OTPAccepted, and the clear's on
 	// OTPEnrolmentLost: ceremony.ErrCeremonyReplaced when the browser session no longer holds the
@@ -257,7 +259,10 @@ type OTPSubmissionResult struct {
 //     (below). Audits EventEnabledOTP.
 //  9. Accepted: audits EventAuthSuccessOtp, records the code on the ceremony (RecordOTPVerified) with
 //     the generation of the authenticator it was checked against, rotates the browser session's
-//     identifier, and only then saves the ceremony in authentication_completed.
+//     identifier, and only then saves the ceremony in authentication_completed, for /auth/completed.
+//     An enrolling user's ceremony is saved instead in level2_recovery_codes, holding the set of
+//     recovery codes the authenticator came with, for /auth/recovery-codes, which shows it once
+//     before the sign-in goes on (#257 decision 14).
 //
 // An answer that shows the form again, OTPAccountDisabled, OTPCodeMissing, OTPRefused or
 // OTPClockAhead, loads the client block for it last (refuse), after everything else that answer
@@ -347,8 +352,9 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 
 	verifiedGeneration := user.OtpConfigGeneration
 	enrolled := false
+	var recoveryCodes []string
 	if !user.OTPEnabled {
-		generation, _, established, establishErr := otpcredential.Establish(ctx, o.database, o.dataCipher, user, secret)
+		generation, codes, established, establishErr := otpcredential.Establish(ctx, o.database, o.dataCipher, user, secret)
 		if establishErr != nil {
 			return OTPSubmissionResult{}, establishErr
 		}
@@ -357,14 +363,13 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		}
 		verifiedGeneration = generation
 		enrolled = true
+		recoveryCodes = codes
 
 		o.auditLogger.Log(ctx, audit.EventEnabledOTP, map[string]interface{}{
 			"user_id": user.Id,
 		})
 		// The new authenticator came with a set of recovery codes, created in Establish's
-		// transaction as on the account page (#257 decisions 1 and 10). The codes returned are not
-		// carried further yet: the step that shows them after the accepted setup code is decision
-		// 14's.
+		// transaction as on the account page (#257 decisions 1 and 10).
 		o.auditLogger.Log(ctx, audit.EventRecoveryCodesCreated, map[string]interface{}{
 			"user_id": user.Id,
 		})
@@ -378,6 +383,12 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 
 	result.Answer = OTPAccepted
 	result.NextStep = "/auth/completed"
+	if enrolled {
+		// The set the authenticator came with waits on the ceremony for the page that shows it
+		// once, the step before /auth/completed (#257 decision 14).
+		holdRecoveryCodes(authContext, recoveryCodes)
+		result.NextStep = recoveryCodesStep
+	}
 	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
 		return result, nil
 	}

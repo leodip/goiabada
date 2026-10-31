@@ -2,7 +2,7 @@
 // way a real application starts it. The tests use it where only a browser sign-in leaves a trace, a
 // session or a consent, which the password grant does not.
 import { createHash, randomBytes } from "node:crypto";
-import type { Browser, BrowserContext, Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { env } from "./environment";
 
 // The redirect URI the tests register on their clients. Nothing answers there (nginx says 404), which
@@ -45,6 +45,19 @@ export async function submitPassword(page: Page, email: string, password: string
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForLoadState();
+}
+
+// After the code that set up an authenticator during a sign-in, the page that shows the ten recovery
+// codes the authenticator came with, once (#257): checks that it lists them, clicks Continue, and
+// returns them, as shown.
+export async function continuePastRecoveryCodes(page: Page): Promise<string[]> {
+  await page.waitForURL((url) => url.pathname === "/auth/recovery-codes");
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
+  const recoveryCodes = (await page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem").allInnerTexts())
+    .map((code) => code.trim());
+  expect(recoveryCodes).toHaveLength(10);
+  await page.getByRole("button", { name: "Continue" }).click();
+  return recoveryCodes;
 }
 
 // Signs the user in through the client in a browser of their own, approving the consent screen if one

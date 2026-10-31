@@ -89,6 +89,20 @@
 "auth.otp_recovery.button" = "Verifica"
 "auth.otp_recovery.back" = "Usa invece l'app di autenticazione"
 
+# --- Recovery codes after the sign-in setup (auth/recovery-codes) -----------
+
+"auth.recovery_codes.page_title" = "Salva i tuoi codici di recupero"
+"auth.recovery_codes.title" = "Salva i tuoi codici di recupero"
+"auth.recovery_codes.lead" = "Se perdi il telefono, puoi accedere con uno di questi codici al posto di un codice dell'app. Ogni codice funziona una sola volta. Salvali ora in un posto sicuro, come un gestore di password. Non vengono mostrati di nuovo."
+"auth.recovery_codes.list_label" = "Codici di recupero"
+"auth.recovery_codes.copy" = "Copia codici"
+"auth.recovery_codes.copied" = "Codici copiati"
+"auth.recovery_codes.copy_failed_status" = "Non è stato possibile copiare i codici. Sono selezionati: puoi copiarli manualmente."
+"auth.recovery_codes.shown_page_title" = "Codici di recupero"
+"auth.recovery_codes.shown_title" = "I tuoi codici di recupero sono già stati mostrati"
+"auth.recovery_codes.shown_lead" = "Vengono mostrati una sola volta. Se non li hai salvati, ottienine di nuovi nella console di amministrazione, in Account, Autenticazione a due fattori."
+"auth.recovery_codes.continue" = "Continua"
+
 # --- OTP enrollment (auth/otp, first-time) -----------------------------------
 
 "auth.otp_enrollment.page_title" = "Configura l'autenticazione a due fattori"

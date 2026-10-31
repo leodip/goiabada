@@ -301,7 +301,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// The previous step's code, so the current step's is left unspent above it for the control.
 	codeC := otptest.PreviousStepCode(t, secret)
 
-	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()

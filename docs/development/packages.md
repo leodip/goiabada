@@ -250,7 +250,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `/auth/level1` (`SelectLevel1Method`), `/auth/level1completed` (`Level1Completion`),
   `/auth/level2` (`Level2Selection`), `/auth/pwd` (`PasswordPrompt` on the GET and beside a refusal,
   `PasswordSubmission` on the POST), `/auth/otp` (`OTPPrompt` on the GET, `OTPSubmission` on the
-  POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET,
+  POST), `/auth/recovery-codes` (`RecoveryCodesPrompt` on the GET, `ContinueAfterRecoveryCodes` on
+  the POST), `/auth/completed` (`Completion`), `/auth/consent` (`ConsentPrompt` on the GET,
   `ConsentSubmission` on the POST), `/auth/issue` (`Issuance`) and a `prompt=none` request at
   `/auth/authorize` (`SilentAuthentication`, with `decideSilentAuthentication`, which
   `Authorization` hands it to). The handlers keep what reads the request and writes the response:

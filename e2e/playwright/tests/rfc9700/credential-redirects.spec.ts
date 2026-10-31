@@ -2,8 +2,9 @@
 // user's password, redirected with 307, hands the password to wherever the redirect points. The auth
 // server MUST NOT redirect such a POST with 307, and SHOULD use 303, the one status that requires the
 // browser to follow with a GET. These record the status of each POST of the sign-in: the password,
-// the one-time code (at enrolment, which is the same handler as at verification), the consent screen,
-// which answers the client itself when the user doesn't allow it, and a password reset.
+// the one-time code (at enrolment, which is the same handler as at verification), the Continue of the
+// page that shows the new authenticator's recovery codes, the consent screen, which answers the
+// client itself when the user doesn't allow it, and a password reset.
 import type { APIRequestContext, Browser, Page } from "@playwright/test";
 import { clientUrl } from "../../lib/admin-console";
 import { submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
@@ -41,6 +42,12 @@ async function signInPostStatuses(page: Page, browser: Browser, request: APIRequ
   await expect(tab).toHaveURL(/\/auth\/otp/);
   await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("#otp-secret").innerText()).trim()));
   statuses.otp = await postStatus(tab, "/auth/otp", () => tab.getByRole("button", { name: "Verify" }).click());
+
+  // The set the new authenticator came with, shown on a step of its own: the code's POST answered
+  // with a redirect to it rather than with the page (#257 decision 14).
+  await expect(tab).toHaveURL(/\/auth\/recovery-codes/);
+  await expect(tab.getByRole("list", { name: "Recovery codes" }).getByRole("listitem")).toHaveCount(10);
+  statuses.recoveryCodes = await postStatus(tab, "/auth/recovery-codes", () => tab.getByRole("button", { name: "Continue" }).click());
 
   await expect(tab).toHaveURL(/\/auth\/consent/);
   statuses.consentGiven = await postStatus(tab, "/auth/consent", () => tab.getByRole("button", { name: "Allow", exact: true }).click());
@@ -86,7 +93,7 @@ test("no POST of the sign-in is redirected with 307 or 308, so no password is se
   }
 });
 
-test("every POST of the sign-in, the password, the one-time code and the consent allowed or declined, is redirected with 303 (section 4.12 SHOULD)", async ({
+test("every POST of the sign-in, the password, the one-time code, the recovery codes' Continue and the consent allowed or declined, is redirected with 303 (section 4.12 SHOULD)", async ({
   page,
   browser,
   clients,
@@ -98,6 +105,12 @@ test("every POST of the sign-in, the password, the one-time code and the consent
   // The password reset answers its page itself, redirecting nowhere. The declined consent answers the
   // client itself, with access_denied, and carries no credential; it is a 303 all the same, since one
   // rule, a POST is answered with 303, is what the docs state.
-  const { password, otp, consentGiven, consentDeclined } = await signInPostStatuses(page, browser, request, client, user);
-  expect({ password, otp, consentGiven, consentDeclined }).toEqual({ password: 303, otp: 303, consentGiven: 303, consentDeclined: 303 });
+  const { password, otp, recoveryCodes, consentGiven, consentDeclined } = await signInPostStatuses(page, browser, request, client, user);
+  expect({ password, otp, recoveryCodes, consentGiven, consentDeclined }).toEqual({
+    password: 303,
+    otp: 303,
+    recoveryCodes: 303,
+    consentGiven: 303,
+    consentDeclined: 303,
+  });
 });

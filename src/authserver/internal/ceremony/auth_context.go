@@ -24,6 +24,7 @@ const (
 	AuthStateLevel1PasswordCompleted AuthState = "level1_password_completed"
 	AuthStateLevel1ExistingSession   AuthState = "level1_existing_session"
 	AuthStateLevel2OTP               AuthState = "level2_otp"
+	AuthStateLevel2RecoveryCodes     AuthState = "level2_recovery_codes"
 	AuthStateAuthenticationCompleted AuthState = "authentication_completed"
 	AuthStateRequiresConsent         AuthState = "requires_consent"
 	AuthStateReadyToIssueCode        AuthState = "ready_to_issue_code"
@@ -230,6 +231,16 @@ type AuthContext struct {
 	// Absent from a context written by an older binary it unmarshals as nil, and the comparison does
 	// not run: a ceremony in flight across the deploy binds as it did before #538.
 	AdoptedSessionAuthTime *time.Time
+	// RecoveryCodes is the set of recovery codes the authenticator this ceremony set up came with,
+	// as shown, held only until the page that shows them first renders: written by
+	// authflow.OTPSubmission when it stores the authenticator, and cleared by
+	// authflow.RecoveryCodesPrompt in the save that comes before that page renders, so a reload
+	// shows them no more (#257 decisions 1 and 14). The browser-session row the ceremony is stored
+	// in is sealed, and the codes are nowhere else: the database keeps only their hashes.
+	//
+	// Absent from a context written by an older binary it unmarshals as nil, which reads as "the
+	// codes were already shown", the page a reload draws.
+	RecoveryCodes []string
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -386,6 +397,7 @@ func (ac *AuthContext) Restart() {
 	ac.PasswordVerifiedAt = nil
 	ac.OtpClaimGeneration = nil
 	ac.AdoptedSessionAuthTime = nil
+	ac.RecoveryCodes = nil
 }
 
 // AddAuthMethod records a completed factor on AuthMethods, the space-separated list that becomes

@@ -46,7 +46,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 	assert.Equal(t, first, second,
 		"a reload of /auth/otp must render the secret the user has already scanned, not a fresh one")
 
-	resp := authenticateWithOtp(t, httpClient, otpUrl, reloaded, code)
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, reloaded, code))
 	_ = reloaded.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()

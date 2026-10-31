@@ -148,7 +148,7 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 
 	code := otptest.Code(t, secret, time.Now())
-	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, code)
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, otpPage, code))
 	_ = otpPage.Body.Close()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/completed")

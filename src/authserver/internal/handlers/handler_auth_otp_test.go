@@ -1273,9 +1273,13 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpEnrolTx, int64(1)).Return(nil).Once()
 		// The new authenticator's recovery codes, in the same transaction: the sign-in setup
 		// creates a set as the account page does (#257 decision 1).
+		var storedHashes []string
 		database.On("ReplaceUserRecoveryCodes", mock.Anything, otpEnrolTx, int64(1),
 			mock.MatchedBy(func(hashes []string) bool { return len(hashes) == 10 })).Return(nil).
-			Run(func(mock.Arguments) { calls = append(calls, "recovery-codes") }).Once()
+			Run(func(args mock.Arguments) {
+				calls = append(calls, "recovery-codes")
+				storedHashes = args.Get(3).([]string)
+			}).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return()
 		// The set is audited beside the enable, naming the user and nothing of the codes.
@@ -1290,8 +1294,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once().
 			Run(func(mock.Arguments) { calls = append(calls, "rotate") })
 
+		var savedRecoveryCodes []string
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
+			savedRecoveryCodes = append([]string(nil), ac.RecoveryCodes...)
+			// The set the new authenticator came with waits on the ceremony for the page that shows
+			// it, the step after this one (#257 decision 14); /auth/completed comes after that.
+			return ac.AuthState == ceremony.AuthStateLevel2RecoveryCodes &&
 				ac.AuthMethods == oidc.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// The value the increment returned, not the pre-enrollment value /auth/level2
@@ -1315,7 +1323,18 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/recovery-codes?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+
+		// The codes the ceremony holds are the ones whose hashes were stored, one for one: the set
+		// the page shows is the set that signs in.
+		if assert.Len(t, savedRecoveryCodes, 10) {
+			shownHashes := make([]string, 0, len(savedRecoveryCodes))
+			for _, code := range savedRecoveryCodes {
+				assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
+				shownHashes = append(shownHashes, recoveryCodeHashForTest(strings.ReplaceAll(code, "-", "")))
+			}
+			assert.ElementsMatch(t, storedHashes, shownHashes)
+		}
 
 		assert.Equal(t, []string{"begin", "establish", "increment", "clear", "recovery-codes", "commit", "rotate", "save"}, calls,
 			"the enable write, the counter advance and the pending-enrolment clear belong inside "+

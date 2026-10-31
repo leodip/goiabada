@@ -15,7 +15,7 @@ That's [two-factor authentication](/concepts/glossary/#two-factor-authentication
 
 1. In the admin console, open your client under **Admin**, **Clients**. On the **Settings** tab, set **Default ACR level** to **Level 3: password and a one-time code, always**, which is `urn:goiabada:level2_mandatory`, and click **Save**. Sign-ins that start after the change use it.
 
-2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither. A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave. See [Users who are already signed in](#users-who-are-already-signed-in).
+2. Sign in to your app as a user with no authenticator. After the password, the sign-in page asks you to set one up: scan the QR code with an authenticator app, then enter the code it shows. The next page shows ten [recovery codes](#recovery-codes), once: save them, then click **Continue** to reach your app. From then on, a sign-in that starts a new session asks for your password and then a code. While your session lasts, it's reused: signing in to your app again, or to another app at the same level, asks for neither. A request that asks for a fresh sign-in, with `prompt=login`, asks for both, whatever the session already gave. See [Users who are already signed in](#users-who-are-already-signed-in).
 
 3. In your app, check how the user signed in before you let them in. The ID token says it in two claims, `acr`, the level, and `amr`, the methods the user used:
 
@@ -56,7 +56,7 @@ The admin console signs administrators in through its own client, `admin-console
 
 A user can set up an authenticator before any client requires one, in the admin console under **Account**, **Two-factor authentication**: they scan the QR code, enter their password and the code the app shows, and click **Turn on two-factor authentication**. The page then shows ten [recovery codes](#recovery-codes), once: they save them somewhere safe, such as a password manager. A client at level 2, the level new clients start with, then asks them for a code too.
 
-At level 3, a user with no authenticator sets one up during the sign-in, on the page that asks for the code. Nothing is stored if their two-factor settings changed while they were doing it, for example in another tab: the sign-in ends, and they sign in again. See [ACR and AMR](/concepts/acr-and-amr/#setting-up-two-factor-authentication-during-a-sign-in).
+At level 3, a user with no authenticator sets one up during the sign-in, on the page that asks for the code. The page after it shows their ten recovery codes, once, and **Continue** goes on to the app. Reloading that page doesn't show the codes again: a user who didn't save them gets a new set in the admin console, under **Account**, **Two-factor authentication**. Nothing is stored if their two-factor settings changed while they were doing it, for example in another tab: the sign-in ends, and they sign in again. See [ACR and AMR](/concepts/acr-and-amr/#setting-up-two-factor-authentication-during-a-sign-in).
 
 The authenticator app lists the account under the auth server's **App name** and the user's email address.
 

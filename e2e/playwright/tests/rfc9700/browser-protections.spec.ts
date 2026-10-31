@@ -8,7 +8,7 @@
 // not offer.
 import type { Request, Response } from "@playwright/test";
 import { addRedirectUri, clientUrl, setImplicitGrant } from "../../lib/admin-console";
-import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
+import { continuePastRecoveryCodes, openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { codeToken } from "../../lib/oauth";
@@ -67,12 +67,14 @@ test("every page of the sign-in, its error pages included, refuses framing and l
 
   // The refusal page, at the authorization endpoint itself.
   await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(client.identifier, { redirect_uri: "https://attacker.example/cb" }).params)}`);
-  // Password, enrolment of a one-time code, consent, and the form_post page.
+  // Password, enrolment of a one-time code, the page showing its recovery codes, consent, and the
+  // form_post page.
   await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(codeRequest(client.identifier, { response_mode: "form_post" }).params)}`);
   await submitPassword(tab, user.email, user.password);
   await expect(tab).toHaveURL(/\/auth\/otp/);
   await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("#otp-secret").innerText()).trim()));
   await tab.getByRole("button", { name: "Verify" }).click();
+  await continuePastRecoveryCodes(tab);
   await expect(tab).toHaveURL(/\/auth\/consent/);
   await tab.getByRole("button", { name: "Allow", exact: true }).click();
   await tab.waitForURL((url) => url.href.startsWith(testRedirectUri));
@@ -90,7 +92,7 @@ test("every page of the sign-in, its error pages included, refuses framing and l
   await context.close();
 
   expect([...pages.keys()].sort()).toEqual(
-    ["/auth/authorize", "/auth/pwd", "/auth/otp", "/auth/consent", "/auth/issue", "/auth/level1completed", "/auth/logout", "/forgot-password", "/no-such-page"].sort(),
+    ["/auth/authorize", "/auth/pwd", "/auth/otp", "/auth/recovery-codes", "/auth/consent", "/auth/issue", "/auth/level1completed", "/auth/logout", "/forgot-password", "/no-such-page"].sort(),
   );
   for (const [path, headers] of pages) {
     await test.step(path, async () => {

@@ -89,7 +89,7 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	require.NotEqual(t, otpSecret, newSecret)
 	// The previous step's code, so the current step's is left unspent above it for the next sign-in.
 	enrolmentCode := otptest.PreviousStepCode(t, newSecret)
-	resp = authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode)
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, otpPage, enrolmentCode))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()

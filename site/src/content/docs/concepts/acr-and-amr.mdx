@@ -96,7 +96,7 @@ Removing the authenticator also lowers each of the user's sessions to what a pas
 
 ## Setting up two-factor authentication during a sign-in
 
-At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. The new authenticator is stored only while the account still has none. If it gains one meanwhile, because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
+At `urn:goiabada:level2_mandatory`, a user with no authenticator sets one up before they enter a code. Once the code is accepted, one more page shows the new authenticator's ten [recovery codes](/guides/require-two-factor-authentication/#recovery-codes), once, and its **Continue** goes on to your app. The new authenticator is stored only while the account still has none. If it gains one meanwhile, because the same user finished setting one up in another tab or on their account page, nothing is stored, and the sign-in ends on a page saying "Your two-factor authentication settings changed". That sign-in can't go on: the user goes back to the app and signs in again, which starts from the account's current settings.
 
 ## Next steps
 

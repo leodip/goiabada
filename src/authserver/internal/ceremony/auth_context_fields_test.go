@@ -54,6 +54,7 @@ var attemptFields = []string{
 	"PasswordVerifiedAt",
 	"OtpClaimGeneration",
 	"AdoptedSessionAuthTime",
+	"RecoveryCodes",
 }
 
 // restartedTo names the two attempt fields a restart does not leave at their zero value: the

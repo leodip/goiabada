@@ -137,10 +137,12 @@ test("the auth server's sign-in, two-factor, consent and sign-out pages", async 
       await own.locator("#otp").fill("000000");
       await verify.click();
     }),
-    titled(own, "consent", "Allow access", async () => {
+    titled(own, "two-factor setup, its recovery codes", "Save your recovery codes", async () => {
       await own.locator("#otp").fill(await freshTotp((await own.locator("#otp-secret").innerText()).trim()));
       await verify.click();
     }),
+    titled(own, "two-factor setup, its recovery codes already shown", "Your recovery codes were already shown", () => own.reload()),
+    titled(own, "consent", "Allow access", () => own.getByRole("button", { name: "Continue" }).click()),
     {
       // The redirect URI removed while the user was at the consent screen: the code is sent nowhere.
       name: "a sign-in stopped, its redirect URI gone",

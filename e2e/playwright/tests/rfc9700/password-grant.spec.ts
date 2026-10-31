@@ -3,7 +3,7 @@
 // clients an administrator turns it on for; these check that nobody else gets it, and that a user
 // with an authenticator never does, since the grant would sign them in on the password alone.
 import { clientUrl, readClientSecret } from "../../lib/admin-console";
-import { submitPassword } from "../../lib/browser-sign-in";
+import { continuePastRecoveryCodes, submitPassword } from "../../lib/browser-sign-in";
 import { expect, test } from "../../lib/fixtures";
 import { passwordToken } from "../../lib/oauth";
 import { authorizeEndpoint, basicAuth, codeRequest, emptyBrowser, expectTokenError, postToken } from "../../lib/rfc6749";
@@ -46,6 +46,7 @@ test("a user with an authenticator is refused the password grant, which cannot a
   await expect(tab).toHaveURL(/\/auth\/otp/);
   await tab.locator('input[name="otp"]').fill(await freshTotp((await tab.locator("#otp-secret").innerText()).trim()));
   await tab.getByRole("button", { name: "Verify" }).click();
+  await continuePastRecoveryCodes(tab);
   await tab.waitForURL((url) => url.searchParams.has("code"));
   await context.close();
 

@@ -105,6 +105,7 @@ var ceremonyRoutes = map[string]bool{
 	"/auth/level1completed": true,
 	"/auth/level2":          true,
 	"/auth/otp":             true,
+	"/auth/recovery-codes":  true,
 	"/auth/completed":       true,
 	"/auth/consent":         true,
 	"/auth/issue":           true,

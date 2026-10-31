@@ -157,6 +157,11 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
 		r.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
 		r.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher)))
+		// The set of recovery codes an authenticator set up during this sign-in came with, shown once
+		// after the accepted setup code, and the Continue that goes on to /auth/completed (#257
+		// decision 14). It checks no credential, so neither method is behind a limiter.
+		r.Get("/recovery-codes", handlers.HandleAuthRecoveryCodesGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewRecoveryCodesPrompt(s.database)))
+		r.Post("/recovery-codes", handlers.HandleAuthRecoveryCodesPost(ceremonyBoundary, ceremonyStore))
 		r.Get("/consent", handlers.HandleConsentGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewConsentPrompt(s.database)))
 		r.Post("/consent", handlers.HandleConsentPost(ceremonyBoundary, clientErrorResponder, httpHelper, ceremonyStore, authflow.NewConsentSubmission(s.database, permissionChecker, auditLogger)))
 		r.Get("/logout", handlers.HandleLogoutGet(httpHelper, s.sessionStore, s.database, tokenParser, auditLogger, s.dataCipher))

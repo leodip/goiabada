@@ -991,7 +991,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1142,7 +1142,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1984,7 +1984,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 
 	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")

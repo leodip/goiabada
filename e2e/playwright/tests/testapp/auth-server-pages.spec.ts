@@ -1,12 +1,14 @@
 // The auth server's own pages a user of the test app meets beyond the steps the other files drive:
 // the two-factor setup page's key, for an authenticator app that cannot scan the QR code, and its
-// Copy key; two tabs signing in side by side, and the page a sign-in pushed out meets; and the not
+// Copy key; the page after it showing the new authenticator's recovery codes once, and its Copy
+// codes; two tabs signing in side by side, and the page a sign-in pushed out meets; and the not
 // found page.
 import type { Browser, BrowserContextOptions } from "@playwright/test";
 import { submitPassword } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, type TestUser, test } from "../../lib/fixtures";
 import { expectResult, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
+import { freshTotp } from "../../lib/totp";
 
 // Signs the user in to the web app at level 2 mandatory, in a browser of their own with these
 // options, and returns once the page that sets up their authenticator shows. initScript runs in the
@@ -52,6 +54,32 @@ test("a copy the browser refuses selects the key instead, and says so", async ({
   await expect(page.getByRole("button", { name: "Couldn't copy" })).toBeVisible();
   await expect(page.locator("#otp-secret-copied")).toHaveText("Couldn't copy the key. It's selected, so you can copy it yourself.");
   expect(await page.evaluate(() => window.getSelection()?.toString().trim())).toBe(key);
+  await context.close();
+});
+
+// The code from the setup page sends the user to a page of its own showing the ten recovery codes the
+// authenticator came with (#257 decision 14). Copy codes copies them, one a line; a reload shows them
+// no more, and Continue on either page finishes the sign-in.
+test("after two-factor setup, the recovery codes are shown once, Copy codes copies them, and Continue signs in", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page, key } = await openTwoFactorSetup(browser, user, { permissions: ["clipboard-read", "clipboard-write"] });
+  await page.locator('input[name="otp"]').fill(await freshTotp(key));
+  await page.getByRole("button", { name: "Verify" }).click();
+
+  await expect(page).toHaveURL(/\/auth\/recovery-codes/);
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
+  const shown = (await page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem").allInnerTexts()).map((c) => c.trim());
+  expect(shown).toHaveLength(10);
+  await page.getByRole("button", { name: "Copy codes" }).click();
+  await expect(page.getByRole("button", { name: "Codes copied" })).toBeVisible();
+  expect((await page.evaluate(() => navigator.clipboard.readText())).split(/\s+/).filter(Boolean)).toEqual(shown);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Your recovery codes were already shown" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Recovery codes" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForURL(testapp.web.url);
+  await expectResult(page, "Signed in");
   await context.close();
 });
 

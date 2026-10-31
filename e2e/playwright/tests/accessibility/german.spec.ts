@@ -119,6 +119,13 @@ for (const theme of ["light", "dark"] as const) {
     await fitsInGerman(own);
     await own.locator("#otp").fill(await freshTotp((await own.locator("#otp-secret").innerText()).trim()));
     await own.getByRole("button", { name: "Bestätigen", exact: true }).click();
+    // The new authenticator's recovery codes, shown once, then the page a reload draws.
+    await expect(own.getByRole("heading", { level: 1 })).toHaveText("Speichern Sie Ihre Wiederherstellungscodes");
+    await fitsInGerman(own);
+    await own.reload();
+    await expect(own.getByRole("heading", { level: 1 })).toHaveText("Ihre Wiederherstellungscodes wurden bereits angezeigt");
+    await fitsInGerman(own);
+    await own.getByRole("button", { name: "Weiter", exact: true }).click();
     await expect(own.getByRole("heading", { level: 1 })).toHaveText("Zugriff erlauben");
     await fitsInGerman(own);
     await page.goto(clientUrl(client.id, "redirect-uris"));

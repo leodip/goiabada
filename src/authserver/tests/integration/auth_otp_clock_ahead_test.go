@@ -117,7 +117,7 @@ func TestAuthOtp_ANextStepCodeOnTheSetupFormIsRefusedAsAClockRunningAhead(t *tes
 	assert.Zero(t, stored.LastOTPStep, "and no step was claimed")
 	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.Id))
 
-	resp := authenticateWithOtp(t, httpClient, otpUrl, page, otptest.Code(t, secret, time.Now()))
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, page, otptest.Code(t, secret, time.Now())))
 	_ = page.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
