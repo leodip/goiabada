@@ -1616,6 +1616,7 @@
 # --- OTP handler (LocalizedError-backed) -------------------------------------
 
 "handler.otp.account_disabled" = "Tu cuenta está desactivada."
+"handler.otp.clock_ahead" = "Parece que el reloj de tu dispositivo va adelantado. Comprueba que la fecha y la hora se ajustan automáticamente y escribe el código que muestra tu aplicación."
 "handler.otp.code_required" = "Escribe el código de 6 dígitos de tu aplicación de autenticación."
 "handler.otp.incorrect_code" = "Ese código no es correcto. Los códigos cambian cada 30 segundos; escribe el que muestra tu aplicación ahora."
 

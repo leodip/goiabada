@@ -192,6 +192,10 @@ const (
 	// OTPRefused is a wrong code, or a replayed one. The form is shown again with one message for
 	// both: a code already spent proves nothing about who is submitting it.
 	OTPRefused
+	// OTPClockAhead is a code from the time step after the server's current one, which only an
+	// authenticator whose clock runs ahead shows. The form is shown again with a message to check
+	// the device's time, and nothing was charged or counted for it (#142).
+	OTPClockAhead
 	// OTPAccepted is a code accepted, and for an enrolling user the authenticator stored: the ceremony
 	// recorded it, the browser session's identifier was rotated, and the ceremony saved in
 	// authentication_completed.
@@ -202,7 +206,8 @@ const (
 type OTPSubmissionResult struct {
 	Answer OTPAnswer
 	// Display is the client block, for the form shown again beside a refusal: set on
-	// OTPAccountDisabled, OTPCodeMissing and OTPRefused, and nil on the two answers that show no form.
+	// OTPAccountDisabled, OTPCodeMissing, OTPRefused and OTPClockAhead, and nil on the two answers
+	// that show no form.
 	Display *ClientDisplayInfo
 	// EnrolmentSecret is the base32 secret of the ceremony's enrolment key, "" for a user with no key
 	// on the ceremony. The form shown again beside a refusal is the enrolment form when it is set.
@@ -235,7 +240,9 @@ type OTPSubmissionResult struct {
 //     EventAuthFailedOtp, and answers OTPRefused. A wrong code: charges it, audits
 //     EventAuthFailedOtp, and answers OTPRefused. Every wrong code is a guess the OTP budget bounds
 //     (#219). The refusal that disabled the authenticator also audits EventOTPAuthenticatorDisabled,
-//     after the others (#489).
+//     after the others (#489). A code from the next step: audits EventAuthFailedOtp with the reason
+//     clock_ahead and answers OTPClockAhead, charging nothing, since only the authenticator can
+//     produce it (#142).
 //  8. An enrolling user: stores the key as the user's authenticator (otpcredential.Establish), which
 //     lands only while the user's OTP configuration generation is still the one read in step 2. A
 //     failed write is returned as an error; a write that did not land ends the lost enrolment
@@ -244,10 +251,10 @@ type OTPSubmissionResult struct {
 //     the generation of the authenticator it was checked against, rotates the browser session's
 //     identifier, and only then saves the ceremony in authentication_completed.
 //
-// An answer that shows the form again, OTPAccountDisabled, OTPCodeMissing or OTPRefused, loads the
-// client block for it last (refuse), after everything else that answer does; a failed read, or a
-// client not found, is returned as an error. An accepted code redirects and a lost enrolment ends on
-// a page of its own, so neither reads the client.
+// An answer that shows the form again, OTPAccountDisabled, OTPCodeMissing, OTPRefused or
+// OTPClockAhead, loads the client block for it last (refuse), after everything else that answer
+// does; a failed read, or a client not found, is returned as an error. An accepted code redirects
+// and a lost enrolment ends on a page of its own, so neither reads the client.
 //
 // A lost enrolment (#471 decision 2, #144) logs a warn record and clears the ceremony, answering
 // OTPEnrolmentLost: nothing was stored, so the ceremony has no second factor to claim. Nothing is
@@ -320,6 +327,14 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		})
 		o.auditDisabled(ctx, verified, user.Id)
 		return o.refuse(ctx, authContext, result, OTPRefused)
+	case otpcredential.OutcomeClockAhead:
+		// Not charged to the rate limiter, and not counted against the authenticator by
+		// VerifyStored: a device whose clock runs ahead is no guess (#142).
+		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
+			"user_id": user.Id,
+			"reason":  audit.AuthFailedOtpClockAhead,
+		})
+		return o.refuse(ctx, authContext, result, OTPClockAhead)
 	}
 
 	verifiedGeneration := user.OtpConfigGeneration

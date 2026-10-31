@@ -60,6 +60,12 @@ func isEncryptedOTPSeed(stored []byte) bool {
 	return err == nil && plain == otpSeed
 }
 
+// clockAheadNow is the instant the clock-ahead cases verify at: 20 seconds into a step, and one
+// at which no step within eight either side of it produces the same passcode for otpSeed (otp's
+// verifier table pins the same instant), so the next step's code matches nothing the window
+// accepts.
+var clockAheadNow = time.Unix(1700000000, 0).UTC()
+
 // codeFor returns a passcode the given seed produces at now, which is what a user reads off their
 // authenticator app.
 func codeFor(t *testing.T, seed string, now time.Time) string {
@@ -374,6 +380,26 @@ func TestVerifyStored(t *testing.T) {
 		assert.Equal(t, now.Unix()/otp.StepSeconds, result.Step)
 	})
 
+	// Only an authenticator whose clock runs ahead of the server's shows the next step's code, so
+	// it is no guess: nothing is claimed, since the step is not accepted, and the count that
+	// disables the authenticator does not move (#142). The mock has no expectation, so any write
+	// fails the case.
+	t.Run("a code from the next step is refused as a clock running ahead, claiming and counting nothing", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+
+		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t),
+			codeFor(t, otpSeed, clockAheadNow.Add(otp.StepSeconds*time.Second)), clockAheadNow)
+
+		require.NoError(t, err)
+		assert.Equal(t, OutcomeClockAhead, result.Outcome)
+		assert.Zero(t, result.Step, "no step was accepted, so none is named")
+		assert.False(t, result.Disabled)
+		database.AssertNotCalled(t, "TryConsumeEnrolledUserOTPStep",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "IncrementUserOtpConsecutiveFailures",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
 	t.Run("a failing claim is an error rather than a refusal", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		claimErr := errors.New("claim refused")
@@ -431,6 +457,19 @@ func TestVerifySupplied(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, OutcomeWrong, result.Outcome)
+		database.AssertNotCalled(t, "TryConsumeUserOTPStep",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("a code from the next step is refused as a clock running ahead, claiming nothing", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+
+		result, err := VerifySupplied(context.Background(), database, enrollableUser(), suppliedSeed,
+			codeFor(t, suppliedSeed, clockAheadNow.Add(otp.StepSeconds*time.Second)), clockAheadNow)
+
+		require.NoError(t, err)
+		assert.Equal(t, OutcomeClockAhead, result.Outcome)
+		assert.Zero(t, result.Step)
 		database.AssertNotCalled(t, "TryConsumeUserOTPStep",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})

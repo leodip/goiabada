@@ -10,23 +10,30 @@ import (
 const StepSeconds = 30
 
 const (
-	// skewSteps is how far either side of the current step a code is accepted, the
-	// window pquerna/otp's totp.Validate applied before the primitive became this
-	// package's (#646). Narrowing it is #142, deliberately not part of this change (#111
-	// decision 6).
-	skewSteps = 1
+	// pastSteps and futureSteps are the accepted window around the current step: the
+	// previous step and the current one, and no step after it (#142). RFC 6238 section 5.2
+	// recommends "at most one time step is allowed as the network delay", which is the
+	// previous step; only an authenticator whose clock runs ahead of the server's produces
+	// the next step's code, and accepting it doubled how long a stolen code stays usable.
+	// MatchStep tells that code apart instead, as ClockAhead, so the user is told to check
+	// the device's time rather than that the code is wrong. The window pquerna/otp's
+	// totp.Validate applied before the primitive became this package's (#646) was one step
+	// either side.
+	pastSteps   = 1
+	futureSteps = 0
 
 	// lookbackSteps is how far below a step MatchStep looks for an earlier one
 	// producing the same passcode. Derived from the window rather than written as a
-	// literal, so narrowing the skew narrows this with it.
+	// literal, so changing the window changes this with it.
 	//
-	// Step A is acceptable while the current step is A-skew through A+skew, so two
-	// steps producing one passcode are acceptable over an unbroken run of current
-	// steps only when they are at most 2*skew+1 apart. A wider pair has a gap in
-	// which the passcode is refused, and by the time it is accepted again the
-	// authenticator is legitimately displaying those same digits for a new step,
-	// which no marker recording a step can tell apart (#111 decision 11).
-	lookbackSteps = 2*skewSteps + 1
+	// Step A is acceptable while the current step is A-futureSteps through A+pastSteps,
+	// pastSteps+futureSteps+1 current steps, so two steps producing one passcode are
+	// acceptable over an unbroken run of current steps only when they are at most that
+	// far apart: 2 under the window above. A wider pair has a gap in which the passcode
+	// is refused, and by the time it is accepted again the authenticator is legitimately
+	// displaying those same digits for a new step, which no marker recording a step can
+	// tell apart (#111 decision 11).
+	lookbackSteps = pastSteps + futureSteps + 1
 
 	// maxLookbackScans bounds how far the walk in matchStepWith repeats, so resolving
 	// a chain of colliding steps costs at most maxLookbackScans*lookbackSteps HMAC
@@ -56,6 +63,23 @@ const (
 	maxLookbackScans = 5
 )
 
+// Match is what MatchStep found for a passcode.
+type Match int
+
+const (
+	// NoMatch is a passcode no step in the window, or just after it, produces: a wrong
+	// code. The zero value, so a Match nobody set refuses.
+	NoMatch Match = iota
+	// Matched is a passcode a step inside the window produces, and the only answer that
+	// accepts it. The step MatchStep reports with it is the one to claim.
+	Matched
+	// ClockAhead is a passcode the step after the window produces and none inside it does,
+	// which only an authenticator whose clock runs ahead of the server's shows (#142). It is
+	// refused, but not as a wrong code: the caller tells the user to check the device's time
+	// and charges them nothing for it, since nobody guessing is helped by it.
+	ClockAhead
+)
+
 // producesPasscode reports whether the given time step produces the passcode being
 // verified. MatchStep supplies the HOTP of the user's secret at that step. A test
 // supplies an explicit set of steps instead, which is the only way to reach a chain of
@@ -63,9 +87,9 @@ const (
 // decision 12, which amends the seams for exactly this reason).
 type producesPasscode func(step int64) (bool, error)
 
-// MatchStep reports which time step produced passcode, within the accepted skew
-// window, so the caller can record that step as consumed. now is a parameter rather
-// than read here so the window can be tested at a pinned instant.
+// MatchStep reports which time step produced passcode, within the accepted window of the
+// previous and current step, so the caller can record that step as consumed. now is a
+// parameter rather than read here so the window can be tested at a pinned instant.
 //
 // A passcode does not name a step. Several steps can produce the same six digits, so
 // the step reported is the lowest one in the chain of such steps, found by walking
@@ -80,34 +104,44 @@ type producesPasscode func(step int64) (bool, error)
 // decision 12). What is accepted does not change either way: only a match inside the
 // window accepts, and the walk moves nothing but the answer.
 //
+// A passcode produced by the step after the window and by none inside it is ClockAhead,
+// and names no step: it is not accepted, so there is nothing to claim. The walk does not
+// run for it.
+//
 // A secret that decodes to no key, empty or whitespace alone, matches nothing (#111
 // decision 9), refused where every secret is decoded, in decodeSecret.
-func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
+func MatchStep(passcode string, secret string, now time.Time) (int64, Match) {
 	produces := func(step int64) (bool, error) {
 		//nolint:gosec // G115: steps count 30-second periods since 1970 from the current time, never negative
 		return passcodeMatches(passcode, uint64(step), secret)
 	}
 
-	step, matched, err := matchStepWith(produces, now.Unix()/StepSeconds)
+	step, match, err := matchStepWith(produces, now.Unix()/StepSeconds)
 	if err != nil {
 		// Errors collapse to "no match" rather than propagating, as pquerna/otp's
 		// totp.Validate did. A wrong-length passcode, an unparseable secret or one that
 		// decodes to no key stays a generic incorrect-OTP response instead of becoming a 500.
-		return 0, false
+		return 0, NoMatch
 	}
-	if !matched {
-		return 0, false
-	}
-	return step, true
+	return step, match
 }
 
 // matchStepWith is MatchStep's step arithmetic over a step predicate rather than over
 // the HMAC directly, so the walk below can be pinned against a chain of colliding steps
 // that no real secret produces.
-func matchStepWith(produces producesPasscode, current int64) (int64, bool, error) {
-	lowest, matched, err := lowestMatch(produces, current-skewSteps, current+skewSteps)
-	if err != nil || !matched {
-		return 0, false, err
+func matchStepWith(produces producesPasscode, current int64) (int64, Match, error) {
+	lowest, matched, err := lowestMatch(produces, current-pastSteps, current+futureSteps)
+	if err != nil {
+		return 0, NoMatch, err
+	}
+	if !matched {
+		// Checked only once nothing inside the window matched, so a passcode both an
+		// accepted step and the next one produce is accepted as the accepted step's.
+		ahead, err := produces(current + futureSteps + 1)
+		if err != nil || !ahead {
+			return 0, NoMatch, err
+		}
+		return 0, ClockAhead, nil
 	}
 
 	// Walk down from the matched step rather than searching one fixed interval below
@@ -128,15 +162,15 @@ func matchStepWith(produces producesPasscode, current int64) (int64, bool, error
 			// predicate's errors are a secret that does not decode to a key and a
 			// wrong-length passcode, and none depends on the step. Refused anyway rather than answered with a
 			// step whose chain has not been walked to the bottom.
-			return 0, false, err
+			return 0, NoMatch, err
 		}
 		if !found {
-			return lowest, true, nil
+			return lowest, Matched, nil
 		}
 		if scans == maxLookbackScans {
 			// A chain longer than anything reachable, so this is a fault rather than a
 			// user. Refuse, for the reason maxLookbackScans records.
-			return 0, false, nil
+			return 0, NoMatch, nil
 		}
 		lowest = earlier
 	}

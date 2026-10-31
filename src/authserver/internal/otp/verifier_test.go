@@ -54,41 +54,42 @@ func TestMatchStep(t *testing.T) {
 	codeAtPinnedStep := codeAtStep(t, validSecret, pinnedStep)
 
 	tests := []struct {
-		name         string
-		passcode     string
-		secret       string
-		expectedStep int64
-		expectedOk   bool
+		name          string
+		passcode      string
+		secret        string
+		expectedStep  int64
+		expectedMatch Match
 	}{
 		{
-			// Outside the window: MatchStep only tries the deltas 0, -1 and +1.
+			// Outside the window: MatchStep accepts the previous and the current step only.
 			name:     "Code from two steps back is refused",
 			passcode: codeAtStep(t, validSecret, pinnedStep-2),
 			secret:   validSecret,
 		},
 		{
-			name:         "Code from the previous step is accepted, naming that step",
-			passcode:     codeAtStep(t, validSecret, pinnedStep-1),
-			secret:       validSecret,
-			expectedStep: pinnedStep - 1,
-			expectedOk:   true,
+			name:          "Code from the previous step is accepted, naming that step",
+			passcode:      codeAtStep(t, validSecret, pinnedStep-1),
+			secret:        validSecret,
+			expectedStep:  pinnedStep - 1,
+			expectedMatch: Matched,
 		},
 		{
-			name:         "Code from the current step is accepted, naming that step",
-			passcode:     codeAtPinnedStep,
-			secret:       validSecret,
-			expectedStep: pinnedStep,
-			expectedOk:   true,
+			name:          "Code from the current step is accepted, naming that step",
+			passcode:      codeAtPinnedStep,
+			secret:        validSecret,
+			expectedStep:  pinnedStep,
+			expectedMatch: Matched,
 		},
 		{
-			name:         "Code from the next step is accepted, naming that step",
-			passcode:     codeAtStep(t, validSecret, pinnedStep+1),
-			secret:       validSecret,
-			expectedStep: pinnedStep + 1,
-			expectedOk:   true,
+			// Only an authenticator whose clock runs ahead of the server's shows it, so it is
+			// told apart from a wrong code, and names no step: nothing is claimed (#142).
+			name:          "Code from the next step is refused as a clock running ahead, naming no step",
+			passcode:      codeAtStep(t, validSecret, pinnedStep+1),
+			secret:        validSecret,
+			expectedMatch: ClockAhead,
 		},
 		{
-			// Outside the window, same as two steps back.
+			// Outside the window and past the next step, so an ordinary wrong code.
 			name:     "Code from two steps ahead is refused",
 			passcode: codeAtStep(t, validSecret, pinnedStep+2),
 			secret:   validSecret,
@@ -120,21 +121,21 @@ func TestMatchStep(t *testing.T) {
 			secret:   validSecret,
 		},
 		{
-			name:         "Passcode padded with whitespace is accepted, since it is trimmed",
-			passcode:     " " + codeAtPinnedStep + " ",
-			secret:       validSecret,
-			expectedStep: pinnedStep,
-			expectedOk:   true,
+			name:          "Passcode padded with whitespace is accepted, since it is trimmed",
+			passcode:      " " + codeAtPinnedStep + " ",
+			secret:        validSecret,
+			expectedStep:  pinnedStep,
+			expectedMatch: Matched,
 		},
 		{
 			// Keep this. It asserts acceptance, which reads like a laxity to tighten.
 			// A secret is upper-cased before it is decoded, as pquerna/otp did, so Google's
 			// lower-case base32 works and refusing it here would be a silent behaviour change.
-			name:         "Lower-case secret is accepted, since it is upper-cased",
-			passcode:     codeAtPinnedStep,
-			secret:       strings.ToLower(validSecret),
-			expectedStep: pinnedStep,
-			expectedOk:   true,
+			name:          "Lower-case secret is accepted, since it is upper-cased",
+			passcode:      codeAtPinnedStep,
+			secret:        strings.ToLower(validSecret),
+			expectedStep:  pinnedStep,
+			expectedMatch: Matched,
 		},
 		{
 			// Keep this, together with the row below. The two look contradictory: the
@@ -150,11 +151,11 @@ func TestMatchStep(t *testing.T) {
 		},
 		{
 			// Keep this, together with the row above.
-			name:         "Secret with surrounding spaces is accepted, since it is trimmed",
-			passcode:     codeAtPinnedStep,
-			secret:       " " + validSecret + " ",
-			expectedStep: pinnedStep,
-			expectedOk:   true,
+			name:          "Secret with surrounding spaces is accepted, since it is trimmed",
+			passcode:      codeAtPinnedStep,
+			secret:        " " + validSecret + " ",
+			expectedStep:  pinnedStep,
+			expectedMatch: Matched,
 		},
 		{
 			// Unparseable base32 secret, as above.
@@ -193,9 +194,9 @@ func TestMatchStep(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			step, ok := MatchStep(tt.passcode, tt.secret, now)
+			step, match := MatchStep(tt.passcode, tt.secret, now)
 
-			assert.Equal(t, tt.expectedOk, ok)
+			assert.Equal(t, tt.expectedMatch, match)
 			// The accepted rows assert the step, not just the boolean, or the table
 			// would pass with the step arithmetic wrong.
 			assert.Equal(t, tt.expectedStep, step)
@@ -206,37 +207,73 @@ func TestMatchStep(t *testing.T) {
 // Keep all of this. Two time steps can produce the same six digits, so a passcode
 // does not name a step (#111 decision 11). MatchStep answers with the lowest step in
 // the chain of steps that produce it, and what these subtests assert is that the
-// answer is the *same* at every current step from which that passcode is accepted.
-// That constancy is the whole mechanism: the first claim of that step is what
-// refuses every later presentation of the same passcode.
+// answer is the *same* at every current step from which that passcode is accepted
+// in one unbroken run. That constancy is the whole mechanism: the first claim of that
+// step is what refuses every later presentation of the same passcode.
 //
 // The table above cannot pin any of this. Nothing collides within eight steps of the
-// instant it pins, so every rule decision 11 rejected passes all 17 of its rows,
+// instant it pins, so every rule decision 11 rejected passes all of its rows,
 // including the shipped one that returned the step matched inside the window.
 // Colliding pairs are rare, roughly 8 authentications in a million meet one, so no
 // other test in the suite will ever reach this path by accident.
 //
-// The pairs, and the expected answer at each current step, are transcribed from an
-// executed sweep of 600,000 consecutive steps of this secret, which also confirmed that
-// no third step within eight either side produces these passcodes. That is what makes the
-// answer constant rather than merely lower than it was. The sweep ran over pquerna/otp's
-// HMAC, so the check below that both steps still produce one passcode also shows this
-// package's HOTP and otptest's agreeing with the library at six steps no RFC vector names.
+// The pairs are transcribed from an executed sweep of 600,000 consecutive steps of this
+// secret, which also confirmed that no third step within eight either side produces these
+// passcodes. That is what makes the answer constant rather than merely lower than it was.
+// The sweep ran over pquerna/otp's HMAC, so the check below that both steps still produce
+// one passcode also shows this package's HOTP and otptest's agreeing with the library at
+// six steps no RFC vector names.
+//
+// Every expectation is a literal for the window of the previous and current step (#142):
+// a step is accepted while the current step is that step or the one after it, and the
+// current step before it is the clock-ahead refusal. Two steps up to two apart are
+// therefore accepted over one unbroken run and answered with the lower step throughout.
+// Three apart, the pair the wider window still covered, now has a refused step between
+// its two runs, so the upper step is answered for itself: the residual lookbackSteps
+// records as inherent, which no step marker can refuse.
 func TestMatchStepWithCollidingSteps(t *testing.T) {
-	// Written for the skew of 1 the server runs at. Spreads are stated as literals
-	// rather than in terms of skewSteps so that #142, if it ever narrows the window,
-	// fails here loudly: which spreads are continuously acceptable is 2*skew+1, so
-	// these rows are claims about the window as much as about the pairs.
+	type answer struct {
+		current int64
+		match   Match
+		step    int64
+	}
+
 	pairs := []struct {
-		name  string
-		lower int64
-		upper int64
+		name    string
+		lower   int64
+		upper   int64
+		answers []answer
 	}{
-		{"Two steps one apart", 56245959, 56245960},
-		{"Two steps two apart", 818665, 818667},
-		// Three apart, the widest pair that is acceptable over an unbroken run of
-		// current steps and so the widest one a step marker can refuse at all.
-		{"Two steps three apart", 56077475, 56077478},
+		{"Two steps one apart", 56245959, 56245960, []answer{
+			{56245957, NoMatch, 0},
+			{56245958, ClockAhead, 0},
+			{56245959, Matched, 56245959},
+			{56245960, Matched, 56245959},
+			{56245961, Matched, 56245959},
+			{56245962, NoMatch, 0},
+		}},
+		// Two apart, the widest pair that is acceptable over an unbroken run of current
+		// steps and so the widest one a step marker can refuse at all.
+		{"Two steps two apart", 818665, 818667, []answer{
+			{818663, NoMatch, 0},
+			{818664, ClockAhead, 0},
+			{818665, Matched, 818665},
+			{818666, Matched, 818665},
+			{818667, Matched, 818665},
+			{818668, Matched, 818665},
+			{818669, NoMatch, 0},
+		}},
+		{"Two steps three apart, with a refused step between their runs", 56077475, 56077478, []answer{
+			{56077473, NoMatch, 0},
+			{56077474, ClockAhead, 0},
+			{56077475, Matched, 56077475},
+			{56077476, Matched, 56077475},
+			// The previous step, 56077476, does not produce it, and the next one does.
+			{56077477, ClockAhead, 0},
+			{56077478, Matched, 56077478},
+			{56077479, Matched, 56077478},
+			{56077480, NoMatch, 0},
+		}},
 	}
 
 	for _, p := range pairs {
@@ -245,20 +282,11 @@ func TestMatchStepWithCollidingSteps(t *testing.T) {
 			require.Equal(t, passcode, codeAtStep(t, validSecret, p.upper),
 				"the two steps must still produce one passcode, or this proves nothing")
 
-			for current := p.lower - 2; current <= p.upper+2; current++ {
-				step, ok := MatchStep(passcode, validSecret, stepMidpoint(current))
+			for _, a := range p.answers {
+				step, match := MatchStep(passcode, validSecret, stepMidpoint(a.current))
 
-				// Refused outside the window of both steps. Neither colliding step
-				// is within skew of the current one there, and the lookback widens
-				// nothing: it moves the answer, never the acceptance.
-				if current < p.lower-1 || current > p.upper+1 {
-					assert.False(t, ok, "current step %d", current)
-					assert.Equal(t, int64(0), step, "current step %d", current)
-					continue
-				}
-
-				assert.True(t, ok, "current step %d", current)
-				assert.Equal(t, p.lower, step, "current step %d", current)
+				assert.Equal(t, a.match, match, "current step %d", a.current)
+				assert.Equal(t, a.step, step, "current step %d", a.current)
 			}
 		})
 	}
@@ -276,9 +304,11 @@ func TestMatchStepWithCollidingSteps(t *testing.T) {
 // 0 chains of three in 20,000,000 steps over 4 secrets, against 1.8e-04 expected.
 // Driving MatchStep with a real secret
 // therefore passes with the walk deleted. The steps below are a synthetic match set
-// standing in for the HMAC, and the shapes are every one that is acceptable over an
-// unbroken run of current steps: pairs up to spread 5, and every chain of three whose
-// adjacent gaps are at most 3.
+// standing in for the HMAC. Under the window of the previous and current step (#142) the
+// shapes acceptable over an unbroken run of current steps are the pairs up to spread 2
+// and every chain of three whose adjacent gaps are at most 2; each is here, beside the
+// pairs and chains one and two gaps wider, which have a refused step between their runs
+// and are the inherent case.
 //
 // Each shape is checked by replaying decision 2's high-water claim over every
 // presentation, rather than by transcribing an expected step per current step: claim the
@@ -295,23 +325,21 @@ func TestMatchStepWithChainsOfCollidingSteps(t *testing.T) {
 		// Offsets from lowestStep, ascending, starting at 0.
 		steps []int64
 		// Whether a second acceptance is expected to remain possible. True only for the
-		// pairs decisions 11 and 12 both accepted as inherent.
+		// shapes with a gap wider than the lookback, which decisions 11 and 12 accepted as
+		// inherent.
 		inherent bool
 	}{
 		{name: "Two steps one apart", steps: []int64{0, 1}},
 		{name: "Two steps two apart", steps: []int64{0, 2}},
-		{name: "Two steps three apart", steps: []int64{0, 3}},
+		{name: "Two steps three apart, inherent", steps: []int64{0, 3}, inherent: true},
 		{name: "Two steps four apart, inherent", steps: []int64{0, 4}, inherent: true},
-		{name: "Two steps five apart, inherent", steps: []int64{0, 5}, inherent: true},
 		{name: "Three steps, gaps of one and one", steps: []int64{0, 1, 2}},
 		{name: "Three steps, gaps of one and two", steps: []int64{0, 1, 3}},
-		{name: "Three steps, gaps of one and three", steps: []int64{0, 1, 4}},
 		{name: "Three steps, gaps of two and one", steps: []int64{0, 2, 3}},
 		{name: "Three steps, gaps of two and two", steps: []int64{0, 2, 4}},
-		{name: "Three steps, gaps of two and three", steps: []int64{0, 2, 5}},
-		{name: "Three steps, gaps of three and one", steps: []int64{0, 3, 4}},
-		{name: "Three steps, gaps of three and two", steps: []int64{0, 3, 5}},
-		{name: "Three steps, gaps of three and three", steps: []int64{0, 3, 6}},
+		{name: "Three steps, gaps of one and three, inherent", steps: []int64{0, 1, 4}, inherent: true},
+		{name: "Three steps, gaps of three and one, inherent", steps: []int64{0, 3, 4}, inherent: true},
+		{name: "Three steps, gaps of two and three, inherent", steps: []int64{0, 2, 5}, inherent: true},
 	}
 
 	for _, shape := range shapes {
@@ -324,21 +352,21 @@ func TestMatchStepWithChainsOfCollidingSteps(t *testing.T) {
 			produces := func(step int64) (bool, error) { return matches[step], nil }
 
 			// One current step either side of everything acceptable, so a refusal at the
-			// edges is part of what is swept.
-			first, last := lowestStep-skewSteps-1, highestStep+skewSteps+1
+			// edges is part of what is swept, the clock-ahead step below the lowest included.
+			first, last := lowestStep-2, highestStep+2
 
 			var replays []string
 			for claimAt := first; claimAt <= last; claimAt++ {
-				claimed, ok, err := matchStepWith(produces, claimAt)
+				claimed, match, err := matchStepWith(produces, claimAt)
 				require.NoError(t, err)
-				if !ok {
+				if match != Matched {
 					continue
 				}
 
 				for replayAt := claimAt + 1; replayAt <= last; replayAt++ {
-					reported, ok, err := matchStepWith(produces, replayAt)
+					reported, match, err := matchStepWith(produces, replayAt)
 					require.NoError(t, err)
-					if ok && reported > claimed {
+					if match == Matched && reported > claimed {
 						replays = append(replays, fmt.Sprintf(
 							"claimed step %d at current %d, then step %d at current %d",
 							claimed, claimAt, reported, replayAt))
@@ -349,7 +377,7 @@ func TestMatchStepWithChainsOfCollidingSteps(t *testing.T) {
 
 			if shape.inherent {
 				// Keep this. It asserts that a replay is still possible, which reads like
-				// a test of a bug, and it is one: a pair spread wider than 2*skew+1 has a
+				// a test of a bug, and it is one: a gap wider than lookbackSteps leaves a
 				// current step at which the passcode is refused, so by the time it is
 				// accepted again the authenticator is legitimately displaying those
 				// digits for a new step. No marker recording a step can refuse that, and
@@ -396,20 +424,20 @@ func TestMatchStepWithAChainLongerThanTheWalk(t *testing.T) {
 	t.Run("A chain the walk can follow to the bottom reports that bottom", func(t *testing.T) {
 		produces, lowest, highest := chain(maxLookbackScans)
 
-		step, ok, err := matchStepWith(produces, highest)
+		step, match, err := matchStepWith(produces, highest)
 
 		require.NoError(t, err)
-		assert.True(t, ok)
+		assert.Equal(t, Matched, match)
 		assert.Equal(t, lowest, step)
 	})
 
 	t.Run("One step further and the passcode is refused instead", func(t *testing.T) {
 		produces, _, highest := chain(maxLookbackScans + 1)
 
-		step, ok, err := matchStepWith(produces, highest)
+		step, match, err := matchStepWith(produces, highest)
 
 		require.NoError(t, err)
-		assert.False(t, ok, "a chain the walk cannot reach the bottom of must be refused")
+		assert.Equal(t, NoMatch, match, "a chain the walk cannot reach the bottom of must be refused")
 		assert.Equal(t, int64(0), step)
 	})
 }
@@ -427,25 +455,25 @@ func TestMatchStepWithAFailingStepPredicate(t *testing.T) {
 	t.Run("An error inside the window is refused", func(t *testing.T) {
 		produces := func(step int64) (bool, error) { return false, predicateFailed }
 
-		step, ok, err := matchStepWith(produces, current)
+		step, match, err := matchStepWith(produces, current)
 
 		require.ErrorIs(t, err, predicateFailed)
-		assert.False(t, ok)
+		assert.Equal(t, NoMatch, match)
 		assert.Equal(t, int64(0), step)
 	})
 
 	t.Run("An error below the window is refused, not answered with the match", func(t *testing.T) {
 		produces := func(step int64) (bool, error) {
-			if step < current-skewSteps {
+			if step < current-pastSteps {
 				return false, predicateFailed
 			}
 			return step == current, nil
 		}
 
-		step, ok, err := matchStepWith(produces, current)
+		step, match, err := matchStepWith(produces, current)
 
 		require.ErrorIs(t, err, predicateFailed)
-		assert.False(t, ok)
+		assert.Equal(t, NoMatch, match)
 		assert.Equal(t, int64(0), step,
 			"the matched step must not leak out of a walk that could not finish")
 	})

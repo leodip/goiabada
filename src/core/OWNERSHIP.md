@@ -457,6 +457,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeLoginEmailRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeLoginPasswordRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeOtpAccountDisabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeOtpClockAhead` | contract | Catalog key of the refusal of a code from the next time step, on the auth server's sign-in pages and as the account API's `error_description` beside `OTP_CLOCK_AHEAD` (#142). Only the auth server writes it, and it is a stable identifier because an operator's override catalog names it to translate the sentence. |
 | `core/i18n` | `ErrCodeOtpCodeRequired` | both-apps | — |
 | `core/i18n` | `ErrCodeOtpIncorrectCode` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |

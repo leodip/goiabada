@@ -1529,6 +1529,7 @@
 "handler.password.confirmation_mismatch" = "As senhas não conferem."
 
 "handler.otp.account_disabled" = "Sua conta está desativada."
+"handler.otp.clock_ahead" = "O relógio do seu dispositivo parece estar adiantado. Verifique se a data e a hora estão definidas automaticamente e digite o código que o aplicativo mostra."
 "handler.otp.code_required" = "Digite o código de 6 dígitos do seu aplicativo autenticador."
 "handler.otp.incorrect_code" = "Esse código não está correto. Os códigos mudam a cada 30 segundos, então digite o que o aplicativo mostra agora."
 

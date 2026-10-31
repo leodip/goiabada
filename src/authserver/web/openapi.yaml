@@ -3645,6 +3645,11 @@ paths:
         enrollment endpoint first. Returns 400 if no enrollment is pending or the one started has
         expired (`OTP_ENROLLMENT_NOT_PENDING`).
 
+        The code is accepted from the authenticator's current 30-second step or the one before it.
+        The code of the step after, which only a device whose clock runs ahead shows, is refused
+        with 400 (`OTP_CLOCK_AHEAD`), whose `error_description` asks the user to check the device's
+        time. Nothing is spent by it, so the next code the authenticator shows still enables.
+
         This request must not carry a `secretKey`. One that does is refused with 400
         (`SECRET_KEY_NOT_ACCEPTED`) rather than having the field ignored, because a caller sending
         one believes it is choosing which authenticator is installed, and it is not.

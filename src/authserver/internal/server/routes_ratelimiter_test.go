@@ -395,12 +395,13 @@ func reachesHandler(s *Server, r *http.Request) bool {
 // ninety seconds whenever the counter reaches it, and the case would then take the success
 // path and fail for a reason that has nothing to do with what it asserts. A sweep of this
 // secret finds 000000 at 2028-04-13T15:03:30Z. Confirmed against MatchStep, which is the
-// three-step window the handler itself verifies in (#219).
+// window the handler itself verifies in, and refused by it outright rather than as a code from
+// the next step, which the handler answers without charging the limiter (#219, #142).
 func routesTestWrongOTPCode(t *testing.T) string {
 	t.Helper()
 
 	for _, candidate := range []string{"000000", "111111", "222222"} {
-		if _, matched := otp.MatchStep(candidate, routesTestOTPSecret, time.Now().UTC()); !matched {
+		if _, match := otp.MatchStep(candidate, routesTestOTPSecret, time.Now().UTC()); match == otp.NoMatch {
 			return candidate
 		}
 	}

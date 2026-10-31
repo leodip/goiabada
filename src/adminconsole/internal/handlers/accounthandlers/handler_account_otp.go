@@ -237,6 +237,7 @@ var accountOTPErrorFields = map[string]string{
 	"AUTHENTICATION_FAILED": "password",
 	"INVALID_OTP_CODE":      "otp",
 	"OTP_CODE_REQUIRED":     "otp",
+	"OTP_CLOCK_AHEAD":       "otp",
 }
 
 // isHandledAccountOTPError says whether a 400 or 409 from PUT /api/v1/account/otp is one this page
@@ -245,6 +246,10 @@ var accountOTPErrorFields = map[string]string{
 // error page. A 429 is decided before this is asked: the API allows five wrong passwords per user
 // per 15 minutes here, so the form is redrawn with the console's own rate-limit sentence, in the
 // page's language, rather than the API's English one (#559 decision 10).
+//
+// OTP_CLOCK_AHEAD is a code from the step after the auth server's current one, which only an
+// authenticator whose clock runs ahead shows: the user acts on it by fixing the device's time, so it
+// is shown on the code field (#142).
 //
 // CONCURRENT_UPDATE is the 409 the API answers when the account's authenticator changed under the
 // request, from another tab or client, and nothing was saved: the user acts on it by trying again,
@@ -260,6 +265,7 @@ func isHandledAccountOTPError(code string) bool {
 	case "AUTHENTICATION_FAILED",
 		"INVALID_OTP_CODE",
 		"OTP_CODE_REQUIRED",
+		"OTP_CLOCK_AHEAD",
 		"OTP_ENROLLMENT_NOT_PENDING",
 		"SECRET_KEY_NOT_ACCEPTED",
 		"OTP_ALREADY_ENABLED",

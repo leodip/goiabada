@@ -417,6 +417,20 @@ func HandleAccountOTPPut(
 			case otpcredential.OutcomeWrong:
 				writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
+			case otpcredential.OutcomeClockAhead:
+				// A code from the next step, which only an authenticator whose clock runs ahead
+				// shows: answered with a code of its own and a message to check the device's
+				// time, and audited, unlike a wrong code here, so an operator can tell a device's
+				// clock from guessing everywhere a code is checked. Nothing was claimed, so the
+				// user's next code still enables (#142).
+				auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
+					"user_id":        user.Id,
+					"logged_in_user": subject,
+					"reason":         audit.AuthFailedOtpClockAhead,
+				})
+				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpClockAhead, nil),
+					"OTP_CLOCK_AHEAD", http.StatusBadRequest)
+				return
 			}
 
 			// The seed's encryption at rest, the authenticator's write and the OTP configuration

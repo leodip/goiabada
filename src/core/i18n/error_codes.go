@@ -98,6 +98,9 @@ const (
 	ErrCodeOtpAccountDisabled = "handler.otp.account_disabled"
 	ErrCodeOtpCodeRequired    = "handler.otp.code_required"
 	ErrCodeOtpIncorrectCode   = "handler.otp.incorrect_code"
+	// A code from the time step after the server's current one, which only an authenticator
+	// whose clock runs ahead shows: refused with this rather than as a wrong code (#142).
+	ErrCodeOtpClockAhead = "handler.otp.clock_ahead"
 
 	// Admin resource permissions handler — in-page validation for the
 	// permission-creation form (browser-flow JSON, surface A).
@@ -222,7 +225,8 @@ const (
 
 	// The account: email, email verification, password, two-factor authentication and the logout
 	// request. Disabling an authenticator the account does not have is handler.user.otp_not_enabled
-	// above, a wrong code on enabling one is handler.otp.incorrect_code, and the email verification
+	// above, a wrong code on enabling one is handler.otp.incorrect_code, a code from the next time step
+	// handler.otp.clock_ahead, and the email verification
 	// send's conflict is handler.email_verification.account_changed. SMTP being off is one sentence
 	// for every endpoint that needs it.
 	ErrCodeAccountCurrentPasswordRequired  = "handler.account.current_password_required"

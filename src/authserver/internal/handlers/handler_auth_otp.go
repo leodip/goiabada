@@ -53,7 +53,8 @@ func HandleAuthOtpGet(
 
 // HandleAuthOtpPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
 // submitted body and runs authflow.OTPSubmission on it, then answers what it did: the form again
-// beside a refusal, the lost-enrolment page, or the redirect to /auth/completed.
+// beside a refusal, which for a code from the next step says to check the device's time (#142), the
+// lost-enrolment page, or the redirect to /auth/completed.
 //
 // The boundary refuses a submission naming another ceremony before the state gate and before the
 // code is looked at, so an OTP form left open in another tab gets the "no longer active" page and
@@ -97,6 +98,8 @@ func HandleAuthOtpPost(
 			renderRefusal(i18n.ErrCodeOtpCodeRequired)
 		case authflow.OTPRefused:
 			renderRefusal(i18n.ErrCodeOtpIncorrectCode)
+		case authflow.OTPClockAhead:
+			renderRefusal(i18n.ErrCodeOtpClockAhead)
 		case authflow.OTPAccepted:
 			boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 		}

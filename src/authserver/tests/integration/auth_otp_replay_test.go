@@ -202,39 +202,41 @@ func assertOtpRefused(t *testing.T, resp *http.Response) {
 	assert.Contains(t, doc.Find(`[role="alert"]`).Text(), "That code isn't right")
 }
 
-// nextStepCode returns a code from one time step after the current one, which is inside the
-// accepted skew window and, when the check below passes, canonicalizes strictly above the step
-// the consumed code claimed, so it is the control every replay case here needs.
+// currentStepCode returns the current step's code, the control every replay case here needs after
+// spending the previous step's (otptest.PreviousStepCode): when the check below passes, it
+// canonicalizes strictly above the step the consumed code claimed. The window accepts the previous
+// and the current step only (#142), so spending the previous step's code is what leaves an unspent
+// code above it; the next step's code is refused as a clock running ahead.
 //
 // **The skip is expressed in the steps MatchStep reports, not in the two codes differing.** A
 // passcode does not name a time step: MatchStep answers with the bottom of the chain of steps
 // producing it (#111 decision 12), and that answer is the same at every current step in one
 // unbroken run of accepting steps, which is why the test can recompute it here: a code delayed
-// past the end of its own run matches nothing and skips at the check above. So a control whose
+// past the end of its own run matches nothing and skips at the check below. So a control whose
 // digits differ from the consumed code can still canonicalize to an older step at or below the
 // marker, and the guard then refuses the control for exactly the right reason while the test
 // reads as a regression. TestMatchStepWithCollidingSteps pins that shape at seam 1: steps 818665
 // and 818667 produce one passcode and MatchStep reports 818665 for it. Comparing digits, which
 // this helper did first, catches only a collision with the immediately preceding step and leaves
-// the other two lookback steps, about 2 in a million per control.
+// the other lookback step, about 1 in a million per control.
 //
 // It skips rather than fails, because the control exists to separate the guard from a broken
 // ceremony and a control the guard is entitled to refuse cannot do that.
-func nextStepCode(t *testing.T, secret string, consumed string) string {
+func currentStepCode(t *testing.T, secret string, consumed string) string {
 	t.Helper()
 
 	now := time.Now().UTC()
-	code := otptest.Code(t, secret, now.Add(time.Duration(otp.StepSeconds)*time.Second))
+	code := otptest.Code(t, secret, now)
 
-	consumedStep, consumedMatched := otp.MatchStep(consumed, secret, now)
-	controlStep, controlMatched := otp.MatchStep(code, secret, now)
-	if !consumedMatched || !controlMatched {
+	consumedStep, consumedMatch := otp.MatchStep(consumed, secret, now)
+	controlStep, controlMatch := otp.MatchStep(code, secret, now)
+	if consumedMatch != otp.Matched || controlMatch != otp.Matched {
 		t.Skipf("a code fell outside the acceptance window before the control was built "+
-			"(consumed matched %v, control matched %v); the two steps cannot be compared",
-			consumedMatched, controlMatched)
+			"(consumed %v, control %v); the two steps cannot be compared",
+			consumedMatch, controlMatch)
 	}
 	if controlStep <= consumedStep {
-		t.Skipf("the control canonicalizes to step %d, at or below the consumed step %d (~2e-06); "+
+		t.Skipf("the control canonicalizes to step %d, at or below the consumed step %d (~1e-06); "+
 			"the guard refuses it correctly, so it cannot separate the guard from the ceremony",
 			controlStep, consumedStep)
 	}
@@ -254,7 +256,8 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 
-	codeC := otptest.Code(t, otpSecret, time.Now())
+	// The previous step's code, so the current step's is left unspent above it for the control.
+	codeC := otptest.PreviousStepCode(t, otpSecret)
 
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -271,7 +274,7 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 	// Control: the ceremony is alive and the form works, so only the replay was refused. It posts
 	// the page the refusal rerendered, which is the page a user who mistyped a code is actually
 	// looking at, so this also requires that rerender to carry the ceremony id (#79).
-	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, otpSecret, codeC))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, currentStepCode(t, otpSecret, codeC))
 	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -292,7 +295,8 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 
-	codeC := otptest.Code(t, secret, time.Now())
+	// The previous step's code, so the current step's is left unspent above it for the control.
+	codeC := otptest.PreviousStepCode(t, secret)
 
 	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, codeC)
 	_ = otpPage.Body.Close()
@@ -313,7 +317,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	_ = otpPage.Body.Close()
 	assertOtpRefused(t, refused)
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, secret, codeC))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, currentStepCode(t, secret, codeC))
 	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -336,7 +340,8 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 
 	keyURL, secret := newOTPKeyURLForTest(t, user.Email)
 
-	codeC := otptest.Code(t, secret, time.Now())
+	// The previous step's code, so the current step's is left unspent above it for the control.
+	codeC := otptest.PreviousStepCode(t, secret)
 
 	// Enroll through the account API, which consumes codeC's step. The seed has to be staged as
 	// a pending enrollment first: the API enrolls the one the server issued and no longer accepts
@@ -372,7 +377,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	_ = otpPage.Body.Close()
 	assertOtpRefused(t, refused)
 
-	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, secret, codeC))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, currentStepCode(t, secret, codeC))
 	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()

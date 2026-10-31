@@ -160,7 +160,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `preserved_session_identifier` | The session a password change kept, the one the user changed it from. Empty when none was kept. |
 | `previous_session_identifier` | The session of the other user that a sign-in on the same browser ended. |
 | `previous_user_id` | The user whose session a sign-in on the same browser ended. |
-| `reason` | Why a link was refused, such as `code_expired`, why sessions and tokens were revoked, such as `account_disabled`, or why a session was deleted, such as `signed_out`. |
+| `reason` | Why a link was refused, such as `code_expired`, why sessions and tokens were revoked, such as `account_disabled`, why a session was deleted, such as `signed_out`, or, as `clock_ahead`, that an authenticator code was refused because the device's clock runs ahead. |
 | `refresh_token_jti` | The `jti` of the refresh token issued. |
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
@@ -224,7 +224,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `auth_success_pwd` | A user's password was accepted on the sign-in page. |
 | `auth_failed_pwd` | A password was refused on the sign-in page, because no user has that email or the password was wrong. |
 | `auth_success_otp` | A user's authenticator code was accepted at sign-in, including a first code that set up their authenticator. |
-| `auth_failed_otp` | An authenticator code was refused at sign-in, because it was wrong or had already been used. |
+| `auth_failed_otp` | An authenticator code was refused at sign-in, because it was wrong or had already been used. With `reason` `clock_ahead`, it was the code of the next 30 seconds, which only a device whose clock runs ahead shows: this one is also written while turning on two-factor authentication, and it isn't someone guessing. |
 | `otp_code_replay_detected` | An authenticator code that had already been used was sent again, at sign-in or while turning on two-factor authentication, and was refused. |
 | `otp_authenticator_disabled` | A user's authenticator was disabled at sign-in, because 100 codes in a row were refused. Written once, beside that 100th refusal's `auth_failed_otp`. |
 | `user_disabled` | A disabled user was refused: at sign-in, when reusing a session, before a code or tokens were issued, at the token endpoint or at `/userinfo`. |

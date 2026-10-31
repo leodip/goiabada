@@ -47,6 +47,46 @@ func Code(t testing.TB, secret string, at time.Time) string {
 	return fmt.Sprintf("%06d", value%1000000)
 }
 
+// stepSeconds is RFC 6238's X, the 30-second step Code counts.
+const stepSeconds = 30
+
+// stepMargin is how near the end of a step NextStepCode and PreviousStepCode wait for the next
+// one to begin. A test sends the code within milliseconds, so two seconds keeps the step it was
+// derived against from turning before the server checks it.
+const stepMargin = 2 * time.Second
+
+// NextStepCode returns the code an authenticator whose clock runs one step ahead shows now: the
+// code of the step after the current one, which the server refuses as a clock running ahead
+// (#142). Near the end of a step it first waits for the next step to begin, so the step cannot turn
+// before the server checks the code and make it the current step's.
+func NextStepCode(t testing.TB, secret string) string {
+	t.Helper()
+
+	return Code(t, secret, awayFromStepEnd().Add(stepSeconds*time.Second))
+}
+
+// PreviousStepCode returns the code of the step before the current one, the oldest the server
+// accepts, so a test that spends it leaves the current step's code unspent above it. Near the end
+// of a step it first waits for the next step to begin, since the previous step's code is refused
+// from then on.
+func PreviousStepCode(t testing.TB, secret string) string {
+	t.Helper()
+
+	return Code(t, secret, awayFromStepEnd().Add(-stepSeconds*time.Second))
+}
+
+// awayFromStepEnd returns the current instant, first waiting for the next step to begin when fewer
+// than stepMargin of this one are left.
+func awayFromStepEnd() time.Time {
+	now := time.Now()
+	left := stepSeconds*time.Second - time.Duration(now.UnixNano()%int64(stepSeconds*time.Second))
+	if left < stepMargin {
+		time.Sleep(left)
+		now = time.Now()
+	}
+	return now
+}
+
 // NewSecret returns a random secret in the shape the server mints: 20 bytes from crypto/rand,
 // written as unpadded base32.
 func NewSecret(t testing.TB) string {

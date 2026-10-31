@@ -66,11 +66,12 @@ var apiErrorCodes = map[string]string{
 	"NOT_FOUND":            "category: an absent entity, 404.",
 
 	// Codes the admin console's Go code routes on, beyond VALIDATION_ERROR above.
-	// isHandledAccountOTPError in adminconsole/.../handler_account_otp.go holds the first seven.
+	// isHandledAccountOTPError in adminconsole/.../handler_account_otp.go holds the first eight.
 	"AUTHENTICATION_FAILED":                "adminconsole: isHandledAccountOTPError redraws the OTP form with the API's sentence.",
 	"INVALID_OTP_CODE":                     "adminconsole: isHandledAccountOTPError.",
 	"OTP_CODE_REQUIRED":                    "adminconsole: isHandledAccountOTPError.",
 	"OTP_ENROLLMENT_NOT_PENDING":           "adminconsole: isHandledAccountOTPError.",
+	"OTP_CLOCK_AHEAD":                      "adminconsole: isHandledAccountOTPError shows it on the code field (#142).",
 	"SECRET_KEY_NOT_ACCEPTED":              "adminconsole: isHandledAccountOTPError.",
 	"OTP_ALREADY_ENABLED":                  "adminconsole: handler_account_otp.go reloads the page on it, from the enable and from the enrolment fetch.",
 	"OTP_NOT_ENABLED":                      "adminconsole: handler_account_otp.go reloads the page on it, from the disable.",

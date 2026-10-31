@@ -587,6 +587,17 @@ const (
 	DeletedUserSessionEndedByAdministrator = "ended_by_administrator"
 )
 
+// The reason field of EventAuthFailedOtp, written only on a refusal that is not a wrong or a
+// replayed code, so an operator can tell a device's clock from someone guessing. Stored data like
+// the event names: a consumer filters on these strings, so a value here cannot change.
+const (
+	// AuthFailedOtpClockAhead is an authenticator code from the time step after the server's
+	// current one, which only an authenticator whose clock runs ahead shows. It is refused with a
+	// message to check the device's time, and neither charged to the otp rate tier nor counted
+	// against the authenticator (#142).
+	AuthFailedOtpClockAhead = "clock_ahead"
+)
+
 // EventTypes returns the canonical list of audit event names, which the admin console's
 // filter dropdown is built from. It returns a copy, so a caller changing the slice it got changes
 // no later answer (#433).

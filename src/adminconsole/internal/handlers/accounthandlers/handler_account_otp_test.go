@@ -456,3 +456,28 @@ func TestHandleOtpPost_ARateLimitIsShownOnTheForm(t *testing.T) {
 		}
 	}
 }
+
+// OTP_CLOCK_AHEAD is the auth server refusing a code from the step after its current one, which only
+// an authenticator whose clock runs ahead shows (#142). The user acts on it by fixing the device's
+// time, so the page shows the API's sentence on the code field, with the QR code to retype from,
+// rather than sending it to the generic error page.
+func TestHandleOtpPost_AClockAheadRefusalIsShownOnTheCodeField(t *testing.T) {
+	const message = "Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows."
+
+	httpHelper := handlersmocks.NewHttpHelper(t)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
+
+	client := newStubApiClient(false)
+	client.updateErr = &apiclient.APIError{Code: "OTP_CLOCK_AHEAD", Message: message, StatusCode: http.StatusBadRequest}
+
+	rr := httptest.NewRecorder()
+	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
+
+	bind := handlertest.Bind(t, httpHelper)
+	assert.Equal(t, message, bind["error"])
+	assert.Equal(t, "otp", bind["errorField"])
+	assert.Equal(t, false, bind["otpEnabled"])
+	assert.Equal(t, testBase64Image, bind["base64Image"])
+	assert.Equal(t, testSecretKey, bind["secretKey"])
+}

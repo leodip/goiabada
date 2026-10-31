@@ -229,6 +229,43 @@ func TestHandleAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
+// TestHandleAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead is #142 at the account
+// API's enable. A code from the step after the server's current one is what an authenticator whose
+// clock runs ahead shows, so it gets an error code of its own and a message to check the device's
+// time, and is audited as auth_failed_otp with reason clock_ahead, where a wrong code here audits
+// nothing: the event is how an operator tells a device's clock from guessing. Nothing is claimed, so
+// the user's next code, from the right step, still enables.
+func TestHandleAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{
+		"user_id":        user.Id,
+		"logged_in_user": subject,
+		"reason":         "clock_ahead",
+	}).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, otptest.NextStepCode(t, otpTestSecret)))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, "OTP_CLOCK_AHEAD", errorCodeOf(t, rr))
+	assert.Equal(t, "Your device's clock seems to be ahead. Check that its date and time are set "+
+		"automatically, then enter the code your app shows.", descriptionOf(t, rr))
+	database.AssertNotCalled(t, "TryConsumeUserOTPStep",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "TryEstablishUserOTP",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	assert.False(t, user.OTPEnabled)
+	auditLogger.AssertExpectations(t)
+}
+
 // TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically is the enable half of #242
 // decision 2, and the counterpart of the disable case below. Establishing the authenticator and
 // advancing the OTP configuration generation have to land as one commit.
@@ -444,7 +481,7 @@ func wrongButWellFormedCode(t *testing.T) string {
 	current := currentOtpCode(t)
 	for _, candidate := range []string{"000000", "111111", "222222"} {
 		if candidate != current {
-			if _, matched := otp.MatchStep(candidate, otpTestSecret, time.Now().UTC()); !matched {
+			if _, match := otp.MatchStep(candidate, otpTestSecret, time.Now().UTC()); match == otp.NoMatch {
 				return candidate
 			}
 		}
