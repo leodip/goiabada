@@ -133,14 +133,15 @@ var adminRouteClassification = map[string]adminRouteClass{
 		"an administrator"),
 
 	// Clients. Reading a secret is the one read a ceiling guards (#402 decision 8).
-	"GET /api/v1/admin/clients/{id}/secret":         appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}":                appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}/authentication": appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}/oauth2-flows":   appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}/redirect-uris":  appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}/web-origins":    appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}/tokens":         appliesCeilings(adminCeilingTarget),
-	"PUT /api/v1/admin/clients/{id}/permissions":    appliesCeilings(adminCeilingGrant, adminCeilingTarget),
+	"GET /api/v1/admin/clients/{id}/secret":                    appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}":                           appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/authentication":            appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/oauth2-flows":              appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/redirect-uris":             appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris": appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/web-origins":               appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/tokens":                    appliesCeilings(adminCeilingTarget),
+	"PUT /api/v1/admin/clients/{id}/permissions":               appliesCeilings(adminCeilingGrant, adminCeilingTarget),
 	// Listing the authserver resource for introspection is held where granting an administrative
 	// permission is, and the list is a write on its client like any other (#676 decision 14).
 	"PUT /api/v1/admin/clients/{id}/introspection-resources": appliesCeilings(adminCeilingGrant, adminCeilingTarget),

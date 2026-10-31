@@ -379,6 +379,93 @@ func TestClientRedirectURIRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	})
 }
 
+// TestClientPostLogoutRedirectURIRefusals_AreInTheRequestsLanguage covers the sign-out redirect URIs
+// save, whose refusals name the sign-out list and the value refused (#147 decision 5).
+func TestClientPostLogoutRedirectURIRefusals_AreInTheRequestsLanguage(t *testing.T) {
+	save := func(client *record.Client, uris []string) func(*testing.T, string) *httptest.ResponseRecorder {
+		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
+			return serveClient(http.MethodPut, "/api/v1/admin/clients/7/post-logout-redirect-uris",
+				postLogoutRedirectURIsBody(t, uris, []string{}), client, nil,
+				func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
+					return HandleClientPostLogoutRedirectURIsPut(database, auditLogger)
+				})(t, acceptLanguage)
+		}
+	}
+	codeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true} }
+	tooMany := make([]string, 61)
+	for i := range tooMany {
+		tooMany[i] = "https://example.com/bye"
+	}
+	overlong := "https://example.com/" + strings.Repeat("x", 2048)
+
+	assertRefusalLanguages(t, []refusalCase{
+		{
+			name:       "a client with no redirect-based flow",
+			serve:      save(&record.Client{Id: 7}, []string{"https://example.com/bye"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.no_redirect_flow",
+			english:    "Sign-out redirect URIs are used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client.",
+			portuguese: "URIs de redirecionamento de saída servem a um cliente que faz o login dos usuários pelo fluxo authorization code com PKCE ou pelo fluxo implicit, e nenhum deles está habilitado para este cliente.",
+		},
+		{
+			name:       "more sign-out redirect URIs than a client holds",
+			serve:      save(codeFlow(), tooMany),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.too_many",
+			english:    "A client can have at most 60 sign-out redirect URIs, and this list has 61.",
+			portuguese: "Um cliente pode ter no máximo 60 URIs de redirecionamento de saída, e esta lista tem 61.",
+		},
+		{
+			name:       "an empty sign-out redirect URI",
+			serve:      save(codeFlow(), []string{" "}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.empty",
+			english:    "Sign-out redirect URI cannot be empty",
+			portuguese: "A URI de redirecionamento de saída não pode ficar vazia",
+		},
+		{
+			name:       "a sign-out redirect URI past the bound",
+			serve:      save(codeFlow(), []string{overlong}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.too_long",
+			english:    "Sign-out redirect URI is too long (2068 bytes, the maximum is 2048): https://example.com/" + strings.Repeat("x", 60) + "...",
+			portuguese: "A URI de redirecionamento de saída é longa demais (2068 bytes, o máximo é 2048): https://example.com/" + strings.Repeat("x", 60) + "...",
+		},
+		{
+			name:       "a sign-out redirect URI that does not parse",
+			serve:      save(codeFlow(), []string{"not a uri"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.invalid",
+			english:    "Invalid sign-out redirect URI: not a uri",
+			portuguese: "URI de redirecionamento de saída inválida: not a uri",
+		},
+		{
+			name:       "a sign-out redirect URI that is not absolute",
+			serve:      save(codeFlow(), []string{"https://example.com/bye#fragment"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.not_absolute",
+			english:    "Sign-out redirect URI must be an absolute URI (a scheme is required, a fragment is not permitted, percent-escapes must be well formed, and an http or https URI must name a host): https://example.com/bye#fragment",
+			portuguese: "A URI de redirecionamento de saída precisa ser absoluta (o esquema é obrigatório, fragmentos não são permitidos, os escapes por porcentagem precisam estar bem formados e uma URI http ou https precisa nomear um host): https://example.com/bye#fragment",
+		},
+		{
+			name:       "a plain-http sign-out redirect URI on a host other than loopback",
+			serve:      save(codeFlow(), []string{"http://app.example.com/bye"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.insecure_http",
+			english:    "Sign-out redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): http://app.example.com/bye",
+			portuguese: "A URI de redirecionamento de saída não pode usar http simples em um host que não seja a interface de loopback (127.0.0.1, [::1] ou localhost): http://app.example.com/bye",
+		},
+		{
+			name:       "a sign-out redirect URI twice",
+			serve:      save(codeFlow(), []string{"https://example.com/bye", "https://example.com/bye"}),
+			status:     http.StatusBadRequest,
+			code:       "handler.client_post_logout_redirect_uris.duplicate",
+			english:    "Duplicate sign-out redirect URIs are not allowed",
+			portuguese: "URIs de redirecionamento de saída duplicadas não são permitidas",
+		},
+	})
+}
+
 // TestClientWebOriginRefusals_AreInTheRequestsLanguage covers the web origins save, whose
 // refusals name the value refused.
 func TestClientWebOriginRefusals_AreInTheRequestsLanguage(t *testing.T) {

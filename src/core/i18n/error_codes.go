@@ -196,6 +196,17 @@ const (
 	ErrCodeClientRedirectURINotAbsolute     = "handler.client_redirect_uris.not_absolute"  // Args: {"uri": string}
 	ErrCodeClientRedirectURIsDuplicate      = "handler.client_redirect_uris.duplicate"
 
+	// The sign-out list's refusals, one for each of the redirect URI save's, since the two lists
+	// are saved under the same rules and a refusal must say which list it is about (#147).
+	ErrCodeClientPostLogoutRedirectURIsNoRedirectFlow = "handler.client_post_logout_redirect_uris.no_redirect_flow"
+	ErrCodeClientPostLogoutRedirectURIsTooMany        = "handler.client_post_logout_redirect_uris.too_many" // Args: {"max": int, "count": int}
+	ErrCodeClientPostLogoutRedirectURIEmpty           = "handler.client_post_logout_redirect_uris.empty"
+	ErrCodeClientPostLogoutRedirectURITooLong         = "handler.client_post_logout_redirect_uris.too_long"      // Args: {"length": int, "max": int, "prefix": string}
+	ErrCodeClientPostLogoutRedirectURIInvalid         = "handler.client_post_logout_redirect_uris.invalid"       // Args: {"uri": string}
+	ErrCodeClientPostLogoutRedirectURIInsecureHTTP    = "handler.client_post_logout_redirect_uris.insecure_http" // Args: {"uri": string}
+	ErrCodeClientPostLogoutRedirectURINotAbsolute     = "handler.client_post_logout_redirect_uris.not_absolute"  // Args: {"uri": string}
+	ErrCodeClientPostLogoutRedirectURIsDuplicate      = "handler.client_post_logout_redirect_uris.duplicate"
+
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
 	ErrCodeClientWebOriginInvalid          = "handler.client_web_origins.invalid"  // Args: {"origin": string}
 	ErrCodeClientWebOriginTooLong          = "handler.client_web_origins.too_long" // Args: {"length": int, "max": int, "origin": string}

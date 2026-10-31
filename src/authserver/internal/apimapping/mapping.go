@@ -444,6 +444,26 @@ func toRedirectURIResponses(uris []record.RedirectURI) []api.RedirectURIResponse
 	return responses
 }
 
+// toPostLogoutRedirectURIResponses is toRedirectURIResponses for the sign-out list, preserving nil
+// for the same reason (#147).
+func toPostLogoutRedirectURIResponses(uris []record.PostLogoutRedirectURI) []api.PostLogoutRedirectURIResponse {
+	if uris == nil {
+		return nil
+	}
+	responses := make([]api.PostLogoutRedirectURIResponse, len(uris))
+	for i, uri := range uris {
+		responses[i] = api.PostLogoutRedirectURIResponse{
+			Id:       uri.Id,
+			URI:      uri.URI,
+			ClientId: uri.ClientId,
+		}
+		if uri.CreatedAt.Valid {
+			responses[i].CreatedAt = &uris[i].CreatedAt.Time
+		}
+	}
+	return responses
+}
+
 func toWebOriginResponses(origins []record.WebOrigin) []api.WebOriginResponse {
 	if origins == nil {
 		return nil
@@ -495,6 +515,7 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		IncludeOpenIDConnectClaimsInIdToken:     client.IncludeOpenIDConnectClaimsInIdToken,
 		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
 		RedirectURIs:                            toRedirectURIResponses(client.RedirectURIs),
+		PostLogoutRedirectURIs:                  toPostLogoutRedirectURIResponses(client.PostLogoutRedirectURIs),
 		WebOrigins:                              toWebOriginResponses(client.WebOrigins),
 	}
 

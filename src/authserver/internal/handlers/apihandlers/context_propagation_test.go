@@ -140,6 +140,8 @@ func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 		Return([]record.Client{{Id: 3, ClientIdentifier: "portal"}}, nil).Once()
 	database.On("ClientLoadRedirectURIs", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
+	database.On("ClientLoadPostLogoutRedirectURIs", theApiRequestsContext(), mock.Anything, mock.Anything).
+		Return(nil).Once()
 	database.On("ClientLoadWebOrigins", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
@@ -161,6 +163,7 @@ func TestHandleClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetClientById", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "ClientLoadWebOrigins", mock.Anything, mock.Anything, mock.Anything)
 }
 

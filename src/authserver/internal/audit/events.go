@@ -551,6 +551,13 @@ const (
 	//
 	// Payload: client_id and client_identifier, the client whose secret was read, and logged_in_user.
 	EventViewedClientSecret = "viewed_client_secret"
+
+	// EventUpdatedPostLogoutRedirectURIs records an administrator's save of a client's sign-out
+	// redirect URIs through PUT /api/v1/admin/clients/{id}/post-logout-redirect-uris, written once
+	// the save has committed, as the redirect URI save's event is (#147 decision 5).
+	//
+	// Payload: client_id, the client saved, and logged_in_user.
+	EventUpdatedPostLogoutRedirectURIs = "updated_post_logout_redirect_uris"
 )
 
 // The reason field of EventDeletedUserSession, one value per cause, which every row of that event
@@ -684,6 +691,7 @@ var auditEventTypes = []string{
 	EventUpdatedOwnPhone,
 	EventUpdatedOwnProfile,
 	EventUpdatedOwnProfilePicture,
+	EventUpdatedPostLogoutRedirectURIs,
 	EventUpdatedRedirectURIs,
 	EventUpdatedResource,
 	EventUpdatedResourcePermissions,

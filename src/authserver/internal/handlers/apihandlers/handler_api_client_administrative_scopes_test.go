@@ -50,6 +50,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 				client := stored()
 				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
+				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 				database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 			},
 			status: http.StatusOK,
@@ -83,6 +84,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 				client := stored()
 				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
+				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 				database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), client).Return(readFailure).Once()
 			},
 			status: http.StatusInternalServerError,

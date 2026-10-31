@@ -87,6 +87,10 @@ const (
 	wireRedirectURIJSON = `{"id":1,"createdAt":"2026-09-16T10:00:00Z",` +
 		`"uri":"https://app.example/cb","clientId":3}`
 
+	// A sign-out redirect URI reads exactly as a redirect URI does (#147 decision 5).
+	wirePostLogoutRedirectURIJSON = `{"id":4,"createdAt":"2026-09-16T10:00:00Z",` +
+		`"uri":"https://app.example/signed-out","clientId":3}`
+
 	// The one nested NULL timestamp in this file, and the whole of what the
 	// {"Time":...,"Valid":...} object became.
 	wireWebOriginJSON = `{"id":2,"createdAt":null,"origin":"https://app.example","clientId":3}`
@@ -577,6 +581,12 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			URI:       "https://app.example/cb",
 			ClientId:  3,
 		}},
+		PostLogoutRedirectURIs: []record.PostLogoutRedirectURI{{
+			Id:        4,
+			CreatedAt: wireNullTime(wireCreated),
+			URI:       "https://app.example/signed-out",
+			ClientId:  3,
+		}},
 		// CreatedAt left NULL on purpose: it is the nested column that used to
 		// reach the wire as a two-field object and now reads null.
 		WebOrigins: []record.WebOrigin{{
@@ -613,6 +623,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	systemLevel := *client
 	systemLevel.ClientIdentifier = builtin.AdminConsoleClientIdentifier
 	systemLevel.RedirectURIs = nil
+	systemLevel.PostLogoutRedirectURIs = nil
 	systemLevel.WebOrigins = nil
 
 	runWireCases(t, []wireCase{
@@ -624,7 +635,8 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			value: ToClientResponse(client),
 			literal: `{"id":3,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				clientScalars("web-app", false) +
-				`,"redirectURIs":[` + wireRedirectURIJSON + `],"webOrigins":[` +
+				`,"redirectURIs":[` + wireRedirectURIJSON + `],` +
+				`"postLogoutRedirectURIs":[` + wirePostLogoutRedirectURIJSON + `],"webOrigins":[` +
 				wireWebOriginJSON + `]}`,
 		},
 		{
@@ -632,7 +644,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			value: ToClientResponse(&systemLevel),
 			literal: `{"id":3,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				clientScalars(builtin.AdminConsoleClientIdentifier, true) +
-				`,"redirectURIs":null,"webOrigins":null}`,
+				`,"redirectURIs":null,"postLogoutRedirectURIs":null,"webOrigins":null}`,
 		},
 	})
 }

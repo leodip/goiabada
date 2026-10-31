@@ -51,10 +51,11 @@ func authenticationPutRequest(t *testing.T, id string, req api.UpdateClientAuthe
 	return withPathValue(r, "id", id)
 }
 
-// stubClientResponseLoads registers the two related-field loads every client handler performs
+// stubClientResponseLoads registers the three related-field loads every client handler performs
 // before it encodes its response. They carry nothing this file asserts on.
 func stubClientResponseLoads(database *datamocks.Database) {
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+	database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 }
 
