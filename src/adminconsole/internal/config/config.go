@@ -170,7 +170,7 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	fs.IntVar(&c.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", c.AdminConsole.ListenPortHttps, "Admin console https port")
 	fs.StringVar(&c.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", c.AdminConsole.ListenHostHttp, "Admin console http host")
 	fs.IntVar(&c.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", c.AdminConsole.ListenPortHttp, "Admin console http port")
-	fs.BoolVar(&c.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", c.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (True-Client-IP, X-Real-IP or the X-Forwarded-For headers)")
+	fs.BoolVar(&c.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", c.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (X-Forwarded-For, or X-Real-IP when it has no address)")
 	adminConsoleTrustedProxies := strings.Join(c.AdminConsole.TrustedProxies, ",")
 	fs.StringVar(&adminConsoleTrustedProxies, "adminconsole-trusted-proxies", adminConsoleTrustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
 	fs.BoolVar(&c.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", c.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")

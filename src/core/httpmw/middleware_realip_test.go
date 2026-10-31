@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,175 +21,182 @@ func mustCIDRs(t *testing.T, entries ...string) []*net.IPNet {
 	return ranges
 }
 
+// resolveClientIPCase is one row of the resolution table: the socket peer, the
+// X-Forwarded-For and X-Real-IP values as one string each, the trust
+// settings, and the client address they resolve to.
+type resolveClientIPCase struct {
+	name              string
+	remoteAddr        string
+	xff               string
+	xRealIP           string
+	trustProxyHeaders bool
+	trusted           []string
+	want              string
+}
+
+const (
+	cdnRange = "198.51.100.0/24" // TEST-NET-2, stands in for a CDN egress range
+	lbRange  = "10.0.0.0/8"      // internal load balancer range
+)
+
+var resolveClientIPCases = []resolveClientIPCase{
+	{
+		name:              "no trust: socket peer, headers ignored even if spoofed",
+		remoteAddr:        "203.0.113.9:44321",
+		xff:               "1.2.3.4, 5.6.7.8",
+		xRealIP:           "9.9.9.9",
+		trustProxyHeaders: false,
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "trust + empty allowlist: single XFF entry is the client",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "203.0.113.9",
+		trustProxyHeaders: true,
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "trust + empty allowlist: spoofed-left, real-right -> rightmost wins",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "6.6.6.6, 203.0.113.9",
+		trustProxyHeaders: true,
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "trust + CDN allowlist: walk past trusted hop to real client",
+		remoteAddr:        "10.0.0.5:5000", // our LB (peer)
+		xff:               "6.6.6.6, 203.0.113.9, 198.51.100.7",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange, cdnRange},
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "allowlist set + direct connection (peer not trusted): headers ignored",
+		remoteAddr:        "203.0.113.9:44321",
+		xff:               "6.6.6.6",
+		xRealIP:           "9.9.9.9",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange, cdnRange},
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "trust + trusted peer + empty XFF + X-Real-IP set",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "",
+		xRealIP:           "203.0.113.9",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "trust + empty XFF + no X-Real-IP -> peer",
+		remoteAddr:        "10.0.0.5:5000",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.0.0.5",
+	},
+	{
+		name:              "IPv6 socket peer with port and no trust",
+		remoteAddr:        "[2001:db8::1]:443",
+		trustProxyHeaders: false,
+		want:              "2001:db8::1",
+	},
+	{
+		name:              "IPv6 client through trusted IPv4 hop",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "2001:db8::abcd, 198.51.100.7",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange, cdnRange},
+		want:              "2001:db8::abcd",
+	},
+	{
+		name:              "malformed / empty XFF segments are skipped, no panic",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               " , , 203.0.113.9 , ",
+		trustProxyHeaders: true,
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "all entries trusted (degenerate) -> leftmost",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "10.1.1.1, 10.2.2.2",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.1.1.1",
+	},
+	{
+		name:              "CIDR range match (10.0.0.0/8 contains 10.9.9.9)",
+		remoteAddr:        "10.9.9.9:5000",
+		xff:               "203.0.113.9, 10.0.0.5",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "bare IP socket peer without port",
+		remoteAddr:        "203.0.113.9",
+		trustProxyHeaders: false,
+		want:              "203.0.113.9",
+	},
+	// An entry that does not parse as an IP is dropped, not carried through: the
+	// header is caller-controlled and the resolved value becomes a rate-limit
+	// bucket, an audit field and a session record (#219). Dropping an entry is not
+	// rejecting the header, so the rows below say which entries survive rather than
+	// assuming the peer always wins.
+	{
+		name:              "non-IP XFF entry alone is dropped -> peer",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "<script>",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.0.0.5",
+	},
+	{
+		name:              "every XFF entry is non-IP -> peer",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "<script>, ../../etc",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.0.0.5",
+	},
+	{
+		name:              "non-IP X-Real-IP is refused -> peer",
+		remoteAddr:        "10.0.0.5:5000",
+		xRealIP:           "../../etc/passwd",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.0.0.5",
+	},
+	{
+		name:              "non-IP entry dropped, surviving untrusted entry is the client",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "<script>, 203.0.113.9",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "203.0.113.9",
+	},
+	{
+		name:              "non-IP entry dropped, surviving entry is trusted -> walk runs out there",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "<script>, 10.0.0.6",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.0.0.6",
+	},
+	{
+		// Alone, so the drop is what decides the answer: with a real client to its
+		// right the walk would stop there and the row would pass either way.
+		name:              "IPv6 address with a zone is not a reachable client -> dropped",
+		remoteAddr:        "10.0.0.5:5000",
+		xff:               "fe80::1%eth0",
+		trustProxyHeaders: true,
+		trusted:           []string{lbRange},
+		want:              "10.0.0.5",
+	},
+}
+
 func TestResolveClientIP(t *testing.T) {
-	const cdn = "198.51.100.0/24" // TEST-NET-2, stands in for a CDN egress range
-	const lb = "10.0.0.0/8"       // internal load balancer range
-
-	tests := []struct {
-		name              string
-		remoteAddr        string
-		xff               string
-		xRealIP           string
-		trustProxyHeaders bool
-		trusted           []string
-		want              string
-	}{
-		{
-			name:              "no trust: socket peer, headers ignored even if spoofed",
-			remoteAddr:        "203.0.113.9:44321",
-			xff:               "1.2.3.4, 5.6.7.8",
-			xRealIP:           "9.9.9.9",
-			trustProxyHeaders: false,
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "trust + empty allowlist: single XFF entry is the client",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "203.0.113.9",
-			trustProxyHeaders: true,
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "trust + empty allowlist: spoofed-left, real-right -> rightmost wins",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "6.6.6.6, 203.0.113.9",
-			trustProxyHeaders: true,
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "trust + CDN allowlist: walk past trusted hop to real client",
-			remoteAddr:        "10.0.0.5:5000", // our LB (peer)
-			xff:               "6.6.6.6, 203.0.113.9, 198.51.100.7",
-			trustProxyHeaders: true,
-			trusted:           []string{lb, cdn},
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "allowlist set + direct connection (peer not trusted): headers ignored",
-			remoteAddr:        "203.0.113.9:44321",
-			xff:               "6.6.6.6",
-			xRealIP:           "9.9.9.9",
-			trustProxyHeaders: true,
-			trusted:           []string{lb, cdn},
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "trust + trusted peer + empty XFF + X-Real-IP set",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "",
-			xRealIP:           "203.0.113.9",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "trust + empty XFF + no X-Real-IP -> peer",
-			remoteAddr:        "10.0.0.5:5000",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.0.0.5",
-		},
-		{
-			name:              "IPv6 socket peer with port and no trust",
-			remoteAddr:        "[2001:db8::1]:443",
-			trustProxyHeaders: false,
-			want:              "2001:db8::1",
-		},
-		{
-			name:              "IPv6 client through trusted IPv4 hop",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "2001:db8::abcd, 198.51.100.7",
-			trustProxyHeaders: true,
-			trusted:           []string{lb, cdn},
-			want:              "2001:db8::abcd",
-		},
-		{
-			name:              "malformed / empty XFF segments are skipped, no panic",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               " , , 203.0.113.9 , ",
-			trustProxyHeaders: true,
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "all entries trusted (degenerate) -> leftmost",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "10.1.1.1, 10.2.2.2",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.1.1.1",
-		},
-		{
-			name:              "CIDR range match (10.0.0.0/8 contains 10.9.9.9)",
-			remoteAddr:        "10.9.9.9:5000",
-			xff:               "203.0.113.9, 10.0.0.5",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "bare IP socket peer without port",
-			remoteAddr:        "203.0.113.9",
-			trustProxyHeaders: false,
-			want:              "203.0.113.9",
-		},
-		// An entry that does not parse as an IP is dropped, not carried through: the
-		// header is caller-controlled and the resolved value becomes a rate-limit
-		// bucket, an audit field and a session record (#219). Dropping an entry is not
-		// rejecting the header, so the rows below say which entries survive rather than
-		// assuming the peer always wins.
-		{
-			name:              "non-IP XFF entry alone is dropped -> peer",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "<script>",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.0.0.5",
-		},
-		{
-			name:              "every XFF entry is non-IP -> peer",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "<script>, ../../etc",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.0.0.5",
-		},
-		{
-			name:              "non-IP X-Real-IP is refused -> peer",
-			remoteAddr:        "10.0.0.5:5000",
-			xRealIP:           "../../etc/passwd",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.0.0.5",
-		},
-		{
-			name:              "non-IP entry dropped, surviving untrusted entry is the client",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "<script>, 203.0.113.9",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "203.0.113.9",
-		},
-		{
-			name:              "non-IP entry dropped, surviving entry is trusted -> walk runs out there",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "<script>, 10.0.0.6",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.0.0.6",
-		},
-		{
-			// Alone, so the drop is what decides the answer: with a real client to its
-			// right the walk would stop there and the row would pass either way.
-			name:              "IPv6 address with a zone is not a reachable client -> dropped",
-			remoteAddr:        "10.0.0.5:5000",
-			xff:               "fe80::1%eth0",
-			trustProxyHeaders: true,
-			trusted:           []string{lb},
-			want:              "10.0.0.5",
-		},
-	}
-
-	for _, tt := range tests {
+	for _, tt := range resolveClientIPCases {
 		t.Run(tt.name, func(t *testing.T) {
 			got := resolveClientIP(tt.remoteAddr, tt.xff, tt.xRealIP, tt.trustProxyHeaders, mustCIDRs(t, tt.trusted...))
 			if got != tt.want {
@@ -316,4 +324,130 @@ func TestRealIP_RewritesRemoteAddr(t *testing.T) {
 	if seen != "203.0.113.9" {
 		t.Errorf("middleware set RemoteAddr = %q, want %q", seen, "203.0.113.9")
 	}
+}
+
+// serveRealIP passes a request from peer, carrying each header's field lines in the order
+// given (one Header.Add per line), through RealIP, and returns the address the next handler
+// sees.
+func serveRealIP(t *testing.T, trustProxyHeaders bool, trusted []string, peer string, xffLines, xRealIPLines []string) string {
+	t.Helper()
+	var seen string
+	handler := RealIP(trustProxyHeaders, mustCIDRs(t, trusted...))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.RemoteAddr
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = peer
+	for _, line := range xffLines {
+		req.Header.Add("X-Forwarded-For", line)
+	}
+	for _, line := range xRealIPLines {
+		req.Header.Add("X-Real-IP", line)
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	return seen
+}
+
+// HAProxy's option forwardfor keeps the lines a client sent and adds its own line after
+// them, so the proxy's observation is the rightmost entry only when every line is read, in
+// order (#727). Peer and addresses are those of the issue's probe.
+func TestRealIP_ReadsEveryXForwardedForLine(t *testing.T) {
+	forgedThenProxy := []string{"6.6.6.6", "203.0.113.7"}
+
+	t.Run("forged line before the proxy's own line, one hop", func(t *testing.T) {
+		got := serveRealIP(t, true, nil, "10.0.0.2:5000", forgedThenProxy, nil)
+		assert.Equal(t, "203.0.113.7", got)
+	})
+
+	t.Run("forged line before the proxy's own line, peer listed as trusted", func(t *testing.T) {
+		got := serveRealIP(t, true, []string{"10.0.0.2"}, "10.0.0.2:5000", forgedThenProxy, nil)
+		assert.Equal(t, "203.0.113.7", got)
+	})
+
+	t.Run("client entry on an earlier line than a trusted hop's", func(t *testing.T) {
+		// A CDN appended its client to the client's own line; HAProxy then added the CDN's
+		// edge address on a line of its own.
+		got := serveRealIP(t, true, []string{lbRange, cdnRange}, "10.0.0.5:5000",
+			[]string{"6.6.6.6, 203.0.113.9", "198.51.100.7"}, nil)
+		assert.Equal(t, "203.0.113.9", got)
+	})
+
+	t.Run("client entry on an earlier line, a trusted hop on each later line", func(t *testing.T) {
+		got := serveRealIP(t, true, []string{lbRange, cdnRange}, "10.0.0.5:5000",
+			[]string{"203.0.113.9", "198.51.100.7", "10.0.0.6"}, nil)
+		assert.Equal(t, "203.0.113.9", got)
+	})
+}
+
+// A value split over several field lines resolves exactly as it does on one line (RFC 9110
+// §5.3): each X-Forwarded-For row of the resolution table, sent with its value split at
+// every comma, expects the row's own result.
+func TestRealIP_SplitXForwardedForResolvesAsOneLine(t *testing.T) {
+	for _, tt := range resolveClientIPCases {
+		if tt.xff == "" {
+			continue
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			var xRealIPLines []string
+			if tt.xRealIP != "" {
+				xRealIPLines = []string{tt.xRealIP}
+			}
+			got := serveRealIP(t, tt.trustProxyHeaders, tt.trusted, tt.remoteAddr,
+				strings.Split(tt.xff, ","), xRealIPLines)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// X-Real-IP holds one address and RFC 9110 §5.3 forbids repeating a field that is not a
+// list, so two lines mean one of them did not come from the proxy: both are ignored and the
+// peer is used, as for a value that is not an IP address.
+func TestRealIP_RepeatedXRealIPIsIgnored(t *testing.T) {
+	t.Run("two lines, no X-Forwarded-For, one hop", func(t *testing.T) {
+		got := serveRealIP(t, true, nil, "10.0.0.5:5000", nil, []string{"6.6.6.6", "203.0.113.9"})
+		assert.Equal(t, "10.0.0.5", got)
+	})
+
+	t.Run("two lines, no X-Forwarded-For, peer listed as trusted", func(t *testing.T) {
+		got := serveRealIP(t, true, []string{lbRange}, "10.0.0.5:5000", nil, []string{"6.6.6.6", "203.0.113.9"})
+		assert.Equal(t, "10.0.0.5", got)
+	})
+
+	t.Run("two identical lines are still two", func(t *testing.T) {
+		got := serveRealIP(t, true, nil, "10.0.0.5:5000", nil, []string{"203.0.113.9", "203.0.113.9"})
+		assert.Equal(t, "10.0.0.5", got)
+	})
+
+	t.Run("one line resolves to its address", func(t *testing.T) {
+		got := serveRealIP(t, true, nil, "10.0.0.5:5000", nil, []string{"203.0.113.9"})
+		assert.Equal(t, "203.0.113.9", got)
+	})
+
+	t.Run("a valid X-Forwarded-For wins over one X-Real-IP line", func(t *testing.T) {
+		got := serveRealIP(t, true, nil, "10.0.0.5:5000", []string{"203.0.113.7"}, []string{"6.6.6.6"})
+		assert.Equal(t, "203.0.113.7", got)
+	})
+
+	t.Run("a valid X-Forwarded-For wins over two X-Real-IP lines", func(t *testing.T) {
+		got := serveRealIP(t, true, nil, "10.0.0.5:5000", []string{"203.0.113.7"}, []string{"6.6.6.6", "7.7.7.7"})
+		assert.Equal(t, "203.0.113.7", got)
+	})
+}
+
+// With TRUST_PROXY_HEADERS off no header is read, however many lines it comes on.
+func TestRealIP_TrustOffIgnoresEveryLine(t *testing.T) {
+	t.Run("several X-Forwarded-For lines", func(t *testing.T) {
+		got := serveRealIP(t, false, nil, "203.0.113.9:44321", []string{"6.6.6.6", "7.7.7.7"}, nil)
+		assert.Equal(t, "203.0.113.9", got)
+	})
+
+	t.Run("several X-Real-IP lines", func(t *testing.T) {
+		got := serveRealIP(t, false, nil, "203.0.113.9:44321", nil, []string{"6.6.6.6", "7.7.7.7"})
+		assert.Equal(t, "203.0.113.9", got)
+	})
+
+	t.Run("one X-Real-IP line", func(t *testing.T) {
+		got := serveRealIP(t, false, nil, "203.0.113.9:44321", nil, []string{"6.6.6.6"})
+		assert.Equal(t, "203.0.113.9", got)
+	})
 }

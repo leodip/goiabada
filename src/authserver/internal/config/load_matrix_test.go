@@ -1296,3 +1296,24 @@ func TestLoad_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
 		t.Errorf("got %d records loading a clean environment, want none: %v", len(records), capture.Text())
 	}
 }
+
+// TestLoad_TrustProxyHeadersHelpNamesTheHeadersRead: the switch's help named True-Client-IP,
+// which the real-IP middleware never reads, a header a CDN can pass through from the client
+// untouched. It names what is read, X-Forwarded-For, and X-Real-IP after it, read only when
+// X-Forwarded-For has no address (#727).
+func TestLoad_TrustProxyHeadersHelpNamesTheHeadersRead(t *testing.T) {
+	fs, _ := loadMatrix(t, nil, nil)
+
+	f := fs.Lookup("authserver-trust-proxy-headers")
+	if f == nil {
+		t.Fatal("authserver-trust-proxy-headers is not registered")
+	}
+	if strings.Contains(f.Usage, "True-Client-IP") {
+		t.Errorf("help %q names True-Client-IP, which is not read", f.Usage)
+	}
+	xff := strings.Index(f.Usage, "X-Forwarded-For")
+	xRealIP := strings.Index(f.Usage, "X-Real-IP")
+	if xff < 0 || xRealIP < 0 || xff > xRealIP {
+		t.Errorf("help %q does not name X-Forwarded-For, then X-Real-IP", f.Usage)
+	}
+}

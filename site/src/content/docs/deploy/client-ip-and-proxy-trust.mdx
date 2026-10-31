@@ -117,7 +117,7 @@ Leave the lists empty. The lists that come to mind for a cluster both go wrong: 
 
 A pod that calls the `goiabada-authserver` or `goiabada-adminconsole` Service directly, around Envoy, can send any `X-Forwarded-For` it likes. No list stops that, since Envoy's pods are pods too. A NetworkPolicy admitting only Envoy does: see [Who can reach Goiabada](/deploy/kubernetes/security/#who-can-reach-goiabada).
 
-Behind [any other routing](/deploy/kubernetes/routing/), the manifest trusts one hop too. That's right behind a routing layer that appends the address it received each connection from, as Envoy and Traefik do. [The client's address](/deploy/kubernetes/routing/#the-clients-address) has how to check which address Goiabada sees.
+Behind [any other routing](/deploy/kubernetes/routing/), the manifest trusts one hop too. That's right behind a routing layer that appends the address it received each connection from, as Envoy, Traefik and HAProxy do. [The client's address](/deploy/kubernetes/routing/#the-clients-address) has how to check which address Goiabada sees.
 
 ### A second proxy hop
 
@@ -141,9 +141,9 @@ With `TRUST_PROXY_HEADERS` off, the default, the client is the address that conn
 
 ### One hop
 
-With `TRUST_PROXY_HEADERS` on and `TRUSTED_PROXIES` empty, the client is the rightmost `X-Forwarded-For` entry, or `X-Real-IP` when there's no `X-Forwarded-For`. An entry that isn't an IP address is skipped.
+With `TRUST_PROXY_HEADERS` on and `TRUSTED_PROXIES` empty, the client is the rightmost `X-Forwarded-For` entry, taken across all the header's lines in order, or `X-Real-IP` when there's no `X-Forwarded-For`. An entry that isn't an IP address is skipped.
 
-That's sound behind one proxy that sets or appends `X-Forwarded-For`, as Nginx, Envoy and Cloudflare do: the rightmost entry is the address that proxy received the connection from, and anything the client sent sits to its left.
+That's sound behind one proxy that sets or appends `X-Forwarded-For`, as Nginx, Envoy, Cloudflare and HAProxy (`option forwardfor`) do: the rightmost entry is the address that proxy received the connection from, and anything the client sent sits to its left, on the same line or an earlier one.
 
 What one hop doesn't survive is a caller that reaches Goiabada **without passing the proxy**. It connects directly, sends any `X-Forwarded-For` it likes, and chooses the address it's rate limited and audited under. No setting can tell that caller from the proxy, which is why each setup above closes the ports instead.
 

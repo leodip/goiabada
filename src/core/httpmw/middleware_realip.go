@@ -31,13 +31,23 @@ import (
 //   - true, trustedProxies set (the ranges ParseTrustedProxies returns): the
 //     forwarded chain is walked from the right, crossing only trusted hops,
 //     which is spoof-resistant across multiple proxies / a CDN.
+//
+// X-Forwarded-For is read across every field line it arrives on, joined in
+// order into one list, as RFC 9110 §5.3 lets a recipient combine a list field.
+// A proxy that adds its own line after the client's, as HAProxy's option
+// forwardfor does, therefore still writes the rightmost entry, and a value split
+// over several lines resolves as it would on one. X-Real-IP holds one address:
+// sent on more than one line it is ignored, and the peer used when
+// X-Forwarded-For has no address, as for a value that is not an IP address. A
+// field that is not a list must not be repeated, so one of the lines did not
+// come from the proxy.
 func RealIP(trustProxyHeaders bool, trustedProxies []*net.IPNet) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.RemoteAddr = resolveClientIP(
 				r.RemoteAddr,
-				r.Header.Get("X-Forwarded-For"),
-				r.Header.Get("X-Real-IP"),
+				strings.Join(r.Header.Values("X-Forwarded-For"), ", "),
+				singleFieldLine(r.Header, "X-Real-IP"),
 				trustProxyHeaders,
 				trustedProxies,
 			)
@@ -46,8 +56,18 @@ func RealIP(trustProxyHeaders bool, trustedProxies []*net.IPNet) func(next http.
 	}
 }
 
+// singleFieldLine returns the value of a header that must come on one field
+// line, or "" when it is absent or arrives on more than one.
+func singleFieldLine(h http.Header, name string) string {
+	if values := h.Values(name); len(values) == 1 {
+		return values[0]
+	}
+	return ""
+}
+
 // resolveClientIP determines the client IP from the unspoofable socket peer, the
-// X-Forwarded-For / X-Real-IP headers, and the set of trusted proxies.
+// X-Forwarded-For value (every field line, joined in order) and the X-Real-IP
+// value (its one field line), and the set of trusted proxies.
 //
 // A client controls the left of the X-Forwarded-For chain; the proxies you
 // control append on the right. So trust flows from the socket peer (the right)
